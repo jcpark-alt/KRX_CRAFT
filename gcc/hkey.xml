@@ -1,0 +1,671 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"
+xmlns:ev="http://www.w3.org/2001/xml-events"
+xmlns:w2="http://www.inswave.com/websquare"
+xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_screenName="단축키 관련 함수" meta_screenId="$c.hkey" meta_desc="단축키 관련 함수를 생성한다.">
+		<w2:type>COMMON</w2:type>
+		<w2:buildDate/>
+		<w2:MSA/>
+		<xf:model>
+			<w2:dataCollection baseNode="map">
+			</w2:dataCollection>
+			<w2:workflowCollection/>
+		</xf:model>
+		<w2:layoutInfo/>
+		<w2:publicInfo method="scwin.init,scwin.isUseShortCut,scwin.setEventPause,scwin.setShortKey,scwin.setCkEditorShortKeyDownAction,scwin.addEvent,scwin.keyToken,scwin.delEvent"/>
+		<script lazy="false" type="text/javascript"><![CDATA[
+
+// =============================================================================
+// 웹 브라우저 단축키가 동작하지 않도록 설정함 (true : 동작, false : 미동작)
+scwin.IS_USE_BROWSER_SHORTCUT = true;
+
+scwin.onpageload = function () {
+
+};
+
+/**
+ * @method
+ * @name init
+ * @description 사용자 지정 단축키 기능을 초기화한다.
+ * @hidden N
+ * @exception 
+ */
+scwin.init = function () {
+    try {
+        const dataListCreationOpt = {
+            id: "dlt_shortcutList",
+            type: "dataList",
+            option: {
+                "baseNode": "list",
+                "repeatNode": "map",
+                "saveRemovedData": "true"
+            },
+            columnInfo: [
+                { "id": "SHORTCUT_SEQ", "dataType": "text", "name": "단축키순번" },
+                { "id": "PROGRAM_CD", "dataType": "text", "name": "프로그램코드" },
+                { "id": "COMPLEX_KEY", "dataType": "text", "name": "복합키" },
+                { "id": "LAST_KEY", "dataType": "text", "name": "단축키" },
+                { "id": "EVENT_TYPE", "dataType": "text", "name": "이벤트타입" },
+                { "id": "EVENT_TARGET", "dataType": "text", "name": "이벤트타겟" },
+                { "id": "EVENT_DETAIL", "dataType": "text", "name": "이벤트설명" },
+                { "id": "EVENT_YN", "dataType": "text", "name": "사용여부" },
+                { "id": "EVENT_NAME", "dataType": "text", "name": "이벤트명" }
+            ]
+        };
+
+        $p.data.create(dataListCreationOpt);
+        $c.hkey.dataList = $p.getComponentById("dlt_shortcutList");
+        const shortcutTargetElement = document;
+        if (shortcutTargetElement.addEventListener) {
+            shortcutTargetElement.addEventListener('keydown', scwin.__keydownEvent);
+        } else if (shortcutTargetElement.attachEvent) {
+            shortcutTargetElement.attachEvent('keydown', scwin.__keydownEvent);
+        }
+    } catch (ex) {
+        console.error(ex);
+    }
+};
+
+/**
+ * @method
+ * @name isUseShortCut
+ * @description 단축키 사용 여부를 설정한다.
+ * @param {String} shortcutFlag 단축키 사용 여부 (Y: 사용 , N: 미사용)
+ * @hidden N
+ * @exception 
+ */
+scwin.isUseShortCut = function (shortcutFlag) {
+    try {
+        if (shortcutFlag == "Y") {
+            scwin.loadingEvent = "Y";
+            document.onkeydown = scwin.__checkEvent;
+        } else {
+            scwin.loadingEvent = "N";
+            document.onkeydown = null;
+        }
+    } catch (ex) {
+        console.error(ex);
+    }
+};
+
+/**
+ * @method
+ * @name setEventPause
+ * @description 컴포넌트에 설정된 이벤트를 중지시킨다.
+ * @param {String} _targetComp : 설정 컴포넌트 객체ID
+ * @param {Boolean} _flag : 이벤트 설정 여부 값 [default: false(실행), true(중지)]
+ * @param {Object} _eventList : 중지 이벤트 리스트 값(배열) [default:null (모든 이벤트)]
+ * @hidden N
+ * @exception 
+ */
+scwin.setEventPause = function (_targetComp, _flag, _eventList) {
+    try {
+        const comp = $p.getComponentById(_targetComp);
+        const flag = WebSquare.util.getBoolean(_flag);
+        const eventList = typeof _eventList != "undefined" ? _eventList : null;
+        if (typeof comp == "undefined")
+            return -1;
+
+        if (comp.options.pluginName == "dataList") {
+            comp.setBroadcast(flag);
+
+            if (flag) {
+                comp.broadcast({
+                    "linkedDataList": ["notifyDataChanged"],
+                    "gridView": ["notifyDataChanged"],
+                    "generalComp": "both"
+                });
+            }
+
+            comp.setEventPause(eventList, flag);
+            for (let i in comp.childCompHash) {
+                const childComp = $c.util.getObject(comp.childCompHash[i].id);
+                if (typeof childComp != "undefined") {
+                    childComp.setEventPause(eventList, flag);
+                }
+            }
+
+            for (let i in comp.refCompHash) {
+                const refComp = $c.util.getObject(comp.refCompHash[i].id);
+                if (typeof refComp != "undefined") {
+                    refComp.setEventPause(eventList, flag);
+                }
+            }
+        } else {
+            comp.setEventPause(eventList, !flag);
+        }
+    } catch (ex) {
+        console.error(ex);
+    }
+};
+
+/**
+ * @method
+ * @name setShortKey
+ * @description 단축키 데이터를 조회하기 위한 Submission을 생성한다.
+ * 
+ * $c.hkey.setShortKey 함수에서는 단축키 데이터 로딩을 위한 Submssion(_sbm_selectShortcutList)을 생성만 한다.
+ * Submssion(_sbm_selectShortcutList)의 실행은 config.xml의 pageFrame > postScript에 정의된 $c.win.processCommonData 함수에서 실행한다.
+ * @param {Object} frame 화면 scope정보가 담긴 객체
+ * @hidden N
+ * @exception 
+ */
+scwin.setShortKey = function (frame) {
+    let frameP = null;
+    if (typeof frame === "object") {
+        frameP = frame.$p;
+    } else {
+        frameP = $p;
+    }
+
+    // login 화면인지 chk, login 화면은 단축키를 설정하지 않는다.
+    const loginDisplay = frameP.getParentWindow().scwin.loginChk
+    if (loginDisplay && loginDisplay === 'login.xml') {
+        return false;
+    } else {
+        const programCd = $c.win.getProgramId(frameP);
+        const programShortKeyInfo = $c.data.getMatchedJSON($c.hkey.dataList, { columnId: "PROGRAM_CD", operator: "==", value: programCd });
+
+        if (!$c.util.isEmpty(programCd) && $c.util.isEmpty(programShortKeyInfo) && (programShortKeyInfo.length === 0)) {
+            const searchCodeGrpOption = {
+                id: "_sbm_selectShortcutList", action: "/main/selectShortcutList",
+                target: '', method: "post",
+                mediatype: "application/json", mode: "asynchronous", isProcessMsg: false,
+                submitDoneHandler: function (e) {
+                    const rsMsg = e.responseJSON.rsMsg;
+
+                    if (rsMsg.statusCode == $c.sbm.getMessageCode('STATUS_SUCCESS')) {
+                        $c.hkey.dataList.setJSON(e.responseJSON.dlt_shortcutList, true);
+                    }
+                }
+            };
+
+            const param = {
+                dma_shortcut: {
+                    PROGRAM_CD: programCd
+                }
+            };
+
+            $c.sbm.create(searchCodeGrpOption);
+
+            const subObj = $c.util.getComponent("_sbm_selectShortcutList");
+            subObj.setRequestData(param);
+        }
+    }
+};
+
+/**
+ * @method
+ * @name setCkEditorShortKeyDownAction
+ * @description 
+ * CkEditor4 (iframe) 내의 Document 객체에 keyDown 이벤트를 바인딩 시킨다.
+ * $c.hkey.setCKEditorShortKeyDownAction 함수는 CkEditor를 포함한 화면 오픈 시 호출해야 한다.
+ * 
+ * @hidden N
+ * @exception 
+ */
+scwin.setCkEditorShortKeyDownAction = function () {
+    $p.setTimeout(function () {
+        const chkEditorIframe = $p.$(".cke_wysiwyg_frame");
+        for (let i = 0; i < chkEditorIframe.length; i++) {
+            const iframeTargetElement = chkEditorIframe[i].contentWindow.document;
+
+            if (iframeTargetElement.addEventListener) {
+                iframeTargetElement.addEventListener('keydown', scwin.__keydownEvent);
+            } else if (iframeTargetElement.attachEvent) {
+                iframeTargetElement.attachEvent('keydown', scwin.__keydownEvent);
+            }
+        }
+    }, { delay: 1000, key: "ckEditorKeyDownEventBindingTimer" });
+};
+
+// 단축키 이벤트가 로딩 되었는지 여부 설정
+scwin.loadingEvent = 'Y';
+
+/**
+ * @method
+ * @name __keydownEvent
+ * @description 단축키 keydownEvent
+ * @param {Object} e 이벤트 객체
+ * @hidden Y
+ * @exception
+ * @example
+ */
+scwin.__keydownEvent = function (e) {
+    if (scwin.loadingEvent == "Y") {
+        scwin.__checkEvent(e);
+    };
+};
+
+
+/**
+ * @method
+ * @name __checkEvent
+ * @description 단축키를 이벤트를 확인한다.
+ * @param {Object} e 이벤트 객체
+ * @hidden Y
+ * @exception
+ * @example
+ */
+scwin.__checkEvent = function (e) {
+    try {
+        let lastKey = e.key || e.keyCode || e.which;
+        let complexKey = "";
+
+        if ($c.util.isEmpty(lastKey)) {
+            return;
+        }
+
+        if (e.ctrlKey && e.altKey) {
+            complexKey = "ctrlAltKey";
+        } else if (e.ctrlKey && e.shiftKey) {
+            complexKey = "ctrlShiftKey";
+        } else if (e.altKey && e.shiftKey) {
+            complexKey = "altShiftKey";
+        } else {
+            if (e.altKey) {
+                complexKey = "altKey";
+            } else if (e.ctrlKey) {
+                complexKey = "ctrlKey";
+            } else if (e.shiftKey) {
+                complexKey = "shiftKey";
+            } else {
+                complexKey = "singleKey";
+            }
+        }
+
+        // Ctrl, Alt, Shift가 아닌 lastKey가 인식될 경우
+        if (lastKey != "Control" && lastKey != "Alt" && lastKey != "Shift") {
+
+            // IE 브라우저에서 e.key 값이 정상적으로 로딩되지 안는 경우에 브라우저 단축키 처리
+            if ((typeof lastKey === "number") || (lastKey === "Unidentified")) {
+                if (e.keyCode >= 112 && e.keyCode <= 123) {
+                    const f_number = ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12"];
+                    lastKey = f_number[e.keyCode - 112];
+                } else if (e.keyCode == 9) {
+                    lastKey = "Tab";
+                } else if (e.keyCode == 27) {
+                    lastKey = "Escape";
+                } else if (e.keyCode == 187) {
+                    lastKey = "=";
+                } else if (e.keyCode == 189) {
+                    lastKey = "-";
+                } else {
+                    lastKey = String.fromCharCode(e.keyCode).toUpperCase();
+                }
+            }
+
+            if (scwin.__isPreventKey(complexKey, lastKey)) {
+                scwin.__runEvent(complexKey, lastKey);
+
+                // 운영 환경에서 브라우저 단축키의 동작을 정지 시킴
+                if (scwin.IS_USE_BROWSER_SHORTCUT === false) {
+
+                    // IE에서 F1 Key 동작 중지
+                    if ('onhelp' in window) {
+                        window.onhelp = function () {
+                            return false;
+                        }
+                    }
+
+                    if (e.preventDefault) {
+                        e.preventDefault();
+                    } else if (e.returnValue) {
+                        e.returnValue = false;
+                    }
+                }
+            }
+        }
+    } catch (ex) {
+        console.error(ex);
+    }
+};
+
+/**
+ * @method
+ * @name __runEvent
+ * @description 단축키를 실행한다.
+ * @param {String} complexKey 복합키 정보 (alt, shift, ctrl)
+ * @param {String} eventKey 이벤트 키 값
+ * @returns {boolean} successFlag의 boolean 값
+ * @hidden Y
+ * @exception
+ * @example
+ */
+scwin.__runEvent = function (complexKey, eventKey) {
+    try {
+        scwin.__runGlobalEvent(complexKey, eventKey);
+
+        const charCode = eventKey.charCodeAt(0);
+        if ((charCode == 13) || (charCode == 39)) {
+            return;
+        }
+
+        const checkShortcut = {};
+        const programCd = "";
+        eventKey = eventKey.toUpperCase();
+
+        const scopeApi = window.$p
+        const activeWindowInfo = $c.win.getActiveWindowInfo(scopeApi);
+        const findframe = activeWindowInfo["window"]; // 단축키가 감지된 프레임
+
+        let searchEvent = $c.data.getMatchedJSON($c.hkey.dataList, [
+            { columnId: "PROGRAM_CD", operator: "==", value: activeWindowInfo["programCd"], logical: "&&" },
+            { columnId: "COMPLEX_KEY", operator: "==", value: complexKey, logical: "&&" },
+            { columnId: "LAST_KEY", operator: "==", value: eventKey, logical: "&&" }
+        ]);
+
+        if (typeof searchEvent == "undefined" || searchEvent.length == 0) {
+            searchEvent = $c.data.getMatchedJSON($c.hkey.dataList, [
+                { columnId: "PROGRAM_CD", operator: "==", value: 'TOP', logical: "&&" },
+                { columnId: "COMPLEX_KEY", operator: "==", value: complexKey, logical: "&&" },
+                { columnId: "LAST_KEY", operator: "==", value: eventKey, logical: "&&" }
+            ]);
+        }
+
+        if (typeof searchEvent != "undefined" && searchEvent.length > 0) {
+            const shortuctObj = searchEvent[0];
+            if (shortuctObj["EVENT_TYPE"] === "F") {
+                if (shortuctObj["EVENT_YN"] == "Y") {
+                    const funcTokenArr = shortuctObj["EVENT_TARGET"].split(".");
+                    let runFunction = findframe;
+                    if (funcTokenArr.length > 0) {
+                        for (let i = 0; i < funcTokenArr.length; i++) {
+                            runFunction = runFunction[funcTokenArr[i].trim()];
+                        }
+                    } else {
+                        runFunction = false;
+                    }
+
+                    if (typeof runFunction == "function") {
+                        runFunction();
+                    }
+                }
+            } else if (shortuctObj["EVENT_TYPE"] === "B") {
+                if (shortuctObj["EVENT_YN"] == "Y") {
+                    const runComponent = findframe.$p.getComponentById(shortuctObj["EVENT_TARGET"].trim());
+                    if (runComponent) {
+                        runComponent.trigger("click");
+                    }
+                }
+            }
+        }
+        $c.hkey.dataList.removeColumnFilterAll();
+    } catch (ex) {
+        console.error(ex);
+    }
+};
+
+/**
+ * @method
+ * @name addEvent
+ * @description 단축키를 추가한다.
+ * @param {Object} object 단축키 추가 정보 객체
+ * @returns {boolean} successFlag의 boolean 값
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.addEvent = function (object) {
+    const successFlag = false;
+    try {
+        const programCd = (object["PROGRAM_CD"] || "");
+        const keyCodeObj = scwin.keyToken(object.shortCutKey.toUpperCase());
+        const eventTarget = (object["EVENT_TARGET"] || "");
+        const eventName = (object["EVENT_NAME"] || "");
+        const eventDetail = (object["EVENT_DETAIL"] || "");
+        const eventType = (object["EVENT_TYPE"].toUpperCase() == "B" || object["EVENT_TYPE"].toUpperCase() == "BUTTON") ? "B" : "F";
+        const eventYn = (object["EVENT_YN"] || "Y");
+        if (programCd == "" || eventTarget == "") {
+            return false;
+        } else {
+            const isKey = $c.data.getMatchedJSON($c.hkey.dataList.getID(), [
+                { columnId: "PROGRAM_CD", operator: "==", value: object["PROGRAM_CD"], logical: "&&" },
+                { columnId: "COMPLEX_KEY", operator: "==", value: keyCodeObj["COMPLEX_KEY"], logical: "&&" },
+                { columnId: "LAST_KEY", operator: "==", value: keyCodeObj["LAST_KEY"].toUpperCase(), logical: "&&" },
+            ]);
+
+            if (isKey.length > 0) {
+                const index = $c.hkey.dataList.getRealRowIndex(0);
+                $c.hkey.dataList.setRowJSON(index, {
+                    "PROGRAM_CD": programCd,
+                    "COMPLEX_KEY": keyCodeObj["COMPLEX_KEY"],
+                    "LAST_KEY": keyCodeObj["LAST_KEY"],
+                    "EVENT_TARGET": eventTarget,
+                    "EVENT_NAME": eventName,
+                    "EVENT_DETAIL": eventDetail,
+                    "EVENT_TYPE": eventType,
+                    "EVENT_YN": eventYn
+                }, true);
+            } else {
+                const insertIdx = $c.hkey.dataList.insertRow();
+                $c.hkey.dataList.setRowJSON(insertIdx, {
+                    "PROGRAM_CD": programCd,
+                    "COMPLEX_KEY": keyCodeObj["COMPLEX_KEY"],
+                    "LAST_KEY": keyCodeObj["LAST_KEY"],
+                    "EVENT_TARGET": eventTarget,
+                    "EVENT_NAME": eventName,
+                    "EVENT_DETAIL": eventDetail,
+                    "EVENT_TYPE": eventType,
+                    "EVENT_YN": eventYn
+                }, true);
+            }
+            $c.hkey.dataList.removeColumnFilterAll();
+            return true;
+        }
+    } catch (ex) {
+        console.error(ex);
+    }
+
+    return WebSquare.util.getBoolean(successFlag);
+};
+
+/**
+ * @method
+ * @name keyToken
+ * @description 키 토큰
+ * @param {String} keyCode 입력한 키의 Code 값
+ * @returns {Object} 입력된 키의 복합키와 조합키 객체
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.keyToken = function (keyCode) {
+    try {
+        const rtnVal = {
+            "COMPLEX_KEY": "",
+            "LAST_KEY": ""
+        };
+        const token = keyCode.split("+");
+
+        let firstKey, secondKey, lastKey;
+
+        if (token.length > 2) {
+            firstKey = token[0].toUpperCase();
+            secondKey = token[1].toUpperCase();
+            lastKey = isNaN(Number(token[2])) ? token[2] : "NUM" + token[2];
+            if (firstKey == "ALT") {
+                rtnVal["COMPLEX_KEY"] = "altShiftKey";
+                rtnVal["LAST_KEY"] = lastKey;
+            } else if (firstKey == "CTRL") {
+                if (secondKey == "SHIFT") {
+                    rtnVal["COMPLEX_KEY"] = "ctrlShiftKey";
+                    rtnVal["LAST_KEY"] = lastKey;
+                } else {
+                    rtnVal["COMPLEX_KEY"] = "ctrlAltKey";
+                    rtnVal["LAST_KEY"] = lastKey;
+                }
+            }
+        } else if (token.length == 2) {
+            firstKey = token[0].toUpperCase();
+            lastKey = isNaN(Number(token[1])) ? token[1] : "NUM" + token[1];
+            if (firstKey == "CTRL" || firstKey == "CTRLKEY") {
+                rtnVal["COMPLEX_KEY"] = "ctrlKey";
+                rtnVal["LAST_KEY"] = lastKey;
+            } else if (firstKey == "ALT" || firstKey == "ALTKEY") {
+                rtnVal["COMPLEX_KEY"] = "altKey";
+                rtnVal["LAST_KEY"] = lastKey;
+            } else if (firstKey == "SHIFT" || firstKey == "SHIFTKEY") {
+                rtnVal["COMPLEX_KEY"] = "shiftKey";
+                rtnVal["LAST_KEY"] = lastKey;
+            } else if (firstKey == "ALTSHIFTKEY") {
+                rtnVal["COMPLEX_KEY"] = "altShiftKey";
+                rtnVal["LAST_KEY"] = lastKey;
+            } else if (firstKey == "CTRLSHIFTKEY") {
+                rtnVal["COMPLEX_KEY"] = "ctrlShiftKey";
+                rtnVal["LAST_KEY"] = lastKey;
+            } else if (firstKey == "CTRLALTKEY") {
+                rtnVal["COMPLEX_KEY"] = "ctrlAltKey";
+                rtnVal["LAST_KEY"] = lastKey;
+            } else {
+                rtnVal["COMPLEX_KEY"] = "singleKey";
+                rtnVal["LAST_KEY"] = lastKey;
+            }
+        } else {
+            lastKey = isNaN(Number(token[0])) ? token[0] : "NUM" + token[0];
+            rtnVal["COMPLEX_KEY"] = "singleKey";
+            rtnVal["LAST_KEY"] = lastKey;
+        }
+        return rtnVal;
+    } catch (ex) {
+        console.error(ex);
+    }
+};
+
+/**
+ * @method
+ * @name delEvent
+ * @description 단축키 등록 삭제 함수
+ * @param {string} keyCode keyCode 값
+ * @param {Object} options options값이 들어있는 객체
+ * @returns {boolean} rtnValue 값, 삭제 여부
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.delEvent = function (keyCode, options) {
+    let rtnVal = true;
+    try {
+        if (keyCode.lastIndexOf("+") > 0) {
+            keyCode = keyCode.toUpperCase();
+            const _idx = keyCode.lastIndexOf("+");
+            let lastKey = keyCode.slice(_idx + 1).toUpperCase();
+            const complexKey = keyCode.slice(0, _idx);
+            let complexKeyArr = "";
+            if (!isNaN(Number(lastKey))) {
+                lastKey = "NUM" + lastKey;
+            }
+
+            if (complexKey == "ALT" || complexKey == "ALTKEY") {
+                complexKeyArr = "altKey";
+            } else if (complexKey == "CTRL" || complexKey == "CTRLKEY") {
+                complexKeyArr = "ctrlKey";
+            } else if (complexKey == "SHIFT" || complexKey == "SHIFTKEY") {
+                complexKeyArr = "shiftKey";
+            } else if (complexKey == "ALT+SHIFT" || complexKey == "ALTSHIFTKEY") {
+                complexKeyArr = "altShiftKey";
+            } else if (complexKey == "CTRL+SHIFT" || complexKey == "CTRLSHIFTKEY") {
+                complexKeyArr = "ctrlShiftKey";
+            } else if (complexKey == "CTRL+ALT" || complexKey == "CTRLALTKEY") {
+                complexKeyArr = "ctrlAltKey";
+            } else if (complexKey == "SINGLE" || complexKey == "SINGLEKEY") {
+                complexKeyArr = "singleKey";
+            }
+
+            const isKey = $c.data.getMatchedJSON($c.hkey.dataList.getID(), [
+                { columnId: "PROGRAM_CD", operator: "==", value: options["PROGRAM_CD"], logical: "&&" },
+                { columnId: "COMPLEX_KEY", operator: "==", value: complexKeyArr, logical: "&&" },
+                { columnId: "LAST_KEY", operator: "==", value: lastKey, logical: "&&" }
+            ]);
+
+            if (isKey.length > 0) {
+                const list = $c.hkey.dataList.getAllJSON();
+                list.forEach(function (val, idx) {
+                    const compare = (val.COMPLEX_KEY + "+" + val.LAST_KEY).toUpperCase();
+                    if (keyCode == compare && val.PROGRAM_CD == isKey[0].PROGRAM_CD) {
+                        $c.hkey.dataList.removeRow(idx);
+                    }
+                })
+            }
+            $c.hkey.dataList.removeColumnFilterAll();
+        }
+    } catch (ex) {
+        console.error(ex);
+        rtnVal = false;
+    }
+    return rtnVal;
+};
+
+/**
+ * @method
+ * @name __isPreventKey
+ * @description 단축키 실행을 막을 대상 Key인지 검사를 수행한다.
+ * @param {string} complexKey 복합키 값( alt, shift 등 )
+ * @param {string} lastKey 마지막 키 값. 복합키인 경우 조합에서 마지막으로 누르는 키
+ * @returns {boolean} 단축키 실행을 막을 대상이면 false, 아닌 경우 true
+ * @hidden Y
+ * @exception
+ * @example
+ */
+scwin.__isPreventKey = function (complexKey, lastKey) {
+    const exTag = ["INPUT", "TEXTAREA", "IFRAME"];
+    const controlKeyList = ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12", "ctrlKey", "altKey", "ctrlAltKey", "ctrlShiftKey", "altShiftKey", "Escape"];
+    const activeTag = document.activeElement.tagName;
+
+    if ((exTag.indexOf(activeTag) === -1)) {
+        if (((complexKey === "singleKey") && (lastKey === "Tab")) || ((complexKey === "shiftKey") && (lastKey === "Tab")) || ((complexKey === "singleKey") && (lastKey === "Enter"))) {
+            return false;
+        } else {
+            return true;
+        }
+    } else if ((exTag.indexOf(activeTag) > -1) && (((complexKey === "ctrlKey") && (lastKey === "A"))
+        || ((complexKey === "ctrlKey") && (lastKey === "C")) || ((complexKey === "ctrlKey") && (lastKey === "V"))
+        || ((complexKey === "ctrlKey") && (lastKey === "X")) || ((complexKey === "ctrlKey") && (lastKey === "Y"))
+        || ((complexKey === "ctrlKey") && (lastKey === "Z")) || ((complexKey === "ctrlShiftKey") && (lastKey === "Z")))) {
+        return false;
+    } else if ((controlKeyList.indexOf(complexKey) !== -1) || (controlKeyList.indexOf(lastKey) !== -1)) {
+        return true;
+    }
+};
+
+/**
+ * @method
+ * @name __runGlobalEvent
+ * @description 전역 단축키 실행 함수.
+ * @param {string} complexKey 복합키 "ctrlKey", "altKey", "ctrlAltKey", "ctrlShiftKey", "altShiftKey"
+ * @param {string} eventKey "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", 
+ * "F12", "Tab", "Escape", "0~9", "a-z", "A-Z", 특수문자(!@#~) 등
+ * @returns
+ * @hidden Y
+    * @exception
+    * @example
+    */
+scwin.__runGlobalEvent = function (complexKey, eventKey) {
+    try {
+        // F1 키를 눌렀을 때에 사용자가 정의한 스크립트만 실행되도록 하기 위해서
+        // 브라우저의 Function Key 동작을 중지키려면 scwin.IS_USE_BROWSER_SHORTCUT 속성을 false로 설정해야 한다. (기본값은 true임)
+        if (eventKey === "F1") {
+            // $c.win.alert("F1가 실행 되었습니다.");
+            // Escape Key가 입력되면 맨 마지막에 오픈된 Alert 또는 Confirm 창을 닫는다.
+        } else if (eventKey === "Escape") {
+            let popupIndex = $p.getAllPopupList().length - 1;
+            if (popupIndex > -1) {
+                for (let i = popupIndex; popupIndex >= 0; popupIndex--) {
+                    if ($p.getAllPopupList()[i].options.frameMode === "pageFrame") {
+                        let messageType = $c.data.getParameter("messageType", $p.getPopupWindow($p.getAllPopupList()[popupIndex].id).$p);
+                        if (!$c.util.isEmpty(messageType) && ((messageType === "alert") || (messageType === "confirm"))) {
+                            $p.getPopupWindow($p.getAllPopupList()[popupIndex].id).$p.closePopup();
+                        }
+                    }
+                }
+            }
+        }
+    } catch (ex) {
+        console.error(ex);
+    }
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload"/>
+</html>

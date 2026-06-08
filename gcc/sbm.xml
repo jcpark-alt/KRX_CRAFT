@@ -1,0 +1,720 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"
+xmlns:ev="http://www.w3.org/2001/xml-events"
+xmlns:w2="http://www.inswave.com/websquare"
+xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_screenName="통신 함수" meta_screenId="$c.sbm" meta_desc="통신 함수(submission 또는 ajax 통신)를 작성한다.">
+		<w2:type>COMMON</w2:type>
+		<w2:buildDate/>
+		<w2:MSA/>
+		<xf:model>
+			<w2:dataCollection baseNode="map"/>
+			<w2:workflowCollection/>
+		</xf:model>
+		<w2:layoutInfo/>
+		<w2:publicInfo method="scwin.getContextPath,scwin.__preSubmitFunction,scwin.__setActionParam,scwin.__callbackSubmitFunction,scwin.__submitErrorHandler,scwin.execute,scwin.executeDynamic,scwin.executeWorkflow,scwin.create,scwin.getResultCode,scwin.getStatusMessage,scwin.resultMsg,scwin.setAction,scwin.getServiceURL,scwin.getMessageCode,scwin.setPagingInfo"/>
+		<script lazy="false" type="text/javascript"><![CDATA[
+// 서버 통신 서비스 호출을 위한 Context Path
+scwin.CONTEXT_PATH = WebSquare.core.getConfiguration("/WebSquare/wpack/contextRoot/@value");
+
+// 서버 통신 서비스 호출을 위한 Service Url (Context Path 이하 경로)
+scwin.SERVICE_URL = "";
+
+// 서버 통신 기본 모드 ( "asynchronous" / "synchronous") - "synchronous"는 비권장 통신 방식임
+scwin.DEFAULT_OPTIONS_MODE = "asynchronous";
+
+// 서버 통신 기본 미디어 타입
+scwin.DEFAULT_OPTIONS_MEDIATYPE = "application/json";
+
+// GET Method에 대해서 RESTFul 방식으로 URL 생성되도록 하는 옵션 (true : 동작, false : 미동작)
+// RESTFul URL 생성 규칙에 관한 자세한 설명은 scwin.setActionParam 함수의 주석 참조
+scwin.IS_RESTFUL_URL = false;
+
+// 통신 상태 코드
+scwin.MESSAGE_CODE = {
+    STATUS_ERROR: "E",
+    STATUS_SUCCESS: "S",
+    STATUS_WARNING: "W",
+    STATUS_INFO: "I"
+};
+
+scwin.onpageload = function () {
+
+};
+
+/**
+ * @method
+ * @name getContextPath
+ * @description 전역으로 선언된 Context Path 값을 가져온다.
+ * @hidden N
+ * @exception 
+ * @example $c.sbm.getContextPath();
+ */
+scwin.getContextPath = function () {
+    return scwin.CONTEXT_PATH;
+};
+
+/**
+ * @method
+ * @name __preSubmitFunction
+ * @description submission의 공통 설정에서 사용.
+ * submisison 통신 직전 호출.
+ * return true일 경우 통신 수행, return false일 경우 통신 중단
+ * 
+ * @param {Object} sbmObj 서브미션 객체
+ * @returns {Boolean} 통신수행여부
+ * @hidden N
+ * @exception 
+ */
+scwin.__preSubmitFunction = function (sbmObj) {
+    if (($c.util.isEmpty(scwin.CONTEXT_PATH) === false) && (sbmObj.action.indexOf(scwin.CONTEXT_PATH) !== 0)) {
+        sbmObj.action = scwin.CONTEXT_PATH + sbmObj.action;
+    }
+
+    // REST API 방식 처리를 위해서 GET Method에 대해서 Request 데이터를 Path Variable 치환 및 QueryString으로 생성함
+    if (scwin.IS_RESTFUL_URL === true) {
+        $c.sbm.__setActionParam(sbmObj);
+    }
+};
+
+/**
+ * @method
+ * @name __setActionParam
+ * @description
+ * REST API 방식 처리를 위해서 GET Method에 대해서 Request 데이터를 Path Variable 치환 및 QueryString으로 생성한다.
+ * 
+ * 1. Path Variable 처리 : Action에서 "/testJsonMap/{procId}/{seq}/"와 같이 Path Variable(${procId}, ${seq})을 선언할 경우, 
+ *	 해당 변수를 DataMap이나 RequestData(JSON)에 정의된 Key의 Value으로 치환한다.
+ *	 DataMap이나 RequestData(JSON) 안에 Path Variable({procId}, {seq})에 정의된 procId와 seq Key(Column)이 존재해야 한다.
+ *	 Key가 존재하지 않을 경우 Path Variable에 추가하지 않는다.
+ *	 Path Variable에 추가된 Key 값은 GET 방식일 경우 생성되는 QueryString에서 제외 시킨다.
+ *	 
+ * 2. QueryString 처리 : GET Method으로 Action을 호출할 경우, 해당 변수를 DataMap이나 RequestData(JSON)에 정의된 Key와 Value으로 치환한다.
+ *	 DataMap이나 RequestData(JSON) 안에 Path Variable({procId}, {seq})에 정의된 procId와 seq Key(Column)이 존재해야 한다.
+ *	 단 건 데이터(Map)만 QueryString으로 생성해서 서버에 전송하고, Array 형태의 데이터의 경우에는 QueryString으로 포함시키지 않는다.
+ *
+ * @param {Object} sbmObj Submission 객체
+ * @hidden N
+ * @exception 
+ * @example
+// Submission ref 정의된 DataMap의 데이터를 QueryString 방식으로 URL에 추가해서 전달하는 예제 코드
+// sbm_submission1.ref = "data:json,dma_dataMap1"
+// sbm_submission1.action = "/restful/testJsonMap2"
+// 생성된 Request URL : http://127.0.0.1:8080/restful/testJsonMap2.do?procId=PR001&subId=SB002&name=Peter&tel=010-2223-4421
+scwin.btn_search1_onclick = function(e) {
+    $c.sbm.execute(sbm_submission1);
+};
+
+// JSON 객체를 QueryString 방식으로 URL에 추가해서 전달하는 예제 코드
+// sbm_submission2.action = "/restful/testJsonMap2"
+// 생성된 Request URL : http://127.0.0.1:8080/restful/testJsonMap2.do?procId=PR001&subId=SB002&name=Peter&tel=010-2223-4421
+scwin.btn_search2_onclick = function(e) {
+    const param = {
+        procId : "PR001",
+        subId : "SB002",
+        name : "Peter",
+        tel : "010-2223-4421"
+    };
+    $c.sbm.execute(sbm_submission2, param);
+};	
+
+// ref 정의된 DataMap의 데이터를 Path Variable과 QueryString 방식을 조합해서 URL에 추가해서 전달하는 예제 코드
+// DataMap 내에 정의된 Column Id 중에서 Path Variable로 정의되지 않은 컬럼(name, tel)을 QueryString 방식으로 추가된다.
+// sbm_submission3.ref = "data:json,dma_dataMap1"
+// sbm_submission3.action = "/restful/testJsonMap3/{procId}/{subId}"
+// 생성된 Request URL : http://127.0.0.1:8080/restful/testJsonMap3/PR001/SB002?name=Peter&tel=010-2223-4421
+scwin.btn_search3_onclick = function(e) {
+    $c.sbm.execute(sbm_submission3);
+};
+ */
+scwin.__setActionParam = function (sbmObj) {
+    let requestData = sbmObj.requestData || WebSquare.ModelUtil.getRefToReqData(sbmObj);
+
+    if ($c.util.isEmpty(requestData)) {
+        return;
+    }
+
+    if (typeof requestData === "string") {
+        requestData = JSON.parse(requestData);
+    }
+
+    if ($c.util.isEmpty(sbmObj.__action)) {
+        sbmObj.__action = sbmObj.action;
+    }
+
+    let actionUrl = sbmObj.__action;
+
+    let queryParam = {};
+    if (sbmObj.__action.indexOf("/{") > -1) {
+        actionUrl = actionUrl.substr(0, actionUrl.indexOf("/{"));
+    }
+
+    // requestData를 QueryString으로 생성해서 submission.action에 추가한다.
+    if ($c.util.isJSON(requestData)) {
+
+        // DataMap에 저장된 데이터를 queryParam에 저장한다.
+        for (let key in requestData) {
+            if (($c.util.isEmpty(requestData[key]) === false) && ($c.util.isJSON(requestData[key]) === false)) {
+                queryParam[key] = encodeURIComponent(requestData[key]);
+            } else if (($c.util.isJSON(requestData[key])) && ($c.util.isArray(requestData[key]) === false)) {
+                for (let subKey in requestData[key]) {
+                    if (($c.util.isEmpty(requestData[key][subKey]) === false) && ($c.util.isJSON(requestData[key][subKey]) === false)) {
+                        queryParam[subKey] = encodeURIComponent(requestData[key][subKey]);
+                    }
+                }
+            }
+        }
+
+        // URL에 Path Variable(ex. {paramId})로 정의된 변수를 queryParam의 정의된 값으로 치환하고, queryParam에서는 제거한다.
+        // queryParam에 Path Variable과 일치하는 값이 없을 경우 Skip한다.
+        const actionArr = sbmObj.__action.split(/(\{[^}]*})/g);
+        for (let i = 0; i < actionArr.length; i++) {
+            if (actionArr[i].match(/(\{[^}]*})/g) !== null) {
+                let paramKey = actionArr[i].substr(1, actionArr[i].indexOf("}") - 1);
+                if (typeof queryParam[paramKey] !== "undefined") {
+                    actionUrl += "/" + queryParam[paramKey];
+                    delete queryParam[paramKey];
+                }
+            }
+        }
+
+        // GET Method로 전송할 경우 queryParam에 저장된 Key, Value를 QueryString으로 생성해서 Action URL에 붙인다.
+        if (sbmObj.method === "get") {
+            for (let key in queryParam) {
+                if (actionUrl.indexOf("?") === -1) {
+                    actionUrl += "?" + key + "=" + queryParam[key];
+                } else {
+                    actionUrl += "&" + key + "=" + queryParam[key];
+                }
+            }
+        }
+
+        sbmObj.action = actionUrl;
+    }
+};
+
+
+/**
+ * @method
+ * @name __callbackSubmitFunction
+ * @description 모든 submission의 defaultCallback - $c.sbm.submitErrorHandler 보다 먼저 수행됨. (400 Error) config.xml에 설정
+ * @param {Object} resObj responseData 객체
+ * @param {Object} sbmObj Submission 객체
+ * @hidden N
+ * @exception 
+ */
+scwin.__callbackSubmitFunction = function (resObj, sbmObj) {
+    const $p = $c.win.__getScope(sbmObj).scwin.$w;
+
+    // server와 연결을 할 수 없을 경우 responseStatusCode가 0으로 발생.
+    if ((resObj.responseStatusCode < 100) || (resObj.responseStatusCode > 599)) {
+        let detailStr = "HTTP STATUS INFO";
+        detailStr += resObj.responseStatusCode;
+        detailStr += " - URI:";
+        detailStr += resObj.resourceUri;
+
+        const msgObj = {
+            statusCode: "E",
+            errorCode: resObj.responseStatusCode,
+            message: "서버와 연결할 수 없습니다. 자세한 내용은 관리자에게 문의하시기 바랍니다.",
+            messageDetail: detailStr
+        };
+
+        $c.sbm.resultMsg(msgObj);
+        return false;
+    }
+
+    if ($c.util.isEmpty(resObj.errorType) && typeof sbmObj._promise_submitDoneHandler === "function") {
+        sbmObj._promise_submitDoneHandler(resObj);
+    } else if (!$c.util.isEmpty(resObj.errorType) && typeof sbmObj._promise_submitErrorHandler === "function") {
+        sbmObj._promise_submitErrorHandler(resObj);
+    }
+
+    const rsJSON = resObj.responseJSON || null;
+    if (rsJSON && rsJSON.rsMsg) {
+        $c.sbm.resultMsg(rsJSON.rsMsg);
+    }
+};
+
+/**
+ * @method
+ * @name __submitErrorHandler
+ * @description submission중 에러가 발생한 경우 호출되는 함수 - 서버 오류(500 error)
+ * @param {Object} resObj responseData 객체
+ * @hidden N
+ * @exception 
+ */
+scwin.__submitErrorHandler = function (resObj) {
+    const $p = $c.win.__getScope(resObj.id).scwin.$w;
+
+    let detailStr = "HTTP STATUS INFO";
+    detailStr += resObj.responseReasonPhrase;
+    detailStr += " ";
+    detailStr += resObj.responseStatusCode;
+    detailStr += "URI:";
+    detailStr += resObj.resourceUri;
+    detailStr += resObj.responseBody;
+
+    const msgObj = {
+        statusCode: "E",
+        errorCode: "E9998",
+        message: "서버 오류입니다. 자세한 내용은 관리자에게 문의하시기 바랍니다.",
+        messageDetail: detailStr
+    };
+
+    $c.sbm.resultMsg(msgObj);
+};
+
+
+/**
+ * @method
+ * @name execute
+ * @description 서버 통신 확장 모듈, Submission를 실행합니다.
+ * @param {Object} sbmObj submission 객체
+ * @param {Object} requestData [Default : null, JSON, XML] 요청 데이터로 submission에 등록된 ref를 무시하고 현재의 값이 할당된다.
+ * @param {Object} compObj [Default : null] 전송중 disable시킬 컴포넌트
+ * @hidden N
+ * @exception 
+ * @example
+// Submission의 ref 속성에 서버에 전송할 DataCollection을 설정하는 경우
+$c.sbm.execute(sbm_search); 
+
+//  Submission의 ref 속성에 서버에 전송할 DataCollection을 설정하지 않고 JSON 객체를 전송하는 경우
+const searchParam = {
+    id : "A0001"
+};
+$c.sbm.execute(sbm_search, searchParam); 
+ */
+scwin.execute = function (sbmObj, requestData, compObj) {
+    return new Promise(function (resolve, reject) {
+        if (typeof sbmObj === "object") {
+            const _sbmObj = (typeof sbmObj == 'object') ? sbmObj : (typeof sbmObj == 'string') ? $p.getSubmission(sbmObj) : sbmObj;
+
+            if ($c.util.isEmpty(_sbmObj.action)) {
+                const alertMsg = $c.data.getMessage("MSG_CM_00002", "action");
+                $c.win.alert(alertMsg);
+                return false;
+            }
+
+            if ($c.util.isEmpty(_sbmObj.submitDoneHandler)) {
+                _sbmObj._promise_submitDoneHandler = function (rtn) {
+                    resolve(rtn);
+                }
+            }
+
+            if ($c.util.isEmpty(_sbmObj.submitErrorHandler)) {
+                _sbmObj._promise_submitErrorHandler = function (rtn) {
+                    reject(rtn);
+                }
+            }
+
+            $p.executeSubmission(_sbmObj, requestData, compObj);
+        }
+    });
+};
+
+
+
+/**
+ * @method
+ * @name executeDynamic
+ * @description Submission를 동적으로 생성해서 실행합니다.
+ * @param {Object} options $c.sbm.create의 options 참고
+ * @param {Object} requestData 요청 데이터
+ * @param {Object} obj 전송중 disable시킬 컴퍼넌트
+ * @hidden N
+ * @exception 
+ * @example
+const searchCodeGrpOption = {
+     id : "sbm_searchCodeGrp",
+     action : "serviceId=CD0001&action=R",
+     target : 'data:json,{"id":"dlt_codeGrp","key":"data"}',
+     submitDoneHandler : scwin.searchCodeGrpCallback, isProcessMsg : false };
+$c.sbm.executeDynamic(searchCodeGrpOption);
+ */
+scwin.executeDynamic = function (options, requestData, obj) {
+    let submissionObj = $c.util.getComponent(options.id);
+
+    if (submissionObj === null) {
+        $c.sbm.create(options);
+        submissionObj = $c.util.getComponent(options.id);
+    } else {
+        $p.deleteSubmission(options.id);
+        $c.sbm.create(options);
+        submissionObj = $c.util.getComponent(options.id);
+    }
+
+    return $c.sbm.execute(submissionObj, requestData, obj);
+};
+
+/**
+ * @method
+ * @name executeWorkflow
+ * @description workflow를 실행합니다.
+ * @param {Object} workflowObj workflow 객체 or workflow 아이디
+ * @hidden N
+ * @exception 
+ * @example
+$c.sbm.executeWorkflow(wkf_basicInfo);
+ */
+scwin.executeWorkflow = function (workflowObj) {
+    $p.executeWorkflow(workflowObj);
+};
+
+
+/**
+ * @method
+ * @name create
+ * @description Submission 객체를 동적으로 생성한다.
+ * @param {Object} options Submission 생성 옵션 JSON 객체
+ * @param {String} options.id submission 객체의 ID. 통신 모듈 실행 시 필요.
+ * @param {String} options.ref 서버로 보낼(request) DataCollection의 조건 표현식.(조건에 때라 표현식이 복잡하다) 또는 Instance Data의 XPath.
+ * @param {String} options.target 서버로 응답(response) 받은 데이터가 위치 할 DataCollection의 조건 표현식. 또는 Instance Data의 XPath.
+ * @param {String} options.action 통신 할 서버 측 URI.(브라우저 보안 정책으로 crossDomain은 지원되지 않는다.)
+ * @param {String} options.method [default: get, post, urlencoded-post]
+ * - get : 파라메타를 url에 붙이는 방식 (HTML과 동일).
+ * - post : 파라메타를 body 구간에 담는 방식 (HTML과 동일)
+ * - urlencoded-post : urlencoded-post.
+ * @param {String} options.mediatype [default: application/xml, text/xml, application/json, application/x-www-form-urlencoded]
+ * application/x-www-form-urlencoded 웹 form 방식(HTML방식). application/json : json 방식. application/xml : XML 방식. text/xml : xml방식
+ * (두 개 차이는 http://stackoverflow._com/questions/4832357 참조)
+ * @param {String} options.mode [default: synchronous, synchronous] 서버와의 통신 방식.  asynchronous:비동기식.  synchronous:동기식
+ * @param {String} options.encoding [default: utf-8, euc-kr, utf-16] 서버 측 encoding 타입 설정 (euc-kr/utf-16/utf-8)
+ * @param {String} options.replace [default: none, all, instance] action으로부터 받은 response data를 적용 구분 값.
+ *   - all : 문서 전체를 서버로부터 온 응답데이터로 교체.
+ *   - instance : 해당되는 데이터 구간.
+ *   - none : 교체안함.
+ * @param {String} options.processMsg submission 통신 중 보여줄 메세지.
+ * @param {String} options.errorHandler submission오류 발생 시 실행 할 함수명.
+ * @param {String} options.customHandler submssion호출 시 실행 할 함수명.
+ * @param {requestCallback} options.submitHandler {script type="javascript" ev:event="xforms-submit"} 에 대응하는 함수.
+ * @param {requestCallback} options.submitDoneHandler {script type="javascript" ev:event="xforms-submit-done"} 에 대응하는 함수
+ * @param {requestCallback} options.submitErrorHandler {script type="javascript" ev:event="xforms-submit-error"} 에 대응하는 함수
+ * @hidden N
+ * @exception 
+ * @example
+$c.sbm.create(options);
+ */
+scwin.create = function (options) {
+    let ref = options.ref || "";
+    let target = options.target || "";
+    let action = options.action; // ajax 서비스 요청 주소
+    let mode = options.mode || scwin.DEFAULT_OPTIONS_MODE; // asynchronous(default)/synchronous
+    let mediatype = options.mediatype || scwin.DEFAULT_OPTIONS_MEDIATYPE; // application/x-www-form-urlencoded
+    let method = (options.method || "post").toLowerCase(); // get/post/put/delete
+    let processMsg = options.processMsg || "";
+    let instance = options.instance || "none";
+
+    let submitHandler = (typeof options.submitHandler === "function") ? options.submitHandler
+        : ((typeof options.submitHandler === "string") ? (options.submitHandler.indexOf("scwin") === 0) ? $p.id + options.submitHandler : options.submitHandler : "");
+    let submitDoneHandler = (typeof options.submitDoneHandler === "function") ? options.submitDoneHandler
+        : ((typeof options.submitDoneHandler === "string") ? (options.submitDoneHandler.indexOf("scwin") === 0) ? $p.id + options.submitDoneHandler : options.submitDoneHandler : "");
+    let submitErrorHandler = (typeof options.submitErrorHandler === "function") ? options.submitErrorHandler
+        : ((typeof options.submitErrorHandler === "string") ? (options.submitErrorHandler.indexOf("scwin") === 0) ? $p.id + options.submitErrorHandler : options.submitErrorHandler : "");
+
+    let resJson = null;
+
+    if ((options.isProcessMsg === true) && (processMsg === "")) {
+        processMsg = "해당 작업을 처리중입니다";
+    } else if (options.isProcessMsg === false) {
+        processMsg = "";
+    }
+
+    const submissionObj = {
+        "id": options.id, // submission 객체의 ID. 통신 모듈 실행 시 필요.
+        "ref": ref, // 서버로 보낼(request) DataCollection의 조건 표현식.(조건에 때라 표현식이 복잡하다) 또는 Instance Data의 XPath.
+        "target": target, // 서버로 응답(response) 받은 데이터가 위치 할 DataCollection의 조건 표현식. 또는 Instance Data의 XPath.
+        "action": action, // 통신 할 서버 측 URI.(브라우저 보안 정책으로 crossDomain은 지원되지 않는다.)
+        "method": method, // [default: post, get, urlencoded-post] get:파라메타를 url에 붙이는 방식 (HTML과 동일).
+        // post:파라메타를 body 구간에 담는 방식 (HTML과 동일). urlencoded-post:urlencoded-post.
+        "mediatype": mediatype, // application/json
+        "encoding": "UTF-8", // [default: utf-8, euc-kr, utf-16] 서버 측 encoding 타입 설정 (euc-kr/utf-16/utf-8)
+        "mode": mode, // [default: synchronous, synchronous] 서버와의 통신 방식. asynchronous:비동기식. synchronous:동기식
+        "processMsg": processMsg, // submission 통신 중 보여줄 메세지.
+        "submitHandler": submitHandler,
+        "submitDoneHandler": submitDoneHandler,
+        "submitErrorHandler": submitErrorHandler
+    };
+
+    $p.createSubmission(submissionObj);
+};
+
+/**
+ * @method
+ * @name getResultCode
+ * @description 서버에서 전송한 통신 결과 코드를 반환한다.
+ * @param {Object} e submission 후 callback의 상태값
+ * @returns {String} 통신 결과 상태 코드
+ * @hidden N
+ * @exception 
+ * @example
+// 통신결과 코드가 있을 경우
+$c.sbm.getResultCode(e);
+// return 예시) E || S || W
+
+// 통신결과 코드가 없을 경우
+$c.sbm.getResultCode(e);
+// return 예시) 웹스퀘어5 로그창 - 결과 상태 메세지가 없습니다.: $c.sbm.getResultCode
+ */
+scwin.getResultCode = function (e) {
+    let rsCode = $c.sbm.getMessageCode('STATUS_ERROR');
+    try {
+        rsCode = e.responseJSON.rsMsg.statusCode;
+    } catch (ex) {
+        console.error("결과 상태 메세지가 없습니다.", ex);
+    }
+
+    return rsCode;
+};
+
+
+/**
+ * @method
+ * @name getStatusMessage
+ * @description 서버에서 전송한 통신 결과 상태 메시지를 반환한다.
+ * @param {Object} e submission 후 callback의 상태값
+ * @returns {String} 상태 메시지
+ * @hidden N
+ * @exception 
+ * @example
+const statusMessage = $c.sbm.getStatusMessage(e);
+ */
+scwin.getStatusMessage = function (e) {
+    try {
+        return e.responseJSON.rsMsg.statusMsg;
+    } catch (ex) {
+        console.error("결과 상태 메세지가 없습니다.", ex);
+        return "";
+    }
+};
+
+/**
+ * @method
+ * @name resultMsg
+ * @description statusCode값에 따라 message를 출력한다.
+ * @param {Object} resultData 상태코드값 및 메시지가 담긴 JSON.
+ * @param {String} resultData.message 메시지
+ * @param {String} resultData.statusCode 상태코드값
+ * @hidden N
+ * @exception 
+ */
+scwin.resultMsg = function (resultData) {
+    if ($c.util.isEmpty(resultData.statusCode)) {
+        return;
+    }
+
+    const message = resultData.message || resultData.statusMsg || "";
+    const msgCode = scwin.MESSAGE_CODE;
+
+    switch (resultData.statusCode) {
+        case msgCode.STATUS_ERROR:
+            if (resultData.errorCode == "E0001") {
+                const alertMsg = $c.data.getMessage("MSG_CM_00003", message);
+                $c.win.alert(alertMsg, function () { $c.win.reload(); });
+            } else if ($c.util.isEmpty(message) === false) {
+                $c.win.alert(message);
+            }
+            break;
+        case msgCode.STATUS_SUCCESS:
+            if ($c.util.isEmpty(message) === false) {
+                $c.win.showToastMessage(scwin.MESSAGE_CODE.STATUS_SUCCESS, message);
+            }
+            break;
+        case msgCode.STATUS_INFO:
+            $c.win.showToastMessage(scwin.MESSAGE_CODE.STATUS_INFO, message);
+            break;
+    }
+};
+
+/**
+ * @method
+ * @name setAction
+ * @description submission action 을 변경한다.
+ * @param {Object} sbmObj 서브미션 객체
+ * @param {String} sbmAction 서브미션 action
+ * @hidden N
+ * @exception 
+ * @example $c.sbm.setAction(sbm_search,"/cust/crgd/v1/user")
+ */
+scwin.setAction = function (sbmObj, sbmAction) {
+    try {
+        if (!$c.util.isEmpty(sbmObj)) {
+            sbmObj.isDefultSubmissionAction = null;
+            sbmObj.action = sbmAction || "";
+            sbmObj.__action = sbmAction || "";
+        }
+    } catch (ex) {
+        console.error(ex);
+    }
+};
+
+/**
+ * @method
+ * @name getServiceURL
+ * @description 전역 상수인 SERVICE_URL의 값을 가져온다.
+ * @param
+ * @returns {String} SERVICE_URL로 선언된 상수를 반환한다.
+ * @hidden N
+ * @exception
+ * @example const serviceURL = $c.sbm.getServiceURL();
+ */
+scwin.getServiceURL = function () {
+    return scwin.SERVICE_URL;
+};
+
+/**
+ * @method
+ * @name getMessageCode
+ * @description MESSAGE_CODE에서 선언된 객체에 대한 값을 반환한다.
+ * STATUS_ERROR = 'E', STATUS_SUCCESS = 'S', STATUS_WARNING = 'W', STATUS_INFO = 'I'
+ * @param {String} code MESSAGE_CODE 값 중 가져오려는 값
+ * @returns {String} MESSAGE_CODE 객체에 있는 값 중 파라미터에 대응하는 값을 반환
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.getMessageCode = function (code) {
+    return scwin.MESSAGE_CODE[code];
+};
+
+/**
+ * @method
+ * @name setPagingInfo
+ * @description 페이징 옵션(pagingInfo)을 기본값과 병합하고, 조회 DataMap(inData) 에
+ *  currentPage / recordCountPerPage 컬럼을 설정한다.
+ *  totalCnt 가 전달되면 페이지 리스트 컴포넌트(pageListComponent) 렌더링까지 수행한다.
+ *  (commonScope.js com.gfnExecute 의 페이징 옵션 + pageListComponent 처리 로직 분리)
+ * @param {Object} pagingInfo 페이징 옵션 객체 (sbmOptions.pagingInfo 가 아닌 값 자체)
+ * @param {String} inData (선택) submission inData 문자열. 조회 DataMap 컬럼 설정에 사용
+ * @param {Number} totalCnt (선택) 전체 건수. 전달 시 pageListComponent 렌더링 수행
+ * @returns {Object} 기본값이 병합된 pagingInfo (pagingInfo 미설정 시 빈 객체 {})
+ * @hidden N
+ * @exception
+ * @example
+const pagingInfo = {
+    pageType : "P",                 // S/P/A
+    pageListId : "pglList",         // 페이지 리스트 아이디
+    pageFunction : "scwin.fnSrch",  // 페이징 처리 함수
+    currentPage : 1,                // 현재 페이지
+    totalCountId : "tbxTotCnt",     // total count 출력 아이디
+    recordCountPerPage : 20         // 한 페이지에 보여줄 라인 수
+};
+// 통신 전: 기본값 병합 + DataMap 컬럼 설정
+$c.sbm.setPagingInfo(pagingInfo, "dataM=dlSearchM");
+// 통신 후: 전체 건수로 페이지 리스트 렌더링
+$c.sbm.setPagingInfo(pagingInfo, null, 135);
+ */
+scwin.setPagingInfo = function (pagingInfo, inData, totalCnt) {
+    // 페이징 옵션이 없으면 빈 객체 반환
+    if ($c.util.isEmpty(pagingInfo)) {
+        return {};
+    }
+
+    const pagingDefault = {
+        /* 필수 */
+        pageType : "",            // S/P/A
+        pageFunction : "",        // 페이징 처리 하는 함수
+        currentPage : 1,          // 현재 페이지
+
+        /* pageType:P 시 필수 */
+        pageListId : "",          // 페이지 리스트 아이디
+
+        /* pageType:S 시 필수 */
+        gridId : "",              // 그리드 아이디
+
+        /* 선택 */
+        totalCountId : "",        // total count 를 출력할 아이디
+        recordCountPerPage : "",  // 한 페이지에 보여줄 라인 수
+        pageSize : 10             // 페이징 시 출력해줄 페이지 번호 개수
+    };
+
+    pagingInfo = $c.util.assignDefined(pagingDefault, pagingInfo);
+
+    // 모바일 환경일 경우 pageSize 5로 변경
+    pagingInfo.pageSize = ($c.util.isMobile()) ? 5 : pagingInfo.pageSize;
+
+    // 조회 Map 키를 inData 첫 토큰에서 추출 (dataM=dataViewM → dataViewM)
+    if (!$c.util.isEmpty(inData)) {
+        let inDataKey = inData.split(" ")[0];
+        inDataKey = (inDataKey.split("=").length > 1) ? inDataKey.split("=")[1] : inDataKey.split("=")[0];
+
+        const inDataMap = $p.getComponentById(inDataKey);
+        if (!$c.util.isEmpty(inDataMap)) {
+            // DataMap 에 currentPage, recordCountPerPage 컬럼이 없으면 추가
+            if (typeof inDataMap.get("currentPage") === "undefined") {
+                inDataMap.addColumn({ id : "currentPage", name : "현재 페이지", dataType : "text", value : "" });
+            }
+            if (typeof inDataMap.get("recordCountPerPage") === "undefined") {
+                inDataMap.addColumn({ id : "recordCountPerPage", name : "한 페이지에 보여줄 라인 수", dataType : "text", value : "" });
+            }
+
+            inDataMap.set("currentPage", pagingInfo.currentPage);
+
+            // recordCountPerPage 결정 (옵션 지정 > Map 기존값 > 기본 10)
+            if (!$c.util.isEmpty(pagingInfo.recordCountPerPage)) {
+                inDataMap.set("recordCountPerPage", pagingInfo.recordCountPerPage);
+            } else if (!$c.util.isEmpty(inDataMap.get("recordCountPerPage"))) {
+                pagingInfo.recordCountPerPage = inDataMap.get("recordCountPerPage");
+            } else {
+                pagingInfo.recordCountPerPage = 10;
+            }
+        }
+    }
+
+    // totalCnt 가 전달되면 페이지 리스트(pageListComponent) 렌더링
+    if (!$c.util.isEmpty(totalCnt) && !$c.util.isEmpty(pagingInfo.pageListId)) {
+        const outTotalCnt = Math.ceil(totalCnt / pagingInfo.recordCountPerPage);
+        const selectCurrentPage = pagingInfo.currentPage;
+
+        pagingInfo.pageListId.split(",").forEach(function (id) {
+            const pageListComponent = $p.getComponentById(id);
+            if ($c.util.isEmpty(pageListComponent)) return;
+
+            pageListComponent.setPageSize(pagingInfo.pageSize);
+
+            if (outTotalCnt > 1) {
+                // 페이지 리스트 표시 및 페이지 변경 이벤트 등록
+                pageListComponent.show();
+                pageListComponent.setCount(outTotalCnt, true);
+                const scopeScwin = pageListComponent.scope_obj.getObj("scwin");
+
+                if (selectCurrentPage != 1 && selectCurrentPage <= outTotalCnt) {
+                    pageListComponent.setValue(selectCurrentPage);
+                } else {
+                    pageListComponent.setValue(1);
+                }
+
+                pageListComponent.unbind("onviewchange");
+                pageListComponent.bind("onviewchange", function (info) {
+                    $p.getComponentById(pageListComponent.getID() + "_page_" + info.newSelectedIndex)?.classList.remove("w2pageList_label_selected");
+
+                    let newSelectedIndex = info.newSelectedIndex;
+                    const oldSelectedIndex = info.oldSelectedIndex;
+
+                    const prevList = Math.ceil(oldSelectedIndex / pagingInfo.pageSize);
+                    const nowList = Math.ceil(newSelectedIndex / pagingInfo.pageSize);
+
+                    if (newSelectedIndex === 1 || (prevList === 1 && nowList === 1 && oldSelectedIndex > pagingInfo.pageSize)) {
+                        newSelectedIndex = 1;
+                    } else if ((prevList - 1) === nowList) {
+                        newSelectedIndex = newSelectedIndex - (pagingInfo.pageSize - 1);
+                    }
+
+                    const procFuncArr = pagingInfo.pageFunction.split(".");
+                    scopeScwin[procFuncArr[1]](newSelectedIndex, oldSelectedIndex);
+                });
+            } else {
+                // 페이지 리스트 미표시
+                pageListComponent.setValue(1);
+                pageListComponent.setCount(1, true);
+                pageListComponent.unbind("onclick");
+            }
+        });
+    }
+
+    return pagingInfo;
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload"/>
+</html>
