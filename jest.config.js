@@ -7,12 +7,7 @@ module.exports = {
   passWithNoTests: true,
   // Page logic is embedded in .xml CDATA; coverage applies only to pure helpers
   // extracted into .js under the business-module trees.
-  collectCoverageFrom: [
-    "gcc/**/*.js",
-    "ins/**/*.js",
-    "mgt/**/*.js",
-    "stf/**/*.js",
-  ],
+  collectCoverageFrom: ["src/**/*.js"],
   coverageReporters: ["text", "lcov"],
   // NOTE: the source repo enforced a global 80% threshold. It is omitted here
   // because no .js sources exist yet (the JS is in XML). Re-add a
