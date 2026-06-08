@@ -4,9 +4,35 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A **WebSquare (Inswave) source tree** for KRX (Korea Exchange) business systems. Every file is a `.xml` WebSquare *screen* document — there is no build, lint, test, or package tooling. Files are normally authored in the WebSquare IDE; here they are edited as source. JavaScript lives inside `<script type="text/javascript"><![CDATA[ ... ]]>` blocks within each XML file.
+A **WebSquare (Inswave) source tree** for KRX (Korea Exchange) business systems. Every file is a `.xml` WebSquare *screen* document, normally authored in the WebSquare IDE; here they are edited as source. JavaScript lives inside `<script type="text/javascript"><![CDATA[ ... ]]>` blocks within each XML file.
 
-There is no compile/run step you can invoke from the shell. "Running" a change means deploying the XML into a WebSquare server and opening the screen in a browser; that is outside this repo. Treat your job as editing the JavaScript inside these XML envelopes correctly and consistently.
+There is no app build/run step you can invoke from the shell. "Running" a change means deploying the XML into a WebSquare server and opening the screen in a browser; that is outside this repo. Treat your job as editing the JavaScript inside these XML envelopes correctly and consistently. For **static checks**, the repo carries a lint/test toolchain — see [Toolchain & commands](#toolchain--commands) below.
+
+## Toolchain & commands
+
+A lint/test toolchain sits on top of the raw XML. All commands run from the repo root.
+
+### `wsxml_lint` — the primary check for this tree
+A Python/lxml linter under `tools/wsxml_lint/` that parses the WebSquare `.xml` pages directly (the only tool that actually inspects this project's source).
+
+- **Run:** `npm run lint:xml`  (= `python -m wsxml_lint gcc ins mgt stf`). Lint a subset/single file: `python -m wsxml_lint gcc/win.xml`.
+- **Exit code:** 0 when there are **no errors** (warnings are allowed); 1 if any error. Current baseline: **`116 files, 0 errors, 424 warnings`**. The warnings are overwhelmingly `WS111`/`WS112`/`WS113` on the legacy `ins/mgt/stf` pages (missing `<head>` `@meta_*` / `<w2:layoutInfo>` / `<w2:dataCollection>`) — expected for W-Craft-converted code, not defects.
+- **Rule codes:** `WS00x` well-formedness · `WS1xx` structure · `WS2xx` references (e.g. **WS201** = a method named in `<w2:publicInfo>` with no definition in the file's CDATA) · `WS4xx` schema (only with `--xsd`). Narrow output with `--select WS201` / `--ignore WS111,WS112`; `--format json` for machine output; `--min-severity warning|error`.
+- **Setup:** needs real Python 3.9+ with `lxml` — `pip install ./tools/wsxml_lint` (the Microsoft Store `python.exe` alias is a stub and must be disabled/avoided). Module tests: `pytest` in `tools/wsxml_lint/`.
+
+### ESLint + Jest (Node) — for extracted `.js` only
+`package.json` scripts: `npm run lint` / `lint:fix` (ESLint flat config, `eslint.config.js`) and `npm test` / `test:coverage` (Jest).
+
+> **Caveat:** these only see standalone `.js` files. This project's JS lives inside XML CDATA, so there is currently **no `.js` source for them to act on** — `npm run lint` passes trivially and `npm test` reports "no tests found" (`passWithNoTests`). They are wired up for any pure helpers later **extracted** out of the XML into `.js` (tests go under `test/`). For real checks on the XML tree, use `npm run lint:xml`. The ESLint config declares the WebSquare runtime globals (`WebSquare`, `scwin`, `$c`, `$p`, `$w`, `comFunc`).
+
+### CI
+`.github/workflows/ci.yml` runs two jobs on push/PR: **Node** (`npm ci` → `lint` → `test:coverage`) and **wsxml-lint** (install the Python tool → `pytest` → `python -m wsxml_lint gcc ins mgt stf`).
+
+### Subagents (`.claude/agents/`, invoke via the Agent tool)
+- **`websquare-code-reviewer`** — read-only review of changed WebSquare JS/XML (API correctness, conventions, dangling component/handler ids). Use before committing.
+- **`websquare-common-fn-dev`** — write/refactor shared common functions, reuse-first.
+- **`websquare-xml-analyzer`** — analyze/generate XML pages; trace where functions or component ids are used.
+- **`websquare-test-doc`** — unit tests + JSDoc for common functions.
 
 ## File anatomy
 
@@ -63,6 +89,7 @@ Rough module focus (from filenames): `stf/` is the largest — securities/listin
 ## Working in this repo
 
 - Edits are surgical changes to JavaScript **inside** CDATA blocks. Preserve the surrounding XML, the JSDoc format, and the file's existing naming generation (modern `$c`/`scwin.camelCase` in `gcc/`; match the legacy `fn_*`/`ins_*` style when editing `ins`/`mgt`/`stf`).
-- When you add or rename a public function, update that file's `<w2:publicInfo method="...">` list.
+- When you add or rename a public function, update that file's `<w2:publicInfo method="...">` list — `npm run lint:xml` flags a declared-but-undefined method as **WS201**.
 - Comments, screen names, and descriptions are in **Korean**; keep new user-facing strings and doc text consistent with the file's language.
 - Do not introduce build/JS-module syntax (imports, bundler conventions) — these run as inline browser scripts under WebSquare, calling other screens only through the `$c` / `scwin` scopes.
+- After editing XML, run `npm run lint:xml` and keep the tree at **0 errors** (the ~424 legacy warnings are the expected baseline; avoid *adding* new ones).
