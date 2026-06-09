@@ -51,6 +51,10 @@
 | `isEmpty` | `utils.cIsNull` | 유지 |
 | `getParameter` | `mgt.getQuery`, `common._trk_getParameter`(검토) | 유지 |
 | `getComponent` | `mgt.getObjectValue`/`setObjectValue`, `filing_trans.$` | **보완** — 값 get/set 은 `getComponent().getValue/setValue` 로 처리(필요 시 헬퍼 보완) |
+| `setCookie` | `common._trk_setCookie`(트래킹 쿠키) | 유지 — 신규 gcc 쿠키 함수, `expire`→`options.expires` |
+| `getCookie` | `common._trk_getCookie`(트래킹 쿠키) | 유지 — 신규 gcc 쿠키 함수 |
+
+> 참고: 신규로 `$c.util` 에 `localStorage`/`sessionStorage` 함수군(`set/get/remove/clear LocalStorage`, `…SessionStorage`)도 추가되었다. mgt 에는 해당 사용처가 없어 매핑 대상은 없으나, 신규/리팩토링 화면에서 영속 저장이 필요할 때 활용한다.
 
 ### 대상 파일: `src/gcc/validate.xml` ($c.validate)
 | gcc 함수 | 매핑되는 레거시 함수(원본) | 조치 |
@@ -120,11 +124,11 @@
 
 ### 2.5 분석/트래킹 모듈 `_trk_*` (`common.xml`)
 > 외부 분석/트래킹 연동 전용. 한 묶음으로 별도 모듈화 권장(개별 이관 비권장).
+> 쿠키 I/O(`_trk_setCookie`/`_trk_getCookie`)는 신규 `$c.util.setCookie`/`getCookie` 로 이관(§1) → 본 목록에서 제외.
 
 | 함수명 | 입력 파라미터 | 반환값 | 기능 요약 |
 | :--- | :--- | :--- | :--- |
 | `_trk_make_code` | `(_TRK_SERVER, _TRK_U)` | `String` | 트래킹 코드 생성 |
-| `_trk_setCookie` / `_trk_getCookie` | `(name[, value, expire])` | `void` / `String` | 트래킹 쿠키 설정/조회 |
 | `_trk_getParameter` | `(name)` | `String` | 트래킹 URL 파라미터 조회(`$c.util.getParameter` 검토) |
 | `_trk_escape` | `(_str)` | `String` | 트래킹 문자열 escape |
 | `_trk_flashContentsView` | `(_TRK_CP)` | `void` | 컨텐츠 뷰 트래킹 전송 |
