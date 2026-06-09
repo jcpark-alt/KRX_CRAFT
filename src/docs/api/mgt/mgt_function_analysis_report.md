@@ -87,7 +87,7 @@
 | `calcYear` | 년 연산 | **공통이관** | `$c.date.addYear` | 중복 |
 | `cGetDifTodayInputday` | 두 날짜 차이 | **공통이관** | `$c.date.diffDate` | 중복 |
 | `cIsJumin` | 주민등록번호 검증 | **공통이관** | `$c.str.isSSN` | 중복 |
-| `cIsResno` | 주민/외국인 번호 검증 | **공통이관** | `$c.validate.isSecurityNumber` | 중복 |
+| `cIsResno` | 주민/외국인 번호 검증 | **공통이관** | `$c.str.isSSN` | 중복 (validate.isSecurityNumber 통합·삭제됨) |
 | `cIsBupin` | 법인등록번호 검증 | **공통이관(검토)** | `$c.str.isBizID` | 사업자번호와 상이 — 별도 검토 |
 
 ### `mgt.xml` (25)

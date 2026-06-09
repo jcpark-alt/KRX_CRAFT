@@ -19,7 +19,7 @@
 | `lpad` | `utils.lpad`, `utils.cGetZero`(0 패딩) | 유지 |
 | `replaceAll` | `utils.replaceAll`, `mgt.replaceAll`, `utils.cRmString`(문자 제거) | 유지 |
 | `isEmail` | `utils.email_chk` | 유지 |
-| `isSSN` | `utils.cIsJumin` | 유지 |
+| `isSSN` | `utils.cIsJumin`, `utils.cIsResno` | 유지 — 주민/외국인 번호 검증 통합 (validate.isSecurityNumber 삭제) |
 | `isBizID` | `utils.cIsBupin`(법인등록번호) | **보완** — 사업자번호와 체계 상이, 법인등록번호 검증로직 보완 검토 |
 
 ### 대상 파일: `src/gcc/num.xml` ($c.num)
@@ -59,7 +59,6 @@
 ### 대상 파일: `src/gcc/validate.xml` ($c.validate)
 | gcc 함수 | 매핑되는 레거시 함수(원본) | 조치 |
 | :--- | :--- | :--- |
-| `isSecurityNumber` | `utils.cIsResno` | 유지 |
 | `setComponentProperty` | `mgt.showObj`(표시/숨김) | 유지 — visible 속성 제어 |
 
 ### 대상 파일: `src/gcc/win.xml` ($c.win)
