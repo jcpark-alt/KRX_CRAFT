@@ -6,14 +6,14 @@
 ## 집계 요약
 
 - **분석 대상:** `src/mgt` 18개 `.xml` 파일, **196개** `scwin.*` 함수(기계적 인벤토리 기준).
-- **분류 규칙:** A그룹(삭제) = A1 달력 · A2 레이아웃(resize/position) · A3 패널 style · A4 파일/엑셀 다운로드 / B그룹 = 공통이관(기존 gcc 매핑) · 업무공통(gcc 미매핑).
+- **분류 규칙:** A그룹(삭제) = A1 달력 · A2 레이아웃(resize/position) · A3 패널 style · A4 파일/엑셀 다운로드 · A5 진행바(Progress) / B그룹 = 공통이관(기존 gcc 매핑) · 업무공통(gcc 미매핑).
 - **범위 주의:** 화면 간 호출 대상인 `scwin.*` 함수만 집계한다. 화면 내부 지역 `function foo()` 헬퍼(예: 달력 내부 보조 함수, `common.xml` 의 `fn_OpenDisclViewer_MGT` 등)는 이관 단위가 아니므로 제외.
 
 | 분류 | 함수 수 |
 | :--- | ---: |
-| A그룹(삭제/제외) | 약 112 |
-| B-공통이관(gcc 매핑) | 약 47 |
-| B-업무공통(gcc 미매핑) | 약 37 |
+| A그룹(삭제/제외) | 약 115 |
+| B-공통이관(gcc 매핑) | 약 46 |
+| B-업무공통(gcc 미매핑) | 약 35 |
 | **합계** | **196** |
 
 ---
@@ -50,9 +50,9 @@
 | `MdiHelp` | 화면 도움말 뷰어 오픈 | **업무공통** | 별도 관리 | gcc 미매핑(도움말 연동) |
 | `InfoMenuID` | 현재 메뉴 ID 반환 | **공통이관** | `$c.win.getProgramId` | 프로그램/메뉴 식별 |
 | `_trk_escape` | 트래킹 문자열 escape | **업무공통** | 별도 관리 | 분석/트래킹 모듈군 |
-| `_trk_setCookie` | 트래킹 쿠키 설정 | **공통이관** | `$c.util.setCookie` | 신규 추가된 gcc 쿠키 함수로 이관(`expire`→`options.expires`) |
-| `_trk_getCookie` | 트래킹 쿠키 조회 | **공통이관** | `$c.util.getCookie` | 신규 추가된 gcc 쿠키 함수로 이관 |
-| `_trk_getParameter` | 트래킹 파라미터 조회 | **업무공통** | 별도 관리 | (`$c.util.getParameter` 검토) |
+| `_trk_setCookie` | 트래킹 쿠키 설정 | **업무공통** | 별도 관리 | 분석/트래킹 모듈군 |
+| `_trk_getCookie` | 트래킹 쿠키 조회 | **업무공통** | 별도 관리 | 분석/트래킹 모듈군 |
+| `_trk_getParameter` | 트래킹 파라미터 조회 | **업무공통** | 별도 관리 | 분석/트래킹 모듈군 |
 | `_trk_make_code` | 트래킹 코드 생성 | **업무공통** | 별도 관리 | 분석/트래킹 모듈군 |
 | `_trk_flashContentsView` | 컨텐츠 뷰 트래킹 | **업무공통** | 별도 관리 | 분석/트래킹 모듈군 |
 | `_trk_clickTrace` | 클릭 트래킹 | **업무공통** | 별도 관리 | 분석/트래킹 모듈군 |
@@ -141,15 +141,16 @@
 | `responseTextXMLHTTP` | XHR 응답 텍스트 | **공통이관(대체)** | `$c.sbm.*` | 원시 XHR |
 | `sendMessage` | 비동기 메시지 전송 | **공통이관(대체)** | `$c.sbm.executeDynamic` | 원시 XHR |
 | `onCompleteResponse` | 응답 핸들러(stub) | **삭제 대상** | N/A | stub/미사용 |
-| `formData2QueryString` | 폼 → 쿼리스트링 변환 | **업무공통** | 별도 관리 | gcc 미매핑 |
+| `formData2QueryString` | 폼 → 쿼리스트링 변환 | **공통이관** | `$c.data.serializeFormToQueryString` | gcc/data.xml 로 이관·리팩토링 완료 |
 
 ### `filing_progress.xml` (4)
+> 전체가 [A5] 진행바 삭제 대상.
 
 | 함수명 | 기능 설명 | 분류 결과 | 매핑 대상(TO-BE) | 비고 / 사유 |
 | :--- | :--- | :---: | :--- | :--- |
-| `createBar` | 진행바 컴포넌트 생성 | **업무공통(검토)** | 별도 관리 | A1~A4 비해당 UI 컴포넌트 — 폐기/대체 검토 |
-| `startBar` | 진행바 애니메이션 | **업무공통(검토)** | 별도 관리 | 위와 동일 |
-| `togglePause` | 진행바 일시정지 토글 | **업무공통(검토)** | 별도 관리 | 본문에 2회 중복 정의 |
+| `createBar` | 진행바 컴포넌트 생성 | **삭제 대상** | N/A | [A5] 진행바 UI 생성 함수 |
+| `startBar` | 진행바 애니메이션 | **삭제 대상** | N/A | [A5] 진행바 애니메이션 제어 |
+| `togglePause` | 진행바 일시정지 토글 | **삭제 대상** | N/A | [A5] 진행바 제어 (본문 2회 중복 정의) |
 
 ### `session.xml` (2)
 

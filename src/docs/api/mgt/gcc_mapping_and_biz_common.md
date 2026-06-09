@@ -51,10 +51,6 @@
 | `isEmpty` | `utils.cIsNull` | 유지 |
 | `getParameter` | `mgt.getQuery`, `common._trk_getParameter`(검토) | 유지 |
 | `getComponent` | `mgt.getObjectValue`/`setObjectValue`, `filing_trans.$` | **보완** — 값 get/set 은 `getComponent().getValue/setValue` 로 처리(필요 시 헬퍼 보완) |
-| `setCookie` | `common._trk_setCookie`(트래킹 쿠키) | 유지 — 신규 gcc 쿠키 함수, `expire`→`options.expires` |
-| `getCookie` | `common._trk_getCookie`(트래킹 쿠키) | 유지 — 신규 gcc 쿠키 함수 |
-
-> 참고: 신규로 `$c.util` 에 `localStorage`/`sessionStorage` 함수군(`set/get/remove/clear LocalStorage`, `…SessionStorage`)도 추가되었다. mgt 에는 해당 사용처가 없어 매핑 대상은 없으나, 신규/리팩토링 화면에서 영속 저장이 필요할 때 활용한다.
 
 ### 대상 파일: `src/gcc/validate.xml` ($c.validate)
 | gcc 함수 | 매핑되는 레거시 함수(원본) | 조치 |
@@ -73,6 +69,7 @@
 | gcc 함수 | 매핑되는 레거시 함수(원본) | 조치 |
 | :--- | :--- | :--- |
 | `getMessage` | `mgt.getMessageParam` | 유지 — 파라미터 바인딩 지원 |
+| `serializeFormToQueryString` | `filing_trans.formData2QueryString` | 신설 — gcc/data.xml 로 이관·리팩토링 완료(폼→쿼리스트링) |
 
 ### 대상 파일: `src/gcc/sbm.xml` ($c.sbm) — 레거시 원시 AJAX
 | gcc 함수 | 매핑되는 레거시 함수(원본) | 조치 |
@@ -119,29 +116,25 @@
 | `sessionCheck` | `()` | `Boolean` | 세션 유효성 점검 후 무효 시 리다이렉트 |
 | `ArfObjectUnLappedFnc` | `(CMMT_ID)` | `void` | ARF 래퍼 엘리먼트 제거(로그인 연동 DOM 처리) |
 | `MdiHelp` | `(helpType)` | `void` | 화면 도움말 뷰어 오픈 |
-| `formData2QueryString` | `(docForm)` | `String` | HTML 폼을 쿼리스트링으로 직렬화 |
 
 ### 2.5 분석/트래킹 모듈 `_trk_*` (`common.xml`)
 > 외부 분석/트래킹 연동 전용. 한 묶음으로 별도 모듈화 권장(개별 이관 비권장).
-> 쿠키 I/O(`_trk_setCookie`/`_trk_getCookie`)는 신규 `$c.util.setCookie`/`getCookie` 로 이관(§1) → 본 목록에서 제외.
 
 | 함수명 | 입력 파라미터 | 반환값 | 기능 요약 |
 | :--- | :--- | :--- | :--- |
 | `_trk_make_code` | `(_TRK_SERVER, _TRK_U)` | `String` | 트래킹 코드 생성 |
+| `_trk_setCookie` / `_trk_getCookie` | `(name[, value, expire])` | `void` / `String` | 트래킹 쿠키 설정/조회 |
 | `_trk_getParameter` | `(name)` | `String` | 트래킹 URL 파라미터 조회(`$c.util.getParameter` 검토) |
 | `_trk_escape` | `(_str)` | `String` | 트래킹 문자열 escape |
 | `_trk_flashContentsView` | `(_TRK_CP)` | `void` | 컨텐츠 뷰 트래킹 전송 |
 | `_trk_clickTrace` | `(_TRK_CKFL, _TRK_CKDATA)` | `void` | 클릭 트래킹 전송 |
 | `_trk_adClick` | `(adSvr, svcCode, adCode)` | `void` | 광고 클릭 트래킹 전송 |
 
-### 2.6 검토 대상 (A1~A4 비해당이나 폐기 권장)
-| 함수명(파일) | 입력 파라미터 | 반환값 | 비고 |
-| :--- | :--- | :--- | :--- |
-| `createBar` / `startBar` / `togglePause` (`filing_progress.xml`) | (다수) | `void` | 진행바 UI 컴포넌트. 표준 WebSquare 진행 표시로 대체 권장(업무공통 편입 비권장) |
+> `filing_progress.xml`(`createBar`/`startBar`/`togglePause`)는 [A5] 진행바 **삭제 대상**으로 분류 — 업무공통 아님(마스터 리포트 참조).
 
 ---
 
 ## 부록: 분류 기준 요약
-- **삭제(A1~A4):** 달력 / 레이아웃(resize·position) / 패널 style / 파일·엑셀 다운로드 → 이관 제외.
+- **삭제(A1~A5):** 달력 / 레이아웃(resize·position) / 패널 style / 파일·엑셀 다운로드 / 진행바(Progress) → 이관 제외.
 - **공통이관(B1):** 위 §1 — 기존 gcc 함수를 유지·재사용(필요 시 보완), 레거시 함수는 폐기.
 - **업무공통(B2):** 위 §2 — gcc 미보유 KRX 고유 공통 기능, 별도 모듈로 관리/구현.
