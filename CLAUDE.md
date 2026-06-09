@@ -14,6 +14,8 @@ There is no app build/run step you can invoke from the shell. "Running" a change
 
 A lint/test toolchain sits on top of the raw XML. All commands run from the repo root.
 
+> **Authoring/validating a gcc common XML?** Follow [src/docs/gcc_xml_guide.md](src/docs/gcc_xml_guide.md) — the required `<head>` skeleton, JSDoc + `publicInfo` conventions, `wsxml_lint` rule codes, and a pre-PR checklist.
+
 ### `wsxml_lint` — the primary check for this tree
 A Python/lxml linter under `tools/wsxml_lint/` that parses the WebSquare `.xml` pages directly (the only tool that actually inspects this project's source).
 
