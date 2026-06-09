@@ -1,8 +1,10 @@
 ---
 name: krx-craft-github-ci
-description: KRX_CRAFT GitHub remote, commit identity, and how to check CI status without gh/token
-metadata:
+description: "KRX_CRAFT GitHub remote, commit identity, and how to check CI status without gh/token"
+metadata: 
+  node_type: memory
   type: reference
+  originSessionId: 668974ca-a8f1-4156-a6e2-5052a9a99557
 ---
 
 The project is connected to **https://github.com/jcpark-alt/KRX_CRAFT** (public, default branch `main`).
