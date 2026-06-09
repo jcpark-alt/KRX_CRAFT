@@ -76,6 +76,11 @@
 | :--- | :--- | :--- |
 | `execute` / `executeDynamic` | `filing_trans.requestXMLHTTP`, `sendMessage`, `getXMLHttpRequest`, `responseTextXMLHTTP` | 유지 — 원시 XHR 폐기, 기존 `$c.sbm` 표준 Submission 사용 |
 
+### 대상 파일: `src/gcc/session.xml` ($c.session) — 신규 공통 모듈
+| gcc 함수 | 매핑되는 레거시 함수(원본) | 조치 |
+| :--- | :--- | :--- |
+| `sessionCheck` | `session.sessionCheck` | 신설 — gcc/session.xml 로 이관·리팩토링 완료(세션 점검·미로그인 시 로그인 이동) |
+
 ---
 
 ## 2. 신규 업무공통함수 관리 리스트 (gcc 미매핑)
@@ -113,7 +118,6 @@
 | :--- | :--- | :--- | :--- |
 | `PanelMsg` | `(panelID, msg)` | `void` | 지정 패널 영역에 메시지 표시(토스트와 별개) |
 | `fn_setFromToDate` | `(pTp, pObjFrom, pObjTo)` | `void` | 기간타입(pTp)에 따라 From/To 일자 컴포넌트 자동 설정 |
-| `sessionCheck` | `()` | `Boolean` | 세션 유효성 점검 후 무효 시 리다이렉트 |
 | `ArfObjectUnLappedFnc` | `(CMMT_ID)` | `void` | ARF 래퍼 엘리먼트 제거(로그인 연동 DOM 처리) |
 | `MdiHelp` | `(helpType)` | `void` | 화면 도움말 뷰어 오픈 |
 
