@@ -70,6 +70,7 @@
 | :--- | :--- | :--- |
 | `getMessage` | `mgt.getMessageParam` | 유지 — 파라미터 바인딩 지원 |
 | `serializeFormToQueryString` | `filing_trans.formData2QueryString` | 신설 — gcc/data.xml 로 이관·리팩토링 완료(폼→쿼리스트링) |
+| `getMatchedJSON` | `mgt_gauce.fn_findRow` | 유지 — 조건 매칭 행/데이터 검색으로 대체 |
 
 ### 대상 파일: `src/gcc/sbm.xml` ($c.sbm) — 레거시 원시 AJAX
 | gcc 함수 | 매핑되는 레거시 함수(원본) | 조치 |
@@ -103,7 +104,7 @@
 | `viewParameter4logSave` | `()` | `String` | 로그저장 파라미터 확인(디버그) |
 | `doLogSave` | `(ver1, ver2, ver3)` | `void` | 활동 로그 저장 실행 |
 
-### 2.3 데이터셋/그리드 보조 (`mgt.xml`, `mgt_gauce.xml`)
+### 2.3 데이터셋/그리드 보조 (`mgt.xml`)
 | 함수명 | 입력 파라미터 | 반환값 | 기능 요약 및 구현 가이드 |
 | :--- | :--- | :--- | :--- |
 | `CopyDataSet` | `(oOrigin, oTarget, features)` | `void` | feature 옵션 기반 데이터셋 복사 |
@@ -111,14 +112,12 @@
 | `cfParseFeature` | `(features, fNameArr, fValueArr, fTypeArr)` | `void` | feature 문자열을 이름/값/타입 배열로 파싱(`CopyDataSet` 보조) |
 | `Combo_CBDataSetPeriod` | `(sval)` | `DataSet` | 기간 선택 콤보용 데이터셋 구성 |
 | `FillGridHeaderTotalCnt` | `(vRsltCnt, panelID)` | `void` | 그리드 헤더 패널에 결과 건수 표시 |
-| `fn_findRow` | `(sval0, sval1, sval2)` | `Number` | 데이터셋에서 컬럼값 조건으로 행 인덱스 검색 |
 
-### 2.4 UI/메시지/세션 (`mgt.xml`, `session.xml`, `commonlogin.xml`, `common.xml`)
+### 2.4 UI/메시지 (`mgt.xml`, `common.xml`)
 | 함수명 | 입력 파라미터 | 반환값 | 기능 요약 및 구현 가이드 |
 | :--- | :--- | :--- | :--- |
 | `PanelMsg` | `(panelID, msg)` | `void` | 지정 패널 영역에 메시지 표시(토스트와 별개) |
 | `fn_setFromToDate` | `(pTp, pObjFrom, pObjTo)` | `void` | 기간타입(pTp)에 따라 From/To 일자 컴포넌트 자동 설정 |
-| `ArfObjectUnLappedFnc` | `(CMMT_ID)` | `void` | ARF 래퍼 엘리먼트 제거(로그인 연동 DOM 처리) |
 | `MdiHelp` | `(helpType)` | `void` | 화면 도움말 뷰어 오픈 |
 
 ### 2.5 분석/트래킹 모듈 `_trk_*` (`common.xml`)
@@ -139,6 +138,6 @@
 ---
 
 ## 부록: 분류 기준 요약
-- **삭제(A1~A5):** 달력 / 레이아웃(resize·position) / 패널 style / 파일·엑셀 다운로드 / 진행바(Progress) → 이관 제외.
-- **공통이관(B1):** 위 §1 — 기존 gcc 함수를 유지·재사용(필요 시 보완), 레거시 함수는 폐기.
+- **삭제(A1~A5):** 달력 / 레이아웃(resize·position) / 패널 style / 파일·엑셀 다운로드 / 진행바(Progress) → 이관 제외. 그 외 레거시 미사용 코드(예: `commonlogin.ArfObjectUnLappedFnc` — 레거시 ARF 플러그인 DOM 처리)도 개별 삭제 대상으로 분류.
+- **공통이관(B1):** 위 §1 — 기존 gcc 함수를 유지·재사용(필요 시 보완), 레거시 함수는 폐기. 신규 모듈 신설 포함(`serializeFormToQueryString`→data, `sessionCheck`→session).
 - **업무공통(B2):** 위 §2 — gcc 미보유 KRX 고유 공통 기능, 별도 모듈로 관리/구현.

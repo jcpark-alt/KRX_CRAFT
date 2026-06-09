@@ -11,9 +11,9 @@
 
 | 분류 | 함수 수 |
 | :--- | ---: |
-| A그룹(삭제/제외) | 약 115 |
-| B-공통이관(gcc 매핑) | 약 47 |
-| B-업무공통(gcc 미매핑) | 약 34 |
+| A그룹(삭제/제외) | 약 116 |
+| B-공통이관(gcc 매핑) | 약 48 |
+| B-업무공통(gcc 미매핑) | 약 32 |
 | **합계** | **196** |
 
 ---
@@ -173,8 +173,8 @@
 | 원본 파일명 | 함수명 | 기능 설명 | 분류 결과 | 매핑 대상(TO-BE) | 비고 / 사유 |
 | :--- | :--- | :--- | :---: | :--- | :--- |
 | `alert_error.xml` | `alert_error` | 에러 객체 메시지 alert | **공통이관** | `$c.win.alert` + `$c.data.getMessage` | `mgt.xml` 동명 함수와 동일 |
-| `commonlogin.xml` | `ArfObjectUnLappedFnc` | ARF 래퍼 엘리먼트 제거 | **업무공통** | 별도 관리 | DOM 조작(로그인 연동) |
-| `mgt_gauce.xml` | `fn_findRow` | 데이터셋 행 검색 | **업무공통** | 별도 관리 | gcc 미매핑(그리드 보조) |
+| `commonlogin.xml` | `ArfObjectUnLappedFnc` | ARF 래퍼 엘리먼트 제거 | **삭제 대상** | N/A | 레거시 ARF(리포트 플러그인) 연동 DOM 처리 — 미사용/폐기 |
+| `mgt_gauce.xml` | `fn_findRow` | 데이터셋 행 검색 | **공통이관** | `$c.data.getMatchedJSON` | 조건 매칭 행 검색을 gcc 공통함수로 대체 |
 
 ---
 
