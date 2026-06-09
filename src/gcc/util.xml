@@ -11,7 +11,7 @@
 			<w2:workflowCollection/>
 		</xf:model>
 		<w2:layoutInfo/>
-		<w2:publicInfo method="scwin.getUserAgent,scwin.getParameter,scwin.getObject,scwin.getFunction,scwin.getCallBackFunction,scwin.getJSON,scwin.isJSON,scwin.isArray,scwin.isEmpty,scwin.isEmptyPlainObject,scwin.getObjectType,scwin.isPlainObject,scwin.isMobile,scwin.isXmlDoc,scwin.setGridViewDelCheckBox,scwin.getChildren,scwin.getGridViewDataList,scwin.getComponent,scwin.createComponent,scwin.setInterval,scwin.clearInterval,scwin.setTimeout,scwin.clearTimeout,scwin.copyClipboard,scwin.confirmThen,scwin.isNotEmpty,scwin.isEmptyArray,scwin.duplcRemove,scwin.assignDefined,scwin.encodeBase64,scwin.decodeBase64,scwin.encodeBase64Utf8,scwin.decodeBase64Utf8,scwin.getKeyCode,scwin.isMobileApp,scwin.setClipboard,scwin.getClipboard,scwin.checkDuplicateJsonKey"/>
+		<w2:publicInfo method="scwin.getUserAgent,scwin.getParameter,scwin.getObject,scwin.getFunction,scwin.getCallBackFunction,scwin.getJSON,scwin.isJSON,scwin.isArray,scwin.isEmpty,scwin.isEmptyPlainObject,scwin.getObjectType,scwin.isPlainObject,scwin.isMobile,scwin.isXmlDoc,scwin.setGridViewDelCheckBox,scwin.getChildren,scwin.getGridViewDataList,scwin.getComponent,scwin.createComponent,scwin.setInterval,scwin.clearInterval,scwin.setTimeout,scwin.clearTimeout,scwin.copyClipboard,scwin.confirmThen,scwin.isNotEmpty,scwin.isEmptyArray,scwin.duplcRemove,scwin.assignDefined,scwin.encodeBase64,scwin.decodeBase64,scwin.encodeBase64Utf8,scwin.decodeBase64Utf8,scwin.getKeyCode,scwin.isMobileApp,scwin.setClipboard,scwin.getClipboard,scwin.checkDuplicateJsonKey,scwin.setCookie,scwin.getCookie,scwin.removeCookie,scwin.setLocalStorage,scwin.getLocalStorage,scwin.removeLocalStorage,scwin.clearLocalStorage,scwin.setSessionStorage,scwin.getSessionStorage,scwin.removeSessionStorage,scwin.clearSessionStorage"/>
 		<script lazy="false" type="text/javascript"><![CDATA[// =============================================================================
 /**
  * 웹스퀘어 컴포넌트 제어, 엑셀 파일 업로드/다운로드, 파일 업로드/다운로드, 기타 유틸리티 함수를 작성한다.
@@ -1214,6 +1214,261 @@ scwin.checkDuplicateJsonKey = function (json, key) {
         }) !== index1;
     });
     return result.length > 0;
+};
+
+/**
+ * @method
+ * @name setCookie
+ * @description 쿠키를 저장한다. 값은 자동으로 encodeURIComponent 처리된다.
+ * @param {String} name 쿠키 이름
+ * @param {String} value 쿠키 값
+ * @param {Object} options 옵션 - expires(Number: 일수 또는 Date), path(기본 "/"), domain, secure(Boolean), sameSite("Lax"/"Strict"/"None")
+ * @returns {void}
+ * @hidden N
+ * @exception
+ * @example
+$c.util.setCookie("LANG", "ko", { expires: 7, path: "/" });
+ */
+scwin.setCookie = function (name, value, options) {
+    options = options || {};
+    let cookie = encodeURIComponent(name) + "=" + encodeURIComponent(value);
+    const expires = options.expires;
+    if (typeof expires === "number") {
+        const d = new Date();
+        d.setTime(d.getTime() + expires * 24 * 60 * 60 * 1000);
+        cookie += "; expires=" + d.toUTCString();
+    } else if (expires instanceof Date) {
+        cookie += "; expires=" + expires.toUTCString();
+    }
+    cookie += "; path=" + (options.path || "/");
+    if (options.domain) {
+        cookie += "; domain=" + options.domain;
+    }
+    if (options.sameSite) {
+        cookie += "; samesite=" + options.sameSite;
+    }
+    if (options.secure) {
+        cookie += "; secure";
+    }
+    document.cookie = cookie;
+};
+
+/**
+ * @method
+ * @name getCookie
+ * @description 지정한 이름의 쿠키 값을 반환한다. 없으면 빈 문자열.
+ * @param {String} name 쿠키 이름
+ * @returns {String} 쿠키 값(decodeURIComponent 처리). 없으면 ""
+ * @hidden N
+ * @exception
+ * @example
+const lang = $c.util.getCookie("LANG");
+ */
+scwin.getCookie = function (name) {
+    const key = encodeURIComponent(name) + "=";
+    const list = document.cookie ? document.cookie.split(";") : [];
+    for (let i = 0; i < list.length; i++) {
+        const item = list[i].replace(/^\s+/, "");
+        if (item.indexOf(key) === 0) {
+            return decodeURIComponent(item.substring(key.length));
+        }
+    }
+    return "";
+};
+
+/**
+ * @method
+ * @name removeCookie
+ * @description 지정한 이름의 쿠키를 삭제한다. (저장 시와 동일한 path/domain 필요)
+ * @param {String} name 쿠키 이름
+ * @param {Object} options 옵션 - path(기본 "/"), domain
+ * @returns {void}
+ * @hidden N
+ * @exception
+ * @example
+$c.util.removeCookie("LANG");
+ */
+scwin.removeCookie = function (name, options) {
+    options = options || {};
+    scwin.setCookie(name, "", { expires: -1, path: options.path || "/", domain: options.domain });
+};
+
+/**
+ * @method
+ * @name __setWebStorage
+ * @description (내부) Web Storage 에 값을 저장한다. 객체/배열은 JSON 문자열로 직렬화.
+ * @param {Storage} storage localStorage 또는 sessionStorage
+ * @param {String} key 키
+ * @param {*} value 값(문자열 또는 객체/배열)
+ * @returns {void}
+ * @hidden Y
+ * @exception
+ * @example
+ */
+scwin.__setWebStorage = function (storage, key, value) {
+    if (!storage) {
+        return;
+    }
+    const data = (typeof value === "object" && value !== null) ? JSON.stringify(value) : value;
+    try {
+        storage.setItem(key, data);
+    } catch (e) {
+        // 저장 실패(용량 초과/프라이빗 모드 등)는 무시한다.
+    }
+};
+
+/**
+ * @method
+ * @name __getWebStorage
+ * @description (내부) Web Storage 값을 읽는다. JSON 이면 파싱, 아니면 원본 문자열 반환.
+ * @param {Storage} storage localStorage 또는 sessionStorage
+ * @param {String} key 키
+ * @returns {*} 저장된 값(JSON 이면 객체/배열). 없으면 null
+ * @hidden Y
+ * @exception
+ * @example
+ */
+scwin.__getWebStorage = function (storage, key) {
+    if (!storage) {
+        return null;
+    }
+    const raw = storage.getItem(key);
+    if (raw === null) {
+        return null;
+    }
+    try {
+        return JSON.parse(raw);
+    } catch (e) {
+        return raw;
+    }
+};
+
+/**
+ * @method
+ * @name setLocalStorage
+ * @description localStorage 에 값을 저장한다. 객체/배열은 자동으로 JSON 직렬화된다.
+ * @param {String} key 키
+ * @param {*} value 값(문자열 또는 객체/배열)
+ * @returns {void}
+ * @hidden N
+ * @exception
+ * @example
+$c.util.setLocalStorage("user", { id: "kim", role: "admin" });
+ */
+scwin.setLocalStorage = function (key, value) {
+    scwin.__setWebStorage(window.localStorage, key, value);
+};
+
+/**
+ * @method
+ * @name getLocalStorage
+ * @description localStorage 값을 읽는다. JSON 이면 객체/배열로 파싱한다.
+ * @param {String} key 키
+ * @returns {*} 저장된 값. 없으면 null
+ * @hidden N
+ * @exception
+ * @example
+const user = $c.util.getLocalStorage("user");
+ */
+scwin.getLocalStorage = function (key) {
+    return scwin.__getWebStorage(window.localStorage, key);
+};
+
+/**
+ * @method
+ * @name removeLocalStorage
+ * @description localStorage 에서 지정한 키를 삭제한다.
+ * @param {String} key 키
+ * @returns {void}
+ * @hidden N
+ * @exception
+ * @example
+$c.util.removeLocalStorage("user");
+ */
+scwin.removeLocalStorage = function (key) {
+    if (window.localStorage) {
+        window.localStorage.removeItem(key);
+    }
+};
+
+/**
+ * @method
+ * @name clearLocalStorage
+ * @description localStorage 의 모든 값을 삭제한다.
+ * @returns {void}
+ * @hidden N
+ * @exception
+ * @example
+$c.util.clearLocalStorage();
+ */
+scwin.clearLocalStorage = function () {
+    if (window.localStorage) {
+        window.localStorage.clear();
+    }
+};
+
+/**
+ * @method
+ * @name setSessionStorage
+ * @description sessionStorage 에 값을 저장한다. 객체/배열은 자동으로 JSON 직렬화된다.
+ * @param {String} key 키
+ * @param {*} value 값(문자열 또는 객체/배열)
+ * @returns {void}
+ * @hidden N
+ * @exception
+ * @example
+$c.util.setSessionStorage("tab", { menu: "list", page: 2 });
+ */
+scwin.setSessionStorage = function (key, value) {
+    scwin.__setWebStorage(window.sessionStorage, key, value);
+};
+
+/**
+ * @method
+ * @name getSessionStorage
+ * @description sessionStorage 값을 읽는다. JSON 이면 객체/배열로 파싱한다.
+ * @param {String} key 키
+ * @returns {*} 저장된 값. 없으면 null
+ * @hidden N
+ * @exception
+ * @example
+const tab = $c.util.getSessionStorage("tab");
+ */
+scwin.getSessionStorage = function (key) {
+    return scwin.__getWebStorage(window.sessionStorage, key);
+};
+
+/**
+ * @method
+ * @name removeSessionStorage
+ * @description sessionStorage 에서 지정한 키를 삭제한다.
+ * @param {String} key 키
+ * @returns {void}
+ * @hidden N
+ * @exception
+ * @example
+$c.util.removeSessionStorage("tab");
+ */
+scwin.removeSessionStorage = function (key) {
+    if (window.sessionStorage) {
+        window.sessionStorage.removeItem(key);
+    }
+};
+
+/**
+ * @method
+ * @name clearSessionStorage
+ * @description sessionStorage 의 모든 값을 삭제한다.
+ * @returns {void}
+ * @hidden N
+ * @exception
+ * @example
+$c.util.clearSessionStorage();
+ */
+scwin.clearSessionStorage = function () {
+    if (window.sessionStorage) {
+        window.sessionStorage.clear();
+    }
 };
 ]]></script>
 	</head>
