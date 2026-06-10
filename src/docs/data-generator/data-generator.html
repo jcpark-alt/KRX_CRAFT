@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WebSquare DataCollection Generator</title>
+<style>
+* { box-sizing: border-box; }
+body { margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Malgun Gothic',sans-serif;
+       color:#1f2933; background:#f0f4f8; line-height:1.5; }
+.wrap { max-width:1500px; margin:0 auto; padding:24px 20px 48px; }
+header h1 { font-size:20px; margin:0 0 4px; }
+header p { margin:0 0 20px; color:#627d98; font-size:13px; }
+/* 결과 컬럼 고정 916px(+100px), 입력 컬럼(1fr)이 나머지 차지 → 입력 -100px 효과 */
+.grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,916px); gap:20px; align-items:start; }
+@media (max-width:860px){ .grid { grid-template-columns:1fr; } }
+.card { background:#fff; border:1px solid #e4e7eb; border-radius:10px; padding:18px; }
+.card h2 { font-size:14px; margin:0 0 14px; color:#243b53; }
+.field { margin-bottom:16px; }
+.field > label { display:block; font-size:12px; font-weight:700; color:#486581; margin-bottom:6px; }
+.radios { display:flex; gap:10px; }
+.radios label { flex:1; display:flex; align-items:center; gap:8px; border:1px solid #cbd2d9; border-radius:8px;
+                padding:9px 12px; font-size:13px; cursor:pointer; user-select:none; }
+.radios label:hover { background:#f7f9fc; }
+.radios input { accent-color:#2563eb; }
+.id-row { display:flex; align-items:stretch; }
+.id-row .prefix { display:flex; align-items:center; padding:0 12px; background:#eef2f7; border:1px solid #cbd2d9;
+                  border-right:none; border-radius:8px 0 0 8px; font-family:Consolas,monospace; font-size:13px; color:#2563eb; font-weight:700; }
+input[type=text] { width:100%; padding:9px 11px; border:1px solid #cbd2d9; border-radius:8px; font-size:13px; }
+.id-row input[type=text] { border-radius:0 8px 8px 0; }
+textarea { width:100%; padding:11px; border:1px solid #cbd2d9; border-radius:8px;
+           font-family:Consolas,'D2Coding',monospace; font-size:13px; resize:vertical; }
+#srcText { min-height:280px; }
+#result { min-height:360px; background:#0f172a; color:#e2e8f0; border-color:#0f172a; }
+.btn { border:none; border-radius:8px; padding:10px 18px; font-size:13px; font-weight:700; cursor:pointer; }
+.btn-primary { background:#2563eb; color:#fff; width:100%; }
+.btn-primary:hover { background:#1d4ed8; }
+.btn-ghost { background:#eef2f7; color:#243b53; }
+.btn-ghost:hover { background:#dde5ee; }
+.result-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.result-head h2 { margin:0; }
+.meta { font-size:12px; color:#7b8794; margin-top:8px; }
+.hint { font-size:11px; color:#9aa5b1; margin-top:6px; }
+.toast { position:fixed; left:50%; bottom:32px; transform:translateX(-50%) translateY(20px);
+         background:#102a43; color:#fff; padding:10px 20px; border-radius:24px; font-size:13px;
+         opacity:0; pointer-events:none; transition:all .25s ease; z-index:50; }
+.toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+.err { color:#b91c1c; }
+details { margin-top:14px; font-size:12px; color:#627d98; }
+details code { background:#eef2f7; padding:1px 5px; border-radius:4px; font-size:11px; }
+details pre { background:#f7f9fc; border:1px solid #e4e7eb; border-radius:6px; padding:10px; overflow:auto; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>WebSquare DataCollection Generator</h1>
+    <p>명세서에서 복사한 텍스트로 <code>w2:dataMap</code> / <code>w2:dataList</code> XML 을 생성합니다. (3줄 = ID / DataType / 한글명)</p>
+  </header>
+
+  <div class="grid">
+    <!-- 입력 -->
+    <section class="card" id="inputCard">
+      <h2>입력</h2>
+
+      <div class="field">
+        <label>데이터 타입</label>
+        <div class="radios">
+          <label><input type="radio" name="dtype" value="dataMap" checked> dataMap <code>(dma_)</code></label>
+          <label><input type="radio" name="dtype" value="dataList"> dataList <code>(dlt_)</code></label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="baseId">ID 입력 (Prefix 자동 적용)</label>
+        <div class="id-row">
+          <span class="prefix" id="prefix">dma_</span>
+          <input type="text" id="baseId" placeholder="예: search" autocomplete="off">
+        </div>
+        <div class="hint">최종 ID: <span id="finalId">dma_</span></div>
+      </div>
+
+      <div class="field">
+        <label for="srcText">원본 텍스트 (엔터 기준 파싱 · 3줄이 1개 컬럼 · 빈 줄 무시)</label>
+        <textarea id="srcText" placeholder="TYPE&#10;number&#10;타입&#10;&#10;SUBJECT&#10;string&#10;제목"></textarea>
+      </div>
+
+      <button class="btn btn-primary" id="genBtn">Generator ▶</button>
+
+      <details>
+        <summary>지원 dataType 매핑</summary>
+        <pre>STRING·TEXT·CHAR·VARCHAR·VARCHAR2        → text
+NUMBER·INT·INTEGER·FLOAT·DOUBLE·NUMERIC  → number
+BIGDECIMAL·DECIMAL                       → bigDecimal
+DATE·TIMESTAMP·DATETIME                  → date
+TIME                                     → time
+JSON·OBJECT·ARRAY                        → json
+(그 외)                                  → text (기본값)</pre>
+      </details>
+    </section>
+
+    <!-- 출력 -->
+    <section class="card" id="resultCard">
+      <div class="result-head">
+        <h2>결과</h2>
+        <button class="btn btn-ghost" id="copyBtn">Copy</button>
+      </div>
+      <textarea id="result" readonly placeholder="생성된 XML 이 여기에 표시됩니다."></textarea>
+      <div class="meta" id="meta"></div>
+    </section>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+
+// 4.2 / Step 2 — DataType 자동 매핑 (대문자 + trim 전처리)
+function getWebSquareDataType(inputType) {
+    const type = String(inputType).toUpperCase().trim();
+    if (["STRING", "TEXT", "CHAR", "VARCHAR", "VARCHAR2"].includes(type)) return "text";
+    if (["NUMBER", "INT", "INTEGER", "FLOAT", "DOUBLE", "NUMERIC"].includes(type)) return "number";
+    if (["BIGDECIMAL", "DECIMAL"].includes(type)) return "bigDecimal";
+    if (["DATE", "TIMESTAMP", "DATETIME"].includes(type)) return "date";
+    if (["TIME"].includes(type)) return "time";
+    if (["JSON", "OBJECT", "ARRAY"].includes(type)) return "json";
+    return "text";
+}
+
+// XML 특수문자 이스케이프 (속성값 안전)
+function escapeXml(s) {
+    return String(s)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+}
+
+// Step 2 — 텍스트 → 컬럼 배열 (빈 줄 무시, 3줄 묶음)
+function parseColumns(raw) {
+    const lines = raw.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+    const cols = [];
+    for (let i = 0; i < lines.length; i += 3) {
+        const id = lines[i];
+        const type = lines[i + 1];
+        const name = lines[i + 2];
+        if (typeof id === "undefined") break;
+        cols.push({
+            id: id,
+            dataType: getWebSquareDataType(typeof type !== "undefined" ? type : ""),
+            name: typeof name !== "undefined" ? name : "",
+            incomplete: (typeof type === "undefined" || typeof name === "undefined")
+        });
+    }
+    return cols;
+}
+
+// Step 3 — XML 조립
+function buildXml(kind, finalId, cols) {
+    const T = "\t";
+    let body = "";
+    if (kind === "dataMap") {
+        for (const c of cols) {
+            body += T + T + '<w2:key id="' + escapeXml(c.id) + '" name="' + escapeXml(c.name)
+                  + '" dataType="' + c.dataType + '"></w2:key>\n';
+        }
+        return '<w2:dataMap id="' + escapeXml(finalId) + '" baseNode="map">\n'
+             + T + '<w2:keyInfo>\n' + body + T + '</w2:keyInfo>\n'
+             + '</w2:dataMap>\n';
+    } else {
+        for (const c of cols) {
+            body += T + T + '<w2:column id="' + escapeXml(c.id) + '" name="' + escapeXml(c.name)
+                  + '" dataType="' + c.dataType + '"></w2:column>\n';
+        }
+        return '<w2:dataList id="' + escapeXml(finalId) + '" baseNode="list" saveRemovedData="true" repeatNode="map">\n'
+             + T + '<w2:columnInfo>\n' + body + T + '</w2:columnInfo>\n'
+             + '</w2:dataList>\n';
+    }
+}
+
+// ---- DOM ----
+const $ = id => document.getElementById(id);
+const prefixOf = kind => (kind === "dataMap" ? "dma_" : "dlt_");
+function selectedKind() {
+    return document.querySelector('input[name="dtype"]:checked').value;
+}
+function computedId() {
+    return prefixOf(selectedKind()) + $("baseId").value.trim();
+}
+function syncPrefix() {
+    const p = prefixOf(selectedKind());
+    $("prefix").textContent = p;
+    $("finalId").textContent = computedId();
+}
+
+// 결과 카드(section) 전체 높이를 입력 카드 높이와 맞춘다.
+// 결과 Textarea 외 영역(헤더/meta/패딩)을 제외하고 최소 높이를 계산한다.
+function syncResultMinHeight() {
+    const inputH = $("inputCard").offsetHeight;
+    const r = $("result");
+    const chrome = $("resultCard").offsetHeight - r.offsetHeight; // 헤더+meta+패딩 (Textarea 높이와 무관한 상수)
+    const target = inputH - chrome;
+    if (target > 0) r.style.minHeight = target + "px";
+}
+
+// 결과 Textarea 높이를 내용에 맞춰 자동 조정 (min-height 가 최소 높이 보장)
+function autoGrowResult() {
+    syncResultMinHeight();
+    const r = $("result");
+    r.style.height = "auto";
+    r.style.height = r.scrollHeight + "px";
+}
+
+function showToast(msg, isErr) {
+    const t = $("toast");
+    t.textContent = msg;
+    t.style.background = isErr ? "#b91c1c" : "#102a43";
+    t.classList.add("show");
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(() => t.classList.remove("show"), 1800);
+}
+
+function generate() {
+    const kind = selectedKind();
+    const cols = parseColumns($("srcText").value);
+    const meta = $("meta");
+    if (cols.length === 0) {
+        $("result").value = "";
+        autoGrowResult();
+        meta.innerHTML = '<span class="err">파싱된 컬럼이 없습니다. ID/DataType/한글명 3줄 형식을 확인하세요.</span>';
+        showToast("입력 데이터가 없습니다.", true);
+        return;
+    }
+    $("result").value = buildXml(kind, computedId(), cols);
+    autoGrowResult();
+    const bad = cols.filter(c => c.incomplete).length;
+    meta.innerHTML = "컬럼 " + cols.length + "개 생성 · ID <b>" + escapeXml(computedId()) + "</b>"
+        + (bad ? ' · <span class="err">' + bad + '개 행이 3줄 미만(누락분은 빈값 처리)</span>' : "");
+    showToast("XML 을 생성했습니다.");
+}
+
+async function copyResult() {
+    const text = $("result").value;
+    if (!text) { showToast("복사할 결과가 없습니다.", true); return; }
+    try {
+        await navigator.clipboard.writeText(text);
+        showToast("클립보드에 복사했습니다.");
+    } catch (e) {
+        // 폴백 (비보안 컨텍스트/file:// 등)
+        const r = $("result");
+        r.removeAttribute("readonly");
+        r.select();
+        try { document.execCommand("copy"); showToast("클립보드에 복사했습니다."); }
+        catch (e2) { showToast("복사 실패 — 수동으로 선택해 복사하세요.", true); }
+        r.setAttribute("readonly", "readonly");
+        window.getSelection().removeAllRanges();
+    }
+}
+
+// 이벤트 바인딩
+document.querySelectorAll('input[name="dtype"]').forEach(r => r.addEventListener("change", syncPrefix));
+$("baseId").addEventListener("input", syncPrefix);
+$("genBtn").addEventListener("click", generate);
+$("copyBtn").addEventListener("click", copyResult);
+window.addEventListener("resize", syncResultMinHeight);
+$("srcText").addEventListener("input", syncResultMinHeight); // 입력 textarea 수동 리사이즈 등 대응
+syncPrefix();
+syncResultMinHeight();
+</script>
+</body>
+</html>
