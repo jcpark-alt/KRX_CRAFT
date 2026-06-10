@@ -268,48 +268,138 @@ scwin.__submitErrorHandler = function (resObj) {
 
 /**
  * @method
+ * @name __applyDuplicateGuard
+ * @description 중복 실행 제어 가드. 비동기 통신이 진행 중(processStatus === 1)인 submission에 대해
+ * allowDuplicate / onDuplicate 옵션에 따라 실행 여부를 판정한다. execute / executeDynamic 공통 로직.
+ * - allowDuplicate가 true이거나 진행 중이 아니면 { skip:false } 반환(정상 실행).
+ * - 진행 중 + onDuplicate "abort" : 진행 중 요청을 취소하고 직전 Promise를 reject한 뒤 { skip:false } 반환(재실행).
+ * - 진행 중 + onDuplicate "ignore"(기본) : { skip:true, result } 반환(이번 호출 건너뜀).
+ * @param {Object} sbmObj submission 객체
+ * @param {Object} execOptions 중복 실행 제어 옵션 (allowDuplicate / onDuplicate)
+ * @returns {Object} { skip:Boolean, result:Object } skip이 true면 호출자는 result로 즉시 종료한다.
+ * @hidden Y
+ * @exception
+ */
+scwin.__applyDuplicateGuard = function (sbmObj, execOptions) {
+    execOptions = execOptions || {};
+
+    const allowDuplicate = (execOptions.allowDuplicate === true) || (sbmObj.allowDuplicate === true);
+
+    if ((allowDuplicate === false) && (sbmObj.processStatus === 1)) {
+        if (execOptions.onDuplicate === "abort") {
+            // 후행 우선 : 진행 중 요청을 취소한다. (abort는 setSubmissionEnd를 동기 호출하여 processStatus를 0으로 리셋)
+            WebSquare.ModelUtil.abort(sbmObj.id, sbmObj.scope_id);
+            // abort는 defaultCallback(__callbackSubmitFunction)을 호출하지 않으므로, 취소된 직전 Promise를 수동으로 reject 처리한다.
+            if (typeof sbmObj._promise_submitErrorHandler === "function") {
+                sbmObj._promise_submitErrorHandler({ aborted: true, reason: "duplicate-abort", id: sbmObj.id });
+            }
+            // 취소된 직전 Promise의 핸들러를 정리한다. (엔진 이벤트 경로 등에서 동일 핸들러가 재호출되어 다음 요청의 Promise를 잘못 settle하는 것을 방지)
+            sbmObj._promise_submitDoneHandler = null;
+            sbmObj._promise_submitErrorHandler = null;
+            return { skip: false };
+        }
+        // 선행 우선(기본) : 진행 중 요청을 유지하고 이번 호출은 건너뛴다.
+        return { skip: true, result: { skipped: true, reason: "duplicate", id: sbmObj.id } };
+    }
+
+    return { skip: false };
+};
+
+
+/**
+ * @method
  * @name execute
  * @description 서버 통신 확장 모듈, Submission를 실행합니다.
  * @param {Object} sbmObj submission 객체
  * @param {Object} requestData [Default : null, JSON, XML] 요청 데이터로 submission에 등록된 ref를 무시하고 현재의 값이 할당된다.
  * @param {Object} compObj [Default : null] 전송중 disable시킬 컴포넌트
+ * @param {Object} options [Default : null] 중복 실행 제어 옵션
+ * @param {Boolean} options.allowDuplicate [Default : false] true이면 진행 중인 통신과 무관하게 중복 실행을 허용한다.
+ *  (submission 객체에 sbmObj.allowDuplicate = true 로 설정해도 동일하게 동작한다.)
+ * @param {String} options.onDuplicate [Default : "ignore"] allowDuplicate가 false이고 통신이 진행 중일 때의 처리 정책.
+ *  - "ignore" : (기본/선행 우선) 진행 중 요청을 유지하고 이번 호출은 건너뛴다. 더블클릭/연타 방지에 사용. (반환 Promise는 { skipped:true }로 resolve)
+ *  - "abort"  : (후행 우선) 진행 중 요청을 취소하고 이번 요청을 실행한다. 검색어 자동완성 등 최신 요청만 의미 있을 때 사용.
+ *               취소된 직전 요청의 Promise는 { aborted:true, reason:"duplicate-abort" }로 reject된다.
  * @hidden N
- * @exception 
+ * @exception
  * @example
 // Submission의 ref 속성에 서버에 전송할 DataCollection을 설정하는 경우
-$c.sbm.execute(sbm_search); 
+$c.sbm.execute(sbm_search);
 
 //  Submission의 ref 속성에 서버에 전송할 DataCollection을 설정하지 않고 JSON 객체를 전송하는 경우
 const searchParam = {
     id : "A0001"
 };
-$c.sbm.execute(sbm_search, searchParam); 
+$c.sbm.execute(sbm_search, searchParam);
+
+// 더블클릭 방지 : 저장 통신이 끝나기 전까지 재호출을 무시한다. (선행 우선)
+$c.sbm.execute(sbm_save, null, btn_save, { allowDuplicate: false });
+
+// 최신 요청만 처리 : 진행 중 요청을 취소하고 새 요청을 실행한다. (후행 우선)
+$c.sbm.execute(sbm_search, searchParam, null, { onDuplicate: "abort" });
+
+// allowDuplicate와 onDuplicate를 동시에 설정하는 경우 : allowDuplicate가 우선한다.
+// allowDuplicate가 true이면 중복 실행을 허용하므로 onDuplicate("abort")는 무시되고, 진행 중 요청을 취소하지 않고 그대로 동시 실행한다.
+$c.sbm.execute(sbm_search, searchParam, null, { allowDuplicate: true, onDuplicate: "abort" });
+
+// ignore(기본) 정책에서 중복으로 건너뛴 호출은 응답 없이 { skipped:true }로 resolve된다.
+// 응답 데이터를 사용하는 then 체인에서는 skipped를 먼저 확인해 후속 처리를 중단해야 한다.
+$c.sbm.execute(sbm_save).then(function (res) {
+    if (res && res.skipped) { return; } // 진행 중 통신이 있어 이번 호출은 건너뜀
+    // ... 정상 응답 처리 ...
+});
+
+// async/await 사용 시에도 동일하게 skipped를 먼저 확인한다.
+scwin.btn_save_onclick = async function (e) {
+    const res = await $c.sbm.execute(sbm_save);
+    if (res && res.skipped) { return; } // 진행 중 통신이 있어 이번 호출은 건너뜀
+    // ... 정상 응답 처리 ...
+};
  */
-scwin.execute = function (sbmObj, requestData, compObj) {
+scwin.execute = function (sbmObj, requestData, compObj, options) {
+    options = options || {};
     return new Promise(function (resolve, reject) {
-        if (typeof sbmObj === "object") {
-            const _sbmObj = (typeof sbmObj == 'object') ? sbmObj : (typeof sbmObj == 'string') ? $p.getSubmission(sbmObj) : sbmObj;
-
-            if ($c.util.isEmpty(_sbmObj.action)) {
-                const alertMsg = $c.data.getMessage("MSG_CM_00002", "action");
-                $c.win.alert(alertMsg);
-                return false;
-            }
-
-            if ($c.util.isEmpty(_sbmObj.submitDoneHandler)) {
-                _sbmObj._promise_submitDoneHandler = function (rtn) {
-                    resolve(rtn);
-                }
-            }
-
-            if ($c.util.isEmpty(_sbmObj.submitErrorHandler)) {
-                _sbmObj._promise_submitErrorHandler = function (rtn) {
-                    reject(rtn);
-                }
-            }
-
-            $p.executeSubmission(_sbmObj, requestData, compObj);
+        if (typeof sbmObj !== "object" || $c.util.isEmpty(sbmObj)) {
+            // submission 객체가 아니면 Promise가 영구 pending 되지 않도록 reject 처리한다.
+            reject($c.data.getMessage("MSG_CM_00002", "submission"));
+            return;
         }
+
+        const _sbmObj = sbmObj;
+
+        if ($c.util.isEmpty(_sbmObj.action)) {
+            const alertMsg = $c.data.getMessage("MSG_CM_00002", "action");
+            $c.win.alert(alertMsg);
+            reject(alertMsg);
+            return;
+        }
+
+        // 동기(synchronous) 모드에서는 통신이 블로킹되어 재호출 시점에 이미 processStatus가 0으로 복귀하므로
+        // 중복 실행 가드가 동작하지 않는다(비동기 모드에서만 유효). 개발자에게 무효임을 알리는 경고 로그를 항상 출력한다.
+        if (_sbmObj.mode === "synchronous") {
+            console.warn("[$c.sbm.execute] 동기(synchronous) 모드에서는 중복 실행 제어(allowDuplicate/onDuplicate)가 동작하지 않습니다. submission id: " + _sbmObj.id + ", action: " + _sbmObj.action);
+        }
+
+        // 중복 실행 제어 가드 (비동기 통신 진행 중 재호출 처리). skip이면 이번 호출을 건너뛰고 즉시 종료한다.
+        const guard = scwin.__applyDuplicateGuard(_sbmObj, options);
+        if (guard.skip === true) {
+            resolve(guard.result);
+            return;
+        }
+
+        if ($c.util.isEmpty(_sbmObj.submitDoneHandler)) {
+            _sbmObj._promise_submitDoneHandler = function (rtn) {
+                resolve(rtn);
+            }
+        }
+
+        if ($c.util.isEmpty(_sbmObj.submitErrorHandler)) {
+            _sbmObj._promise_submitErrorHandler = function (rtn) {
+                reject(rtn);
+            }
+        }
+
+        $p.executeSubmission(_sbmObj, requestData, compObj);
     });
 };
 
@@ -322,8 +412,11 @@ scwin.execute = function (sbmObj, requestData, compObj) {
  * @param {Object} options $c.sbm.create의 options 참고
  * @param {Object} requestData 요청 데이터
  * @param {Object} obj 전송중 disable시킬 컴퍼넌트
+ * @param {Object} execOptions [Default : null] 중복 실행 제어 옵션. $c.sbm.execute의 options 참고(allowDuplicate / onDuplicate).
+ *  executeDynamic은 매 호출마다 submission을 재생성하므로, 가드는 재생성 전의 기존 submission 객체(진행 중 통신)에서 판정한다.
+ *  동기(synchronous) 모드에서는 통신이 블로킹되어 가드가 동작하지 않으며, 이 경우 $c.sbm.execute에서 콘솔 경고 로그가 출력된다.
  * @hidden N
- * @exception 
+ * @exception
  * @example
 const searchCodeGrpOption = {
      id : "sbm_searchCodeGrp",
@@ -331,9 +424,43 @@ const searchCodeGrpOption = {
      target : 'data:json,{"id":"dlt_codeGrp","key":"data"}',
      submitDoneHandler : scwin.searchCodeGrpCallback, isProcessMsg : false };
 $c.sbm.executeDynamic(searchCodeGrpOption);
+
+// 진행 중 요청을 취소하고 최신 요청으로 재실행 (후행 우선)
+$c.sbm.executeDynamic(searchCodeGrpOption, null, null, { onDuplicate: "abort" });
+
+// 더블클릭 방지 : 진행 중 통신이 끝나기 전까지 재호출을 무시한다. (선행 우선)
+$c.sbm.executeDynamic(searchCodeGrpOption, null, null, { allowDuplicate: false });
+
+// allowDuplicate와 onDuplicate를 동시에 설정하는 경우 : allowDuplicate가 우선한다.
+// allowDuplicate가 true이면 중복 실행을 허용하므로 onDuplicate("abort")는 무시되고, 진행 중 요청을 취소하지 않고 그대로 동시 실행한다.
+$c.sbm.executeDynamic(searchCodeGrpOption, null, null, { allowDuplicate: true, onDuplicate: "abort" });
+
+// ignore(기본) 정책에서 중복으로 건너뛴 호출은 응답 없이 { skipped:true }로 resolve된다.
+// 응답 데이터를 사용하는 then 체인에서는 skipped를 먼저 확인해 후속 처리를 중단해야 한다.
+$c.sbm.executeDynamic(searchCodeGrpOption).then(function (res) {
+    if (res && res.skipped) { return; } // 진행 중 통신이 있어 이번 호출은 건너뜀
+    // ... 정상 응답 처리 ...
+});
+
+// async/await 사용 시에도 동일하게 skipped를 먼저 확인한다.
+scwin.btn_search_onclick = async function (e) {
+    const res = await $c.sbm.executeDynamic(searchCodeGrpOption);
+    if (res && res.skipped) { return; } // 진행 중 통신이 있어 이번 호출은 건너뜀
+    // ... 정상 응답 처리 ...
+};
  */
-scwin.executeDynamic = function (options, requestData, obj) {
+scwin.executeDynamic = function (options, requestData, obj, execOptions) {
+    execOptions = execOptions || {};
     let submissionObj = $c.util.getComponent(options.id);
+
+    // 중복 실행 제어 : executeDynamic은 매 호출마다 submission을 삭제/재생성(processStatus 0으로 초기화)하므로,
+    // 가드는 재생성 전의 기존 객체에서 판정한다. skip이면 재생성/실행 없이 즉시 종료한다.
+    if (submissionObj !== null) {
+        const guard = scwin.__applyDuplicateGuard(submissionObj, execOptions);
+        if (guard.skip === true) {
+            return Promise.resolve(guard.result);
+        }
+    }
 
     if (submissionObj === null) {
         $c.sbm.create(options);
@@ -344,7 +471,7 @@ scwin.executeDynamic = function (options, requestData, obj) {
         submissionObj = $c.util.getComponent(options.id);
     }
 
-    return $c.sbm.execute(submissionObj, requestData, obj);
+    return $c.sbm.execute(submissionObj, requestData, obj, execOptions);
 };
 
 /**
