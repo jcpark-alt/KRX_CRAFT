@@ -10,7 +10,7 @@ JavaScript lives inside `<script><![CDATA[ ... ]]>` blocks in `.xml` screen page
 | Path | What |
 |------|------|
 | `src/gcc/` | Modern common library — one `$c.*` namespace per file (`$c.util`, `$c.win`, `$c.str`, …) |
-| `src/ins/`, `src/mgt/`, `src/stf/` | W-Craft-converted business modules (legacy style) |
+| `src/as-is/ins/`, `src/as-is/mgt/`, `src/as-is/stf/` | W-Craft-converted business modules (legacy style) |
 | `tools/wsxml_lint/` | Python/lxml linter for the WebSquare XML pages |
 | `.claude/agents/` | Project subagents for WebSquare review / dev / analysis / docs |
 

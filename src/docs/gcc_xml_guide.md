@@ -1,6 +1,6 @@
 # gcc 공통 XML 작성 · 검증 가이드
 
-`src/gcc`(및 `src/mgt/gcc` 등) 의 **WebSquare 공통함수 XML** 파일을 새로 만들거나 함수를 추가할 때 지켜야 할 규칙과 검증 절차를 정리한다.
+`src/gcc`(및 `src/as-is/mgt/gcc` 등) 의 **WebSquare 공통함수 XML** 파일을 새로 만들거나 함수를 추가할 때 지켜야 할 규칙과 검증 절차를 정리한다.
 
 ---
 
@@ -131,7 +131,7 @@ scwin.isEmpty = function (value) {
 | :--- | :--- |
 | 단일 파일 검증 | `python -m wsxml_lint src/gcc/<name>.xml` |
 | gcc 전체(엄격) | `npm run lint:xml:gcc` (= `wsxml_lint src/gcc`) |
-| 레거시(완화) | `npm run lint:xml:legacy` (`src/ins src/mgt src/stf --ignore WS111,WS112,WS113`) |
+| 레거시(완화) | `npm run lint:xml:legacy` (`src/as-is/ins src/as-is/mgt src/as-is/stf --ignore WS111,WS112,WS113`) |
 | 전체 | `npm run lint:xml` |
 | API 문서 재생성 | `npm run docs:gcc` → `src/docs/api/gcc/index.html` |
 
