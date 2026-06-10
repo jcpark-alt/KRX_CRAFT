@@ -16,6 +16,8 @@ A lint/test toolchain sits on top of the raw XML. All commands run from the repo
 
 > **Authoring/validating a gcc common XML?** Follow [src/docs/gcc_xml_guide.md](src/docs/gcc_xml_guide.md) — the required `<head>` skeleton, JSDoc + `publicInfo` conventions, `wsxml_lint` rule codes, and a pre-PR checklist.
 
+> **Building a single-page HTML tool/doc under `src/docs/`?** Follow [src/docs/DESIGN.md](src/docs/DESIGN.md) — the shared design system (color tokens, typography, layout grid, components, interaction patterns) so tool pages keep a consistent look. Dependency-free, works from `file://`.
+
 ### `wsxml_lint` — the primary check for this tree
 A Python/lxml linter under `tools/wsxml_lint/` that parses the WebSquare `.xml` pages directly (the only tool that actually inspects this project's source).
 
