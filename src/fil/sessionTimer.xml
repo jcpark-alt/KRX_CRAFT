@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head>
+		<w2:type>COMMON</w2:type>
+		<w2:buildDate/>
+		<xf:model>
+			<w2:workflowCollection/>
+		</xf:model>
+		<w2:publicInfo method="scwin.restartTimer,scwin.showKindEditor,scwin.hideKindEditor,scwin.req4sessionExtn,scwin.startTimer"/>
+		<script type="text/javascript" lazy="false"><![CDATA[
+/* ★Wcraft guide★    
+스크립트 수작업 유의사항
+*/
+
+
+//운영
+//var minute = 10;
+//var second = 0;
+
+//개발
+minute = 59;
+second = 60;
+timer;
+firstTimer = true;
+$(document).ready(function() {
+    // 타이머 시작
+    scwin.startTimer();
+
+    // 이벤트 바인딩
+    $("#btnExtensionSession").on("click", restartTimer);
+});
+
+
+
+
+
+/**
+ * 타이머 재시작(세션 연장 시)
+ */
+/**
+ * @method
+ * @name restartTimer
+ * @description desc
+ * @param
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.restartTimer = function() {
+    $('#divTimeOut').addClass('pop_wrap');
+    clearInterval(scwin.timer);
+
+    //운영
+    //minute = 10;
+    //second = 0;
+
+    //개발
+    scwin.minute = 59;
+    scwin.second = 60;
+    scwin.startTimer();
+    scwin.showKindEditor();
+};
+
+
+
+
+/**
+ * 화면에 KIND 편집기 존재 시 편집기(ActiveX 영역 재활성화)
+ * (2013-09-24 이동윤 추가)공용으로 사용하기 위해 밖으로 뺐음(KBoY)
+ */
+/**
+ * @method
+ * @name showKindEditor
+ * @description desc
+ * @param
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.showKindEditor = function() {
+    if ($("#kindEditorArea1").length > 0) {
+        $("#content").show();
+    }
+};
+
+
+
+
+/**
+ * 화면에 KIND 편집기 존재 시 편집기(ActiveX 영역 비활성화)
+ * (2013-09-24 이동윤 추가)공용으로 사용하기 위해 밖으로 뺐음(KBoY)
+ */
+/**
+ * @method
+ * @name hideKindEditor
+ * @description desc
+ * @param
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.hideKindEditor = function() {
+    if ($("#kindEditorArea1").length > 0) {
+        $("#content").hide();
+    }
+};
+
+
+
+
+
+/**
+ * web.xml 에 Sessio timeout을 2분으로 해놨음.Session을 끊기지 않게 하려고 빈 request를 하나 날린다. 
+ */
+/**
+ * @method
+ * @name req4sessionExtn
+ * @description desc
+ * @param
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.req4sessionExtn = function() {
+    var xhr = $.ajax({
+        type: "POST",
+        url: "/main/login.do",
+        data: "method=extensionSessionTime",
+        success: function(data) {
+            try {
+                eval("var result = " + data);
+                if (result.sesChk == 'Y') {
+                    location.href = "/main/login.do?method=logoutByUnusualCon";
+                } else {
+                    if (result.sametime == 'Y') {
+                        scwin.hideKindEditor();
+                        $('#divCutLoginIn').removeClass('pop_wrap');
+                    }
+                }
+            } catch (e) {
+                eval("var result = {'sametime':'N'}");
+            }
+        },
+        error: function(data) {
+            xhr.abort();
+        }
+    });
+};
+
+
+
+
+
+
+
+
+/**
+ * 타이머 시작
+ */
+/**
+ * @method
+ * @name startTimer
+ * @description desc
+ * @param
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.startTimer = function() {
+    scwin.timer = setInterval(function() {
+        if (scwin.firstTimer) {
+            scwin.req4sessionExtn();
+            scwin.firstTimer = false;
+        }
+        //KBoY 0:00이되면 시간 계산 끝내고 싶은데 카은트 계산이 밑에 있으니까 -1:59 한번 찍고 끝내네..
+        // 2. 카운트다운 계산
+        if (scwin.second == 0) {
+            scwin.minute = scwin.minute - 1;
+            scwin.second = 60;
+        }
+        scwin.second = scwin.second - 1;
+
+        // 1. 유효성 체크(자동 로그아웃 알림 팝업) 요구사항 5분전
+        if (scwin.minute == 5 && scwin.second == 0) {
+            //이미 비밀번호 만료 div가 떠 있다면 그놈 숨기고 timeOut div를 보여줘라. timeOut 연장 해도 어차피 화면 이동 하면 또 보이게 될것임.
+            if (!$('#divAlertBasicWarn').hasClass('pop_wrap')) {
+                $('#divAlertBasicWarn').addClass('pop_wrap');
+            }
+            $('#divTimeOut').removeClass('pop_wrap');
+            scwin.hideKindEditor();
+        } else if (scwin.minute <= 0 && scwin.second <= 0) {
+            clearInterval(scwin.timer);
+            // 3. 로그아웃 처리
+            location.href = "/main/login.do?method=timeOut";
+        }
+        //1분에 한번 30초에 서버로 쓸데없는 request를 날려 세션이 끊기지 않게 한다.
+        if (scwin.second == 30) {
+            scwin.req4sessionExtn();
+        }
+        // 3. 분/초 텍스트 셋팅
+        $("#areaSessionTimer").text(scwin.minute + ":" + ((scwin.second + "").length == 1 ? '0' + scwin.second : scwin.second));
+        $("#auto_sec").text(scwin.minute + ":" + ((scwin.second + "").length == 1 ? '0' + scwin.second : scwin.second));
+    }, 1000);
+};
+]]></script>
+	</head>
+	<body ev:onpageload="" ev:onpageunload=""/>
+</html>

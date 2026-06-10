@@ -1,0 +1,825 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head>
+		<w2:type>COMMON</w2:type>
+		<w2:buildDate/>
+		<xf:model>
+			<w2:workflowCollection/>
+		</xf:model>
+		<w2:publicInfo method="scwin.fn_ElwPageSearch,scwin.fn_ElwPageUsrSearch,scwin.fn_ElwSub,scwin.fn_ElwSelectSub,scwin.batchElwSubmit,scwin.isNotAdmin,scwin.fn_isPossibleSave,scwin.fn_ElwChangePage,scwin.goNextPage,scwin.fn_clearTransTbl,scwin.fn_setBzCd,scwin.fn_setMainPage,scwin.fn_openCalendar,scwin.fn_IsValid,scwin.fn_IsValidArr,scwin.fn_IsValidDate,scwin.fn_IsValidArrDate,scwin.fn_IsValidSelect,scwin.Chk_Digit_Point,scwin.Chk_Sosu_Point_1,scwin.Chk_Sosu_Point_Digit,scwin.Chk_Sosu_Point_Final_Pay_Amt,scwin.Chk_Percent,scwin.Chk_Sosu_Point_2,scwin.fn_isProcess,scwin.fn_msgResultForSave,scwin.fn_showMsgForRemind,scwin.fn_chkElwPrc,scwin.fn_chkSaveElwPrc"/>
+		<script type="text/javascript" lazy="false"><![CDATA[
+/* ★Wcraft guide★    
+스크립트 수작업 유의사항
+*/
+
+
+INSERT = 0;
+UPDATE = 1;
+SELECT = 2;
+DELETE = 3;
+NEWSEL = 4;
+BZ_NEWPRE = 0; /* ELW 예비심사               */
+BZ_NEWLST = 1; /* ELW 신규상장               */
+BZ_ADDPRE = 2; /* ELW 추가예비               */
+BZ_ADDLST = 3; /* ELW 추가상장               */
+BZ_USRLST = 4; /* 신청관련 조회               */
+
+/* 상장업무구분코드 */
+CD_NEWPRE = '002'; /* ELW 예비심사               */
+CD_NEWLST = '003'; /* ELW 신규상장               */
+CD_ADDPRE = '004'; /* ELW 추가예비               */
+CD_ADDLST = '005'; /* ELW 추가상장               */
+
+/* 상장처리상태코드 */
+/* 00 : 신청중 , 01 : 신청완료 , 10 : 접수 , 02 : 반송  */
+CD_STAT_ING = '00';
+CD_STAT_FIN = '01';
+CD_STAT_REJ = '02'; /* 업무 처리 번호 있더라도 신규처리 */
+
+LD_MKT_TP_CD = '1'; /* 상장공시시장구분코드 */
+/* 유가 , 코스닥 시장 구분 : 일단은 유가만 신청 : 1 */
+
+
+IDX_LIST = 0; /* 상장처리현황 */
+IDX_MST = 1; /* ELW심사및신규상장         */
+IDX_FNC = 2; /* ELW재무                   */
+IDX_DRV = 3; /* ELW장외파생               */
+IDX_PACK = 4; /* ELW일괄신고서             */
+IDX_LP = 5; /* ELW예비심사유동성공급자   */
+IDX_ULY = 6; /* ELW예비심사기초자산       */
+IDX_ATTACH = 7; /* ELW첨부                   */
+IDX_PUBOFR = 8; /* ELW공모사항               */
+IDX_USER = 9; /* ELW 신청인정보              */
+IDX_MSTADD = 10; /* ELW 추가상장              */
+IDX_LPADD = 11; /* ELW 추가상장 최초조회 : 예비심사유동성공급자    */
+IDX_PBCT = 12; /* ELW 추가상장 : 발행제비용의내역    */
+
+/**
+ * @method
+ * @name fn_ElwPageSearch
+ * @description desc
+ * @param
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.fn_ElwPageSearch = function() {
+    if (form.isuNm != undefined) {
+        form.isuNm.setValue("");
+    }
+    form.action = '/list/elwPage.do';
+    form.method.setValue('elwPageSearch');
+    form.submit();
+};
+/**
+ * @method
+ * @name fn_ElwPageUsrSearch
+ * @description desc
+ * @param
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.fn_ElwPageUsrSearch = function() {
+    form.bzCd.setValue(scwin.BZ_USRLST);
+    if (form.isuNm != undefined) {
+        form.isuNm.setValue("");
+    }
+    form.action = '/list/elwPage.do';
+    form.method.setValue('elwPageSearch');
+    form.submit();
+};
+/**
+ * @method
+ * @name fn_ElwSub
+ * @description desc
+ * @param
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.fn_ElwSub = function() {
+    //	alert("fn_ElwSub  ==  " + bzProcsNo);
+    if (scwin.isNotAdmin()) {
+        if (eval(form["billLstSaveStatCd"].getValue()) != 4) {
+            alert("신청인정보  페이지까지 입력을 하셔야만 제출 하실수 있습니다.");
+            return;
+        }
+
+        //-- 기준가격,행사가격 데이타 검증 --> 
+        if (!scwin.fn_chkSaveElwPrc()) return;
+        form["listProcsStatCd"].setValue(scwin.CD_STAT_FIN); /* 상장처리상태코드 */
+
+        if (!scwin.fn_isProcess('S')) return;
+        form.action = '/list/elwPage.do';
+        form.method.setValue('elwPageSub');
+        form.submit();
+    }
+};
+/**
+ * @method
+ * @name fn_ElwSelectSub
+ * @description desc
+ * @param
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.fn_ElwSelectSub = function() {
+    if (scwin.isNotAdmin()) {
+        if (!$("[name='checkSub']").is(':checked')) {
+            alert('선택된 항목이 없습니다.');
+            return;
+        }
+        var values = new Array();
+        $("input:checkbox[name='checkSub']").each(function() {
+            if (this.checked) {
+                values.push($(this).val());
+            }
+        });
+        var str;
+        for (var i = 0; i < values.length; i++) {
+            if (i == 0) {
+                str = values[i];
+            } else {
+                str = str + "_" + values[i];
+            }
+        }
+        form["listProcsStatCd"].setValue(scwin.CD_STAT_FIN); /* 상장처리상태코드 */
+        form["checkSubNo"].setValue(str);
+        if (!scwin.fn_isProcess('S')) return;
+        form.action = '/list/elwPage.do';
+        form.method.setValue('elwSelectSub');
+        form.submit();
+    }
+};
+/**
+ * @method
+ * @name batchElwSubmit
+ * @description desc
+ * @param
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.batchElwSubmit = function() {
+    if (scwin.isNotAdmin()) {
+        if (!$("[name='checkForBatch']").is(':checked')) {
+            alert('선택된 항목이 없습니다.');
+            return;
+        }
+
+        //	$("input:checkbox[name='checkForBatch']").each(
+        //												function()
+        //												{
+        //													if(this.checked){
+        //														alert($(this).val());
+        //													}
+        //												}
+        //											)
+
+
+        if (!scwin.fn_isProcess('S')) return;
+        form.action = '/list/elwPage.do';
+        form.method.setValue('batchElwSubmit');
+        form.submit();
+    }
+};
+
+
+
+//관리자인경우는 조회만 가능
+/**
+ * @method
+ * @name isNotAdmin
+ * @description desc
+ * @param
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.isNotAdmin = function() {
+    if (form.isurCd.getValue() == "99999" || form.isurCd.getValue() == "") {
+        alert("\n 관리자는 조회가 가능합니다.");
+        return false;
+    }
+    return true;
+};
+/**
+ * @method
+ * @name fn_isPossibleSave
+ * @description desc
+ * @param
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.fn_isPossibleSave = function() {
+    scwin.isNotAdmin();
+
+    // BZ_ADDPRE 중  '00' , '02' 만 저장가능
+    // 2012/08/08 KBoY 반송시 해당탭으로 이동하기 위해 반송시 기존꺼 02로 돌리고 03으로 하나를 카피 뜨기 때문에 02로 올 일이 없다.
+    if (form.bzCd.getValue() == scwin.BZ_ADDPRE || form.bzCd.getValue() == scwin.BZ_ADDLST) {
+        if (form.listProcsStatCd.getValue() != "" && form.listProcsStatCd.getValue() != scwin.CD_STAT_ING && form.listProcsStatCd.getValue() != '03') {
+            alert("\n 해당 종목이 처리중입니다.       \n\n 목록에서 상태를 확인하세요.");
+            return false;
+        }
+    }
+
+    // 반송된 업무처리일경우는 첫페이지에서만 저장이 가능 2012-07-31 KBoY 03으로 오기 때문에 앞으로 여기 올일 없음.
+    if (form.listProcsStatCd.getValue() == scwin.CD_STAT_REJ) {
+        if (eval(form.nowPage.getValue()) == 1) {
+            form["bzProcsNo"].setValue("");
+            form["transKind"].setValue(scwin.INSERT);
+            form["listProcsStatCd"].setValue(scwin.CD_STAT_ING); /* 상장처리상태코드 */
+
+            return true;
+        } else {
+            alert("\n 현재 텝에서는 저장을 할수 없습니다. \n\n 증권발행개요 탭으로 이동후, 저장을 하세요");
+            return false;
+        }
+    }
+
+    //3단계(파일첨부) 입력안해도 다음단계로 이동가능하도록 수정 (2010-02-01) 
+    if (form.billLstSaveStatCd.getValue() < 2) {
+        if (eval(form.nowPage.getValue()) > (eval(form.billLstSaveStatCd.getValue()) + 1)) {
+            alert("\n 현재 텝에서는 저장을 할수 없습니다. \n\n 탭별로 작성후 저장하셔야 합니다..");
+            return false;
+        }
+    }
+    //2012-07-31 KBoY 다시 저장할때 prelistBizImpl doChangeListPorcsStatCd()에서 '03'받아다 00으로 강제 세팅함...					
+    if (form.listProcsStatCd.getValue() != '03') {
+        form["listProcsStatCd"].setValue(scwin.CD_STAT_ING); /* 상장처리상태코드 */
+
+    }
+
+    //viewFormNameAndData(); 
+    if (form["bzProcsNo"].getValue() == "") form["transKind"].setValue(scwin.INSERT);
+
+    else form["transKind"].setValue(scwin.UPDATE);
+    return true;
+};
+/**
+ * @method
+ * @name fn_ElwChangePage
+ * @description desc
+ * @param {string} pageIndex desc
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.fn_ElwChangePage = function(pageIndex) {
+    if (form.billLstSaveStatCd.getValue() == "") {
+        form.billLstSaveStatCd.setValue(0);
+    }
+
+    //alert("현재 단계: " + pageIndex + "_최종저장단계: " + form.billLstSaveStatCd.value);
+
+    //3단계(파일첨부) 입력안해도 다음단계로 이동가능하도록 수정 (2010-02-01)
+    //상장&추가상장예비심사의경우 파일첨부 필수임 KBoY(2012-08-21)
+    var bzCd = form.bzCd.getValue();
+    if (eval(pageIndex) <= (eval(form.billLstSaveStatCd.getValue()) + 1)) {
+        scwin.goNextPage(pageIndex);
+    } else {
+        //		if(form.billLstSaveStatCd.value < 3 && (bzCd == '0' || bzCd == '2')) {
+        if (form.billLstSaveStatCd.getValue() < 2) {
+            alert("현재페이지의 항목들을 저장후에 다음 페이지로 이동할수 있습니다.");
+            return;
+        } else {
+            //체크안하고 페이지 자유롭게 이동
+            //2012-09-04 KBoY 모든 단계에서 파일첨부 필수처리 해제 		
+            /*			if(bzCd == '0' || bzCd == '2') {
+            				alert("현재페이지의 항목들을 저장후에 다음 페이지로 이동할수 있습니다.");
+            				return ;
+            			}else{
+            				goNextPage(pageIndex);
+            			}
+            */
+            scwin.goNextPage(pageIndex);
+        }
+    }
+};
+
+
+
+
+
+
+/* 3단계(파일첨부) 입력안해도 다음단계로 이동가능하도록 수정 (2010-02-01) */
+/**
+ * @method
+ * @name goNextPage
+ * @description desc
+ * @param {string} pageIndex desc
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.goNextPage = function(pageIndex) {
+    form.nowPage.setValue(pageIndex);
+    var procsStatCd = form.listProcsStatCd.getValue();
+    if (form.bzProcsNo.getValue() == "") {
+        // 신규 작성일경우
+        form["transKind"].setValue(scwin.NEWSEL);
+    } else {
+        if (eval(form.nowPage.getValue()) <= eval(form.billLstSaveStatCd.getValue())) {
+            // 		if( procsStatCd != '' ) {
+            form["transKind"].setValue(scwin.SELECT);
+        } else {
+            form["transKind"].setValue(scwin.NEWSEL);
+        }
+    }
+    scwin.fn_clearTransTbl();
+    if (pageIndex == '1') {
+        scwin.fn_setMainPage();
+    } else if (pageIndex == '2') {
+        form["transTbl"][0].setValue(scwin.IDX_FNC);
+        form["transTbl"][1].setValue(scwin.IDX_DRV);
+    } else if (pageIndex == '3') {
+        form["transTbl"][0].setValue(scwin.IDX_ATTACH);
+    } else if (pageIndex == '4') {
+        form["transTbl"][0].setValue(scwin.IDX_USER);
+    }
+    form.action = '/list/elw.do';
+    form.method.setValue('searchElw');
+    form.submit();
+};
+/**
+ * @method
+ * @name fn_clearTransTbl
+ * @description desc
+ * @param
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.fn_clearTransTbl = function() {
+    for (var i = 0; i < form["transTbl"].length; i++) {
+        form["transTbl"][i].setValue(0);
+    }
+};
+/**
+ * @method
+ * @name fn_setBzCd
+ * @description desc
+ * @param
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.fn_setBzCd = function() {
+    if (form.listBzTpCd.getValue() == scwin.CD_NEWPRE) form["bzCd"].setValue(scwin.BZ_NEWPRE);
+
+    else if (form.listBzTpCd.getValue() == scwin.CD_NEWLST) form["bzCd"].setValue(scwin.BZ_NEWLST);
+
+    else if (form.listBzTpCd.getValue() == scwin.CD_ADDPRE) form["bzCd"].setValue(scwin.BZ_ADDPRE);
+
+    else if (form.listBzTpCd.getValue() == scwin.CD_ADDLST) form["bzCd"].setValue(scwin.BZ_ADDLST);
+};
+/**
+ * @method
+ * @name fn_setMainPage
+ * @description desc
+ * @param
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.fn_setMainPage = function() {
+    if (form["bzCd"].getValue() == scwin.BZ_NEWPRE) {
+        form["transTbl"][0].setValue(scwin.IDX_MST);
+        form["transTbl"][1].setValue(scwin.IDX_ULY);
+        form["transTbl"][2].setValue(scwin.IDX_PACK);
+        form["transTbl"][3].setValue(scwin.IDX_LP);
+    } else if (form["bzCd"].getValue() == scwin.BZ_NEWLST) {
+        form["transTbl"][0].setValue(scwin.IDX_MST);
+        form["transTbl"][1].setValue(scwin.IDX_ULY);
+        form["transTbl"][2].setValue(scwin.IDX_PUBOFR);
+        form["transTbl"][3].setValue(scwin.IDX_LP);
+    } else if (form["bzCd"].getValue() == scwin.BZ_ADDPRE) {
+        form["transTbl"][0].setValue(scwin.IDX_MSTADD);
+        form["transTbl"][1].setValue(scwin.IDX_PACK);
+        form["transTbl"][2].setValue(scwin.IDX_ULY);
+        form["transTbl"][3].setValue(scwin.IDX_LPADD);
+        form["transTbl"][4].setValue(scwin.IDX_LP);
+    } else if (form["bzCd"].getValue() == scwin.BZ_ADDLST) {
+        form["transTbl"][0].setValue(scwin.IDX_MSTADD);
+        form["transTbl"][1].setValue(scwin.IDX_PUBOFR);
+        form["transTbl"][2].setValue(scwin.IDX_ULY);
+        form["transTbl"][3].setValue(scwin.IDX_LPADD);
+        form["transTbl"][4].setValue(scwin.IDX_LP);
+    }
+};
+openCalendarObj = null;
+paramCalendarObj = null;
+/**
+ * @method
+ * @name fn_openCalendar
+ * @description desc
+ * @param {string} obj desc
+ * @param {string} paramObj desc
+ * @param {string} chkBzCalnd desc
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.fn_openCalendar = function(obj, paramObj, chkBzCalnd) {
+    scwin.openCalendarObj = obj;
+    scwin.paramCalendarObj = paramObj;
+    if (chkBzCalnd) {
+        isChkBzCalnd = true;
+    } else {
+        isChkBzCalnd = false;
+    }
+    popUpYYYYMMDD(obj);
+};
+/**
+ * @method
+ * @name fn_IsValid
+ * @description desc
+ * @param {string} obj desc
+ * @param {string} arrVar desc
+ * @param {string} arrVarAlt desc
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.fn_IsValid = function(obj, arrVar, arrVarAlt) {
+    for (i = 0; i < arrVar.length; i++) {
+        var arrObj = obj[arrVar[i]];
+        if (arrObj.getValue() == '' || arrObj.getValue() == ' ') {
+            var msg = arrObj.alt != '' ? arrObj.alt : arrVarAlt[i];
+            alert(msg + '(은)는 반드시 입력하셔야 합니다.');
+            arrObj.focus();
+            return false;
+        }
+    }
+    return true;
+};
+/**
+ * @method
+ * @name fn_IsValidArr
+ * @description desc
+ * @param {string} obj desc
+ * @param {string} arrVar desc
+ * @param {string} arrVarAlt desc
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.fn_IsValidArr = function(obj, arrVar, arrVarAlt) {
+    for (i = 0; i < arrVar.length; i++) {
+        var arrObj = obj[arrVar[i]];
+        for (j = 0; j < arrObj.length; j++) {
+            if (arrObj[j].getValue() == '') {
+                alert(arrVarAlt[i] + '(은)는 반드시 입력하셔야 합니다.');
+                arrObj[j].focus();
+                return false;
+            }
+        }
+    }
+    return true;
+};
+/**
+ * @method
+ * @name fn_IsValidDate
+ * @description desc
+ * @param {string} obj desc
+ * @param {string} arrVar desc
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.fn_IsValidDate = function(obj, arrVar) {
+    for (i = 0; i < arrVar.length; i++) {
+        var arrObj = obj[arrVar[i]];
+        if (arrObj.getValue() == '') {
+            alert(arrObj.alt + '(은)는 반드시 입력하셔야 합니다.');
+            arrObj.focus();
+            return false;
+        }
+        if (arrObj.getValue().length != 8) {
+            alert(arrObj.alt + '입력 날짜를 확인하세요');
+            arrObj.focus();
+            return false;
+        }
+    }
+    return true;
+};
+/**
+ * @method
+ * @name fn_IsValidArrDate
+ * @description desc
+ * @param {string} obj desc
+ * @param {string} arrVar desc
+ * @param {string} checkLen desc
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.fn_IsValidArrDate = function(obj, arrVar, checkLen) {
+    for (i = 0; i < arrVar.length; i++) {
+        var arrObj = obj[arrVar[i]];
+        for (j = 0; j < arrObj.length; j++) {
+            if (arrObj[j].getValue() == '' || arrObj[j].getValue().length != checkLen) {
+                alert('입력 날짜를 확인하세요');
+                arrObj[j].focus();
+                return false;
+            }
+        }
+    }
+    return true;
+};
+/**
+ * @method
+ * @name fn_IsValidSelect
+ * @description desc
+ * @param {string} obj desc
+ * @param {string} arrVar desc
+ * @param {string} arrVarAlt desc
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.fn_IsValidSelect = function(obj, arrVar, arrVarAlt) {
+    for (i = 0; i < arrVar.length; i++) {
+        var arrObj = obj[arrVar[i]];
+        if (arrObj.getValue() == '') {
+            alert(arrVarAlt[i] + '(은)는 반드시 선택하셔야 합니다.');
+            arrObj.focus();
+            return false;
+        }
+    }
+    return true;
+};
+
+
+// 숫자와 "." 만 포함되어있는지 Check
+/**
+ * @method
+ * @name Chk_Digit_Point
+ * @description desc
+ * @param {string} str desc
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.Chk_Digit_Point = function(str) {
+    for (var i = 0; i < str.length; i++) {
+        var ch = str.charAt(i);
+        if ((ch < "0" || ch > "9") && !(ch == "." || ch == ",")) {
+            return false;
+        }
+    }
+    return true;
+};
+
+// 만기상환률 : 숫자와 "." 만 포함되어있는지 Check 숫자와 '.' 만 가능, 999 보다 크면 false
+/**
+ * @method
+ * @name Chk_Sosu_Point_1
+ * @description desc
+ * @param {string} Name desc
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.Chk_Sosu_Point_1 = function(Name) {
+    if (!scwin.Chk_Digit_Point(Name.getValue())) {
+        alert(" 숫자와 . 만 입력 가능합니다.");
+        Name.focus();
+        return false;
+    }
+    var temp = Name.getValue().replace(",", "");
+    if (temp >= 10000) {
+        alert(" 10000보다 작아야 합니다.");
+        Name.focus();
+        return false;
+    }
+    return true;
+};
+/**
+ * @method
+ * @name Chk_Sosu_Point_Digit
+ * @description desc
+ * @param {string} Name desc
+ * @param {string} funcName desc
+ * @param {string} digit desc
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.Chk_Sosu_Point_Digit = function(Name, funcName, digit) {
+    if (funcName == "Chk_Sosu_Point_1") {
+        scwin.Chk_Sosu_Point_1(Name);
+    } else if (funcName == "Chk_Sosu_Point_2") {
+        scwin.Chk_Sosu_Point_2(Name);
+    } else if (funcName == "Chk_Sosu_Point_Final_Pay_Amt") {
+        scwin.Chk_Sosu_Point_Final_Pay_Amt(Name);
+    } else if (funcName == "fn_showMsgForRemind") {
+        scwin.fn_showMsgForRemind(Name.alt, Name.getValue());
+    } else if (funcName == "Chk_Percent") {
+        scwin.Chk_Percent(Name);
+    }
+    var arrVal = Name.getValue().split(".");
+    if (arrVal[1].length > digit) {
+        alert(Name.alt + "는(은) 소수점 이하 " + digit + "자리까지 입력 가능합니다.");
+        Name.focus();
+        return false;
+    }
+};
+/**
+ * @method
+ * @name Chk_Sosu_Point_Final_Pay_Amt
+ * @description desc
+ * @param {string} Name desc
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.Chk_Sosu_Point_Final_Pay_Amt = function(Name) {
+    if (!scwin.Chk_Digit_Point(Name.getValue())) {
+        alert(" 숫자와 . 만 입력 가능합니다.");
+        Name.focus();
+        return false;
+    }
+    if (Name.getValue() >= 100000) {
+        alert("만원단위까지 입력이 가능합니다.");
+        Name.focus();
+        return false;
+    }
+    return true;
+};
+
+// 백분율 Check (0 ~ 100), 소수점과 '.' 만 가능
+/**
+ * @method
+ * @name Chk_Percent
+ * @description desc
+ * @param {string} Name desc
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.Chk_Percent = function(Name) {
+    if (!scwin.Chk_Digit_Point(Name.getValue())) {
+        alert(" 숫자와 . 만 입력 가능합니다.");
+        Name.focus();
+        return false;
+    }
+    if (Name.getValue() > 100) {
+        alert(" 100보다 큽니다.");
+        Name.focus();
+        return false;
+    }
+    return true;
+};
+
+// 제반비용 : 숫자와 "." 만 포함되어있는지 Check 숫자와 '.' 만 가능
+/**
+ * @method
+ * @name Chk_Sosu_Point_2
+ * @description desc
+ * @param {string} Name desc
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.Chk_Sosu_Point_2 = function(Name) {
+    if (!scwin.Chk_Digit_Point(Name.getValue())) {
+        alert(" 숫자와 . 만 입력 가능합니다.");
+        Name.focus();
+        return false;
+    }
+    return true;
+};
+
+
+/*
+ * 상장업무처리 메세지 처리
+ */
+LastJob = "";
+/**
+ * @method
+ * @name fn_isProcess
+ * @description desc
+ * @param {string} gubun desc
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.fn_isProcess = function(gubun) {
+    if (gubun == 'I') scwin.LastJob = '저장';
+
+    else if (gubun == 'U') scwin.LastJob = '수정';
+
+    else if (gubun == 'D') scwin.LastJob = '삭제';
+
+    else if (gubun == 'S') scwin.LastJob = '제출';
+    if (!window.confirm("[" + scwin.LastJob + "] 하시겠습니까?")) {
+        return false;
+    }
+    return true;
+};
+/**
+ * @method
+ * @name fn_msgResultForSave
+ * @description desc
+ * @param
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.fn_msgResultForSave = function() {
+    if (form.resultMsg.getValue() != "") alert(form.resultMsg.getValue());
+};
+/**
+ * @method
+ * @name fn_showMsgForRemind
+ * @description desc
+ * @param {string} msg desc
+ * @param {string} value desc
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.fn_showMsgForRemind = function(msg, value) {
+    alert(msg + "  :  " + value + "  으로 입력하셨습니다.");
+};
+/**
+ * @method
+ * @name fn_chkElwPrc
+ * @description desc
+ * @param {string} msg desc
+ * @param {string} obj desc
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.fn_chkElwPrc = function(msg, obj) {
+    var val = obj.getValue();
+    if (val == '0') {
+        alert(msg + " 항목은 0으로 입력할 수 없습니다.");
+        obj.setValue('');
+        obj.focus();
+        return false;
+    } else if (val != '') {
+        scwin.fn_showMsgForRemind(msg, val);
+        return true;
+    }
+};
+/**
+ * @method
+ * @name fn_chkSaveElwPrc
+ * @description desc
+ * @param
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.fn_chkSaveElwPrc = function() {
+    if (form.elwUlyBasPrc != undefined && form.elwUlyBasPrc.getValue() == 0) {
+        alert("기준가격/지수 항목은 0인 값을 입력할 수 없습니다.");
+        form.elwUlyBasPrc.focus();
+        return false;
+    }
+    if (form.elwExerPrc != undefined && form.elwExerPrc.getValue() == 0) {
+        alert("행사가격/지수 항목은 0인 값을 입력할 수 없습니다.");
+        form.elwExerPrc.focus();
+        return false;
+    }
+    return true;
+};
+]]></script>
+	</head>
+	<body ev:onpageload="" ev:onpageunload=""/>
+</html>

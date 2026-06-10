@@ -1,0 +1,359 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head>
+		<w2:type>COMMON</w2:type>
+		<w2:buildDate/>
+		<xf:model>
+			<w2:workflowCollection/>
+		</xf:model>
+		<w2:publicInfo method="scwin.getClosedVal,scwin.fn_GetCurrentTime,scwin.fn_SetCurrentTime,scwin.checkCanSubmit,scwin.checkCanSubmitBeforeLogin,scwin.checkCanSubmitBeforeLoginSub,scwin.timeGuBun"/>
+		<script type="text/javascript" lazy="false"><![CDATA[
+/* ★Wcraft guide★    
+스크립트 수작업 유의사항
+*/
+
+
+statusStr = "공시 제출 가능 시간 : 평일 18:00 까지";
+sdate = "";
+nowDate;
+bzChkFrm;
+submitSec = 0;
+//마감여부 체크
+
+Date.prototype.format = function(format) {
+    var o = {
+        "M+": this.getMonth() + 1, //month	
+        "d+": this.getDate(), //day	
+        "h+": this.getHours(), //hour	
+        "H+": this.getHours(), //hour	
+        "m+": this.getMinutes(), //minute	
+        "s+": this.getSeconds(), //second	
+        "q+": Math.floor((this.getMonth() + 3) / 3), //quarter	
+        "S": this.getMilliseconds() //millisecond
+    };
+    if (/(y+)/.test(format)) format = format.replace(RegExp.$1, (this.getFullYear() + "").substr(4 - RegExp.$1.length));
+    for (var k in o)
+        if (new RegExp("(" + k + ")").test(format)) format = format.replace(RegExp.$1, RegExp.$1.length == 1 ? o[k] : ("00" + o[k]).substr(("" + o[k]).length));
+    return format;
+};
+/**
+ * @method
+ * @name getClosedVal
+ * @description desc
+ * @param {string} type desc
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.getClosedVal = function(type) {
+    var result;
+    var xhr3 = $.ajax({
+        type: "POST",
+        cache: false,
+        timeout: 5000,
+        url: "/main/mainIntro.do",
+        data: "method=getCurrentTime",
+        success: function(data) {
+            try {
+                result = $.parseJSON(data);
+            } catch (e) {
+                eval("result = " + '{"currentTime":"' + new Date().format("yyyy-MM-dd HH:mm:ss") + '","businessClosing":"N"};');
+            }
+        },
+        error: function(data) {
+            eval("result = " + '{"currentTime":"' + new Date().format("yyyy-MM-dd HH:mm:ss") + '","businessClosing":"N"};');
+            xhr3.abort();
+        },
+        complete: function(data) {
+            scwin.sdate = Date.parse(result.currentTime, "yyyy-MM-dd HH:mm:ss");
+            if (type == 0) {
+                scwin.fn_SetCurrentTime();
+                scwin.checkCanSubmitBeforeLogin();
+            } else if (type == 1) {
+                scwin.checkCanSubmit();
+            } else {
+                scwin.checkCanSubmitBeforeLoginSub();
+            }
+        }
+    });
+    return result;
+};
+
+
+
+
+// 현재시간 type 0:로그인전 , 1:로그인 후, 2:로그인전 sub화면
+/**
+ * @method
+ * @name fn_GetCurrentTime
+ * @description desc
+ * @param {string} _frm desc
+ * @param {string} type desc
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.fn_GetCurrentTime = function(_frm, type) {
+    scwin.bzChkFrm = _frm;
+    scwin.getClosedVal(type);
+};
+
+
+
+/** 현재시간 */
+/**
+ * @method
+ * @name fn_SetCurrentTime
+ * @description desc
+ * @param
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.fn_SetCurrentTime = function() {
+    window.setTimeout("fn_SetCurrentTime()", 1000);
+    var currentTimeStr = sdate.toString("yyyy-MM-dd HH:mm:ss");
+    //var htmlStr = "<span class='text_red'>" + currentTimeStr + "</span> " + statusStr;
+    document.getElementById('currentTimeDiv').innerHTML = currentTimeStr;
+};
+
+
+
+
+//filSubmitGubun 0:제출가능, 1:제출마감 30분미만, 2:제출불가, 3:로그인전 6시 이후
+filSubmitGubun = "0";
+/** 제출가능여부 */
+/**
+ * @method
+ * @name checkCanSubmit
+ * @description desc
+ * @param
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.checkCanSubmit = function() {
+    window.setTimeout("checkCanSubmit()", 1000);
+    sdate.addMilliseconds(1000);
+    scwin.nowDate = new Date(scwin.sdate);
+
+
+    //filSubmitGubun setting
+    scwin.timeGuBun(scwin.nowDate, 0);
+
+    /*	
+    //테스트용
+    if(nowDate.getSeconds() < 20){
+    	filSubmitGubun = 0;
+    }else if(nowDate.getSeconds() < 40){
+    	filSubmitGubun = 1;		
+    }else{
+    	filSubmitGubun = 2;	
+    }
+    //테스트용
+    */
+    if (scwin.filSubmitGubun == 0) {
+        $('#submitCondition strong').text('공시제출가능');
+        $('#submitCondition').css({
+            'background': '#6695e1'
+        });
+        $('#submitCondition').parent().css({
+            'background': '#6695e1'
+        });
+        $('.lnb_wrap h2').css({
+            'background': '#6695e1'
+        });
+    } else if (scwin.filSubmitGubun == 1) {
+        var nowMinute = nowDate.getMinutes();
+        $('#submitCondition strong').text('공시제출마감' + (60 - nowMinute) + '분전');
+        $('#submitCondition').css({
+            'background': '#e68e07'
+        });
+        $('#submitCondition').parent().css({
+            'background': '#e68e07'
+        });
+        $('.lnb_wrap h2').css({
+            'background': '#e68e07'
+        });
+    } else {
+        $('#submitCondition strong').text('공시제출불가능');
+        $('#submitCondition').css({
+            'background': '#C9503B'
+        });
+        $('#submitCondition').parent().css({
+            'background': '#C9503B'
+        });
+        $('.lnb_wrap h2').css({
+            'background': '#C9503B'
+        });
+    }
+};
+
+
+
+
+/** 로그인전 제출가능여부 */
+/**
+ * @method
+ * @name checkCanSubmitBeforeLogin
+ * @description desc
+ * @param
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.checkCanSubmitBeforeLogin = function() {
+    window.setTimeout("checkCanSubmitBeforeLogin()", 1000);
+    sdate.addMilliseconds(1000);
+    scwin.nowDate = new Date(scwin.sdate);
+
+    //filSubmitGubun setting
+    scwin.timeGuBun(scwin.nowDate, 1);
+    if (scwin.filSubmitGubun == 0) {
+        $('#submitCondition h3').text('상장공시 제출 가능합니다.');
+        $('#submitCondition h3').css({
+            'background': '#6695e1'
+        });
+        $('#submitCondition h3').css({
+            'background': '#6695e1'
+        });
+    } else if (scwin.filSubmitGubun == 1) {
+        var nowMinute = nowDate.getMinutes();
+        $('#submitCondition h3').text('공시제출마감' + (60 - nowMinute) + '분전');
+        $('#submitCondition h3').css({
+            'background': '#e68e07'
+        });
+        $('.lnb_wrap h2').css({
+            'background': '#e68e07'
+        });
+    } else {
+        $('#submitCondition h3').text('평일 18시까지 공시 제출 가능');
+        $('#submitCondition h3').css({
+            'background': '#1393c5'
+        });
+    }
+};
+
+
+
+
+/** 로그인전 제출가능여부 */
+/**
+ * @method
+ * @name checkCanSubmitBeforeLoginSub
+ * @description desc
+ * @param
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.checkCanSubmitBeforeLoginSub = function() {
+    window.setTimeout("checkCanSubmitBeforeLoginSub()", 1000);
+    sdate.addMilliseconds(1000);
+    scwin.nowDate = new Date(scwin.sdate);
+    var timeGuBunObj = scwin.timeGuBun(scwin.nowDate, 1);
+    if (scwin.filSubmitGubun == 0) {
+        $('#submitCondition strong').text('공시제출가능');
+        $('#submitCondition').css({
+            'background': '#6695e1'
+        });
+        $('#submitCondition').parent().css({
+            'background': '#6695e1'
+        });
+        $('.lnb_wrap h2').css({
+            'background': '#6695e1'
+        });
+    } else if (scwin.filSubmitGubun == 1) {
+        var nowMinute = nowDate.getMinutes();
+        $('#submitCondition strong').text('공시제출마감' + (60 - nowMinute) + '분전');
+        $('#submitCondition').css({
+            'background': '#e68e07'
+        });
+        $('#submitCondition').parent().css({
+            'background': '#e68e07'
+        });
+        $('.lnb_wrap h2').css({
+            'background': '#e68e07'
+        });
+    } else {
+        $('#submitCondition strong').text('18시까지 제출 가능');
+        $('#submitCondition').css({
+            'background': '#6695e1'
+        });
+        $('#submitCondition').parent().css({
+            'background': '#6695e1'
+        });
+        $('.lnb_wrap h2').css({
+            'background': '#6695e1'
+        });
+    }
+    timeGuBunObj = null;
+};
+
+
+
+//ver1: 0:로그인 후, 1:로그인전
+/**
+ * @method
+ * @name timeGuBun
+ * @description desc
+ * @param {string} ver desc
+ * @param {string} ver1 desc
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.timeGuBun = function(ver, ver1) {
+    var nowHour = ver.getHours();
+    var nowMinute = ver.getMinutes();
+    if (nowHour >= 17) {
+        if (nowHour < 18) {
+            if (nowMinute > 29 && nowMinute <= 59) {
+                scwin.filSubmitGubun = 1;
+            } else {
+                scwin.filSubmitGubun = 0;
+            }
+        } else {
+            //18시 이후(다시 개시할 수 있음)
+            if (ver1 == 0) {
+                //로그인 후인 경우
+                if (scwin.submitSec == 0) {
+                    //30초마다 한번 개시인지 체크 한다.
+                    if (scwin.getClosedVal().businessClosing == 'N') {
+                        scwin.filSubmitGubun = 0;
+                    } else {
+                        scwin.filSubmitGubun = 2;
+                    }
+                }
+            } else {
+                scwin.filSubmitGubun = 3;
+            }
+        }
+    } else if (nowHour > 7 && nowHour < 17) {
+        if (scwin.submitSec == 0) {
+            //30초마다 한번 개시인지 체크 한다.
+            if (scwin.getClosedVal().businessClosing == 'N') {
+                scwin.filSubmitGubun = 0;
+            } else scwin.filSubmitGubun = 2;
+        }
+    } else {
+        if (ver1 == 0) {
+            scwin.filSubmitGubun = 2;
+        } else {
+            scwin.filSubmitGubun = 3;
+        }
+    }
+    scwin.submitSec++;
+    if (scwin.submitSec == 30) scwin.submitSec = 0;
+};
+]]></script>
+	</head>
+	<body ev:onpageload="" ev:onpageunload=""/>
+</html>
