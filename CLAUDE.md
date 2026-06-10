@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A **WebSquare (Inswave) source tree** for KRX (Korea Exchange) business systems. Every file is a `.xml` WebSquare *screen* document, normally authored in the WebSquare IDE; here they are edited as source. JavaScript lives inside `<script type="text/javascript"><![CDATA[ ... ]]>` blocks within each XML file.
 
-The XML lives under **`src/`** in four trees — `src/gcc/` (modern common library) and `src/as-is/ins/`, `src/as-is/mgt/`, `src/as-is/stf/` (converted business modules). The Python linter is under `tools/wsxml_lint/`; Node/Claude tooling sits at the repo root.
+The XML lives under **`src/`**, which holds four top-level trees: `src/gcc/` (the modern common library), `src/cm/` (the cm module — currently just its own per-module `src/cm/gcc/` copy of the common library), `src/docs/` (docs + generated API HTML), and `src/as-is/` (the legacy W-Craft-converted business modules: `src/as-is/{fil,ins,mgt,stf}`, where `fil` additionally nests the `bnf` and `inf` sub-trees). The Python linter is under `tools/wsxml_lint/`; Node/Claude tooling sits at the repo root.
 
 There is no app build/run step you can invoke from the shell. "Running" a change means deploying the XML into a WebSquare server and opening the screen in a browser; that is outside this repo. Treat your job as editing the JavaScript inside these XML envelopes correctly and consistently. For **static checks**, the repo carries a lint/test toolchain — see [Toolchain & commands](#toolchain--commands) below.
 
@@ -23,7 +23,7 @@ A Python/lxml linter under `tools/wsxml_lint/` that parses the WebSquare `.xml` 
 
 - **Run:** `npm run lint:xml` — a **split** of two scripts:
   - `npm run lint:xml:gcc` → `python -m wsxml_lint src/gcc` (strict) → baseline **`11 files, 0 errors, 0 warnings`**.
-  - `npm run lint:xml:legacy` → `python -m wsxml_lint src/as-is/ins src/as-is/mgt src/as-is/stf --ignore WS111,WS112,WS113` → baseline **`107 files, 0 errors, 0 warnings`**.
+  - `npm run lint:xml:legacy` → `python -m wsxml_lint src/as-is/ins src/as-is/mgt src/as-is/stf --ignore WS111,WS112,WS113` → baseline **`108 files, 0 errors, 0 warnings`**.
   - Lint a single file: `python -m wsxml_lint src/gcc/win.xml`.
 - **Why the split:** `WS111`/`WS112`/`WS113` fire on *every* legacy page (missing `<head>` `@meta_*` / `<w2:layoutInfo>` / `<w2:dataCollection>`) — a systematic W-Craft conversion gap, not defects (~424 warnings). They are ignored for `src/as-is/ins|mgt|stf` so real issues aren't buried, while `src/gcc` stays strict. To see the full legacy baseline, run `python -m wsxml_lint src/as-is/ins src/as-is/mgt src/as-is/stf` (no `--ignore`).
 - **Exit code:** 0 when there are **no errors** (warnings are allowed); 1 if any error.
@@ -80,8 +80,11 @@ The actively maintained core (most recent edits). Each file is one namespace und
 
 When writing code in `src/gcc/`, **reuse the `$c.*` helpers** instead of reimplementing (e.g. `$c.util.isEmpty(x)` over hand-rolled emptiness checks, `$c.str.*` for string ops, `$c.win.alert`/`$c.win.confirm` for dialogs, `$c.sbm.*` for all server calls). The files already cross-reference this way.
 
-### `src/as-is/ins/`, `src/as-is/mgt/`, `src/as-is/stf/` — converted business modules (legacy style)
-Three separate KRX business systems' screen libraries. Their scripts begin with the marker:
+### `src/cm/` — the cm module's per-module common-library copy
+Currently just `src/cm/gcc/` — a **per-module copy** of the `src/gcc/` library (9 files) that is an *older / CM-specific variant*, **not** a newer version. When reconciling it with the canonical `src/gcc/`, cherry-pick only genuinely general improvements into `src/gcc/` and keep CM-specific behavior (different backend endpoints/field names, `/cm/main/...` landing pages, etc.) **out** of the shared lib. `src/cm/` is **not** in the CI lint scope.
+
+### `src/as-is/` — converted business modules (legacy style)
+The legacy W-Craft-converted screen libraries, grouped under **`src/as-is/`**: `ins`, `mgt`, `stf`, and `fil` (which additionally nests the `bnf` and `inf` sub-trees). Their scripts begin with the marker:
 ```
 /* ★Wcraft guide★
 스크립트 수작업 유의사항   ("script manual-work cautions")
@@ -95,7 +98,7 @@ This marks code produced by the **W-Craft conversion tool** (migrating an older 
 
 Same-named files recur across directories (`common.xml`, `PopupCalendar.xml`, `calendar_fil.xml`, `filing_common.xml`, `ShiftCrossBrowser_ver.2.4.min.xml`, …) — these are **per-module copies**, not shared. A fix in one is not automatically reflected in the others; check whether the same edit is needed in sibling directories.
 
-Rough module focus (from filenames): `src/as-is/stf/` is the largest — securities/listing flows (new listing, ETN/ELW/bond/digital receiving, `list_common*`, `ods`, `marketMaker`); `src/as-is/ins/` and `src/as-is/mgt/` cover related listing/filing and management screens.
+Rough module focus (from filenames): `src/as-is/stf/` is the largest — securities/listing flows (new listing, ETN/ELW/bond/digital receiving, `list_common*`, `ods`, `marketMaker`); `src/as-is/ins/` and `src/as-is/mgt/` cover related listing/filing and management screens; `src/as-is/fil/` covers filing flows (ELW/ETN/digital/prelist), with its `bnf` (bond filing) and `inf` (issuer/code settings — `creditGradSetting`, `currencySetting`, …) sub-trees.
 
 ## Working in this repo
 

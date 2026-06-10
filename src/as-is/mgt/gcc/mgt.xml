@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml"
 	xmlns:ev="http://www.w3.org/2001/xml-events"
 	xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
-	<head meta_screenName="업무 공통 함수(mgt)" meta_screenId="$c.mgt" meta_desc="mgt 업무 모듈에서 추출한 업무공통(KRX 고유) 함수를 작성한다. (종목검색, 로그저장, 데이터셋 보조, UI/메시지, 분석/트래킹). 함수명은 camelCase 로 표준화하고 JSDoc 에 AS-IS 원본명을 병기한다.">
+	<head meta_screenName="업무 공통 함수(mgt)" meta_screenId="$c.mgt" meta_desc="mgt 업무 모듈에서 추출한 업무공통(KRX 고유) 함수를 작성한다. (종목검색, 로그저장, 데이터셋 보조, UI/메시지). 분석/트래킹(trk*) 함수는 trk.xml($c.trk)로 분리. 함수명은 camelCase 로 표준화하고 JSDoc 에 AS-IS 원본명을 병기한다.">
 		<w2:type>COMMON</w2:type>
 		<w2:buildDate/>
 		<w2:MSA/>
@@ -11,11 +11,12 @@
 			<w2:workflowCollection/>
 		</xf:model>
 		<w2:layoutInfo/>
-		<w2:publicInfo method="scwin.jongmokSearchReset,scwin.jongmokSearchRtn,scwin.jongmokSearchRtn2,scwin.createXmlObj4LogSave,scwin.startLogSave,scwin.chkStats4LogSave,scwin.viewParameter4LogSave,scwin.doLogSave,scwin.copyDataSet,scwin.copyDataSetHeader,scwin.cfParseFeature,scwin.comboCbDataSetPeriod,scwin.fillGridHeaderTotalCnt,scwin.panelMsg,scwin.setFromToDate,scwin.mdiHelp,scwin.trkMakeCode,scwin.trkSetCookie,scwin.trkGetCookie,scwin.trkGetParameter,scwin.trkEscape,scwin.trkFlashContentsView,scwin.trkClickTrace,scwin.trkAdClick"/>
+		<w2:publicInfo method="scwin.jongmokSearchReset,scwin.jongmokSearchRtn,scwin.jongmokSearchRtn2,scwin.createXmlObj4LogSave,scwin.startLogSave,scwin.chkStats4LogSave,scwin.viewParameter4LogSave,scwin.doLogSave,scwin.copyDataSet,scwin.copyDataSetHeader,scwin.cfParseFeature,scwin.comboCbDataSetPeriod,scwin.fillGridHeaderTotalCnt,scwin.panelMsg,scwin.setFromToDate,scwin.mdiHelp"/>
 		<script lazy="false" type="text/javascript"><![CDATA[// =============================================================================
 /**
  * mgt 업무 모듈에서 추출한 업무공통(KRX 고유) 함수.
- * 종목검색 / 로그저장 / 데이터셋 보조 / UI·메시지 / 분석·트래킹.
+ * 종목검색 / 로그저장 / 데이터셋 보조 / UI·메시지.
+ * 분석·트래킹(trk*) 함수는 trk.xml($c.trk)로 분리하였다.
  * 함수명은 camelCase 로 표준화하고, 각 JSDoc 에 AS-IS 원본명을 병기한다.
  *
  * @author Inswave Systems
@@ -452,249 +453,6 @@ scwin.mdiHelp = function (helpType) {
     $c.frame.path("/").GMdiHelp(helpType);
 };
 
-// -----------------------------------------------------------------------------
-// 5. 분석/트래킹 모듈 trk* (origin: common.xml, AS-IS: _trk_*)
-//    외부 분석 솔루션 연동 전용. 트래킹 초기화(_trk_code_base, _trk_img_* 등
-//    전역 상태/이미지 객체) 는 별도 init 코드에서 설정되어야 동작한다.
-//    함수만 이관하며 알고리즘은 원본을 보존한다. (상태 변수명은 외부 init 호환 위해 유지)
-// -----------------------------------------------------------------------------
-
-// 트래킹 모듈 상태(초기값). 실제 값은 트래킹 init 에서 주입.
-scwin._TRK_U = scwin._TRK_U || "";
-scwin._EXEN = scwin._EXEN || "";
-
-/**
- * @method
- * @name trkEscape
- * @description 트래킹 전송용 문자열 escape (특수문자 %인코딩).
- * (AS-IS: _trk_escape, origin: common.xml)
- * @param {String} _str 원본 문자열
- * @returns {String} escape 된 문자열
- * @hidden N
- * @exception
- * @example
- */
-scwin.trkEscape = function (_str) {
-    let str;
-    let ch;
-    let bEncURI = "N";
-    try { encodeURI("Y"); bEncURI = "Y"; } catch (_e) { bEncURI = "N"; }
-    str = (bEncURI === "Y") ? encodeURI(_str) : escape(_str);
-
-    while ((ch = str.indexOf("+")) > 0) str = str.substr(0, ch) + "%2B" + str.substr(ch + 1, str.length);
-    while ((ch = str.indexOf("/")) > 0) str = str.substr(0, ch) + "%2F" + str.substr(ch + 1, str.length);
-    while ((ch = str.indexOf("&")) > 0) str = str.substr(0, ch) + "%26" + str.substr(ch + 1, str.length);
-    while ((ch = str.indexOf("?")) > 0) str = str.substr(0, ch) + "%3F" + str.substr(ch + 1, str.length);
-    while ((ch = str.indexOf(":")) > 0) str = str.substr(0, ch) + "%3A" + str.substr(ch + 1, str.length);
-    while ((ch = str.indexOf("#")) > 0) str = str.substr(0, ch) + "%23" + str.substr(ch + 1, str.length);
-    return str;
-};
-
-/**
- * @method
- * @name trkSetCookie
- * @description 트래킹용 쿠키를 설정한다. (path=/, expire 는 ms 단위 가산)
- * (AS-IS: _trk_setCookie, origin: common.xml)
- * @param {String} name 쿠키 이름
- * @param {String} value 쿠키 값
- * @param {Number} expire 만료(현재시각 + expire ms)
- * @returns {void}
- * @hidden N
- * @exception
- * @example
- */
-scwin.trkSetCookie = function (name, value, expire) {
-    const today = new Date();
-    today.setTime(today.getTime() + expire);
-    document.cookie = name + "=" + value + "; path=/; expires=" + today.toGMTString() + ";";
-};
-
-/**
- * @method
- * @name trkGetCookie
- * @description 트래킹용 쿠키 값을 조회한다.
- * (AS-IS: _trk_getCookie, origin: common.xml)
- * @param {String} name 쿠키 이름
- * @returns {String} 쿠키 값(없으면 "")
- * @hidden N
- * @exception
- * @example
- */
-scwin.trkGetCookie = function (name) {
-    const cookieName = name + "=";
-    let x = 0;
-    while (x <= document.cookie.length) {
-        const y = (x + cookieName.length);
-        if (document.cookie.substring(x, y) === cookieName) {
-            let endOfCookie = document.cookie.indexOf(";", y);
-            if (endOfCookie === -1) endOfCookie = document.cookie.length;
-            return unescape(document.cookie.substring(y, endOfCookie));
-        }
-        x = document.cookie.indexOf(" ", x) + 1;
-        if (x === 0) break;
-    }
-    return "";
-};
-
-/**
- * @method
- * @name trkGetParameter
- * @description self/top URL 쿼리스트링에서 트래킹 파라미터 값을 조회한다.
- * (AS-IS: _trk_getParameter, origin: common.xml)
- * @param {String} name 파라미터 이름
- * @returns {String} 파라미터 값(없으면 "")
- * @hidden N
- * @exception
- * @example
- */
-scwin.trkGetParameter = function (name) {
-    const paraName = name + "=";
-    let url = "" + self.document.location.search;
-    let tURL = "";
-    try { tURL = top.document.location.search; } catch (_e) { tURL = ""; }
-    url = url + "&" + tURL;
-    if (url.indexOf(paraName) !== -1) {
-        const x = url.indexOf(paraName) + paraName.length;
-        const y = url.substr(x).indexOf("&");
-        return (y !== -1) ? url.substring(x, x + y) : url.substr(x);
-    }
-    return "";
-};
-
-/**
- * @method
- * @name trkMakeCode
- * @description 트래킹 호출 URL(tracker.jsp 파라미터)을 생성한다. 페이지/리퍼러/광고키/환경정보 포함.
- * (AS-IS: _trk_make_code, origin: common.xml)
- * @param {String} _TRK_SERVER 트래킹 서버 호스트
- * @param {String} _TRK_U 트래킹 사용자/서비스 코드
- * @returns {String} 트래킹 호출 URL (file:// 페이지면 "")
- * @hidden N
- * @exception
- * @example
- */
-scwin.trkMakeCode = function (_TRK_SERVER, _TRK_U) {
-    let dt = document.title.toString();
-    dt = dt.substr(0, 128);
-    let dr = self.document.referrer;
-    let tdr = "";
-    try { tdr = top.document.referrer; } catch (_e) { tdr = ""; }
-    let tdu = "";
-    try { tdu = top.document.location.href; } catch (_e) { tdu = ""; }
-    if (dr === tdu) dr = tdr;
-    if (dr === "undefined") dr = "";
-    let du = self.document.location.href;
-    if (du.substr(0, 4) === "file") return "";
-
-    const keys = ["OVKEY", "OVRAW", "netpia", "logger_kw", "source"];
-    for (let k = 0; k < keys.length; k++) {
-        const adKeyVal = scwin.trkGetParameter(keys[k]);
-        if (adKeyVal !== "" && du.indexOf(keys[k] + "=") < 0) {
-            du = du + ((du.indexOf("?") !== -1) ? "&" : "?") + keys[k] + "=" + adKeyVal;
-        }
-    }
-
-    const ce = navigator.cookieEnabled ? "Y" : "N";
-    const je = navigator.javaEnabled() ? "Y" : "N";
-    let ss = "";
-    let cd = "";
-    if (scwin._trk_bJS12) {
-        ss = screen.width + "x" + screen.height;
-        cd = screen.colorDepth;
-    }
-    if (!dt) dt = "";
-    if (!dr) dr = "";
-    if (!du) du = "";
-
-    const t = new Date();
-    const tye = (scwin._trk_bMSIE) ? (t.getYear()) : (t.getFullYear());
-    const tmo = t.getMonth() + 1;
-    const tda = t.getDate();
-    const tho = t.getHours();
-    const tmi = t.getMinutes();
-    const tse = t.getSeconds();
-    const tzo = t.getTimezoneOffset();
-    const prtcl = (document.location.protocol.indexOf("https") !== -1) ? "https://" : "http://";
-
-    let tc = prtcl + _TRK_SERVER;
-    const bPNF = ((typeof _TRK_PI) !== "undefined" && _TRK_PI === "PNF") ? true : false;
-    tc = tc + (bPNF ? "/tracker_click.jsp" : "/tracker.jsp");
-    tc = tc + "?u=" + scwin._TRK_U + "&XU=&EXEN=" + scwin._EXEN;
-
-    if (bPNF) {
-        tc = tc + "&rnd=" + Math.random() + "&CKFL=" + _TRK_PI + "&CKDATA=" + scwin.trkEscape(du);
-    } else {
-        tc = tc + "&dr=" + scwin.trkEscape(dr) + "&XDR=&dt=" + scwin.trkEscape(dt) + "&du=" + scwin.trkEscape(du);
-        if ((typeof _TRK_CP) !== "undefined" && _TRK_CP !== "") tc = tc + "&CP=" + scwin.trkEscape(_TRK_CP) + "&XCP=";
-        if ((typeof _TRK_PI) !== "undefined" && _TRK_PI !== "") tc = tc + "&PI=" + _TRK_PI;
-        if ((typeof _TRK_PN) !== "undefined" && _TRK_PN !== "") tc = tc + "&PN=" + scwin.trkEscape(_TRK_PN);
-        if ((typeof _TRK_MF) !== "undefined" && _TRK_MF !== "") tc = tc + "&MF=" + scwin.trkEscape(_TRK_MF);
-        if ((typeof _TRK_CC) !== "undefined" && _TRK_CC !== "") tc = tc + "&CC=" + _TRK_CC;
-        if ((typeof _TRK_RK) !== "undefined" && _TRK_RK !== "") tc = tc + "&RK=" + scwin.trkEscape(_TRK_RK);
-        tc = tc + "&js=Y&ss=" + escape(ss) + "&cd=" + cd + "&ce=" + ce + "&je=" + je
-            + "&tzo=" + tzo + "&tye=" + tye + "&tmo=" + tmo + "&tda=" + tda + "&tho=" + tho + "&tmi=" + tmi + "&tse=" + tse;
-    }
-    return tc;
-};
-
-/**
- * @method
- * @name trkFlashContentsView
- * @description Flash/컨텐츠 뷰 트래킹 이미지를 전송한다.
- * (AS-IS: _trk_flashContentsView, origin: common.xml)
- * @param {String} _TRK_CP 컨텐츠 경로(CP)
- * @returns {void}
- * @hidden N
- * @exception
- * @example
- */
-scwin.trkFlashContentsView = function (_TRK_CP) {
-    let _trk_code_flash = scwin._trk_code_base;
-    _trk_code_flash = _trk_code_flash.replace(/&CP=.*&XCP=/g, "&XCP=");
-    _trk_code_flash = _trk_code_flash.replace(/&dr=.*&XDR=/g, "&XDR=");
-    _trk_img_base_click.src = _trk_code_flash + "&dr=&CP=" + scwin.trkEscape(_TRK_CP) + "&rnd=" + Math.random();
-    if (scwin._TRK_U !== "") {
-        _trk_code_flash = _trk_code_flash.replace(/\?u=2&XU=/g, "?u=" + scwin._TRK_U + "&XU=");
-        _trk_img_chan_click.src = _trk_code_flash + "&dr=&CP=" + scwin.trkEscape(_TRK_CP) + "&rnd=" + Math.random();
-    }
-};
-
-/**
- * @method
- * @name trkClickTrace
- * @description 클릭 트래킹 이미지를 전송한다.
- * (AS-IS: _trk_clickTrace, origin: common.xml)
- * @param {String} _TRK_CKFL 클릭 플래그
- * @param {String} _TRK_CKDATA 클릭 데이터
- * @returns {void}
- * @hidden N
- * @exception
- * @example
- */
-scwin.trkClickTrace = function (_TRK_CKFL, _TRK_CKDATA) {
-    let _trk_code_click = _trk_code_base.substr(0, _trk_code_base.indexOf("tracker.jsp"));
-    _trk_code_click = _trk_code_click + "tracker_click.jsp?rnd=" + Math.random() + "&CKFL=" + _TRK_CKFL + "&CKDATA=" + scwin.trkEscape(_TRK_CKDATA);
-    _trk_img_base_click.src = _trk_code_click + "&u=2";
-    if (scwin._TRK_U !== "") _trk_img_chan_click.src = _trk_code_click + "&u=" + scwin._TRK_U;
-};
-
-/**
- * @method
- * @name trkAdClick
- * @description 광고 클릭 트래킹 이미지를 전송한다.
- * (AS-IS: _trk_adClick, origin: common.xml)
- * @param {String} adSvr 광고 트래킹 서버 호스트
- * @param {String} svcCode 서비스 코드
- * @param {String} adCode 광고 코드
- * @returns {void}
- * @hidden N
- * @exception
- * @example
- */
-scwin.trkAdClick = function (adSvr, svcCode, adCode) {
-    const prtcl = (document.location.protocol.indexOf("https") !== -1) ? "https://" : "http://";
-    _trk_img_base_click.src = prtcl + adSvr + "/tracker_ad.jsp?u=" + svcCode + "&mode=C&adCode=" + adCode;
-};
 ]]></script>
 	</head>
 	<body ev:onpageload="scwin.onpageload"/>
