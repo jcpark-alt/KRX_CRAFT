@@ -8,7 +8,7 @@
 ## 1. 최우선 참조 파일 및 분석 대상 경로
 너는 작업을 수행하기 위해 아래 경로에 위치한 1차 분석 마스터 리포트를 완벽하게 파싱하고 그 안의 **'공통이관'**으로 분류된 함수 전체 목록을 추출해야 해.
 
-- **참조 파일 경로:** `D:\documents\KRX_Craft\W_Craft_gcc_20260529\src\docs\api\mgt\mgt_function_analysis_report.md`
+- **참조 파일 경로:** `D:\workspace\W_Craft_gcc_20260529\src\docs\api\mgt\mgt_function_analysis_report.md`
 - **추출 대상 데이터:** 위 파일에서 분류 결과가 **[공통이관]** 또는 **[이관 대상]**으로 확정된 함수들의 전체 리스트 (함수명, 설명, 매핑 파일 정보 등).
 
 ---
@@ -23,7 +23,7 @@
 
 ### 🔗 [기능 2: 외부 API 문서 새 탭 연동 및 앵커 링킹 (핵심 요구사항)]
 - 메인 화면에 출력된 **TO-BE 함수명을 클릭하면**, 다음 주소로 **새 탭(`target="_blank"`)이 열리며 이동**해야 해.
-- **연동 타겟 주소:** `D:\documents\KRX_Craft\W_Craft_gcc_20260529\src\docs\api\gcc\index.html`
+- **연동 타겟 주소:** `D:\workspace\W_Craft_gcc_20260529\src\docs\api\gcc\index.html`
 - **앵커 링크 매핑 규칙:** 클릭 시 해당 `index.html` 내의 특정 함수 위치로 바로 스크롤 이동이 가능하도록 뒤에 **ID 앵커 해시값(`#TO-BE함수명`)**을 붙여서 하이퍼링크 주소를 바인딩해줘.
   - *예시:* `<a href="../gcc/index.html#scwin.getValResultMsg" target="_blank">scwin.getValResultMsg</a>` (상대 경로 유연성 고려 가능)
 

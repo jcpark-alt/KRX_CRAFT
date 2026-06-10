@@ -38,7 +38,7 @@
 
 ## 4. 분석 대상 샘플 코드 (data.xml 일부)
 참고를 위해 `data.xml` 파일에 작성된 JSDoc 샘플을 제공할게. 이 스타일에 맞춰서 다른 파일들도 유추하거나 구조를 잡아줘.
-D:\documents\KRX_Craft\W_Craft_gcc_20260529\src\gcc 폴더에 각 파일 별로 전체 소스가 있으니 실제 파일을 참고해서 구조를 잡아줘.
+D:\workspace\W_Craft_gcc_20260529\src\gcc 폴더에 각 파일 별로 전체 소스가 있으니 실제 파일을 참고해서 구조를 잡아줘.
 
 /**
  * @method
@@ -56,8 +56,8 @@ scwin.getValResultMsg = function (valInfo, value, dataCollectionObj, rowIndex) {
 ---
 
 ## 5. API 문서 생성 위치
-D:\documents\KRX_Craft\W_Craft_gcc_20260529\src\docs\api 폴더 아래에 신규 폴더에 생성해줘.
-예) D:\documents\KRX_Craft\W_Craft_gcc_20260529\src\docs\api\gcc
+D:\workspace\W_Craft_gcc_20260529\src\docs\api 폴더 아래에 신규 폴더에 생성해줘.
+예) D:\workspace\W_Craft_gcc_20260529\src\docs\api\gcc
 
 ---
 

@@ -10,9 +10,9 @@
 ## 1. 최우선 참조 파일 및 디렉토리 경로
 다음 두 개의 마크다운 파일에 정리된 함수 추출 결과와 분류 기준을 **반드시 로드하고 상호 참조(Cross-Reference)**하여 이관을 진행한다.
 
-1. **분석 마스터 리포트 파일:** `D:\documents\KRX_Craft\W_Craft_gcc_20260529\src\mgt\md\mgt_function_analysis_report.md`
+1. **분석 마스터 리포트 파일:** `D:\workspace\W_Craft_gcc_20260529\src\mgt\md\mgt_function_analysis_report.md`
    - *역할:* `mgt` 폴더에서 추출된 전체 함수 목록의 필터링 결과 및 [삭제 대상/이관 대상] 분류 이력 확인.
-2. **이관 및 매핑 가이드 파일:** `D:\documents\KRX_Craft\W_Craft_gcc_20260529\src\mgt\md\gcc_mapping_and_biz_common.md`
+2. **이관 및 매핑 가이드 파일:** `D:\workspace\W_Craft_gcc_20260529\src\mgt\md\gcc_mapping_and_biz_common.md`
    - *역할:* 기존 `gcc` 공통 파일(data.xml, util.xml 등)로 매핑된 함수 목록과 업무공통함수로 분류된 대상 목록 확인.
 
 > 작성 규칙 표준은 `src/docs/gcc_xml_guide.md`(gcc 공통 XML 작성·검증 가이드) 참조.

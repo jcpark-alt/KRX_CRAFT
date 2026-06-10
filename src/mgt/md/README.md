@@ -6,8 +6,8 @@
 ---
 
 ## 1. 분석 대상 및 디렉토리 구조
-- **AS-IS 소스 위치:** `D:\documents\KRX_Craft\W_Craft_gcc_20260529\src\mgt` (이하 **mgt 폴더**)
-- **TO-BE 공통 위치:** `D:\documents\KRX_Craft\W_Craft_gcc_20260529\src\gcc` (이하 **gcc 폴더**)
+- **AS-IS 소스 위치:** `D:\workspace\W_Craft_gcc_20260529\src\mgt` (이하 **mgt 폴더**)
+- **TO-BE 공통 위치:** `D:\workspace\W_Craft_gcc_20260529\src\gcc` (이하 **gcc 폴더**)
 - **파일 형태:** WebSquare5 화면 또는 스크립트 파일 (`.xml` 내 `<script>` 태그 안의 JavaScript 함수 정의부)
 
 ---
@@ -76,7 +76,7 @@
 ---
 
 ## 4. API 문서 생성 위치
-D:\documents\KRX_Craft\W_Craft_gcc_20260529\src\docs\api 폴더 아래에 신규 폴더에 생성해줘.
-예) D:\documents\KRX_Craft\W_Craft_gcc_20260529\src\docs\api\mgt
+D:\workspace\W_Craft_gcc_20260529\src\docs\api 폴더 아래에 신규 폴더에 생성해줘.
+예) D:\workspace\W_Craft_gcc_20260529\src\docs\api\mgt
 
 준비가 완료되었다면, 내가 입력하거나 업로드하는 `src/mgt` 소스 코드 내용을 기반으로 위 규칙들을 엄격히 적용하여 API 마크다운 문서를 작성해줘.
