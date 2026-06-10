@@ -22,8 +22,8 @@ A lint/test toolchain sits on top of the raw XML. All commands run from the repo
 A Python/lxml linter under `tools/wsxml_lint/` that parses the WebSquare `.xml` pages directly (the only tool that actually inspects this project's source).
 
 - **Run:** `npm run lint:xml` — a **split** of two scripts:
-  - `npm run lint:xml:gcc` → `python -m wsxml_lint src/gcc` (strict) → baseline **`10 files, 0 errors, 0 warnings`**.
-  - `npm run lint:xml:legacy` → `python -m wsxml_lint src/ins src/mgt src/stf --ignore WS111,WS112,WS113` → baseline **`106 files, 0 errors, 0 warnings`**.
+  - `npm run lint:xml:gcc` → `python -m wsxml_lint src/gcc` (strict) → baseline **`11 files, 0 errors, 0 warnings`**.
+  - `npm run lint:xml:legacy` → `python -m wsxml_lint src/ins src/mgt src/stf --ignore WS111,WS112,WS113` → baseline **`107 files, 0 errors, 0 warnings`**.
   - Lint a single file: `python -m wsxml_lint src/gcc/win.xml`.
 - **Why the split:** `WS111`/`WS112`/`WS113` fire on *every* legacy page (missing `<head>` `@meta_*` / `<w2:layoutInfo>` / `<w2:dataCollection>`) — a systematic W-Craft conversion gap, not defects (~424 warnings). They are ignored for `src/ins|mgt|stf` so real issues aren't buried, while `src/gcc` stays strict. To see the full legacy baseline, run `python -m wsxml_lint src/ins src/mgt src/stf` (no `--ignore`).
 - **Exit code:** 0 when there are **no errors** (warnings are allowed); 1 if any error.
