@@ -21,9 +21,10 @@ xmlns:xf="http://www.w3.org/2002/xforms">
 scwin.DATA_PREFIX = "dlt_commonCode";
 
 scwin.COMMON_CODE_INFO = {
-    LABEL: "CODE_NM",
-    VALUE: "COM_CD",
-    FILED_ARR: ["GRP_CD", "COM_CD", "CODE_NM"]
+    LABEL: "cdValNm",
+    VALUE: "cdVal",
+    FILED_ARR: ["DEP_CD", "cdVal", "cdValNm"],
+    ACTION: "/api/common/sample/common-codes?cdEngNmList="
 }
 
 // 공통 코드 데이터
@@ -439,7 +440,7 @@ scwin.setCommonCode = async function (codeOptions, callbackFunc) {
  * @method
  * @name __getCommonCodeData
  * @description setCommonCode 용 공통 코드 데이터를 취득한다. 캐시에 없거나 useLocalCache=false 인
- *  그룹만 서버(/common/selectCodeList)에서 await 로 받아 캐시에 저장하고, code별 데이터 맵을 반환한다.
+ *  그룹만 서버(COMMON_CODE_INFO.ACTION)에서 await 로 받아 캐시에 저장하고, code별 데이터 맵을 반환한다.
  * @param {Array} codeOptions 코드 옵션 배열
  * @returns {Promise<Object>} { (DATA_PREFIX+code) : [코드 데이터], ... }
  * @hidden Y
@@ -460,19 +461,23 @@ scwin.__getCommonCodeData = async function (codeOptions) {
     });
 
     if (paramCodes.length > 0) {
+        // COMMON_CODE_INFO.ACTION (REST GET) 으로 코드 목록을 조회한다. 조회할 코드들은 URL 쿼리스트링에 덧붙인다.
+        // ex) /api/common/sample/common-codes?cdEngNmList=04,00024
         const rtn = await $c.sbm.executeDynamic({
             id: "_sbm_searchCode",
-            action: "/common/selectCodeList",
+            action: scwin.COMMON_CODE_INFO.ACTION + paramCodes.join(","),
+            method: "get",
+            mediatype: "application/json",
             isProcessMsg: false
-        }, {
-            "dma_commonCode": { "GRP_CD": paramCodes.join(","), "DATA_PREFIX": scwin.DATA_PREFIX }
         });
 
-        const resJSON = (rtn && rtn.responseJSON) ? rtn.responseJSON : {};
+        // REST 응답은 body 래퍼에 코드별 데이터가 담겨 온다. (래퍼가 없으면 평면 응답으로 처리)
+        const resJSON = (rtn && rtn.responseJSON && rtn.responseJSON.body) ? rtn.responseJSON.body
+            : ((rtn && rtn.responseJSON) ? rtn.responseJSON : {});
         for (let key in resJSON) {
-            if (key.indexOf(scwin.DATA_PREFIX) > -1) {
-                scwin.commonCodeList[key] = resJSON[key];
-            }
+            // 응답 키가 코드(예: "04")면 DATA_PREFIX를 붙여 캐시 키(예: "dlt_commonCode04")로 정규화한다.
+            const cacheKey = (key.indexOf(scwin.DATA_PREFIX) === 0) ? key : (scwin.DATA_PREFIX + key);
+            scwin.commonCodeList[cacheKey] = resJSON[key];
         }
     }
 
