@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ev="http://www.w3.org/2001/xml-events"
+	xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_screenName="업무 공통 함수(fil)" meta_screenId="$c.fil" meta_desc="fil 업무 모듈(상장공시 필링 — ELW/ETN/디지털/예심/채권)에서 추출한 업무공통(KRX 고유) 함수를 작성한다. 필링 입력화면 전반에서 재사용되는 소수점 허용 콤마 처리(컴포넌트 단위), 처리 확인 가드, 공시 제출 가능 시간대 판정. 분석/트래킹(_trk_*) 함수는 trk.xml($c.trk), 문서 인쇄(Rexpert) 함수는 print.xml($c.print)로 분리. 종목검색·컴포넌트 값 get/set·메시지·로그저장 등 ins 모듈과 동일 사본 함수는 $c.ins 를 재사용한다. 함수명은 camelCase 로 표준화하고 JSDoc 에 AS-IS 원본명을 병기한다.">
+		<w2:type>COMMON</w2:type>
+		<w2:buildDate/>
+		<w2:MSA/>
+		<xf:model>
+			<w2:dataCollection baseNode="map"/>
+			<w2:workflowCollection/>
+		</xf:model>
+		<w2:layoutInfo/>
+		<w2:publicInfo method="scwin.setComma,scwin.delComma,scwin.objSetComma,scwin.objRmComma,scwin.objRmComma2,scwin.confirmProcess,scwin.getSubmitGubun"/>
+		<script lazy="false" type="text/javascript"><![CDATA[// =============================================================================
+/**
+ * fil 업무 모듈(상장공시 필링 — ELW/ETN/디지털/예심/채권)에서 추출한 업무공통
+ * (KRX 고유) 함수.
+ * 필링 입력화면 전반에서 재사용되는 핵심만 선별 이관한다:
+ *   - 소수점 허용 천단위 콤마 처리(문자열/컴포넌트 단위)
+ *   - 저장/수정/삭제/제출 처리 확인 가드
+ *   - 공시 제출 가능 시간대 판정(평일 18:00 마감 규칙)
+ * 분석·트래킹(_trk_*) 함수는 trk.xml($c.trk), 문서 인쇄(Rexpert) 함수는
+ * print.xml($c.print)로 분리하였다.
+ * 종목검색 / 컴포넌트 값 get·set / 메시지 / 로그저장 등 ins 모듈과 동일 사본
+ * 함수는 새로 만들지 않고 $c.ins 를 재사용한다(stockSearch/stf/function/person
+ * 등 동일 origin).
+ * 함수명은 camelCase 로 표준화하고, 각 JSDoc 에 AS-IS 원본명을 병기한다.
+ *
+ * @author Inswave Systems
+ * @class fil
+ * @namespace $c.fil
+ */
+// =============================================================================
+
+scwin.onpageload = function () {
+
+};
+
+// -----------------------------------------------------------------------------
+// 1. 소수점 허용 콤마 처리 (origin: digitalNumberFormat.xml / etnNumberFormat.xml)
+//    필링 금액/수량 입력 컴포넌트 전반(elw050xx·prelist050xx·digital·etn)에서
+//    fn_CommaValueAll / fn_RmCommaValueAll 화면별 변형이 공통으로 호출하는 코어.
+//    정수만 다루는 $c.num.formatNumber 와 달리 소수점·음수·선행 '.' 을 보존한다.
+// -----------------------------------------------------------------------------
+
+/**
+ * @method
+ * @name setComma
+ * @description 숫자 문자열에 천단위 콤마를 찍는다. (소수점 이하·음수 보존)
+ * (AS-IS: fn_SetComma, origin: digitalNumberFormat.xml)
+ * @param {String} numstr 원본 숫자 문자열
+ * @returns {String} 콤마가 적용된 문자열
+ * @hidden N
+ * @exception
+ * @example var s = $c.fil.setComma("1234567.89"); // "1,234,567.89"
+ */
+scwin.setComma = function (numstr) {
+    numstr = String(numstr);
+    const re0 = /^(-?\d+)(\d{3})($|\..*$)/;
+    if (re0.test(numstr)) {
+        return numstr.replace(re0, function (str, p1, p2, p3) {
+            return scwin.setComma(p1) + "," + p2 + p3;
+        });
+    }
+    return numstr;
+};
+
+/**
+ * @method
+ * @name delComma
+ * @description 콤마 등 숫자 외 문자를 제거해 정규화된 숫자 문자열로 만든다. (소수점·음수 보존, 선행 0 정리)
+ * (AS-IS: fn_DelComma, origin: digitalNumberFormat.xml)
+ * @param {String} numstr 원본 문자열
+ * @returns {String} 숫자만 남긴 문자열(빈값/`0-` 은 "")
+ * @hidden N
+ * @exception
+ * @example var n = $c.fil.delComma("1,234.50"); // "1234.50"
+ */
+scwin.delComma = function (numstr) {
+    numstr = String(numstr);
+    if (numstr === "") return "";
+    if (numstr === "0-") return "";
+    numstr = numstr.replace(/[^\d\.-]/g, "");
+    numstr = String(numstr.match(/^-?\d*\.?\d*/));
+    numstr = numstr.replace(/^(-?)(\d*)(.*)/, function (str, p1, p2, p3) {
+        p2 = (p2 > 0) ? String(p2.match(/[1-9]\d*$/)) : "0";
+        return p1 + p2 + p3;
+    });
+    return numstr;
+};
+
+/**
+ * @method
+ * @name __rmComma
+ * @description 문자열에서 콤마만 제거한다. (delComma 와 달리 숫자 정규화는 하지 않음)
+ * (AS-IS: fn_RmComma, origin: digitalNumberFormat.xml)
+ * @param {String} str 원본 문자열
+ * @returns {String} 콤마 제거 문자열(미입력은 String(str) 보존)
+ * @hidden Y
+ * @exception
+ * @example
+ */
+scwin.__rmComma = function (str) {
+    // 항목 미입력 시 합계 오류 방지를 위해 String(str) 을 그대로 반환(원본 보존).
+    if (str === null || str === "") return String(str);
+    return String(str.replace(/,/g, ""));
+};
+
+/**
+ * @method
+ * @name objSetComma
+ * @description 컴포넌트 값에 천단위 콤마를 적용해 다시 설정한다. (선행 '.' 은 '0.' 으로 보정)
+ * (AS-IS: fn_ObjValueSetComma, origin: digitalNumberFormat.xml)
+ * @param {Object} numObj 대상 입력 컴포넌트
+ * @returns {void}
+ * @hidden N
+ * @exception
+ * @example $c.fil.objSetComma(form["isuPrc"]);
+ */
+scwin.objSetComma = function (numObj) {
+    if (numObj !== null && numObj !== "") {
+        const tmp = numObj.getValue();
+        if (tmp.substring(0, 1) === ".") {
+            numObj.setValue("0" + numObj.getValue());
+        }
+        numObj.setValue(scwin.setComma(numObj.getValue()));
+    }
+};
+
+/**
+ * @method
+ * @name objRmComma
+ * @description 컴포넌트 값에서 콤마를 제거해 다시 설정한다.
+ * (AS-IS: fn_ObjValueResetRmComma, origin: digitalNumberFormat.xml)
+ * @param {Object} numObj 대상 입력 컴포넌트
+ * @returns {void}
+ * @hidden N
+ * @exception
+ * @example $c.fil.objRmComma(form["isuPrc"]);
+ */
+scwin.objRmComma = function (numObj) {
+    if (numObj !== null && numObj !== "") {
+        numObj.setValue(scwin.__rmComma(numObj.getValue()));
+    }
+};
+
+/**
+ * @method
+ * @name objRmComma2
+ * @description 값이 있을 때만 컴포넌트 콤마를 제거한다. (null/빈값을 0 으로 바꾸지 않는 안전판)
+ * (AS-IS: fn_ObjValueResetRmComma2, origin: digitalNumberFormat.xml)
+ * @param {Object} numObj 대상 입력 컴포넌트
+ * @returns {void}
+ * @hidden N
+ * @exception
+ * @example $c.fil.objRmComma2(form["isuPrc"]);
+ */
+scwin.objRmComma2 = function (numObj) {
+    if (numObj !== null && numObj.getValue().length > 0) {
+        numObj.setValue(scwin.__rmComma(numObj.getValue()));
+    }
+};
+
+// -----------------------------------------------------------------------------
+// 2. 처리 확인 가드 (origin: digitalApplList.xml / etnApplList.xml / elw.xml)
+//    신청목록 화면의 저장/수정/삭제/제출 직전 confirm 가드(공통 사본).
+// -----------------------------------------------------------------------------
+
+/**
+ * @method
+ * @name confirmProcess
+ * @description 처리 구분(저장/수정/삭제/제출)에 맞는 확인 다이얼로그를 띄우고 진행 여부를 반환한다.
+ * (AS-IS: fn_isProcess, origin: digitalApplList.xml)
+ * @param {String} gubun 처리 구분 (I:저장 U:수정 D:삭제 S:제출)
+ * @returns {Boolean} 사용자가 확인하면 true, 취소하면 false
+ * @hidden N
+ * @exception
+ * @example if (!$c.fil.confirmProcess("S")) return;
+ */
+scwin.confirmProcess = function (gubun) {
+    let lastJob = "";
+    if (gubun === "I") lastJob = "저장";
+    else if (gubun === "U") lastJob = "수정";
+    else if (gubun === "D") lastJob = "삭제";
+    else if (gubun === "S") lastJob = "제출";
+    return window.confirm("[" + lastJob + "] 하시겠습니까?");
+};
+
+// -----------------------------------------------------------------------------
+// 3. 공시 제출 가능 시간대 판정 (origin: currentTime.xml)
+//    평일 18:00 마감 규칙. AS-IS timeGuBun 은 전역 scwin.filSubmitGubun 을 세팅하고
+//    18시 이후 재개시 판정을 위해 내부에서 서버(getClosedVal)를 호출했다. TO-BE 는
+//    영업마감 여부(businessClosing)를 인자로 받아 구분코드를 '반환'하는 순수 함수로
+//    재구성했다(서버 throttle 제거). 서버 마감조회는 호출부가 $c.sbm 으로 수행한다.
+// -----------------------------------------------------------------------------
+
+/**
+ * @method
+ * @name getSubmitGubun
+ * @description 현재 시각으로 공시 제출 가능 시간대 구분코드를 판정한다. (평일 18:00 마감)
+ * (AS-IS: timeGuBun, origin: currentTime.xml)
+ * @param {Date} nowDate 기준 시각(서버시각 권장)
+ * @param {Boolean} beforeLogin 로그인 전 화면이면 true (마감 시 3, 아니면 2)
+ * @param {String} businessClosing 영업마감 여부("Y"=마감 / "N"=개시). 17~18시 외 시간대 판정에 사용
+ * @returns {Number} 0:제출가능 1:마감30분전 2:제출불가(로그인후) 3:제출불가(로그인전/마감)
+ * @hidden N
+ * @exception
+ * @example var gb = $c.fil.getSubmitGubun(new Date(serverTime), false, "N");
+ */
+scwin.getSubmitGubun = function (nowDate, beforeLogin, businessClosing) {
+    const nowHour = nowDate.getHours();
+    const nowMinute = nowDate.getMinutes();
+    const closed = (businessClosing === "Y");
+
+    if (nowHour >= 17) {
+        if (nowHour < 18) {
+            // 17:00~17:59 — 17:30 이후는 마감 30분전 경고
+            return (nowMinute > 29 && nowMinute <= 59) ? 1 : 0;
+        }
+        // 18시 이후 — 재개시(businessClosing=N)면 다시 제출가능
+        if (!beforeLogin) {
+            return closed ? 2 : 0;
+        }
+        return 3;
+    }
+
+    if (nowHour > 7 && nowHour < 17) {
+        // 평일 업무시간 — 영업마감 여부로 판정
+        return closed ? 2 : 0;
+    }
+
+    // 07시 이전 등 업무시간 외
+    return beforeLogin ? 3 : 2;
+};
+
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload"/>
+</html>

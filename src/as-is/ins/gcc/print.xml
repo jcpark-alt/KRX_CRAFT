@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ev="http://www.w3.org/2001/xml-events"
+	xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_screenName="문서 인쇄 공통 함수(print)" meta_screenId="$c.print" meta_desc="ins 모듈에서 분리한 문서 인쇄(Rexpert 리포트/PDF/미리보기) 공통 함수. AS-IS fn_open_report* / fn_PrintPreView / fn_make_dtsToJson / fn_dataFormatValue (origin: report.xml). Rexpert 런타임(rex_GetgoDictionay, rex_gfRexRptOpen) 및 외부 화면이 로드되어 있어야 동작한다.">
+		<w2:type>COMMON</w2:type>
+		<w2:buildDate/>
+		<w2:MSA/>
+		<xf:model>
+			<w2:dataCollection baseNode="map"/>
+			<w2:workflowCollection/>
+		</xf:model>
+		<w2:layoutInfo/>
+		<w2:publicInfo method="scwin.openReport,scwin.openReportYear,scwin.openReportPdf,scwin.printPreView,scwin.makeDtsToJson,scwin.dataFormatValue"/>
+		<script lazy="false" type="text/javascript"><![CDATA[// =============================================================================
+/**
+ * 문서 인쇄 공통 함수. ins.xml($c.ins)에서 분리.
+ * Rexpert 리포트 출력 / PDF 다운로드 / 미리보기 / 데이터셋→리포트 JSON 변환.
+ * (AS-IS: fn_open_report*, fn_PrintPreView, fn_make_dtsToJson, fn_dataFormatValue,
+ *  origin: report.xml)
+ * Rexpert 런타임(rex_GetgoDictionay, rex_gfRexRptOpen)과 외부 화면이 로드되어
+ * 있어야 동작한다. 함수명은 camelCase 로 표준화하고 JSDoc 에 AS-IS 원본명을 병기한다.
+ *
+ * @author Inswave Systems
+ * @class print
+ * @namespace $c.print
+ */
+// =============================================================================
+
+scwin.onpageload = function () {
+
+};
+
+/**
+ * @method
+ * @name openReport
+ * @description CSV 데이터셋 문자열로 Rexpert 리포트 미리보기 팝업을 연다.
+ * (AS-IS: fn_open_report, origin: report.xml)
+ * @param {String} dataSetCSV CSVSTR 형식 데이터
+ * @param {String} rexRptName 레포트명(rex_rptname)
+ * @param {Array} userParam 사용자 파라미터 배열([{uid, unm}, ...], 옵션)
+ * @returns {void}
+ * @hidden N
+ * @exception
+ * @example $c.print.openReport(csv, "RPT_YEAR", null);
+ */
+scwin.openReport = function (dataSetCSV, rexRptName, userParam) {
+    const oRptMainParam = rex_GetgoDictionay();
+
+    // 필수 - 레포트명
+    oRptMainParam.put("rex_rptname", rexRptName);
+
+    // 필수 - 데이터 타입 설정
+    oRptMainParam.put("rex_datatype", "CSVSTR");
+    oRptMainParam.put("rex_data", dataSetCSV);
+
+    // 옵션 - 파라미터 정의
+    if (userParam != null && userParam.length > 0) {
+        for (let i = 0; i < userParam.length; i++) {
+            oRptMainParam.put(userParam[i].uid, userParam[i].unm);
+        }
+    }
+
+    // 옵션 - 팝업설정
+    const rexPreViewFeatures = "center=yes,scrollbars=no,status=no,toolbar=no,resizable=1,location=no,menu=no,width=825,height=1000";
+    oRptMainParam.put("rex_open_window", rexPreViewFeatures);
+
+    // preview 팝업 열기
+    rex_gfRexRptOpen("popup", oRptMainParam);
+};
+
+/**
+ * @method
+ * @name openReportYear
+ * @description 파라미터 없이 CSV 데이터셋으로 연도 리포트를 연다. (openReport 래퍼)
+ * (AS-IS: fn_open_report_year, origin: report.xml)
+ * @param {String} dataSetCSV CSVSTR 형식 데이터
+ * @param {String} rexRptName 레포트명
+ * @returns {void}
+ * @hidden N
+ * @exception
+ * @example $c.print.openReportYear(csv, "RPT_YEAR");
+ */
+scwin.openReportYear = function (dataSetCSV, rexRptName) {
+    scwin.openReport(dataSetCSV, rexRptName, null);
+};
+
+/**
+ * @method
+ * @name openReportPdf
+ * @description 사용자 파라미터를 form 으로 구성해 PDF 미리보기 팝업(filePdfload.do)으로 submit 한다.
+ * (AS-IS: fn_open_report_pdf, origin: report.xml)
+ * @param {String} pdfRptName PDF 레포트명
+ * @param {Array} userParam 사용자 파라미터 배열([{uid, unm}, ...])
+ * @returns {void}
+ * @hidden N
+ * @exception
+ * @example $c.print.openReportPdf("PDF_RPT", userParam);
+ */
+scwin.openReportPdf = function (pdfRptName, userParam) {
+    if (document.getElementById("pdfPreView")) {
+        document.body.removeChild(document.getElementById("pdfPreView"));
+    }
+    const time = new Date().getTime();
+    $c.frame.path("/").OuterWindow.window.open("", "pdf_preViewPopup_" + time, "left=0,top=0,width=825,height=768,resizable=yes,scrollbars=no,location=no,status=no");
+    const form = document.createElement("form");
+    form.setAttribute("id", "pdfPreView");
+    form.setAttribute("name", "pdfPreView");
+    form.setAttribute("method", "POST");
+    form.setAttribute("target", "pdf_preViewPopup_" + time);
+    form.setAttribute("action", "/filePdfload.do?method=getPdfInfo");
+
+    // 옵션 - 파라미터 정의
+    if (userParam != null && userParam.length > 0) {
+        for (let i = 0; i < userParam.length; i++) {
+            const hiddenField = document.createElement("input");
+            hiddenField.setAttribute("type", "hidden");
+            hiddenField.setAttribute("id", userParam[i].uid);
+            hiddenField.setAttribute("name", userParam[i].uid);
+            if (userParam[i].uid.indexOf("jsonData") !== -1) {
+                hiddenField.setAttribute("value", JSON.stringify(userParam[i].unm));
+            } else {
+                hiddenField.setAttribute("value", userParam[i].unm);
+            }
+            form.appendChild(hiddenField);
+        }
+        const rptNameField = document.createElement("input");
+        rptNameField.setAttribute("type", "hidden");
+        rptNameField.setAttribute("id", "pdf_rptname");
+        rptNameField.setAttribute("name", "pdf_rptname");
+        rptNameField.setAttribute("value", pdfRptName);
+        form.appendChild(rptNameField);
+    }
+    document.body.appendChild(form);
+    form.submit();
+};
+
+/**
+ * @method
+ * @name printPreView
+ * @description 외부 XML 데이터를 연동해 Rexpert 미리보기 모달을 연다.
+ * (AS-IS: fn_PrintPreView, origin: report.xml)
+ * @param {String} rexName 레포트명
+ * @param {String} dataType 데이터 타입
+ * @param {String} dataLocation 데이터 위치(경로)
+ * @param {String} dataXPath 데이터 XPath
+ * @returns {void}
+ * @hidden N
+ * @exception
+ * @example $c.print.printPreView(name, type, loc, xpath);
+ */
+scwin.printPreView = function (rexName, dataType, dataLocation, dataXPath) {
+    // 필수 - rexpert 선언
+    const oRptMainParam = rex_GetgoDictionay();
+    oRptMainParam.put("rex_rptname", rexName);
+    oRptMainParam.put("rex_datatype", dataType);
+    oRptMainParam.put("rex_data", "http://203.235.1.94:8081" + dataLocation); // 운영서버
+    oRptMainParam.put("rex_xpath", dataXPath);
+
+    // 옵션 - 팝업설정
+    const rexPreViewFeatures = "center:yes;resizable__no;scroll:no;status:no;dialogWidth:825px;dialogHeight:768px";
+    oRptMainParam.put("rex_open_window", rexPreViewFeatures);
+
+    // preview 팝업 열기
+    rex_gfRexRptOpen("popupmodal", oRptMainParam);
+};
+
+/**
+ * @method
+ * @name makeDtsToJson
+ * @description 데이터셋을 리포트 헤더 기준으로 순회하며 (옵션) 포맷을 적용해 JSON 배열로 변환한다.
+ * (AS-IS: fn_make_dtsToJson, origin: report.xml)
+ * @param {Object} dtsObj 헤더 정보를 가진 데이터셋(DataHeader 보유)
+ * @param {Object} dtsReportObj 행 데이터를 가진 리포트 데이터셋
+ * @param {Array} dataFormatObj 포맷 지정 배열(["헤더명:포맷타입", ...], 옵션)
+ * @returns {Object} { arrayData: [{헤더명: 값}, ...] }
+ * @hidden N
+ * @exception
+ * @example var json = $c.print.makeDtsToJson(dsHdr, dsRpt, ["AMT:FormatNumberEx"]);
+ */
+scwin.makeDtsToJson = function (dtsObj, dtsReportObj, dataFormatObj) {
+    const rtnArray = [];
+    const dtsObjHeaders = (dtsObj.DataHeader).split(","); // 해당 객체의 Header 정보 추출
+
+    for (let j = 1; j <= dtsReportObj.getTotalRow(); j++) {
+        const tmpObj = {};
+        for (let k = 0; k < dtsObjHeaders.length; k++) {
+            const dtsHeaders = (dtsObjHeaders[k]).split(":"); // Header 정보
+            const dtsHeaderNm = dtsHeaders[0];                // 실제 Header 명
+            let dtsReportValue = dtsReportObj.getCellData(j, dtsHeaderNm);
+            if (dataFormatObj != null && dataFormatObj.length > 0) {
+                for (let m = 0; m < dataFormatObj.length; m++) {
+                    const dfObj = (dataFormatObj[m]).split(":");
+                    const dfHeaderNm = dfObj[0]; // DataFormat 할 Header 명
+                    const dfNm = dfObj[1];       // DataFormat Type
+                    if (dtsHeaderNm === dfHeaderNm) {
+                        dtsReportValue = scwin.dataFormatValue(dfNm, dtsReportValue);
+                        break;
+                    }
+                }
+            }
+            tmpObj[dtsHeaderNm] = dtsReportValue;
+        }
+        rtnArray.push(tmpObj);
+    }
+    return { arrayData: rtnArray };
+};
+
+/**
+ * @method
+ * @name dataFormatValue
+ * @description 데이터포맷 타입에 따라 값을 변환한다. (makeDtsToJson 보조)
+ * (AS-IS: fn_dataFormatValue, origin: report.xml)
+ * @param {String} dataFormatType 포맷 타입("FormatNumberEx" 등)
+ * @param {String} dataValue 원본 값
+ * @returns {String} 변환된 값
+ * @hidden N
+ * @exception
+ * @example var v = $c.print.dataFormatValue("FormatNumberEx", "1000");
+ */
+scwin.dataFormatValue = function (dataFormatType, dataValue) {
+    let rtnVal;
+    switch (dataFormatType) {
+        case "FormatNumberEx":
+            rtnVal = $c.num.formatNumber(dataValue);
+            break;
+        default:
+            break;
+    }
+    return rtnVal;
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload"/>
+</html>

@@ -23,9 +23,9 @@ A Python/lxml linter under `tools/wsxml_lint/` that parses the WebSquare `.xml` 
 
 - **Run:** `npm run lint:xml` — a **split** of two scripts:
   - `npm run lint:xml:gcc` → `python -m wsxml_lint src/gcc` (strict) → baseline **`11 files, 0 errors, 0 warnings`**.
-  - `npm run lint:xml:legacy` → `python -m wsxml_lint src/as-is/ins src/as-is/mgt src/as-is/stf --ignore WS111,WS112,WS113` → baseline **`108 files, 0 errors, 0 warnings`**.
+  - `npm run lint:xml:legacy` → `python -m wsxml_lint src/as-is/ins src/as-is/mgt src/as-is/stf src/as-is/fil --ignore WS111,WS112,WS113` → baseline **`227 files, 0 errors, 0 warnings`**.
   - Lint a single file: `python -m wsxml_lint src/gcc/win.xml`.
-- **Why the split:** `WS111`/`WS112`/`WS113` fire on *every* legacy page (missing `<head>` `@meta_*` / `<w2:layoutInfo>` / `<w2:dataCollection>`) — a systematic W-Craft conversion gap, not defects (~424 warnings). They are ignored for `src/as-is/ins|mgt|stf` so real issues aren't buried, while `src/gcc` stays strict. To see the full legacy baseline, run `python -m wsxml_lint src/as-is/ins src/as-is/mgt src/as-is/stf` (no `--ignore`).
+- **Why the split:** `WS111`/`WS112`/`WS113` fire on *every* legacy page (missing `<head>` `@meta_*` / `<w2:layoutInfo>` / `<w2:dataCollection>`) — a systematic W-Craft conversion gap, not defects (~424 warnings). They are ignored for `src/as-is/ins|mgt|stf|fil` so real issues aren't buried, while `src/gcc` stays strict. To see the full legacy baseline, run `python -m wsxml_lint src/as-is/ins src/as-is/mgt src/as-is/stf src/as-is/fil` (no `--ignore`).
 - **Exit code:** 0 when there are **no errors** (warnings are allowed); 1 if any error.
 - **Rule codes:** `WS00x` well-formedness · `WS1xx` structure · `WS2xx` references (e.g. **WS201** = a method named in `<w2:publicInfo>` with no definition in the file's CDATA) · `WS4xx` schema (only with `--xsd`). Narrow output with `--select WS201` / `--ignore WS111,WS112`; `--format json` for machine output; `--min-severity warning|error`.
 - **Setup:** needs real Python 3.9+ with `lxml` — `pip install ./tools/wsxml_lint` (the Microsoft Store `python.exe` alias is a stub and must be disabled/avoided). Module tests: `pytest` in `tools/wsxml_lint/`.
@@ -36,7 +36,7 @@ A Python/lxml linter under `tools/wsxml_lint/` that parses the WebSquare `.xml` 
 > **Caveat:** these only see standalone `.js` files. This project's JS lives inside XML CDATA, so there is currently **no `.js` source for them to act on** — `npm run lint` passes trivially and `npm test` reports "no tests found" (`passWithNoTests`). They are wired up for any pure helpers later **extracted** out of the XML into `.js` (tests go under `test/`). For real checks on the XML tree, use `npm run lint:xml`. The ESLint config declares the WebSquare runtime globals (`WebSquare`, `scwin`, `$c`, `$p`, `$w`, `comFunc`).
 
 ### CI
-`.github/workflows/ci.yml` runs two jobs on push/PR: **Node** (`npm ci` → `lint` → `test:coverage`) and **wsxml-lint** (install the Python tool → `pytest` → strict `python -m wsxml_lint src/gcc` → de-noised `python -m wsxml_lint src/as-is/ins src/as-is/mgt src/as-is/stf --ignore WS111,WS112,WS113`).
+`.github/workflows/ci.yml` runs two jobs on push/PR: **Node** (`npm ci` → `lint` → `test:coverage`) and **wsxml-lint** (install the Python tool → `pytest` → strict `python -m wsxml_lint src/gcc` → de-noised `python -m wsxml_lint src/as-is/ins src/as-is/mgt src/as-is/stf src/as-is/fil --ignore WS111,WS112,WS113`).
 
 ### Subagents (`.claude/agents/`, invoke via the Agent tool)
 - **`websquare-code-reviewer`** — read-only review of changed WebSquare JS/XML (API correctness, conventions, dangling component/handler ids). Use before committing.
@@ -102,8 +102,8 @@ Rough module focus (from filenames): `src/as-is/stf/` is the largest — securit
 
 ## Working in this repo
 
-- Edits are surgical changes to JavaScript **inside** CDATA blocks. Preserve the surrounding XML, the JSDoc format, and the file's existing naming generation (modern `$c`/`scwin.camelCase` in `src/gcc/`; match the legacy `fn_*`/`ins_*` style when editing `src/as-is/ins/`, `src/as-is/mgt/`, `src/as-is/stf/`).
+- Edits are surgical changes to JavaScript **inside** CDATA blocks. Preserve the surrounding XML, the JSDoc format, and the file's existing naming generation (modern `$c`/`scwin.camelCase` in `src/gcc/`; match the legacy `fn_*`/`ins_*` style when editing `src/as-is/ins/`, `src/as-is/mgt/`, `src/as-is/stf/`, `src/as-is/fil/`).
 - When you add or rename a public function, update that file's `<w2:publicInfo method="...">` list — `npm run lint:xml` flags a declared-but-undefined method as **WS201**.
 - Comments, screen names, and descriptions are in **Korean**; keep new user-facing strings and doc text consistent with the file's language.
 - Do not introduce build/JS-module syntax (imports, bundler conventions) — these run as inline browser scripts under WebSquare, calling other screens only through the `$c` / `scwin` scopes.
-- After editing XML, run `npm run lint:xml` and keep **both halves at 0 warnings** (`src/gcc` strict, `src/as-is/ins|mgt|stf` with the three conversion-gap rules ignored). A new warning there means a real, non-baseline issue — fix it rather than widening `--ignore`.
+- After editing XML, run `npm run lint:xml` and keep **both halves at 0 warnings** (`src/gcc` strict, `src/as-is/ins|mgt|stf|fil` with the three conversion-gap rules ignored). A new warning there means a real, non-baseline issue — fix it rather than widening `--ignore`.

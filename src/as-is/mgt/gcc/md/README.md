@@ -79,4 +79,29 @@ sval.itemArr = [
 
 ---
 
+## 분리 규칙: 문서 print 관련 함수 → `print.xml`
+
+공통함수 중 **문서 print(인쇄/출력) 관련 함수**는 `mgt.xml`에 두지 않고
+같은 폴더의 별도 파일 `print.xml`(`meta_screenId="$c.print"`)로 분리해 생성한다.
+(분석/트래킹 함수를 `trk.xml`로 분리한 [1번 항목](#1-분석트래킹trk-함수-분리--trkxml)과 동일한 방식.)
+
+**분리 대상 판별 조건** — 함수가 다음 중 하나라도 해당하면 print 함수로 보고 `print.xml`로 이관한다.
+
+- 함수명이 print/인쇄/출력 의미를 가짐 (`*print*`, `*Print*`, `fn_print*`, `*출력*` 등).
+- 브라우저 인쇄(`window.print()`) 또는 리포트/문서 출력 솔루션(`$c.rpt.*` 등)을 호출.
+- 화면 표시가 아니라 인쇄용 문서/미리보기 생성·레이아웃을 목적으로 함.
+
+**이관 시 처리(요약)** — trk 분리와 동일한 절차를 따른다.
+
+- 대상 함수 + 관련 모듈 상태(있다면)를 신규 `print.xml`(`meta_screenId="$c.print"`)로 이동.
+- `mgt.xml` `publicInfo`에서 이관 함수 제거하고, `meta_desc`/헤더 주석을 "print.xml로 분리" 안내로 갱신.
+- 호출처 네임스페이스(`$c.mgt.*` → `$c.print.*`)를 함께 변경(repo 내 호출처 확인 후).
+- API 문서: `src/docs/api/mgt/index_print.html` 신규 생성, `index_mgt.html`에서 print 함수 제거.
+- `python -m wsxml_lint src/as-is/mgt/gcc/print.xml`이 `0 errors, 0 warnings`인지 확인.
+
+> 현재 `mgt.xml`에는 print 관련 함수가 없어 실제 이관은 발생하지 않았다.
+> 이후 print 함수가 추가/식별되면 본 규칙에 따라 `print.xml`로 분리한다.
+
+---
+
 검증: `python -m wsxml_lint src/as-is/mgt/gcc/mgt.xml` → `0 errors, 0 warnings`.

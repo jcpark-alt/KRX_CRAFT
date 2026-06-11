@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fil → gcc 공통이관 함수 매핑 가이드</title>
+<style>
+* { box-sizing: border-box; }
+body { margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Malgun Gothic',sans-serif;
+       color:#1f2933; background:#fff; line-height:1.6; }
+code { font-family:'SFMono-Regular',Consolas,'Liberation Mono',monospace; font-size:.9em; }
+.layout { display:flex; min-height:100vh; }
+.sidebar { width:300px; flex:0 0 300px; border-right:1px solid #e4e7eb; background:#f7f9fc;
+           height:100vh; position:sticky; top:0; overflow-y:auto; padding:16px 0; }
+.brand { padding:0 18px 12px; }
+.brand h1 { font-size:15px; margin:0 0 4px; }
+.brand .sub { font-size:12px; color:#7b8794; }
+.search { margin:8px 14px 12px; }
+.search input { width:100%; padding:8px 10px; border:1px solid #cbd2d9; border-radius:6px; font-size:13px; }
+.nav-file { padding:6px 18px 2px; font-size:12px; font-weight:700; color:#243b53; }
+.nav a { display:block; padding:3px 18px 3px 28px; font-size:12px; color:#627d98; text-decoration:none;
+         white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.nav a:hover { color:#102a43; background:#eef2f7; }
+.content { flex:1 1 auto; padding:28px 40px; max-width:1000px; }
+.content > h1 { font-size:22px; margin:0 0 2px; }
+.content > .summary { color:#7b8794; margin:0 0 24px; font-size:13px; }
+.file-group { margin-bottom:34px; }
+.file-group > h2 { font-size:16px; border-bottom:2px solid #102a43; padding-bottom:6px; margin:0 0 16px; }
+.card { border:1px solid #e4e7eb; border-radius:8px; padding:14px 16px; margin-bottom:12px; background:#fff; }
+.map-row { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.asis { color:#b45309; background:#fff7ed; border:1px solid #fed7aa; padding:3px 9px; border-radius:5px; font-weight:600; }
+.arrow { color:#9aa5b1; font-weight:700; }
+.tobe { color:#2563eb; background:#eff6ff; border:1px solid #bfdbfe; padding:3px 9px; border-radius:5px;
+        font-weight:600; text-decoration:none; }
+.tobe:hover { background:#dbeafe; text-decoration:underline; }
+.tobe .ext { font-size:10px; color:#60a5fa; margin-left:3px; }
+.badge { font-size:11px; padding:1px 7px; border-radius:10px; }
+.badge.review { background:#fef9c3; color:#854d0e; }
+.badge.replace { background:#fce7f3; color:#9d174d; }
+.desc { margin:8px 0 0; color:#486581; font-size:13px; }
+.note { margin:4px 0 0; color:#9aa5b1; font-size:12px; }
+.legend { font-size:12px; color:#627d98; margin-top:6px; }
+.legend .asis, .legend .tobe { padding:1px 6px; font-weight:600; }
+</style>
+</head>
+<body>
+<div class="layout">
+<aside class="sidebar">
+  <div class="brand">
+    <h1>fil → gcc 공통이관 매핑</h1>
+    <div class="sub" id="sub"></div>
+  </div>
+  <div class="search"><input id="search" type="search" placeholder="AS-IS / TO-BE 검색..." autocomplete="off"></div>
+  <nav class="nav" id="nav"></nav>
+</aside>
+<main class="content">
+  <h1>fil → gcc 공통이관 함수 매핑 가이드</h1>
+  <p class="summary" id="summary"></p>
+  <p class="legend">
+    <span class="asis">AS-IS(레거시)</span> <span class="arrow">→</span>
+    <span class="tobe">TO-BE(gcc 표준)</span> — TO-BE 클릭 시 <code>gcc/index.html</code> 의 해당 함수 위치로 새 탭 이동.
+  </p>
+  <div id="main"></div>
+</main>
+</div>
+
+<script>
+// fil_function_analysis_report.md 의 [공통이관] 대표 함수 (AS-IS → TO-BE)
+const GCC_INDEX = "../gcc/index.html";
+const DATA = [
+  // digitalNumberFormat.xml / etnNumberFormat.xml / lossLimitEtnNumberFormat.xml (3중 사본)
+  { file:"digitalNumberFormat.xml", asis:"fn_NumberFormat / fn_ValueSetComma / fn_insertComma", desc:"천단위 콤마(정수 포맷)", tobe:"$c.num.formatNumber" },
+  { file:"digitalNumberFormat.xml", asis:"fn_removeComma / fn_DelComma(정수)", desc:"콤마 제거", tobe:"$c.num.unFormatNumber" },
+  { file:"digitalNumberFormat.xml", asis:"fn_checkNum / fn_checkNum2 / fn_checkNumFormat", desc:"숫자 입력 검증", tobe:"$c.num.isNumber" },
+  { file:"digitalNumberFormat.xml", asis:"fn_AddZero", desc:"한자리 0 패딩", tobe:"$c.str.lpad" },
+
+  // digitalFormValidate.xml / etnFormValidate.xml / lossLimitEtnFormValidate.xml (3중 사본)
+  { file:"digitalFormValidate.xml", asis:"fn_getCheckByte / fn_getAsciiLength / fn_checkLength(2/3)", desc:"바이트 길이 검사", tobe:"$c.str.getByteLength" },
+  { file:"digitalFormValidate.xml", asis:"getCurrentDate", desc:"현재 일자", tobe:"$c.date.formatDate" },
+  { file:"digitalFormValidate.xml", asis:"fn_checkPhoneNumber", desc:"전화번호 형식", tobe:"$c.str.isPhone" },
+  { file:"digitalFormValidate.xml", asis:"fn_checkEmail", desc:"이메일 형식", tobe:"$c.str.isEmail" },
+  { file:"digitalFormValidate.xml", asis:"fn_checkNumber", desc:"숫자 여부", tobe:"$c.num.isNumber" },
+  { file:"digitalFormValidate.xml", asis:"fn_checkDate", desc:"일자 유효성", tobe:"$c.validate.isValidDate" },
+
+  // *ApplList.xml — 쿠키
+  { file:"digitalApplList.xml", asis:"getCookie", desc:"쿠키 조회", tobe:"$c.util.getCookie" },
+
+  // common.xml (root, filing_common 사촌)
+  { file:"common.xml", asis:"fn_Trim", desc:"앞뒤 공백 제거", tobe:"$c.str.trim" },
+  { file:"common.xml", asis:"removeChar / fn_IgnoreSpaces", desc:"문자/공백 제거", tobe:"$c.str.replaceAll" },
+  { file:"common.xml", asis:"isMinusNum / fn_IsNumber", desc:"숫자/음수 검사", tobe:"$c.num.isNumber" },
+  { file:"common.xml", asis:"getOnlyNum", desc:"콤마 제거", tobe:"$c.num.unFormatNumber" },
+  { file:"common.xml", asis:"moneyType", desc:"천단위 콤마 포맷", tobe:"$c.num.formatNumber" },
+  { file:"common.xml", asis:"fn_IsNull / fn_NullChk", desc:"Null/빈값 체크", tobe:"$c.util.isEmpty" },
+  { file:"common.xml", asis:"fn_IsNotNull", desc:"Not Null 체크", tobe:"$c.util.isNotEmpty" },
+  { file:"common.xml", asis:"fn_CheckEmail", desc:"이메일 검증", tobe:"$c.str.isEmail" },
+  { file:"common.xml", asis:"fn_CheckByte / fn_GetByte / fn_CalcContn / fn_IsExceedMaxLen", desc:"바이트 길이/초과", tobe:"$c.str.getByteLength" },
+  { file:"common.xml", asis:"fn_CheckDate / fn_CheckDateGn", desc:"일자 유효성", tobe:"$c.validate.isValidDate" },
+  { file:"common.xml", asis:"fn_PopManual", desc:"매뉴얼 팝업", tobe:"$c.win.openPopup" },
+
+  // prelistCheck.xml
+  { file:"prelistCheck.xml", asis:"fn_IsValidDateComm", desc:"일자 유효성", tobe:"$c.validate.isValidDate" },
+  { file:"prelistCheck.xml", asis:"fn_CheckStringLength / fn_StrCharByte", desc:"바이트 길이", tobe:"$c.str.getByteLength" },
+  { file:"prelistCheck.xml", asis:"fn_JuminCheck", desc:"주민등록번호 검증", tobe:"$c.str.isSSN" },
+
+  // prelist.xml
+  { file:"prelist.xml", asis:"getByteLength / fn_CheckMaxLength", desc:"바이트 길이", tobe:"$c.str.getByteLength" },
+
+  // elw.xml
+  { file:"elw.xml", asis:"Chk_Percent", desc:"백분율 숫자 검증", tobe:"$c.num.isNumber" },
+
+  // filing_trans.xml / trans.xml — 원시 XHR → 대체
+  { file:"filing_trans.xml", asis:"getXMLHttpRequest", desc:"XHR 객체 생성", tobe:"$c.sbm.*", tag:"대체" },
+  { file:"filing_trans.xml", asis:"requestXMLHTTP / requestAsyncXMLHTTP", desc:"XHR 요청", tobe:"$c.sbm.execute", tag:"대체" },
+  { file:"filing_trans.xml", asis:"responseTextXMLHTTP", desc:"XHR 응답 텍스트", tobe:"$c.sbm.*", tag:"대체" },
+  { file:"filing_trans.xml", asis:"sendMessage", desc:"비동기 메시지 전송", tobe:"$c.sbm.executeDynamic", tag:"대체" },
+  { file:"filing_trans.xml", asis:"formData2QueryString", desc:"폼 → 쿼리스트링", tobe:"$c.data.serializeFormToQueryString" },
+
+  // sessionTimer.xml / sessionTimerOuter.xml — 세션
+  { file:"sessionTimer.xml", asis:"startTimer / req4sessionExtn / restartTimer / initTime", desc:"세션 점검·연장", tobe:"$c.session.sessionCheck" },
+
+  // bnf/number_format_kor.xml
+  { file:"bnf/number_format_kor.xml", asis:"number_format", desc:"천단위 콤마 포맷", tobe:"$c.num.formatNumber" },
+  { file:"bnf/number_format_kor.xml", asis:"num2won / num2won_zero", desc:"숫자→한글금액", tobe:"$c.num.numberToKor" },
+  { file:"bnf/number_format_kor.xml", asis:"non_zero", desc:"양의정수 검증", tobe:"$c.num.isNumber" },
+
+  // bnf/bondCommon.xml — 채권 공통(문자/숫자/날짜)
+  { file:"bnf/bondCommon.xml", asis:"dateToyyyyMMdd", desc:"Date→yyyyMMdd", tobe:"$c.date.formatDate" },
+  { file:"bnf/bondCommon.xml", asis:"addMonth / addMonth2", desc:"월 가감", tobe:"$c.date.addMonth" },
+  { file:"bnf/bondCommon.xml", asis:"Chk_Date / Chk_Date2 / fn_CheckDate / chkDate2", desc:"일자 유효성", tobe:"$c.validate.isValidDate" },
+  { file:"bnf/bondCommon.xml", asis:"Chk_Digit / Chk_Number / Chk_Sosu* / DemicalCheck*", desc:"숫자/소수 검증", tobe:"$c.num.isNumber" },
+  { file:"bnf/bondCommon.xml", asis:"Add_MoneyComma(_Value)", desc:"금액 콤마", tobe:"$c.num.formatMoney" },
+  { file:"bnf/bondCommon.xml", asis:"Del_MoneyComma(_Value)", desc:"콤마 제거", tobe:"$c.num.unFormatNumber" },
+  { file:"bnf/bondCommon.xml", asis:"Del_Hypen* / Del_Point* / replacePercent", desc:"문자 치환/제거", tobe:"$c.str.replaceAll" },
+  { file:"bnf/bondCommon.xml", asis:"GetByte / byteCheck / cutMsg", desc:"바이트 길이/절단", tobe:"$c.str.getByteLength" },
+  { file:"bnf/bondCommon.xml", asis:"fnLPAD", desc:"좌측 0 패딩", tobe:"$c.str.lpad" },
+  { file:"bnf/bondCommon.xml", asis:"IsPhone / IsTel*", desc:"전화번호 형식", tobe:"$c.str.isPhone" },
+  { file:"bnf/bondCommon.xml", asis:"CheckEmail / fn_emailFrontCheck / fn_emailBackCheck", desc:"이메일 검증", tobe:"$c.str.isEmail" },
+
+  // bnf/trans.xml — 원시 XHR
+  { file:"bnf/trans.xml", asis:"getXMLHttpRequest / requestXMLHTTP / sendMessage", desc:"원시 XHR 통신", tobe:"$c.sbm.execute", tag:"대체" },
+
+  // inf/function.xml — 표준/숫자/날짜 검증(공통 사본)
+  { file:"inf/function.xml", asis:"Chk_Digit / Chk_Sosu* / Chk_Money / DemicalCheck", desc:"숫자/금액 검증", tobe:"$c.num.isNumber" },
+  { file:"inf/function.xml", asis:"GetByte / fn_ChkStrLenb", desc:"바이트 길이", tobe:"$c.str.getByteLength" },
+  { file:"inf/function.xml", asis:"fn_convCalDate", desc:"8자리→YYYY-MM-DD", tobe:"$c.date.dateFormat" },
+
+  // inf/common.xml
+  { file:"inf/common.xml", asis:"getDuration", desc:"두 일자 기간 계산", tobe:"$c.date.diffDate" }
+];
+
+// $c.<ns>.<fn> → gcc/index.html 앵커(m-<ns>-<fn>, 와일드카드는 모듈 섹션 mod-<ns>)
+function toAnchor(tobe) {
+  const m = tobe.match(/\$c\.([a-z]+)\.([A-Za-z0-9_*]+)/);
+  if (!m) return null;
+  return (m[2] === "*") ? ("mod-" + m[1]) : ("m-" + m[1] + "-" + m[2]);
+}
+function esc(s) { return (s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+function tobeLink(tobe) {
+  const anchor = toAnchor(tobe);
+  const href = GCC_INDEX + (anchor ? "#" + anchor : "");
+  return '<a class="tobe" href="' + href + '" target="_blank" rel="noopener" title="gcc/index.html 에서 보기">'
+       + esc(tobe) + '<span class="ext">↗</span></a>';
+}
+
+function render() {
+  const files = [];
+  DATA.forEach(d => { if (files.indexOf(d.file) === -1) files.push(d.file); });
+
+  document.getElementById("summary").textContent =
+    "참조: fil_function_analysis_report.md · 공통이관 대표 " + DATA.length + "건 · 연동 타겟: gcc/index.html";
+  document.getElementById("sub").textContent = DATA.length + "건 · " + files.length + "개 원본 파일";
+
+  // sidebar
+  let nav = "";
+  files.forEach(f => {
+    nav += '<div class="nav-file">' + esc(f) + '</div>';
+    DATA.forEach((d, i) => {
+      if (d.file === f) nav += '<a href="#card-' + i + '">' + esc(d.asis) + '</a>';
+    });
+  });
+  document.getElementById("nav").innerHTML = nav;
+
+  // main cards grouped by file
+  let main = "";
+  files.forEach(f => {
+    main += '<section class="file-group"><h2>' + esc(f) + '</h2>';
+    DATA.forEach((d, i) => {
+      if (d.file !== f) return;
+      const tag = d.tag
+        ? ' <span class="badge ' + (d.tag === "대체" ? "replace" : "review") + '">' + esc(d.tag) + '</span>'
+        : "";
+      const search = esc((d.asis + " " + d.tobe + " " + d.desc).toLowerCase());
+      main += '<article class="card" id="card-' + i + '" data-search="' + search + '">'
+            + '<div class="map-row"><code class="asis">' + esc(d.asis) + '</code>'
+            + '<span class="arrow">→</span>' + tobeLink(d.tobe) + tag + '</div>'
+            + '<p class="desc">' + esc(d.desc) + '</p>'
+            + '</article>';
+    });
+    main += '</section>';
+  });
+  document.getElementById("main").innerHTML = main;
+}
+render();
+
+// 검색 필터 (AS-IS / TO-BE / 설명)
+const box = document.getElementById("search");
+box.addEventListener("input", () => {
+  const v = box.value.trim().toLowerCase();
+  document.querySelectorAll(".card").forEach(c => {
+    c.style.display = (!v || c.dataset.search.indexOf(v) !== -1) ? "" : "none";
+  });
+  document.querySelectorAll(".file-group").forEach(g => {
+    const any = [...g.querySelectorAll(".card")].some(c => c.style.display !== "none");
+    g.style.display = (!v || any) ? "" : "none";
+  });
+});
+</script>
+</body>
+</html>

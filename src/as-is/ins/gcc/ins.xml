@@ -1,0 +1,632 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ev="http://www.w3.org/2001/xml-events"
+	xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_screenName="업무 공통 함수(ins)" meta_screenId="$c.ins" meta_desc="ins 업무 모듈(상장·발행·공시)에서 추출한 업무공통(KRX 고유) 함수를 작성한다. (종목검색, 컴포넌트 값 get/set, 입력검증, 기간·일자, 메시지, 표준코드 매핑, 문자열 Hex, 로그저장). 분석/트래킹(_trk_*) 함수는 trk.xml($c.trk), 문서 인쇄(Rexpert) 함수는 print.xml($c.print)로 분리. 함수명은 camelCase 로 표준화하고 JSDoc 에 AS-IS 원본명을 병기한다.">
+		<w2:type>COMMON</w2:type>
+		<w2:buildDate/>
+		<w2:MSA/>
+		<xf:model>
+			<w2:dataCollection baseNode="map"/>
+			<w2:workflowCollection/>
+		</xf:model>
+		<w2:layoutInfo/>
+		<w2:publicInfo method="scwin.jongmokSearchReset,scwin.jongmokSearchRtn,scwin.jongmokSearchRtn2,scwin.getObjectValue,scwin.setObjectValue,scwin.checkEmptyValue,scwin.checkMaxLength,scwin.setFromToDate,scwin.setFromToDate1,scwin.compareFromToDate,scwin.compareFromToDate2,scwin.getMessageParam,scwin.getStdCdToStdTpCd,scwin.toHex4,scwin.fromHex4,scwin.createXmlObj4LogSave,scwin.startLogSave,scwin.chkStats4LogSave,scwin.viewParameter4LogSave,scwin.doLogSave"/>
+		<script lazy="false" type="text/javascript"><![CDATA[// =============================================================================
+/**
+ * ins 업무 모듈(상장·발행·공시)에서 추출한 업무공통(KRX 고유) 함수.
+ * 종목검색 / 컴포넌트 값 get·set / 입력검증 / 기간·일자 / 메시지 / 표준코드 매핑 /
+ * 문자열 Hex / 로그저장.
+ * 분석·트래킹(_trk_*) 함수는 trk.xml($c.trk), 문서 인쇄(Rexpert) 함수는
+ * print.xml($c.print)로 분리하였다.
+ * 함수명은 camelCase 로 표준화하고, 각 JSDoc 에 AS-IS 원본명을 병기한다.
+ *
+ * @author Inswave Systems
+ * @class ins
+ * @namespace $c.ins
+ */
+// =============================================================================
+
+scwin.onpageload = function () {
+
+};
+
+// -----------------------------------------------------------------------------
+// 0. 내부 헬퍼 (private)
+// -----------------------------------------------------------------------------
+
+/**
+ * @method
+ * @name __byteLength
+ * @description 문자열의 바이트 길이를 구한다. (한글 2byte, 그 외 1byte)
+ * (AS-IS: getStringSize, origin: stf.xml)
+ * @param {String} message 대상 문자열
+ * @returns {Number} 바이트 길이
+ * @hidden Y
+ * @exception
+ * @example
+ */
+scwin.__byteLength = function (message) {
+    let len = 0;
+    for (let i = 0; i < message.length; i++) {
+        (message.charCodeAt(i) > 255) ? len += 2 : len++;
+    }
+    return len;
+};
+
+// -----------------------------------------------------------------------------
+// 1. 종목검색 (origin: stockSearch.xml)
+// -----------------------------------------------------------------------------
+
+// 종목검색 상태 변수
+scwin.stSearchId = "";
+scwin.stSearchNm = "";
+scwin.stSearchIsurId = "";
+scwin.stSearchIsurNm = "";
+scwin.stSearchId_js = "";
+scwin.stSearchNm_js = "";
+scwin.stSearchIsurId_js = "";
+scwin.stSearchIsurNm_js = "";
+
+/**
+ * @method
+ * @name jongmokSearchReset
+ * @description 종목검색 관련 상태 변수를 모두 초기화한다.
+ * (AS-IS: JongmokSearch_Reset, origin: stockSearch.xml)
+ * @returns {void}
+ * @hidden N
+ * @exception
+ * @example $c.ins.jongmokSearchReset();
+ */
+scwin.jongmokSearchReset = function () {
+    scwin.stSearchId = "";
+    scwin.stSearchNm = "";
+    scwin.stSearchIsurId = "";
+    scwin.stSearchIsurNm = "";
+    scwin.stSearchId_js = "";
+    scwin.stSearchNm_js = "";
+    scwin.stSearchIsurId_js = "";
+    scwin.stSearchIsurNm_js = "";
+    scwin.stSearchKind = "";
+    scwin.stSearchMarket = "";
+    scwin.stSearchOpt = "";
+};
+
+/**
+ * @method
+ * @name jongmokSearchRtn
+ * @description 종목검색 결과(코드/명)를 호출 화면으로 반환한다. (주식·선물용)
+ * (AS-IS: JongmokSearch_Rtn, origin: stockSearch.xml)
+ * @param {String} sval1 종목 코드
+ * @param {String} sval2 종목 명
+ * @returns {void}
+ * @hidden N
+ * @exception
+ * @example $c.ins.jongmokSearchRtn("005930", "삼성전자");
+ */
+scwin.jongmokSearchRtn = function (sval1, sval2) {
+    if (scwin.stSearchId_js === "") {
+        stSearchId.setValue(sval1);
+        if (scwin.stSearchNm !== "") {
+            stSearchNm.setValue(sval2);
+        }
+    } else {
+        scwin.stSearchId_js = sval1;
+        scwin.stSearchNm_js = sval2;
+    }
+};
+
+/**
+ * @method
+ * @name jongmokSearchRtn2
+ * @description 종목검색 결과(코드/명 + 발행사 정보)를 호출 화면으로 반환한다. (ELW·수익증권용)
+ * (AS-IS: JongmokSearch_Rtn2, origin: stockSearch.xml)
+ * @param {String} sval1 종목 코드
+ * @param {String} sval2 종목 명
+ * @param {String} sval3 발행사 코드
+ * @param {String} sval4 발행사 명
+ * @returns {void}
+ * @hidden N
+ * @exception
+ * @example $c.ins.jongmokSearchRtn2(code, name, isurId, isurNm);
+ */
+scwin.jongmokSearchRtn2 = function (sval1, sval2, sval3, sval4) {
+    if (scwin.stSearchId_js === "") {
+        stSearchId.setValue(sval1);
+        if (scwin.stSearchNm !== "") stSearchNm.setValue(sval2);
+        if (scwin.stSearchIsurId !== "") stSearchIsurId.setValue(sval3);
+        if (scwin.stSearchIsurNm !== "") stSearchIsurNm.setValue(sval4);
+    } else {
+        scwin.stSearchId_js = sval1;
+        scwin.stSearchNm_js = sval2;
+        scwin.stSearchIsurId_js = sval3;
+        scwin.stSearchIsurNm_js = sval4;
+    }
+};
+
+// -----------------------------------------------------------------------------
+// 2. 컴포넌트 값 get/set (origin: stf.xml) — KRX 컴포넌트 명명규칙(rdo/edt/cmb/txa) 기반.
+// -----------------------------------------------------------------------------
+
+/**
+ * @method
+ * @name getObjectValue
+ * @description 컴포넌트의 type/id 명명규칙(rdo/edt/cmb/txa)으로 값을 추출한다.
+ * (AS-IS: getObjectValue, origin: stf.xml)
+ * @param {Object} obj 값을 읽을 컴포넌트
+ * @returns {String} 컴포넌트 값(없으면 "")
+ * @hidden N
+ * @exception
+ * @example var v = $c.ins.getObjectValue(edt_FROM_DD);
+ */
+scwin.getObjectValue = function (obj) {
+    // type 으로 구분 가능한 것은 text/checkbox/password (HTML control 직접 사용분).
+    if (obj.type === "text") {
+        return $c.str.trim(obj.getValue());
+    } else if (obj.type === "checkbox") {
+        return (obj.checked) ? "Y" : "N";
+    } else if (obj.type === "password") {
+        return $c.str.trim(obj.getValue());
+    } else if (obj.id.indexOf("rdo") > -1) {
+        // radio = CodeValue
+        return obj.getValue();
+    } else if (obj.id.indexOf("edt") > -1) {
+        // emedit = text
+        return $c.str.trim(obj.getText());
+    } else if (obj.id.indexOf("cmb") > -1) {
+        // combo
+        const tmp = obj.ValueOfIndex("VALUE", obj.getSelectedIndex());
+        if (tmp.indexOf("null") > -1) {
+            return "";
+        }
+        return obj.ValueOfIndex("VALUE", obj.getSelectedIndex());
+    } else if (obj.id.indexOf("txa") > -1) {
+        // textarea = text
+        return $c.str.trim(obj.getText());
+    }
+    return "";
+};
+
+/**
+ * @method
+ * @name setObjectValue
+ * @description 컴포넌트의 type/id 명명규칙(rdo/edt/cmb/txa)으로 값을 설정한다.
+ * (AS-IS: setObjectValue, origin: stf.xml)
+ * @param {Object} obj 값을 설정할 컴포넌트
+ * @param {String} value 설정할 값
+ * @returns {void}
+ * @hidden N
+ * @exception
+ * @example $c.ins.setObjectValue(edt_FROM_DD, "20260101");
+ */
+scwin.setObjectValue = function (obj, value) {
+    if (obj.type === "checkbox") {
+        obj.setValue(value === "Y");
+    } else if (obj.id.indexOf("cmb") > -1) {
+        // combo
+        obj.setSelectedIndex(obj.IndexOfColumn("VALUE", value));
+    } else {
+        // text / password / rdo / edt / txa 공통
+        obj.setValue(value);
+    }
+};
+
+// -----------------------------------------------------------------------------
+// 3. 입력검증 (origin: stf.xml)
+// -----------------------------------------------------------------------------
+
+/**
+ * @method
+ * @name checkEmptyValue
+ * @description 컴포넌트 값이 비었는지 검사하고, 비었으면 alert 후 포커스를 준다.
+ * (AS-IS: checkEmptyValue, origin: stf.xml)
+ * @param {Object} obj 검사할 컴포넌트
+ * @param {String} msg 항목명(메시지에 표시)
+ * @returns {Boolean} 값이 있으면 true, 비었으면 false
+ * @hidden N
+ * @exception
+ * @example if (!$c.ins.checkEmptyValue(edt_NM, "회사명")) return;
+ */
+scwin.checkEmptyValue = function (obj, msg) {
+    if (scwin.getObjectValue(obj) === "") {
+        alert("[" + msg + "]를  입력하세요.");
+        obj.focus();
+        return false;
+    }
+    return true;
+};
+
+/**
+ * @method
+ * @name checkMaxLength
+ * @description 컴포넌트 값의 바이트 길이가 size 를 초과하면 alert 후 포커스를 준다. (한글 2byte)
+ * (AS-IS: checkMaxLength, origin: stf.xml)
+ * @param {Object} obj 검사할 컴포넌트
+ * @param {Number} size 허용 최대 바이트
+ * @param {String} lbl 항목명(메시지에 표시)
+ * @returns {Boolean} 초과하지 않으면 true
+ * @hidden N
+ * @exception
+ * @example if (!$c.ins.checkMaxLength(edt_NM, 40, "회사명")) return;
+ */
+scwin.checkMaxLength = function (obj, size, lbl) {
+    const overLen = scwin.__byteLength(scwin.getObjectValue(obj)) - size;
+    if (overLen > 0) {
+        alert("[ " + lbl + " ] 항목의 최대입력은 [ " + size + " ] byte 입니다.    \n\n[ " + overLen + " ] byte 를 초과하였습니다.\n\n확인하세요. ( 한글 : 2 byte  숫자,영문 : 1 byte )");
+        obj.focus();
+        return false;
+    }
+    return true;
+};
+
+// -----------------------------------------------------------------------------
+// 4. 기간 / 일자 (origin: stf.xml)
+// -----------------------------------------------------------------------------
+
+/**
+ * @method
+ * @name setFromToDate
+ * @description 기간구분(pTp)에 따라 From/To 일자 컴포넌트를 자동 설정한다. (To 가 비면 오늘 기준)
+ * (AS-IS: fn_setFromToDate, origin: stf.xml)
+ * @param {Number} pTp 기간구분 (1:1주일 2:1개월 3:3개월 4:6개월 5:1년 6:2년)
+ * @param {Object} pObjFrom From 일자 컴포넌트
+ * @param {Object} pObjTo To 일자 컴포넌트
+ * @returns {void}
+ * @hidden N
+ * @exception
+ * @example $c.ins.setFromToDate(2, edt_FROM_DD, edt_TO_DD);
+ */
+scwin.setFromToDate = function (pTp, pObjFrom, pObjTo) {
+    let vFrom = "";
+    let vTo = scwin.getObjectValue(pObjTo);
+    if ($c.util.isEmpty(vTo)) {
+        vTo = $c.date.getServerDateTime("yyyymmdd"); // 값이 없으면 오늘 기준
+    }
+
+    switch (Number(pTp)) {
+        case 1: vFrom = $c.date.addDate(vTo, -7); break;   // 1주일 전
+        case 2: vFrom = $c.date.addMonth(vTo, -1); break;  // 1개월 전
+        case 3: vFrom = $c.date.addMonth(vTo, -3); break;  // 3개월 전
+        case 4: vFrom = $c.date.addMonth(vTo, -6); break;  // 6개월 전
+        case 5: vFrom = $c.date.addYear(vTo, -1); break;   // 1년 전
+        case 6: vFrom = $c.date.addYear(vTo, -2); break;   // 2년 전
+        default: vFrom = vTo; break;
+    }
+    scwin.setObjectValue(pObjFrom, vFrom);
+    scwin.setObjectValue(pObjTo, vTo);
+};
+
+/**
+ * @method
+ * @name setFromToDate1
+ * @description 기간문자열(예: "3d"/"3m"/"3y")에 따라 From/To 일자 컴포넌트를 설정한다.
+ * (AS-IS: fn_setFromToDate1, origin: stf.xml)
+ * @param {String} pTerm 기간문자열 (숫자 + d/m/y, 미지정 시 1년 전)
+ * @param {Object} pObjFrom From 일자 컴포넌트
+ * @param {Object} pObjTo To 일자 컴포넌트
+ * @returns {void}
+ * @hidden N
+ * @exception
+ * @example $c.ins.setFromToDate1("3m", edt_FROM_DD, edt_TO_DD);
+ */
+scwin.setFromToDate1 = function (pTerm, pObjFrom, pObjTo) {
+    let vFrom = "";
+    let vTo = scwin.getObjectValue(pObjTo);
+    if ($c.util.isEmpty(vTo)) {
+        vTo = $c.date.getServerDateTime("yyyymmdd"); // 값이 없으면 오늘 기준
+    }
+    pTerm = pTerm.toLowerCase();
+    const nIdx = pTerm.search(/d|m|y/g);
+    const sTerm = Number(pTerm.substring(0, nIdx));
+    const sTp = pTerm.substring(nIdx, pTerm.length);
+    switch (sTp) {
+        case "d": vFrom = $c.date.addDate(vTo, -sTerm); break;
+        case "m": vFrom = $c.date.addMonth(vTo, -sTerm); break;
+        case "y": vFrom = $c.date.addYear(vTo, -sTerm); break;
+        default: vFrom = $c.date.addYear(vTo, -1); break;
+    }
+    scwin.setObjectValue(pObjFrom, vFrom);
+    scwin.setObjectValue(pObjTo, vTo);
+};
+
+/**
+ * @method
+ * @name compareFromToDate
+ * @description From 일자가 To 일자보다 크면 alert 후 false 를 반환한다.
+ * (AS-IS: compareFromToDate, origin: stf.xml)
+ * @param {Object} fromDate From 일자 컴포넌트
+ * @param {Object} toDate To 일자 컴포넌트
+ * @param {String} fromMsg From 항목명
+ * @param {String} toMsg To 항목명
+ * @returns {Boolean} 정상(From<=To)이면 true
+ * @hidden N
+ * @exception
+ * @example if (!$c.ins.compareFromToDate(edt_FROM, edt_TO, "시작일", "종료일")) return;
+ */
+scwin.compareFromToDate = function (fromDate, toDate, fromMsg, toMsg) {
+    if (Number(scwin.getObjectValue(fromDate)) > Number(scwin.getObjectValue(toDate))) {
+        alert(fromMsg + "을(를) " + toMsg + " 이전으로 선택하세요.");
+        return false;
+    }
+    return true;
+};
+
+/**
+ * @method
+ * @name compareFromToDate2
+ * @description 검색시작일이 검색종료일보다 크면 alert·포커스 후 false 를 반환한다.
+ * (AS-IS: compareFromToDate2, origin: stf.xml)
+ * @param {Object} objSDate 검색시작일 컴포넌트
+ * @param {Object} objEDate 검색종료일 컴포넌트
+ * @returns {Boolean} 정상(시작<=종료)이면 true
+ * @hidden N
+ * @exception
+ * @example if (!$c.ins.compareFromToDate2(edt_SDATE, edt_EDATE)) return;
+ */
+scwin.compareFromToDate2 = function (objSDate, objEDate) {
+    if (Number(scwin.getObjectValue(objSDate)) > Number(scwin.getObjectValue(objEDate))) {
+        alert("검색시작일을  검색종료일 이전으로 선택하세요.");
+        objSDate.focus();
+        return false;
+    }
+    return true;
+};
+
+// -----------------------------------------------------------------------------
+// 5. 메시지 (origin: stf.xml) — KRX 공통메시지 테이블.
+// -----------------------------------------------------------------------------
+
+// 공통메시지 정의. "MSG-A***" 키는 "^" 자리에 targetMsg 가 치환된다.
+scwin.MESSAGE_KEYS = [
+    { key: "MSG-A001", content: "[^] 처리 성공하였습니다." },
+    { key: "MSG-0001", content: "성공적으로 처리되었습니다." },
+    { key: "MSG-A002", content: "[^] 처리 실패하였습니다." },
+    { key: "MSG-0002", content: "작업처리 중 오류가 발생하였습니다." },
+    { key: "MSG-0003", content: "조회결과가 없습니다." },
+    { key: "MSG-0004", content: "정보를  변경하시겠습니까?" },
+    { key: "MSG-A005", content: "[^] 을(를) 입력하셔야 합니다." },
+    { key: "MSG-A006", content: "[^] 처리를 하시겠습니까?" },
+    { key: "MSG-0006", content: "삭제된 자료는 복구할 수 없습니다. 정말 삭제하시겠습니까?" },
+    { key: "MSG-0007", content: "수정된 자료는 이전상태로 복구할 수 없습니다. 자료를 수정하시겠습니까?" },
+    { key: "MSG-0008", content: "입력된 값[^]은 너무 큰값이거나 올바르지 않은 값입니다." },
+    { key: "MSG-0009", content: "저장할 수정내용이 없습니다." },
+    { key: "MSG-0010", content: "업무처리번호생성실패" },
+    { key: "MSG-0011", content: "현재일 이후에 이미 변경할 업무가 있습니다." },
+    { key: "MSG-0012", content: "기초자산 선택시만 사유를 추가 할수있습니다." },
+    { key: "MSG-0013", content: "[회사코드(명)]을 선택해주세요." },
+    { key: "MSG-0014", content: "[신규등록구분]을 선택해주세요." },
+    { key: "MSG-0015", content: "[종목코드(명)]을 선택해주세요." },
+    { key: "MSG-0016", content: "[발행사/기초자산]을 선택해주세요." },
+    { key: "MSG-0017", content: "[피흡수합병법인]을 선택해주세요." },
+    { key: "MSG-0018", content: "[변경후] 항목중 빠진 부분이 있습니다." },
+    { key: "MSG-0019", content: "[변경후 행사가격, 전환비율]은 모두 입력하셔야 합니다." },
+    { key: "MSG-0020", content: "입력한 일자보다, 예정된 관리종목지정업무가 있습니다.\n\n관리종목지정현황을 확인하세요." },
+    { key: "MSG-0021", content: "신규 관리종목지정 업무를 저장 할 수 없습니다.\n\n관리종목지정현황을 확인하세요." },
+    { key: "MSG-0022", content: "변경된  항목이 있습니다.\n\n수정후에 안내문작성을 다시 클릭하세요." },
+    { key: "MSG-0023", content: "관리종목지정시 매매거래정지 및 정지해제 업무를 처리바랍니다." },
+    { key: "MSG-0024", content: "공시검토단계로 전송하시겠습니까?" },
+    { key: "MSG-0025", content: "금감원코드가 없어 입력하실수 없습니다." },
+    { key: "MSG-0901", content: " ·현재는 법인제출 마감을 하실 수 없습니다." },
+    { key: "MSG-0902", content: " ·법인 제출이 마감되었습니다." },
+    { key: "MSG-0903", content: " ·법인 제출과 금융감독원 접수가 마감되었습니다.\n ·업무 마감을 하실 수 있습니다." },
+    { key: "MSG-0904", content: " ·법인 제출과 금융감독원 접수가 마감되었습니다.\n ·업무가 마감되었습니다." },
+    { key: "MSG-0905", content: " ·현재 모든 업무가 마감되었습니다." },
+    { key: "MSG-0906", content: " ·법인 제출이 진행중입니다." },
+    { key: "MSG-0907", content: "이미 공시처리되었습니다. 정정공시처리하시겠습니까?" },
+    { key: "MSG-0908", content: "원본 데이터를 조회할 수 없어 공시문서를 생성할 수 없습니다." },
+    { key: "MSG-0909", content: "변경사항을 저장한 후에 수행할 수 있습니다. 저장후 후 처리하세요." },
+    { key: "MSG-0910", content: "[^]의 형식이 옳바르지 않습니다." },
+    { key: "MSG-0911", content: "[^]은 5자리입니다." },
+    { key: "MSG-0912", content: " ·법인 제출이 마감되었습니다.\n ·업무가 마감되었습니다." },
+    { key: "MSG-0913", content: " ·법인 제출이 진행중입니다.\n ·업무가 마감되었습니다." }
+];
+
+/**
+ * @method
+ * @name getMessageParam
+ * @description KRX 공통메시지 테이블에서 key 로 메시지를 찾고, "^" 를 targetMsg 로 치환해 반환한다.
+ * (AS-IS: getMessageParam, origin: stf.xml)
+ * @param {String} key 메시지 코드(예: "MSG-A001")
+ * @param {String} targetMsg "^" 자리에 치환할 문자열
+ * @returns {String} 완성된 메시지(미정의 코드면 "MessageCode: key")
+ * @hidden N
+ * @exception
+ * @example $c.win.alert($c.ins.getMessageParam("MSG-A001", "저장"));
+ */
+scwin.getMessageParam = function (key, targetMsg) {
+    let content;
+    for (let i = 0; i < scwin.MESSAGE_KEYS.length; i++) {
+        if (key === scwin.MESSAGE_KEYS[i].key) {
+            content = scwin.MESSAGE_KEYS[i].content;
+            break;
+        }
+    }
+    if (content === undefined) {
+        return "MessageCode: " + key;
+    }
+    const count = content.indexOf("^");
+    if (count > -1) {
+        content = content.substring(0, count) + targetMsg + content.substring(count + 1);
+    }
+    return content;
+};
+
+// -----------------------------------------------------------------------------
+// 6. 표준코드 매핑 (origin: function.xml)
+// -----------------------------------------------------------------------------
+
+/**
+ * @method
+ * @name getStdCdToStdTpCd
+ * @description 표준코드 신청구분(std_cd_appl_contn_tp_cd)을 상세 표준유형코드로 매핑한다.
+ * (AS-IS: get_stdcd2stdTpCd, origin: function.xml)
+ * @param {String} stdCdApplContnTpCd 표준코드 신청구분 (01~13)
+ * @param {String} type2 전자단기사채(07) 구분 시 "CP" 면 CP(7), 아니면 전단채(77)
+ * @returns {String} 상세 표준유형코드
+ * @hidden N
+ * @exception
+ * @example var tp = $c.ins.getStdCdToStdTpCd("01");
+ */
+scwin.getStdCdToStdTpCd = function (stdCdApplContnTpCd, type2) {
+    switch (stdCdApplContnTpCd) {
+        case "01": return "3";   // 채권
+        case "02": return "2";   // 주권
+        case "03": return "4";   // 수익증권
+        case "04": return "5";   // 신주인수권증권(WR)
+        case "05": return "55";  // 신주인수권증서(R)
+        case "06": return "8";   // 유가증권예탁증서(DR)
+        case "07": return (type2 === "CP") ? "7" : "77"; // CP(7) / 전자단기사채(77)
+        case "08": return "9";   // 스트립
+        case "09": return "6";   // 양도성예금증서(CD)
+        case "10": return "11";  // 주식워런트증권(ELW)
+        case "11": return "10";  // ELS/DLS
+        case "12": return "14";  // ETN
+        case "13": return "15";  // 투자계약증권
+        default: return "";
+    }
+};
+
+// -----------------------------------------------------------------------------
+// 7. 문자열 Hex 인코딩 (origin: person.xml) — 종목코드 등 파라미터 전달용.
+// -----------------------------------------------------------------------------
+
+/**
+ * @method
+ * @name toHex4
+ * @description 문자열의 각 문자를 4자리 16진수로 인코딩한다(대문자).
+ * (AS-IS: StringToHex4, origin: person.xml)
+ * @param {String} originalString 원본 문자열
+ * @returns {String} 4자리 Hex 연결 문자열
+ * @hidden N
+ * @exception
+ * @example var enc = $c.ins.toHex4("AB");
+ */
+scwin.toHex4 = function (originalString) {
+    let returnString = "";
+    for (let i = 0; i < originalString.length; i++) {
+        const tmp = "0000" + (parseInt(originalString.charCodeAt(i)).toString(16));
+        returnString += tmp.substring(tmp.length - 4);
+    }
+    return returnString.toUpperCase();
+};
+
+/**
+ * @method
+ * @name fromHex4
+ * @description 4자리 16진수 연결 문자열을 원본 문자열로 디코딩한다.
+ * (AS-IS: Hex4ToStr, origin: person.xml)
+ * @param {String} encodeData 4자리 Hex 연결 문자열
+ * @returns {String} 디코딩된 문자열
+ * @hidden N
+ * @exception
+ * @example var str = $c.ins.fromHex4(enc);
+ */
+scwin.fromHex4 = function (encodeData) {
+    let newData = "";
+    let iNo = 0;
+    for (let i = 0; i < encodeData.length / 4; i++) {
+        const str = encodeData.substr(iNo, 4);
+        newData += String.fromCharCode(parseInt("0x" + str));
+        iNo += 4;
+    }
+    return newData;
+};
+
+// -----------------------------------------------------------------------------
+// 8. 로그 저장 (origin: stf.xml) — 레거시 XHR 기반. 신규 화면은 $c.sbm 사용 권장.
+// -----------------------------------------------------------------------------
+
+/**
+ * @method
+ * @name createXmlObj4LogSave
+ * @description 로그저장 요청용 XMLHttpRequest 객체를 생성한다.
+ * (AS-IS: createXMLObj4LogSave, origin: stf.xml)
+ * @returns {void}
+ * @hidden N
+ * @exception
+ * @example $c.ins.createXmlObj4LogSave();
+ */
+scwin.createXmlObj4LogSave = function () {
+    if (window.XMLHttpRequest) {
+        scwin.xmlHttp4LogSave = new XMLHttpRequest();
+    } else if (window.ActiveXObject) {
+        scwin.xmlHttp4LogSave = new ActiveXObject("Microsoft.XMLHTTP");
+    }
+};
+
+/**
+ * @method
+ * @name startLogSave
+ * @description 화면 ID/처리구분으로 로그저장 요청을 비동기 전송한다.
+ * (AS-IS: startLogSave, origin: stf.xml)
+ * @param {String} ver1 화면 ID (SCREN_ID)
+ * @param {String} ver2 화면 처리구분 코드 (SCREN_PROCES_TP_CD)
+ * @returns {void}
+ * @hidden N
+ * @exception
+ * @example $c.ins.startLogSave("ULDINS0101", "R");
+ */
+scwin.startLogSave = function (ver1, ver2) {
+    const url = "/common/logSaveAct.jsp?SCREN_ID=" + ver1 + "&SCREN_PROCES_TP_CD=" + ver2;
+    scwin.xmlHttp4LogSave.onreadystatechange = scwin.chkStats4LogSave;
+    scwin.xmlHttp4LogSave.open("GET", url, true);
+    scwin.xmlHttp4LogSave.send(null);
+};
+
+/**
+ * @method
+ * @name chkStats4LogSave
+ * @description 로그저장 XHR 응답 상태를 점검하고 완료 시 결과를 처리한다. (onreadystatechange 콜백)
+ * (AS-IS: chkStats4LogSave, origin: stf.xml)
+ * @returns {void}
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.chkStats4LogSave = function () {
+    if (scwin.xmlHttp4LogSave.readyState === 4 && scwin.xmlHttp4LogSave.status === 200) {
+        scwin.viewParameter4LogSave();
+    }
+};
+
+/**
+ * @method
+ * @name viewParameter4LogSave
+ * @description 로그저장 응답(result 노드) 값을 확인한다. (alert4LogSave 가 true 일 때 alert)
+ * (AS-IS: viewParameter4logSave, origin: stf.xml)
+ * @returns {void}
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.viewParameter4LogSave = function () {
+    const xmlDoc = scwin.xmlHttp4LogSave.responseXML;
+    const node = xmlDoc.getElementsByTagName("result");
+    if (scwin.alert4LogSave) {
+        alert(node[0].childNodes[0].nodeValue);
+    }
+};
+
+/**
+ * @method
+ * @name doLogSave
+ * @description 로그저장 전체 흐름을 실행한다(객체 생성 → 전송).
+ * (AS-IS: doLogSave, origin: stf.xml)
+ * @param {String} ver1 화면 ID
+ * @param {String} ver2 화면 처리구분 코드
+ * @param {Boolean} ver3 true 면 응답을 alert 로 표시
+ * @returns {void}
+ * @hidden N
+ * @exception
+ * @example $c.ins.doLogSave("ULDINS0101", "R");
+ */
+scwin.doLogSave = function (ver1, ver2, ver3) {
+    scwin.createXmlObj4LogSave();
+    if (ver3) scwin.alert4LogSave = true;
+    scwin.startLogSave(ver1, ver2);
+};
+
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload"/>
+</html>
