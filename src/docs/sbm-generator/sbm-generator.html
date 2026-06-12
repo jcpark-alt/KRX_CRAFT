@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WebSquare Submission → executeDynamic Generator</title>
+<style>
+* { box-sizing: border-box; }
+body { margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Malgun Gothic',sans-serif;
+       color:#1f2933; background:#f0f4f8; line-height:1.5; }
+.wrap { max-width:1500px; margin:0 auto; padding:24px 20px 48px; }
+header h1 { font-size:20px; margin:0 0 4px; }
+header p { margin:0 0 20px; color:#627d98; font-size:13px; }
+header code { background:#eef2f7; padding:1px 5px; border-radius:4px; font-size:12px; color:#2563eb; }
+/* 결과 컬럼 고정 916px, 입력 컬럼(1fr)이 나머지 차지 */
+.grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,916px); gap:20px; align-items:start; }
+@media (max-width:860px){ .grid { grid-template-columns:1fr; } }
+.card { background:#fff; border:1px solid #e4e7eb; border-radius:10px; padding:18px; }
+.card h2 { font-size:14px; margin:0 0 14px; color:#243b53; }
+.field { margin-bottom:16px; }
+.field > label { display:block; font-size:12px; font-weight:700; color:#486581; margin-bottom:6px; }
+.radios { display:flex; gap:10px; }
+.radios label { flex:1; display:flex; align-items:center; gap:8px; border:1px solid #cbd2d9; border-radius:8px;
+                padding:9px 12px; font-size:13px; cursor:pointer; user-select:none; }
+.radios label:hover { background:#f7f9fc; }
+.radios input { accent-color:#2563eb; }
+.two { display:flex; gap:12px; }
+.two > .field { flex:1; margin-bottom:0; }
+input[type=text], select { width:100%; padding:9px 11px; border:1px solid #cbd2d9; border-radius:8px;
+                           font-size:13px; background:#fff; }
+textarea { width:100%; padding:11px; border:1px solid #cbd2d9; border-radius:8px;
+           font-family:Consolas,'D2Coding',monospace; font-size:13px; resize:vertical; }
+#srcText { min-height:240px; }
+#result { min-height:360px; background:#0f172a; color:#e2e8f0; border-color:#0f172a; }
+.btn { border:none; border-radius:8px; padding:10px 18px; font-size:13px; font-weight:700; cursor:pointer; }
+.btn-primary { background:#2563eb; color:#fff; width:100%; }
+.btn-primary:hover { background:#1d4ed8; }
+.btn-ghost { background:#eef2f7; color:#243b53; }
+.btn-ghost:hover { background:#dde5ee; }
+.result-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.result-head h2 { margin:0; }
+.meta { font-size:12px; color:#7b8794; margin-top:8px; }
+.meta b { color:#243b53; }
+.hint { font-size:11px; color:#9aa5b1; margin-top:6px; }
+.toast { position:fixed; left:50%; bottom:32px; transform:translateX(-50%) translateY(20px);
+         background:#102a43; color:#fff; padding:10px 20px; border-radius:24px; font-size:13px;
+         opacity:0; pointer-events:none; transition:all .25s ease; z-index:50; }
+.toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+.err { color:#b91c1c; }
+details { margin-top:14px; font-size:12px; color:#627d98; }
+details code { background:#eef2f7; padding:1px 5px; border-radius:4px; font-size:11px; color:#2563eb; }
+details pre { background:#f7f9fc; border:1px solid #e4e7eb; border-radius:6px; padding:10px; overflow:auto; line-height:1.6; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>WebSquare Submission → executeDynamic Generator</h1>
+    <p><code>&lt;xf:submission&gt;</code> XML 을 붙여넣으면 <code>$c.sbm.executeDynamic</code> 호출 스크립트를 생성합니다. (ref/target 은 간소화 문법으로 변환)</p>
+  </header>
+
+  <div class="grid">
+    <!-- 입력 -->
+    <section class="card" id="inputCard">
+      <h2>입력</h2>
+
+      <div class="field">
+        <label for="srcText">Submission XML (&lt;xf:submission ... /&gt;)</label>
+        <textarea id="srcText" placeholder='&lt;xf:submission id="sbm_commonGroup" ref=&#39;data:json,{"id":"dma_search","key":"body"}&#39; target=&#39;data:json,{"id":"dlt_commonGrp","key":"body.content"}&#39; action="/common/selectCommonGroup" method="post" mediatype="application/json" mode="asynchronous" ev:submitdone="scwin.sbm_commonGroup_submitdone"&gt;&lt;/xf:submission&gt;'></textarea>
+      </div>
+
+      <div class="field">
+        <label>호출 스타일</label>
+        <div class="radios">
+          <label><input type="radio" name="style" value="plain" checked> 기본</label>
+          <label><input type="radio" name="style" value="then"> Promise <code>.then</code></label>
+          <label><input type="radio" name="style" value="await"> async / await</label>
+        </div>
+      </div>
+
+      <div class="two field">
+        <div class="field">
+          <label for="gridview">gridview ID <span style="font-weight:400;color:#9aa5b1">(선택)</span></label>
+          <input type="text" id="gridview" placeholder="예: grd_main" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="dupCtrl">중복 실행 제어 <span style="font-weight:400;color:#9aa5b1">(선택)</span></label>
+          <select id="dupCtrl">
+            <option value="">없음</option>
+            <option value="abort">onDuplicate: "abort" (후행 우선)</option>
+            <option value="noDup">allowDuplicate: false (더블클릭 방지)</option>
+          </select>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="genBtn">Generator ▶</button>
+
+      <details>
+        <summary>ref / target 간소화 변환 규칙 (sbm.xml 기준)</summary>
+        <pre>[ref]   요청 DataCollection (data:json,... → 간소화)
+  data:json,dma_a                              → dma_a
+  data:json,{"id":"dma_a","key":"body"}        → dma_a=body
+  data:json,["dma_a","dlt_b"]                  → dma_a,dlt_b
+
+[target] 응답 DataCollection (data:json,... → 간소화)
+  data:json,dlt_a                              → dlt_a
+  data:json,{"id":"dlt_a","key":"body.content"} → dlt_a=body.content
+  data:json,{"action":"append","id":"dlt_a"}    → dlt_a|append    (기존 유지 + 추가)
+  data:json,["dlt_a","dlt_b"]                   → dlt_a,dlt_b
+
+· id=key  : 응답 경로 지정 (점(.) 경로 허용, 예: body.content)
+· |append : setJSON(data, true) 누적 적재
+· method=post / mode=asynchronous / mediatype=application/json 은 기본값이라 생략</pre>
+      </details>
+    </section>
+
+    <!-- 출력 -->
+    <section class="card" id="resultCard">
+      <div class="result-head">
+        <h2>결과 (executeDynamic 스크립트)</h2>
+        <button class="btn btn-ghost" id="copyBtn">Copy</button>
+      </div>
+      <textarea id="result" readonly placeholder="생성된 스크립트가 여기에 표시됩니다."></textarea>
+      <div class="meta" id="meta"></div>
+    </section>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+
+const $ = id => document.getElementById(id);
+
+// ---- 파싱 ----
+
+// <xf:submission ...> 의 속성을 추출한다. (작은/큰따옴표 모두 지원)
+function parseSubmissionAttrs(xml) {
+    const tagMatch = xml.match(/<\s*[\w.-]*:?submission\b([\s\S]*?)\/?>/i);
+    if (!tagMatch) return null;
+    const body = tagMatch[1];
+    const attrs = {};
+    const re = /([\w:.-]+)\s*=\s*("([^"]*)"|'([^']*)')/g;
+    let m;
+    while ((m = re.exec(body)) !== null) {
+        attrs[m[1]] = (typeof m[3] !== "undefined") ? m[3] : m[4];
+    }
+    return attrs;
+}
+
+// "data:json,..." 표현식을 [{id, key, append}] 배열로 파싱한다.
+function parseDataExpr(expr) {
+    if (typeof expr !== "string") return [];
+    expr = expr.trim();
+    if (!expr) return [];
+    const m = expr.match(/^data:(?:json|xml)\s*,\s*([\s\S]*)$/i);
+    let payload = m ? m[1].trim() : expr;
+
+    let parsed;
+    try {
+        parsed = JSON.parse(payload);
+    } catch (e) {
+        // 단일 ID 문자열 (예: data:json,dma_search)
+        return [{ id: payload.replace(/^["']|["']$/g, "").trim(), key: "", append: false }];
+    }
+
+    const items = Array.isArray(parsed) ? parsed : [parsed];
+    return items.map(function (it) {
+        if (typeof it === "string") return { id: it, key: "", append: false };
+        if (it && typeof it === "object") {
+            return {
+                id: it.id,
+                key: it.key || "",
+                append: (it.action === "append" || it.append === true)
+            };
+        }
+        return null;
+    }).filter(function (it) { return it && it.id; });
+}
+
+// ref 간소화 문자열 : "id" 또는 "id=key" 를 콤마로 결합 (append 없음)
+function toSimplifiedRef(items) {
+    return items.map(function (it) {
+        return it.key ? (it.id + "=" + it.key) : it.id;
+    }).join(",");
+}
+
+// target 간소화 문자열 : "id[=key][|append]" 를 콤마로 결합
+function toSimplifiedTarget(items) {
+    return items.map(function (it) {
+        let s = it.key ? (it.id + "=" + it.key) : it.id;
+        if (it.append) s += "|append";
+        return s;
+    }).join(",");
+}
+
+// ---- 코드 조립 ----
+
+function jsStr(s) { return JSON.stringify(String(s)); }
+
+// 핸들러 값 : 식별자/멤버경로면 함수 참조(따옴표 없음), 그 외엔 문자열
+function handlerRef(v) {
+    v = String(v).trim();
+    if (/^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)*$/.test(v)) return v;
+    return jsStr(v);
+}
+
+function buildOptionLines(attrs) {
+    const lines = [];
+    const push = (k, v) => lines.push("    " + k + " : " + v);
+
+    push("id", jsStr(attrs.id || ""));
+    if (attrs.action) push("action", jsStr(attrs.action));
+
+    if (attrs.method && attrs.method.toLowerCase() !== "post") push("method", jsStr(attrs.method));
+    if (attrs.mode && attrs.mode.toLowerCase() === "synchronous") push("mode", jsStr("synchronous"));
+    if (attrs.mediatype && attrs.mediatype.toLowerCase() !== "application/json") push("mediatype", jsStr(attrs.mediatype));
+
+    const refItems = parseDataExpr(attrs.ref);
+    if (refItems.length) push("ref", jsStr(toSimplifiedRef(refItems)));
+
+    const tgtItems = parseDataExpr(attrs.target);
+    if (tgtItems.length) push("target", jsStr(toSimplifiedTarget(tgtItems)));
+
+    const gv = $("gridview").value.trim();
+    if (gv) push("gridview", jsStr(gv));
+
+    if (attrs["ev:submit"]) push("submitHandler", handlerRef(attrs["ev:submit"]));
+    if (attrs["ev:submitdone"]) push("submitDoneHandler", handlerRef(attrs["ev:submitdone"]));
+    if (attrs["ev:submiterror"]) push("submitErrorHandler", handlerRef(attrs["ev:submiterror"]));
+
+    if (attrs.processMsg) push("processMsg", jsStr(attrs.processMsg));
+    else push("isProcessMsg", "false");
+
+    return { lines: lines, refItems: refItems, tgtItems: tgtItems };
+}
+
+function selectedStyle() {
+    return document.querySelector('input[name="style"]:checked').value;
+}
+
+function buildCallExpr() {
+    const dup = $("dupCtrl").value;
+    let execOpt = "";
+    if (dup === "abort") execOpt = '{ onDuplicate: "abort" }';
+    else if (dup === "noDup") execOpt = "{ allowDuplicate: false }";
+    const tail = execOpt ? (", null, null, " + execOpt) : "";
+    return "$c.sbm.executeDynamic(sbmOptions" + tail + ")";
+}
+
+function buildSnippet(attrs) {
+    const built = buildOptionLines(attrs);
+    let out = "const sbmOptions = {\n" + built.lines.join(",\n") + "\n};\n\n";
+
+    const call = buildCallExpr();
+    const style = selectedStyle();
+    if (style === "then") {
+        out += call + ".then(function (res) {\n"
+             + "    if (res && res.skipped) { return; } // 진행 중 통신이 있어 이번 호출은 건너뜀\n"
+             + "    // ... 정상 응답 처리 ...\n"
+             + "});\n";
+    } else if (style === "await") {
+        out += "// ※ async 함수 내부에서 호출하세요.\n"
+             + "const res = await " + call + ";\n"
+             + "if (res && res.skipped) { return; } // 진행 중 통신이 있어 이번 호출은 건너뜀\n"
+             + "// ... 정상 응답 처리 ...\n";
+    } else {
+        out += call + ";\n";
+    }
+    return { code: out, built: built };
+}
+
+// ---- 결과 높이 동기화 ----
+function syncResultMinHeight() {
+    const inputH = $("inputCard").offsetHeight;
+    const r = $("result");
+    const chrome = $("resultCard").offsetHeight - r.offsetHeight;
+    const target = inputH - chrome;
+    if (target > 0) r.style.minHeight = target + "px";
+}
+function autoGrowResult() {
+    syncResultMinHeight();
+    const r = $("result");
+    r.style.height = "auto";
+    r.style.height = r.scrollHeight + "px";
+}
+
+function showToast(msg, isErr) {
+    const t = $("toast");
+    t.textContent = msg;
+    t.style.background = isErr ? "#b91c1c" : "#102a43";
+    t.classList.add("show");
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(() => t.classList.remove("show"), 1800);
+}
+
+function generate() {
+    const raw = $("srcText").value;
+    const meta = $("meta");
+    const attrs = parseSubmissionAttrs(raw);
+    if (!attrs) {
+        $("result").value = "";
+        autoGrowResult();
+        meta.innerHTML = '<span class="err">&lt;xf:submission&gt; 태그를 찾을 수 없습니다. submission XML 전체를 붙여넣으세요.</span>';
+        showToast("submission 태그를 찾지 못했습니다.", true);
+        return;
+    }
+    if (!attrs.id) {
+        $("result").value = "";
+        autoGrowResult();
+        meta.innerHTML = '<span class="err">submission 에 id 속성이 없습니다. id 는 통신 실행에 필수입니다.</span>';
+        showToast("id 속성이 없습니다.", true);
+        return;
+    }
+
+    const r = buildSnippet(attrs);
+    $("result").value = r.code;
+    autoGrowResult();
+
+    const appendN = r.built.tgtItems.filter(t => t.append).length;
+    const handlers = ["ev:submit", "ev:submitdone", "ev:submiterror"].filter(k => attrs[k]).length;
+    meta.innerHTML = "id <b>" + escHtml(attrs.id) + "</b>"
+        + " · ref <b>" + r.built.refItems.length + "</b>개"
+        + " · target <b>" + r.built.tgtItems.length + "</b>개"
+        + (appendN ? ' · <b>' + appendN + '</b>개 append' : "")
+        + (handlers ? " · 핸들러 <b>" + handlers + "</b>개" : "");
+    showToast("스크립트를 생성했습니다.");
+}
+
+function escHtml(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+async function copyResult() {
+    const text = $("result").value;
+    if (!text) { showToast("복사할 결과가 없습니다.", true); return; }
+    try {
+        await navigator.clipboard.writeText(text);
+        showToast("클립보드에 복사했습니다.");
+    } catch (e) {
+        const r = $("result");
+        r.removeAttribute("readonly");
+        r.select();
+        try { document.execCommand("copy"); showToast("클립보드에 복사했습니다."); }
+        catch (e2) { showToast("복사 실패 — 수동으로 선택해 복사하세요.", true); }
+        r.setAttribute("readonly", "readonly");
+        window.getSelection().removeAllRanges();
+    }
+}
+
+// 이벤트 바인딩
+$("genBtn").addEventListener("click", generate);
+$("copyBtn").addEventListener("click", copyResult);
+document.querySelectorAll('input[name="style"]').forEach(r => r.addEventListener("change", () => { if ($("result").value) generate(); }));
+$("dupCtrl").addEventListener("change", () => { if ($("result").value) generate(); });
+$("gridview").addEventListener("input", () => { if ($("result").value) generate(); });
+window.addEventListener("resize", syncResultMinHeight);
+$("srcText").addEventListener("input", syncResultMinHeight);
+syncResultMinHeight();
+</script>
+</body>
+</html>
