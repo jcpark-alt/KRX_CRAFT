@@ -344,6 +344,24 @@ def _defined_function_names(code):
     return names
 
 
+def rule11_remove_include(code, report):
+    """스크립트 영역에서 `include(...)` 로 시작하는 라인을 삭제(활성 + 주석 처리 모두). 문자열 내부 보호."""
+    mask = code_mask(code)
+    pat = re.compile(r'(?m)^[ \t]*(/+[ \t]*)?include\b\s*\([^\n]*\r?\n?')
+    spans, removed = [], 0
+    for mo in pat.finditer(code):
+        commented = bool(mo.group(1))
+        cpos = mo.start() + mo.group(0).index("include")
+        if not commented and not mask[cpos]:
+            continue   # 문자열/비코드 내부
+        spans.append((mo.start(), mo.end()))
+        removed += 1
+    for s, e in sorted(spans, reverse=True):
+        code = code[:s] + code[e:]
+    report["rule11"] = removed
+    return code
+
+
 def rule7_gcc_substitute(code, report):
     """substitution_dict() 의 함수 호출부를 단어경계로 치환(코드 세그먼트만, 메서드 호출 .fn() 제외).
     파일 내에 함수로 선언/정의된 이름은 치환에서 제외한다(로컬 정의 우선, 선언부 손상 방지)."""
@@ -799,6 +817,21 @@ def _replace_in_code(script, pattern, repl):
     return "".join(res)
 
 
+def rule10_remove_events(xml, report):
+    """XML 영역에서 <xf:events>...</xf:events> 블록과 <xf:event .../> 요소를 모두 삭제(주석 블록 포함)."""
+    total = 0
+    # 1) 주석 처리된 events 블록  <!-- <xf:events ...> ... -->
+    xml, n = re.subn(r'(?s)[ \t]*<!--\s*<xf:events?\b.*?-->[ \t]*\r?\n?', '', xml); total += n
+    # 2) 짝 태그 컨테이너  <xf:events ...> ... </xf:events>
+    xml, n = re.subn(r'(?s)[ \t]*<xf:events\b[^>]*>.*?</xf:events>[ \t]*\r?\n?', '', xml); total += n
+    # 3) 단독 self-closing  <xf:event .../>
+    xml, n = re.subn(r'[ \t]*<xf:event\b[^>]*/>[ \t]*\r?\n?', '', xml); total += n
+    # 4) 짝 태그 단독  <xf:event ...> ... </xf:event>
+    xml, n = re.subn(r'(?s)[ \t]*<xf:event\b[^>]*>.*?</xf:event>[ \t]*\r?\n?', '', xml); total += n
+    report["rule10"] = report.get("rule10", 0) + total
+    return xml
+
+
 # ---------- 판단 필요 항목 리포트 ----------
 def collect_judgment(script, head, body, report):
     # 규칙6 미변환으로 남은 submission 노드(실행 호출 없음 등)
@@ -844,7 +877,7 @@ def collect_judgment(script, head, body, report):
 
 # ---------- 파이프라인 ----------
 def convert(raw, filename):
-    report = {"rule1": "", "rule2": 0, "rule2_skip": [], "rule3": [], "rule4": None, "rule4_merge": None, "rule5a": 0, "rule5b": [], "rule6": {"converted": [], "deleted": 0}, "rule7": [], "rule8": {"const": 0, "let": 0}, "rule9": 0, "wcraft": 0, "judgment": []}
+    report = {"rule1": "", "rule2": 0, "rule2_skip": [], "rule3": [], "rule4": None, "rule4_merge": None, "rule5a": 0, "rule5b": [], "rule6": {"converted": [], "deleted": 0}, "rule7": [], "rule8": {"const": 0, "let": 0}, "rule9": 0, "rule10": 0, "rule11": 0, "wcraft": 0, "judgment": []}
     reg = split_regions(raw)
     if reg is None:
         raise ValueError("SCRIPT(CDATA) 영역을 찾지 못했습니다.")
@@ -855,12 +888,15 @@ def convert(raw, filename):
     s = rule5b_setvalue(s, report)
     reg["head"], s = rule6_submission(reg["head"], reg["body"], s, report)
     s = rule9_remove_obsolete(s, report)
+    s = rule11_remove_include(s, report)
     s = rule8_var(s, report)
     s = rule7_gcc_substitute(s, report)
     s, reg["body"] = rule3_handlers(s, reg["body"], report)
     s, reg["body"] = rule4_structure(s, reg["body"], report)
-    s = align_wcraft(s, report)   # //----W-Craft 마커 주석 맨앞 정렬
+    s = align_wcraft(s, report)   # //----W-Craft 마커 주석 정렬
     s = format_script(s)          # 함수 단위 빈 줄 + 주석 맨앞 정렬
+    reg["head"] = rule10_remove_events(reg["head"], report)   # <xf:events>/<xf:event> 삭제
+    reg["body"] = rule10_remove_events(reg["body"], report)
     collect_judgment(s, reg["head"], reg["body"], report)
     result = reg["head"] + reg["script_open"] + s + reg["script_close"] + reg["body"]
     return result, report
@@ -894,6 +930,8 @@ def print_report(rep, filename):
         print("   -", s)
     print("규칙8 var→const/let : const %d, let %d" % (rep["rule8"]["const"], rep["rule8"]["let"]))
     print("규칙9 불필요 $c.cm.* 호출 제거 :", rep["rule9"], "건")
+    print("규칙10 <xf:events>/<xf:event> 삭제 :", rep["rule10"], "건")
+    print("규칙11 include(...) 라인 삭제 :", rep["rule11"], "건")
     print("\n==== [단계2 입력] Claude Code 보강 필요 항목 ====")
     for s in rep["judgment"]:
         print(" * " + s)

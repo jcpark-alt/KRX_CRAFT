@@ -85,6 +85,23 @@ WebSquare XML 소스를 GCC 공통함수 체계·표준 JS 규칙으로 자동 �
     * 중괄호 없는 제어문 본문(`if (x) $c.cm.ShowWin(...);`)은 삭제 시 동작이 바뀌므로 보류·리포트합니다.
     * 문자열/주석 등 리터럴 내부는 보호합니다(규칙 5 동일 원칙).
 
+### 규칙 10: `<xf:events>` / `<xf:event>` 요소 삭제
+
+* XML(주로 `<body>`) 영역에서 **`<xf:events ...> ... </xf:events>` 블록과 그 안의 `<xf:event .../>` 요소를 전부 삭제**합니다.
+    * `<xf:events>`(컨테이너, 짝 태그)와 `<xf:event>`(self-closing) 모두 대상입니다.
+* 이들은 W-Craft 변환 시 남은 **레거시 이벤트 매핑 선언**으로, WebSquare 표준에서는 컴포넌트의 `ev:on*` 속성(규칙 3)으로 이벤트가 바인딩되므로 불필요합니다.
+* **삭제 범위·주의사항**:
+    * 주석 처리된 블록(`<!-- <xf:events ...> ... -->`)도 함께 제거합니다.
+    * 컨테이너 `<xf:events>` 가 있으면 내부 `<xf:event>` 를 포함해 통째로 삭제하고, 컨테이너 없이 단독으로 존재하는 `<xf:event .../>` 도 삭제합니다.
+    * 삭제 후 남는 빈 줄은 정리합니다.
+
+### 규칙 11: `include(...)` 스크립트 삭제
+
+* 스크립트 영역에서 **`include(...)` 로 시작하는 라인을 삭제**합니다. (예: `include("../js/common.js");`)
+* 외부 JS 파일 로딩 구문으로, gcc 공통 라이브러리는 `$c.*` 네임스페이스로 제공되어 별도 include 가 필요 없습니다.
+* **삭제 범위**: 활성 코드뿐 아니라 주석 처리된 형태(`//include(...)`, `////include(...)`)도 제거합니다.
+* 문자열/비코드 내부는 보호합니다.
+
 ---
 
 ## 3. 레거시 → gcc 공통함수 치환 매핑표 (Substitution Map)
@@ -210,7 +227,7 @@ WebSquare XML 은 `head(xml) → script(JavaScript, CDATA) → body(xml)` 구조
 
 "입력이 같으면 출력이 항상 같은" **결정적(deterministic)** 변환만 Python 으로 일괄 처리합니다. 판단이 필요 없는 1:1 규칙이 대상입니다.
 
-> **참조 구현**: `src/conversion/tools/convert.py` — 영역 분리 + 규칙 1~9 결정적 치환(문자열/주석/정규식 보호)과 단계 2 리포트 출력. 규칙 7 은 `gcc_mapping.substitution_dict()` 를 단일 출처로 쓰고, 검토/대체 태그·충돌 함수는 자동 치환하지 않고 리포트로 분리합니다. 마지막에 포매팅을 적용합니다: **`//----W-Craft` 마커 주석을 바로 아래 코드 라인의 들여쓰기에 맞춰 정렬**, **함수 단위 빈 줄 1개 삽입**, **함수 주석 맨앞(컬럼 0) 정렬**. 일괄 실행은 `src/conversion/tools/convert_all.py`.
+> **참조 구현**: `src/conversion/tools/convert.py` — 영역 분리 + 규칙 1~11 결정적 치환(문자열/주석/정규식 보호)과 단계 2 리포트 출력. 규칙 7 은 `gcc_mapping.substitution_dict()` 를 단일 출처로 쓰고, 검토/대체 태그·충돌 함수는 자동 치환하지 않고 리포트로 분리합니다. 마지막에 포매팅을 적용합니다: **`//----W-Craft` 마커 주석을 바로 아래 코드 라인의 들여쓰기에 맞춰 정렬**, **함수 단위 빈 줄 1개 삽입**, **함수 주석 맨앞(컬럼 0) 정렬**. 일괄 실행은 `src/conversion/tools/convert_all.py`.
 > 실행: `python src/conversion/tools/convert.py <src.xml> [out.xml]`
 
 | 규칙 | 처리 영역 | Python 처리 방식 | 비고 |
@@ -224,6 +241,8 @@ WebSquare XML 은 `head(xml) → script(JavaScript, CDATA) → body(xml)` 구조
 | 규칙 3 (동기화) | SCRIPT+BODY | 이벤트명 소문자화 + `ev:on*` 속성 ↔ 스크립트 함수명 **동시** 수정 | 이름변경 사전(dict) 공유 |
 | 규칙 8 `var`→`const`/`let` | SCRIPT | 재할당 분석: 단일 할당 → `const`, 재할당·카운터 → `let` | 호이스팅·재선언 의존 시 Claude 검토 |
 | 규칙 9 불필요 호출 제거 | SCRIPT | `$c.cm.ShowWin/ShowNoData/CloseWin/ShowTrWin/CloseTrWin` 단독 statement 삭제(주석 흔적 포함) | 중괄호 없는 제어문 본문은 보류·리포트 |
+| 규칙 10 이벤트요소 삭제 | BODY(XML) | `<xf:events>...</xf:events>` 블록 및 `<xf:event .../>` 요소 전부 삭제(주석 블록 포함) | `ev:on*` 속성으로 대체됨(규칙 3) |
+| 규칙 11 include 삭제 | SCRIPT | `include(...)` 로 시작하는 라인 삭제(주석 형태 포함) | gcc 는 `$c.*` 로 제공되어 불필요 |
 
 **기계 치환 원칙**
 * **단어경계 매칭**: 함수명 치환은 `\b함수명\s*\(` 처럼 호출부만 매칭하여 부분 문자열 오치환을 막습니다. `replaceAll`·`trim` 등 흔한 이름은 특히 주의(원시 String 메서드와 충돌 가능).
