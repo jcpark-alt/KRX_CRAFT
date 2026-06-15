@@ -198,7 +198,7 @@ WebSquare XML 은 `head(xml) → script(JavaScript, CDATA) → body(xml)` 구조
 
 "입력이 같으면 출력이 항상 같은" **결정적(deterministic)** 변환만 Python 으로 일괄 처리합니다. 판단이 필요 없는 1:1 규칙이 대상입니다.
 
-> **참조 구현**: `src/conversion/tools/convert.py` — 영역 분리 + 규칙 1·3·5·7 결정적 치환(문자열/주석/정규식 보호)과 단계 2 리포트 출력. 규칙 7 은 `gcc_mapping.substitution_dict()` 를 단일 출처로 쓰고, 스크립트에서 발견된 검토/대체 태그·충돌 함수는 자동 치환하지 않고 리포트로 분리합니다.
+> **참조 구현**: `src/conversion/tools/convert.py` — 영역 분리 + 규칙 1~8 결정적 치환(문자열/주석/정규식 보호)과 단계 2 리포트 출력. 규칙 7 은 `gcc_mapping.substitution_dict()` 를 단일 출처로 쓰고, 검토/대체 태그·충돌 함수는 자동 치환하지 않고 리포트로 분리합니다. 마지막에 포매팅을 적용합니다: **`//----W-Craft` 마커 주석을 맨앞(컬럼 0)으로 정렬**, **함수 단위 빈 줄 1개 삽입**, **함수 주석 맨앞(컬럼 0) 정렬**. 일괄 실행은 `src/conversion/tools/convert_all.py`.
 > 실행: `python src/conversion/tools/convert.py <src.xml> [out.xml]`
 
 | 규칙 | 처리 영역 | Python 처리 방식 | 비고 |
@@ -207,7 +207,7 @@ WebSquare XML 은 `head(xml) → script(JavaScript, CDATA) → body(xml)` 구조
 | 규칙 2 전역변수 이동 | SCRIPT | 최상위 `scwin.X = <리터럴>;` 만 `// 전역 변수 선언` 구역으로 이동 | 호출/참조 RHS(예: `$c.x.f()`)는 실행순서 영향으로 이동 보류·리포트 |
 | 규칙 4 영역 재배치 | SCRIPT | 함수 정의를 init/event/일반 3구역으로 분류·정렬(경계 주석+doc 주석 동반). `gform_onload`→`onpageload` 병합은 안전조건에서만 | 함수 사이/뒤 최상위 실행문 있으면 보류·리포트 |
 | 규칙 5 문법/API | SCRIPT | `==`/`!=` → `===`/`!==`, `X.value = v` → `X.setValue(v)` | 문자열·정규식·주석 리터럴 보호 |
-| 규칙 6 Submission | HEAD+SCRIPT | 정적 action + 단순 `execute(id)` 만 `executeDynamic({...})` 로 변환 + 노드 삭제 | 동적 action/속성변형은 sbmOptions 스텁과 함께 리포트(`sbm-generator` 로직 이식) |
+| 규칙 6 Submission | HEAD+SCRIPT | 정적 action + 단순 `execute(id)` 만, 호출 앞에 `const sbmOptions = {...}` 선언 후 `executeDynamic(sbmOptions)` 로 변환 + 노드 삭제 | 동적 action/속성변형은 sbmOptions 스텁과 함께 리포트(`sbm-generator` 로직 이식) |
 | 규칙 7 (1:1) | SCRIPT | **태그 없는** 매핑만 함수명 단어경계 치환 (`fn_Trim(` → `$c.str.trim(`) | `gcc_mapping.substitution_dict()` 사용(태그없음·무충돌) |
 | 규칙 3 (동기화) | SCRIPT+BODY | 이벤트명 소문자화 + `ev:on*` 속성 ↔ 스크립트 함수명 **동시** 수정 | 이름변경 사전(dict) 공유 |
 | 규칙 8 `var`→`const`/`let` | SCRIPT | 재할당 분석: 단일 할당 → `const`, 재할당·카운터 → `let` | 호이스팅·재선언 의존 시 Claude 검토 |

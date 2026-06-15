@@ -447,6 +447,79 @@ def rule4_structure(script, body, report):
     return result, body
 
 
+def align_wcraft(script, report=None):
+    """`//----W-Craft ...` 마커 주석을 맨앞(컬럼 0)으로 정렬(앞 들여쓰기 제거). 문자열 내부는 보호. 멱등."""
+    mask = code_mask(script)
+    pat = re.compile(r'(?m)^([ \t]+)(//-+\s*W-Craft[^\n]*)$')
+    out, last, cnt = [], 0, 0
+    for mo in pat.finditer(script):
+        if not mask[mo.start(1)]:   # 문자열/비코드 영역이면 스킵
+            continue
+        out.append(script[last:mo.start()]); out.append(mo.group(2)); last = mo.end()
+        cnt += 1
+    out.append(script[last:])
+    if report is not None:
+        report["wcraft"] = cnt
+    return "".join(out)
+
+
+def format_script(script):
+    """
+    변환 후 스크립트 정리: 최상위 함수 정의마다
+    - 함수(및 그 앞 주석) 앞에 빈 줄 1개를 둔다(함수 단위 구분).
+    - 함수에 붙은 주석 블록을 맨앞(컬럼 0)으로 정렬한다(공통 들여쓰기 제거).
+    재정렬(규칙4)이 보류된 파일에도 적용되며, 함수 사이 실행문은 그대로 둔다. 멱등.
+    """
+    depth = depth_array(script)
+    lines = script.split("\n")
+    offs, p = [], 0
+    for ln in lines:
+        offs.append(p); p += len(ln) + 1
+    N = len(lines)
+    fre = re.compile(r'^[ \t]*scwin\.[A-Za-z_$][\w$]*\s*=\s*(?:async\s+)?function\b')
+
+    def is_cb(s):
+        t = s.strip()
+        return t == "" or t.startswith(("//", "/*", "*", "*/"))
+
+    def dedent(block):
+        nb = [l for l in block if l.strip() != ""]
+        if not nb:
+            return []
+        m = min(len(l) - len(l.lstrip()) for l in nb)
+        ded = [(l[m:] if l.strip() != "" else "") for l in block]
+        while ded and ded[0].strip() == "":
+            ded.pop(0)
+        while ded and ded[-1].strip() == "":
+            ded.pop()
+        return ded
+
+    out, buf, i = [], [], 0
+    while i < N:
+        at = offs[i]
+        ln = lines[i]
+        if at < len(depth) and depth[at] == 0 and fre.match(ln):
+            j = i + 1
+            while j < N and offs[j] < len(depth) and depth[offs[j]] != 0:
+                j += 1
+            lead = dedent(buf); buf = []
+            while out and out[-1].strip() == "":
+                out.pop()
+            if out:
+                out.append("")          # 함수 앞 빈 줄 1개
+            out.extend(lead)            # 맨앞 정렬된 주석
+            out.extend(lines[i:j])      # 함수 본문(그대로)
+            i = j
+            continue
+        if is_cb(ln):
+            buf.append(ln); i += 1
+            continue
+        out.extend(buf); buf = []
+        out.append(ln); i += 1
+    out.extend(buf)
+    return "\n".join(out)
+
+
 # ---------- 규칙 6 : Submission → executeDynamic (sbm-generator 로직 이식) ----------
 def _sbm_parse_attrs(open_tag):
     attrs = {}
@@ -493,33 +566,39 @@ def _sbm_handler(v):
     return json.dumps(v, ensure_ascii=False)
 
 
-def _build_sbm_options(attrs):
-    p = ['id: %s' % json.dumps(attrs.get("id", ""), ensure_ascii=False)]
+def _sbm_option_parts(attrs):
+    """sbmOptions 의 'key : value' 항목 리스트(샘플 스타일)."""
+    p = ['id : %s' % json.dumps(attrs.get("id", ""), ensure_ascii=False)]
     if attrs.get("action"):
-        p.append('action: %s' % json.dumps(attrs["action"], ensure_ascii=False))
+        p.append('action : %s' % json.dumps(attrs["action"], ensure_ascii=False))
     if attrs.get("method") and attrs["method"].lower() != "post":
-        p.append('method: %s' % json.dumps(attrs["method"], ensure_ascii=False))
+        p.append('method : %s' % json.dumps(attrs["method"], ensure_ascii=False))
     if attrs.get("mode") and attrs["mode"].lower() == "synchronous":
-        p.append('mode: "synchronous"')
+        p.append('mode : "synchronous"')
     if attrs.get("mediatype") and attrs["mediatype"].lower() != "application/json":
-        p.append('mediatype: %s' % json.dumps(attrs["mediatype"], ensure_ascii=False))
+        p.append('mediatype : %s' % json.dumps(attrs["mediatype"], ensure_ascii=False))
     ref = _sbm_parse_data_expr(attrs.get("ref", ""))
     if ref:
-        p.append('ref: %s' % json.dumps(_sbm_simpl(ref, False), ensure_ascii=False))
+        p.append('ref : %s' % json.dumps(_sbm_simpl(ref, False), ensure_ascii=False))
     tgt = _sbm_parse_data_expr(attrs.get("target", ""))
     if tgt:
-        p.append('target: %s' % json.dumps(_sbm_simpl(tgt, True), ensure_ascii=False))
+        p.append('target : %s' % json.dumps(_sbm_simpl(tgt, True), ensure_ascii=False))
     if attrs.get("ev:submit"):
-        p.append('submitHandler: %s' % _sbm_handler(attrs["ev:submit"]))
+        p.append('submitHandler : %s' % _sbm_handler(attrs["ev:submit"]))
     if attrs.get("ev:submitdone"):
-        p.append('submitDoneHandler: %s' % _sbm_handler(attrs["ev:submitdone"]))
+        p.append('submitDoneHandler : %s' % _sbm_handler(attrs["ev:submitdone"]))
     if attrs.get("ev:submiterror"):
-        p.append('submitErrorHandler: %s' % _sbm_handler(attrs["ev:submiterror"]))
+        p.append('submitErrorHandler : %s' % _sbm_handler(attrs["ev:submiterror"]))
     if attrs.get("processMsg"):
-        p.append('processMsg: %s' % json.dumps(attrs["processMsg"], ensure_ascii=False))
+        p.append('processMsg : %s' % json.dumps(attrs["processMsg"], ensure_ascii=False))
     else:
-        p.append('isProcessMsg: false')
-    return "{ " + ", ".join(p) + " }"
+        p.append('isProcessMsg : false')
+    return p
+
+
+def _build_sbm_options(attrs):
+    """인라인 한 줄 표기(리포트 스텁용)."""
+    return "{ " + ", ".join(_sbm_option_parts(attrs)) + " }"
 
 
 def rule6_submission(head, script, report):
@@ -528,27 +607,54 @@ def rule6_submission(head, script, report):
     해당 `<xf:submission>` 노드를 삭제. 동적 action(런타임 설정)/속성 변형은 변환하지 않고 스텁과 함께 리포트.
     """
     node_re = re.compile(r'<xf:submission\b[\s\S]*?(?:/>|</xf:submission>)')
-    converted, judged, del_spans = [], [], []
+    smask = code_mask(script)
+    depth = depth_array(script)
+
+    def block_key(pos):
+        d = depth[pos]
+        i = pos
+        while i > 0 and depth[i] >= d:
+            i -= 1
+        return i
+
+    converted, judged, del_spans, edits = [], [], [], []
+    block_used = {}   # block_key -> 사용된 sbmOptions 개수(같은 블록 충돌 방지)
+
     for mo in node_re.finditer(head):
-        node = mo.group(0)
-        attrs = _sbm_parse_attrs(node.split(">", 1)[0])
+        attrs = _sbm_parse_attrs(mo.group(0).split(">", 1)[0])
         sid = attrs.get("id")
         if not sid:
             continue
         call_re = re.compile(r'\$c\.sbm\.execute\s*\(\s*(?:' + re.escape(sid)
                              + r'|"' + re.escape(sid) + r'"|\'' + re.escape(sid) + r'\')\s*\)')
-        smask = code_mask(script)
-        has_call = any(smask[m.start()] for m in call_re.finditer(script))
-        opts = _build_sbm_options(attrs)
+        calls = [m for m in call_re.finditer(script) if smask[m.start()]]
+        if not calls:
+            continue
         dynamic = (('getComponentById("%s")' % sid) in script
                    or re.search(r'(?<![.\w$])' + re.escape(sid) + r'\.action\b', script) is not None
                    or not attrs.get("action"))
-        if has_call and not dynamic:
-            script = _replace_in_code(script, call_re, lambda m, o=opts: "$c.sbm.executeDynamic(" + o + ")")
-            converted.append(sid)
-            del_spans.append((mo.start(), mo.end()))
-        elif has_call:
-            judged.append((sid, opts))
+        if dynamic:
+            judged.append((sid, _build_sbm_options(attrs)))
+            continue
+        parts = _sbm_option_parts(attrs)
+        for m in calls:
+            ls = script.rfind("\n", 0, m.start()) + 1
+            prefix = script[ls:m.start()]
+            indent = prefix[:len(prefix) - len(prefix.lstrip())]
+            bk = block_key(m.start())
+            cnt = block_used.get(bk, 0)
+            name = "sbmOptions" if cnt == 0 else "sbmOptions%d" % (cnt + 1)
+            block_used[bk] = cnt + 1
+            body = ",\n".join(indent + "    " + pt for pt in parts)
+            const_block = "%sconst %s = {\n%s\n%s};\n" % (indent, name, body, indent)
+            edits.append((ls, ls, const_block))                                   # 옵션 변수 선언 삽입
+            edits.append((m.start(), m.end(), "$c.sbm.executeDynamic(%s)" % name))  # 호출부 치환
+        converted.append(sid)
+        del_spans.append((mo.start(), mo.end()))
+
+    # script 편집 적용(위치 역순 → 오프셋 보존)
+    for s, e, t in sorted(edits, key=lambda x: x[0], reverse=True):
+        script = script[:s] + t + script[e:]
 
     # 변환된 submission 노드 삭제(라인 단위로 정리)
     for s, e in sorted(del_spans, reverse=True):
@@ -625,7 +731,7 @@ def collect_judgment(script, head, body, report):
 
 # ---------- 파이프라인 ----------
 def convert(raw, filename):
-    report = {"rule1": "", "rule2": 0, "rule2_skip": [], "rule3": [], "rule4": None, "rule4_merge": None, "rule5a": 0, "rule5b": [], "rule6": {"converted": [], "deleted": 0}, "rule7": [], "rule8": {"const": 0, "let": 0}, "judgment": []}
+    report = {"rule1": "", "rule2": 0, "rule2_skip": [], "rule3": [], "rule4": None, "rule4_merge": None, "rule5a": 0, "rule5b": [], "rule6": {"converted": [], "deleted": 0}, "rule7": [], "rule8": {"const": 0, "let": 0}, "wcraft": 0, "judgment": []}
     reg = split_regions(raw)
     if reg is None:
         raise ValueError("SCRIPT(CDATA) 영역을 찾지 못했습니다.")
@@ -639,6 +745,8 @@ def convert(raw, filename):
     s = rule7_gcc_substitute(s, report)
     s, reg["body"] = rule3_handlers(s, reg["body"], report)
     s, reg["body"] = rule4_structure(s, reg["body"], report)
+    s = align_wcraft(s, report)   # //----W-Craft 마커 주석 맨앞 정렬
+    s = format_script(s)          # 함수 단위 빈 줄 + 주석 맨앞 정렬
     collect_judgment(s, reg["head"], reg["body"], report)
     result = reg["head"] + reg["script_open"] + s + reg["script_close"] + reg["body"]
     return result, report
