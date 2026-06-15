@@ -250,559 +250,69 @@ scwin.totalCnt = 0; //전체 row
 scwin.pageNoCnt = 10; //page 번호 개수
 scwin.vCurrPageNo = 0; //현재 선택된 페이지번호
 scwin.gExcelTp = "1";
+
+// scwin.onpageload, scwin.onpageunload 함수
 scwin.onpageload = function() {
-    scwin.gform_onload();
+    $c.stf.showObj(grd_Grid_excel, false);
+    //// $c.stf.showObj(mgrd_Grid_excel, false);
+    $c.stf.showObj(panel_scn, false);
+    $c.stf.showObj(panel_combo, false);
+    $c.stf.showObj(mgrd_Grid, false);
+    $c.stf.showObj(txb_FssUnqNo, false);
+
+    // 패널라운드 처리
+    ////$c.cm.PanelToGroupBox(panel_1);
+    scwin.fn_SetCode();
+
+    const codeOptions = [ 
+                    { code : "getDepUpCode", compID : "cmb_TeamList" },  //팀 리스트 dts_dep
+                    { code : "getEmpNoDepCode", compID : "cmb_EmpList" },  //담당자 리스트 dts_emp
+                    { code : "listStdIndtpCB", compID : "cmb_IndTp" },   //업종  dts_IndTp
+                    //{ code : "comIsur", compID : "txb_isur_cd" },   //업종  dts_IndTp
+    //                 { code : "00005", compID : "sbx_CommCodePart1, sbx_CommCodePart2"},
+    //                 { code : "00024", compID : "grd_CommCodeSample:JOB_CD", useLocalCache : false}
+    ];
+    debugger;
+    await $c.data.setCommonCode(codeOptions);
+
+    const resData = await $c.cm.fn_com_isur(txb_isur_cd, txb_com_abbrv);
+    MxDataSet_com_isur.setJSON(resData.responseJSON.dlt_commonCodecomIsur);
+
+    $c.stf.Combo_CBDataSetLimit(cmb_PerPage);
+    $c.stf.Combo_CBDataSetPeriod(cmb_PeriodTp);
+
+    ////// 가우스헤더 셋팅
+    ////dts_Dscl_Cond.DataID = "/gauceSystemierAdaptor.do?method=getGauceDataHeader&messageId=DSCLDETAILCOND_IN";
+
+	//----W-Craft WebSquare 변환 확인: reset----//
+    ////dts_Dscl_Cond.reset();
+
+    //dts_dep onloadcompleted
+    const depUpCodeStr = "dlt_commonCode" + "getDepUpCode";
+    const depUpCodeComp = $p.getComponentById(depUpCodeStr);
+	if ($c.session.info("js_dep_cd").substring(0,2) === '26'  || $c.session.info("js_dep_cd").substring(0,2) === '34') {
+		////scwin.CopyDataSet(dts_dep, dts_dep1);
+        const dcoptions = {
+            baseNode : "list",
+            repeatNode : "map",
+            saveRemovedData : "true"
+        };
+        const dlObj = $c.data.createDataList(depUpCodeStr + "1", ["DEP_CD", "VALUE", "TEXT"], ["text", "text", "text"] , dcoptions);
+        dlObj.setJSON(depUpCodeComp.getAllJSON());
+
+		scwin.fn_addDsclTeamAll(depUpCodeComp.getTotalRow(), depUpCodeComp, dlObj);
+		$c.stf.setObjectValue(cmb_TeamList, 'UPTEAM') ;	
+	}
+
+    ////$c.cm.fn_com_isur(txb_isur_cd, txb_com_abbrv);
+    await scwin.fn_CheckCond();
+    ////showload.style.display = "none";
 };
 scwin.onpageunload = function() {
     
 };
-scwin.fn_SetCode = function() {debugger;
-    scwin.gDepCd = $c.session.info("js_dep_cd");
-    scwin.gEmpNo = $c.session.info("js_emp_no");
-    scwin.gUpDepCd = $c.session.info("js_belngdepcd");
-    if (scwin.gLdMktTp === '1' || scwin.gLdMktTp === '2' || scwin.gLdMktTp === '4' || scwin.gLdMktTp === '6') {
-        $c.stf.setObjectValue(rdo_MKT_ID, scwin.gLdMktTp);
-        $c.stf.showObj(panel_mkt, false);
-    } else {
-        $c.stf.setObjectValue(rdo_MKT_ID, '9');
-    }
 
-    //채권일 경우 채권상장폐지여부 제외 항목으로 보이게끔 수정 20170310
-    if ($c.stf.getObjectValue(rdo_MKT_ID) === '4') {
-        $c.stf.showObj(label_3, false);
-        $c.stf.showObj(label_24, true);
-    } else {
-        $c.stf.showObj(label_3, true);
-        $c.stf.showObj(label_24, false);
-    }
-
-    // 유가 공시팀(26**), 코스닥 공시팀(34**) => 일때만 보여준다.     
-    // 코넥스 추가
-    if ($c.session.info("js_dep_cd").substring(0, 2) === '26' || $c.session.info("js_dep_cd").substring(0, 2) === '34' || $c.session.info("js_dep_cd").substring(0, 2) === '3B') {
-        $c.stf.showObj(panel_dep_emp, true);
-        scwin.gDepCd = "UPTEAM";
-    } else {
-        $c.stf.showObj(panel_dep_emp, false);
-    }
-
-    //  기간 from~ to  셋팅	
-    vCurDate = $c.utils.cGetToday("yyyymmdd");
-    //edt_FromDate.text = cGetMinusDate2(vCurDate, 7); 	// 일주일전 날짜
-    edt_FromDate.setValue(vCurDate); // 현재날짜
-    edt_ToDate.setValue(vCurDate); // 현재날짜
-
-    // 팀 리스트 박스(소속부서와 같은 상위부서인 팀)	
-    //dts_dep.DataID = "/CodeAction.do?method=listDepCdCode&For=R";
-    ////dts_dep.DataID = "/CodeAction.do?method=getDepUpCode" + "&inputMessageId=CODE_EMPDEP_IN&outputMessageId=CODE_EMPDEP_OUT" + "&For=R&DEP_CD=" + $c.session.info("js_dep_cd");
-
-	//----W-Craft WebSquare 변환 확인: Reset----//
-    ////dts_dep.Reset();
-
-    //담당자 리스트 박스(소속부서와 같은 상위부서인 팀원)	
-    ////dts_emp.DataID = "/CodeAction.do?method=getEmpNoDepCode" + "&inputMessageId=CODE_EMPDEP_IN&outputMessageId=CODE_EMPDEP_OUT" + "&For=R&DEP_CD=" + $c.session.info("js_dep_cd");
-
-	//----W-Craft WebSquare 변환 확인: Reset----//
-    ////dts_emp.Reset();
-
-    // 업종 셋팅
-    ////dts_IndTp.DataID = "/CodeAction.do?method=listStdIndtpCB" + "&inputMessageId=CODEVALUE_INOUT&outputMessageId=CODE_OUT" + "&For=R";
-
-	//----W-Craft WebSquare 변환 확인: Reset----//
-    ////dts_IndTp.Reset();
-};
-
-
-// 법인명이 있고 특정 다른 조건을 선택할때 메세지
-scwin.fn_CheckComNmCond = function() {
-    let vIsurCd = $c.stf.getObjectValue(txb_isur_cd);
-    if (vIsurCd !== '') {
-        alert("해당항목 선택시 법인코드(명)의 조건값이  초기화 됩니다.");
-        $c.stf.setObjectValue(txb_isur_cd, '');
-        $c.stf.setObjectValue(txb_com_abbrv, '');
-        return;
-    }
-};
-
-
-
-// 공시상세  목록검색 조건체크  : 사용자 클릭 -->
-scwin.fn_CheckCond = async function() {
-    let vIsurCd = $c.stf.getObjectValue(txb_isur_cd);
-    const vFssUnqNm = $c.stf.getObjectValue(txb_FssUnqNm);
-    const vFormCd = $c.stf.getObjectValue(txb_FormCd);
-    const vFormNm = $c.stf.getObjectValue(txb_FormNm);
-    const vRsnclssCnt = $c.stf.getObjectValue(txb_rsn_cnt);
-    let vKeyword = $c.stf.getObjectValue(txb_keyword);
-
-    /*
-    if (vKeyword == '' ) {
-    	if (vIsurCd == '' &&  vFssUnqNm == '' && vFormNm == '' 
-    		&& (vRsnclssCnt =='' || vRsnclssCnt == '0') ) {
-    		alert("법인코드(명), 제출의무자명, 공시제목, 사유분류 중 하나 이상을  입력하셔야 합니다." );
-    		txb_isur_cd.focus();
-    		return;	
-    	}
-    } 
-    */
-
-    // 일자 체크
-    if ($c.stf.getObjectValue(edt_FromDate).length < 8) {
-        alert("일자 올바르게 입력하십시오.");
-        edt_FromDate.focus();
-        return;
-    }
-
-    // 일자 체크
-    if ($c.stf.getObjectValue(edt_ToDate).length < 8) {
-        alert("일자 올바르게 입력하십시오.");
-        edt_ToDate.focus();
-        return;
-    }
-    if ($c.stf.compareFromToDate2(edt_FromDate, edt_ToDate) === false) {
-        return;
-    }
-
-
-    // 4년 이상의 기간은 검색 할 수 없다
-    /*
-    var edt_FromDate_year = getObjectValue(edt_FromDate).substr(0,4);
-    var edt_FromDate_month = getObjectValue(edt_FromDate).substr(4,2)-1;
-    var edt_FromDate_day = getObjectValue(edt_FromDate).substr(6,2);
-    var edt_FromDate_Date = new Date(edt_FromDate_year,edt_FromDate_month,edt_FromDate_day);
-     
-    var edt_ToDate_year = getObjectValue(edt_ToDate).substr(0,4);
-    var edt_ToDate_month = getObjectValue(edt_ToDate).substr(4,2)-1;
-    var edt_ToDate_day = getObjectValue(edt_ToDate).substr(6,2);
-    var edt_ToDate_Date = new Date(edt_ToDate_year,edt_ToDate_month,edt_ToDate_day);
-    var date_result = ( Date.parse(edt_ToDate_Date) - Date.parse(edt_FromDate_Date) ) / ( 1000*60*60*24 );
-
-    if ( date_result > 1461) {
-    	alert("검색기간은 4년 이상을 초과 할 수 없습니다." );
-    	return;	
-    }
-    */
-
-
-
-    // 보고서코그 체크
-    if (vFormCd.length > 0 && vFormCd.length !== 5) {
-        alert("보고서코드 5자리를 입력하십시오.");
-        txb_FormCd.focus();
-        return;
-    }
-    // 언어구분 체크
-    if (scwin.getChkValue(chb_kor_yn) === 0 && scwin.getChkValue(chb_eng_yn) === 0) {
-        alert("언어구분은 한개이상 선택하십시오.");
-        chb_kor_yn.focus();
-        return;
-    }
-
-    // 제출유형 체크
-    if (scwin.getChkValue(chb_main_yn) === 0 && scwin.getChkValue(chb_atch_yn) === 0) {
-        alert("제출유형은 한개이상 선택하십시오.");
-        chb_main_yn.focus();
-        return;
-    }
-    if (scwin.fn_chkAttchKeyword() === false) {
-        return;
-    }
-    let sRsnClssCdList = "";
-    let sFormUpclssCd;
-    let sRsnClssCd;
-    for (let i = 1; i <= dts_Dscl_Cond.getTotalRow(); i++) {
-        sFormUpclssCd = dts_Dscl_Cond.getCellData(i, "FORM_UPCLSS_CD");
-        sRsnClssCd = dts_Dscl_Cond.getCellData(i, "RSN_CLSS_CD");
-        if (sRsnClssCd !== "000") {
-            sRsnClssCdList += (sFormUpclssCd + sRsnClssCd + ",");
-        }
-    }
-
-    // 맨뒤에 ", " 제거 하기 
-    scwin.gRsnClssCdList = sRsnClssCdList.substr(0, sRsnClssCdList.length - 1);
-    scwin.gDepCd = $c.stf.getObjectValue(cmb_TeamList);
-    scwin.gEmpNo = $c.stf.getObjectValue(cmb_EmpList);
-    if (scwin.gDepCd === "UPTEAM" && $c.session.info("js_dep_cd").substr(2, 4) === '00') {
-        scwin.gUpDepCd = $c.session.info("js_dep_cd");
-    }
-    if ($c.session.info("js_dep_cd") === '3410') {
-        // 코 공시제도팀인 공시총괄팀으로 설정-- 2010.03.11
-        scwin.gUpDepCd = '3400';
-    }
-    scwin.fn_Search();
-};
-
-
-
-//  공시상세   목록검색 : 사용자 클릭 -->
-scwin.fn_Search = async function() {debugger;
-    // 조회 버튼 클릭 후 바로 버튼 클릭 안되게 처리 20150325
-    btn_Search.setDisabled(true);
-    ////btn_Search.src = "../img/btn_select_d.gif";
-    scwin.vCurrPageNo = 0;
-    ////dts_DsclList_excel.removeAll();
-debugger;
-    //공시본문검색은 채권해제법인제외 조건을 선택하지 못하게 한다.
-    //검색엔진 테이블에 채권공시법인여부 칼럼이 없어서..
-    if (txb_keyword.getValue() !== "") {
-        if ($c.stf.getObjectValue(rdo_MKT_ID) === '4') {
-            chb_ListStatCd.setValue(0);
-        }
-    }
-    let url = "";
-    let url_cond = "&ISUR_CD=" + $c.stf.getObjectValue(txb_isur_cd) + "&FROM_DATE=" + $c.stf.getObjectValue(edt_FromDate) + "&TO_DATE=" + $c.stf.getObjectValue(edt_ToDate) + "&DEP_CD=" + scwin.gDepCd + "&UP_DEP_CD=" + scwin.gUpDepCd + "&EMP_NO=" + scwin.gEmpNo + "&LIST_STAT=" + scwin.getChkValue(chb_ListStatCd) + "&LAST_YN=" + scwin.getChkValue(chb_Last) + "&BYPASS_YN=" + scwin.getChkValue(chb_ByPass) + "&FORM_CD=" + $c.stf.getObjectValue(txb_FormCd) + "&FORM_NM=" + $c.stf.getObjectValue(txb_FormNm) + "&KEYWORD=" + $c.stf.replaceAll($c.stf.getObjectValue(txb_keyword), "&", "＆") + "&FSS_UNQ_NO=" + $c.stf.getObjectValue(txb_FssUnqNo) + "&FSS_UNQ_NM=" + $c.stf.getObjectValue(txb_FssUnqNm) + "&ACNTCLS_MM=" + $c.stf.getObjectValue(cmb_month) + "&IND_TP=" + $c.stf.getObjectValue(cmb_IndTp) + "&KOR_YN=" + scwin.getChkValue(chb_kor_yn) + "&ENG_YN=" + scwin.getChkValue(chb_eng_yn) + "&LD_MKT_TP=" + $c.stf.getObjectValue(rdo_MKT_ID) + "&RSN_CLSS_CD_LIST=" + scwin.gRsnClssCdList + "&MAIN_YN=" + scwin.getChkValue(chb_main_yn) + "&ATCH_YN=" + scwin.getChkValue(chb_atch_yn) + "&DEP_TP=" + scwin.getChkValue(chb_dep_tp) + "&BASIS_TP=" + $c.stf.getObjectValue(cmb_Basis) + "&PAGENO=" + scwin.vCurrPageNo + "&PAGESIZE=" + scwin.pageSize + "&SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + $c.stf.info("SCREN_PROCS_TP_CD_01");
-    //alert(url_cond);
-
-    scwin.gKeyword = $c.stf.getObjectValue(txb_keyword);
-    if (scwin.gKeyword.length > 0) {
-        //본문검색 키워드가있을때 ... 
-        let iOpCnt = 0;
-        if (scwin.gKeyword.indexOf("&") > 0) {
-            iOpCnt = iOpCnt + 1;
-        }
-        if (scwin.gKeyword.indexOf("|") > 0) {
-            iOpCnt = iOpCnt + 1;
-        }
-        if (scwin.gKeyword.indexOf("!") > 0) {
-            iOpCnt = iOpCnt + 1;
-        }
-        if (iOpCnt > 1) {
-            alert("본문검색 키워드는 한 개만 사용할 수 있습니다.");
-            txb_keyword.focus();
-            return;
-        }
-        if (scwin.pageSize === 0) {
-            alert("공시본문내용으로 검색할 경우에는 한페이지당 보여주는 갯수를 '전체'로 사용할 수 없습니다.");
-            $c.stf.setObjectValue(cmb_PerPage, "50");
-            cmb_PerPage.focus();
-            return;
-        }
-        $c.stf.showObj(mgrd_Grid, true);
-        $c.stf.showObj(grd_Grid, false);
-        ////$c.cm.ShowWin(mgrd_Grid);
-
-        // 1. 검색 건수부터 조회한다.
-        ////url = "/DisclosureSearch.do?method=countDsclDetailSrchEngine" + "&inputMessageId=DSCLDETAILCOND_IN" + "&outputMessageId=SCN_CNTSTAT_OUT";
-
-        //alert("본문검색 카운트: "+url + url_cond);						
-        ////dts_scn_list.DataID = encodeURI(url + url_cond);
-
-	//----W-Craft WebSquare 변환 확인: reset----//
-        ////dts_scn_list.reset();
-	dts_scn_in.set("ISUR_CD", txb_isur_cd.getValue());
-	dts_scn_in.set("FROM_DATE",  edt_FromDate.getValue());
-	dts_scn_in.set("TO_DATE",  edt_ToDate.getValue());
-	dts_scn_in.set("DEP_CD",  scwin.gDepCd);
-	dts_scn_in.set("UP_DEP_CD",  scwin.gUpDepCd);
-	dts_scn_in.set("EMP_NO",  scwin.gEmpNo);
-	dts_scn_in.set("LIST_STAT",   chb_ListStatCd.getValue());
-	dts_scn_in.set("LAST_YN",  chb_Last.getValue());
-	dts_scn_in.set("BYPASS_YN",  chb_ByPass.getValue());	// 사전확인면제 조건 추가 by LDJ_20130422)
-	dts_scn_in.set("FORM_CD="+ txb_FormCd.getValue());
-	dts_scn_in.set("FORM_NM",  txb_FormNm.getValue());
-	//dts_scn_in.set("KEYWORD",  txb_keyword.getValue());
-	dts_scn_in.set("KEYWORD",  txb_keyword.getValue().replaceAll("&", "＆"));
-	dts_scn_in.set("FSS_UNQ_NO",  txb_FssUnqNo.getValue());
-	dts_scn_in.set("FSS_UNQ_NM",  txb_FssUnqNm.getValue());
-	dts_scn_in.set("ACNTCLS_MM",  cmb_month.getValue());
-	dts_scn_in.set("IND_TP",  cmb_IndTp.getValue());
-	dts_scn_in.set("KOR_YN", chb_kor_yn.getValue());
-	dts_scn_in.set("ENG_YN",  chb_eng_yn.getValue());
-	dts_scn_in.set("LD_MKT_TP",  rdo_MKT_ID.getValue());
-	//dts_scn_in.set("RSN_CLSS_CD_LIST",  gRsnClssCdList);  //ps.
-	dts_scn_in.set("MAIN_YN", chb_main_yn.getValue());
-	dts_scn_in.set("ATCH_YN",  chb_atch_yn.getValue()	);
-	dts_scn_in.set("DEP_TP",  chb_dep_tp.getValue()	);
-	dts_scn_in.set("BASIS_TP="+ cmb_Basis.getValue());
-	dts_scn_in.set("PAGENO", scwin.vCurrPageNo);
-	dts_scn_in.set("PAGESIZE",  scwin.pageSize);
-	dts_scn_in.set("SCREN_ID",scwin.vScrenID);
-	dts_scn_in.set("SCREN_PROCES_TP_CD", $c.stf.info("SCREN_PROCS_TP_CD_01"));
-
-    	const resData = await $c.sbm.execute(sbm_countDsclDetailSrchEngine);
-	//dts_DsclList.setJSON(resData.responseJSON);
-debugger;
-        const vScnCur = dts_scn_list.getCellData(dts_scn_list.getTotalRow() - 1, "SCN_CUR");
-        //alert(dts_scn_list.CountRow +", "+vScnCur);	
-
-        if (dts_scn_list.getTotalRow() > 0) {
-            // 2.  Docruzer으로 검색
-            ////url = "/DisclosureSearch.do?method=pagingDsclDetailSrchEngine" + "&inputMessageId=DSCLDETAILCOND_IN" + "&outputMessageId=DSCLDETAILLIST_OUT";
-            url_cond += "&SCN_NM=" + vScnCur;
-            //url_cond += "&SCN_NM=discls_internal";
-            //alert("본문검색: "+url + url_cond);	
-
-            //alert("url-->"+url + url_cond);
-
-            ////dts_DsclList.DataID = encodeURI(url + url_cond);
-
-	//----W-Craft WebSquare 변환 확인: reset----//
-            ////dts_DsclList.reset();
-            const resData = await $c.sbm.execute(sbm_pagingDsclDetailSrchEngine);
-            //dts_DsclList.setJSON(resData.responseJSON);            
-            $c.stf.showObj(panel_scn, true);
-            $c.stf.showObj(panel_combo, true);
-            $c.stf.showObj(mgrd_Grid, true);
-            $c.stf.showObj(grd_Grid, false);
-            ////$c.cm.ShowWin(mgrd_Grid);
-        } else {
-            // 조회 버튼 클릭 후 바로 버튼 클릭 안되게 처리 20150325
-            btn_Search.setDisabled(true);
-            ////btn_Search.src = "../img/btn_select.gif";
-            scwin.vCurrPageNo = 0;
-            ////dts_DsclList_excel.removeAll();
-            ////dts_DsclList.removeAll();
-            showObj(mgrd_Grid, true);	
-            //showObj(grd_Grid, false);	
-            $c.cm.CloseWin(0, mgrd_Grid);
-        }
-    } else {
-        // 본문검색 키워드가 없을때 ... 일반 DB검색
-        ////url = "/DisclosureSearch.do?method=pagingDsclDetailSrch" + "&inputMessageId=DSCLDETAILCOND_IN" + "&outputMessageId=DSCLDETAILLIST_OUT";
-        ////dts_DsclList.DataID = encodeURI(url + url_cond);
-
-	//----W-Craft WebSquare 변환 확인: reset----//
-        ////dts_DsclList.reset();
-    	const resData = await $c.sbm.execute(sbm_pagingDsclDetailSrch);
-    	dts_DsclList.setJSON(resData.responseJSON);        
-        $c.stf.showObj(panel_scn, false);
-        $c.stf.showObj(panel_combo, false);
-        $c.stf.showObj(mgrd_Grid, false);
-        $c.stf.showObj(grd_Grid, true);
-        $c.cm.ShowWin(grd_Grid);
-    }
-};
-scwin.ScnarioNmCall = function(pScnNm) {debugger;
-    scwin.vCurrPageNo = 0;
-    let url = "";
-    if (scwin.gKeyword.length > 0) {
-        //본문검색 키워드가있을때 ... 
-
-        if ($c.stf.getObjectValue(rdo_MKT_ID) === '4') {
-            chb_ListStatCd.setValue(0);
-        }
-        // 2.  Docruzer으로 검색
-        url = "/DisclosureSearch.do?method=pagingDsclDetailSrchEngine" + "&inputMessageId=DSCLDETAILCOND_IN" + "&outputMessageId=DSCLDETAILLIST_OUT";
-    } else {
-        url = "/DisclosureSearch.do?method=pagingDsclDetailSrch" + "&inputMessageId=DSCLDETAILCOND_IN" + "&outputMessageId=DSCLDETAILLIST_OUT";
-    }
-    url = url + "&ISUR_CD=" + $c.stf.getObjectValue(txb_isur_cd) + "&FROM_DATE=" + $c.stf.getObjectValue(edt_FromDate) + "&TO_DATE=" + $c.stf.getObjectValue(edt_ToDate) + "&DEP_CD=" + scwin.gDepCd + "&UP_DEP_CD=" + scwin.gUpDepCd + "&EMP_NO=" + scwin.gEmpNo + "&LIST_STAT=" + scwin.getChkValue(chb_ListStatCd) + "&LAST_YN=" + scwin.getChkValue(chb_Last) + "&BYPASS_YN=" + scwin.getChkValue(chb_ByPass) + "&FORM_CD=" + $c.stf.getObjectValue(txb_FormCd) + "&FORM_NM=" + $c.stf.getObjectValue(txb_FormNm) + "&KEYWORD=" + $c.utils.replaceAll($c.stf.getObjectValue(txb_keyword), "&", "＆") + "&FSS_UNQ_NO=" + $c.stf.getObjectValue(txb_FssUnqNo) + "&FSS_UNQ_NM=" + $c.stf.getObjectValue(txb_FssUnqNm) + "&ACNTCLS_MM=" + $c.stf.getObjectValue(cmb_month) + "&IND_TP=" + $c.stf.getObjectValue(cmb_IndTp) + "&KOR_YN=" + scwin.getChkValue(chb_kor_yn) + "&ENG_YN=" + scwin.getChkValue(chb_eng_yn) + "&LD_MKT_TP=" + $c.stf.getObjectValue(rdo_MKT_ID) + "&RSN_CLSS_CD_LIST=" + scwin.gRsnClssCdList + "&SCN_NM=" + pScnNm + "&MAIN_YN=" + scwin.getChkValue(chb_main_yn) + "&ATCH_YN=" + scwin.getChkValue(chb_atch_yn) + "&DEP_TP=" + scwin.getChkValue(chb_dep_tp) + "&BASIS_TP=" + $c.stf.getObjectValue(cmb_Basis) + "&PAGENO=" + scwin.vCurrPageNo + "&PAGESIZE=" + scwin.pageSize + "&SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + $c.stf.info("SCREN_PROCS_TP_CD_01");
-    //alert("ScnarioNmCall=> "+ url);
-    dts_DsclList.DataID = encodeURI(url);
-
-	//----W-Craft WebSquare 변환 확인: reset----//
-    dts_DsclList.reset();
-
-    //var vKeyword =  getObjectValue(txb_keyword);		
-    if (scwin.gKeyword.length > 0) {
-        $c.cm.ShowWin(mgrd_Grid);
-    } else {
-        $c.cm.ShowWin(grd_Grid);
-    }
-};
-scwin.PageNoCall = function(vPageNo) {
-    //현재 선택한 페이지번호
-    scwin.vCurrPageNo = vPageNo;
-    let url;
-    //gKeyword =  getObjectValue(txb_keyword);	
-
-    if (scwin.gKeyword.length > 0) {
-        //본문검색 키워드가있을때 ... 
-
-        if ($c.stf.getObjectValue(rdo_MKT_ID) === '4') {
-            chb_ListStatCd.setValue(0);
-        }
-        // 2.  Docruzer으로 검색
-        url = "/DisclosureSearch.do?method=pagingDsclDetailSrchEngine" + "&inputMessageId=DSCLDETAILCOND_IN" + "&outputMessageId=DSCLDETAILLIST_OUT";
-    } else {
-        url = "/DisclosureSearch.do?method=pagingDsclDetailSrch" + "&inputMessageId=DSCLDETAILCOND_IN" + "&outputMessageId=DSCLDETAILLIST_OUT";
-    }
-    url = url + "&ISUR_CD=" + $c.stf.getObjectValue(txb_isur_cd) + "&FROM_DATE=" + $c.stf.getObjectValue(edt_FromDate) + "&TO_DATE=" + $c.stf.getObjectValue(edt_ToDate) + "&DEP_CD=" + scwin.gDepCd + "&UP_DEP_CD=" + scwin.gUpDepCd + "&EMP_NO=" + scwin.gEmpNo + "&LIST_STAT=" + scwin.getChkValue(chb_ListStatCd) + "&LAST_YN=" + scwin.getChkValue(chb_Last) + "&BYPASS_YN=" + scwin.getChkValue(chb_ByPass) + "&FORM_CD=" + $c.stf.getObjectValue(txb_FormCd) + "&FORM_NM=" + $c.stf.getObjectValue(txb_FormNm) + "&KEYWORD=" + $c.stf.replaceAll($c.stf.getObjectValue(txb_keyword), "&", "＆") + "&FSS_UNQ_NO=" + $c.stf.getObjectValue(txb_FssUnqNo) + "&FSS_UNQ_NM=" + $c.stf.getObjectValue(txb_FssUnqNm) + "&ACNTCLS_MM=" + $c.stf.getObjectValue(cmb_month) + "&IND_TP=" + $c.stf.getObjectValue(cmb_IndTp) + "&KOR_YN=" + scwin.getChkValue(chb_kor_yn) + "&ENG_YN=" + scwin.getChkValue(chb_eng_yn) + "&LD_MKT_TP=" + $c.stf.getObjectValue(rdo_MKT_ID) + "&RSN_CLSS_CD_LIST=" + scwin.gRsnClssCdList + "&SCN_NM=" + scwin.gScnNm + "&MAIN_YN=" + scwin.getChkValue(chb_main_yn) + "&ATCH_YN=" + scwin.getChkValue(chb_atch_yn) + "&DEP_TP=" + scwin.getChkValue(chb_dep_tp) + "&BASIS_TP=" + $c.stf.getObjectValue(cmb_Basis) + "&PAGENO=" + scwin.vCurrPageNo + "&PAGESIZE=" + scwin.pageSize + "&SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + $c.stf.info("SCREN_PROCS_TP_CD_01");
-    dts_DsclList.DataID = encodeURI(url);
-
-	//----W-Craft WebSquare 변환 확인: reset----//
-    dts_DsclList.reset();
-
-    //alert("PageNoCall=> "+ url);
-    //var vKeyword =  getObjectValue(txb_keyword);		
-    if (scwin.gKeyword.length > 0) {
-        $c.cm.ShowWin(mgrd_Grid);
-    } else {
-        $c.cm.ShowWin(grd_Grid);
-    }
-};
-scwin.getChkValue = function(obj) {
-    //return (obj.checked) ? "Y" : "N";
-    if (obj.getValue() === "1") {
-        return obj.getValue();
-    } else {
-        return "0";
-    }
-};
-scwin.setChkValue = function(obj, booleanVal) {
-    //return (obj.checked) ? "Y" : "N";
-    obj.setValue(booleanVal);
-};
-
-
-
-//  공시상세검색    엑셀다운로드  -->
-scwin.fn_ExcelDownload = function() {
-    let vKeyword = $c.stf.getObjectValue(txb_keyword);
-    if (vKeyword.length > 0) {
-        $c.stf.doLogSave(scwin.vScrenID, $c.stf.info("SCREN_PROCS_TP_CD_07"));
-        $c.data.downloadGridViewExcel(mgrd_Grid_excel, "공시상세검색 목록(본문내용)", "", "8");
-    } else {
-        /*
-        var edt_FromDate_year = getObjectValue(edt_FromDate).substr(0,4);
-        var edt_FromDate_month = getObjectValue(edt_FromDate).substr(4,2)-1;
-        var edt_FromDate_day = getObjectValue(edt_FromDate).substr(6,2);
-        var edt_FromDate_Date = new Date(edt_FromDate_year,edt_FromDate_month,edt_FromDate_day);
-         
-        var edt_ToDate_year = getObjectValue(edt_ToDate).substr(0,4);
-        var edt_ToDate_month = getObjectValue(edt_ToDate).substr(4,2)-1;
-        var edt_ToDate_day = getObjectValue(edt_ToDate).substr(6,2);
-        var edt_ToDate_Date = new Date(edt_ToDate_year,edt_ToDate_month,edt_ToDate_day);
-
-			
-        // 4년 이상의 기간은 검색 할 수 없다
-        var date_result = ( Date.parse(edt_ToDate_Date) - Date.parse(edt_FromDate_Date) ) / ( 1000*60*60*24 );
-
-        if ( date_result > 1461) {
-        	alert("검색기간은 4년 이상을 초과 할 수 없습니다." );
-        	return;	
-        }
-        */
-
-        showload.style.display = "";
-
-        // 엑셀저장 버튼 클릭 후 바로 버튼 클릭 안되게 처리 20150325
-        btn_Excel.setDisabled(true);
-        btn_Excel.src = "../img/btn_excelsave_d.gif";
-        let url = "";
-
-        //1만건 이상인 경우 메일로 전송
-        if (scwin.totalCnt >= 10000) {
-            scwin.gExcelTp = "2";
-            url = "/DisclosureSearch.do?method=listDsclDetailSrchExcel";
-        } else {
-            scwin.gExcelTp = "1";
-            url = "/DisclosureSearch.do?method=listDsclDetailSrch";
-        }
-        url += "&inputMessageId=DSCLDETAILCOND_IN" + "&outputMessageId=DSCLDETAILLIST_OUT" + "&ISUR_CD=" + $c.stf.getObjectValue(txb_isur_cd) + "&FROM_DATE=" + $c.stf.getObjectValue(edt_FromDate) + "&TO_DATE=" + $c.stf.getObjectValue(edt_ToDate) + "&DEP_CD=" + scwin.gDepCd + "&UP_DEP_CD=" + scwin.gUpDepCd + "&EMP_NO=" + scwin.gEmpNo + "&LIST_STAT=" + scwin.getChkValue(chb_ListStatCd) + "&LAST_YN=" + scwin.getChkValue(chb_Last) + "&BYPASS_YN=" + scwin.getChkValue(chb_ByPass) + "&FORM_CD=" + $c.stf.getObjectValue(txb_FormCd) + "&FORM_NM=" + $c.stf.getObjectValue(txb_FormNm) + "&KEYWORD=" + $c.stf.replaceAll($c.stf.getObjectValue(txb_keyword), "&", "＆") + "&FSS_UNQ_NO=" + $c.stf.getObjectValue(txb_FssUnqNo) + "&FSS_UNQ_NM=" + $c.stf.getObjectValue(txb_FssUnqNm) + "&ACNTCLS_MM=" + $c.stf.getObjectValue(cmb_month) + "&IND_TP=" + $c.stf.getObjectValue(cmb_IndTp) + "&KOR_YN=" + scwin.getChkValue(chb_kor_yn) + "&ENG_YN=" + scwin.getChkValue(chb_eng_yn) + "&LD_MKT_TP=" + $c.stf.getObjectValue(rdo_MKT_ID) + "&MAIN_YN=" + scwin.getChkValue(chb_main_yn) + "&ATCH_YN=" + scwin.getChkValue(chb_atch_yn) + "&DEP_TP=" + scwin.getChkValue(chb_dep_tp) + "&BASIS_TP=" + $c.stf.getObjectValue(cmb_Basis) + "&RSN_CLSS_CD_LIST=" + scwin.gRsnClssCdList + "&SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + $c.stf.info("SCREN_PROCS_TP_CD_07");
-        dts_DsclList_excel.DataID = encodeURI(url);
-
-	//----W-Craft WebSquare 변환 확인: reset----//
-        dts_DsclList_excel.reset();
-    }
-};
-
-
-
-// 그리드에서 클릭 row의 변수셋팅
-scwin.fn_setContnId = function(obj) {
-    scwin.gAcptNo = dts_DsclList.getCellData(eval(obj), "ACPT_NO");
-    scwin.gMainFormCd = dts_DsclList.getCellData(eval(obj), "FORM_CD");
-    scwin.gFormVer = dts_DsclList.getCellData(eval(obj), "FORM_VER");
-    scwin.gIsurCd = dts_DsclList.getCellData(eval(obj), "ISUR_CD");
-
-    //alert("부모창:"+gAcptNo+","+gMainFormCd+","+ gFormVer+","+ gIsurCd);
-
-};
-
-	//----W-Craft WebSquare 변환 확인: reset----//
-scwin.fn_resetParam = function() {
-    vCurrDate = $c.utils.cGetToday("yyyymmdd"); // 현재날짜
-
-    // 유가 공시팀(26**), 코스닥 공시팀(34**) => 일때만 보여준다.
-    if ($c.session.info("js_dep_cd").substring(0, 2) === '26' || $c.session.info("js_dep_cd").substring(0, 2) === '34') {
-        scwin.gDepCd = "UPTEAM";
-        $c.stf.setObjectValue(cmb_TeamList, scwin.gDepCd);
-    }
-
-
-    // 코넥스 추가를 추가 했었지만 2017.02.17 모든 시장을 보여달라고 해서 삭제함
-    if (scwin.gLdMktTp === '1' || scwin.gLdMktTp === '2') {
-        $c.stf.setObjectValue(rdo_MKT_ID, scwin.gLdMktTp);
-    } else {
-        // 코넥스는 유가, 코스닥도 볼 수 있음
-        if (scwin.gLdMktTp === '6' || scwin.gLdMktTp === '4') {
-            $c.stf.setObjectValue(rdo_MKT_ID, scwin.gLdMktTp);
-        } else {
-            $c.stf.setObjectValue(rdo_MKT_ID, '9');
-        }
-    }
-
-    //채권일 경우 채권상장폐지여부 제외 항목으로 보이게끔 수정 20170310
-    if ($c.stf.getObjectValue(rdo_MKT_ID) === '4') {
-        $c.stf.showObj(label_3, false);
-        $c.stf.showObj(label_24, true);
-        scwin.setChkValue(chb_ListStatCd, "1");
-    } else {
-        $c.stf.showObj(label_3, true);
-        $c.stf.showObj(label_24, false);
-        scwin.setChkValue(chb_ListStatCd, false);
-    }
-
-    //setObjectValue(rdo_MKT_ID, $c.session.info("js_market"));
-
-    $c.stf.setObjectValue(txb_isur_cd, "");
-    $c.stf.setObjectValue(txb_com_abbrv, "");
-    $c.stf.setObjectValue(edt_FromDate, vCurrDate);
-    $c.stf.setObjectValue(edt_ToDate, vCurrDate);
-    $c.stf.setObjectValue(cmb_EmpList, "");
-    //setChkValue(chb_ListStatCd, false);
-    scwin.setChkValue(chb_Last, false);
-    scwin.setChkValue(chb_ByPass, false);
-    $c.stf.setObjectValue(txb_FormCd, "");
-    $c.stf.setObjectValue(txb_FormNm, "");
-    $c.stf.setObjectValue(txb_keyword, "");
-    $c.stf.setObjectValue(txb_FssUnqNo, "");
-    $c.stf.setObjectValue(txb_FssUnqNm, "");
-    $c.stf.setObjectValue(cmb_month, "");
-    $c.stf.setObjectValue(cmb_IndTp, "");
-    scwin.setChkValue(chb_kor_yn, true);
-    scwin.setChkValue(chb_eng_yn, true);
-    scwin.setChkValue(chb_main_yn, true);
-    scwin.setChkValue(chb_atch_yn, true);
-    scwin.setChkValue(chb_dep_tp, true);
-    $c.stf.setObjectValue(cmb_Basis, "2");
-    $c.stf.setObjectValue(cmb_PerPage, "50");
-    $c.stf.setObjectValue(txb_rsn_cnt, "");
-    dts_Dscl_Cond.removeAll();
-    scwin.gRsnClssCdList = "";
-};
-
-
-// 공시팀 전체 목록에 추가
-scwin.fn_addDsclTeamAll = function(rowcount, dtsDepComp, dtsDepCompCopy) {
-    dtsDepComp.setCellData(2,"VALUE", 'UPTEAM');		// 
-    dtsDepComp.setCellData(2,"TEXT", '공시팀 전체');
-    dtsDepComp.setCellData(2,"DEP_CD", 'UPTEAM' );		
-    for (let i = 3; i <= rowcount; i++) {
-        dtsDepComp.setCellData(i,"VALUE", dtsDepCompCopy.getCellData(i-1,"VALUE"));		// 
-        dtsDepComp.setCellData(i,"TEXT", dtsDepCompCopy.getCellData(i-1,"TEXT"));	
-        dtsDepComp.setCellData(i,"DEP_CD", dtsDepCompCopy.getCellData(i-1,"DEP_CD"));
-    }
-    dtsDepComp.insertRow();
-    dtsDepComp.setCellData(rowcount+1,"VALUE", dtsDepCompCopy.getCellData(rowcount,"VALUE"));		// 
-    dtsDepComp.setCellData(rowcount+1,"TEXT", dtsDepCompCopy.getCellData(rowcount,"TEXT"));	
-    dtsDepComp.setCellData(rowcount+1,"DEP_CD", dtsDepCompCopy.getCellData(rowcount,"DEP_CD"));	
-};
-
-
-
-// 첨부서류만 선택하고 본문검색을 하고자할때 알림.
-scwin.fn_chkAttchKeyword = function() {
-    let vKeyword = $c.stf.getObjectValue(txb_keyword);
-    if (vKeyword.length > 0) {
-        if (scwin.getChkValue(chb_main_yn) === 0 &&
-            scwin.getChkValue(chb_atch_yn) === 1) {
-            alert('첨부서류만 선택한 후에는 공시본문내용 검색기능을 사용 할 수 없습니다.\n공시본문에서만 내용검색이 가능합니다.');
-            txb_keyword.focus();
-            return false;
-        }
-    }
-};
+// WebSquare 컴포넌트 이벤트 함수
 scwin.btn_Search_onclick = function() {
     scwin.fn_CheckCond();
 };
@@ -877,7 +387,6 @@ scwin.dts_emp_OnLoadCompleted = function(rowcount) {
     //setObjectValue(cmb_EmpList, $c.session.info("js_emp_no"));	
 
 };
-
 	//----W-Craft WebSquare 변환 확인: Filter----//
 scwin.dts_emp_OnFilter = function(row) {
     //  부서코드에  해당하는 사원을 가져온다.
@@ -1132,7 +641,6 @@ scwin.txb_FssUnqNm_onblur = function() {
         txb_FssUnqNo.setValue("");
     }
 };
-
 	//----W-Craft WebSquare 변환 확인: Filter----//
 scwin.MxDataSet_com_isur_OnFilter = function(row) {
     if (skw !== "" && foColum === "1") {
@@ -1199,11 +707,9 @@ scwin.txb_isur_cd_onkeyup = function() {debugger;
         }
     }
 };
-
 scwin.txb_isur_cd_onchange = function (info) {
 	
 };
-
 scwin.txb_isur_cd_oneditkeyup = function (info, e) {debugger;
 	if (info.newValue === "") {
         ////Grd_com_isur.style.display = "none";
@@ -1217,14 +723,11 @@ scwin.txb_isur_cd_oneditkeyup = function (info, e) {debugger;
         ////}
     }
 };
-
 scwin.txb_isur_cd_onviewchange = function (info) {debugger;
 	////if (kcode =='13'){
 		$c.cm.fn_com_Confirm_set();
 	////}
 };
-
-
 scwin.txb_FormCd_onblur = function() {
     if (txb_FormCd.getValue() === "") {
         txb_FormNm.setValue("");
@@ -1239,63 +742,6 @@ scwin.cmb_PeriodTp_onselchange = function() {
     const vTp = $c.cp.valueOfIndex(cmb_PeriodTp, "VALUE", cmb_PeriodTp.getSelectedIndex());
     $c.stf.fn_setFromToDate(vTp, edt_FromDate, edt_ToDate);
 };
-scwin.gform_onload = async function() {
-    $c.stf.showObj(grd_Grid_excel, false);
-    //// $c.stf.showObj(mgrd_Grid_excel, false);
-    $c.stf.showObj(panel_scn, false);
-    $c.stf.showObj(panel_combo, false);
-    $c.stf.showObj(mgrd_Grid, false);
-    $c.stf.showObj(txb_FssUnqNo, false);
-
-    // 패널라운드 처리
-    ////$c.cm.PanelToGroupBox(panel_1);
-    scwin.fn_SetCode();
-
-    const codeOptions = [ 
-                    { code : "getDepUpCode", compID : "cmb_TeamList" },  //팀 리스트 dts_dep
-                    { code : "getEmpNoDepCode", compID : "cmb_EmpList" },  //담당자 리스트 dts_emp
-                    { code : "listStdIndtpCB", compID : "cmb_IndTp" },   //업종  dts_IndTp
-                    //{ code : "comIsur", compID : "txb_isur_cd" },   //업종  dts_IndTp
-    //                 { code : "00005", compID : "sbx_CommCodePart1, sbx_CommCodePart2"},
-    //                 { code : "00024", compID : "grd_CommCodeSample:JOB_CD", useLocalCache : false}
-    ];
-    debugger;
-    await $c.data.setCommonCode(codeOptions);
-
-    const resData = await $c.cm.fn_com_isur(txb_isur_cd, txb_com_abbrv);
-    MxDataSet_com_isur.setJSON(resData.responseJSON.dlt_commonCodecomIsur);
-
-    $c.stf.Combo_CBDataSetLimit(cmb_PerPage);
-    $c.stf.Combo_CBDataSetPeriod(cmb_PeriodTp);
-
-    ////// 가우스헤더 셋팅
-    ////dts_Dscl_Cond.DataID = "/gauceSystemierAdaptor.do?method=getGauceDataHeader&messageId=DSCLDETAILCOND_IN";
-
-	//----W-Craft WebSquare 변환 확인: reset----//
-    ////dts_Dscl_Cond.reset();
-
-    //dts_dep onloadcompleted
-    const depUpCodeStr = "dlt_commonCode" + "getDepUpCode";
-    const depUpCodeComp = $p.getComponentById(depUpCodeStr);
-	if ($c.session.info("js_dep_cd").substring(0,2) === '26'  || $c.session.info("js_dep_cd").substring(0,2) === '34') {
-		////scwin.CopyDataSet(dts_dep, dts_dep1);
-        const dcoptions = {
-            baseNode : "list",
-            repeatNode : "map",
-            saveRemovedData : "true"
-        };
-        const dlObj = $c.data.createDataList(depUpCodeStr + "1", ["DEP_CD", "VALUE", "TEXT"], ["text", "text", "text"] , dcoptions);
-        dlObj.setJSON(depUpCodeComp.getAllJSON());
-
-		scwin.fn_addDsclTeamAll(depUpCodeComp.getTotalRow(), depUpCodeComp, dlObj);
-		$c.stf.setObjectValue(cmb_TeamList, 'UPTEAM') ;	
-	}
-
-    ////$c.cm.fn_com_isur(txb_isur_cd, txb_com_abbrv);
-    await scwin.fn_CheckCond();
-    ////showload.style.display = "none";
-};
-
 scwin.dts_DsclList_ondataload = async function () {debugger;
 	//showload.style.display ="none";   //ps.   불필요
 	
@@ -1345,7 +791,6 @@ scwin.dts_DsclList_ondataload = async function () {debugger;
 
     ////CloseWin(totalCnt, grd_Grid); //ps. 불필요. 
 };
-
 scwin.dts_scn_list_ondataload = async function () {
 	let combo_text = ""; 
 
@@ -1371,6 +816,535 @@ scwin.dts_scn_list_ondataload = async function () {
 	// 조회 버튼 클릭 후 바로 버튼 클릭 안되게 처리 20150325
 	//btn_Search.disabled = false;
 	//btn_Search.src = "../img/btn_select.gif";
+};
+
+// 일반 함수
+scwin.fn_SetCode = function() {debugger;
+    scwin.gDepCd = $c.session.info("js_dep_cd");
+    scwin.gEmpNo = $c.session.info("js_emp_no");
+    scwin.gUpDepCd = $c.session.info("js_belngdepcd");
+    if (scwin.gLdMktTp === '1' || scwin.gLdMktTp === '2' || scwin.gLdMktTp === '4' || scwin.gLdMktTp === '6') {
+        $c.stf.setObjectValue(rdo_MKT_ID, scwin.gLdMktTp);
+        $c.stf.showObj(panel_mkt, false);
+    } else {
+        $c.stf.setObjectValue(rdo_MKT_ID, '9');
+    }
+
+    //채권일 경우 채권상장폐지여부 제외 항목으로 보이게끔 수정 20170310
+    if ($c.stf.getObjectValue(rdo_MKT_ID) === '4') {
+        $c.stf.showObj(label_3, false);
+        $c.stf.showObj(label_24, true);
+    } else {
+        $c.stf.showObj(label_3, true);
+        $c.stf.showObj(label_24, false);
+    }
+
+    // 유가 공시팀(26**), 코스닥 공시팀(34**) => 일때만 보여준다.     
+    // 코넥스 추가
+    if ($c.session.info("js_dep_cd").substring(0, 2) === '26' || $c.session.info("js_dep_cd").substring(0, 2) === '34' || $c.session.info("js_dep_cd").substring(0, 2) === '3B') {
+        $c.stf.showObj(panel_dep_emp, true);
+        scwin.gDepCd = "UPTEAM";
+    } else {
+        $c.stf.showObj(panel_dep_emp, false);
+    }
+
+    //  기간 from~ to  셋팅	
+    vCurDate = $c.utils.cGetToday("yyyymmdd");
+    //edt_FromDate.text = cGetMinusDate2(vCurDate, 7); 	// 일주일전 날짜
+    edt_FromDate.setValue(vCurDate); // 현재날짜
+    edt_ToDate.setValue(vCurDate); // 현재날짜
+
+    // 팀 리스트 박스(소속부서와 같은 상위부서인 팀)	
+    //dts_dep.DataID = "/CodeAction.do?method=listDepCdCode&For=R";
+    ////dts_dep.DataID = "/CodeAction.do?method=getDepUpCode" + "&inputMessageId=CODE_EMPDEP_IN&outputMessageId=CODE_EMPDEP_OUT" + "&For=R&DEP_CD=" + $c.session.info("js_dep_cd");
+
+	//----W-Craft WebSquare 변환 확인: Reset----//
+    ////dts_dep.Reset();
+
+    //담당자 리스트 박스(소속부서와 같은 상위부서인 팀원)	
+    ////dts_emp.DataID = "/CodeAction.do?method=getEmpNoDepCode" + "&inputMessageId=CODE_EMPDEP_IN&outputMessageId=CODE_EMPDEP_OUT" + "&For=R&DEP_CD=" + $c.session.info("js_dep_cd");
+
+	//----W-Craft WebSquare 변환 확인: Reset----//
+    ////dts_emp.Reset();
+
+    // 업종 셋팅
+    ////dts_IndTp.DataID = "/CodeAction.do?method=listStdIndtpCB" + "&inputMessageId=CODEVALUE_INOUT&outputMessageId=CODE_OUT" + "&For=R";
+
+	//----W-Craft WebSquare 변환 확인: Reset----//
+    ////dts_IndTp.Reset();
+};
+// 법인명이 있고 특정 다른 조건을 선택할때 메세지
+scwin.fn_CheckComNmCond = function() {
+    let vIsurCd = $c.stf.getObjectValue(txb_isur_cd);
+    if (vIsurCd !== '') {
+        alert("해당항목 선택시 법인코드(명)의 조건값이  초기화 됩니다.");
+        $c.stf.setObjectValue(txb_isur_cd, '');
+        $c.stf.setObjectValue(txb_com_abbrv, '');
+        return;
+    }
+};
+// 공시상세  목록검색 조건체크  : 사용자 클릭 -->
+scwin.fn_CheckCond = async function() {
+    let vIsurCd = $c.stf.getObjectValue(txb_isur_cd);
+    const vFssUnqNm = $c.stf.getObjectValue(txb_FssUnqNm);
+    const vFormCd = $c.stf.getObjectValue(txb_FormCd);
+    const vFormNm = $c.stf.getObjectValue(txb_FormNm);
+    const vRsnclssCnt = $c.stf.getObjectValue(txb_rsn_cnt);
+    let vKeyword = $c.stf.getObjectValue(txb_keyword);
+
+    /*
+    if (vKeyword == '' ) {
+    	if (vIsurCd == '' &&  vFssUnqNm == '' && vFormNm == '' 
+    		&& (vRsnclssCnt =='' || vRsnclssCnt == '0') ) {
+    		alert("법인코드(명), 제출의무자명, 공시제목, 사유분류 중 하나 이상을  입력하셔야 합니다." );
+    		txb_isur_cd.focus();
+    		return;	
+    	}
+    } 
+    */
+
+    // 일자 체크
+    if ($c.stf.getObjectValue(edt_FromDate).length < 8) {
+        alert("일자 올바르게 입력하십시오.");
+        edt_FromDate.focus();
+        return;
+    }
+
+    // 일자 체크
+    if ($c.stf.getObjectValue(edt_ToDate).length < 8) {
+        alert("일자 올바르게 입력하십시오.");
+        edt_ToDate.focus();
+        return;
+    }
+    if ($c.stf.compareFromToDate2(edt_FromDate, edt_ToDate) === false) {
+        return;
+    }
+
+
+    // 4년 이상의 기간은 검색 할 수 없다
+    /*
+    var edt_FromDate_year = getObjectValue(edt_FromDate).substr(0,4);
+    var edt_FromDate_month = getObjectValue(edt_FromDate).substr(4,2)-1;
+    var edt_FromDate_day = getObjectValue(edt_FromDate).substr(6,2);
+    var edt_FromDate_Date = new Date(edt_FromDate_year,edt_FromDate_month,edt_FromDate_day);
+     
+    var edt_ToDate_year = getObjectValue(edt_ToDate).substr(0,4);
+    var edt_ToDate_month = getObjectValue(edt_ToDate).substr(4,2)-1;
+    var edt_ToDate_day = getObjectValue(edt_ToDate).substr(6,2);
+    var edt_ToDate_Date = new Date(edt_ToDate_year,edt_ToDate_month,edt_ToDate_day);
+    var date_result = ( Date.parse(edt_ToDate_Date) - Date.parse(edt_FromDate_Date) ) / ( 1000*60*60*24 );
+
+    if ( date_result > 1461) {
+    	alert("검색기간은 4년 이상을 초과 할 수 없습니다." );
+    	return;	
+    }
+    */
+
+
+
+    // 보고서코그 체크
+    if (vFormCd.length > 0 && vFormCd.length !== 5) {
+        alert("보고서코드 5자리를 입력하십시오.");
+        txb_FormCd.focus();
+        return;
+    }
+    // 언어구분 체크
+    if (scwin.getChkValue(chb_kor_yn) === 0 && scwin.getChkValue(chb_eng_yn) === 0) {
+        alert("언어구분은 한개이상 선택하십시오.");
+        chb_kor_yn.focus();
+        return;
+    }
+
+    // 제출유형 체크
+    if (scwin.getChkValue(chb_main_yn) === 0 && scwin.getChkValue(chb_atch_yn) === 0) {
+        alert("제출유형은 한개이상 선택하십시오.");
+        chb_main_yn.focus();
+        return;
+    }
+    if (scwin.fn_chkAttchKeyword() === false) {
+        return;
+    }
+    let sRsnClssCdList = "";
+    let sFormUpclssCd;
+    let sRsnClssCd;
+    for (let i = 1; i <= dts_Dscl_Cond.getTotalRow(); i++) {
+        sFormUpclssCd = dts_Dscl_Cond.getCellData(i, "FORM_UPCLSS_CD");
+        sRsnClssCd = dts_Dscl_Cond.getCellData(i, "RSN_CLSS_CD");
+        if (sRsnClssCd !== "000") {
+            sRsnClssCdList += (sFormUpclssCd + sRsnClssCd + ",");
+        }
+    }
+
+    // 맨뒤에 ", " 제거 하기 
+    scwin.gRsnClssCdList = sRsnClssCdList.substr(0, sRsnClssCdList.length - 1);
+    scwin.gDepCd = $c.stf.getObjectValue(cmb_TeamList);
+    scwin.gEmpNo = $c.stf.getObjectValue(cmb_EmpList);
+    if (scwin.gDepCd === "UPTEAM" && $c.session.info("js_dep_cd").substr(2, 4) === '00') {
+        scwin.gUpDepCd = $c.session.info("js_dep_cd");
+    }
+    if ($c.session.info("js_dep_cd") === '3410') {
+        // 코 공시제도팀인 공시총괄팀으로 설정-- 2010.03.11
+        scwin.gUpDepCd = '3400';
+    }
+    scwin.fn_Search();
+};
+//  공시상세   목록검색 : 사용자 클릭 -->
+scwin.fn_Search = async function() {debugger;
+    // 조회 버튼 클릭 후 바로 버튼 클릭 안되게 처리 20150325
+    btn_Search.setDisabled(true);
+    ////btn_Search.src = "../img/btn_select_d.gif";
+    scwin.vCurrPageNo = 0;
+    ////dts_DsclList_excel.removeAll();
+debugger;
+    //공시본문검색은 채권해제법인제외 조건을 선택하지 못하게 한다.
+    //검색엔진 테이블에 채권공시법인여부 칼럼이 없어서..
+    if (txb_keyword.getValue() !== "") {
+        if ($c.stf.getObjectValue(rdo_MKT_ID) === '4') {
+            chb_ListStatCd.setValue(0);
+        }
+    }
+    let url = "";
+    let url_cond = "&ISUR_CD=" + $c.stf.getObjectValue(txb_isur_cd) + "&FROM_DATE=" + $c.stf.getObjectValue(edt_FromDate) + "&TO_DATE=" + $c.stf.getObjectValue(edt_ToDate) + "&DEP_CD=" + scwin.gDepCd + "&UP_DEP_CD=" + scwin.gUpDepCd + "&EMP_NO=" + scwin.gEmpNo + "&LIST_STAT=" + scwin.getChkValue(chb_ListStatCd) + "&LAST_YN=" + scwin.getChkValue(chb_Last) + "&BYPASS_YN=" + scwin.getChkValue(chb_ByPass) + "&FORM_CD=" + $c.stf.getObjectValue(txb_FormCd) + "&FORM_NM=" + $c.stf.getObjectValue(txb_FormNm) + "&KEYWORD=" + $c.stf.replaceAll($c.stf.getObjectValue(txb_keyword), "&", "＆") + "&FSS_UNQ_NO=" + $c.stf.getObjectValue(txb_FssUnqNo) + "&FSS_UNQ_NM=" + $c.stf.getObjectValue(txb_FssUnqNm) + "&ACNTCLS_MM=" + $c.stf.getObjectValue(cmb_month) + "&IND_TP=" + $c.stf.getObjectValue(cmb_IndTp) + "&KOR_YN=" + scwin.getChkValue(chb_kor_yn) + "&ENG_YN=" + scwin.getChkValue(chb_eng_yn) + "&LD_MKT_TP=" + $c.stf.getObjectValue(rdo_MKT_ID) + "&RSN_CLSS_CD_LIST=" + scwin.gRsnClssCdList + "&MAIN_YN=" + scwin.getChkValue(chb_main_yn) + "&ATCH_YN=" + scwin.getChkValue(chb_atch_yn) + "&DEP_TP=" + scwin.getChkValue(chb_dep_tp) + "&BASIS_TP=" + $c.stf.getObjectValue(cmb_Basis) + "&PAGENO=" + scwin.vCurrPageNo + "&PAGESIZE=" + scwin.pageSize + "&SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + $c.stf.info("SCREN_PROCS_TP_CD_01");
+    //alert(url_cond);
+
+    scwin.gKeyword = $c.stf.getObjectValue(txb_keyword);
+    if (scwin.gKeyword.length > 0) {
+        //본문검색 키워드가있을때 ... 
+        let iOpCnt = 0;
+        if (scwin.gKeyword.indexOf("&") > 0) {
+            iOpCnt = iOpCnt + 1;
+        }
+        if (scwin.gKeyword.indexOf("|") > 0) {
+            iOpCnt = iOpCnt + 1;
+        }
+        if (scwin.gKeyword.indexOf("!") > 0) {
+            iOpCnt = iOpCnt + 1;
+        }
+        if (iOpCnt > 1) {
+            alert("본문검색 키워드는 한 개만 사용할 수 있습니다.");
+            txb_keyword.focus();
+            return;
+        }
+        if (scwin.pageSize === 0) {
+            alert("공시본문내용으로 검색할 경우에는 한페이지당 보여주는 갯수를 '전체'로 사용할 수 없습니다.");
+            $c.stf.setObjectValue(cmb_PerPage, "50");
+            cmb_PerPage.focus();
+            return;
+        }
+        $c.stf.showObj(mgrd_Grid, true);
+        $c.stf.showObj(grd_Grid, false);
+        ////$c.cm.ShowWin(mgrd_Grid);
+
+        // 1. 검색 건수부터 조회한다.
+        ////url = "/DisclosureSearch.do?method=countDsclDetailSrchEngine" + "&inputMessageId=DSCLDETAILCOND_IN" + "&outputMessageId=SCN_CNTSTAT_OUT";
+
+        //alert("본문검색 카운트: "+url + url_cond);						
+        ////dts_scn_list.DataID = encodeURI(url + url_cond);
+
+	//----W-Craft WebSquare 변환 확인: reset----//
+        ////dts_scn_list.reset();
+	dts_scn_in.set("ISUR_CD", txb_isur_cd.getValue());
+	dts_scn_in.set("FROM_DATE",  edt_FromDate.getValue());
+	dts_scn_in.set("TO_DATE",  edt_ToDate.getValue());
+	dts_scn_in.set("DEP_CD",  scwin.gDepCd);
+	dts_scn_in.set("UP_DEP_CD",  scwin.gUpDepCd);
+	dts_scn_in.set("EMP_NO",  scwin.gEmpNo);
+	dts_scn_in.set("LIST_STAT",   chb_ListStatCd.getValue());
+	dts_scn_in.set("LAST_YN",  chb_Last.getValue());
+	dts_scn_in.set("BYPASS_YN",  chb_ByPass.getValue());	// 사전확인면제 조건 추가 by LDJ_20130422)
+	dts_scn_in.set("FORM_CD="+ txb_FormCd.getValue());
+	dts_scn_in.set("FORM_NM",  txb_FormNm.getValue());
+	//dts_scn_in.set("KEYWORD",  txb_keyword.getValue());
+	dts_scn_in.set("KEYWORD",  txb_keyword.getValue().replaceAll("&", "＆"));
+	dts_scn_in.set("FSS_UNQ_NO",  txb_FssUnqNo.getValue());
+	dts_scn_in.set("FSS_UNQ_NM",  txb_FssUnqNm.getValue());
+	dts_scn_in.set("ACNTCLS_MM",  cmb_month.getValue());
+	dts_scn_in.set("IND_TP",  cmb_IndTp.getValue());
+	dts_scn_in.set("KOR_YN", chb_kor_yn.getValue());
+	dts_scn_in.set("ENG_YN",  chb_eng_yn.getValue());
+	dts_scn_in.set("LD_MKT_TP",  rdo_MKT_ID.getValue());
+	//dts_scn_in.set("RSN_CLSS_CD_LIST",  gRsnClssCdList);  //ps.
+	dts_scn_in.set("MAIN_YN", chb_main_yn.getValue());
+	dts_scn_in.set("ATCH_YN",  chb_atch_yn.getValue()	);
+	dts_scn_in.set("DEP_TP",  chb_dep_tp.getValue()	);
+	dts_scn_in.set("BASIS_TP="+ cmb_Basis.getValue());
+	dts_scn_in.set("PAGENO", scwin.vCurrPageNo);
+	dts_scn_in.set("PAGESIZE",  scwin.pageSize);
+	dts_scn_in.set("SCREN_ID",scwin.vScrenID);
+	dts_scn_in.set("SCREN_PROCES_TP_CD", $c.stf.info("SCREN_PROCS_TP_CD_01"));
+
+    	const resData = await $c.sbm.execute(sbm_countDsclDetailSrchEngine);
+	//dts_DsclList.setJSON(resData.responseJSON);
+debugger;
+        const vScnCur = dts_scn_list.getCellData(dts_scn_list.getTotalRow() - 1, "SCN_CUR");
+        //alert(dts_scn_list.CountRow +", "+vScnCur);	
+
+        if (dts_scn_list.getTotalRow() > 0) {
+            // 2.  Docruzer으로 검색
+            ////url = "/DisclosureSearch.do?method=pagingDsclDetailSrchEngine" + "&inputMessageId=DSCLDETAILCOND_IN" + "&outputMessageId=DSCLDETAILLIST_OUT";
+            url_cond += "&SCN_NM=" + vScnCur;
+            //url_cond += "&SCN_NM=discls_internal";
+            //alert("본문검색: "+url + url_cond);	
+
+            //alert("url-->"+url + url_cond);
+
+            ////dts_DsclList.DataID = encodeURI(url + url_cond);
+
+	//----W-Craft WebSquare 변환 확인: reset----//
+            ////dts_DsclList.reset();
+            const resData = await $c.sbm.execute(sbm_pagingDsclDetailSrchEngine);
+            //dts_DsclList.setJSON(resData.responseJSON);            
+            $c.stf.showObj(panel_scn, true);
+            $c.stf.showObj(panel_combo, true);
+            $c.stf.showObj(mgrd_Grid, true);
+            $c.stf.showObj(grd_Grid, false);
+            ////$c.cm.ShowWin(mgrd_Grid);
+        } else {
+            // 조회 버튼 클릭 후 바로 버튼 클릭 안되게 처리 20150325
+            btn_Search.setDisabled(true);
+            ////btn_Search.src = "../img/btn_select.gif";
+            scwin.vCurrPageNo = 0;
+            ////dts_DsclList_excel.removeAll();
+            ////dts_DsclList.removeAll();
+            showObj(mgrd_Grid, true);	
+            //showObj(grd_Grid, false);	
+            $c.cm.CloseWin(0, mgrd_Grid);
+        }
+    } else {
+        // 본문검색 키워드가 없을때 ... 일반 DB검색
+        ////url = "/DisclosureSearch.do?method=pagingDsclDetailSrch" + "&inputMessageId=DSCLDETAILCOND_IN" + "&outputMessageId=DSCLDETAILLIST_OUT";
+        ////dts_DsclList.DataID = encodeURI(url + url_cond);
+
+	//----W-Craft WebSquare 변환 확인: reset----//
+        ////dts_DsclList.reset();
+    	const resData = await $c.sbm.execute(sbm_pagingDsclDetailSrch);
+    	dts_DsclList.setJSON(resData.responseJSON);        
+        $c.stf.showObj(panel_scn, false);
+        $c.stf.showObj(panel_combo, false);
+        $c.stf.showObj(mgrd_Grid, false);
+        $c.stf.showObj(grd_Grid, true);
+        $c.cm.ShowWin(grd_Grid);
+    }
+};
+scwin.ScnarioNmCall = function(pScnNm) {debugger;
+    scwin.vCurrPageNo = 0;
+    let url = "";
+    if (scwin.gKeyword.length > 0) {
+        //본문검색 키워드가있을때 ... 
+
+        if ($c.stf.getObjectValue(rdo_MKT_ID) === '4') {
+            chb_ListStatCd.setValue(0);
+        }
+        // 2.  Docruzer으로 검색
+        url = "/DisclosureSearch.do?method=pagingDsclDetailSrchEngine" + "&inputMessageId=DSCLDETAILCOND_IN" + "&outputMessageId=DSCLDETAILLIST_OUT";
+    } else {
+        url = "/DisclosureSearch.do?method=pagingDsclDetailSrch" + "&inputMessageId=DSCLDETAILCOND_IN" + "&outputMessageId=DSCLDETAILLIST_OUT";
+    }
+    url = url + "&ISUR_CD=" + $c.stf.getObjectValue(txb_isur_cd) + "&FROM_DATE=" + $c.stf.getObjectValue(edt_FromDate) + "&TO_DATE=" + $c.stf.getObjectValue(edt_ToDate) + "&DEP_CD=" + scwin.gDepCd + "&UP_DEP_CD=" + scwin.gUpDepCd + "&EMP_NO=" + scwin.gEmpNo + "&LIST_STAT=" + scwin.getChkValue(chb_ListStatCd) + "&LAST_YN=" + scwin.getChkValue(chb_Last) + "&BYPASS_YN=" + scwin.getChkValue(chb_ByPass) + "&FORM_CD=" + $c.stf.getObjectValue(txb_FormCd) + "&FORM_NM=" + $c.stf.getObjectValue(txb_FormNm) + "&KEYWORD=" + $c.utils.replaceAll($c.stf.getObjectValue(txb_keyword), "&", "＆") + "&FSS_UNQ_NO=" + $c.stf.getObjectValue(txb_FssUnqNo) + "&FSS_UNQ_NM=" + $c.stf.getObjectValue(txb_FssUnqNm) + "&ACNTCLS_MM=" + $c.stf.getObjectValue(cmb_month) + "&IND_TP=" + $c.stf.getObjectValue(cmb_IndTp) + "&KOR_YN=" + scwin.getChkValue(chb_kor_yn) + "&ENG_YN=" + scwin.getChkValue(chb_eng_yn) + "&LD_MKT_TP=" + $c.stf.getObjectValue(rdo_MKT_ID) + "&RSN_CLSS_CD_LIST=" + scwin.gRsnClssCdList + "&SCN_NM=" + pScnNm + "&MAIN_YN=" + scwin.getChkValue(chb_main_yn) + "&ATCH_YN=" + scwin.getChkValue(chb_atch_yn) + "&DEP_TP=" + scwin.getChkValue(chb_dep_tp) + "&BASIS_TP=" + $c.stf.getObjectValue(cmb_Basis) + "&PAGENO=" + scwin.vCurrPageNo + "&PAGESIZE=" + scwin.pageSize + "&SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + $c.stf.info("SCREN_PROCS_TP_CD_01");
+    //alert("ScnarioNmCall=> "+ url);
+    dts_DsclList.DataID = encodeURI(url);
+
+	//----W-Craft WebSquare 변환 확인: reset----//
+    dts_DsclList.reset();
+
+    //var vKeyword =  getObjectValue(txb_keyword);		
+    if (scwin.gKeyword.length > 0) {
+        $c.cm.ShowWin(mgrd_Grid);
+    } else {
+        $c.cm.ShowWin(grd_Grid);
+    }
+};
+scwin.PageNoCall = function(vPageNo) {
+    //현재 선택한 페이지번호
+    scwin.vCurrPageNo = vPageNo;
+    let url;
+    //gKeyword =  getObjectValue(txb_keyword);	
+
+    if (scwin.gKeyword.length > 0) {
+        //본문검색 키워드가있을때 ... 
+
+        if ($c.stf.getObjectValue(rdo_MKT_ID) === '4') {
+            chb_ListStatCd.setValue(0);
+        }
+        // 2.  Docruzer으로 검색
+        url = "/DisclosureSearch.do?method=pagingDsclDetailSrchEngine" + "&inputMessageId=DSCLDETAILCOND_IN" + "&outputMessageId=DSCLDETAILLIST_OUT";
+    } else {
+        url = "/DisclosureSearch.do?method=pagingDsclDetailSrch" + "&inputMessageId=DSCLDETAILCOND_IN" + "&outputMessageId=DSCLDETAILLIST_OUT";
+    }
+    url = url + "&ISUR_CD=" + $c.stf.getObjectValue(txb_isur_cd) + "&FROM_DATE=" + $c.stf.getObjectValue(edt_FromDate) + "&TO_DATE=" + $c.stf.getObjectValue(edt_ToDate) + "&DEP_CD=" + scwin.gDepCd + "&UP_DEP_CD=" + scwin.gUpDepCd + "&EMP_NO=" + scwin.gEmpNo + "&LIST_STAT=" + scwin.getChkValue(chb_ListStatCd) + "&LAST_YN=" + scwin.getChkValue(chb_Last) + "&BYPASS_YN=" + scwin.getChkValue(chb_ByPass) + "&FORM_CD=" + $c.stf.getObjectValue(txb_FormCd) + "&FORM_NM=" + $c.stf.getObjectValue(txb_FormNm) + "&KEYWORD=" + $c.stf.replaceAll($c.stf.getObjectValue(txb_keyword), "&", "＆") + "&FSS_UNQ_NO=" + $c.stf.getObjectValue(txb_FssUnqNo) + "&FSS_UNQ_NM=" + $c.stf.getObjectValue(txb_FssUnqNm) + "&ACNTCLS_MM=" + $c.stf.getObjectValue(cmb_month) + "&IND_TP=" + $c.stf.getObjectValue(cmb_IndTp) + "&KOR_YN=" + scwin.getChkValue(chb_kor_yn) + "&ENG_YN=" + scwin.getChkValue(chb_eng_yn) + "&LD_MKT_TP=" + $c.stf.getObjectValue(rdo_MKT_ID) + "&RSN_CLSS_CD_LIST=" + scwin.gRsnClssCdList + "&SCN_NM=" + scwin.gScnNm + "&MAIN_YN=" + scwin.getChkValue(chb_main_yn) + "&ATCH_YN=" + scwin.getChkValue(chb_atch_yn) + "&DEP_TP=" + scwin.getChkValue(chb_dep_tp) + "&BASIS_TP=" + $c.stf.getObjectValue(cmb_Basis) + "&PAGENO=" + scwin.vCurrPageNo + "&PAGESIZE=" + scwin.pageSize + "&SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + $c.stf.info("SCREN_PROCS_TP_CD_01");
+    dts_DsclList.DataID = encodeURI(url);
+
+	//----W-Craft WebSquare 변환 확인: reset----//
+    dts_DsclList.reset();
+
+    //alert("PageNoCall=> "+ url);
+    //var vKeyword =  getObjectValue(txb_keyword);		
+    if (scwin.gKeyword.length > 0) {
+        $c.cm.ShowWin(mgrd_Grid);
+    } else {
+        $c.cm.ShowWin(grd_Grid);
+    }
+};
+scwin.getChkValue = function(obj) {
+    //return (obj.checked) ? "Y" : "N";
+    if (obj.getValue() === "1") {
+        return obj.getValue();
+    } else {
+        return "0";
+    }
+};
+scwin.setChkValue = function(obj, booleanVal) {
+    //return (obj.checked) ? "Y" : "N";
+    obj.setValue(booleanVal);
+};
+//  공시상세검색    엑셀다운로드  -->
+scwin.fn_ExcelDownload = function() {
+    let vKeyword = $c.stf.getObjectValue(txb_keyword);
+    if (vKeyword.length > 0) {
+        $c.stf.doLogSave(scwin.vScrenID, $c.stf.info("SCREN_PROCS_TP_CD_07"));
+        $c.data.downloadGridViewExcel(mgrd_Grid_excel, "공시상세검색 목록(본문내용)", "", "8");
+    } else {
+        /*
+        var edt_FromDate_year = getObjectValue(edt_FromDate).substr(0,4);
+        var edt_FromDate_month = getObjectValue(edt_FromDate).substr(4,2)-1;
+        var edt_FromDate_day = getObjectValue(edt_FromDate).substr(6,2);
+        var edt_FromDate_Date = new Date(edt_FromDate_year,edt_FromDate_month,edt_FromDate_day);
+         
+        var edt_ToDate_year = getObjectValue(edt_ToDate).substr(0,4);
+        var edt_ToDate_month = getObjectValue(edt_ToDate).substr(4,2)-1;
+        var edt_ToDate_day = getObjectValue(edt_ToDate).substr(6,2);
+        var edt_ToDate_Date = new Date(edt_ToDate_year,edt_ToDate_month,edt_ToDate_day);
+
+			
+        // 4년 이상의 기간은 검색 할 수 없다
+        var date_result = ( Date.parse(edt_ToDate_Date) - Date.parse(edt_FromDate_Date) ) / ( 1000*60*60*24 );
+
+        if ( date_result > 1461) {
+        	alert("검색기간은 4년 이상을 초과 할 수 없습니다." );
+        	return;	
+        }
+        */
+
+        showload.style.display = "";
+
+        // 엑셀저장 버튼 클릭 후 바로 버튼 클릭 안되게 처리 20150325
+        btn_Excel.setDisabled(true);
+        btn_Excel.src = "../img/btn_excelsave_d.gif";
+        let url = "";
+
+        //1만건 이상인 경우 메일로 전송
+        if (scwin.totalCnt >= 10000) {
+            scwin.gExcelTp = "2";
+            url = "/DisclosureSearch.do?method=listDsclDetailSrchExcel";
+        } else {
+            scwin.gExcelTp = "1";
+            url = "/DisclosureSearch.do?method=listDsclDetailSrch";
+        }
+        url += "&inputMessageId=DSCLDETAILCOND_IN" + "&outputMessageId=DSCLDETAILLIST_OUT" + "&ISUR_CD=" + $c.stf.getObjectValue(txb_isur_cd) + "&FROM_DATE=" + $c.stf.getObjectValue(edt_FromDate) + "&TO_DATE=" + $c.stf.getObjectValue(edt_ToDate) + "&DEP_CD=" + scwin.gDepCd + "&UP_DEP_CD=" + scwin.gUpDepCd + "&EMP_NO=" + scwin.gEmpNo + "&LIST_STAT=" + scwin.getChkValue(chb_ListStatCd) + "&LAST_YN=" + scwin.getChkValue(chb_Last) + "&BYPASS_YN=" + scwin.getChkValue(chb_ByPass) + "&FORM_CD=" + $c.stf.getObjectValue(txb_FormCd) + "&FORM_NM=" + $c.stf.getObjectValue(txb_FormNm) + "&KEYWORD=" + $c.stf.replaceAll($c.stf.getObjectValue(txb_keyword), "&", "＆") + "&FSS_UNQ_NO=" + $c.stf.getObjectValue(txb_FssUnqNo) + "&FSS_UNQ_NM=" + $c.stf.getObjectValue(txb_FssUnqNm) + "&ACNTCLS_MM=" + $c.stf.getObjectValue(cmb_month) + "&IND_TP=" + $c.stf.getObjectValue(cmb_IndTp) + "&KOR_YN=" + scwin.getChkValue(chb_kor_yn) + "&ENG_YN=" + scwin.getChkValue(chb_eng_yn) + "&LD_MKT_TP=" + $c.stf.getObjectValue(rdo_MKT_ID) + "&MAIN_YN=" + scwin.getChkValue(chb_main_yn) + "&ATCH_YN=" + scwin.getChkValue(chb_atch_yn) + "&DEP_TP=" + scwin.getChkValue(chb_dep_tp) + "&BASIS_TP=" + $c.stf.getObjectValue(cmb_Basis) + "&RSN_CLSS_CD_LIST=" + scwin.gRsnClssCdList + "&SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + $c.stf.info("SCREN_PROCS_TP_CD_07");
+        dts_DsclList_excel.DataID = encodeURI(url);
+
+	//----W-Craft WebSquare 변환 확인: reset----//
+        dts_DsclList_excel.reset();
+    }
+};
+// 그리드에서 클릭 row의 변수셋팅
+scwin.fn_setContnId = function(obj) {
+    scwin.gAcptNo = dts_DsclList.getCellData(eval(obj), "ACPT_NO");
+    scwin.gMainFormCd = dts_DsclList.getCellData(eval(obj), "FORM_CD");
+    scwin.gFormVer = dts_DsclList.getCellData(eval(obj), "FORM_VER");
+    scwin.gIsurCd = dts_DsclList.getCellData(eval(obj), "ISUR_CD");
+
+    //alert("부모창:"+gAcptNo+","+gMainFormCd+","+ gFormVer+","+ gIsurCd);
+
+};
+	//----W-Craft WebSquare 변환 확인: reset----//
+scwin.fn_resetParam = function() {
+    vCurrDate = $c.utils.cGetToday("yyyymmdd"); // 현재날짜
+
+    // 유가 공시팀(26**), 코스닥 공시팀(34**) => 일때만 보여준다.
+    if ($c.session.info("js_dep_cd").substring(0, 2) === '26' || $c.session.info("js_dep_cd").substring(0, 2) === '34') {
+        scwin.gDepCd = "UPTEAM";
+        $c.stf.setObjectValue(cmb_TeamList, scwin.gDepCd);
+    }
+
+
+    // 코넥스 추가를 추가 했었지만 2017.02.17 모든 시장을 보여달라고 해서 삭제함
+    if (scwin.gLdMktTp === '1' || scwin.gLdMktTp === '2') {
+        $c.stf.setObjectValue(rdo_MKT_ID, scwin.gLdMktTp);
+    } else {
+        // 코넥스는 유가, 코스닥도 볼 수 있음
+        if (scwin.gLdMktTp === '6' || scwin.gLdMktTp === '4') {
+            $c.stf.setObjectValue(rdo_MKT_ID, scwin.gLdMktTp);
+        } else {
+            $c.stf.setObjectValue(rdo_MKT_ID, '9');
+        }
+    }
+
+    //채권일 경우 채권상장폐지여부 제외 항목으로 보이게끔 수정 20170310
+    if ($c.stf.getObjectValue(rdo_MKT_ID) === '4') {
+        $c.stf.showObj(label_3, false);
+        $c.stf.showObj(label_24, true);
+        scwin.setChkValue(chb_ListStatCd, "1");
+    } else {
+        $c.stf.showObj(label_3, true);
+        $c.stf.showObj(label_24, false);
+        scwin.setChkValue(chb_ListStatCd, false);
+    }
+
+    //setObjectValue(rdo_MKT_ID, $c.session.info("js_market"));
+
+    $c.stf.setObjectValue(txb_isur_cd, "");
+    $c.stf.setObjectValue(txb_com_abbrv, "");
+    $c.stf.setObjectValue(edt_FromDate, vCurrDate);
+    $c.stf.setObjectValue(edt_ToDate, vCurrDate);
+    $c.stf.setObjectValue(cmb_EmpList, "");
+    //setChkValue(chb_ListStatCd, false);
+    scwin.setChkValue(chb_Last, false);
+    scwin.setChkValue(chb_ByPass, false);
+    $c.stf.setObjectValue(txb_FormCd, "");
+    $c.stf.setObjectValue(txb_FormNm, "");
+    $c.stf.setObjectValue(txb_keyword, "");
+    $c.stf.setObjectValue(txb_FssUnqNo, "");
+    $c.stf.setObjectValue(txb_FssUnqNm, "");
+    $c.stf.setObjectValue(cmb_month, "");
+    $c.stf.setObjectValue(cmb_IndTp, "");
+    scwin.setChkValue(chb_kor_yn, true);
+    scwin.setChkValue(chb_eng_yn, true);
+    scwin.setChkValue(chb_main_yn, true);
+    scwin.setChkValue(chb_atch_yn, true);
+    scwin.setChkValue(chb_dep_tp, true);
+    $c.stf.setObjectValue(cmb_Basis, "2");
+    $c.stf.setObjectValue(cmb_PerPage, "50");
+    $c.stf.setObjectValue(txb_rsn_cnt, "");
+    dts_Dscl_Cond.removeAll();
+    scwin.gRsnClssCdList = "";
+};
+// 공시팀 전체 목록에 추가
+scwin.fn_addDsclTeamAll = function(rowcount, dtsDepComp, dtsDepCompCopy) {
+    dtsDepComp.setCellData(2,"VALUE", 'UPTEAM');		// 
+    dtsDepComp.setCellData(2,"TEXT", '공시팀 전체');
+    dtsDepComp.setCellData(2,"DEP_CD", 'UPTEAM' );		
+    for (let i = 3; i <= rowcount; i++) {
+        dtsDepComp.setCellData(i,"VALUE", dtsDepCompCopy.getCellData(i-1,"VALUE"));		// 
+        dtsDepComp.setCellData(i,"TEXT", dtsDepCompCopy.getCellData(i-1,"TEXT"));	
+        dtsDepComp.setCellData(i,"DEP_CD", dtsDepCompCopy.getCellData(i-1,"DEP_CD"));
+    }
+    dtsDepComp.insertRow();
+    dtsDepComp.setCellData(rowcount+1,"VALUE", dtsDepCompCopy.getCellData(rowcount,"VALUE"));		// 
+    dtsDepComp.setCellData(rowcount+1,"TEXT", dtsDepCompCopy.getCellData(rowcount,"TEXT"));	
+    dtsDepComp.setCellData(rowcount+1,"DEP_CD", dtsDepCompCopy.getCellData(rowcount,"DEP_CD"));	
+};
+// 첨부서류만 선택하고 본문검색을 하고자할때 알림.
+scwin.fn_chkAttchKeyword = function() {
+    let vKeyword = $c.stf.getObjectValue(txb_keyword);
+    if (vKeyword.length > 0) {
+        if (scwin.getChkValue(chb_main_yn) === 0 &&
+            scwin.getChkValue(chb_atch_yn) === 1) {
+            alert('첨부서류만 선택한 후에는 공시본문내용 검색기능을 사용 할 수 없습니다.\n공시본문에서만 내용검색이 가능합니다.');
+            txb_keyword.focus();
+            return false;
+        }
+    }
 };
 ]]></script>
 	</head>
