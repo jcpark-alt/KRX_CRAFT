@@ -1,19 +1,16 @@
-### 📄 생성된 `websquare_conversion_guide.md` 주요 내용 미리보기
-
 # WebSquare XML Conversion Specification & Claude Code Execution Guide
 
-본 문서는 WebSquare XML 파일의 소스 코드를 스캔하여 신규 GCC 공통함수 체계 및 표준 자바스크립트 규칙에 맞게 자동 변환하기 위한 Claude Code 실행 지침서 및 상세 규칙 정의서입니다.
+WebSquare XML 소스를 GCC 공통함수 체계·표준 JS 규칙으로 자동 변환하기 위한 Claude Code 실행 지침서이자 규칙 정의서입니다.
 
 ---
 
 ## 1. 개요 및 변환 목표
 * **목적**: 기존 구조의 WebSquare XML 파일을 분석하여 신규 GCC 공통 표준(컴포넌트 제어, 동적 Submission, 엄격한 타입 비교 등)으로 일괄 자동 변환.
 * **변환 대상**: XML 파일 내의 `<script>` 영역(JavaScript) 및 `<body>` 영역(UI XML 컴포넌트 마크업).
-* **컨텍스트 가이드 파일**:
-    * `D:\workspace\W_Craft_gcc_20260529\src\docs\sbm-generator\README.md` (Submission 치환 가이드)
-    * `D:\workspace\W_Craft_gcc_20260529\src\docs\sbm-generator\sbm-generator.html` (Submission 스크립트 치환 참고)
-    * `D:\workspace\W_Craft_gcc_20260529\src\docs\api\{fil,ins,mgt}\index_transfer.html` (**레거시 → gcc 공통함수 치환 목록**, 모듈별 `DATA` 배열이 단일 출처)
-    * `D:\workspace\W_Craft_gcc_20260529\src\docs\api\gcc\index.html` (gcc 공통함수 `$c.*` API 레퍼런스 — 치환 대상 함수의 시그니처 확인)
+* **컨텍스트 가이드 파일** (repo 루트 기준):
+    * `src/docs/sbm-generator/README.md` · `sbm-generator.html` (Submission 치환 가이드/참고)
+    * `src/docs/api/{fil,ins,mgt}/index_transfer.html` (**레거시 → gcc 치환 목록**, 모듈별 `DATA` 배열이 단일 출처)
+    * `src/docs/api/gcc/index.html` (`$c.*` API 레퍼런스 — 치환 함수 시그니처 확인)
 
 ---
 
@@ -63,11 +60,26 @@
     * 치환 후 더 이상 참조되지 않는 레거시 공통함수 **정의**는 제거 검토 대상입니다. 단, 같은 파일 내 다른 함수가 여전히 참조하면 유지합니다.
     * 비교 연산자 엄격화(규칙 5)와 함께, 치환 결과가 `null`/빈값을 반환할 수 있는 경우 `$c.util.isEmpty()` 로 방어 코드를 보강합니다.
 
+### 규칙 8: `var` 선언의 `const` / `let` 치환
+* 스크립트 영역의 `var` 선언을 블록 스코프 키워드(`const`/`let`)로 치환합니다.
+    * **재할당이 없는 변수** → `const`
+    * **재할당·증감되는 변수, 반복문 카운터** → `let`
+* **판정 기준**: 선언 이후 같은 스코프에서 `=`(재대입)·`++`·`--`·`+=` 등으로 값이 다시 바뀌면 `let`, 한 번만 할당되면 `const`.
+    * *예시:* `var url = ...;`(한 번만 할당) → `const url = ...;` / `var cnt = 0; ... cnt = i;` → `let cnt = 0;`
+* **암묵적 전역 선언화**: `var` 없이 사용된 변수(예: `for (i = 1; i <= n; i++)` 의 `i`)도 명시적으로 선언합니다. 반복문 카운터·누적 변수는 `let`.
+* **치환 시 유의사항(Claude 검토 대상)**:
+    * `var` 의 **함수 스코프 호이스팅**에 의존하는 코드(선언 전 사용, 같은 이름 재선언)는 블록 스코프로 바꾸면 동작이 달라질 수 있으므로 검토 후 치환합니다.
+    * 반복문 내부에서 **클로저가 루프 변수를 캡처**하는 경우, `var`→`let` 전환으로 캡처 동작이 바뀝니다(대개 의도대로 개선되나 확인 필요).
+    * 문자열·주석·정규식 내부의 `var` 는 치환 대상이 아닙니다(리터럴 보호 — 규칙 5 동일 원칙).
+    * 객체/배열 자체를 재대입하지 않고 내부만 변경(`obj.x = 1`, `arr.push(...)`)하는 경우는 `const` 가 적절합니다.
+
 ---
 
 ## 3. 레거시 → gcc 공통함수 치환 매핑표 (Substitution Map)
 
 `src/docs/api/{fil,ins,mgt}/index_transfer.html` 의 `DATA` 배열을 namespace 기준으로 통합한 대표 매핑입니다. (AS-IS = 레거시 함수 / TO-BE = gcc 표준 `$c.*`) 동일 의미의 사본 함수는 슬래시(`/`)로 묶었습니다.
+
+> **프로그램 접근**: 이 표는 사람이 읽는 요약이고, 변환기는 `src/conversion/tools/gcc_mapping.py` 로더로 위 `DATA`(SOT)를 직접 파싱해 사용합니다. `substitution_dict()` 는 **태그 없는 순수 식별자·무충돌** 항목만 담은 자동 1:1 치환 사전(규칙 7)을, `conflicts()` 는 동일 이름이 다른 `$c.*` 로 갈리는 충돌 항목을 돌려줍니다. (`python src/conversion/tools/gcc_mapping.py` 로 요약 확인)
 
 ### 3.1 `$c.str` — 문자열
 
@@ -193,8 +205,9 @@ WebSquare XML 은 `head(xml) → script(JavaScript, CDATA) → body(xml)` 구조
 | 규칙 4 영역 재배치 | SCRIPT | 고정 주석 바운더리 기준 4개 파트 정렬, `gform_onload` 본문 → `onpageload` 이동 후 원정의 삭제 | |
 | 규칙 5 문법/API | SCRIPT | `==`/`!=` → `===`/`!==`, `X.value = v` → `X.setValue(v)` | 문자열·정규식·주석 리터럴 보호 |
 | 규칙 6 Submission | HEAD+SCRIPT | `<xf:submission>` 속성 파싱 → `sbmOptions` 생성, `<xf:submission>` 노드 삭제 | `sbm-generator.html` 변환 로직 이식 |
-| 규칙 7 (1:1) | SCRIPT | **태그 없는** 매핑만 함수명 단어경계 치환 (`fn_Trim(` → `$c.str.trim(`) | §3 매핑표의 *태그 없음* 항목만 |
+| 규칙 7 (1:1) | SCRIPT | **태그 없는** 매핑만 함수명 단어경계 치환 (`fn_Trim(` → `$c.str.trim(`) | `gcc_mapping.substitution_dict()` 사용(태그없음·무충돌) |
 | 규칙 3 (동기화) | SCRIPT+BODY | 이벤트명 소문자화 + `ev:on*` 속성 ↔ 스크립트 함수명 **동시** 수정 | 이름변경 사전(dict) 공유 |
+| 규칙 8 `var`→`const`/`let` | SCRIPT | 재할당 분석: 단일 할당 → `const`, 재할당·카운터 → `let` | 호이스팅·재선언 의존 시 Claude 검토 |
 
 **기계 치환 원칙**
 * **단어경계 매칭**: 함수명 치환은 `\b함수명\s*\(` 처럼 호출부만 매칭하여 부분 문자열 오치환을 막습니다. `replaceAll`·`trim` 등 흔한 이름은 특히 주의(원시 String 메서드와 충돌 가능).
@@ -224,4 +237,3 @@ Python 이 남긴 **"추가 작업 목록"만** Claude Code 로 처리합니다.
 > 역할 분담 요약: **Python = 양·일관성·속도**(결정적 1:1 치환·재배치), **Claude Code = 판단·재설계·검증**(검토/대체 매핑, 통신 재작성, 최종 확인).
 
 ---
-
