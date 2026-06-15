@@ -198,6 +198,9 @@ WebSquare XML 은 `head(xml) → script(JavaScript, CDATA) → body(xml)` 구조
 
 "입력이 같으면 출력이 항상 같은" **결정적(deterministic)** 변환만 Python 으로 일괄 처리합니다. 판단이 필요 없는 1:1 규칙이 대상입니다.
 
+> **참조 구현**: `src/conversion/tools/convert.py` — 영역 분리 + 규칙 1·3·5·7 결정적 치환(문자열/주석/정규식 보호)과 단계 2 리포트 출력. 규칙 7 은 `gcc_mapping.substitution_dict()` 를 단일 출처로 쓰고, 스크립트에서 발견된 검토/대체 태그·충돌 함수는 자동 치환하지 않고 리포트로 분리합니다.
+> 실행: `python src/conversion/tools/convert.py <src.xml> [out.xml]`
+
 | 규칙 | 처리 영역 | Python 처리 방식 | 비고 |
 | --- | --- | --- | --- |
 | 규칙 1 파일명 변수 | SCRIPT | 파일명 추출 → `scwin.vScrenID = "{파일명}";` 최상단 삽입(없을 때만) | 멱등 |
