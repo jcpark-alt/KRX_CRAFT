@@ -22,6 +22,7 @@ CLI:
 import re
 import sys
 import io
+import json
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -446,14 +447,145 @@ def rule4_structure(script, body, report):
     return result, body
 
 
+# ---------- 규칙 6 : Submission → executeDynamic (sbm-generator 로직 이식) ----------
+def _sbm_parse_attrs(open_tag):
+    attrs = {}
+    for m in re.finditer(r'([\w:.-]+)\s*=\s*("([^"]*)"|\'([^\']*)\')', open_tag):
+        attrs[m.group(1)] = m.group(3) if m.group(3) is not None else m.group(4)
+    return attrs
+
+
+def _sbm_parse_data_expr(expr):
+    if not expr:
+        return []
+    expr = expr.strip()
+    m = re.match(r'^data:(?:json|xml)\s*,\s*([\s\S]*)$', expr, re.I)
+    payload = (m.group(1).strip() if m else expr)
+    try:
+        parsed = json.loads(payload)
+    except Exception:
+        return [{"id": payload.strip('"\'').strip(), "key": "", "append": False}]
+    items = parsed if isinstance(parsed, list) else [parsed]
+    out = []
+    for it in items:
+        if isinstance(it, str):
+            out.append({"id": it, "key": "", "append": False})
+        elif isinstance(it, dict):
+            out.append({"id": it.get("id"), "key": it.get("key") or "",
+                        "append": (it.get("action") == "append" or it.get("append") is True)})
+    return [o for o in out if o.get("id")]
+
+
+def _sbm_simpl(items, with_append):
+    parts = []
+    for i in items:
+        s = (i["id"] + "=" + i["key"]) if i["key"] else i["id"]
+        if with_append and i["append"]:
+            s += "|append"
+        parts.append(s)
+    return ",".join(parts)
+
+
+def _sbm_handler(v):
+    v = v.strip()
+    if re.match(r'^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$', v):
+        return v
+    return json.dumps(v, ensure_ascii=False)
+
+
+def _build_sbm_options(attrs):
+    p = ['id: %s' % json.dumps(attrs.get("id", ""), ensure_ascii=False)]
+    if attrs.get("action"):
+        p.append('action: %s' % json.dumps(attrs["action"], ensure_ascii=False))
+    if attrs.get("method") and attrs["method"].lower() != "post":
+        p.append('method: %s' % json.dumps(attrs["method"], ensure_ascii=False))
+    if attrs.get("mode") and attrs["mode"].lower() == "synchronous":
+        p.append('mode: "synchronous"')
+    if attrs.get("mediatype") and attrs["mediatype"].lower() != "application/json":
+        p.append('mediatype: %s' % json.dumps(attrs["mediatype"], ensure_ascii=False))
+    ref = _sbm_parse_data_expr(attrs.get("ref", ""))
+    if ref:
+        p.append('ref: %s' % json.dumps(_sbm_simpl(ref, False), ensure_ascii=False))
+    tgt = _sbm_parse_data_expr(attrs.get("target", ""))
+    if tgt:
+        p.append('target: %s' % json.dumps(_sbm_simpl(tgt, True), ensure_ascii=False))
+    if attrs.get("ev:submit"):
+        p.append('submitHandler: %s' % _sbm_handler(attrs["ev:submit"]))
+    if attrs.get("ev:submitdone"):
+        p.append('submitDoneHandler: %s' % _sbm_handler(attrs["ev:submitdone"]))
+    if attrs.get("ev:submiterror"):
+        p.append('submitErrorHandler: %s' % _sbm_handler(attrs["ev:submiterror"]))
+    if attrs.get("processMsg"):
+        p.append('processMsg: %s' % json.dumps(attrs["processMsg"], ensure_ascii=False))
+    else:
+        p.append('isProcessMsg: false')
+    return "{ " + ", ".join(p) + " }"
+
+
+def rule6_submission(head, script, report):
+    """
+    정적 action + 단순 `$c.sbm.execute(id)` 호출만 `$c.sbm.executeDynamic({...})` 로 변환하고
+    해당 `<xf:submission>` 노드를 삭제. 동적 action(런타임 설정)/속성 변형은 변환하지 않고 스텁과 함께 리포트.
+    """
+    node_re = re.compile(r'<xf:submission\b[\s\S]*?(?:/>|</xf:submission>)')
+    converted, judged, del_spans = [], [], []
+    for mo in node_re.finditer(head):
+        node = mo.group(0)
+        attrs = _sbm_parse_attrs(node.split(">", 1)[0])
+        sid = attrs.get("id")
+        if not sid:
+            continue
+        call_re = re.compile(r'\$c\.sbm\.execute\s*\(\s*(?:' + re.escape(sid)
+                             + r'|"' + re.escape(sid) + r'"|\'' + re.escape(sid) + r'\')\s*\)')
+        smask = code_mask(script)
+        has_call = any(smask[m.start()] for m in call_re.finditer(script))
+        opts = _build_sbm_options(attrs)
+        dynamic = (('getComponentById("%s")' % sid) in script
+                   or re.search(r'(?<![.\w$])' + re.escape(sid) + r'\.action\b', script) is not None
+                   or not attrs.get("action"))
+        if has_call and not dynamic:
+            script = _replace_in_code(script, call_re, lambda m, o=opts: "$c.sbm.executeDynamic(" + o + ")")
+            converted.append(sid)
+            del_spans.append((mo.start(), mo.end()))
+        elif has_call:
+            judged.append((sid, opts))
+
+    # 변환된 submission 노드 삭제(라인 단위로 정리)
+    for s, e in sorted(del_spans, reverse=True):
+        ls = head.rfind("\n", 0, s) + 1
+        le = e
+        if head[ls:s].strip() == "":           # 앞이 들여쓰기뿐이면 라인 시작부터
+            s = ls
+        while le < len(head) and head[le] in " \t":
+            le += 1
+        if le < len(head) and head[le] == "\n":
+            le += 1
+        head = head[:s] + head[le:]
+
+    report["rule6"] = {"converted": converted, "deleted": len(del_spans)}
+    for sid, opts in judged:
+        report["judgment"].append("규칙6 수동 변환: %s (동적 action/속성) → sbmOptions: %s" % (sid, opts))
+    return head, script
+
+
+def _replace_in_code(script, pattern, repl):
+    """코드 영역(문자열/주석 제외)에서만 pattern 을 repl(mo)->str 로 치환."""
+    mask = code_mask(script)
+    res, last = [], 0
+    for mo in pattern.finditer(script):
+        if not mask[mo.start()]:
+            continue
+        res.append(script[last:mo.start()]); res.append(repl(mo)); last = mo.end()
+    res.append(script[last:])
+    return "".join(res)
+
+
 # ---------- 판단 필요 항목 리포트 ----------
 def collect_judgment(script, head, body, report):
-    subs = re.findall(r'<xf:submission\s+id="([^"]+)"', head)
-    if subs:
-        report["judgment"].append("규칙6 Submission(%d): %s → sbmOptions/executeDynamic 재작성 + 노드 삭제" % (len(subs), ", ".join(subs)))
-    execs = re.findall(r'\$c\.sbm\.execute\(([^)]*)\)', script)
-    if execs:
-        report["judgment"].append("$c.sbm.execute %d건 → executeDynamic 검토: %s" % (len(execs), ", ".join(s.strip() for s in execs)))
+    # 규칙6 미변환으로 남은 submission 노드(실행 호출 없음 등)
+    remain = re.findall(r'<xf:submission\s+id="([^"]+)"', head)
+    if remain:
+        report["judgment"].append("미변환 submission 노드(실행 호출 없음/동적): " + ", ".join(remain))
 
     # gcc_mapping 연동: 스크립트에서 발견된 '검토/대체' 태그 / 충돌 함수 → 단계2(Claude) 대상
     rows = gcc_mapping.load_mappings()
@@ -493,7 +625,7 @@ def collect_judgment(script, head, body, report):
 
 # ---------- 파이프라인 ----------
 def convert(raw, filename):
-    report = {"rule1": "", "rule2": 0, "rule2_skip": [], "rule3": [], "rule4": None, "rule4_merge": None, "rule5a": 0, "rule5b": [], "rule7": [], "rule8": {"const": 0, "let": 0}, "judgment": []}
+    report = {"rule1": "", "rule2": 0, "rule2_skip": [], "rule3": [], "rule4": None, "rule4_merge": None, "rule5a": 0, "rule5b": [], "rule6": {"converted": [], "deleted": 0}, "rule7": [], "rule8": {"const": 0, "let": 0}, "judgment": []}
     reg = split_regions(raw)
     if reg is None:
         raise ValueError("SCRIPT(CDATA) 영역을 찾지 못했습니다.")
@@ -502,6 +634,7 @@ def convert(raw, filename):
     s = rule2_globals(s, report)
     s = rule5a_strict_eq(s, report)
     s = rule5b_setvalue(s, report)
+    reg["head"], s = rule6_submission(reg["head"], s, report)
     s = rule8_var(s, report)
     s = rule7_gcc_substitute(s, report)
     s, reg["body"] = rule3_handlers(s, reg["body"], report)
@@ -521,6 +654,9 @@ def print_report(rep, filename):
     print("규칙5b .value= → .setValue() :", len(rep["rule5b"]), "건")
     for s in rep["rule5b"]:
         print("   -", s)
+    print("규칙6 Submission→executeDynamic :", len(rep["rule6"]["converted"]), "건 변환, 노드삭제", rep["rule6"]["deleted"])
+    for sid in rep["rule6"]["converted"]:
+        print("   -", sid)
     print("규칙3 ev:on 핸들러 동기화 :", len(rep["rule3"]), "건")
     for s in rep["rule3"]:
         print("   -", s)
