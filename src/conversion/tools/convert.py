@@ -30,7 +30,11 @@ import gcc_mapping  # noqa: E402
 
 # ---------- 영역 분리 ----------
 def split_regions(raw):
+    # 1) <script ...><![CDATA[ ... ]]></script> (표준)
     m = re.search(r'(<script[^>]*?>\s*<!\[CDATA\[)(.*?)(\]\]>\s*</script>)', raw, re.S)
+    # 2) CDATA 래퍼 없는 <script ...> ... </script> (W-Craft 변환 편차)
+    if not m:
+        m = re.search(r'(<script[^>]*?>)(.*?)(</script>)', raw, re.S)
     if not m:
         return None
     return {
