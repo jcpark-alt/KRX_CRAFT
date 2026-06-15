@@ -566,7 +566,33 @@ def _sbm_handler(v):
     return json.dumps(v, ensure_ascii=False)
 
 
-def _sbm_option_parts(attrs):
+def _gridview_map(body):
+    """body XML 의 <w2:gridView> 에서 {dataCollection ID: gridView id} 매핑을 만든다."""
+    m = {}
+    for tag in re.finditer(r'<w2:gridView\b[^>]*>', body):
+        t = tag.group(0)
+        gid = re.search(r'\bid="([^"]+)"', t)
+        dl = re.search(r'\bdataList="([^"]+)"', t)
+        if not gid or not dl:
+            continue
+        dc = re.sub(r'^data:(?:json|xml)?\s*,?\s*', '', dl.group(1)).strip()
+        dc = dc.split(",")[0].strip().strip('"\'')
+        if dc:
+            m[dc] = gid.group(1)
+    return m
+
+
+def _gridview_for(attrs, gridmap):
+    """submission 의 target dataCollection ID 를 역추적해 매칭되는 gridView id 를 찾는다."""
+    if not gridmap:
+        return None
+    for t in _sbm_parse_data_expr(attrs.get("target", "")):
+        if t["id"] in gridmap:
+            return gridmap[t["id"]]
+    return None
+
+
+def _sbm_option_parts(attrs, gridview=None):
     """sbmOptions 의 'key : value' 항목 리스트(샘플 스타일)."""
     p = ['id : %s' % json.dumps(attrs.get("id", ""), ensure_ascii=False)]
     if attrs.get("action"):
@@ -589,6 +615,8 @@ def _sbm_option_parts(attrs):
         p.append('submitDoneHandler : %s' % _sbm_handler(attrs["ev:submitdone"]))
     if attrs.get("ev:submiterror"):
         p.append('submitErrorHandler : %s' % _sbm_handler(attrs["ev:submiterror"]))
+    if gridview:
+        p.append('gridview : %s' % json.dumps(gridview, ensure_ascii=False))
     if attrs.get("processMsg"):
         p.append('processMsg : %s' % json.dumps(attrs["processMsg"], ensure_ascii=False))
     else:
@@ -596,17 +624,19 @@ def _sbm_option_parts(attrs):
     return p
 
 
-def _build_sbm_options(attrs):
+def _build_sbm_options(attrs, gridview=None):
     """인라인 한 줄 표기(리포트 스텁용)."""
-    return "{ " + ", ".join(_sbm_option_parts(attrs)) + " }"
+    return "{ " + ", ".join(_sbm_option_parts(attrs, gridview)) + " }"
 
 
-def rule6_submission(head, script, report):
+def rule6_submission(head, body, script, report):
     """
-    정적 action + 단순 `$c.sbm.execute(id)` 호출만 `$c.sbm.executeDynamic({...})` 로 변환하고
+    정적 action + 단순 `$c.sbm.execute(id)` 호출만 `$c.sbm.executeDynamic(sbmOptions)` 로 변환하고
     해당 `<xf:submission>` 노드를 삭제. 동적 action(런타임 설정)/속성 변형은 변환하지 않고 스텁과 함께 리포트.
+    target dataCollection ID 를 역추적해 body 의 <w2:gridView> id 를 gridview 로 자동 삽입한다.
     """
     node_re = re.compile(r'<xf:submission\b[\s\S]*?(?:/>|</xf:submission>)')
+    gridmap = _gridview_map(body)
     smask = code_mask(script)
     depth = depth_array(script)
 
@@ -633,10 +663,11 @@ def rule6_submission(head, script, report):
         dynamic = (('getComponentById("%s")' % sid) in script
                    or re.search(r'(?<![.\w$])' + re.escape(sid) + r'\.action\b', script) is not None
                    or not attrs.get("action"))
+        gridview = _gridview_for(attrs, gridmap)
         if dynamic:
-            judged.append((sid, _build_sbm_options(attrs)))
+            judged.append((sid, _build_sbm_options(attrs, gridview)))
             continue
-        parts = _sbm_option_parts(attrs)
+        parts = _sbm_option_parts(attrs, gridview)
         for m in calls:
             ls = script.rfind("\n", 0, m.start()) + 1
             prefix = script[ls:m.start()]
@@ -740,7 +771,7 @@ def convert(raw, filename):
     s = rule2_globals(s, report)
     s = rule5a_strict_eq(s, report)
     s = rule5b_setvalue(s, report)
-    reg["head"], s = rule6_submission(reg["head"], s, report)
+    reg["head"], s = rule6_submission(reg["head"], reg["body"], s, report)
     s = rule8_var(s, report)
     s = rule7_gcc_substitute(s, report)
     s, reg["body"] = rule3_handlers(s, reg["body"], report)

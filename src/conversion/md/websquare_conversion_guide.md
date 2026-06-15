@@ -207,7 +207,7 @@ WebSquare XML 은 `head(xml) → script(JavaScript, CDATA) → body(xml)` 구조
 | 규칙 2 전역변수 이동 | SCRIPT | 최상위 `scwin.X = <리터럴>;` 만 `// 전역 변수 선언` 구역으로 이동 | 호출/참조 RHS(예: `$c.x.f()`)는 실행순서 영향으로 이동 보류·리포트 |
 | 규칙 4 영역 재배치 | SCRIPT | 함수 정의를 init/event/일반 3구역으로 분류·정렬(경계 주석+doc 주석 동반). `gform_onload`→`onpageload` 병합은 안전조건에서만 | 함수 사이/뒤 최상위 실행문 있으면 보류·리포트 |
 | 규칙 5 문법/API | SCRIPT | `==`/`!=` → `===`/`!==`, `X.value = v` → `X.setValue(v)` | 문자열·정규식·주석 리터럴 보호 |
-| 규칙 6 Submission | HEAD+SCRIPT | 정적 action + 단순 `execute(id)` 만, 호출 앞에 `const sbmOptions = {...}` 선언 후 `executeDynamic(sbmOptions)` 로 변환 + 노드 삭제 | 동적 action/속성변형은 sbmOptions 스텁과 함께 리포트(`sbm-generator` 로직 이식) |
+| 규칙 6 Submission | HEAD+SCRIPT | 정적 action + 단순 `execute(id)` 만, 호출 앞에 `const sbmOptions = {...}` 선언 후 `executeDynamic(sbmOptions)` 로 변환 + 노드 삭제. target ID 역추적으로 body `<w2:gridView>` id 를 `gridview` 자동 삽입 | 동적 action/속성변형은 sbmOptions 스텁과 함께 리포트(`sbm-generator` 로직 이식) |
 | 규칙 7 (1:1) | SCRIPT | **태그 없는** 매핑만 함수명 단어경계 치환 (`fn_Trim(` → `$c.str.trim(`) | `gcc_mapping.substitution_dict()` 사용(태그없음·무충돌) |
 | 규칙 3 (동기화) | SCRIPT+BODY | 이벤트명 소문자화 + `ev:on*` 속성 ↔ 스크립트 함수명 **동시** 수정 | 이름변경 사전(dict) 공유 |
 | 규칙 8 `var`→`const`/`let` | SCRIPT | 재할당 분석: 단일 할당 → `const`, 재할당·카운터 → `let` | 호이스팅·재선언 의존 시 Claude 검토 |
@@ -238,5 +238,66 @@ Python 이 남긴 **"추가 작업 목록"만** Claude Code 로 처리합니다.
 4. **(Claude)** 잔존 레거시 호출을 grep 으로 점검하고, 의미를 검증한 뒤 `npm run lint:xml` 로 마무리한다.
 
 > 역할 분담 요약: **Python = 양·일관성·속도**(결정적 1:1 치환·재배치), **Claude Code = 판단·재설계·검증**(검토/대체 매핑, 통신 재작성, 최종 확인).
+
+---
+
+## 📄 가이드라인 추가/수정 내용
+
+### 1. 규칙 6 (Submission 변환 매핑) 상세 업데이트
+
+기존 가이드의 `gridview : "grd_main"`과 같은 고정 기본값 대신, 아래의 **역추적 매핑 규칙**을 적용합니다.
+
+* **`gridview` 자동 매핑 규칙**:
+1. `sbmOptions.target`에 지정된 dataCollection ID를 추출합니다. (예: `dlt_FaqList=body` 또는 `data:json,dlt_FaqList` 형태에서 순수 ID인 `dlt_FaqList`만 추출)
+2. `<body>` XML 영역 전체를 스캔하여, `<w2:gridView>` 컴포넌트 중 `dataList` 속성에 해당 ID가 포함되어 있는지 찾습니다.
+* *예시 매칭 조건:* `<w2:gridView ... dataList="data:dlt_FaqList" ...>` 또는 `dataList="dlt_FaqList"`
+
+
+3. 일치하는 `<w2:gridView>` 컴포넌트를 찾으면, 해당 태그의 **`id` 속성 값**을 추출합니다. (예: `id="grd_jongmok"`)
+4. 추출한 ID를 `sbmOptions` 객체의 **`gridview` 속성**으로 추가합니다. 만약 매핑된 `gridView`가 없다면 해당 속성은 생략하거나 가이드라인에 따라 처리합니다.
+
+
+
+#### [치환 적용 전/후 예시]
+
+* **body xml 영역 (스캔 대상)**
+
+```xml
+<w2:gridView id="grd_jongmok" dataList="data:dlt_FaqList" ...>
+</w2:gridView>
+
+```
+
+* **변경 후 스크립트 코드**
+
+```javascript
+const sbmOptions = {
+    id : "sbm_SelectAfLoginFaqList",
+    action : "/api/discls/support/faq/select-list",
+    method : "get",
+    ref : "dma_SearchReq",
+    target : "dlt_FaqList=body",
+    submitDoneHandler : scwin.sbm_SelectFaqList_submitdone,
+    gridview : "grd_jongmok", // body xml의 w2:gridView id를 역추적하여 자동 삽입
+    isProcessMsg : false
+};
+$c.sbm.executeDynamic(sbmOptions);
+
+```
+
+---
+
+## 🤖 Claude Code용 추가 프롬프트 텍스트 (영문 가이드 추가본)
+
+기존 Claude Code 프롬프트의 **9번 항목**을 아래와 같이 구체화하여 실행하시면 Claude가 XML과 스크립트를 더 정확하게 교차 분석합니다. 기존 프롬프트에 이 내용을 덮어쓰거나 추가해 주세요.
+
+```text
+9. Advanced Submission Mapping:
+   - When generating 'sbmOptions' from <xf:submission>, extract the pure DataList ID from the 'target' attribute (e.g., extract 'dlt_FaqList' from 'dlt_FaqList=body' or 'data:json,dlt_FaqList').
+   - Scan the <body> XML area to find a <w2:gridView> component whose 'dataList' attribute matches this extracted DataList ID (e.g., dataList="data:dlt_FaqList").
+   - If a matching <w2:gridView> is found, extract its 'id' attribute (e.g., id="grd_jongmok") and dynamically add it to 'sbmOptions' as the 'gridview' property (e.g., gridview : "grd_jongmok").
+   - Finally, replace '$c.sbm.execute' with '$c.sbm.executeDynamic(sbmOptions);' and completely remove the corresponding <xf:submission> XML element nodes from the <head>.
+
+```
 
 ---
