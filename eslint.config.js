@@ -13,7 +13,7 @@ const globals = require("globals");
 // `no-undef` from firing on them.
 module.exports = [
   {
-    ignores: ["node_modules/**", "coverage/**", "tools/wsxml_lint/**"],
+    ignores: ["node_modules/**", "coverage/**", "tools/wsxml_lint/**", "src/engine/**"],
   },
   {
     files: ["**/*.js"],
