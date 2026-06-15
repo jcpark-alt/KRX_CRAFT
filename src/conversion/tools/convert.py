@@ -95,6 +95,26 @@ def code_mask(code):
     return mask
 
 
+def depth_array(code):
+    """각 위치 직전의 괄호 중첩 깊이. (코드 영역만 카운트, 문자열/주석 무시)"""
+    mask = code_mask(code)
+    depth = [0] * (len(code) + 1)
+    d = 0
+    for i, ch in enumerate(code):
+        depth[i] = d
+        if mask[i]:
+            if ch in "([{":
+                d += 1
+            elif ch in ")]}":
+                d -= 1
+    depth[len(code)] = d
+    return depth
+
+
+# 이동 가능한 전역 변수의 RHS(순수 리터럴만). 호출/참조/연산식은 제외(실행순서 영향).
+_LITERAL_RE = re.compile(r'^(?:"[^"]*"|\'[^\']*\'|-?\d+(?:\.\d+)?|true|false|null|undefined|\[\s*\]|\{\s*\})$')
+
+
 # ---------- 규칙별 변환 ----------
 def rule1_vscrenid(code, filename, report):
     if re.search(r'scwin\.vScrenID\s*=', code):
@@ -102,6 +122,45 @@ def rule1_vscrenid(code, filename, report):
         return code
     report["rule1"] = '삽입'
     return '\nscwin.vScrenID = "%s";\n' % filename + code
+
+
+def rule2_globals(code, report):
+    """
+    최상위(depth 0) 전역 변수 선언 `scwin.X = <리터럴>;` 을 vScrenID 하단
+    `// 전역 변수 선언` 구역으로 모은다. 호출/참조 RHS 는 이동하지 않고 리포트로 분리.
+    """
+    if not re.search(r'scwin\.vScrenID\s*=', code):
+        return code  # 규칙1 선행 필요
+    depth = depth_array(code)
+    decl = re.compile(r'(?m)^[ \t]*scwin\.([A-Za-z_$][\w$]*)\s*=\s*(.+?);[ \t]*(?://[^\n]*)?[ \t]*\r?\n?')
+    moved, spans, skipped = [], [], []
+    for mo in decl.finditer(code):
+        name, rhs = mo.group(1), mo.group(2).strip()
+        if name == "vScrenID" or depth[mo.start()] != 0:
+            continue
+        if not _LITERAL_RE.match(rhs):
+            if "function" not in rhs and "=>" not in rhs:   # 함수정의는 전역변수 아님(무시)
+                skipped.append("scwin.%s = %s" % (name, rhs[:48]))
+            continue
+        moved.append(mo.group(0).strip())
+        spans.append((mo.start(), mo.end()))
+
+    if skipped:
+        report["rule2_skip"] = skipped
+    if not moved:
+        return code
+
+    res = code
+    for s, e in sorted(spans, reverse=True):
+        res = res[:s] + res[e:]
+    # 기존 '// 전역 변수 선언' 주석 제거(중복 방지) 후 vScrenID 바로 아래에 재삽입
+    res = re.sub(r'(?m)^[ \t]*//[ \t]*전역 변수 선언[ \t]*\r?\n?', '', res)
+    a = re.search(r'scwin\.vScrenID\s*=\s*[^;\n]*;[ \t]*(?://[^\n]*)?\r?\n?', res)
+    at = a.end()
+    block = "// 전역 변수 선언\n" + "\n".join(moved) + "\n"
+    res = res[:at] + block + res[at:]
+    report["rule2"] = len(moved)
+    return res
 
 
 def rule5a_strict_eq(code, report):
@@ -143,6 +202,84 @@ def rule3_handlers(script, body, report):
         script = re.sub(r'(scwin\.)' + re.escape(nm) + r'\b', r'\1' + new, script)
         report["rule3"].append("%s -> %s" % (nm, new))
     return script, body
+
+
+def _is_reassigned(code, mask, name):
+    """name 이 선언 이후 재할당/증감되는지(코드 영역에서). 불확실하면 True(=let) 쪽으로 보수적."""
+    esc = re.escape(name)
+    # 대입(=, +=, -=, ...) — 선언의 'name =' 한 건은 정상이므로 2건 이상이면 재할당
+    eq = re.compile(r'(?<![.\w$])' + esc + r'\s*(?:=(?!=)|[-+*/%&|^]=|<<=|>>=)')
+    inc = re.compile(r'(?<![.\w$])' + esc + r'\s*(?:\+\+|--)|(?:\+\+|--)\s*' + esc + r'(?![\w$])')
+    eq_n = inc_n = 0
+    pos = 0
+    for txt, is_code in segments(code):
+        if is_code:
+            eq_n += len(eq.findall(txt))
+            inc_n += len(inc.findall(txt))
+        pos += len(txt)
+    return (eq_n > 1) or (inc_n > 0)
+
+
+def rule8_var(code, report):
+    """var → const/let. 단일·초기화·미재할당만 const, 그 외(다중/구조분해/무초기화/재할당/for) 는 let."""
+    mask = code_mask(code)
+    n = len(code)
+    edits = []  # (start, end, keyword)
+    for mo in re.finditer(r'(?<![.\w$])var(?![\w$])', code):
+        if not mask[mo.start()]:
+            continue
+        # for (var ...) 루프 변수 → let
+        in_for = re.search(r'\bfor\s*\(\s*$', code[:mo.start()]) is not None
+        # var 뒤 첫 토큰 분석
+        i = mo.end()
+        while i < n and (not mask[i] or code[i].isspace()):
+            i += 1
+        if i >= n:
+            continue
+        if code[i] in "{[":          # 구조분해 → let
+            edits.append((mo.start(), mo.end(), "let")); continue
+        nm = re.match(r'[A-Za-z_$][\w$]*', code[i:])
+        if not nm:
+            continue
+        name = nm.group(0)
+        j = i + len(name)
+        # 이름 뒤 첫 의미 문자로 초기화(=) 여부 판정
+        while j < n and (not mask[j] or code[j].isspace()):
+            j += 1
+        has_init = (j < n and code[j] == "=" and code[j:j+2] != "==")
+        # 다중 선언 여부: 문장 끝(;)까지 최상위 콤마 존재?
+        depth, k, multi = 0, j, False
+        while k < n:
+            if not mask[k]:
+                k += 1; continue
+            c = code[k]
+            if c in "([{":
+                depth += 1
+            elif c in ")]}":
+                if depth == 0:
+                    break
+                depth -= 1
+            elif c == ";" and depth == 0:
+                break
+            elif c == "," and depth == 0:
+                multi = True; break
+            k += 1
+        if in_for or multi or (not has_init):
+            kw = "let"
+        else:
+            kw = "let" if _is_reassigned(code, mask, name) else "const"
+        edits.append((mo.start(), mo.end(), kw))
+
+    if not edits:
+        return code
+    res, last, c_n, l_n = [], 0, 0, 0
+    for s, e, kw in edits:
+        res.append(code[last:s]); res.append(kw); last = e
+        if kw == "const": c_n += 1
+        else: l_n += 1
+    res.append(code[last:])
+    report["rule8"] = {"const": c_n, "let": l_n}
+    return "".join(res)
 
 
 def rule7_gcc_substitute(code, report):
@@ -207,20 +344,24 @@ def collect_judgment(script, head, body, report):
         report["judgment"].append("window.event.keyCode (IE 레거시) → 표준 이벤트 인자 검토")
     if re.search(r'\bdebugger\b', script):
         report["judgment"].append("debugger; 잔존 → 제거 검토")
-    if re.search(r'\bvar\b', script):
-        report["judgment"].append("규칙8 var 선언 → const/let (재할당 분석 필요, Claude 검토)")
+    # 규칙8 후속: var 없이 대입되는 암묵적 전역(예: for (i = ...))은 명시 선언 검토 대상
+    implicit = sorted(set(re.findall(r'\bfor\s*\(\s*([A-Za-z_$][\w$]*)\s*=(?!=)', script)))
+    if implicit:
+        report["judgment"].append("암묵적 전역 루프변수(var 없음) → let 명시 선언 검토: " + ", ".join(implicit))
 
 
 # ---------- 파이프라인 ----------
 def convert(raw, filename):
-    report = {"rule1": "", "rule3": [], "rule5a": 0, "rule5b": [], "rule7": [], "judgment": []}
+    report = {"rule1": "", "rule2": 0, "rule2_skip": [], "rule3": [], "rule5a": 0, "rule5b": [], "rule7": [], "rule8": {"const": 0, "let": 0}, "judgment": []}
     reg = split_regions(raw)
     if reg is None:
         raise ValueError("SCRIPT(CDATA) 영역을 찾지 못했습니다.")
     s = reg["script"]
     s = rule1_vscrenid(s, filename, report)
+    s = rule2_globals(s, report)
     s = rule5a_strict_eq(s, report)
     s = rule5b_setvalue(s, report)
+    s = rule8_var(s, report)
     s = rule7_gcc_substitute(s, report)
     s, reg["body"] = rule3_handlers(s, reg["body"], report)
     collect_judgment(s, reg["head"], reg["body"], report)
@@ -231,6 +372,9 @@ def convert(raw, filename):
 def print_report(rep, filename):
     print("==== [단계1] Python 기계 치환 리포트 :", filename, "====")
     print("규칙1 vScrenID :", rep["rule1"])
+    print("규칙2 전역변수 이동 :", rep["rule2"], "건", ("(이동보류 %d건)" % len(rep["rule2_skip"])) if rep["rule2_skip"] else "")
+    for s in rep["rule2_skip"]:
+        print("   (보류) -", s)
     print("규칙5a ==/!= → ===/!== :", rep["rule5a"], "건")
     print("규칙5b .value= → .setValue() :", len(rep["rule5b"]), "건")
     for s in rep["rule5b"]:
@@ -241,6 +385,7 @@ def print_report(rep, filename):
     print("규칙7 레거시→gcc 치환 :", len(rep["rule7"]), "건")
     for s in rep["rule7"]:
         print("   -", s)
+    print("규칙8 var→const/let : const %d, let %d" % (rep["rule8"]["const"], rep["rule8"]["let"]))
     print("\n==== [단계2 입력] Claude Code 보강 필요 항목 ====")
     for s in rep["judgment"]:
         print(" * " + s)

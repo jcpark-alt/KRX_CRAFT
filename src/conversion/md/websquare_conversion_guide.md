@@ -204,7 +204,7 @@ WebSquare XML 은 `head(xml) → script(JavaScript, CDATA) → body(xml)` 구조
 | 규칙 | 처리 영역 | Python 처리 방식 | 비고 |
 | --- | --- | --- | --- |
 | 규칙 1 파일명 변수 | SCRIPT | 파일명 추출 → `scwin.vScrenID = "{파일명}";` 최상단 삽입(없을 때만) | 멱등 |
-| 규칙 2 전역변수 이동 | SCRIPT | `scwin.X = ...;` 전역 선언을 `// 전역 변수 선언` 구역으로 이동 | |
+| 규칙 2 전역변수 이동 | SCRIPT | 최상위 `scwin.X = <리터럴>;` 만 `// 전역 변수 선언` 구역으로 이동 | 호출/참조 RHS(예: `$c.x.f()`)는 실행순서 영향으로 이동 보류·리포트 |
 | 규칙 4 영역 재배치 | SCRIPT | 고정 주석 바운더리 기준 4개 파트 정렬, `gform_onload` 본문 → `onpageload` 이동 후 원정의 삭제 | |
 | 규칙 5 문법/API | SCRIPT | `==`/`!=` → `===`/`!==`, `X.value = v` → `X.setValue(v)` | 문자열·정규식·주석 리터럴 보호 |
 | 규칙 6 Submission | HEAD+SCRIPT | `<xf:submission>` 속성 파싱 → `sbmOptions` 생성, `<xf:submission>` 노드 삭제 | `sbm-generator.html` 변환 로직 이식 |
