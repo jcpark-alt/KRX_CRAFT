@@ -291,7 +291,7 @@ scwin.openMenu = function (menuNm, url, menuCode, paramObj, option) {
 
     // client에서 url 숨기기 메뉴일 경우에는 새 창으로 띄우기 적용 
     if ($c.util.isEmpty(url)) {
-        $c.win.alert("메뉴에 프로그램이 등록되지 않았습니다.");
+        //$c.win.alert("메뉴에 프로그램이 등록되지 않았습니다.");	//필요시 오픈
         return false;
     } if (url == "/") {
         const url = document.location.href + "/";
@@ -299,7 +299,6 @@ scwin.openMenu = function (menuNm, url, menuCode, paramObj, option) {
         return false;
     } else {
         menuCode = menuCode || "";
-        const layout = $p.main().main.getLayoutId();
         let tmpUrl;
         let menuCodeParm = menuCode;
         let frameMode = '';
@@ -310,7 +309,6 @@ scwin.openMenu = function (menuNm, url, menuCode, paramObj, option) {
         if (url.indexOf("/") !== 0) {
             url = "/" + url;
         }
-        url = $c.sbm.getContextPath() + url;
 
         if ((typeof paramObj !== "undefined") && (paramObj !== null)) {
             data = paramObj;
@@ -334,126 +332,47 @@ scwin.openMenu = function (menuNm, url, menuCode, paramObj, option) {
             fixed = option.fixed;
         }
 
-        if (layout == "T") {
-            const tabObj = {
-                closable: closable, // 탭 닫기 기능 제공
-                openAction: "select", // exist 는 기존 탭을 갱신, new 는 항상 새로, select는 동일 id 가 존재하면 선택, last: 기존 tab을 마지막 tab으로 이동후 선택
-                label: menuNm
-            };
+		//start 동일메뉴 재오픈 체크
+		let curParamData = $p.main().pfm_layout.scope.$p.getParameter("paramData") || {};
+		let curMenuInfo = curParamData["menuInfo"];
+		if (curMenuInfo){
+			let curMenuCd = curMenuInfo["menuCode"];
+			if (curMenuCd == menuCode){
+				//이미 열려있는 메뉴면 리턴처리.
+				return false;
+			}
+		}
+		//end
+		const isClose = $p.main().main.closeBeforePage($p.main().pfm_layout.getWindow().$p.getFrame());
 
-            const contObj = {
-                frameMode: "pageFrame",
-                scope: true,
-                src: url,
-                alwaysDraw: false,
-                title: menuNm,
-                dataObject: {
-                    type: "json",
-                    name: "paramData",
-                    data: data
-                }
-            };
+		if (isClose) {
+			const programCd = $p.top().wfm_gnb.getWindow().dlt_menu.getMatchedColumnData("SRC_PATH", url, "PROGRAM_CD");
+			data.menuInfo.programCd = programCd[0];
 
-            // tabObj의 openAction의 last값의 동작 특이 사항으로 선택이 되지 않은 경우 선택하는 로직 추가
-            return Promise.resolve().then(function () {
-                return $p.main().tac_layout.addTab(menuCode, tabObj, contObj);
-            }).then(function (tabId) {
-                $p.main().tac_layout.setSelectedTabIndex(tabId);
-                return tabId;
-            }).then(function (tabId) {
-                // history에 화면 전환했던 프로그램 코드 저장
-                if (!$c.util.isEmpty(option) && option.isHistory && !$c.util.isEmpty(menuCode)) {
-                    $c.win.pushState(data);
-                }
-                return tabId;
-            });
+			// history에 화면 전환했던 프로그램 코드 저장
+			if (!$c.util.isEmpty(option) && option.isHistory && !$c.util.isEmpty(menuCode)) {
+				$c.win.pushState(data);
+			}
 
-        } else if (layout == "M") {
-            const options = {
-                title: menuNm,
-                src: url,
-                windowTitle: menuNm,
-                windowId: menuCode,
-                openAction: "selectWindow",
-                frameMode: "pageFrame",
-                fixed: (fixed === true) ? true : false,
-                _closable: (closable === false) ? false : true,
-                closeAction: function (title) {
-                    const winScope = $p.main().wdc_main.getWindowByUniqueId(this.id);
-                    if (winScope._options != undefined && winScope._options._closable === false) {
-                        return false;
-                    } else {
-                        const isOnbeforecloseall = $p.main().wdc_main.getUserData("isOnbeforeCloseAll");
+			const param = {
+				dataObject: {
+					type: "json",
+					name: "paramData",
+					data: data
+				}
+			};
 
-                        if ((typeof isOnbeforecloseall === "undefined") || (isOnbeforecloseall === false)) {
-                            const isClose = $p.main().main.closeBeforePage(winScope.$p.getFrame());
-                            if (isClose === false) {
-                                $p.main().wdc_main.setFocus($p.main().wdc_main.getSelectedIndex());
-                            }
-                            $p.main().wdc_main.setUserData("isOnbeforeCloseAll", false);
-                            return isClose;
-                        }
+			return Promise.resolve().then(function () {
+				$p.$('.gnb_menu li').removeClass('on');
+				$p.parent().wfm_gnb.removeClass('active');
+				
+				$p.parent().grp_wrap.removeClass('noside'); // 업무화면용 레이아웃 적용 (Side 노출)
 
-                        return true;
-                    }
-                },
-                dataObject: {
-                    type: "json",
-                    name: "paramData",
-                    data: data
-                }
-            }
-
-            return Promise.resolve().then(function () {
-                $p.main().wdc_main.createWindow(options);
-                return options;
-            }).then(function (options) {
-                let winScope = $p.main().wdc_main.getWindow(options.windowId);
-                winScope._options = { _closable: options._closable };
-
-                // history에 화면 전환했던 프로그램 코드 저장
-                if (!$c.util.isEmpty(option) && option.isHistory && !$c.util.isEmpty(menuCode)) {
-                    $c.win.pushState(data);
-                }
-            });
-        } else if (layout == "S") {
-            //start 동일메뉴 재오픈 체크
-            let curParamData = $p.main().pfm_layout.scope.$p.getParameter("paramData") || {};
-            let curMenuInfo = curParamData["menuInfo"];
-            if (curMenuInfo){
-                let curMenuCd = curMenuInfo["menuCode"];
-                if (curMenuCd == menuCode){
-                    //이미 열려있는 메뉴면 리턴처리.
-                    return false;
-                }
-            }
-            //end
-            const isClose = $p.main().main.closeBeforePage($p.main().pfm_layout.getWindow().$p.getFrame());
-
-            if (isClose) {
-                const programCd = $p.main().pfm_side.getWindow().dlt_menu.getMatchedColumnData("SRC_PATH", url, "PROGRAM_CD");
-                data.menuInfo.programCd = programCd[0];
-
-                // history에 화면 전환했던 프로그램 코드 저장
-                if (!$c.util.isEmpty(option) && option.isHistory && !$c.util.isEmpty(menuCode)) {
-                    $c.win.pushState(data);
-                }
-
-                const param = {
-                    dataObject: {
-                        type: "json",
-                        name: "paramData",
-                        data: data
-                    }
-                };
-
-                return Promise.resolve().then(function () {
-                    return $p.main().pfm_layout.setSrc(url, param);
-                });
-            } else {
-                return false;
-            }
-        }
+				return $p.main().pfm_layout.setSrc(url, param);
+			});
+		} else {
+			return false;
+		}
     }
     return false;
 };
@@ -973,11 +892,13 @@ scwin.setHistoryBackEvent = function () {
  * @example $c.win.pushState(option.dataObject.data);
  */
 scwin.pushState = function (data) {
+    / * 정책 미정으로 주석 처리
     if (data.menuInfo.menuCode === "MAIN") {
         history.pushState({ "data": data }, data.menuInfo.menuNm, $c.sbm.getContextPath().replace(/\/$/, ""));
     } else {
         history.pushState({ "data": data }, data.menuInfo.menuNm, "?menuCd=" + data.menuInfo.menuCode);
     }
+    */
 };
 
 /**
