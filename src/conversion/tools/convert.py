@@ -291,9 +291,68 @@ def rule8_var(code, report):
     return "".join(res)
 
 
+_OBSOLETE_CM = "ShowWin|ShowNoData|CloseWin|ShowTrWin|CloseTrWin"
+
+
+def rule9_remove_obsolete(code, report):
+    """
+    불필요 공통함수 호출($c.cm.ShowWin/ShowNoData/CloseWin/ShowTrWin/CloseTrWin)을
+    단독 statement 라인 단위로 제거(활성 코드 + 주석처리된 W-Craft 흔적 모두).
+    - 활성 호출은 문자열 내부면 스킵(리터럴 보호).
+    - 직전 줄이 중괄호 없는 제어문 헤더(if/for/while/else …)) 이면 본문 손상 방지를 위해 보류·리포트.
+    """
+    mask = code_mask(code)
+    pat = re.compile(r'(?m)^[ \t]*(/+[ \t]*)?\$c\.cm\.(?:' + _OBSOLETE_CM + r')\b[^\n]*\n?')
+    spans, removed, skipped = [], 0, []
+    for mo in pat.finditer(code):
+        commented = bool(mo.group(1))
+        cpos = mo.start() + mo.group(0).index("$c.cm.")
+        if not commented:
+            if not mask[cpos]:
+                continue  # 문자열/비코드 내부
+            prev_lines = [l for l in code[:mo.start()].splitlines() if l.strip() != ""]
+            prevline = prev_lines[-1].strip() if prev_lines else ""
+            braceless = (prevline == "else"
+                         or (re.match(r'^(if|for|while|else\s+if|else)\b', prevline)
+                             and prevline.endswith(")") and not prevline.endswith("{")))
+            if braceless:
+                skipped.append(prevline[:40])
+                continue
+        spans.append((mo.start(), mo.end()))
+        removed += 1
+    for s, e in sorted(spans, reverse=True):
+        code = code[:s] + code[e:]
+    report["rule9"] = removed
+    if skipped:
+        report["judgment"].append("규칙9 제거 보류(중괄호 없는 제어문 본문): " + ", ".join(skipped))
+    return code
+
+
+def _defined_function_names(code):
+    """스크립트에서 함수로 '선언/정의'된 이름 집합. (이 이름들은 rule7 gcc 치환에서 제외)"""
+    names = set()
+    patterns = [
+        r'(?<![.\w$])([A-Za-z_$][\w$]*)\s*[:=]\s*(?:async\s+)?function\b',     # NAME = function / NAME: function
+        r'\bscwin\.([A-Za-z_$][\w$]*)\s*=\s*(?:async\s+)?function\b',          # scwin.NAME = function
+        r'(?<![.\w$])([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?\([^()]*\)\s*=>',   # NAME = (..) =>
+        r'\bscwin\.([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?\([^()]*\)\s*=>',     # scwin.NAME = (..) =>
+        r'\bfunction\s+([A-Za-z_$][\w$]*)\s*\(',                               # function NAME(
+    ]
+    for pat in patterns:
+        for m in re.finditer(pat, code):
+            names.add(m.group(1))
+    return names
+
+
 def rule7_gcc_substitute(code, report):
-    """substitution_dict() 의 함수 호출부를 단어경계로 치환(코드 세그먼트만, 메서드 호출 .fn() 제외)."""
+    """substitution_dict() 의 함수 호출부를 단어경계로 치환(코드 세그먼트만, 메서드 호출 .fn() 제외).
+    파일 내에 함수로 선언/정의된 이름은 치환에서 제외한다(로컬 정의 우선, 선언부 손상 방지)."""
     sub = gcc_mapping.substitution_dict()
+    defined = _defined_function_names(code)
+    excluded = sorted(n for n in sub if n in defined)
+    if excluded:
+        sub = {k: v for k, v in sub.items() if k not in defined}
+        report["rule7_excluded"] = excluded
     mask = code_mask(code)
     # 길이가 긴 이름부터(부분 겹침 방지)
     names = sorted(sub, key=len, reverse=True)
@@ -448,19 +507,42 @@ def rule4_structure(script, body, report):
 
 
 def align_wcraft(script, report=None):
-    """`//----W-Craft ...` 마커 주석을 맨앞(컬럼 0)으로 정렬(앞 들여쓰기 제거). 문자열 내부는 보호. 멱등."""
+    """`//----W-Craft ...` 마커 주석을 **바로 아래 코드 라인의 들여쓰기**에 맞춰 정렬. 문자열 내부는 보호. 멱등."""
     mask = code_mask(script)
-    pat = re.compile(r'(?m)^([ \t]+)(//-+\s*W-Craft[^\n]*)$')
-    out, last, cnt = [], 0, 0
-    for mo in pat.finditer(script):
-        if not mask[mo.start(1)]:   # 문자열/비코드 영역이면 스킵
+    lines = script.split("\n")
+    offs, p = [], 0
+    for ln in lines:
+        offs.append(p); p += len(ln) + 1
+    marker_re = re.compile(r'^([ \t]*)(//-+\s*W-Craft.*)$')
+
+    def indent_of(s):
+        return s[:len(s) - len(s.lstrip())]
+
+    cnt = 0
+    for i, ln in enumerate(lines):
+        m = marker_re.match(ln)
+        if not m:
             continue
-        out.append(script[last:mo.start()]); out.append(mo.group(2)); last = mo.end()
-        cnt += 1
-    out.append(script[last:])
+        st = offs[i]
+        if st - 1 >= 0 and st - 1 < len(mask) and not mask[st - 1]:
+            continue   # 직전 개행이 비코드(문자열 내부) → 스킵
+        # 바로 아래의 비공백·비마커 코드 라인 들여쓰기를 따른다
+        target = None
+        for k in range(i + 1, len(lines)):
+            s = lines[k]
+            if s.strip() == "" or marker_re.match(s):
+                continue
+            target = indent_of(s)
+            break
+        if target is None:
+            continue
+        new = target + m.group(2)
+        if new != ln:
+            lines[i] = new
+            cnt += 1
     if report is not None:
         report["wcraft"] = cnt
-    return "".join(out)
+    return "\n".join(lines)
 
 
 def format_script(script):
@@ -762,7 +844,7 @@ def collect_judgment(script, head, body, report):
 
 # ---------- 파이프라인 ----------
 def convert(raw, filename):
-    report = {"rule1": "", "rule2": 0, "rule2_skip": [], "rule3": [], "rule4": None, "rule4_merge": None, "rule5a": 0, "rule5b": [], "rule6": {"converted": [], "deleted": 0}, "rule7": [], "rule8": {"const": 0, "let": 0}, "wcraft": 0, "judgment": []}
+    report = {"rule1": "", "rule2": 0, "rule2_skip": [], "rule3": [], "rule4": None, "rule4_merge": None, "rule5a": 0, "rule5b": [], "rule6": {"converted": [], "deleted": 0}, "rule7": [], "rule8": {"const": 0, "let": 0}, "rule9": 0, "wcraft": 0, "judgment": []}
     reg = split_regions(raw)
     if reg is None:
         raise ValueError("SCRIPT(CDATA) 영역을 찾지 못했습니다.")
@@ -772,6 +854,7 @@ def convert(raw, filename):
     s = rule5a_strict_eq(s, report)
     s = rule5b_setvalue(s, report)
     reg["head"], s = rule6_submission(reg["head"], reg["body"], s, report)
+    s = rule9_remove_obsolete(s, report)
     s = rule8_var(s, report)
     s = rule7_gcc_substitute(s, report)
     s, reg["body"] = rule3_handlers(s, reg["body"], report)
@@ -810,6 +893,7 @@ def print_report(rep, filename):
     for s in rep["rule7"]:
         print("   -", s)
     print("규칙8 var→const/let : const %d, let %d" % (rep["rule8"]["const"], rep["rule8"]["let"]))
+    print("규칙9 불필요 $c.cm.* 호출 제거 :", rep["rule9"], "건")
     print("\n==== [단계2 입력] Claude Code 보강 필요 항목 ====")
     for s in rep["judgment"]:
         print(" * " + s)

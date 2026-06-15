@@ -58,6 +58,7 @@ WebSquare XML 소스를 GCC 공통함수 체계·표준 JS 규칙으로 자동 �
     * 인자 순서·개수가 레거시와 다를 수 있으므로, 치환 전 gcc 함수 시그니처(`src/docs/api/gcc/index.html`)를 반드시 확인합니다.
     * 동일 AS-IS 함수가 여러 모듈/파일에 **사본**(`common.xml`, `function.xml`, `utils.xml` 등)으로 중복 존재할 수 있습니다. 사본 정의를 직접 고치지 말고, 호출부를 gcc 공통함수 호출로 바꿉니다.
     * 치환 후 더 이상 참조되지 않는 레거시 공통함수 **정의**는 제거 검토 대상입니다. 단, 같은 파일 내 다른 함수가 여전히 참조하면 유지합니다.
+    * **함수 선언/정의명은 치환에서 제외**합니다. 파일 내에 함수로 선언/정의된 이름(`scwin.JongmokName = function(...)`, `function isNum(...)`, `NAME = (...) =>` 등)이 매핑표 키와 겹치더라도, 로컬 정의 우선 원칙에 따라 해당 이름은 gcc 치환 대상에서 빼고 선언부·호출부를 그대로 둡니다(선언부 손상·동작 불일치 방지).
     * 비교 연산자 엄격화(규칙 5)와 함께, 치환 결과가 `null`/빈값을 반환할 수 있는 경우 `$c.util.isEmpty()` 로 방어 코드를 보강합니다.
 
 ### 규칙 8: `var` 선언의 `const` / `let` 치환
@@ -72,6 +73,17 @@ WebSquare XML 소스를 GCC 공통함수 체계·표준 JS 규칙으로 자동 �
     * 반복문 내부에서 **클로저가 루프 변수를 캡처**하는 경우, `var`→`let` 전환으로 캡처 동작이 바뀝니다(대개 의도대로 개선되나 확인 필요).
     * 문자열·주석·정규식 내부의 `var` 는 치환 대상이 아닙니다(리터럴 보호 — 규칙 5 동일 원칙).
     * 객체/배열 자체를 재대입하지 않고 내부만 변경(`obj.x = 1`, `arr.push(...)`)하는 경우는 `const` 가 적절합니다.
+
+### 규칙 9: 불필요 공통함수 호출 제거
+
+* gcc 표준에서 더 이상 사용하지 않는 아래 로딩/윈도우 제어 공통함수 **호출을 스크립트에서 삭제**합니다. (로딩 인디케이터는 통신 모듈이 자동 처리)
+    * `$c.cm.ShowWin` / `$c.cm.CloseWin` — 로딩 윈도우 표시/닫기
+    * `$c.cm.ShowNoData` — 데이터 없음 표시
+    * `$c.cm.ShowTrWin` / `$c.cm.CloseTrWin` — 트랜잭션 윈도우 표시/닫기
+* **삭제 범위**: 해당 함수만 호출하는 단독 statement 라인을 삭제합니다. 활성 코드뿐 아니라 주석 처리된 W-Craft 흔적(`////$c.cm.ShowWin(...)`)도 함께 제거합니다.
+* **주의사항**:
+    * 중괄호 없는 제어문 본문(`if (x) $c.cm.ShowWin(...);`)은 삭제 시 동작이 바뀌므로 보류·리포트합니다.
+    * 문자열/주석 등 리터럴 내부는 보호합니다(규칙 5 동일 원칙).
 
 ---
 
@@ -198,7 +210,7 @@ WebSquare XML 은 `head(xml) → script(JavaScript, CDATA) → body(xml)` 구조
 
 "입력이 같으면 출력이 항상 같은" **결정적(deterministic)** 변환만 Python 으로 일괄 처리합니다. 판단이 필요 없는 1:1 규칙이 대상입니다.
 
-> **참조 구현**: `src/conversion/tools/convert.py` — 영역 분리 + 규칙 1~8 결정적 치환(문자열/주석/정규식 보호)과 단계 2 리포트 출력. 규칙 7 은 `gcc_mapping.substitution_dict()` 를 단일 출처로 쓰고, 검토/대체 태그·충돌 함수는 자동 치환하지 않고 리포트로 분리합니다. 마지막에 포매팅을 적용합니다: **`//----W-Craft` 마커 주석을 맨앞(컬럼 0)으로 정렬**, **함수 단위 빈 줄 1개 삽입**, **함수 주석 맨앞(컬럼 0) 정렬**. 일괄 실행은 `src/conversion/tools/convert_all.py`.
+> **참조 구현**: `src/conversion/tools/convert.py` — 영역 분리 + 규칙 1~9 결정적 치환(문자열/주석/정규식 보호)과 단계 2 리포트 출력. 규칙 7 은 `gcc_mapping.substitution_dict()` 를 단일 출처로 쓰고, 검토/대체 태그·충돌 함수는 자동 치환하지 않고 리포트로 분리합니다. 마지막에 포매팅을 적용합니다: **`//----W-Craft` 마커 주석을 바로 아래 코드 라인의 들여쓰기에 맞춰 정렬**, **함수 단위 빈 줄 1개 삽입**, **함수 주석 맨앞(컬럼 0) 정렬**. 일괄 실행은 `src/conversion/tools/convert_all.py`.
 > 실행: `python src/conversion/tools/convert.py <src.xml> [out.xml]`
 
 | 규칙 | 처리 영역 | Python 처리 방식 | 비고 |
@@ -211,6 +223,7 @@ WebSquare XML 은 `head(xml) → script(JavaScript, CDATA) → body(xml)` 구조
 | 규칙 7 (1:1) | SCRIPT | **태그 없는** 매핑만 함수명 단어경계 치환 (`fn_Trim(` → `$c.str.trim(`) | `gcc_mapping.substitution_dict()` 사용(태그없음·무충돌) |
 | 규칙 3 (동기화) | SCRIPT+BODY | 이벤트명 소문자화 + `ev:on*` 속성 ↔ 스크립트 함수명 **동시** 수정 | 이름변경 사전(dict) 공유 |
 | 규칙 8 `var`→`const`/`let` | SCRIPT | 재할당 분석: 단일 할당 → `const`, 재할당·카운터 → `let` | 호이스팅·재선언 의존 시 Claude 검토 |
+| 규칙 9 불필요 호출 제거 | SCRIPT | `$c.cm.ShowWin/ShowNoData/CloseWin/ShowTrWin/CloseTrWin` 단독 statement 삭제(주석 흔적 포함) | 중괄호 없는 제어문 본문은 보류·리포트 |
 
 **기계 치환 원칙**
 * **단어경계 매칭**: 함수명 치환은 `\b함수명\s*\(` 처럼 호출부만 매칭하여 부분 문자열 오치환을 막습니다. `replaceAll`·`trim` 등 흔한 이름은 특히 주의(원시 String 메서드와 충돌 가능).
