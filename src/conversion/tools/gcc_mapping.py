@@ -149,6 +149,49 @@ def substitution_dict(no_tag_only=True, modules=DEFAULT_MODULES, base_dir=None):
     return out
 
 
+_MODULE_FN_CACHE = {}
+
+
+def module_fn_dict(base_dir=None):
+    """
+    이미 `$c.<ns>.` 네임스페이스가 붙었지만 함수명이 레거시인 호출을 gcc 정규명으로
+    정규화하기 위한 사전 { "$c.<ns>.<asis>": "$c.<ns>.<tobe>" } 를 만든다.
+
+    단일 출처(SOT): src/as-is/{fil,ins,mgt,stf}/gcc/*.xml 각 함수의 JSDoc
+    `(AS-IS: <원본명>, origin: ...)` 주석 + 바로 뒤의 `scwin.<tobe> = function` 정의.
+    네임스페이스는 파일의 `meta_screenId="$c.<ns>"` 에서 읽는다(substitution_map.md §9 와 동일).
+      - asis == tobe(이름 동일)·내부 헬퍼(tobe 가 `__` 시작)·비식별자(와일드카드 등)는 제외.
+      - 같은 키가 서로 다른 tobe 로 갈리면(충돌) 제외.
+    """
+    base = (Path(base_dir) if base_dir else Path(__file__).resolve().parents[2]) / "as-is"
+    cache_key = str(base)
+    if cache_key in _MODULE_FN_CACHE:
+        return _MODULE_FN_CACHE[cache_key]
+    raw = {}   # key -> set(tobe full)
+    for path in sorted(base.glob("*/gcc/*.xml")):
+        text = io.open(path, "r", encoding="utf-8", errors="replace").read()
+        m = re.search(r'meta_screenId="\$c\.([A-Za-z_][\w]*)"', text)
+        if not m:
+            continue
+        ns = m.group(1)
+        for am in re.finditer(r'\(AS-IS:\s*([^,)]+?)\s*(?:,[^)]*)?\)', text):
+            fm = re.search(r'scwin\.([A-Za-z_$][\w$]*)\s*=\s*(?:async\s+)?function',
+                           text[am.end():am.end() + 600])
+            if not fm:
+                continue
+            tobe = fm.group(1)
+            if tobe.startswith("__"):          # 내부 헬퍼는 외부 호출 정규화 대상 아님
+                continue
+            for asis in re.split(r'[\/,]', am.group(1)):
+                asis = asis.strip()
+                if not _IDENT_RE.match(asis) or asis == tobe:
+                    continue
+                raw.setdefault("$c.%s.%s" % (ns, asis), set()).add("$c.%s.%s" % (ns, tobe))
+    out = {k: next(iter(v)) for k, v in raw.items() if len(v) == 1}
+    _MODULE_FN_CACHE[cache_key] = out
+    return out
+
+
 def conflicts(no_tag_only=True, modules=DEFAULT_MODULES, base_dir=None):
     """같은 asis 식별자가 2개 이상 다른 tobe 로 매핑되는 충돌 목록 {name: [tobe, ...]}."""
     out = {}

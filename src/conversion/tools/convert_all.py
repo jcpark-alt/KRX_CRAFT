@@ -38,8 +38,8 @@ def convert_dir(src_rel, dst_rel):
         return {"status": "소스 비어있음", "files": 0}
     dst.mkdir(parents=True, exist_ok=True)
     agg = {"files": len(files), "ok": 0, "wf_fail": [], "idem_fail": [],
-           "r2": 0, "r3": 0, "r4_done": 0, "r4_defer": 0, "r5a": 0, "r5b": 0,
-           "r6": 0, "r7": 0, "r8c": 0, "r8l": 0, "judgment": 0, "errors": []}
+           "r2": 0, "r3": 0, "r4_done": 0, "r4_defer": 0, "r5a": 0, "r5b": 0, "r5c": 0, "r5d": 0,
+           "r6": 0, "r7": 0, "r7m": 0, "r7n": 0, "r8c": 0, "r8l": 0, "r12": 0, "r13": 0, "judgment": 0, "errors": []}
     for f in files:
         name = os.path.basename(f)
         raw = io.open(f, "r", encoding="utf-8").read()
@@ -62,10 +62,16 @@ def convert_dir(src_rel, dst_rel):
         agg["r4_defer"] += 1 if rep["rule4"] is None else 0
         agg["r5a"] += rep["rule5a"]
         agg["r5b"] += len(rep["rule5b"])
+        agg["r5c"] += len(rep["rule5c"])
+        agg["r5d"] += len(rep["rule5d"])
         agg["r6"] += len(rep["rule6"]["converted"])
         agg["r7"] += len(rep["rule7"])
+        agg["r7m"] += len(rep["rule7m"])
+        agg["r7n"] += len(rep["rule7n"])
         agg["r8c"] += rep["rule8"]["const"]
         agg["r8l"] += rep["rule8"]["let"]
+        agg["r12"] += len(rep["rule12"]["converted"])
+        agg["r13"] += len(rep["rule13"])
         agg["judgment"] += len(rep["judgment"])
     agg["status"] = "변환완료"
     return agg
@@ -85,9 +91,9 @@ def main():
         wf = "OK" if not r["wf_fail"] else ("FAIL " + ",".join(r["wf_fail"]))
         idem = "OK" if not r["idem_fail"] else ("DIFF " + ",".join(r["idem_fail"]))
         print("[%s] %d개 변환  WF=%s  IDEM=%s" % (mod, r["ok"], wf, idem))
-        print("     규칙2=%d r3=%d r4(적용%d/보류%d) r5a=%d r5b=%d r6=%d r7=%d r8(c%d/l%d)  판단필요=%d"
-              % (r["r2"], r["r3"], r["r4_done"], r["r4_defer"], r["r5a"], r["r5b"],
-                 r["r6"], r["r7"], r["r8c"], r["r8l"], r["judgment"]))
+        print("     규칙2=%d r3=%d r4(적용%d/보류%d) r5a=%d r5b=%d r5c=%d r5d=%d r6=%d r7=%d r7m=%d r7n=%d r8(c%d/l%d) r12=%d r13=%d  판단필요=%d"
+              % (r["r2"], r["r3"], r["r4_done"], r["r4_defer"], r["r5a"], r["r5b"], r["r5c"], r["r5d"],
+                 r["r6"], r["r7"], r["r7m"], r["r7n"], r["r8c"], r["r8l"], r["r12"], r["r13"], r["judgment"]))
         if r["errors"]:
             for e in r["errors"]:
                 print("     ! 오류:", e)

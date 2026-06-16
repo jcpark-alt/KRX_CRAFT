@@ -11,7 +11,14 @@ substitution_dict() 를 단일 출처로 사용한다.
   · 규칙 3 : ev:on* 바인딩 핸들러명 이벤트부 소문자화 + body/script 동기화
   · 규칙 5a: == / != -> === / !==   (>=,<=,=> 및 기존 ===,!== 제외)
   · 규칙 5b: X.value = RHS; -> X.setValue(RHS);  (단일라인 대입만, 읽기 제외)
+  · 규칙 5c: X.src = RHS;   -> X.setBackgroundImage(RHS);  (단일라인 대입만, 읽기 제외)
+  · 규칙 5d: X.getTotalRow() -> X.getRowCount()  (메서드명 치환, 수신 객체·인자 보존)
   · 규칙 7 : substitution_dict() 의 (태그없음·무충돌·순수식별자) 함수 호출부 단어경계 치환
+  · 규칙 7m: 레거시 메서드 호출 {객체}.CloseFrame() -> $c.win.closePopup() (수신 객체 제거, 무인자만)
+  · 규칙 7n: 이미 $c.<ns>. 붙은 레거시명 정규화 $c.stf.fn_setFromToDate( -> $c.stf.setFromToDate( (인자 보존)
+  · 규칙 13: scwin.fn_* 정의 함수의 fn_ 제거 + camelCase 정규화, 정의·호출부(head/script/body) 동기화
+  · 규칙 12: 같은 스코프의 {DC}.DataID = encode({url}) + {DC}.reset() 쌍을
+            $c.sbm.executeDynamic(sbmOptions) 로 전환(주석 변형 포함, action=URL의 ? 앞 경로)
 
 판단 필요 항목(규칙 6 submission, 레거시 dataset API, 검토/대체·충돌 매핑 등)은 리포트로 출력.
 
@@ -198,6 +205,48 @@ def rule5b_setvalue(code, report):
     return "".join(res)
 
 
+def rule5c_setbgimage(code, report):
+    mask = code_mask(code)
+    pat = re.compile(r'(\b[\w$]+(?:\.[\w$]+)*)\.src\s*=\s*(?!=)([^;\n]+);')
+    res, last = [], 0
+    for mo in pat.finditer(code):
+        if not mask[mo.start()]:
+            continue
+        report["rule5c"].append(mo.group(0).strip())
+        res.append(code[last:mo.start()])
+        res.append(mo.group(1) + ".setBackgroundImage(" + mo.group(2).strip() + ");")
+        last = mo.end()
+    res.append(code[last:])
+    return "".join(res)
+
+
+# 레거시 메서드명 → 표준 메서드명(수신 객체·인자 보존). 규칙 7m(수신 객체 제거)과 다름.
+_METHOD_RENAME_MAP = {
+    "getTotalRow": "getRowCount",   # {dataCollection}.getTotalRow() → .getRowCount()
+}
+
+
+def rule5d_method_rename(code, report):
+    """`{객체}.getTotalRow()` 같은 메서드명을 표준 메서드명(`getRowCount`)으로 치환한다.
+    수신 객체와 인자는 보존하고 메서드명만 바꾼다. 코드 세그먼트(문자열/주석/정규식 제외)만 치환."""
+    if not _METHOD_RENAME_MAP:
+        return code
+    mask = code_mask(code)
+    nm = "|".join(re.escape(n) for n in sorted(_METHOD_RENAME_MAP, key=len, reverse=True))
+    pat = re.compile(r'\.(' + nm + r')(\s*\()')
+    res, last = [], 0
+    for mo in pat.finditer(code):
+        if not mask[mo.start()]:
+            continue
+        old = mo.group(1)
+        res.append(code[last:mo.start()])
+        res.append("." + _METHOD_RENAME_MAP[old] + mo.group(2))
+        report["rule5d"].append("%s() -> %s()" % (old, _METHOD_RENAME_MAP[old]))
+        last = mo.end()
+    res.append(code[last:])
+    return "".join(res)
+
+
 def rule3_handlers(script, body, report):
     names = set(re.findall(r'ev:on[\w-]+="\s*scwin\.([\w$]+)\s*"', body))
     for nm in names:
@@ -211,6 +260,54 @@ def rule3_handlers(script, body, report):
         script = re.sub(r'(scwin\.)' + re.escape(nm) + r'\b', r'\1' + new, script)
         report["rule3"].append("%s -> %s" % (nm, new))
     return script, body
+
+
+def _camel_strip_fn(name):
+    """'fn_' 접두어를 제거하고 camelCase 로 변환. (fn_setFromToDate→setFromToDate,
+    fn_OpenRecvDetail→openRecvDetail, fn_in_charge→inCharge) 변환 불가/무변화면 None."""
+    if not name.startswith("fn_"):
+        return None
+    parts = [p for p in name[3:].split("_") if p]
+    if not parts:
+        return None
+    new = (parts[0][0].lower() + parts[0][1:]) + "".join(p[0].upper() + p[1:] for p in parts[1:])
+    return new if new and new != name else None
+
+
+def rule13_rename_scwin_fn(head, script, body, report):
+    """scwin.fn_* 로 '정의'된 함수의 fn_ 접두어를 제거하고 camelCase 로 정규화한 뒤,
+    정의·호출부(head publicInfo/submission, script, body ev:on*)를 모두 갱신한다.
+    - 같은 파일에 정의된 함수만 대상(로컬 정의 우선).
+    - 대상명이 (개명되지 않는) 기존 함수명과 겹치거나 둘 이상이 같은 이름으로 수렴하면 보류·리포트(충돌 방지)."""
+    defined = list(dict.fromkeys(re.findall(
+        r'scwin\.(fn_[A-Za-z_$][\w$]*)\s*=\s*(?:async\s+)?function', script)))
+    if not defined:
+        return head, script, body
+    all_defs = set(re.findall(r'scwin\.([A-Za-z_$][\w$]*)\s*=\s*(?:async\s+)?function', script))
+    cand = {}
+    for old in defined:
+        new = _camel_strip_fn(old)
+        if new:
+            cand[old] = new
+    keep_names = all_defs - set(cand)              # 이번에 바뀌지 않는 기존 함수명
+    newcount = {}
+    for v in cand.values():
+        newcount[v] = newcount.get(v, 0) + 1
+    rename, skipped = {}, []
+    for old, new in cand.items():
+        if newcount[new] > 1 or new in keep_names:
+            skipped.append("%s → %s" % (old, new))
+            continue
+        rename[old] = new
+    if rename:
+        pat = re.compile(r'(scwin\.)(' + "|".join(re.escape(o) for o in rename) + r')\b')
+        script = _replace_in_code(script, pat, lambda m: m.group(1) + rename[m.group(2)])
+        head = pat.sub(lambda m: m.group(1) + rename[m.group(2)], head)
+        body = pat.sub(lambda m: m.group(1) + rename[m.group(2)], body)
+        report["rule13"] = ["%s → %s" % (o, n) for o, n in rename.items()]
+    if skipped:
+        report["judgment"].append("규칙13 scwin.fn_* 정규화 보류(충돌): " + ", ".join(skipped))
+    return head, script, body
 
 
 def _is_reassigned(code, mask, name):
@@ -360,6 +457,71 @@ def rule11_remove_include(code, report):
         code = code[:s] + code[e:]
     report["rule11"] = removed
     return code
+
+
+# 레거시 메서드 호출(수신 객체 보유) → gcc 공통함수 매핑. 규칙 7(순수 식별자 호출)과 달리
+# `{객체}.method()` 형태 전체를 인자 없는 gcc 호출로 치환(수신 객체 제거).
+_METHOD_CALL_MAP = {
+    "CloseFrame": "$c.win.closePopup",   # {객체}.CloseFrame() → $c.win.closePopup()
+}
+
+
+def rule7m_method_substitute(code, report):
+    """`{객체}.CloseFrame()` 등 레거시 메서드 호출을 gcc 공통함수 호출로 치환(수신 객체 제거).
+    - 수신 객체는 식별자 체인(`frame`, `$c.frame` 등)을 포괄하며 인자 없는 호출만 대상.
+    - 코드 세그먼트(문자열/주석/정규식 제외)만 치환. `await` 등 선행 토큰은 보존.
+    - 변환된 호출 바로 위의 W-Craft 검수 마커(메서드명 언급)는 함께 제거(규칙 12 동일 원칙).
+    - 인자가 있는 동일 메서드 호출은 동작 차이 가능성으로 보류·리포트."""
+    if not _METHOD_CALL_MAP:
+        return code
+    mask = code_mask(code)
+    nm = "|".join(re.escape(n) for n in sorted(_METHOD_CALL_MAP, key=len, reverse=True))
+    pat = re.compile(r'(?<![.\w$])([\w$]+(?:\.[\w$]+)*)\.(' + nm + r')\s*\(([^()]*)\)')
+    res, last = [], 0
+    for mo in pat.finditer(code):
+        if not mask[mo.start()]:
+            continue
+        recv, method, args = mo.group(1), mo.group(2), mo.group(3).strip()
+        if args:
+            report["judgment"].append("규칙7m 메서드 치환 보류(인자 있음): " + mo.group(0).strip())
+            continue
+        prefix = code[last:mo.start()]
+        ls = code.rfind("\n", 0, mo.start()) + 1            # 호출 라인 시작
+        if ls > last:                                        # 바로 위 라인 검사(메서드명 언급 W-Craft 마커)
+            p_ls = code.rfind("\n", 0, ls - 1) + 1
+            prevline = code[p_ls:ls]
+            if p_ls >= last and _WCRAFT_MARK.match(prevline) and method in prevline:
+                prefix = code[last:p_ls] + code[ls:mo.start()]
+        res.append(prefix)
+        res.append(_METHOD_CALL_MAP[method] + "()")
+        report["rule7m"].append("%s.%s() -> %s()" % (recv, method, _METHOD_CALL_MAP[method]))
+        last = mo.end()
+    res.append(code[last:])
+    return "".join(res)
+
+
+def rule7n_normalize_module_fn(code, report):
+    """이미 `$c.<ns>.` 네임스페이스가 붙었지만 함수명이 레거시인 호출
+    (`$c.stf.fn_setFromToDate(` 등)을 gcc 정규명(`$c.stf.setFromToDate(`)으로 정규화한다.
+    매핑은 gcc_mapping.module_fn_dict()(src/as-is/*/gcc/*.xml 의 JSDoc AS-IS↔@name)가 단일 출처.
+    인자는 보존(이름만 정규화)하고, 코드 세그먼트(문자열/주석/정규식 제외)만 치환한다."""
+    fmap = gcc_mapping.module_fn_dict()
+    if not fmap:
+        return code
+    mask = code_mask(code)
+    keys = sorted(fmap, key=len, reverse=True)   # 긴 키 우선(부분 겹침 방지)
+    pat = re.compile(r'(?<![.\w$])(' + "|".join(re.escape(k) for k in keys) + r')(\s*\()')
+    res, last = [], 0
+    for mo in pat.finditer(code):
+        if not mask[mo.start()]:
+            continue
+        key = mo.group(1)
+        res.append(code[last:mo.start()])
+        res.append(fmap[key] + mo.group(2))
+        report["rule7n"].append("%s() -> %s()" % (key, fmap[key]))
+        last = mo.end()
+    res.append(code[last:])
+    return "".join(res)
 
 
 def rule7_gcc_substitute(code, report):
@@ -832,6 +994,163 @@ def rule10_remove_events(xml, report):
     return xml
 
 
+# ---------- 규칙 12 : DataID/reset 패턴 → executeDynamic (동적 submission) ----------
+# 같은 함수 스코프에서 `{DC}.DataID = encodeURI({url})`(또는 `////` 주석 변형)과
+# `{DC}.reset();` 이 한 쌍으로 존재하면 $c.sbm.executeDynamic(sbmOptions) 로 전환한다.
+# (websquare_conversion_guide.md "URL/DataID 패턴 기반 동적 Submission 변환 지침")
+_DATAID_RE = re.compile(
+    r'(?m)^[ \t]*(/+[ \t]*)?([A-Za-z_$][\w$]*)\.DataID\s*=(?!=)\s*([^\n;]+);[^\n]*$')
+_RESET_RE = re.compile(
+    r'(?m)^[ \t]*(/+[ \t]*)?([A-Za-z_$][\w$]*)\.reset\s*\(\s*\)\s*;[^\n]*$')
+_ENCODE_WRAP = re.compile(
+    r'^(?:encodeURIComponent|encodeURI|encode)\s*\(\s*([\s\S]*?)\s*\)\s*$')
+_STR_LIT = re.compile(r'''(["'])(.*?)\1''')
+_WCRAFT_MARK = re.compile(r'^[ \t]*//-+\s*W-Craft')
+
+
+def _line_bounds(text, pos):
+    ls = text.rfind("\n", 0, pos) + 1
+    le = text.find("\n", pos)
+    le = len(text) if le < 0 else le + 1
+    return ls, le
+
+
+def _find_url_literal(expr, loose=False):
+    """expr 안에서 action 으로 쓸 URL 경로를 찾는다(쿼리스트링 '?' 이후 제거).
+    우선 '/'·'http' 로 시작하는 경로 리터럴을 찾고, loose=True 면 첫 문자열 리터럴로 폴백."""
+    for m in _STR_LIT.finditer(expr):
+        s = m.group(2)
+        if s.startswith("/") or s.startswith("http"):
+            return s.split("?", 1)[0]
+    if loose:
+        m = _STR_LIT.search(expr)
+        if m:
+            return m.group(2).split("?", 1)[0]
+    return None
+
+
+def _dyn_options_block(indent, name, dc, action):
+    """샘플 스타일 sbmOptions 선언 + executeDynamic 호출 블록을 생성(끝에 개행 포함)."""
+    parts = [
+        'id : "sbm_%s"' % dc,
+        'action : "%s"' % action,
+        'ref : ""',
+        'target : "%s=body.content"' % dc,
+        'submitDoneHandler : scwin.sbm_%s_submitdone' % dc,
+        'isProcessMsg : false',
+    ]
+    inner = ",\n".join(indent + "    " + p for p in parts)
+    return ("%sconst %s = {\n%s\n%s};\n\n%s$c.sbm.executeDynamic(%s);\n"
+            % (indent, name, inner, indent, indent, name))
+
+
+def rule12_dynamic_submission(script, report):
+    depth = depth_array(script)
+
+    def block_range(pos):
+        d = depth[pos]
+        i = pos
+        while i > 0 and depth[i] >= d:
+            i -= 1
+        j = pos
+        while j < len(script) and depth[j] >= d:
+            j += 1
+        return i, j
+
+    resets = [{"dc": mo.group(2), "bk": block_range(mo.start())[0],
+               "start": mo.start(), "end": mo.end(), "used": False}
+              for mo in _RESET_RE.finditer(script)]
+
+    # 스코프(블록)별 sbmOptions 명명: 같은 블록에서만 2,3… 부여. 블록 내 기존
+    # sbmOptions(예: 규칙6 산출) 개수로 시작값을 시드해 같은 스코프 충돌을 막는다.
+    block_state = {}
+
+    def next_name(bk, pos):
+        if bk not in block_state:
+            i, j = block_range(pos)
+            block_state[bk] = len(re.findall(r'\bsbmOptions\d*\b', script[i:j]))
+        c = block_state[bk]
+        block_state[bk] = c + 1
+        return "sbmOptions" if c == 0 else "sbmOptions%d" % (c + 1)
+
+    edits = {}   # start -> (end, repl)
+
+    def add_del(s, e):
+        if s not in edits:
+            edits[s] = (e, "")
+
+    converted, skipped = [], []
+    for mo in _DATAID_RE.finditer(script):
+        dc, rhs = mo.group(2), mo.group(3).strip()
+        bk = block_range(mo.start())[0]
+        # 같은 블록·같은 dc 의 reset 짝(미사용) 찾기 — 뒤쪽 reset 우선
+        pair = None
+        for r in resets:
+            if r["used"] or r["dc"] != dc or r["bk"] != bk:
+                continue
+            pair = r
+            if r["start"] > mo.start():
+                break
+        if pair is None:
+            skipped.append("%s.DataID (짝 reset 없음)" % dc)
+            continue
+        # URL/action 해석: encode() 래퍼 제거 → 리터럴 직접 또는 식별자 역추적
+        inner = rhs
+        wm = _ENCODE_WRAP.match(rhs)
+        if wm:
+            inner = wm.group(1).strip()
+        url_decl = None
+        action = _find_url_literal(inner, loose=False)
+        if not action and re.match(r'^[A-Za-z_$][\w$]*$', inner):
+            ident = inner
+            for dm in re.finditer(
+                    r'(?m)^[ \t]*(?:/+[ \t]*)?(?:var|let|const)?[ \t]*' + re.escape(ident)
+                    + r'\s*=(?!=)\s*([^\n;]+);', script):
+                if dm.start() < mo.start():
+                    url_decl = (dm.start(), dm.end(), ident, dm.group(1))
+            if url_decl:
+                action = _find_url_literal(url_decl[3], loose=True)
+        if not action:
+            skipped.append("%s.DataID (action URL 해석 실패)" % dc)
+            continue
+        pair["used"] = True
+        # DataID 라인 → 블록 치환
+        d_ls, d_le = _line_bounds(script, mo.start())
+        line = script[d_ls:d_le]
+        indent = line[:len(line) - len(line.lstrip())]
+        name = next_name(bk, mo.start())
+        edits[d_ls] = (d_le, _dyn_options_block(indent, name, dc, action))
+        # reset 라인 삭제
+        add_del(pair["start"], pair["end"])
+        # url-const 라인 + 그 아래 url 참조 주석(예: //alert(url);) 삭제
+        if url_decl:
+            u_ls, u_le = _line_bounds(script, url_decl[0])
+            add_del(u_ls, u_le)
+            ref = re.compile(r'(?<![.\w$])' + re.escape(url_decl[2]) + r'(?![\w$])')
+            for lm in re.finditer(r'(?m)^[ \t]*//[^\n]*\n', script[u_le:d_ls]):
+                if ref.search(lm.group(0)):
+                    add_del(u_le + lm.start(), u_le + lm.end())
+        # W-Craft 마커 주석(핵심 라인 직전) 삭제
+        anchors = [d_ls, _line_bounds(script, pair["start"])[0]]
+        if url_decl:
+            anchors.append(_line_bounds(script, url_decl[0])[0])
+        for a in anchors:
+            if a <= 0:
+                continue
+            p_ls, _ = _line_bounds(script, a - 1)
+            if _WCRAFT_MARK.match(script[p_ls:a]):
+                add_del(p_ls, a)
+        converted.append("%s → sbm_%s (action=%s)" % (dc, dc, action))
+
+    for s in sorted(edits, reverse=True):
+        e, repl = edits[s]
+        script = script[:s] + repl + script[e:]
+    report["rule12"] = {"converted": converted}
+    for s in skipped:
+        report["judgment"].append("규칙12 동적 submission 미변환: " + s)
+    return script
+
+
 # ---------- 판단 필요 항목 리포트 ----------
 def collect_judgment(script, head, body, report):
     # 규칙6 미변환으로 남은 submission 노드(실행 호출 없음 등)
@@ -877,7 +1196,7 @@ def collect_judgment(script, head, body, report):
 
 # ---------- 파이프라인 ----------
 def convert(raw, filename):
-    report = {"rule1": "", "rule2": 0, "rule2_skip": [], "rule3": [], "rule4": None, "rule4_merge": None, "rule5a": 0, "rule5b": [], "rule6": {"converted": [], "deleted": 0}, "rule7": [], "rule8": {"const": 0, "let": 0}, "rule9": 0, "rule10": 0, "rule11": 0, "wcraft": 0, "judgment": []}
+    report = {"rule1": "", "rule2": 0, "rule2_skip": [], "rule3": [], "rule4": None, "rule4_merge": None, "rule5a": 0, "rule5b": [], "rule5c": [], "rule5d": [], "rule6": {"converted": [], "deleted": 0}, "rule7": [], "rule7m": [], "rule7n": [], "rule8": {"const": 0, "let": 0}, "rule9": 0, "rule10": 0, "rule11": 0, "rule12": {"converted": []}, "rule13": [], "wcraft": 0, "judgment": []}
     reg = split_regions(raw)
     if reg is None:
         raise ValueError("SCRIPT(CDATA) 영역을 찾지 못했습니다.")
@@ -886,11 +1205,17 @@ def convert(raw, filename):
     s = rule2_globals(s, report)
     s = rule5a_strict_eq(s, report)
     s = rule5b_setvalue(s, report)
+    s = rule5c_setbgimage(s, report)
+    s = rule5d_method_rename(s, report)
     reg["head"], s = rule6_submission(reg["head"], reg["body"], s, report)
+    s = rule12_dynamic_submission(s, report)
     s = rule9_remove_obsolete(s, report)
     s = rule11_remove_include(s, report)
     s = rule8_var(s, report)
     s = rule7_gcc_substitute(s, report)
+    s = rule7m_method_substitute(s, report)
+    s = rule7n_normalize_module_fn(s, report)
+    reg["head"], s, reg["body"] = rule13_rename_scwin_fn(reg["head"], s, reg["body"], report)
     s, reg["body"] = rule3_handlers(s, reg["body"], report)
     s, reg["body"] = rule4_structure(s, reg["body"], report)
     s = align_wcraft(s, report)   # //----W-Craft 마커 주석 정렬
@@ -912,6 +1237,12 @@ def print_report(rep, filename):
     print("규칙5b .value= → .setValue() :", len(rep["rule5b"]), "건")
     for s in rep["rule5b"]:
         print("   -", s)
+    print("규칙5c .src= → .setBackgroundImage() :", len(rep["rule5c"]), "건")
+    for s in rep["rule5c"]:
+        print("   -", s)
+    print("규칙5d .getTotalRow() → .getRowCount() :", len(rep["rule5d"]), "건")
+    for s in rep["rule5d"]:
+        print("   -", s)
     print("규칙6 Submission→executeDynamic :", len(rep["rule6"]["converted"]), "건 변환, 노드삭제", rep["rule6"]["deleted"])
     for sid in rep["rule6"]["converted"]:
         print("   -", sid)
@@ -928,10 +1259,22 @@ def print_report(rep, filename):
     print("규칙7 레거시→gcc 치환 :", len(rep["rule7"]), "건")
     for s in rep["rule7"]:
         print("   -", s)
+    print("규칙7m 레거시 메서드→gcc 치환 :", len(rep["rule7m"]), "건")
+    for s in rep["rule7m"]:
+        print("   -", s)
+    print("규칙7n 모듈 네임스페이스 레거시명 정규화 :", len(rep["rule7n"]), "건")
+    for s in rep["rule7n"]:
+        print("   -", s)
     print("규칙8 var→const/let : const %d, let %d" % (rep["rule8"]["const"], rep["rule8"]["let"]))
     print("규칙9 불필요 $c.cm.* 호출 제거 :", rep["rule9"], "건")
     print("규칙10 <xf:events>/<xf:event> 삭제 :", rep["rule10"], "건")
     print("규칙11 include(...) 라인 삭제 :", rep["rule11"], "건")
+    print("규칙12 DataID/reset → executeDynamic :", len(rep["rule12"]["converted"]), "건")
+    for s in rep["rule12"]["converted"]:
+        print("   -", s)
+    print("규칙13 scwin.fn_* → camelCase 정규화 :", len(rep["rule13"]), "건")
+    for s in rep["rule13"]:
+        print("   -", s)
     print("\n==== [단계2 입력] Claude Code 보강 필요 항목 ====")
     for s in rep["judgment"]:
         print(" * " + s)
