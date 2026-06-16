@@ -22,8 +22,8 @@ from .model import ApiMethod, ApiModule, ApiParam, ApiReturn
 
 # /** ... */ 블록 (첫 번째 */ 까지, 비탐욕). finditer 로 블록끼리 겹치지 않게 수집.
 _JSDOC_RE = re.compile(r"/\*\*(.*?)\*/", re.DOTALL)
-# 블록 직후(공백/개행 허용)에 오는 scwin.<name> = function (<args>) 선언.
-_ASSIGN_RE = re.compile(r"\s*scwin\.([A-Za-z0-9_$]+)\s*=\s*function\s*\(([^)]*)\)")
+# 블록 직후(공백/개행 허용)에 오는 scwin.<name> = (async) function (<args>) 선언.
+_ASSIGN_RE = re.compile(r"\s*scwin\.([A-Za-z0-9_$]+)\s*=\s*(?:async\s+)?function\s*\(([^)]*)\)")
 # 정리된 줄에서 @tag 시작을 인식.
 _TAG_RE = re.compile(r"^@(\w+)\s?(.*)$")
 

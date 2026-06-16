@@ -15,7 +15,7 @@ xmlns:xf="http://www.w3.org/2002/xforms">
 		</xf:model>
 		<w2:layoutInfo>
 		</w2:layoutInfo>
-		<w2:publicInfo method="scwin.getValResultMsg,scwin.setDownloadGridViewOption,scwin.loadMessage,scwin.initChangeCheckedDc,scwin.setChangeCheckedDc,scwin.getChangeCheckedMainFrame,scwin.setCommonCode,scwin.getCommonCodeDataList,scwin.executeCommonCode,scwin.getParameter,scwin.getColumnName,scwin.getDataCollection,scwin.getMessage,scwin.isModified,scwin.downloadMultipleDataList,scwin.downloadMultipleGridView,scwin.downloadGridViewExcel,scwin.downloadGridViewCSV,scwin.uploadGridViewExcel,scwin.uploadGridViewCSV,scwin.validateGroup,scwin.validateGridView,scwin.createDataList,scwin.createDataMap,scwin.undoAll,scwin.undoRow,scwin.undoGridView,scwin.deleteRow,scwin.insertRow,scwin.getMatchedJSON,scwin.setUserData,scwin.getUserData,scwin.createHolidayDataList,scwin.loadHoliday,scwin.serializeFormToQueryString,scwin.showProcessMessage,scwin.hideProcessMessage"/>
+		<w2:publicInfo method="scwin.getValResultMsg,scwin.setDownloadGridViewOption,scwin.loadMessage,scwin.initChangeCheckedDc,scwin.setChangeCheckedDc,scwin.getChangeCheckedMainFrame,scwin.setCommonCode,scwin.getCommonCodeDataList,scwin.executeCommonCode,scwin.getParameter,scwin.getColumnName,scwin.getDataCollection,scwin.getMessage,scwin.isModified,scwin.downloadMultipleDataList,scwin.downloadMultipleGridView,scwin.downloadGridViewExcel,scwin.downloadGridViewCSV,scwin.uploadGridViewExcel,scwin.uploadGridViewCSV,scwin.validateGroup,scwin.validateGridView,scwin.createDataList,scwin.createDataMap,scwin.undoAll,scwin.undoRow,scwin.undoGridView,scwin.deleteRow,scwin.insertRow,scwin.getMatchedJSON,scwin.setUserData,scwin.getUserData,scwin.createHolidayDataList,scwin.loadHoliday,scwin.serializeFormToQueryString,scwin.downFile"/>
 		<script type="text/javascript" lazy="false"><![CDATA[
 // 공통 코드 저장을 위한 DataList 속성 정보
 scwin.DATA_PREFIX = "dlt_commonCode";
@@ -2592,28 +2592,69 @@ scwin.serializeFormToQueryString = function (form) {
 
 /**
  * @method
- * @name showProcessMessage
- * @description 프로세스 메시지(로딩바)를 화면에 표시한다.
+ * @name downFile
+ * @description desc
+ * @param {string} url 파일 다운로드 URL
+ * @param {string} fileName 파일명
+ * @param {string} param 추가 파라메터
+ * @returns
  * @hidden N
  * @exception
+ * @migrationStatus
  * @example
-$c.data.showProcessMessage();
+	//파일명 설정
+	let url = "/api/listing/listinvstg/commitments/file-download"
+	const param = {
+		cmitBzProcsNo : "20250124000310",
+		seq : 2,
+		cmitTpCd : "20",
+		cmitAttachFileNm : "코스닥예비심사청구조건검색.txt"
+	}; 
+	$c.data.downFile(url,  "코스닥예비심사청구조건검색.txt", param);
+	
+	//서버 저장된 파일명으로 다운로드
+ 	$c.data.downFile($p, "/api/common/sample/file-download-sample", "",{});
  */
-scwin.showProcessMessage = function () {
-    WebSquare.layer.showProcessMessage('...');
-};
+scwin.downFile = async function (url, fileName, param) {
+	return new Promise(async (resolve, reject) => {
+		try{
+			const paramUrl = new URLSearchParams(param).toString();
+			url = url + "?" + paramUrl;
+			const response = await fetch(url);
+			if (!response.ok) throw new Error("파일 다운로드 실패");
+			const disposition = response.headers.get("Content-Disposition");
+			const filenameStarRegex = /filename\*=\s*([^']*''|[^'\s]+'[^'\s]*')[ \t]*([^;\n]*)/
+			const startMatches = filenameStarRegex.exec(disposition);
+			let svrFileName;
 
-/**
- * @method
- * @name hideProcessMessage
- * @description 표시 중인 프로세스 메시지(로딩바)를 숨긴다.
- * @hidden N
- * @exception
- * @example
-$c.data.hideProcessMessage();
- */
-scwin.hideProcessMessage = function () {
-    WebSquare.layer.hideProcessMessage();
+			if (startMatches && startMatches[2]) {
+				try {
+					svrFileName = decodeURIComponent(startMatches[2].trim());
+				} catch (e) {
+					console.error('filename* 디코딩 실패:', e);
+				}
+			}
+ 
+			const blob = await response.blob();
+			const link = document.createElement('a');
+			const blobUrl = URL.createObjectURL(blob);
+			
+			link.href = blobUrl;
+			link.download = fileName || svrFileName;	
+			
+			document.body.appendChild(link);
+			link.click();
+			document.body.removeChild(link);
+			
+			window.URL.revokeObjectURL(blobUrl);
+
+			//성공시 파일명을 넘겨주며 완료 처리합니다.
+			resolve(fileName);
+		} catch (error) {
+			//실패시 에러를 넘겨줍니다.
+			reject(error);
+		}
+	});
 };
 ]]></script>
 	</head>
