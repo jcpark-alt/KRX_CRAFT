@@ -11,7 +11,7 @@
 			<w2:workflowCollection/>
 		</xf:model>
 		<w2:layoutInfo/>
-		<w2:publicInfo method="scwin.getUserAgent,scwin.getParameter,scwin.getObject,scwin.getFunction,scwin.getCallBackFunction,scwin.getJSON,scwin.isJSON,scwin.isArray,scwin.isEmpty,scwin.isEmptyPlainObject,scwin.getObjectType,scwin.isPlainObject,scwin.isMobile,scwin.isXmlDoc,scwin.setGridViewDelCheckBox,scwin.getChildren,scwin.getGridViewDataList,scwin.getComponent,scwin.createComponent,scwin.setInterval,scwin.clearInterval,scwin.setTimeout,scwin.clearTimeout,scwin.copyClipboard,scwin.confirmThen,scwin.isNotEmpty,scwin.isEmptyArray,scwin.duplcRemove,scwin.assignDefined,scwin.encodeBase64,scwin.decodeBase64,scwin.encodeBase64Utf8,scwin.decodeBase64Utf8,scwin.getKeyCode,scwin.isMobileApp,scwin.setClipboard,scwin.getClipboard,scwin.checkDuplicateJsonKey,scwin.setCookie,scwin.getCookie,scwin.removeCookie,scwin.setLocalStorage,scwin.getLocalStorage,scwin.removeLocalStorage,scwin.clearLocalStorage,scwin.setSessionStorage,scwin.getSessionStorage,scwin.removeSessionStorage,scwin.clearSessionStorage,scwin.getUploadFileSize"/>
+		<w2:publicInfo method="scwin.getUserAgent,scwin.getParameter,scwin.getObject,scwin.getFunction,scwin.getCallBackFunction,scwin.getJSON,scwin.isJSON,scwin.isArray,scwin.isEmpty,scwin.isEmptyPlainObject,scwin.getObjectType,scwin.isPlainObject,scwin.isMobile,scwin.isXmlDoc,scwin.setGridViewDelCheckBox,scwin.setTextLengthCounter,scwin.getChildren,scwin.getGridViewDataList,scwin.getComponent,scwin.createComponent,scwin.setInterval,scwin.clearInterval,scwin.setTimeout,scwin.clearTimeout,scwin.copyClipboard,scwin.confirmThen,scwin.isNotEmpty,scwin.isEmptyArray,scwin.duplcRemove,scwin.assignDefined,scwin.encodeBase64,scwin.decodeBase64,scwin.encodeBase64Utf8,scwin.decodeBase64Utf8,scwin.getKeyCode,scwin.isMobileApp,scwin.setClipboard,scwin.getClipboard,scwin.checkDuplicateJsonKey,scwin.setCookie,scwin.getCookie,scwin.removeCookie,scwin.setLocalStorage,scwin.getLocalStorage,scwin.removeLocalStorage,scwin.clearLocalStorage,scwin.setSessionStorage,scwin.getSessionStorage,scwin.removeSessionStorage,scwin.clearSessionStorage,scwin.getUploadFileSize"/>
 		<script lazy="false" type="text/javascript"><![CDATA[// =============================================================================
 /**
  * 웹스퀘어 컴포넌트 제어, 엑셀 파일 업로드/다운로드, 파일 업로드/다운로드, 기타 유틸리티 함수를 작성한다.
@@ -629,9 +629,119 @@ scwin.setGridViewDelCheckBox = function (gridViewObjArr) {
 };
 
 /**
- * @method 
+ * @method
+ * @name setTextLengthCounter
+ * @description 입력 컴포넌트의 입력값 길이를 실시간으로 계산하여 출력 컴포넌트에
+ *   "{현재}/{제한} {단위}" 형식으로 표시한다. 입력 시 제한 초과분을 자동으로 잘라내고
+ *   경고 스타일을 토글한다. byte/글자 모드를 자동 감지하며 옵션으로 재정의할 수 있다.
+ * @param {(Object|String)} comp 글자수를 체크할 입력 컴포넌트(객체 또는 id)
+ * @param {(Object|String)} displayComp 글자수 현황을 출력할 컴포넌트(객체 또는 id)
+ * @param {Object} options 옵션
+ * @param {Number} options.maxLength 제한값. 미지정 시 컴포넌트의 maxByteLength/maxlength에서 자동 조회
+ * @param {String} options.checkType "byte" 또는 "length". 미지정 시 자동 감지(maxByteLength가 있으면 byte)
+ * @param {String} options.ignoreChar 길이 계산 시 제외할 문자
+ * @param {String} options.unit 표시 단위. 기본값 byte 모드 "byte", length 모드 "자"
+ * @param {Boolean} options.limit 초과 입력 자동 차단 여부. 기본값 true
+ * @param {(String|Boolean)} options.warnClass 입력이 제한을 초과할 때 토글할 경고 클래스. 기본값 "red", false면 비활성
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+$c.util.setTextLengthCounter("ipbContent", "spnCount");                                     // 컴포넌트 maxByteLength 자동, byte 모드
+$c.util.setTextLengthCounter(ipbName, spnNameCnt, { maxLength: 100, checkType: "length" }); // 100자 제한, 글자 모드
+$c.util.setTextLengthCounter(txaMemo, spnMemoCnt, { maxLength: 4000, limit: false, warnClass: "warn" }); // 차단 없이 경고만
+ */
+scwin.setTextLengthCounter = function (comp, displayComp, options) {
+    try {
+        comp = (typeof comp === "string") ? $p.getComponentById(comp) : comp;
+        displayComp = (typeof displayComp === "string") ? $p.getComponentById(displayComp) : displayComp;
+        options = options || {};
+
+        const maxByte = (typeof comp.getMaxByteLength === "function") ? comp.getMaxByteLength() : 0;
+        const maxLen = (typeof comp.getMaxLength === "function") ? comp.getMaxLength() : 0;
+
+        const checkType = options.checkType || (maxByte ? "byte" : "length");
+        const ignoreChar = options.ignoreChar || "";
+        const unit = options.unit || (checkType === "byte" ? "byte" : "자");
+        const doLimit = (options.limit !== false);
+        const warnClass = (options.warnClass === undefined) ? "red" : options.warnClass;
+
+        const limit = (options.maxLength == null)
+            ? (checkType === "byte" ? maxByte : maxLen)
+            : options.maxLength;
+
+        const formatNumber = function (num) {
+            return String(num).replace(/\B(?=(\d{3})(?!\d))/g, ",");
+        };
+
+        // 제한값(limit) byte 이하가 되도록 문자열을 잘라 반환한다.
+        const limitByByte = function (text) {
+            let total = 0;
+            let result = "";
+            const chars = text.split("");
+            for (let i = 0; i < chars.length; i++) {
+                const byte = $c.str.getByteLength(chars[i], ignoreChar);
+                if (total + byte > limit) {
+                    break;
+                }
+                total += byte;
+                result += chars[i];
+            }
+            return result;
+        };
+
+        const getCurrentLength = function (text) {
+            if (checkType === "byte") {
+                return $c.str.getByteLength(text, ignoreChar);
+            }
+            let target = text;
+            if (ignoreChar) {
+                ignoreChar.split(",").forEach(function (ch) {
+                    target = $c.str.replaceAll(target, ch, "");
+                });
+            }
+            return target.length;
+        };
+
+        const update = function () {
+            let value = comp.getValue();
+            let current = getCurrentLength(value);
+            const over = current > limit;
+
+            if (doLimit && over) {
+                const limited = (checkType === "byte") ? limitByByte(value) : value.substring(0, limit);
+                comp.setEventPause(null, true);
+                comp.setValue(limited);
+                comp.setEventPause(null, false);
+                value = limited;
+                current = getCurrentLength(value);
+            }
+
+            displayComp.setValue(formatNumber(current) + "/" + formatNumber(limit) + " " + unit);
+
+            if (warnClass !== false) {
+                if (over) {
+                    displayComp.addClass(warnClass);
+                } else {
+                    displayComp.removeClass(warnClass);
+                }
+            }
+        };
+
+        comp.bind("oninput", update);
+        comp.bind("onchange", update);
+
+        // 초기 표시
+        update();
+    } catch (ex) {
+        console.error(ex);
+    }
+};
+
+/**
+ * @method
  * @name _setGridViewRowCheckBox
- * @description 
+ * @description
  * @param {Object} gridViewObj 그리드뷰 객체
  * @param {Number} rowIndex rowIndex 값
  * @param {String} newValue set할 값.
