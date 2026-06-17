@@ -16,6 +16,9 @@ substitution_dict() 를 단일 출처로 사용한다.
   · 규칙 7 : substitution_dict() 의 (태그없음·무충돌·순수식별자) 함수 호출부 단어경계 치환
   · 규칙 7m: 레거시 메서드 호출 {객체}.CloseFrame() -> $c.win.closePopup() (수신 객체 제거, 무인자만)
   · 규칙 7n: 이미 $c.<ns>. 붙은 레거시명 정규화 $c.stf.fn_setFromToDate( -> $c.stf.setFromToDate( (인자 보존)
+  · 규칙 14: $c.<ns>.showObj/getObjectValue/setObjectValue(컴포넌트,…) -> 컴포넌트.show("")/hide()/getValue()/setValue(…)
+            (첫 인자=컴포넌트를 수신 객체로 승격; showObj 는 2번째 불리언 리터럴로 분기)
+  · 규칙 15: $c.<ns>.alert_error(…) -> $c.win.alert(…)  (네임스페이스+이름 변경, 인자 보존)
   · 규칙 13: scwin.fn_* 정의 함수의 fn_ 제거 + camelCase 정규화, 정의·호출부(head/script/body) 동기화
   · 규칙 12: 같은 스코프의 {DC}.DataID = encode({url}) + {DC}.reset() 쌍을
             $c.sbm.executeDynamic(sbmOptions) 로 전환(주석 변형 포함, action=URL의 ? 앞 경로)
@@ -522,6 +525,112 @@ def rule7n_normalize_module_fn(code, report):
         last = mo.end()
     res.append(code[last:])
     return "".join(res)
+
+
+def _scan_call(code, mask, open_idx):
+    """open_idx 는 호출의 '(' 위치. 최상위(콤마) 인자 리스트와 닫는 ')' 다음 인덱스를
+    (args, end) 로 반환한다. 문자열/주석/정규식(mask==0)은 무시. 괄호 불균형이면 None."""
+    n, depth, i = len(code), 0, open_idx
+    args, cur = [], open_idx + 1
+    while i < n:
+        if mask[i]:
+            c = code[i]
+            if c in "([{":
+                depth += 1
+            elif c in ")]}":
+                depth -= 1
+                if depth == 0:
+                    last = code[cur:i].strip()
+                    if last != "" or args:
+                        args.append(last)
+                    return args, i + 1
+            elif c == "," and depth == 1:
+                args.append(code[cur:i].strip())
+                cur = i + 1
+        i += 1
+    return None
+
+
+# 규칙 14: 컴포넌트를 첫 인자로 받던 레거시 모듈 공통함수 → 컴포넌트 네이티브 메서드(수신 객체 승격)
+_COMPONENT_METHODS = ("showObj", "getObjectValue", "setObjectValue")
+
+
+def _rule14_build(method, args, snippet, report):
+    """매핑 치환 문자열을 만든다. 인자 개수/형태가 매핑과 안 맞으면 None(보류·리포트)."""
+    if method == "showObj":
+        if len(args) != 2:
+            report["judgment"].append("규칙14 showObj 보류(인자 %d개): %s" % (len(args), snippet))
+            return None
+        comp, flag = args[0], args[1]
+        if flag == "true":      # 인자 ""을 넘겨 이전 display 속성 유지
+            report["rule14"].append('showObj(%s, true) -> %s.show("")' % (comp, comp))
+            return '%s.show("")' % comp
+        if flag == "false":
+            report["rule14"].append("showObj(%s, false) -> %s.hide()" % (comp, comp))
+            return "%s.hide()" % comp
+        report["judgment"].append("규칙14 showObj 2번째 인자 비리터럴(동적) 보류: " + snippet)
+        return None
+    if method == "getObjectValue":
+        if len(args) != 1:
+            report["judgment"].append("규칙14 getObjectValue 보류(인자 %d개): %s" % (len(args), snippet))
+            return None
+        comp = args[0]
+        report["rule14"].append("getObjectValue(%s) -> %s.getValue()" % (comp, comp))
+        return "%s.getValue()" % comp
+    # setObjectValue
+    if len(args) != 2:
+        report["judgment"].append("규칙14 setObjectValue 보류(인자 %d개): %s" % (len(args), snippet))
+        return None
+    comp, val = args[0], args[1]
+    report["rule14"].append("setObjectValue(%s, …) -> %s.setValue(…)" % (comp, comp))
+    return "%s.setValue(%s)" % (comp, val)
+
+
+def rule14_component_method(code, report):
+    """`$c.<ns>.showObj/getObjectValue/setObjectValue(컴포넌트, …)` 를 컴포넌트 네이티브 메서드
+    호출로 치환(첫 인자=컴포넌트를 수신 객체로 승격). 인자 안의 중첩 호출도 재귀로 함께 변환한다.
+    showObj 는 2번째 불리언 리터럴(true/false)일 때만 show("")/hide() 로 분기. 리터럴 내부 보호."""
+    pat = re.compile(r'\$c\.[A-Za-z_$][\w$]*\.(' + "|".join(_COMPONENT_METHODS) + r')\s*\(')
+    mask = code_mask(code)
+    res, last = [], 0
+    for mo in pat.finditer(code):
+        if mo.start() < last or not mask[mo.start()]:
+            continue
+        scanned = _scan_call(code, mask, mo.end() - 1)
+        if scanned is None:
+            continue
+        args, end = scanned
+        args = [rule14_component_method(a, report) for a in args]   # 중첩 호출 선처리
+        repl = _rule14_build(mo.group(1), args, code[mo.start():end], report)
+        if repl is None:
+            continue
+        res.append(code[last:mo.start()])
+        res.append(repl)
+        last = end
+    res.append(code[last:])
+    return "".join(res)
+
+
+def rule15_alert_error(code, report):
+    """`$c.<ns>.alert_error(...)` 를 `$c.win.alert(...)` 로 치환(네임스페이스+이름 변경, 인자 보존).
+    문구 지정/콜백이 필요하면 $c.win.messageBox 로 수동 보강(리포트 안내). 리터럴 내부 보호."""
+    mask = code_mask(code)
+    pat = re.compile(r'\$c\.[A-Za-z_$][\w$]*\.alert_error(\s*\()')
+    res, last = [], 0
+    for mo in pat.finditer(code):
+        if not mask[mo.start()]:
+            continue
+        res.append(code[last:mo.start()])
+        res.append("$c.win.alert" + mo.group(1))
+        report["rule15"].append(code[mo.start():mo.end()].strip() + " -> $c.win.alert(")
+        last = mo.end()
+    res.append(code[last:])
+    code = "".join(res)
+    if report["rule15"]:
+        report["judgment"].append(
+            "규칙15 alert_error→$c.win.alert 적용(%d건): 에러 문구·콜백 필요 시 $c.win.messageBox 로 수동 보강 검토"
+            % len(report["rule15"]))
+    return code
 
 
 def rule7_gcc_substitute(code, report):
@@ -1196,7 +1305,7 @@ def collect_judgment(script, head, body, report):
 
 # ---------- 파이프라인 ----------
 def convert(raw, filename):
-    report = {"rule1": "", "rule2": 0, "rule2_skip": [], "rule3": [], "rule4": None, "rule4_merge": None, "rule5a": 0, "rule5b": [], "rule5c": [], "rule5d": [], "rule6": {"converted": [], "deleted": 0}, "rule7": [], "rule7m": [], "rule7n": [], "rule8": {"const": 0, "let": 0}, "rule9": 0, "rule10": 0, "rule11": 0, "rule12": {"converted": []}, "rule13": [], "wcraft": 0, "judgment": []}
+    report = {"rule1": "", "rule2": 0, "rule2_skip": [], "rule3": [], "rule4": None, "rule4_merge": None, "rule5a": 0, "rule5b": [], "rule5c": [], "rule5d": [], "rule6": {"converted": [], "deleted": 0}, "rule7": [], "rule7m": [], "rule7n": [], "rule8": {"const": 0, "let": 0}, "rule9": 0, "rule10": 0, "rule11": 0, "rule12": {"converted": []}, "rule13": [], "rule14": [], "rule15": [], "wcraft": 0, "judgment": []}
     reg = split_regions(raw)
     if reg is None:
         raise ValueError("SCRIPT(CDATA) 영역을 찾지 못했습니다.")
@@ -1215,6 +1324,8 @@ def convert(raw, filename):
     s = rule7_gcc_substitute(s, report)
     s = rule7m_method_substitute(s, report)
     s = rule7n_normalize_module_fn(s, report)
+    s = rule14_component_method(s, report)
+    s = rule15_alert_error(s, report)
     reg["head"], s, reg["body"] = rule13_rename_scwin_fn(reg["head"], s, reg["body"], report)
     s, reg["body"] = rule3_handlers(s, reg["body"], report)
     s, reg["body"] = rule4_structure(s, reg["body"], report)
@@ -1264,6 +1375,12 @@ def print_report(rep, filename):
         print("   -", s)
     print("규칙7n 모듈 네임스페이스 레거시명 정규화 :", len(rep["rule7n"]), "건")
     for s in rep["rule7n"]:
+        print("   -", s)
+    print("규칙14 컴포넌트 메서드 승격(show/hide/getValue/setValue) :", len(rep["rule14"]), "건")
+    for s in rep["rule14"]:
+        print("   -", s)
+    print("규칙15 alert_error → $c.win.alert :", len(rep["rule15"]), "건")
+    for s in rep["rule15"]:
         print("   -", s)
     print("규칙8 var→const/let : const %d, let %d" % (rep["rule8"]["const"], rep["rule8"]["let"]))
     print("규칙9 불필요 $c.cm.* 호출 제거 :", rep["rule9"], "건")
