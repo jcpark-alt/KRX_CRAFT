@@ -16,12 +16,13 @@ substitution_dict() 를 단일 출처로 사용한다.
   · 규칙 7 : substitution_dict() 의 (태그없음·무충돌·순수식별자) 함수 호출부 단어경계 치환
   · 규칙 7m: 레거시 메서드 호출 {객체}.CloseFrame() -> $c.win.closePopup() (수신 객체 제거, 무인자만)
   · 규칙 7n: 이미 $c.<ns>. 붙은 레거시명 정규화 $c.stf.fn_setFromToDate( -> $c.stf.setFromToDate( (인자 보존)
-  · 규칙 14: $c.<ns>.showObj/getObjectValue/setObjectValue(컴포넌트,…) -> 컴포넌트.show("")/hide()/getValue()/setValue(…)
-            (첫 인자=컴포넌트를 수신 객체로 승격; showObj 는 2번째 불리언 리터럴로 분기)
+  · 규칙 14: $c.<ns>.showObj/getObjectValue/setObjectValue/removeRow(컴포넌트,…) -> 컴포넌트.show("")/hide()/getValue()/setValue(…)/removeRows(…)
+            (첫 인자=컴포넌트를 수신 객체로 승격; showObj 는 2번째 불리언 리터럴로 분기; removeRow→removeRows)
   · 규칙 15: $c.<ns>.alert_error(…) -> $c.win.alert(…)  (네임스페이스+이름 변경, 인자 보존)
   · 규칙 13: scwin.fn_* 정의 함수의 fn_ 제거 + camelCase 정규화, 정의·호출부(head/script/body) 동기화
-  · 규칙 12: 같은 스코프의 {DC}.DataID = encode({url}) + {DC}.reset() 쌍을
-            $c.sbm.executeDynamic(sbmOptions) 로 전환(주석 변형 포함, action=URL의 ? 앞 경로)
+  · 규칙 12: 같은 스코프의 {DC}.DataID = encode({url})|"리터럴" + {DC}.reset()|{DC}.Reset() 쌍을
+            $c.sbm.executeDynamic(sbmOptions) 로 전환(주석 변형 포함, action=URL의 ? 앞 경로.
+            Gauce 대문자 .Reset() 및 직접 문자열 리터럴 DataID 포함)
 
 판단 필요 항목(규칙 6 submission, 레거시 dataset API, 검토/대체·충돌 매핑 등)은 리포트로 출력.
 
@@ -552,7 +553,7 @@ def _scan_call(code, mask, open_idx):
 
 
 # 규칙 14: 컴포넌트를 첫 인자로 받던 레거시 모듈 공통함수 → 컴포넌트 네이티브 메서드(수신 객체 승격)
-_COMPONENT_METHODS = ("showObj", "getObjectValue", "setObjectValue")
+_COMPONENT_METHODS = ("showObj", "getObjectValue", "setObjectValue", "removeRow")
 
 
 def _rule14_build(method, args, snippet, report):
@@ -577,6 +578,13 @@ def _rule14_build(method, args, snippet, report):
         comp = args[0]
         report["rule14"].append("getObjectValue(%s) -> %s.getValue()" % (comp, comp))
         return "%s.getValue()" % comp
+    if method == "removeRow":   # $c.cp.removeRow(comp, row) -> comp.removeRows(row)
+        if len(args) != 2:
+            report["judgment"].append("규칙14 removeRow 보류(인자 %d개): %s" % (len(args), snippet))
+            return None
+        comp, row = args[0], args[1]
+        report["rule14"].append("removeRow(%s, …) -> %s.removeRows(…)" % (comp, comp))
+        return "%s.removeRows(%s)" % (comp, row)
     # setObjectValue
     if len(args) != 2:
         report["judgment"].append("규칙14 setObjectValue 보류(인자 %d개): %s" % (len(args), snippet))
@@ -587,9 +595,10 @@ def _rule14_build(method, args, snippet, report):
 
 
 def rule14_component_method(code, report):
-    """`$c.<ns>.showObj/getObjectValue/setObjectValue(컴포넌트, …)` 를 컴포넌트 네이티브 메서드
-    호출로 치환(첫 인자=컴포넌트를 수신 객체로 승격). 인자 안의 중첩 호출도 재귀로 함께 변환한다.
-    showObj 는 2번째 불리언 리터럴(true/false)일 때만 show("")/hide() 로 분기. 리터럴 내부 보호."""
+    """`$c.<ns>.showObj/getObjectValue/setObjectValue/removeRow(컴포넌트, …)` 를 컴포넌트 네이티브
+    메서드 호출로 치환(첫 인자=컴포넌트를 수신 객체로 승격). 인자 안의 중첩 호출도 재귀로 함께 변환한다.
+    showObj 는 2번째 불리언 리터럴(true/false)일 때만 show("")/hide() 로 분기.
+    removeRow(comp, row) 는 comp.removeRows(row) 로 승격. 리터럴 내부 보호."""
     pat = re.compile(r'\$c\.[A-Za-z_$][\w$]*\.(' + "|".join(_COMPONENT_METHODS) + r')\s*\(')
     mask = code_mask(code)
     res, last = [], 0
@@ -1106,11 +1115,14 @@ def rule10_remove_events(xml, report):
 # ---------- 규칙 12 : DataID/reset 패턴 → executeDynamic (동적 submission) ----------
 # 같은 함수 스코프에서 `{DC}.DataID = encodeURI({url})`(또는 `////` 주석 변형)과
 # `{DC}.reset();` 이 한 쌍으로 존재하면 $c.sbm.executeDynamic(sbmOptions) 로 전환한다.
+# DataID 우변은 encodeURI(url) 래퍼·식별자 역추적뿐 아니라 **직접 문자열 리터럴**도 허용한다
+# (예: dts.DataID = "/gauceSystemierAdaptor.do?method=getGauceDataHeader&..."; → action=경로).
+# 짝 reset 은 WebSquare 소문자 `.reset()` 와 Gauce 레거시 대문자 `.Reset()` 를 모두 인식한다.
 # (websquare_conversion_guide.md "URL/DataID 패턴 기반 동적 Submission 변환 지침")
 _DATAID_RE = re.compile(
     r'(?m)^[ \t]*(/+[ \t]*)?([A-Za-z_$][\w$]*)\.DataID\s*=(?!=)\s*([^\n;]+);[^\n]*$')
 _RESET_RE = re.compile(
-    r'(?m)^[ \t]*(/+[ \t]*)?([A-Za-z_$][\w$]*)\.reset\s*\(\s*\)\s*;[^\n]*$')
+    r'(?m)^[ \t]*(/+[ \t]*)?([A-Za-z_$][\w$]*)\.[Rr]eset\s*\(\s*\)\s*;[^\n]*$')
 _ENCODE_WRAP = re.compile(
     r'^(?:encodeURIComponent|encodeURI|encode)\s*\(\s*([\s\S]*?)\s*\)\s*$')
 _STR_LIT = re.compile(r'''(["'])(.*?)\1''')
@@ -1138,12 +1150,13 @@ def _find_url_literal(expr, loose=False):
     return None
 
 
-def _dyn_options_block(indent, name, dc, action):
-    """샘플 스타일 sbmOptions 선언 + executeDynamic 호출 블록을 생성(끝에 개행 포함)."""
+def _dyn_options_block(indent, name, dc, action, ref=""):
+    """샘플 스타일 sbmOptions 선언 + executeDynamic 호출 블록을 생성(끝에 개행 포함).
+    ref 기본값은 "" (규칙 12). 규칙 16(trs)은 KeyValue 에서 추출한 데이터셋명을 넘긴다."""
     parts = [
         'id : "sbm_%s"' % dc,
         'action : "%s"' % action,
-        'ref : ""',
+        'ref : "%s"' % ref,
         'target : "%s=body.content"' % dc,
         'submitDoneHandler : scwin.sbm_%s_submitdone' % dc,
         'isProcessMsg : false',
@@ -1260,6 +1273,180 @@ def rule12_dynamic_submission(script, report):
     return script
 
 
+# ---------- 규칙 16 : Gauce 트랜잭션(trs) Action/KeyValue/Parameters/Post → executeDynamic ----------
+# 같은 블록 스코프에서 레거시 Gauce 트랜잭션 객체의
+#   {trs}.Action = {url};  {trs}.KeyValue = "JSP(...)";  [{trs}.Parameters = {qs};]  {trs}.Post();
+# 패턴을 $c.sbm.executeDynamic(sbmOptions) 로 전환한다.
+#   · Action     → sbmOptions.action  (URL 의 ? 앞 경로, 규칙 12 와 동일 _find_url_literal)
+#   · KeyValue   → sbmOptions.ref      ("JSP(I:pInput=A,I:pFile=B)" → "A,B" : '=' 우변 데이터셋명들)
+#   · Parameters → 쿼리스트링 연결식을 JSON 객체로 변환해 주석으로 첨부(검토용, 미실행)
+#   · Post()     → $c.sbm.executeDynamic(sbmOptions);
+# id/target/submitDoneHandler/isProcessMsg 는 규칙 12 와 동일 규약(객체명 기반)으로 생성한다
+# (target/submitDoneHandler 는 응답 처리 규약상 단계 2 에서 검토 보강 대상).
+_TRS_POST_RE = re.compile(
+    r'(?m)^[ \t]*([A-Za-z_$][\w$]*)\.Post\s*\(\s*\)\s*;[^\n]*$')
+_TRS_ASSIGN_RE = re.compile(
+    r'(?m)^[ \t]*([A-Za-z_$][\w$]*)\.(Action|KeyValue|Parameters)\s*=(?!=)\s*([^\n;]+);[^\n]*$')
+
+
+def _keyvalue_to_ref(rhs):
+    """KeyValue 우변("JSP(I:pInput=A,I:pFile=B)")에서 '=' 우변 데이터셋명들을 콤마결합."""
+    m = _STR_LIT.search(rhs)
+    inner = m.group(2) if m else rhs
+    return ",".join(re.findall(r'=\s*([A-Za-z_$][\w$]*)', inner))
+
+
+def _split_top_plus(expr):
+    """문자열/괄호 보호하며 최상위 '+' 로 분할(빈 토큰 제거)."""
+    parts, buf, i, n = [], [], 0, len(expr)
+    depth, quote = 0, None
+    while i < n:
+        c = expr[i]
+        if quote:
+            buf.append(c)
+            if c == "\\" and i + 1 < n:
+                buf.append(expr[i + 1]); i += 2; continue
+            if c == quote:
+                quote = None
+            i += 1; continue
+        if c in "\"'":
+            quote = c; buf.append(c); i += 1; continue
+        if c in "([{":
+            depth += 1; buf.append(c); i += 1; continue
+        if c in ")]}":
+            depth -= 1; buf.append(c); i += 1; continue
+        if c == "+" and depth == 0:
+            parts.append("".join(buf).strip()); buf = []; i += 1; continue
+        buf.append(c); i += 1
+    parts.append("".join(buf).strip())
+    return [p for p in parts if p != ""]
+
+
+def _params_to_pairs(rhs):
+    """Parameters 우변(쿼리스트링 연결식)을 [(key, [(종류, 값)...])] 로 파싱."""
+    pairs, state = [], {"key": None, "val": []}
+
+    def flush():
+        if state["key"] is not None:
+            pairs.append((state["key"], list(state["val"])))
+
+    for p in _split_top_plus(rhs):
+        sm = re.fullmatch(r"""(["'])([\s\S]*)\1""", p)
+        if sm:
+            text = sm.group(2)
+            kms = list(re.finditer(r'(?:^|,)\s*([A-Za-z_$][\w$]*)\s*=', text))
+            if not kms:
+                if text:
+                    state["val"].append(("lit", text))
+                continue
+            pre = text[:kms[0].start()]
+            if pre:
+                state["val"].append(("lit", pre))
+            for ki, km in enumerate(kms):
+                flush()
+                state["key"], state["val"] = km.group(1), []
+                vend = kms[ki + 1].start() if ki + 1 < len(kms) else len(text)
+                vtext = text[km.end():vend]
+                if vtext:
+                    state["val"].append(("lit", vtext))
+        else:
+            state["val"].append(("expr", p))
+    flush()
+    return pairs
+
+
+def _render_param_value(parts):
+    if not parts:
+        return '""'
+    rendered = ['"%s"' % v if k == "lit" else v for k, v in parts]
+    return rendered[0] if len(rendered) == 1 else " + ".join(rendered)
+
+
+def rule16_trs_submission(script, report):
+    depth = depth_array(script)
+
+    def block_range(pos):
+        d = depth[pos]
+        i = pos
+        while i > 0 and depth[i] >= d:
+            i -= 1
+        j = pos
+        while j < len(script) and depth[j] >= d:
+            j += 1
+        return i, j
+
+    block_state = {}
+
+    def next_name(bk, pos):
+        if bk not in block_state:
+            i, j = block_range(pos)
+            block_state[bk] = len(re.findall(r'\bsbmOptions\d*\b', script[i:j]))
+        c = block_state[bk]
+        block_state[bk] = c + 1
+        return "sbmOptions" if c == 0 else "sbmOptions%d" % (c + 1)
+
+    assigns = {}   # (obj, prop) -> [mo, ...]
+    for mo in _TRS_ASSIGN_RE.finditer(script):
+        assigns.setdefault((mo.group(1), mo.group(2)), []).append(mo)
+
+    def latest_before(obj, prop, bk, pos):
+        best = None
+        for mo in assigns.get((obj, prop), []):
+            if block_range(mo.start())[0] != bk or mo.start() >= pos:
+                continue
+            if best is None or mo.start() > best.start():
+                best = mo
+        return best
+
+    edits = {}
+    converted, skipped = [], []
+    for pm in _TRS_POST_RE.finditer(script):
+        obj = pm.group(1)
+        bk = block_range(pm.start())[0]
+        am = latest_before(obj, "Action", bk, pm.start())
+        if am is None:
+            skipped.append("%s.Post (짝 Action 없음)" % obj)
+            continue
+        action = _find_url_literal(am.group(3).strip(), loose=False)
+        if not action:
+            skipped.append("%s.Post (action URL 해석 실패)" % obj)
+            continue
+        km = latest_before(obj, "KeyValue", bk, pm.start())
+        ref = _keyvalue_to_ref(km.group(3).strip()) if km else ""
+        prm = latest_before(obj, "Parameters", bk, pm.start())
+
+        p_ls, p_le = _line_bounds(script, pm.start())
+        line = script[p_ls:p_le]
+        indent = line[:len(line) - len(line.lstrip())]
+        name = next_name(bk, pm.start())
+        block = _dyn_options_block(indent, name, obj, action, ref=ref)
+        if prm:
+            pairs = _params_to_pairs(prm.group(3).strip())
+            cmt = [indent + "// [전환검토] %s.Parameters → 동적 파라미터(필요 시 sbmOptions 에 반영)" % obj,
+                   indent + "// const sbmParams = {"]
+            for ki, (k, v) in enumerate(pairs):
+                tail = "," if ki < len(pairs) - 1 else ""
+                cmt.append(indent + "//     %s : %s%s" % (k, _render_param_value(v), tail))
+            cmt.append(indent + "// };")
+            block = "\n".join(cmt) + "\n" + block
+        edits[p_ls] = (p_le, block)
+        for mo in (am, km, prm):
+            if mo is None:
+                continue
+            a_ls, a_le = _line_bounds(script, mo.start())
+            edits.setdefault(a_ls, (a_le, ""))
+        converted.append("%s.Post → executeDynamic (sbm_%s, action=%s, ref=%s)"
+                         % (obj, obj, action, ref or "''"))
+
+    for s in sorted(edits, reverse=True):
+        e, repl = edits[s]
+        script = script[:s] + repl + script[e:]
+    report["rule16"] = {"converted": converted, "skipped": skipped}
+    for s in skipped:
+        report["judgment"].append("규칙16 trs 트랜잭션 미변환: " + s)
+    return script
+
+
 # ---------- 판단 필요 항목 리포트 ----------
 def collect_judgment(script, head, body, report):
     # 규칙6 미변환으로 남은 submission 노드(실행 호출 없음 등)
@@ -1305,7 +1492,7 @@ def collect_judgment(script, head, body, report):
 
 # ---------- 파이프라인 ----------
 def convert(raw, filename):
-    report = {"rule1": "", "rule2": 0, "rule2_skip": [], "rule3": [], "rule4": None, "rule4_merge": None, "rule5a": 0, "rule5b": [], "rule5c": [], "rule5d": [], "rule6": {"converted": [], "deleted": 0}, "rule7": [], "rule7m": [], "rule7n": [], "rule8": {"const": 0, "let": 0}, "rule9": 0, "rule10": 0, "rule11": 0, "rule12": {"converted": []}, "rule13": [], "rule14": [], "rule15": [], "wcraft": 0, "judgment": []}
+    report = {"rule1": "", "rule2": 0, "rule2_skip": [], "rule3": [], "rule4": None, "rule4_merge": None, "rule5a": 0, "rule5b": [], "rule5c": [], "rule5d": [], "rule6": {"converted": [], "deleted": 0}, "rule7": [], "rule7m": [], "rule7n": [], "rule8": {"const": 0, "let": 0}, "rule9": 0, "rule10": 0, "rule11": 0, "rule12": {"converted": []}, "rule13": [], "rule14": [], "rule15": [], "rule16": {"converted": [], "skipped": []}, "wcraft": 0, "judgment": []}
     reg = split_regions(raw)
     if reg is None:
         raise ValueError("SCRIPT(CDATA) 영역을 찾지 못했습니다.")
@@ -1318,6 +1505,7 @@ def convert(raw, filename):
     s = rule5d_method_rename(s, report)
     reg["head"], s = rule6_submission(reg["head"], reg["body"], s, report)
     s = rule12_dynamic_submission(s, report)
+    s = rule16_trs_submission(s, report)
     s = rule9_remove_obsolete(s, report)
     s = rule11_remove_include(s, report)
     s = rule8_var(s, report)
@@ -1388,6 +1576,9 @@ def print_report(rep, filename):
     print("규칙11 include(...) 라인 삭제 :", rep["rule11"], "건")
     print("규칙12 DataID/reset → executeDynamic :", len(rep["rule12"]["converted"]), "건")
     for s in rep["rule12"]["converted"]:
+        print("   -", s)
+    print("규칙16 trs Action/KeyValue/Parameters/Post → executeDynamic :", len(rep["rule16"]["converted"]), "건")
+    for s in rep["rule16"]["converted"]:
         print("   -", s)
     print("규칙13 scwin.fn_* → camelCase 정규화 :", len(rep["rule13"]), "건")
     for s in rep["rule13"]:

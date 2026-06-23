@@ -133,6 +133,7 @@
     * 규칙 14b: `$c.{객체명}.showObj({컴포넌트}, false)` → `{컴포넌트}.hide();`
     * 규칙 14c: `$c.{객체명}.getObjectValue({컴포넌트})` → `{컴포넌트}.getValue();`
     * 규칙 14d: `$c.{객체명}.setObjectValue({컴포넌트}, value)` → `{컴포넌트}.setValue(value);`
+    * 규칙 14e: `$c.{객체명}.removeRow({컴포넌트}, row)` → `{컴포넌트}.removeRows(row);` — 첫 인자=컴포넌트를 수신 객체로 승격하고, 두 번째 인자(행 위치/인덱스)를 네이티브 `removeRows(…)` 에 그대로 전달(메서드명 단수→복수). *예시:* `$c.cp.removeRow(dts_fileList, i)` → `dts_fileList.removeRows(i)`
 * **치환 시 유의사항**:
     * `{객체명}` 네임스페이스는 무엇이든(`$c.stf`, `$c.fil`, `$c.ins`, `$c.mgt` 등) 대상이며, 첫 인자(컴포넌트 식별자/표현식)와 나머지 인자(setObjectValue 의 `value` 등)는 보존합니다.
     * `showObj` 의 두 번째 인자는 **불리언 리터럴(`true`/`false`)** 인 경우에만 자동 치환합니다. 변수 등 동적 값이면 `show`/`hide` 분기를 정적으로 결정할 수 없으므로 보류·리포트합니다.
@@ -145,6 +146,26 @@
 * `$c.{객체명}.alert_error(...)` 호출을 `$c.win.alert(...)` 로 치환합니다(네임스페이스+함수명 변경, 인자 보존).
 * 에러 메시지 문구를 직접 지정하거나 닫기 콜백이 필요한 경우에는 `$c.win.messageBox($p, "alert", "{보낼 메시지}", {callbackFunction})` 형태로 **수동 보강**합니다(자동 치환은 `$c.win.alert` 로만 수행하고 리포트로 안내).
 * 문자열/주석/정규식 리터럴 내부는 보호합니다(규칙 5 동일 원칙).
+
+### 규칙 16: Gauce 트랜잭션(trs) `Action`/`KeyValue`/`Parameters`/`Post` → `$c.sbm.executeDynamic`
+
+* 같은 블록 스코프에서 레거시 Gauce 트랜잭션 객체의 아래 묶음을 `$c.sbm.executeDynamic(sbmOptions)` 로 전환합니다(규칙 12 와 동일 계열).
+
+```javascript
+{trs}.Action = "{url}" + ...;
+{trs}.KeyValue = "JSP(I:pInput=A,I:pFile=B)";
+{trs}.Parameters = "K1=" + expr1 + ",K2=" + expr2;   // 선택
+{trs}.Post();
+```
+
+* **속성 매핑**:
+    * **`Action` → `sbmOptions.action`**: URL 문자열에서 쿼리스트링(`?` 이후)을 제외한 순수 경로만 추출(규칙 12 의 `_find_url_literal` 동일).
+    * **`KeyValue` → `sbmOptions.ref`**: `JSP(...)` 안의 각 `KEY:name=DATASET` 에서 `=` 우변 데이터셋명만 콤마결합. 예: `"JSP(I:pInput=dts_ContentsInfo,I:pFile=dts_fileList)"` → `"dts_ContentsInfo,dts_fileList"`, `"JSP(I:pInput=dts_ContentsDel)"` → `"dts_ContentsDel"`.
+    * **`Parameters` → 주석 JSON**: 쿼리스트링 연결식(`"K1=" + expr1 + ",K2=" + expr2`)을 `// const sbmParams = { K1 : expr1, K2 : expr2 }` 형태의 **주석 처리된 JSON 객체**로 변환해 호출 앞에 첨부(검토용, 미실행). 값이 비면 `""`.
+    * **`Post()` → `$c.sbm.executeDynamic(sbmOptions);`**.
+* **자동 생성 속성**: `id : "sbm_{trs}"`, `target : "{trs}=body.content"`, `submitDoneHandler : scwin.sbm_{trs}_submitdone`, `isProcessMsg : false` (규칙 12 규약 동일).
+    * `target`·`submitDoneHandler` 는 트랜잭션 응답 처리 규약상 **단계 2(Claude) 검토 보강 대상**입니다(기존 `{trs}_OnSuccess`/`{trs}_OnFail` 핸들러 로직 이식). `Parameters` 주석 JSON 은 서버 전달 파라미터를 어떻게 `sbmOptions` 에 반영할지 판단해 보강합니다.
+* **유의사항**: Action URL 해석 실패·짝 `Action` 없는 `Post()` 는 미변환·리포트. 문자열/주석/정규식 리터럴 내부는 보호합니다(규칙 5 동일 원칙).
 
 ---
 
