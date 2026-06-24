@@ -235,12 +235,16 @@ scwin.__callbackSubmitFunction = function (resObj, sbmObj) {
             : (typeof gridviewRef === "string")
                 ? gridviewRef.split(",").map(function (s) { return s.trim(); }).filter(Boolean)
                 : [gridviewRef];
+        // 각 gridView를 { gv, autoFocus } 디스크립터로 구성한다. autoFocus는 그리드별로 해석한다(기본 true).
         gridViews = refs.map(function (ref) {
-            return (typeof ref === "string") ? $p.getComponentById(ref) : ref;
+            const gv = (typeof ref === "string") ? $p.getComponentById(ref) : ref;
+            if (!gv) { return null; }
+            const gridId = (typeof ref === "string") ? ref : gv.id;
+            return { gv: gv, autoFocus: scwin.__resolveAutoFocus(sbmObj._autoFocus, gridId) };
         }).filter(Boolean);
-        gridViews.forEach(function (gridView) {
-            if (gridView && typeof gridView.initGrid === "function") {
-                gridView.initGrid();
+        gridViews.forEach(function (entry) {
+            if (entry.gv && typeof entry.gv.initGrid === "function") {
+                entry.gv.initGrid();
             }
         });
     }
@@ -489,6 +493,27 @@ scwin.__normalizeRefTarget = function (options) {
 
 /**
  * @method
+ * @name __resolveAutoFocus
+ * @description gridView별 autoFocus 옵션을 해석한다. executeDynamic 응답 시 grid.refresh() 후 첫 셀 포커스 여부를 판정한다.
+ *  - autoFocus === false : 모든 grid 포커스 생략(false)
+ *  - autoFocus가 객체(맵) : 해당 gridId가 false로 명시된 경우에만 생략, 그 외(미지정 포함)는 true
+ *  - 그 외(undefined / true) : true(기본)
+ * @param {Boolean|Object} autoFocus executeDynamic options.autoFocus 값
+ * @param {String} gridId 대상 gridView의 컴포넌트 ID
+ * @returns {Boolean} 해당 gridView의 첫 셀 포커스 적용 여부
+ * @hidden Y
+ * @exception
+ */
+scwin.__resolveAutoFocus = function (autoFocus, gridId) {
+    if (autoFocus === false) { return false; }
+    if (autoFocus && (typeof autoFocus === "object")) {
+        return autoFocus[gridId] !== false; // 맵에 없으면 기본 true
+    }
+    return true; // undefined / true
+};
+
+/**
+ * @method
  * @name __bindResponseToTargets
  * @description executeDynamic 간소화 target으로 분리된 바인딩 디스크립터에 따라, 통신 응답을
  *  대상 DataCollection에 직접 적재한다.
@@ -499,8 +524,8 @@ scwin.__normalizeRefTarget = function (options) {
  * @param {Object} sbmObj Submission 객체 (scope window의 $p를 도출하는 데 사용)
  * @param {Object} rtn 통신 응답 객체 (rtn.responseJSON 에 실데이터)
  * @param {Array} targets 바인딩 디스크립터 배열 [{id, key, append}]
- * @param {Array} gridViews [Default : []] 지정 시, setJSON으로 데이터가 로드되는 각 target DataCollection의
- *  ondataload 이벤트에 각 gridView.refresh() 호출을 1회만 바인딩한다(중복 등록 방지). 다중 gridView를 지원한다.
+ * @param {Array} gridViews [Default : []] { gv:컴포넌트, autoFocus:Boolean } 디스크립터 배열. 지정 시, setJSON으로 데이터가 로드되는 각 target DataCollection의
+ *  ondataload 이벤트에 각 gv.refresh() 호출을 1회만 바인딩한다(중복 등록 방지). autoFocus가 true이고 로드된 데이터가 있으면 refresh 직후 gv.setFocusedCell(0,0)로 첫 셀에 포커스한다. 다중 gridView를 지원한다.
  * @hidden Y
  * @exception
  */
@@ -529,9 +554,14 @@ scwin.__bindResponseToTargets = function (sbmObj, rtn, targets, gridViews) {
             if (dc.__gridviewRefreshBound !== true) {
                 dc.bind("ondataload", function () {
                     const gvs = dc.__gridviewsToRefresh || [];
-                    gvs.forEach(function (gv) {
-                        if (gv && typeof gv.refresh === "function") {
-                            gv.refresh();
+                    // 데이터가 있을 때만 첫 셀 포커스(setFocusedCell)를 적용한다.(빈 그리드 가드)
+                    const hasRows = (typeof dc.getRowCount === "function") && (dc.getRowCount() > 0);
+                    gvs.forEach(function (entry) {
+                        if (entry.gv && typeof entry.gv.refresh === "function") {
+                            entry.gv.refresh();
+                            if (entry.autoFocus && hasRows && (typeof entry.gv.setFocusedCell === "function")) {
+                                entry.gv.setFocusedCell(0, 0);
+                            }
                         }
                     });
                 });
@@ -589,8 +619,10 @@ scwin.__bindResponseToTargets = function (sbmObj, rtn, targets, gridViews) {
  *  자세한 규칙은 scwin.__normalizeRefTarget / scwin.__bindResponseToTargets 참고.
  *  options.gridview 를 지정하면 통신 성공 시 응답 자동 바인딩 직전에 grid.initGrid()를 호출하고, target DataCollection의 데이터 로드(ondataload) 시 grid.refresh()를 호출한다.
  *  gridview는 콤마(,)로 구분한 다중 ID 문자열("grd_main,grd_sub")을 지원하며, 이 경우 모든 grid에 대해 initGrid()/refresh()를 수행한다.
+ *  options.autoFocus로 refresh 직후 첫 셀 포커스(setFocusedCell(0,0)) 여부를 제어한다(기본 true). 객체 맵으로 그리드별 지정도 가능하다.
  * @param {Object} options $c.sbm.create의 options 참고
  * @param {String|Object} options.gridview [Default : null] 통신 성공 시 처리할 gridView. 컴포넌트 ID 문자열(콤마로 구분한 다중 ID 가능) 또는 컴포넌트 객체. 자동 바인딩 직전 initGrid() 호출, target DataCollection의 ondataload 시 refresh() 호출.
+ * @param {Boolean|Object} options.autoFocus [Default : true] gridview refresh 직후 첫 셀 포커스 여부. true(전체 포커스)/false(전체 생략) 또는 { gridId: false } 객체 맵으로 그리드별 제어(맵에 없으면 기본 true). 로드된 데이터가 없으면 포커스하지 않는다.
  * @param {Object} requestData 요청 데이터
  * @param {Object} obj 전송중 disable시킬 컴퍼넌트
  * @param {Object} execOptions [Default : null] 중복 실행 제어 옵션. $c.sbm.execute의 options 참고(allowDuplicate / onDuplicate).
@@ -626,6 +658,17 @@ const sbmOptions = {
      ref : "dma_search",
      target : "dlt_commonGrp,dlt_commonCode",
      gridview : "grd_main,grd_sub", // 콤마로 다중 gridview 설정
+     isProcessMsg : false };
+$c.sbm.executeDynamic(sbmOptions);
+
+// autoFocus : refresh 직후 첫 셀 포커스 제어 (기본 true). 객체 맵으로 그리드별 지정 가능.
+const sbmOptions = {
+     id : "sbm_SelectTempDynamic",
+     action : "/sample/tempSelect",
+     ref : "dma_search",
+     target : "dlt_commonGrp,dlt_commonCode",
+     gridview : "grd_main,grd_sub",
+     autoFocus : { grd_sub : false }, // grd_main만 첫 셀 포커스, grd_sub는 생략. (false면 전체 생략, 미지정/true면 전체 포커스)
      isProcessMsg : false };
 $c.sbm.executeDynamic(sbmOptions);
 
@@ -701,6 +744,8 @@ scwin.executeDynamic = function (options, requestData, obj, execOptions) {
     // target DataCollection의 ondataload 이벤트에서 grid.refresh()가 호출되도록 한다. (컴포넌트 ID 문자열 또는 컴포넌트 객체)
     if (options.gridview && (submissionObj !== null)) {
         submissionObj._gridview = options.gridview;
+        // 그리드 자동 포커스 옵션을 부착한다.(미지정 시 __resolveAutoFocus에서 기본 true로 해석)
+        submissionObj._autoFocus = options.autoFocus;
     }
 
     return $c.sbm.execute(submissionObj, requestData, obj, execOptions);
