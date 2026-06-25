@@ -52,7 +52,9 @@ scwin.CB_FUNCTION_MANAGER = {
 };
 
 // 대외망 홈(index) 이동 경로. 배포 모듈별로 경로가 다를 수 있어 상수로 분리한다. (scwin.goHomeEx 에서 사용)
-scwin.HOME_EX_URL = "/websquare/websquare.html?w2xPath=/cm/main/index_ex.xml";
+scwin.HOME_EX_URL = "/cm/main/fill/index.xml";
+
+scwin.HOME_URL = `/cm/main/${WebSquareExternal.contextPath}/index.xml`;
 
 scwin.onpageload = function () {
     requires("uiplugin.popup");
@@ -148,9 +150,9 @@ scwin.getActiveWindowInfo = function (scopeApi) {
         activeInfo["type"] = "P";
         activeInfo["programCd"] = $c.win.getProgramId(popupWindow.$p);
         activeInfo["window"] = popupWindow;
-    } else if ($p.main().main && typeof $p.main().main.getLayoutId === "function") {
+    } else if ($p.main().pfm_main.scope.main && typeof $p.main().pfm_main.scope.main.getLayoutId === "function") {
         // TabControl 또는 WindowContainer를 통해서 오픈된 업무 화면
-        activeInfo["type"] = $p.main().main.getLayoutId();
+        activeInfo["type"] = $p.main().pfm_main.scope.main.getLayoutId();
         if (activeInfo["type"] == "T") {
             const selectedTabId = $p.main().tac_layout.getSelectedTabID();
             findProgramList = $c.data.menuComp.getMatchedJSON("MENU_CD", selectedTabId, true);
@@ -166,10 +168,10 @@ scwin.getActiveWindowInfo = function (scopeApi) {
             }
             activeInfo["window"] = $p.main().wdc_main.getWindow(selectedWindowId);
         } else if (activeInfo["type"] == "S") {
-            if (!$c.util.isEmpty($c.data.getParameter($p.main().pfm_layout.getWindow().$p, "menuInfo"))) {
-                activeInfo["programCd"] = $c.data.getParameter($p.main().pfm_layout.getWindow().$p, "menuInfo").programCd;
+            if (!$c.util.isEmpty($c.data.getParameter($p.main().pfm_main.scope.pfm_layout.getWindow().$p, "menuInfo"))) {
+                activeInfo["programCd"] = $c.data.getParameter($p.main().pfm_main.scope.pfm_layout.getWindow().$p, "menuInfo").programCd;
             }
-            activeInfo["window"] = $p.main().pfm_layout.getWindow();
+            activeInfo["window"] = $p.main().pfm_main.scope.pfm_layout.getWindow();
         }
     } else {
         // Window Popup 방식으로 오픈된 팝업 화면
@@ -194,13 +196,13 @@ $c.win.showToastMessage($c.sbm.getMessageCode('STATUS_SUCCESS'), e.responseJSON.
  */
 scwin.showToastMessage = function (messageType, message) {
 
-    if ($c.util.isEmpty($p.main().pfm_footer)) {
+    if ($c.util.isEmpty($p.main().pfm_main.scope.pfm_footer)) {
         return;
     }
 
     const messageIdx = new Date().getTime();
 
-    const pgfFooter = $p.main().pfm_footer.getWindow();
+    const pgfFooter = $p.main().pfm_main.scope.pfm_footer.getWindow();
     let className = "";
 
     if ($c.sbm.getMessageCode('STATUS_ERROR') === messageType) {
@@ -299,10 +301,10 @@ scwin.openMenu = function (menuNm, url, menuCode, paramObj, option) {
         return false;
     } else {
         menuCode = menuCode || "";
-        const layout = $p.main().main.getLayoutId();
-        let tmpUrl;
-        let menuCodeParm = menuCode;
-        let frameMode = '';
+		const layout = $p.main().pfm_main.scope.main.getLayoutId();
+        // let tmpUrl;
+        // let menuCodeParm = menuCode;
+        // let frameMode = '';
         let data = {};
         let closable = true;
         let fixed = false;
@@ -333,128 +335,131 @@ scwin.openMenu = function (menuNm, url, menuCode, paramObj, option) {
             fixed = option.fixed;
         }
 
-        if (layout == "T") {
-            const tabObj = {
-                closable: closable, // 탭 닫기 기능 제공
-                openAction: "select", // exist 는 기존 탭을 갱신, new 는 항상 새로, select는 동일 id 가 존재하면 선택, last: 기존 tab을 마지막 tab으로 이동후 선택
-                label: menuNm
-            };
+		if (layout === "T") {
+			const tabObj = {
+				closable: closable,
+				// 탭 닫기 기능 제공
+				openAction: "select",
+				// exist 는 기존 탭을 갱신, new 는 항상 새로, select는 동일 id 가 존재하면 선택, last: 기존 tab을 마지막 tab으로 이동후 선택
+				label: menuNm
+			};
+			const contObj = {
+				frameMode: "pageFrame",
+				scope: true,
+				src: url,
+				alwaysDraw: false,
+				title: menuNm,
+				dataObject: {
+				type: "json",
+				name: "paramData",
+				data: data
+				}
+			};
 
-            const contObj = {
-                frameMode: "pageFrame",
-                scope: true,
-                src: url,
-                alwaysDraw: false,
-                title: menuNm,
-                dataObject: {
-                    type: "json",
-                    name: "paramData",
-                    data: data
-                }
-            };
+			// tabObj의 openAction의 last값의 동작 특이 사항으로 선택이 되지 않은 경우 선택하는 로직 추가
+			return Promise.resolve().then(function () {
+				return $p.main().pfm_main.scope.tac_layout.addTab(menuCode, tabObj, contObj);
+			}).then(function (tabId) {
+				$p.main().pfm_main.scope.tac_layout.setSelectedTabIndex(tabId);
+				return tabId;
+			}).then(function (tabId) {
+				// history에 화면 전환했던 프로그램 코드 저장
+				if (!$c.util.isEmpty($p, option) && option.isHistory && !$c.util.isEmpty($p, menuCode)) {
+				$c.win.pushState($p, data);
+				}
+				return tabId;
+			});
+		} else if (layout === "M") {
+			const options = {
+				title: menuNm,
+				src: url,
+				windowTitle: menuNm,
+				windowId: menuCode,
+				openAction: "selectWindow",
+				frameMode: "pageFrame",
+				fixed: fixed === true ? true : false,
+				_closable: closable === false ? false : true,
+				closeAction: function (title) {
+				const winScope = $p.main().pfm_main.scope.wdc_main.getWindowByUniqueId(this.id);
+				if (winScope._options != undefined && winScope._options._closable === false) {
+					return false;
+				} else {
+					const isOnbeforecloseall = $p.main().pfm_main.scope.wdc_main.getUserData("isOnbeforeCloseAll");
+					if (typeof isOnbeforecloseall === "undefined" || isOnbeforecloseall === false) {
+					const isClose = $p.main().pfm_main.scope.main.closeBeforePage(winScope.$p.getFrame());
+					if (isClose === false) {
+						$p.main().pfm_main.scope.wdc_main.setFocus($p.main().pfm_main.scope.wdc_main.getSelectedIndex());
+					}
+					$p.main().pfm_main.scope.wdc_main.setUserData("isOnbeforeCloseAll", false);
+					return isClose;
+					}
+					return true;
+				}
+				},
+				dataObject: {
+				type: "json",
+				name: "paramData",
+				data: data
+				}
+			};
+			return Promise.resolve().then(function () {
+				$p.main().pfm_main.scope.wdc_main.createWindow(options);
+				return options;
+			}).then(function (options) {
+				let winScope = $p.main().pfm_main.scope.wdc_main.getWindow(options.windowId);
+				winScope._options = {
+				_closable: options._closable
+				};
 
-            // tabObj의 openAction의 last값의 동작 특이 사항으로 선택이 되지 않은 경우 선택하는 로직 추가
-            return Promise.resolve().then(function () {
-                return $p.main().tac_layout.addTab(menuCode, tabObj, contObj);
-            }).then(function (tabId) {
-                $p.main().tac_layout.setSelectedTabIndex(tabId);
-                return tabId;
-            }).then(function (tabId) {
-                // history에 화면 전환했던 프로그램 코드 저장
-                if (!$c.util.isEmpty(option) && option.isHistory && !$c.util.isEmpty(menuCode)) {
-                    $c.win.pushState(data);
-                }
-                return tabId;
-            });
+				// history에 화면 전환했던 프로그램 코드 저장
+				if (!$c.util.isEmpty($p, option) && option.isHistory && !$c.util.isEmpty($p, menuCode)) {
+				$c.win.pushState($p, data);
+				}
+			});
+		} else if (layout === "S") {
+			//start 동일메뉴 재오픈 체크
+			let curParamData = $p.main().pfm_main.scope.pfm_layout.scope.$p.getParameter("paramData") || {};
+			let curMenuInfo = curParamData["menuInfo"];
+			if (curMenuInfo){
+				let curMenuCd = curMenuInfo["menuCode"];
+				if (curMenuCd == menuCode){
+					//이미 열려있는 메뉴면 리턴처리.
+					return false;
+				}
+			}
+			//end
+			const isClose = $p.main().pfm_main.scope.main.closeBeforePage($p.main().pfm_main.scope.pfm_layout.getWindow().$p.getFrame());
 
-        } else if (layout == "M") {
-            const options = {
-                title: menuNm,
-                src: url,
-                windowTitle: menuNm,
-                windowId: menuCode,
-                openAction: "selectWindow",
-                frameMode: "pageFrame",
-                fixed: (fixed === true) ? true : false,
-                _closable: (closable === false) ? false : true,
-                closeAction: function (title) {
-                    const winScope = $p.main().wdc_main.getWindowByUniqueId(this.id);
-                    if (winScope._options != undefined && winScope._options._closable === false) {
-                        return false;
-                    } else {
-                        const isOnbeforecloseall = $p.main().wdc_main.getUserData("isOnbeforeCloseAll");
+			if (isClose) {
+				const programCd = $p.main().pfm_main.scope.pfm_gnb.getWindow().dlt_menu.getMatchedColumnData("SRC_PATH", url, "PROGRAM_CD");
+				data.menuInfo.programCd = programCd[0];
 
-                        if ((typeof isOnbeforecloseall === "undefined") || (isOnbeforecloseall === false)) {
-                            const isClose = $p.main().main.closeBeforePage(winScope.$p.getFrame());
-                            if (isClose === false) {
-                                $p.main().wdc_main.setFocus($p.main().wdc_main.getSelectedIndex());
-                            }
-                            $p.main().wdc_main.setUserData("isOnbeforeCloseAll", false);
-                            return isClose;
-                        }
+				// history에 화면 전환했던 프로그램 코드 저장
+				if (!$c.util.isEmpty(option) && option.isHistory && !$c.util.isEmpty(menuCode)) {
+					$c.win.pushState(data);
+				}
 
-                        return true;
-                    }
-                },
-                dataObject: {
-                    type: "json",
-                    name: "paramData",
-                    data: data
-                }
-            }
+				const param = {
+					dataObject: {
+						type: "json",
+						name: "paramData",
+						data: data
+					}
+				};
 
-            return Promise.resolve().then(function () {
-                $p.main().wdc_main.createWindow(options);
-                return options;
-            }).then(function (options) {
-                let winScope = $p.main().wdc_main.getWindow(options.windowId);
-                winScope._options = { _closable: options._closable };
+				return Promise.resolve().then(function () {
+					$p.$('.gnb_menu li').removeClass('on');
+					$p.parent().pfm_gnb.removeClass('active');
+					
+					$p.parent().grp_wrap.removeClass('noside'); // 업무화면용 레이아웃 적용 (Side 노출)
 
-                // history에 화면 전환했던 프로그램 코드 저장
-                if (!$c.util.isEmpty(option) && option.isHistory && !$c.util.isEmpty(menuCode)) {
-                    $c.win.pushState(data);
-                }
-            });
-        } else if (layout == "S") {
-            //start 동일메뉴 재오픈 체크
-            let curParamData = $p.main().pfm_layout.scope.$p.getParameter("paramData") || {};
-            let curMenuInfo = curParamData["menuInfo"];
-            if (curMenuInfo){
-                let curMenuCd = curMenuInfo["menuCode"];
-                if (curMenuCd == menuCode){
-                    //이미 열려있는 메뉴면 리턴처리.
-                    return false;
-                }
-            }
-            //end
-            const isClose = $p.main().main.closeBeforePage($p.main().pfm_layout.getWindow().$p.getFrame());
-
-            if (isClose) {
-                const programCd = $p.main().pfm_side.getWindow().dlt_menu.getMatchedColumnData("SRC_PATH", url, "PROGRAM_CD");
-                data.menuInfo.programCd = programCd[0];
-
-                // history에 화면 전환했던 프로그램 코드 저장
-                if (!$c.util.isEmpty(option) && option.isHistory && !$c.util.isEmpty(menuCode)) {
-                    $c.win.pushState(data);
-                }
-
-                const param = {
-                    dataObject: {
-                        type: "json",
-                        name: "paramData",
-                        data: data
-                    }
-                };
-
-                return Promise.resolve().then(function () {
-                    return $p.main().pfm_layout.setSrc(url, param);
-                });
-            } else {
-                return false;
-            }
-        }
+					return $p.main().pfm_main.scope.pfm_layout.setSrc(url, param);
+				});
+			} else {
+				return false;
+			}
+		}
     }
-    return false;
 };
 
 /**
@@ -500,12 +505,12 @@ scwin.openPopup = function (url, opts, data) {
             let isClose = true;
 
             if (popupWindow.$p.getFrameId() === null) {
-                if ($p.main().main && typeof $p.main().main.closeBeforePage === "function") {
-                    isClose = $p.main().main.closeBeforePage(window.$p.main().$p.getFrame());
+                if ($p.main().pfm_main.scope.main && typeof $p.main().pfm_main.scope.main.closeBeforePage === "function") {
+                    isClose = $p.main().pfm_main.scope.main.closeBeforePage(window.$p.main().$p.getFrame());
                 }
             } else {
-                if ($p.main().main && typeof $p.main().main.closeBeforePage === "function") {
-                    isClose = $p.main().main.closeBeforePage(popupWindow.$p.getFrame());
+                if ($p.main().pfm_main.scope.main && typeof $p.main().pfm_main.scope.main.closeBeforePage === "function") {
+                    isClose = $p.main().pfm_main.scope.main.closeBeforePage(popupWindow.$p.getFrame());
                 }
             }
 
@@ -529,8 +534,8 @@ scwin.openPopup = function (url, opts, data) {
 
             if (!$c.util.isEmpty(popup) && !$c.util.isEmpty(popup.callbackParam)) {
                 closeParam = $c.util.getJSON(popup.callbackParam);
-            } else if ($p.main().main && !$c.util.isEmpty(popupWindow.$p.main().scwin._popup) && !$c.util.isEmpty(popupWindow.$p.main().scwin._popup.callbackParam)) {
-                closeParam = $c.util.getJSON(popupWindow.$p.main().main._popup.callbackParam);
+            } else if ($p.main().pfm_main.scope.main && !$c.util.isEmpty(popupWindow.$p.main().scwin._popup) && !$c.util.isEmpty(popupWindow.$p.main().scwin._popup.callbackParam)) {
+                closeParam = $c.util.getJSON(popupWindow.$p.main().pfm_main.scope.main._popup.callbackParam);
             } else {
                 if (messageType === "confirm") {
                     closeParam = { clickValue: false };
@@ -863,10 +868,10 @@ scwin.setProgramAuthority = function () {
 
     if ((typeof menuInfo !== "undefined") && (typeof menuInfo.menuCode !== "undefined") && (menuInfo.menuCode.trim() !== "")) {
         const menuCd = menuInfo.menuCode;
-        const menuInfoList = $p.main().pfm_side.getWindow().dlt_menu.getMatchedJSON("MENU_CD", menuCd);
+        const menuInfoList = $p.main().pfm_main.scope.pfm_side.getWindow().dlt_menu.getMatchedJSON("MENU_CD", menuCd);
 
         if (menuInfoList.length > 0) {
-            const programAuthorityList = $p.main().pfm_side.getWindow().dlt_programAuthority.getMatchedJSON("PROGRAM_CD", menuInfoList[0].PROGRAM_CD);
+            const programAuthorityList = $p.main().pfm_main.scope.pfm_side.getWindow().dlt_programAuthority.getMatchedJSON("PROGRAM_CD", menuInfoList[0].PROGRAM_CD);
 
             if (programAuthorityList.length > 0) {
                 const programAuthority = programAuthorityList[0];
@@ -1148,12 +1153,11 @@ scwin.goHome = function (param) {
     const contextPath = $c.sbm.getContextPath();
 
     if (contextPath == "" && !$c.util.isEmpty(param)) {
-        top.window.location.href = "/?menuCd=" + param;
+        $p.main().pfm_main.setSrc("/index.html");
     } else if (contextPath == "" && $c.util.isEmpty(param)) {
-        top.window.location.href = "/";
+        $p.main().pfm_main.setSrc("/index.html");
     } else {
-        //top.window.location.href = contextPath;
-		top.window.location.href = "/websquare/websquare.html?w2xPath=/cm/main/index.xml";
+        $p.main().pfm_main.setSrc(scwin.HOME_URL);
     }
 
 };
@@ -1172,11 +1176,11 @@ scwin.goHomeEx = function (param) {
     const contextPath = $c.sbm.getContextPath();
 
     if (contextPath == "" && !$c.util.isEmpty(param)) {
-        top.window.location.href = "/?menuCd=" + param;
+        $p.main().pfm_main.setSrc("/index.html");
     } else if (contextPath == "" && $c.util.isEmpty(param)) {
-        top.window.location.href = "/";
+        $p.main().pfm_main.setSrc("/index.html");
     } else {
-        top.window.location.href = scwin.HOME_EX_URL;
+        $p.main().pfm_main.setSrc(scwin.HOME_EX_URL);
     }
 
 };
@@ -1216,7 +1220,7 @@ scwin.logout = function () {
  * @example
  */
 scwin.isAdmin = function () {
-    const isAdmin = $p.main().pfm_side.getWindow().dma_defInfo.get("IS_ADMIN");
+    const isAdmin = $p.main().pfm_main.scope.pfm_side.getWindow().dma_defInfo.get("IS_ADMIN");
 
     if (isAdmin === "Y") {
         return true;

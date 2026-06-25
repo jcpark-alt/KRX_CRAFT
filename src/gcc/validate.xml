@@ -11,7 +11,7 @@
 			<w2:workflowCollection/>
 		</xf:model>
 		<w2:layoutInfo/>
-		<w2:publicInfo method="scwin.validateDataCollect,scwin.validateDataGroup,scwin.validateDataCollection,scwin.getGridViewDataList,scwin.getChildrenComponent,scwin.getDataCollection,scwin.setFocus,scwin.isBirthDay,scwin.isValidDate,scwin.setComponentProperty"/>
+		<w2:publicInfo method="scwin.getChildrenComponent,scwin.getDataCollection,scwin.getGridViewDataList,scwin.isBirthDay,scwin.isValidDate,scwin.setFocus,scwin.validateDataCollect,scwin.validateDataCollection,scwin.validateDataGroup"/>
 		<script lazy="false" type="text/javascript"><![CDATA[
 // =============================================================================
 /**
@@ -30,12 +30,18 @@ scwin.onpageload = function() {
 /**
  * @method
  * @name validateDataCollect
- * @description DataCollection 유효성을 검증하는 공통함수
- *
+ * @description DataCollection 유효성을 검증하는 공통함수 *
  * @param {Object} validateObj 검증할 component 컨테이너 또는 gridView Component (id 문자열 허용)
- * @param {Object} options 통합 옵션 객체 (setComponentProperty 와 동일 포맷)
- *   { validateType:"alert", checkType:"single", focus:true, editMode:true,
- *     fields: { "컴포넌트ID(GridView는 컬럼ID)": { required:true, maxLength:15, ... } } }
+ * @param {Object} options 통합 옵션 객체
+ *   { 
+ * 		validateType:"alert", 
+ * 		checkType:"single", 
+ * 		focus:true, 
+ * 		editMode:true,
+ *      fields: { 
+ * 			"컴포넌트ID(GridView는 컬럼ID)": { required:true, maxLength:15, ... } 
+ * 		} 
+ * }
  *   - 동작: validateType(alert|mark|all), checkType(single|multi), focus, editMode
  *   - fields: 필드별 검증 규칙 (값은 객체 형태)
  * @memberOf validate
@@ -45,13 +51,15 @@ scwin.onpageload = function() {
  * @exception
  * @example
     const options = {
-        validateType : "alert", checkType : "single", focus : true,
+        validateType : "alert", // alert|mark|all
+		checkType : "single", // single|multi
+		focus : true,
         fields : {
-            ipbAge  : { required : true, maxLength : 3, allowChar : "0-9" },
-            ipbName : { required : true, maxLength : 10 }
+            ipbAge  : { required : true, maxLength : 3, allowChar : "0-9", name : "나이" },
+            ipbName : { required : true, maxLength : 10, name : "사원명" }
         }
     };
-    $c.validate.setComponentProperty(options);   // 동일 options 로 속성 설정
+    
     $c.validate.validateDataCollect(grpBox, options);   // 동일 options 로 검증
 
     입력 허용 문자, 입력 허용 불가 문자, 최대 입력 문자수 설정은 GridView의 Column의 속성에서 설정한다. <br/>
@@ -68,8 +76,6 @@ scwin.onpageload = function() {
     - num:n - 숫자 <br/>
     - num:i - 정수 <br/>
     - num:f - 실수 <br/>
-    - allowChar:0-9 - 숫자만 입력(정수형) <br/>
-    - allowChar:0-9. - 숫자만 입력(실수형) <br/>
     - fromNum:5 - 최소 입력 숫자 <br/>
     - toNum:10 - 최대 입력 숫자 <br/>
     - format:email - email format <br/>
@@ -78,8 +84,6 @@ scwin.onpageload = function() {
     - format:mobilePhone - mobilePhone format <br/>
     - format:bizNum - 사업자번호 format <br/>
     - format:birth - 생년월일(주민번호 앞자리) format <br/>
-
-    dataList의 경우 조건에 따라 해당 row의 validate를 제어할 수 있도록 validateCondition 컬럼을 추가하여 사용할 수 있다.
  */
 scwin.validateDataCollect = async function (validateObj, options) {
     options = Object.assign({ validateType : "alert", checkType : "single", focus : true, editMode : true, fields : {} }, options);
@@ -96,7 +100,7 @@ scwin.validateDataCollect = async function (validateObj, options) {
 
     // 컴포넌트 ID 추출 (getID 우선, 없으면 .id)
     const getCompId = function (comp) {
-        return (typeof comp.getID === "function") ? comp.getID() : comp.id;
+        return (typeof comp.getOriginalID === "function") ? comp.getOriginalID() : comp.id;
     };
 
     let validateResult = true;
@@ -117,28 +121,35 @@ scwin.validateDataCollect = async function (validateObj, options) {
                 }
             });
 
+			let isBreak = false;
+
             // options.fields(컴포넌트ID 또는 컬럼ID 기준) 규칙으로 validation 진행
-            objArr.forEach(valObj => {
+            objArr.some(valObj => {
+				if (isBreak) return true;
+
                 const dataObjInfo = scwin.getDataCollection(valObj);
                 if ($c.util.isEmpty(dataObjInfo)) return;
 
                 const rules = fields[getCompId(valObj)] || fields[dataObjInfo.columnId];
                 if ($c.util.isEmpty(rules)) return;
 
-                const valInfo = Object.assign({ id : getCompId(valObj), name : "" }, rules);
+                const valInfo = Object.assign({ id : getCompId(valObj), name : undefined }, rules);
 
                 for (const key of Object.keys(valInfo)) {
                     if (key === "id" || key === "name") continue;
                     const validateKey = key.toUpperCase();
-                    const val = String(valInfo[key]).toUpperCase();
+                    const val = String(valInfo[key]);
                     if (!val) continue;
 
-                    const result = scwin.validateDataGroup(validateKey, val, valObj, dataObjInfo, checkType, validateType, options);
+                    const result = scwin.validateDataGroup(validateKey, val, valInfo, valObj, dataObjInfo, checkType, validateType, options);
                     validateResult = (validateResult) ? result.validateResult : false;
                     messageArr.push(...result.messageArr);
                     (firstObj === null) && (firstObj = result.firstObj);
 
-                    if (checkType === "SINGLE" && !validateResult) break;
+                    if (checkType === "SINGLE" && !validateResult) {
+						isBreak = true;
+						break;
+					}
                 }
             });
 
@@ -165,26 +176,35 @@ scwin.validateDataCollect = async function (validateObj, options) {
             const gridViewCollect = await scwin.getGridViewDataList(validateObj);
             const gridViewData = gridViewCollect.getAllJSON();
 
+			let isBreak = false;
+
             // GridView row × column, options.fields(컬럼ID 기준) 규칙으로 validation 진행
-            gridViewData.forEach((rowData, rowIndex) => {
-                Object.keys(rowData).forEach((columnId, colIndex) => {
+            gridViewData.some((rowData, rowIndex) => {
+				if (isBreak) return true;
+
+                Object.keys(rowData).some((columnId, colIndex) => {
+					if (isBreak) return true;
+
                     const rules = fields[columnId];
                     if ($c.util.isEmpty(rules)) return;
 
-                    const valInfo = Object.assign({ id : columnId, name : "" }, rules);
+                    const valInfo = Object.assign({ id : columnId, name : undefined }, rules);
 
                     for (const key of Object.keys(valInfo)) {
                         if (key === "id" || key === "name") continue;
                         const validateKey = key.toUpperCase();
-                        const val = String(valInfo[key]).toUpperCase();
+                        const val = String(valInfo[key]);
                         if (!val) continue;
 
-                        const result = scwin.validateDataCollection(validateKey, val, validateObj, gridViewCollect, rowIndex, colIndex, checkType, validateType, options);
+                        const result = scwin.validateDataCollection(validateKey, val, valInfo, validateObj, gridViewCollect, rowIndex, colIndex, checkType, validateType, options);
                         validateResult = (validateResult) ? result.validateResult : false;
                         messageArr.push(...result.messageArr);
                         (firstObj === null) && (firstObj = result.firstObj);
 
-                        if (checkType === "SINGLE" && !validateResult) break;
+                        if (checkType === "SINGLE" && !validateResult) {
+							isBreak = true;
+							break;
+						}
                     }
                 });
             });
@@ -215,6 +235,7 @@ scwin.validateDataCollect = async function (validateObj, options) {
  * @description 데이터 유효성 확인
  * @param {string} validateKey validate key 값
  * @param {string} val validate key value 값
+ * @param {string} valInfo validate 정보 값
  * @param {string} valObj component 객체
  * @param {string} dataObjInfo dataCollection 객체
  * @param {string} checkType validate check 방식 (SINGLE, MULTI)
@@ -225,16 +246,16 @@ scwin.validateDataCollect = async function (validateObj, options) {
  * @exception
  * @example
  */
-scwin.validateDataGroup = function (validateKey, val, valObj, dataObjInfo, checkType, validateType, options) {
+scwin.validateDataGroup = function (validateKey, val, valInfo, valObj, dataObjInfo, checkType, validateType, options) {
     let validateResult = true;
     let messageArr = [];
     let firstObj = null;
     const valObjValue = valObj.getValue();
 
-    if (validateKey === "REQUIRED" && val === "TRUE") {
+    if (validateKey === "REQUIRED" && val.toUpperCase() === "TRUE") {
         if (valObjValue === "") {
             if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(dataObjInfo.columnName)} 필수 입력사항입니다.`;
+                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.columnName)} 필수 입력사항입니다.`;
                 (firstObj === null) && (firstObj = valObj);
 
                 if (checkType === "SINGLE") {
@@ -259,7 +280,7 @@ scwin.validateDataGroup = function (validateKey, val, valObj, dataObjInfo, check
     if (validateKey === "ALLOWCHAR") {
         if (valObjValue.length !== ((valObjValue.match(new RegExp("[" + val + "]", "g")) === null) ? 0 : valObjValue.match(new RegExp("[" + val + "]", "g")).length)) {
             if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(dataObjInfo.columnName)} 허용된 문자(${val})만 입력해주세요.`;
+                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.columnName)} 허용된 문자(${val})만 입력해주세요.`;
                 (firstObj === null) && (firstObj = valObj);
 
                 if (checkType === "SINGLE") {
@@ -282,9 +303,9 @@ scwin.validateDataGroup = function (validateKey, val, valObj, dataObjInfo, check
     }
 
     if (validateKey === "FORMAT") {
-        if (val === "BIRTH" && !scwin.isBirthDay(valObjValue)) {
+        if (val.toUpperCase() === "BIRTH" && !scwin.isBirthDay(valObjValue)) {
             if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(dataObjInfo.columnName)} 정확한 생년월일을 입력해주세요.`;
+                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.columnName)} 정확한 생년월일을 입력해주세요.`;
                 (firstObj === null) && (firstObj = valObj);
 
                 if (checkType === "SINGLE") {
@@ -303,9 +324,9 @@ scwin.validateDataGroup = function (validateKey, val, valObj, dataObjInfo, check
             }
 
             validateResult = false;
-        } else if (val === "DATE" && !scwin.isValidDate(valObjValue)) {
+        } else if (val.toUpperCase() === "DATE" && !scwin.isValidDate(valObjValue)) {
             if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(dataObjInfo.columnName)} 정확한 날짜 형식을 입력해주세요.`;
+                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.columnName)} 정확한 날짜 형식을 입력해주세요.`;
                 (firstObj === null) && (firstObj = valObj);
 
                 if (checkType === "SINGLE") {
@@ -324,9 +345,9 @@ scwin.validateDataGroup = function (validateKey, val, valObj, dataObjInfo, check
             }
 
             validateResult = false;
-        } else if (val === "MOBILEPHONE" && !$c.str.isMobilePhone(valObjValue)) {
+        } else if (val.toUpperCase() === "MOBILEPHONE" && !$c.str.isMobilePhone(valObjValue)) {
             if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(dataObjInfo.columnName)} 정확한 모바일폰 형식을 입력해주세요.`;
+                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.columnName)} 정확한 모바일폰 형식을 입력해주세요.`;
                 (firstObj === null) && (firstObj = valObj);
 
                 if (checkType === "SINGLE") {
@@ -345,9 +366,9 @@ scwin.validateDataGroup = function (validateKey, val, valObj, dataObjInfo, check
             }
 
             validateResult = false;
-        } else if (val === "SECURITYNUMBER" && !$c.str.isSSN(valObjValue)) {
+        } else if (val.toUpperCase() === "SECURITYNUMBER" && !$c.str.isSSN(valObjValue)) {
             if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(dataObjInfo.columnName)} 정확한 주민등록번호 형식을 입력해주세요.`;
+                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.columnName)} 정확한 주민등록번호 형식을 입력해주세요.`;
                 (firstObj === null) && (firstObj = valObj);
 
                 if (checkType === "SINGLE") {
@@ -372,7 +393,7 @@ scwin.validateDataGroup = function (validateKey, val, valObj, dataObjInfo, check
     if (validateKey === "FIXLENGTH") {
         if (valObjValue.length !== Number.parseInt(val)) {
             if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(dataObjInfo.columnName)} 고정길이(${val})로 입력해주세요.`;
+                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.columnName)} 고정길이(${val})로 입력해주세요.`;
                 (firstObj === null) && (firstObj = valObj);
 
                 if (checkType === "SINGLE") {
@@ -397,7 +418,7 @@ scwin.validateDataGroup = function (validateKey, val, valObj, dataObjInfo, check
     if (validateKey === "MINLENGTH") {
         if (valObjValue.length < Number.parseInt(val)) {
             if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(dataObjInfo.columnName)} 최소길이(${val}) 보다 크게 입력해주세요.`;
+                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.columnName)} 최소길이(${val}) 보다 크게 입력해주세요.`;
                 (firstObj === null) && (firstObj = valObj);
 
                 if (checkType === "SINGLE") {
@@ -422,7 +443,7 @@ scwin.validateDataGroup = function (validateKey, val, valObj, dataObjInfo, check
     if (validateKey === "MAXLENGTH") {
         if (valObjValue.length > Number.parseInt(val)) {
             if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(dataObjInfo.columnName)} 최대길이(${val}) 보다 작게 입력해주세요.`;
+                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.columnName)} 최대길이(${val}) 보다 작게 입력해주세요.`;
                 (firstObj === null) && (firstObj = valObj);
 
                 if (checkType === "SINGLE") {
@@ -453,6 +474,7 @@ scwin.validateDataGroup = function (validateKey, val, valObj, dataObjInfo, check
  * @description DataCollection 데이터 유효성 확인
  * @param {string} validateKey validate key 값
  * @param {string} val validate key value 값
+ * @param {string} valInfo validate 정보 값
  * @param {object} valObj gridView component 객체
  * @param {object} dataObjInfo dataCollection 객체
  * @param {number} rowIndex row index
@@ -465,16 +487,16 @@ scwin.validateDataGroup = function (validateKey, val, valObj, dataObjInfo, check
  * @exception
  * @example
  */
-scwin.validateDataCollection = function (validateKey, val, valObj, dataObjInfo, rowIndex, colIndex, checkType, validateType, options) {
+scwin.validateDataCollection = function (validateKey, val, valInfo, valObj, dataObjInfo, rowIndex, colIndex, checkType, validateType, options) {
     let validateResult = true;
     let messageArr = [];
     let firstObj = null;
     const valObjValue = valObj.getCellData(rowIndex, colIndex);
 
-    if (validateKey === "REQUIRED" && val === "TRUE") {
+    if (validateKey === "REQUIRED" && val.toUpperCase() === "TRUE") {
         if (valObjValue === "") {
             if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(dataObjInfo.getColumnName(colIndex))} 필수 입력사항입니다.`;
+                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.getColumnName(colIndex))} 필수 입력사항입니다.`;
                 (firstObj === null) && (firstObj = valObj);
 
                 if (checkType === "SINGLE") {
@@ -498,7 +520,7 @@ scwin.validateDataCollection = function (validateKey, val, valObj, dataObjInfo, 
     if (validateKey === "ALLOWCHAR") {
         if (valObjValue.length !== ((valObjValue.match(new RegExp("[" + val + "]", "g")) === null) ? 0 : valObjValue.match(new RegExp("[" + val + "]", "g")).length)) {
             if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(dataObjInfo.getColumnName(colIndex))} 허용된 문자(${val})만 입력해주세요.`;
+                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.getColumnName(colIndex))} 허용된 문자(${val})만 입력해주세요.`;
                 (firstObj === null) && (firstObj = valObj);
 
                 if (checkType === "SINGLE") {
@@ -520,9 +542,9 @@ scwin.validateDataCollection = function (validateKey, val, valObj, dataObjInfo, 
     }
 
     if (validateKey === "FORMAT") {
-        if (val === "BIRTH" && !scwin.isBirthDay(valObjValue)) {
+        if (val.toUpperCase() === "BIRTH" && !scwin.isBirthDay(valObjValue)) {
             if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(dataObjInfo.getColumnName(colIndex))} 정확한 생년월일을 입력해주세요.`;
+                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.getColumnName(colIndex))} 정확한 생년월일을 입력해주세요.`;
                 (firstObj === null) && (firstObj = valObj);
 
                 if (checkType === "SINGLE") {
@@ -540,9 +562,9 @@ scwin.validateDataCollection = function (validateKey, val, valObj, dataObjInfo, 
             }
 
             validateResult = false;
-        } else if (val === "DATE" && !scwin.isValidDate(valObjValue)) {
+        } else if (val.toUpperCase() === "DATE" && !scwin.isValidDate(valObjValue)) {
             if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(dataObjInfo.getColumnName(colIndex))} 정확한 날짜 형식을 입력해주세요.`;
+                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.getColumnName(colIndex))} 정확한 날짜 형식을 입력해주세요.`;
                 (firstObj === null) && (firstObj = valObj);
 
                 if (checkType === "SINGLE") {
@@ -560,9 +582,9 @@ scwin.validateDataCollection = function (validateKey, val, valObj, dataObjInfo, 
             }
 
             validateResult = false;
-        } else if (val === "MOBILEPHONE" && !$c.str.isMobilePhone(valObjValue)) {
+        } else if (val.toUpperCase() === "MOBILEPHONE" && !$c.str.isMobilePhone(valObjValue)) {
             if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(dataObjInfo.getColumnName(colIndex))} 정확한 모바일폰 형식을 입력해주세요.`;
+                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.getColumnName(colIndex))} 정확한 모바일폰 형식을 입력해주세요.`;
                 (firstObj === null) && (firstObj = valObj);
 
                 if (checkType === "SINGLE") {
@@ -580,9 +602,9 @@ scwin.validateDataCollection = function (validateKey, val, valObj, dataObjInfo, 
             }
 
             validateResult = false;
-        } else if (val === "SECURITYNUMBER" && !$c.str.isSSN(valObjValue)) {
+        } else if (val.toUpperCase() === "SECURITYNUMBER" && !$c.str.isSSN(valObjValue)) {
             if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(dataObjInfo.getColumnName(colIndex))} 정확한 형식을 입력해주세요.`;
+                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.getColumnName(colIndex))} 정확한 형식을 입력해주세요.`;
                 (firstObj === null) && (firstObj = valObj);
 
                 if (checkType === "SINGLE") {
@@ -606,7 +628,7 @@ scwin.validateDataCollection = function (validateKey, val, valObj, dataObjInfo, 
     if (validateKey === "FIXLENGTH") {
         if (valObjValue.length !== Number.parseInt(val)) {
             if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(dataObjInfo.getColumnName(colIndex))} 고정길이(${val})로 입력해주세요.`;
+                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.getColumnName(colIndex))} 고정길이(${val})로 입력해주세요.`;
                 (firstObj === null) && (firstObj = valObj);
 
                 if (checkType === "SINGLE") {
@@ -630,7 +652,7 @@ scwin.validateDataCollection = function (validateKey, val, valObj, dataObjInfo, 
     if (validateKey === "MINLENGTH") {
         if (valObjValue.length < Number.parseInt(val)) {
             if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(dataObjInfo.getColumnName(colIndex))} 최소길이(${val}) 보다 크게 입력해주세요.`;
+                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.getColumnName(colIndex))} 최소길이(${val}) 보다 크게 입력해주세요.`;
                 (firstObj === null) && (firstObj = valObj);
 
                 if (checkType === "SINGLE") {
@@ -654,7 +676,7 @@ scwin.validateDataCollection = function (validateKey, val, valObj, dataObjInfo, 
     if (validateKey === "MAXLENGTH") {
         if (valObjValue.length > Number.parseInt(val)) {
             if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(dataObjInfo.getColumnName(colIndex))} 최대길이(${val}) 보다 작게 입력해주세요.`;
+                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.getColumnName(colIndex))} 최대길이(${val}) 보다 작게 입력해주세요.`;
                 (firstObj === null) && (firstObj = valObj);
 
                 if (checkType === "SINGLE") {
@@ -907,86 +929,6 @@ scwin.isValidDate = function (dateStr, format = "YYYYMMDD") {
     const daysInMonth = [31, isLeapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
     return day >= 1 && day <= daysInMonth[month - 1];
-};
-
-/**
- * @method
- * @name setComponentProperty
- * @description onpageload 등에서 options.fields 에 정의된 컴포넌트별 속성을 일괄 설정한다.
- *  validateDataCollect 와 동일한 통합 options 포맷을 공유한다.
- *  options = { ..., fields : { "컴포넌트ID" : { 속성명 : 값, ... }, ... } }
- *  - 예약 키: value(setValue), disabled(setDisabled), readOnly(setReadOnly),
- *    visible(표시/숨김), style(setStyle), class(addClass), label(setLabel)
- *  - 그 외 키: setProperty 로 일반 속성 설정 (maxlength, allowChar 등). 적용 불가 키는 건너뛴다.
- * @param {Object} options 통합 옵션 객체. fields 에 컴포넌트별 속성을 정의한다.
- * @returns {Boolean} 컴포넌트가 모두 정상 처리되면 true, 미발견 컴포넌트가 있으면 false
- * @hidden N
- * @exception
- * @example
-$c.validate.setComponentProperty({
-    fields : {
-        ipbAge  : { maxlength : 3, allowChar : "0-9", title : "나이" },
-        ipbName : { readOnly : true, value : "홍길동" },
-        btnSave : { disabled : true, visible : false },
-        grpBox  : { style : { color : "red", width : "100px" }, class : "req" }
-    }
-});
- */
-scwin.setComponentProperty = function (options) {
-    const fields = ($c.util.isEmpty(options)) ? null : options.fields;
-    if ($c.util.isEmpty(fields)) return false;
-
-    let result = true;
-
-    Object.keys(fields).forEach(function (compId) {
-        const comp = $p.getComponentById(compId);
-        if ($c.util.isEmpty(comp)) {
-            console.warn("[$c.validate.setComponentProperty] 컴포넌트를 찾을 수 없습니다: " + compId);
-            result = false;
-            return;
-        }
-
-        const props = fields[compId] || {};
-        Object.keys(props).forEach(function (key) {
-            const value = props[key];
-            try {
-                switch (key) {
-                    case "value":
-                        comp.setValue(value);
-                        break;
-                    case "disabled":
-                        comp.setDisabled(value);
-                        break;
-                    case "readOnly":
-                    case "readonly":
-                        comp.setReadOnly(value);
-                        break;
-                    case "visible":
-                        comp.setStyle("display", value ? "" : "none");
-                        break;
-                    case "style":
-                        // { 속성명 : 값 } 형태의 스타일 객체
-                        Object.keys(value).forEach(function (styleKey) {
-                            comp.setStyle(styleKey, value[styleKey]);
-                        });
-                        break;
-                    case "class":
-                        comp.addClass(value);
-                        break;
-                    case "label":
-                        comp.setLabel(value);
-                        break;
-                    default:
-                        comp.setProperty(key, value);
-                }
-            } catch (ex) {
-                // 컴포넌트에 적용할 수 없는 키(검증 전용 등)는 건너뛴다.
-                console.warn("[$c.validate.setComponentProperty] " + compId + "." + key + " 적용 생략", ex);
-            }
-        });
-    });
-
-    return result;
 };
 
 ]]></script>

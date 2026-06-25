@@ -17,7 +17,7 @@ xmlns:xf="http://www.w3.org/2002/xforms">
 		</w2:mfeSubmission>
 		<w2:layoutInfo>
 		</w2:layoutInfo>
-		<w2:publicInfo method="scwin.sessionCheck,scwin.getExcelDownPath,scwin.getUserInfo,scwin.setUserInfo,scwin.isLogin,scwin.goLogin"/>
+		<w2:publicInfo method="scwin.sessionCheck,scwin.getExcelDownPath,scwin.getUserInfo,scwin.setUserInfo,scwin.isLogin,scwin.goLogin,scwin.goIndex,scwin.goLogout"/>
 		<script type="text/javascript" lazy="false"><![CDATA[
 scwin.onpageload = async function() {
     console.log("session", "onpageload");
@@ -30,25 +30,6 @@ scwin.onpageload = async function() {
  * 단일 JSON 객체(scwin.userInfo)로 저장/관리하도록 변경함. (scwin.setUserInfo 참고)
  *
  * 필드 구조(서버 응답 body와 동일):
- *   id          : 사용자 ID
- *   empNo       : 사원번호
- *   empNm       : 사용자 이름
- *   email       : 사용자 Email
- *   usrTpCd     : 사용자구분코드
- *   depCd       : 사용자부서코드
- *   duty        : 공시당번여부
- *   dutyChrg    : 공시당번여부
- *   jobtitl     : 직책구분
- *   market      : 시장구분
- *   gduty       : 당번그룹구분코드
- *   sndloc      : 송신처구분코드
- *   depNm       : 사용자부서명
- *   belngDepCd  : 상위부서코드
- *   svrGubun    : 접속서버 구분
- *   bondYn      : 채권상장팀이면 Y
- *   dutyTpCd    : 당번타입코드
- *   insideEmail : 내부메일
- *   accessTp    : 로그인 타입
  */
 scwin.userInfo = {};
 
@@ -81,13 +62,18 @@ scwin.url = "/api/common/user-info";
  * @exception
  * @example
  */
-scwin.sessionCheck = function() {
+scwin.sessionCheck = async function(isFirst = false) {
     if (!$p) {
         $p = $w;
     }
-    if (!scwin.isLogin()) {
-        scwin.goLogin();
-    }
+
+	const isLogin = await scwin.isLogin(isFirst);
+
+    if (isLogin) {
+        await $c.session.goIndex(isFirst);
+    } else {
+		await $c.session.goLogin(isFirst);
+	}
 };
 
 /**
@@ -165,31 +151,6 @@ scwin.setUserInfo = async function() {
     }
 };
 
-scwin.setSampleUserInfo = function() {
-    // 개발/테스트용 샘플 사용자 정보
-    scwin.userInfo = {
-        id: "201031",
-        empNo: "201031",
-        empNm: "정유정",
-        email: "eds@krx.co.kr",
-        usrTpCd: "4",
-        depCd: "3440",
-        duty: "N",
-        dutyChrg: "N",
-        jobtitl: "03",
-        market: "2",
-        gduty: "21",
-        sndloc: "11",
-        depNm: "공시3팀",
-        belngDepCd: "3400",
-        svrGubun: "test1",
-        bondYn: "N",
-        dutyTpCd: "",
-        insideEmail: "eds@krxin.co.kr",
-        accessTp: "1"
-    };
-};
-
 /**
  * @method
  * @name isLogin
@@ -205,8 +166,13 @@ scwin.setSampleUserInfo = function() {
  * console.log("로그인이 안 되어 있습니다.");
  * }
  */
-scwin.isLogin = function() {
-    return !$c.util.isEmpty(scwin.userInfo.id);
+scwin.isLogin = async function(isFirst = false) {
+	// 서버에서 로그인 정보가 있는 확인
+	if (!isFirst) {
+		await scwin.setUserInfo();
+	}
+
+	return Object.keys(scwin.userInfo).length > 0;
 };
 
 /**
@@ -221,20 +187,73 @@ scwin.isLogin = function() {
  * $c.session.goLogin();
  *
  */
-scwin.goLogin = async function() {
-    if (location.href.indexOf("/cm/main/login.xml") > -1) {
-        console.log('여기는 로그인 페이지입니다.');
-    } else {
-        //로그인 페이지가 아닌데..들어옴..
-        console.log("로그인 페이지가 아닌데..들어옴..");
-        let chk = await scwin.setUserInfo();
-        if (chk) {
-            return scwin;
-        } else {
-            alert("로그인 페이지로 이동합니다.");
-            top.document.location.href = "/websquare/websquare.html?w2xPath=/cm/main/login.xml";
-        }
-    }
+scwin.goLogin = async function(isFirst = false) {
+	// 로그인 여부를 확인해서 로그인 페이지로 이동
+	const isLogin = await $c.session.isLogin(isFirst);
+
+	// 로그인 페이지이거나 로그인 상태면 return
+    if (document.location.search === "" && isLogin) {
+		await $c.session.goIndex();
+		return;
+	} else if (document.location.href.indexOf(`/cm/main/${WebSquareExternal.contextPath}/login.xml`) > -1) {
+        return;
+    } 
+
+	// redirectUrl 이 있는 경우 해당 페이지로 이동
+	if (!$c.util.isEmpty(WebSquareExternal.redirectUrl)) {
+		await $p.main().pfm_main.setSrc(WebSquareExternal.redirectUrl);
+		WebSquareExternal.redirectUrl = "";
+		return;
+	}
+
+	if (!isLogin) {
+		if (!isFirst) {
+			await $c.win.alert("로그인 페이지로 이동합니다.");
+		}
+		await $p.main().pfm_main.setSrc(`/cm/main/${WebSquareExternal.contextPath}/login.xml`);
+		return;
+	}
+};
+
+/**
+ * @method
+ * @name goIndex
+ * @description Index 페이지로 전환됩니다.
+ * @param
+ * @hidden N
+ * @exception
+ * @example
+ *
+ * $c.session.goIndex();
+ *
+ */
+scwin.goIndex = async function(isFirst = false) {
+
+	if ($c.util.isEmpty(WebSquareExternal.redirectUrl)) {
+		await $p.main().pfm_main.setSrc(`/cm/main/${WebSquareExternal.contextPath}/index.xml`);
+	} else {
+		await $p.main().pfm_main.setSrc(WebSquareExternal.redirectUrl);
+		WebSquareExternal.redirectUrl = "";
+	}
+
+	return;
+};
+
+/**
+ * @method
+ * @name goLogout
+ * @description 로그아웃 후 로그인 페이지로 전환됩니다.
+ * @param
+ * @hidden N
+ * @exception
+ * @example
+ *
+ * $c.session.goLogout();
+ *
+ */
+scwin.goLogout = async function() {
+	scwin.userInfo = {};
+    await $p.main().pfm_main.setSrc(`/cm/main/${WebSquareExternal.contextPath}/login.xml`);
 };]]></script>
 	</head>
 	<body ev:onpageload="scwin.onpageload">

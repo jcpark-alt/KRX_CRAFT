@@ -15,7 +15,7 @@ xmlns:xf="http://www.w3.org/2002/xforms">
 		</xf:model>
 		<w2:layoutInfo>
 		</w2:layoutInfo>
-		<w2:publicInfo method="scwin.getValResultMsg,scwin.setDownloadGridViewOption,scwin.loadMessage,scwin.initChangeCheckedDc,scwin.setChangeCheckedDc,scwin.getChangeCheckedMainFrame,scwin.setCommonCode,scwin.getCommonCodeDataList,scwin.executeCommonCode,scwin.getParameter,scwin.getColumnName,scwin.getDataCollection,scwin.getMessage,scwin.isModified,scwin.downloadMultipleDataList,scwin.downloadMultipleGridView,scwin.downloadGridViewExcel,scwin.downloadGridViewCSV,scwin.uploadGridViewExcel,scwin.uploadGridViewCSV,scwin.validateGroup,scwin.validateGridView,scwin.createDataList,scwin.createDataMap,scwin.undoAll,scwin.undoRow,scwin.undoGridView,scwin.deleteRow,scwin.insertRow,scwin.getMatchedJSON,scwin.setUserData,scwin.getUserData,scwin.createHolidayDataList,scwin.loadHoliday,scwin.serializeFormToQueryString,scwin.downFile"/>
+		<w2:publicInfo method="scwin.getValResultMsg,scwin.setDownloadGridViewOption,scwin.loadMessage,scwin.loadCommonMessage,scwin.initChangeCheckedDc,scwin.setChangeCheckedDc,scwin.getChangeCheckedMainFrame,scwin.setCommonCode,scwin.getCommonCodeDataList,scwin.executeCommonCode,scwin.getParameter,scwin.getColumnName,scwin.getDataCollection,scwin.getMessage,scwin.isModified,scwin.downloadMultipleDataList,scwin.downloadMultipleGridView,scwin.downloadGridViewExcel,scwin.downloadGridViewCSV,scwin.uploadGridViewExcel,scwin.uploadGridViewCSV,scwin.validateGroup,scwin.validateGridView,scwin.createDataList,scwin.createDataMap,scwin.undoAll,scwin.undoRow,scwin.undoGridView,scwin.deleteRow,scwin.insertRow,scwin.getMatchedJSON,scwin.setUserData,scwin.getUserData,scwin.createHolidayDataList,scwin.loadHoliday,scwin.serializeFormToQueryString,scwin.downFile"/>
 		<script type="text/javascript" lazy="false"><![CDATA[
 // 공통 코드 저장을 위한 DataList 속성 정보
 scwin.DATA_PREFIX = "dlt_commonCode";
@@ -241,6 +241,38 @@ scwin.loadMessage = function () {
     };
 
     $c.sbm.executeDynamic(getMessageOption);
+};
+
+/**
+ * @method
+ * @name loadCommonMessage
+ * @description 공통 메시지 정의 파일(common_message.json)을 동기 로드하여 캐시 객체(scwin._commonMessage)에 넣는다.
+ *  getMessage가 1회 지연 로드하므로 별도 호출은 선택사항이며, 페이지 초기화 시 미리 호출해 두면 첫 getMessage 호출이 빨라진다.
+ *  파일 경로는 컨텍스트 경로 기준 "/websquare/cm/message/common_message.json" 이다.(배포 위치가 다르면 경로를 조정한다.)
+ * @param
+ * @hidden N
+ * @exception
+ * @example $c.data.loadCommonMessage();
+ */
+scwin.loadCommonMessage = function () {
+    scwin._commonMessageLoaded = true;
+    try {
+        const opt = {
+            id: "_sbm_commonMessage",
+            action: $c.sbm.getContextPath() + "/websquare/cm/message/common_message.json",
+            method: "get",
+            mode: "synchronous",
+            mediatype: "application/json",
+            submitDoneHandler: function (e) {
+                scwin._commonMessage = (e && e.responseJSON) ? e.responseJSON : {};
+            },
+            isProcessMsg: false
+        };
+        $c.sbm.executeDynamic(opt);
+    } catch (ex) {
+        console.error("[$c.data.loadCommonMessage] Exception :: " + ex.message);
+    }
+    if ($c.util.isEmpty(scwin._commonMessage)) { scwin._commonMessage = {}; }
 };
 
 /**
@@ -828,26 +860,51 @@ scwin.getDataCollection = function (comObj) {
 /**
  * @method
  * @name getMessage
- * @description 공통 메시지 코드에 해당하는 공통 메시지 코드를 반환합니다.
- * @param {String} msgId 메시지 ID , Array 형식인 경우는 첫번째 인덱스가 sysMsgId가 되고 두번째 인덱스부터 치환문자가 됨
+ * @description 공통 메시지 코드에 해당하는 메시지를 반환합니다. 공통 메시지 정의 파일(common_message.json)을 우선 조회하고, 없으면 서버 다국어 메시지(WebSquareLang)로 폴백합니다.(common_message.json은 최초 호출 시 1회 지연 로드)
+ * @param {String} msgId 메시지 ID. 두번째 인자부터는 메시지의 자리표시자($[0], $[1] ...)를 순서대로 치환한다.($[n] ← (n+2)번째 인자)
+ * @description 메시지 본문에 "$[n]{받침조사/무받침조사}" 형태의 인라인 조사 마커를 쓰면, 해당 인자의 받침 유무에 따라 조사를 자동 선택해 "값+조사"로 치환한다.(한국어 화면에서만 동작, 빈 인자면 마커 유지)
  * @hidden N
- * @exception 
+ * @exception
  * @example
 $c.data.getMessage("MSG_CM_00001");  // "변경된 데이터를 저장하시겠습니까?"
 $c.data.getMessage("MSG_CM_00002", $c.str.attachPostposition("전화번호"));  // "전화번호는 필수입력값입니다."
 $c.data.getMessage("MSG_CM_00003", "세션이 종료되어");  // "세션이 종료되어 로그인 화면으로 이동하겠습니다."
 $c.data.getMessage("MSG_CM_00007", "엑셀", "5M");  // 엑셀 파일의 크기가 5M를 초과 했습니다.
+
+// 인라인 조사 마커 : 메시지 "$[0]{은/는} 필수 입력 사항입니다." 인 경우
+$c.data.getMessage("MSG_XXX", "아이디");  // "아이디는 필수 입력 사항입니다." (받침 없음 → 는)
+$c.data.getMessage("MSG_XXX", "이메일");  // "이메일은 필수 입력 사항입니다." (받침 있음 → 은)
+// 메시지 "$[0]{을/를} 입력해주세요." 인 경우
+$c.data.getMessage("MSG_YYY", "성명");    // "성명을 입력해주세요." (받침 있음 → 을)
  */
 scwin.getMessage = function (msgId) {
+    // 공통 메시지 정의 파일(common_message.json)을 최초 1회 지연 로드한다.
+    if (scwin._commonMessageLoaded !== true) {
+        scwin.loadCommonMessage();
+    }
+
     let message = ""
     if ($c.util.isEmpty(msgId) === false) {
-        message = WebSquare.WebSquareLang[msgId];
+        // common_message.json 우선 조회, 없으면 서버 다국어 메시지(WebSquareLang)로 폴백한다.
+        if (scwin._commonMessage && ($c.util.isEmpty(scwin._commonMessage[msgId]) === false)) {
+            message = scwin._commonMessage[msgId];
+        } else if (WebSquare.WebSquareLang && ($c.util.isEmpty(WebSquare.WebSquareLang[msgId]) === false)) {
+            message = WebSquare.WebSquareLang[msgId];
+        }
     }
 
     if ($c.util.isEmpty(message) === false) {
         let tmpMessage = message;
 
         if (arguments.length > 1) {
+            const args = arguments;
+            // $[n]{A/B} 인라인 조사 마커 : 인자 n(0-based)의 받침 유무로 A(받침)/B(무받침)를 선택해 "값+조사"로 치환한다.
+            tmpMessage = tmpMessage.replace(/\$\[(\d+)\]\{([^/}]+)\/([^}]+)\}/g, function (m, idx, a, b) {
+                const val = args[Number(idx) + 1];
+                if ($c.util.isEmpty(val)) { return m; } // 빈 값이면 마커를 보존한다.
+                const josa = ($c.win.getLanguage() === "ko") ? ($c.str.isFinalConsonant(val) ? a : b) : "";
+                return val + josa;
+            });
             for (let i = 1; i < arguments.length; i++) {
                 if ($c.util.isEmpty(arguments[i]) === false) {
                     tmpMessage = (tmpMessage.indexOf("$[" + (i - 1) + "]") != -1) ? $c.str.replaceAll(tmpMessage, "$[" + (i - 1) + "]", arguments[i]) : tmpMessage;
