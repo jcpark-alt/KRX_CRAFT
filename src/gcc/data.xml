@@ -15,7 +15,7 @@ xmlns:xf="http://www.w3.org/2002/xforms">
 		</xf:model>
 		<w2:layoutInfo>
 		</w2:layoutInfo>
-		<w2:publicInfo method="scwin.getValResultMsg,scwin.setDownloadGridViewOption,scwin.loadMessage,scwin.loadCommonMessage,scwin.initChangeCheckedDc,scwin.setChangeCheckedDc,scwin.getChangeCheckedMainFrame,scwin.setCommonCode,scwin.getCommonCodeDataList,scwin.executeCommonCode,scwin.getParameter,scwin.getColumnName,scwin.getDataCollection,scwin.getMessage,scwin.isModified,scwin.downloadMultipleDataList,scwin.downloadMultipleGridView,scwin.downloadGridViewExcel,scwin.downloadGridViewCSV,scwin.uploadGridViewExcel,scwin.uploadGridViewCSV,scwin.validateGroup,scwin.validateGridView,scwin.createDataList,scwin.createDataMap,scwin.undoAll,scwin.undoRow,scwin.undoGridView,scwin.deleteRow,scwin.insertRow,scwin.getMatchedJSON,scwin.getDiffJSON,scwin.setUserData,scwin.getUserData,scwin.createHolidayDataList,scwin.loadHoliday,scwin.serializeFormToQueryString,scwin.downFile"/>
+		<w2:publicInfo method="scwin.getValResultMsg,scwin.setDownloadGridViewOption,scwin.loadMessage,scwin.loadCommonMessage,scwin.initChangeCheckedDc,scwin.setChangeCheckedDc,scwin.getChangeCheckedMainFrame,scwin.setCommonCode,scwin.getCommonCodeDataList,scwin.executeCommonCode,scwin.getParameter,scwin.getColumnName,scwin.getDataCollection,scwin.getMessage,scwin.isModified,scwin.downloadMultipleDataList,scwin.downloadMultipleGridView,scwin.downloadGridViewExcel,scwin.downloadGridViewCSV,scwin.uploadGridViewExcel,scwin.uploadGridViewCSV,scwin.validateGroup,scwin.validateGridView,scwin.createDataList,scwin.createDataMap,scwin.undoAll,scwin.undoRow,scwin.undoGridView,scwin.deleteRow,scwin.insertRow,scwin.getMatchedJSON,scwin.getDiffJSON,scwin.pickJSON,scwin.omitJSON,scwin.keyByJSON,scwin.groupByJSON,scwin.deepClone,scwin.mergeJSON,scwin.setUserData,scwin.getUserData,scwin.createHolidayDataList,scwin.loadHoliday,scwin.serializeFormToQueryString,scwin.downFile"/>
 		<script type="text/javascript" lazy="false"><![CDATA[
 // 공통 코드 저장을 위한 DataList 속성 정보
 scwin.DATA_PREFIX = "dlt_commonCode";
@@ -2565,6 +2565,207 @@ scwin.getDiffJSON = function (source, target) {
         }
     } catch (ex) {
         console.error("[$c.data.getDiffJSON] Exception :: " + ex.message);
+    }
+    return result;
+};
+
+// 파라미터가 DataMap이면 getJSON()으로 변환, 그 외(JSON 객체)는 그대로 반환한다.(내부 헬퍼)
+scwin.__getPlainJSON = function (param) {
+    if (param && (typeof param.getObjectType === "function") && (param.getObjectType() === "dataMap")) {
+        return param.getJSON();
+    }
+    return param;
+};
+
+// 파라미터가 DataList이면 getAllJSON()으로 변환, 그 외(배열)는 그대로 반환한다.(내부 헬퍼)
+scwin.__getPlainArray = function (param) {
+    if (param && (typeof param.getObjectType === "function") && (param.getObjectType() === "dataList")) {
+        return param.getAllJSON();
+    }
+    return param;
+};
+
+/**
+ * @method
+ * @name pickJSON
+ * @description 데이터(DataMap 또는 JSON 객체)에서 지정한 key만 추출하여 새 JSON으로 반환한다. 파라미터가 DataMap이면 getJSON()으로 변환 후 처리한다.
+ * @param {Object} source 원본 데이터. DataMap 객체 또는 JSON 객체.
+ * @param {Array|String} keys 추출할 key 목록(배열) 또는 단일 key 문자열.
+ * @returns {Object} 지정한 key만 담은 JSON. 존재하지 않는 key는 무시한다.
+ * @hidden N
+ * @exception
+ * @example
+$c.data.pickJSON({ nm : "홍길동", age : "20", addr : "서울" }, ["nm", "age"]);
+// → { nm : "홍길동", age : "20" }
+$c.data.pickJSON(dma_user, ["userId", "userNm"]);
+ */
+scwin.pickJSON = function (source, keys) {
+    const result = {};
+    try {
+        const json = scwin.__getPlainJSON(source);
+        if ($c.util.getObjectType(json) !== "json") { return result; }
+        const keyArr = $c.util.isArray(keys) ? keys : [keys];
+        for (let i = 0; i < keyArr.length; i++) {
+            if (Object.prototype.hasOwnProperty.call(json, keyArr[i]) === true) {
+                result[keyArr[i]] = json[keyArr[i]];
+            }
+        }
+    } catch (ex) {
+        console.error("[$c.data.pickJSON] Exception :: " + ex.message);
+    }
+    return result;
+};
+
+/**
+ * @method
+ * @name omitJSON
+ * @description 데이터(DataMap 또는 JSON 객체)에서 지정한 key만 제외하고 나머지를 새 JSON으로 반환한다. 파라미터가 DataMap이면 getJSON()으로 변환 후 처리한다.
+ * @param {Object} source 원본 데이터. DataMap 객체 또는 JSON 객체.
+ * @param {Array|String} keys 제외할 key 목록(배열) 또는 단일 key 문자열.
+ * @returns {Object} 지정한 key를 제외한 JSON.
+ * @hidden N
+ * @exception
+ * @example
+$c.data.omitJSON({ nm : "홍길동", age : "20", pw : "1234" }, ["pw"]);
+// → { nm : "홍길동", age : "20" }
+$c.data.omitJSON(dma_user, ["_rowStatus", "_originStatus"]);
+ */
+scwin.omitJSON = function (source, keys) {
+    const result = {};
+    try {
+        const json = scwin.__getPlainJSON(source);
+        if ($c.util.getObjectType(json) !== "json") { return result; }
+        const keyArr = $c.util.isArray(keys) ? keys : [keys];
+        for (const key in json) {
+            if (Object.prototype.hasOwnProperty.call(json, key) === false) { continue; }
+            if (keyArr.indexOf(key) === -1) {
+                result[key] = json[key];
+            }
+        }
+    } catch (ex) {
+        console.error("[$c.data.omitJSON] Exception :: " + ex.message);
+    }
+    return result;
+};
+
+/**
+ * @method
+ * @name keyByJSON
+ * @description 배열(또는 DataList)을 지정한 key 값을 기준으로 { key값 : row } 형태의 인덱싱 맵으로 반환한다. 파라미터가 DataList이면 getAllJSON()으로 변환 후 처리한다.
+ * @param {Object} list 원본 데이터. DataList 객체 또는 JSON 배열.
+ * @param {String} key 인덱스로 사용할 컬럼(필드)명.
+ * @returns {Object} { key값 : row } 형태의 맵. 동일 key값이 여러 건이면 마지막 row로 덮어쓴다.
+ * @hidden N
+ * @exception
+ * @example
+$c.data.keyByJSON([{ id : "1", nm : "A" }, { id : "2", nm : "B" }], "id");
+// → { "1" : { id : "1", nm : "A" }, "2" : { id : "2", nm : "B" } }
+$c.data.keyByJSON(dlt_member, "memberId");
+ */
+scwin.keyByJSON = function (list, key) {
+    const result = {};
+    try {
+        const arr = scwin.__getPlainArray(list);
+        if ($c.util.isArray(arr) === false) { return result; }
+        for (let i = 0; i < arr.length; i++) {
+            const row = arr[i];
+            if ($c.util.getObjectType(row) !== "json") { continue; }
+            if (Object.prototype.hasOwnProperty.call(row, key) === true) {
+                result[row[key]] = row;
+            }
+        }
+    } catch (ex) {
+        console.error("[$c.data.keyByJSON] Exception :: " + ex.message);
+    }
+    return result;
+};
+
+/**
+ * @method
+ * @name groupByJSON
+ * @description 배열(또는 DataList)을 지정한 key 값을 기준으로 { key값 : [rows] } 형태로 그룹핑하여 반환한다. 파라미터가 DataList이면 getAllJSON()으로 변환 후 처리한다.
+ * @param {Object} list 원본 데이터. DataList 객체 또는 JSON 배열.
+ * @param {String} key 그룹핑 기준 컬럼(필드)명.
+ * @returns {Object} { key값 : [같은 key값을 가진 row 배열] } 형태의 맵.
+ * @hidden N
+ * @exception
+ * @example
+$c.data.groupByJSON([{ dept : "A", nm : "갑" }, { dept : "A", nm : "을" }, { dept : "B", nm : "병" }], "dept");
+// → { A : [{ dept : "A", nm : "갑" }, { dept : "A", nm : "을" }], B : [{ dept : "B", nm : "병" }] }
+$c.data.groupByJSON(dlt_member, "deptCd");
+ */
+scwin.groupByJSON = function (list, key) {
+    const result = {};
+    try {
+        const arr = scwin.__getPlainArray(list);
+        if ($c.util.isArray(arr) === false) { return result; }
+        for (let i = 0; i < arr.length; i++) {
+            const row = arr[i];
+            if ($c.util.getObjectType(row) !== "json") { continue; }
+            if (Object.prototype.hasOwnProperty.call(row, key) === false) { continue; }
+            const groupKey = row[key];
+            if ($c.util.isArray(result[groupKey]) === false) { result[groupKey] = []; }
+            result[groupKey].push(row);
+        }
+    } catch (ex) {
+        console.error("[$c.data.groupByJSON] Exception :: " + ex.message);
+    }
+    return result;
+};
+
+/**
+ * @method
+ * @name deepClone
+ * @description 데이터(JSON/배열, DataMap/DataList)를 깊은 복사하여 원본과 독립된 새 객체로 반환한다. DataMap은 getJSON(), DataList는 getAllJSON()으로 변환 후 복제한다. JSON 직렬화 기반이므로 function/undefined/Date 등은 보존되지 않는다.
+ * @param {Object} source 복사할 원본 데이터.
+ * @returns {Object} 원본과 참조를 공유하지 않는 깊은 복사본. 원시값은 그대로 반환한다.
+ * @hidden N
+ * @exception
+ * @example
+const copy = $c.data.deepClone({ user : { id : "1" } });
+copy.user.id = "2"; // 원본 불변
+const snapshot = $c.data.deepClone(dma_user); // DataMap → plain JSON 복제본
+ */
+scwin.deepClone = function (source) {
+    try {
+        // DataMap/DataList는 plain 데이터로 변환 후 복제한다.
+        let target = scwin.__getPlainJSON(source);
+        target = scwin.__getPlainArray(target);
+        if (target === null || typeof target !== "object") { return target; }
+        return JSON.parse(JSON.stringify(target));
+    } catch (ex) {
+        console.error("[$c.data.deepClone] Exception :: " + ex.message);
+        return source;
+    }
+};
+
+/**
+ * @method
+ * @name mergeJSON
+ * @description 여러 개의 데이터(DataMap 또는 JSON 객체)를 하나의 JSON으로 얕게(shallow) 병합하여 반환한다. 동일 key는 뒤에 전달된 인자가 앞 인자를 덮어쓴다. DataMap 인자는 getJSON()으로 변환 후 병합하며, JSON 객체가 아닌 인자는 무시한다.
+ * @param {...Object} sources 병합할 데이터. DataMap 객체 또는 JSON 객체를 가변 인자로 전달한다.
+ * @returns {Object} 병합된 새 JSON.(원본 인자는 변경하지 않는다)
+ * @hidden N
+ * @exception
+ * @example
+$c.data.mergeJSON({ a : "1", b : "2" }, { b : "9", c : "3" });
+// → { a : "1", b : "9", c : "3" }
+$c.data.mergeJSON(dma_search.getJSON(), { pageIndex : "1" });
+ */
+scwin.mergeJSON = function () {
+    const result = {};
+    try {
+        for (let i = 0; i < arguments.length; i++) {
+            const json = scwin.__getPlainJSON(arguments[i]);
+            if ($c.util.getObjectType(json) !== "json") { continue; }
+            for (const key in json) {
+                if (Object.prototype.hasOwnProperty.call(json, key) === true) {
+                    result[key] = json[key];
+                }
+            }
+        }
+    } catch (ex) {
+        console.error("[$c.data.mergeJSON] Exception :: " + ex.message);
     }
     return result;
 };
