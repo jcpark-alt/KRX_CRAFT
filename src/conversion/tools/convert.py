@@ -23,6 +23,9 @@ substitution_dict() 를 단일 출처로 사용한다.
   · 규칙 12: 같은 스코프의 {DC}.DataID = encode({url})|"리터럴" + {DC}.reset()|{DC}.Reset() 쌍을
             $c.sbm.executeDynamic(sbmOptions) 로 전환(주석 변형 포함, action=URL의 ? 앞 경로.
             Gauce 대문자 .Reset() 및 직접 문자열 리터럴 DataID 포함)
+  · 규칙 17: [await] {recv}.CreateDialogFrame(id,url,title,left,top,width,height,type) ->
+            $c.win.openPopup(url, options, data). type="window"→browserPopup(콜백 추가)/그 외→pageFramePopup.
+            options.id=url 파일명(확장자 제거), left/top 드롭, 정수 width/height→"Npx". 윗줄 row 인자 호출 삭제.
 
 판단 필요 항목(규칙 6 submission, 레거시 dataset API, 검토/대체·충돌 매핑 등)은 리포트로 출력.
 
@@ -1447,6 +1450,150 @@ def rule16_trs_submission(script, report):
     return script
 
 
+# ---------- 규칙 17 : $c.frame.CreateDialogFrame(...) → $c.win.openPopup(...) ----------
+# AS-IS: [await] {recv}.CreateDialogFrame(id, url, title, left, top, width, height, type)
+#   · type === "window" → "browserPopup", 그 외/없음 → "pageFramePopup"
+#   · left, top 인자는 사용하지 않음(드롭)
+#   · options.id 는 url 의 파일명(확장자 제거)을 사용(AS-IS 첫 인자는 무시)
+#   · width/height : 정수 리터럴은 "{n}px", 그 외(표현식/변수)는 원형 유지
+#   · browserPopup 이면 data.callbackFn + scwin.popupCallback(result) 호출 + scwin.popupCallback 정의 추가
+#   · CreateDialogFrame 바로 윗줄이 인자에 row 를 넘기는 함수 호출이면 삭제
+# data 객체는 레거시 호출에 페이로드가 없어 TO-DO 플레이스홀더로 생성한다(검토 보강).
+_CDF_RE = re.compile(r'(?:await\s+)?(?:\$c\.)?frame\.CreateDialogFrame\s*\(')
+_ROW_CALL_RE = re.compile(r'^[ \t]*[\w$.]+\s*\([^()]*\brow\b[^()]*\)\s*;[ \t]*$')
+_INT_LIT_RE = re.compile(r'^\d+$')
+_POPUP_CALLBACK_DEF = (
+    "\n"
+    "/**\n"
+    " * @method\n"
+    " * @name popupCallback\n"
+    " * @description browserPopup 팝업의 callback 함수. 부모창에서 팝업 결과 값을 처리한다.\n"
+    " * @param {String | Number} arg 팝업에서 전달받은 값\n"
+    " */\n"
+    "scwin.popupCallback = function (arg) {\n"
+    "    // TO-DO : arg 값 확인 후 업무 로직 추가\n"
+    "};\n"
+)
+
+
+def _url_to_id(url_arg):
+    """url 인자(문자열 리터럴)에서 파일명(확장자 제거)을 추출. 리터럴이 아니면 None."""
+    m = re.fullmatch(r'''(["'])([\s\S]*)\1''', url_arg.strip())
+    if not m:
+        return None
+    base = re.split(r'[\\/]', m.group(2))[-1]
+    return base.rsplit(".", 1)[0] if base else None
+
+
+def _popup_dim(arg):
+    """width/height 인자 → 정수 리터럴이면 "Npx", 그 외(표현식/변수)는 원형 유지."""
+    a = arg.strip()
+    return '"%spx"' % a if _INT_LIT_RE.match(a) else a
+
+
+def rule17_create_dialog_frame(code, report):
+    mask = code_mask(code)
+    depth = depth_array(code)
+
+    def block_range(pos):
+        d = depth[pos]
+        i = pos
+        while i > 0 and depth[i] >= d:
+            i -= 1
+        j = pos
+        while j < len(code) and depth[j] >= d:
+            j += 1
+        return i, j
+
+    block_state = {}
+
+    def names(bk, pos):
+        if bk not in block_state:
+            i, j = block_range(pos)
+            block_state[bk] = len(re.findall(r'\bconst +options\d*\b', code[i:j]))
+        c = block_state[bk]
+        block_state[bk] = c + 1
+        sfx = "" if c == 0 else str(c + 1)
+        return "options" + sfx, "data" + sfx, "result" + sfx
+
+    edits = {}
+    converted, skipped = [], []
+    need_callback = [False]
+
+    for mo in _CDF_RE.finditer(code):
+        if not mask[mo.start()]:
+            continue
+        scanned = _scan_call(code, mask, mo.end() - 1)
+        if scanned is None:
+            continue
+        args, end = scanned
+        if len(args) != 8:
+            skipped.append("CreateDialogFrame 인자 %d개(8개 아님): %s" % (len(args), code[mo.start():end][:60]))
+            continue
+        _id, url, title, _left, _top, width, height, ptype = args
+        popup_id = _url_to_id(url)
+        if popup_id is None:
+            skipped.append("CreateDialogFrame url 비리터럴(파일명 추출 불가): %s" % url.strip())
+            continue
+        is_browser = ptype.strip() in ('"window"', "'window'")
+        popup_type = "browserPopup" if is_browser else "pageFramePopup"
+
+        ls, le = _line_bounds(code, mo.start())
+        line = code[ls:le]
+        indent = line[:len(line) - len(line.lstrip())]
+        bk = block_range(mo.start())[0]
+        opt, dat, res = names(bk, mo.start())
+
+        blk = [
+            indent + "const %s = {" % opt,
+            indent + '    id: "%s",' % popup_id,
+            indent + "    title: %s," % title.strip(),
+            indent + '    type: "%s",' % popup_type,
+            indent + "    width: %s," % _popup_dim(width),
+            indent + "    height: %s" % _popup_dim(height),
+            indent + "};",
+            "",
+            indent + "const %s = {" % dat,
+        ]
+        if is_browser:
+            blk.append(indent + "    // TO-DO : 팝업으로 전달할 파라미터 설정,")
+            blk.append(indent + '    callbackFn: "scwin.popupCallback"')
+        else:
+            blk.append(indent + "    // TO-DO : 팝업으로 전달할 파라미터 설정")
+        blk.append(indent + "};")
+        blk.append("")
+        blk.append(indent + "const %s = await $c.win.openPopup(%s, %s, %s);" % (res, url.strip(), opt, dat))
+        if is_browser:
+            blk.append(indent + "scwin.popupCallback(%s);" % res)
+            need_callback[0] = True
+        else:
+            blk.append(indent + "// TO-DO : result 값 확인 후 업무 로직 추가")
+        repl = "\n".join(blk) + "\n"
+
+        stmt_ls, _ = _line_bounds(code, mo.start())
+        stmt_le = code.find("\n", end)
+        stmt_le = len(code) if stmt_le < 0 else stmt_le + 1
+        edits[stmt_ls] = (stmt_le, repl)
+
+        if stmt_ls > 0:
+            prev_ls, prev_le = _line_bounds(code, stmt_ls - 1)
+            if _ROW_CALL_RE.match(code[prev_ls:prev_le].rstrip("\n")):
+                edits.setdefault(prev_ls, (prev_le, ""))
+
+        converted.append("CreateDialogFrame → openPopup (id=%s, type=%s)" % (popup_id, popup_type))
+
+    for s in sorted(edits, reverse=True):
+        e, repl = edits[s]
+        code = code[:s] + repl + code[e:]
+
+    if need_callback[0] and not re.search(r'scwin\.popupCallback\s*=', code):
+        code = code.rstrip("\n") + "\n" + _POPUP_CALLBACK_DEF
+    report["rule17"] = {"converted": converted, "skipped": skipped}
+    for s in skipped:
+        report["judgment"].append("규칙17 CreateDialogFrame 미변환: " + s)
+    return code
+
+
 # ---------- 판단 필요 항목 리포트 ----------
 def collect_judgment(script, head, body, report):
     # 규칙6 미변환으로 남은 submission 노드(실행 호출 없음 등)
@@ -1492,7 +1639,7 @@ def collect_judgment(script, head, body, report):
 
 # ---------- 파이프라인 ----------
 def convert(raw, filename):
-    report = {"rule1": "", "rule2": 0, "rule2_skip": [], "rule3": [], "rule4": None, "rule4_merge": None, "rule5a": 0, "rule5b": [], "rule5c": [], "rule5d": [], "rule6": {"converted": [], "deleted": 0}, "rule7": [], "rule7m": [], "rule7n": [], "rule8": {"const": 0, "let": 0}, "rule9": 0, "rule10": 0, "rule11": 0, "rule12": {"converted": []}, "rule13": [], "rule14": [], "rule15": [], "rule16": {"converted": [], "skipped": []}, "wcraft": 0, "judgment": []}
+    report = {"rule1": "", "rule2": 0, "rule2_skip": [], "rule3": [], "rule4": None, "rule4_merge": None, "rule5a": 0, "rule5b": [], "rule5c": [], "rule5d": [], "rule6": {"converted": [], "deleted": 0}, "rule7": [], "rule7m": [], "rule7n": [], "rule8": {"const": 0, "let": 0}, "rule9": 0, "rule10": 0, "rule11": 0, "rule12": {"converted": []}, "rule13": [], "rule14": [], "rule15": [], "rule16": {"converted": [], "skipped": []}, "rule17": {"converted": [], "skipped": []}, "wcraft": 0, "judgment": []}
     reg = split_regions(raw)
     if reg is None:
         raise ValueError("SCRIPT(CDATA) 영역을 찾지 못했습니다.")
@@ -1506,6 +1653,7 @@ def convert(raw, filename):
     reg["head"], s = rule6_submission(reg["head"], reg["body"], s, report)
     s = rule12_dynamic_submission(s, report)
     s = rule16_trs_submission(s, report)
+    s = rule17_create_dialog_frame(s, report)
     s = rule9_remove_obsolete(s, report)
     s = rule11_remove_include(s, report)
     s = rule8_var(s, report)
@@ -1579,6 +1727,9 @@ def print_report(rep, filename):
         print("   -", s)
     print("규칙16 trs Action/KeyValue/Parameters/Post → executeDynamic :", len(rep["rule16"]["converted"]), "건")
     for s in rep["rule16"]["converted"]:
+        print("   -", s)
+    print("규칙17 CreateDialogFrame → openPopup :", len(rep["rule17"]["converted"]), "건")
+    for s in rep["rule17"]["converted"]:
         print("   -", s)
     print("규칙13 scwin.fn_* → camelCase 정규화 :", len(rep["rule13"]), "건")
     for s in rep["rule13"]:
