@@ -1,0 +1,772 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:ev="http://www.w3.org/2001/xml-events"
+    xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+    <head meta_screenName="(팝업)서식관리 서식 파일 생성 축멤버 추가">
+        <w2:type>COMPONENT</w2:type>
+        <w2:buildDate/>
+        <w2:MSA/>
+        <xf:model>
+            <w2:dataCollection baseNode="map">
+                <w2:dataMap baseNode="map" id="dma_search">
+        			<w2:keyInfo>
+        				<w2:key id="txnId" name="텍사노미ID" dataType="text" />
+        			</w2:keyInfo>
+        		</w2:dataMap>
+                <w2:dataList id="dlt_dataPoint" baseNode="list" saveRemovedData="true" repeatNode="map">
+        			<w2:columnInfo>
+        				<w2:column id="dataId" name="객체ID" dataType="text"></w2:column>
+                        <w2:column id="dataNm" name="객체명" dataType="text"></w2:column>
+                        <w2:column id="enumList" name="Enumeration" dataType="text"></w2:column>
+        			</w2:columnInfo>
+        		</w2:dataList>
+                <w2:dataList id="dlt_enum" baseNode="list" saveRemovedData="true" repeatNode="map">
+        			<w2:columnInfo>        				
+                        <w2:column id="enumKorLabl" name="참조명(한글명)" dataType="text"></w2:column>                        
+                        <w2:column id="member" name="Member" dataType="text"></w2:column>
+                        <w2:column id="enumVal" name="참조값" dataType="text"></w2:column>
+                        <w2:column id="enumEnLabl" name="참조명(영문명)" dataType="text"></w2:column>
+        			</w2:columnInfo>
+        		</w2:dataList>
+                <w2:dataList id="dlt_com" baseNode="list" saveRemovedData="true" repeatNode="map">
+        			<w2:columnInfo>        				
+                        <w2:column id="elmtKorLabl" name="엘리먼트한글라벨" dataType="text"></w2:column>
+                        <w2:column id="elmtId" name="엘리먼트ID" dataType="text"></w2:column>
+        			</w2:columnInfo>
+        		</w2:dataList>                
+                <w2:dataList id="dlt_list" baseNode="list" saveRemovedData="true" repeatNode="map">
+        			<w2:columnInfo>                        
+        				<w2:column id="elmtLvl" name="엘리먼트레벨" dataType="text"></w2:column>
+        				<w2:column id="elmtId" name="엘리먼트ID" dataType="text"></w2:column>
+        				<w2:column id="elmtKorLabl" name="엘리먼트한글라벨" dataType="text"></w2:column>
+                        <w2:column id="elmtEngLabl" name="엘리먼트영어라벨" dataType="text"></w2:column>                        
+        				<w2:column id="abstractYn" name="Abstract여부" dataType="text"></w2:column>
+                        <w2:column id="elmtTp" name="엘리먼트구분" dataType="text"></w2:column>
+                        <w2:column id="dataTp" name="데이터타입" dataType="text"></w2:column>
+                        <w2:column id="upElmtId" name="상위엘리먼트 ID" dataType="text"></w2:column>
+                        <w2:column id="dispOrd" name="표시순서" dataType="text"></w2:column>
+                        <w2:column id="isLeaf" name="최하위노드여부" dataType="text"></w2:column>
+                        <w2:column id="arcrole" name="XBRL관계형태" dataType="text"></w2:column>
+                        <w2:column id="isButton" name="버튼정보" dataType="text"></w2:column>              
+        			</w2:columnInfo>
+        		</w2:dataList>                
+            </w2:dataCollection>
+            <xf:submission id="sbm_list" action="/api/dp/axis-member-tree" method="get" mediatype="application/json"
+        		ref="data:json,dma_search" target='data:json,{"id":"dlt_list","key":"body"}' encoding="UTF-8" mode="asynchronous" ev:submitdone="scwin.sbm_list_submitdone" processMsg="조회중...">
+        	</xf:submission>
+            <w2:workflowCollection/>
+        </xf:model>
+        <w2:layoutInfo/>
+        <w2:publicInfo method=""/>
+        <script lazy="false" type="text/javascript"><![CDATA[
+
+            scwin.selIndex = "";
+            scwin.dataTp = "";            
+            scwin.rdoVal = "";            
+
+            scwin.onpageload = function() {
+	
+                scwin.vScrenID = "ULDTMS02030.xml";
+                dma_search.set("txnId", $c.data.getParameter("txnId"));
+                // data Point 값을 넣는다                
+                dlt_dataPoint.setJSON($c.data.getParameter("dataPoint"));
+
+                // 참조 DATA POINT Enumulation값만 있는 데이 조회
+                const enumList = dlt_dataPoint.getAllJSON();
+                enumList.forEach(function(cont) {
+                    if (!$c.util.isEmpty(cont.enumList)) {
+                        sbx_dataPoint.addItem(cont.dataId, cont.dataNm);
+                    }
+                });
+                scwin.fnSearch();
+            };
+
+            scwin.sbm_list_submitdone = function (e) {
+                                
+                // 조회 성공인 경우
+                const result = e.responseJSON;
+                if (result.success) {
+                    // 버튼 숨김 처리
+                    scwin.fnButtonVisible("0");
+                    // 전체 펼치기
+                    grd_list.spanAll(true);
+                } else {
+                    $c.win.alert(result.message);
+                }
+            };
+
+            scwin.rdo_axies_onclick = function (index, value) {
+
+                // 초기화
+                sbx_dataPoint.setValue("");                
+                dlt_enum.removeAll();
+                dlt_com.removeAll();
+                ibx_axis1.setValue("");
+                ibx_axis2.setValue("");
+                ibx_axis3.setValue("");
+                ibx_member.setValue("");
+
+                if (!$c.util.isEmpty(scwin.selIndex)) {
+                    dlt_list.setCellData(scwin.selIndex, "isButton", "선택");
+                    scwin.selIndex = "";
+                }                
+                scwin.fnButtonVisible(value);
+            };
+
+            scwin.grd_list_oncellclick = function (rowIndex, columnIndex, columnId) {
+
+                if (columnId == "isButton") {
+                    // 웹스퀘어는 트리형태로 사용 할 경우 보이는 rowIndex 기준으로 하기 때문에 close된 항목이 
+                    // 있을 경우 rowIndex가 틀어져 버리는 문제가 있어 getRealRowIndex를 필수로 사용
+                    const realIndex = grd_list.getRealRowIndex(rowIndex);
+                    // 그리드 값 변경                    
+                    dlt_list.setCellData(realIndex, "isButton", "선택됨");
+                    if (!$c.util.isEmpty(scwin.selIndex) && realIndex != scwin.selIndex) {
+                        dlt_list.setCellData(scwin.selIndex, "isButton", "선택");
+                    }
+                    scwin.selIndex = realIndex;
+                    
+                    if (scwin.rdoVal == "0") {
+                        // 상위 명을 가져오는 처리
+                        for (let i=scwin.selIndex; i > 0; i--) {
+                            if (dlt_list.getCellData(scwin.selIndex, "upElmtId") == dlt_list.getCellData(i, "elmtId")) {
+                                ibx_axis1.setValue(dlt_list.getCellData(i, "elmtKorLabl"));
+                                // 선택된 축의 DataType
+                                scwin.dataTp = dlt_list.getCellData(i, "dataTp");
+                                break;
+                            }
+                        }                    
+                        ibx_member.setValue(dlt_list.getCellData(scwin.selIndex, "elmtKorLabl"));
+                    } else if (scwin.rdoVal == "1") {
+                        ibx_axis2.setValue(dlt_list.getCellData(scwin.selIndex, "elmtKorLabl"));
+
+                        // 초기화
+                        dlt_com.removeAll();
+                        // 하위에 Member찾아서 처리
+                        const lvl_ = dlt_list.getCellData(scwin.selIndex, "elmtLvl");
+                        let index_ = 0;
+                        for (let i=(scwin.selIndex + 1); i < dlt_list.getTotalRow(); i++) {
+                            if (lvl_ >= parseInt(dlt_list.getCellData(i, "elmtLvl"))) {
+                                break;
+                            } else {
+                                if (dlt_list.getCellData(i, "elmtTp") == "MEMB" && dlt_list.getCellData(i, "isLeaf") == "1") {
+                                    dlt_com.insertRow(index_);
+                                    dlt_com.setCellData(index_, "elmtKorLabl", dlt_list.getCellData(i, "elmtKorLabl"));
+                                    dlt_com.setCellData(index_, "elmtId", dlt_list.getCellData(i, "elmtId"));
+                                    index_++;
+                                }
+                            }
+                        }
+                        sbx_dataPoint.setDisabled(false);
+
+                        // Enumueration 초기화
+                        for (let i=0; i < dlt_enum.getRowCount(); i++) {
+                            dlt_enum.setCellData(i, "member", "");
+                        }
+                    } else {
+                        ibx_axis3.setValue(dlt_list.getCellData(scwin.selIndex, "elmtKorLabl"));
+                    }
+                    // 그리드 button 스타일 변경
+                    scwin.fnButtonProc();
+                }
+            };
+
+            scwin.grd_list_onscrolly = function (e) {
+
+                // 기존에 체크되서 변경되어 정보 있는지 체크
+                if (!$c.util.isEmpty(scwin.selIndex)) {
+                    scwin.fnButtonProc();
+                }
+            };
+
+            scwin.grd_list_ontoggleclick = function (collapsed, rowIndex) {
+
+                // 기존에 체크되서 변경되어 정보 있는지 체크
+                if (!$c.util.isEmpty(scwin.selIndex) && !collapsed) {
+                    scwin.fnButtonProc();
+                }
+            };
+
+            scwin.sbx_dataPoint_onchange = function (info) {
+
+                // 초기화
+                dlt_enum.removeAll();
+                // DataList 해당 정보를 조회해서 Enumeration정보 여부 체크
+                for (let i=0; i < dlt_dataPoint.getRowCount(); i++) {
+                    if (dlt_dataPoint.getCellData(i, "dataId") == info.newValue) {                        
+                        if (!$c.util.isEmpty(dlt_dataPoint.getCellData(i, "enumList"))) {
+                            const items = (dlt_dataPoint.getCellData(i, "enumList")).split("|");                                                        
+                            for (let j=0; j < items.length; j++) {                                   
+                                const index = dlt_enum.insertRow();
+
+                                const cont = items[j];
+                                dlt_enum.setCellData(index, "enumVal", cont.substring(0, cont.indexOf(":")));
+                                dlt_enum.setCellData(index, "enumKorLabl", cont.substring(cont.indexOf(":")+1, cont.indexOf("(")));
+                                dlt_enum.setCellData(index, "enumEnLabl", cont.substring(cont.indexOf("(")+1, cont.indexOf(")")));
+                            }
+                        }
+                        grp_content2_2.show();
+                        grp_content2_3.show();
+                        tbx_content2.show();
+                        break;
+                    }
+                }
+            };
+
+            scwin.chk_kind_onviewchange = function (info) {
+
+                if (info.checked) {
+                    grp_content1_3.show();
+                } else {
+                    grp_content1_3.hide();
+                    sbx_standard.setValue("");
+                }
+            };
+
+            scwin.btn_close_onclick = function (e) {
+
+                $c.win.closePopup();
+            };
+
+            scwin.btn_select_onclick = function (e) {
+
+                const params = {};
+                if ($c.util.isEmpty(scwin.selIndex)) {
+                    $c.win.alert("축/멤버를 추가 해주세요.");
+                    return;
+                }
+
+                let list = [];                
+                if (scwin.rdoVal == "0") {
+                    params.axisId = dlt_list.getCellData(scwin.selIndex, "upElmtId");
+                    params.axisLabl = ibx_axis1.getValue();
+                    params.axisTypCd = scwin.dataTp;
+                    params.membId = dlt_list.getCellData(scwin.selIndex, "elmtId");
+                    params.membLabl = dlt_list.getCellData(scwin.selIndex, "elmtKorLabl");
+                    params.refDpId = "";
+
+                    if (chk_kind.getValue() == "Y") {
+                        params.condBasDpId = sbx_standard.getValue();
+                    } else {
+                        params.condBasDpId = "";
+                    }
+                    params.enumList = null;                    
+                } else if (scwin.rdoVal == "1") {
+                    // 참조 DATAPOINT 체크
+                    if ($c.util.isEmpty(sbx_dataPoint.getValue())) {
+                        $c.win.alert("참조 DATAPOINT를 선택 해주세요", function () { sbx_dataPoint.focus(); });
+                        return;
+                    }
+                    params.axisId = dlt_list.getCellData(scwin.selIndex, "elmtId");
+                    params.axisLabl = dlt_list.getCellData(scwin.selIndex, "elmtKorLabl");
+                    params.axisTypCd = dlt_list.getCellData(scwin.selIndex, "dataTp");
+                    params.membId = "";
+                    params.membLabl = "";
+                    params.refDpId = sbx_dataPoint.getValue();
+                    params.condBasDpId = "";
+                                        
+                    if (dlt_enum.getRowCount() > 0) {
+                        const json = dlt_com.getAllJSON();                        
+                        // 참조값 체크
+                        for (let i=0; i < dlt_enum.getRowCount(); i++) {
+                            let data_ = {};
+                            
+                            // 참조명 체크 
+                            if ($c.util.isEmpty(dlt_enum.getCellData(i, "member"))) {
+                                $c.win.alert("참조값 \"" + dlt_enum.getCellData(i, "enumKorLabl") + "\"에 Member를 선택 해주세요", function () { grd_enum.setFocusedCell(i, 1, true); });
+                                return;
+                            }
+                            
+                            // Member명 조회
+                            const obj = json.find(function(item){
+                                            return item.elmtId ===  dlt_enum.getCellData(i, "member");
+                                        });
+                          
+                            data_.enumVal = dlt_enum.getCellData(i, "enumVal");
+                            data_.enumKorLabl = dlt_enum.getCellData(i, "enumKorLabl");
+                            data_.enumEnLabl = dlt_enum.getCellData(i, "enumEnLabl");
+                            data_.mappAxisId = dlt_list.getCellData(scwin.selIndex, "elmtId");
+                            data_.membId = dlt_enum.getCellData(i, "member");                           
+                            data_.membLabl = obj.elmtKorLabl;
+                            data_.membOrd = i + 1;
+                            list.push(data_);
+                        }                        
+                        params.enumList = list;                                         
+                    } else {
+                        params.enumList = null;
+                    }
+                } else {
+                    params.axisId = dlt_list.getCellData(scwin.selIndex, "elmtId");
+                    params.axisLabl = dlt_list.getCellData(scwin.selIndex, "elmtKorLabl");
+                    params.axisTypCd = dlt_list.getCellData(scwin.selIndex, "dataTp");
+                    params.membId = "";
+                    params.membLabl = "";
+                    params.refDpId = "";
+                    params.condBasDpId = "";
+                    params.enumList = null;
+                }
+                $c.win.closePopup(params);
+            };
+
+            scwin.fnSearch = function () {
+                
+                // 조회 
+                $c.sbm.execute(sbm_list, dma_search.getJSON());
+            };
+
+            scwin.fnButtonVisible = function (val) {
+                
+                //  체크된 항목 정보 임시 저장
+                scwin.rdoVal = val;
+                // 고정적으로 사용못하게 하는 객체
+                sbx_dataPoint.setDisabled(true);
+                grp_content2_2.hide();
+                grp_content2_3.hide();
+                grp_content1_3.hide();
+                tbx_content2.hide();
+
+                if (val == "0") {
+                    grp_content1_1.show();
+                    grp_content1_2.show();                        
+                    grp_content2_1.hide();                        
+                    grp_content3_1.hide();
+                    grp_content3_2.hide();
+                    tbx_content3.hide();
+                } else if (val == "1") {
+                    grp_content1_1.hide();
+                    grp_content1_2.hide();                        
+                    grp_content2_1.show();
+                    grp_content3_1.hide();
+                    grp_content3_2.hide();
+                    tbx_content3.hide();
+                } else {
+                    grp_content1_1.hide();
+                    grp_content1_2.hide();                        
+                    grp_content2_1.hide();                        
+                    grp_content3_1.show();
+                    grp_content3_2.show();
+                    tbx_content3.show();
+                }
+
+                // 그리드 번튼 숨김 처리
+                for (let i=0; i < dlt_list.getTotalRow(); i++) {
+                    if (val == "0") {
+                        if (dlt_list.getCellData(i, "elmtTp") == "MEMB" && dlt_list.getCellData(i, "isLeaf") == "1") {
+                            grd_list.setCellStyle(i, "isButton", "visibility", "");
+                        } else {
+                            grd_list.setCellStyle(i, "isButton", "visibility", "hidden");
+                        }                        
+                    } else if (val == "1") {
+                        if (dlt_list.getCellData(i, "elmtTp") == "EXPL_AXIS") {
+                            grd_list.setCellStyle(i, "isButton", "visibility", "");
+                        } else {
+                            grd_list.setCellStyle(i, "isButton", "visibility", "hidden");
+                        }                        
+                    } else {
+                        if (dlt_list.getCellData(i, "elmtTp") == "TYPD_AXIS") {
+                            grd_list.setCellStyle(i, "isButton", "visibility", "");
+                        } else {
+                            grd_list.setCellStyle(i, "isButton", "visibility", "hidden");
+                        }                       
+                    }
+                }                
+            };
+
+            scwin.fnButtonProc = function () {
+
+                // 그리드 button 스타일 변경
+                const options = {
+                    target: "선택됨",
+                    backColor: "blue",
+                    color: "white",
+                    resBackColor: "white",
+                    resColor: "black"
+                };                    
+                $c.tms.setGridButton(grd_list, options);
+            };                    
+
+        ]]></script>
+    </head>
+    <body ev:onpageload="scwin.onpageload">
+    	<xf:group class="pop_contents" id="" meta_snippetCategory="00_화면시작" meta_snippetKeyComponent="true"
+    		meta_snippetName="0_02 팝업페이지시작">
+    		<xf:group class="tblbox mb10" id="" meta_snippetCategory="05_입출력테이블" meta_snippetKeyComponent="true"
+    			meta_snippetName="5_01 1단테이블" style="">
+    			<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+    				<w2:attributes>
+    					<w2:summary></w2:summary>
+    				</w2:attributes>
+    				<xf:group tagname="colgroup">
+    					<xf:group tagname="col"></xf:group>
+    				</xf:group>
+    				<xf:group style="" tagname="tr">
+    					<xf:group class="w2tb_th" style="" tagname="th">
+    						<w2:attributes>
+    							<w2:colspan>1</w2:colspan>
+    							<w2:rowspan>1</w2:rowspan>
+    						</w2:attributes>
+    						<w2:textbox class="" id="" label="축/멤버 유형 선택" ref="" style="" userData2=""></w2:textbox>
+    					</xf:group>
+    				</xf:group>
+    				<xf:group tagname="tr">
+    					<xf:group class="w2tb_td" tagname="td">
+    						<w2:attributes>
+    							<w2:colspan>1</w2:colspan>
+    							<w2:rowspan>1</w2:rowspan>
+    						</w2:attributes>
+    						<xf:group id="" class="flex">
+    							<xf:group id="">
+    								<xf:select1 ref="" appearance="full" meta_snippetCategory="10_입력폼" meta_snippetName="10_05 Radio"
+    									meta_snippetKeyComponent="true" disabled="" style="" id="rdo_axies1" renderType="radiogroup" rows="" cols="" selectedIndex="0"
+    									name="a" ev:onlabelclick="scwin.rdo_axies_onclick" ev:onradioclick="scwin.rdo_axies_onclick">
+    									<xf:choices>
+    										<xf:item>
+    											<xf:label><![CDATA[Explicit /고정 멤버]]></xf:label>
+    											<xf:value><![CDATA[0]]></xf:value>
+    										</xf:item>
+    									</xf:choices>
+    								</xf:select1>
+    								<w2:textbox id="" label="설계 시점에 축과 멤버를 직접 지정" style="" class="ml30"></w2:textbox>
+    							</xf:group>
+    							<xf:group id="">
+    								<xf:select1 ref="" appearance="full" meta_snippetCategory="10_입력폼" meta_snippetName="10_05 Radio"
+    									meta_snippetKeyComponent="true" disabled="" style="" id="rdo_axies2" renderType="radiogroup" rows="" cols="" selectedIndex="1"
+    									name="a" ev:onlabelclick="scwin.rdo_axies_onclick" ev:onradioclick="scwin.rdo_axies_onclick">
+    									<xf:choices>
+    										<xf:item>
+    											<xf:label><![CDATA[Explicit / 다이나믹 멤버 (DP 참조)]]></xf:label>
+    											<xf:value><![CDATA[1]]></xf:value>
+    										</xf:item>
+    									</xf:choices>
+    								</xf:select1>
+    								<w2:textbox class="ml30" id="" label="참조 DataPoint의 Enumeration 값에 따라 멤버 동적 결정" style=""></w2:textbox>
+    							</xf:group>
+    							<xf:group id="">
+    								<xf:select1 ref="" appearance="full" meta_snippetCategory="10_입력폼" meta_snippetName="10_05 Radio"
+    									meta_snippetKeyComponent="true" disabled="" style="" id="rdo_axies3" renderType="radiogroup" rows="" cols="" selectedIndex="1"
+    									name="a" ev:onlabelclick="scwin.rdo_axies_onclick" ev:onradioclick="scwin.rdo_axies_onclick">
+    									<xf:choices>
+    										<xf:item>
+    											<xf:label><![CDATA[Typed 축]]></xf:label>
+    											<xf:value><![CDATA[2]]></xf:value>
+    										</xf:item>
+    									</xf:choices>
+    								</xf:select1>
+    								<w2:textbox class="ml30" id="" label="축만 지정. 멤버는 시스템이 자동 설정" style=""></w2:textbox>
+    							</xf:group>
+    						</xf:group>
+    					</xf:group>
+    				</xf:group>
+    			</xf:group>
+    		</xf:group>
+    		<xf:group id="">
+    			<xf:group class="titbox" id="" meta_snippetCategory="02_타이틀" meta_snippetKeyComponent="true"
+    				meta_snippetName="2_02 서브타이틀(h3)" style="">
+    				<w2:textbox class="" id="" label="축/멤버 선택 - Definition Linkbase" style="" tagname="h3"></w2:textbox>
+    			</xf:group>
+    			<xf:group adaptiveThreshold="" class="gvwbox" id="" meta_snippetCategory="06_그리드" meta_snippetKeyComponent="true" meta_snippetName="6_01 그리드" style="">
+    			    <w2:gridView autoFit="allColumn" checkReadOnlyOnPasteEnable="" class="gvw" dataList="data:dlt_list" focusMode="row"
+    			    	hideHeader="true" id="grd_list" scrollByColumn="false" scrollByColumnAdaptive="false" style="height: 300px;"
+    			    	ev:oncellclick="scwin.grd_list_oncellclick" ev:onscrolly="scwin.grd_list_onscrolly" ev:ontoggleclick="scwin.grd_list_ontoggleclick" defaultCellHeight="25">
+    			    	<w2:caption id="caption2" style="" value="this is a grid caption."></w2:caption>
+    			    	<w2:header id="header2" style="">
+    			    		<w2:row id="row3" style="">
+    			    			<w2:column width="500" blockSelect="false" id="column1" displayMode="label" inputType="text"
+    			    				fixColumnWidth="false" removeBorderStyle="false">
+    			    			</w2:column>
+    			    			<w2:column width="80" blockSelect="false" id="column2" displayMode="label" inputType="text"
+    			    				fixColumnWidth="true" removeBorderStyle="false">
+    			    			</w2:column>
+    			    		</w2:row>
+    			    	</w2:header>
+    			    	<w2:gBody id="gBody2" style="">
+    			    		<w2:row id="row4" style="">
+    			    			<w2:column width="500" blockSelect="false" id="elmtKorLabl" displayMode="label" inputType="drilldown"
+    			    				escape="false" textAlign="left" removeBorderStyle="false" depthColumn="elmtLvl" depthType="div" showDepth="2"
+    			    				readOnly="true">
+    			    			</w2:column>
+    			    			<w2:column width="80" blockSelect="false" id="isButton" displayMode="label" inputType="button"
+    			    				removeBorderStyle="false" value="선택">
+    			    			</w2:column>
+    			    		</w2:row>
+    			    	</w2:gBody>
+    			    </w2:gridView>
+    			</xf:group>
+
+    			<xf:group id="grp_content1_1" meta_snippetCategory="05_입출력테이블" meta_snippetName="5_02 2단테이블" meta_snippetKeyComponent="true" style="" class="tblbox">
+    				<xf:group adaptive="" adaptiveThreshold="768" tagname="table" style="" id="" class="w2tb tbl">
+    					<w2:attributes>
+    						<w2:summary></w2:summary>
+    					</w2:attributes>
+    					<xf:group tagname="colgroup">
+    						<xf:group tagname="col" style="width:150px;"></xf:group>
+    						<xf:group tagname="col" style=""></xf:group>
+    						<xf:group tagname="col" style="width:150px;"></xf:group>
+    						<xf:group tagname="col" style=""></xf:group>
+    					</xf:group>
+    					<xf:group tagname="tr">
+    						<xf:group tagname="th" class="w2tb_th ">
+    							<w2:attributes>
+    								<w2:scope>row</w2:scope>
+    							</w2:attributes>
+    							<w2:textbox ref="" style="" userData2="" id="" label="선택된 축" class=""></w2:textbox>
+    						</xf:group>
+    						<xf:group tagname="td" class="w2tb_td">
+    							<w2:attributes></w2:attributes>
+    							<xf:input meta_snippetCategory="10_입력폼" meta_snippetName="10_01 InputBox" meta_snippetKeyComponent="true"
+    								style="width: 360px;" id="ibx_axis1" placeholder="" class="" readOnly="true">
+    							</xf:input>
+    						</xf:group>
+    						<xf:group tagname="th" class="w2tb_th ">
+    							<w2:attributes>
+    								<w2:scope>row</w2:scope>
+    							</w2:attributes>
+    							<w2:textbox ref="" style="" userData2="" id="" label="선택된 멤버" class=""></w2:textbox>
+    						</xf:group>
+    						<xf:group tagname="td" class="w2tb_td">
+    							<w2:attributes></w2:attributes>
+    							<xf:input meta_snippetCategory="10_입력폼" meta_snippetName="10_01 InputBox" meta_snippetKeyComponent="true"
+    								style="width: 360px;" id="ibx_member" placeholder="" class="" readOnly="true">
+    							</xf:input>
+    						</xf:group>
+    					</xf:group>
+    				</xf:group>
+    			</xf:group>
+
+                <xf:group id="grp_content1_2" class="tblbox" meta_snippetCategory="05_입출력테이블" meta_snippetKeyComponent="true" meta_snippetName="5_02 2단테이블" style="">
+    				<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+    					<w2:attributes>
+    						<w2:summary></w2:summary>
+    					</w2:attributes>
+    					<xf:group tagname="colgroup">    						
+    						<xf:group style="" tagname="col"></xf:group>
+    					</xf:group>
+    					<xf:group tagname="tr">
+    						<xf:group class="w2tb_th " tagname="th">
+    							<w2:attributes>
+    								<w2:scope>row</w2:scope>
+    							</w2:attributes>
+    							<xf:select ref="" appearance="full" meta_snippetCategory="10_입력폼" meta_snippetName="10_06 Checkbox"
+    								meta_snippetKeyComponent="true" disabled="" style="" id="chk_kind" renderType="checkboxgroup" rows="" selectedindex="1" cols="" ev:onviewchange="scwin.chk_kind_onviewchange">
+    								<xf:choices>
+    									<xf:item>
+    										<xf:label><![CDATA[조건부 축 적용]]></xf:label>
+    										<xf:value><![CDATA[Y]]></xf:value>
+    									</xf:item>
+    								</xf:choices>
+    							</xf:select>
+    							<w2:textbox class="" id="" label="(기준 DP가 서식에 존재할 때만 이 축을 적용합니다.)" ref="" style="" userData2=""></w2:textbox>   							
+    						</xf:group>
+                        </xf:group>
+                    </xf:group>
+                </xf:group>
+
+                <xf:group id="grp_content1_3" class="tblbox" meta_snippetCategory="05_입출력테이블" meta_snippetKeyComponent="true" meta_snippetName="5_02 2단테이블" style="">
+    				<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+    					<w2:attributes>
+    						<w2:summary></w2:summary>
+    					</w2:attributes>
+    					<xf:group tagname="colgroup">
+    						<xf:group style="width:150px;" tagname="col"></xf:group>
+    						<xf:group style="" tagname="col"></xf:group>
+    					</xf:group>
+    					<xf:group tagname="tr">    					
+    						<xf:group class="w2tb_th " tagname="th">
+    							<w2:attributes>
+    								<w2:scope>row</w2:scope>
+    							</w2:attributes>
+    							<w2:textbox class="" id="" label="기준 DATAPOINT" ref="" style="" userData2=""></w2:textbox>
+    						</xf:group>
+    						<xf:group class="w2tb_td" tagname="td">
+    							<w2:attributes></w2:attributes>
+    							<xf:select1 allOption="" appearance="minimal" chooseOption="true" class="" direction="auto" disabled="false"
+    								disabledClass="w2selectbox_disabled" id="sbx_standard" meta_snippetCategory="10_입력폼" meta_snippetKeyComponent="true"
+    								meta_snippetName="10_02 SelectBox" ref="" renderType="" style="width: 100%;" submenuSize="auto" chooseOptionLabel="DataPoint를 선택하세요">
+    								<xf:choices>
+    									<xf:itemset nodeset="data:dlt_dataPoint">
+    										<xf:label ref="dataNm"></xf:label>
+    										<xf:value ref="dataId"></xf:value>
+    									</xf:itemset>
+    								</xf:choices>
+    							</xf:select1>
+    						</xf:group>
+    					</xf:group>
+    				</xf:group>
+    			</xf:group>
+
+                <xf:group id="grp_content2_1" class="tblbox" meta_snippetCategory="05_입출력테이블" meta_snippetKeyComponent="true" meta_snippetName="5_02 2단테이블" style="">
+    				<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+    					<w2:attributes>
+    						<w2:summary></w2:summary>
+    					</w2:attributes>
+    					<xf:group tagname="colgroup">
+    						<xf:group style="width:150px;" tagname="col"></xf:group>
+    						<xf:group style="" tagname="col"></xf:group>
+    						<xf:group style="width:150px;" tagname="col"></xf:group>
+    						<xf:group style="" tagname="col"></xf:group>
+    					</xf:group>
+    					<xf:group tagname="tr">
+    						<xf:group class="w2tb_th " tagname="th">
+    							<w2:attributes>
+    								<w2:scope>row</w2:scope>
+    							</w2:attributes>
+    							<w2:textbox class="" id="" label="선택된 축" ref="" style="" userData2=""></w2:textbox>
+    						</xf:group>
+    						<xf:group class="w2tb_td" tagname="td">
+    							<w2:attributes></w2:attributes>
+    							<xf:input class="" id="ibx_axis2" meta_snippetCategory="10_입력폼" meta_snippetKeyComponent="true"
+    								meta_snippetName="10_01 InputBox" placeholder="" style="width: 360px;" readOnly="true">
+    							</xf:input>
+    						</xf:group>
+    						<xf:group class="w2tb_th " tagname="th">
+    							<w2:attributes>
+    								<w2:scope>row</w2:scope>
+    							</w2:attributes>
+    							<w2:textbox class="" id="" label="참조 DATAPOINT" ref="" style="" userData2=""></w2:textbox>
+    						</xf:group>
+    						<xf:group class="w2tb_td" tagname="td">
+    							<w2:attributes></w2:attributes>
+    							<xf:select1 allOption="" appearance="minimal" chooseOption="true" class="" direction="auto" disabled="false"
+    								disabledClass="w2selectbox_disabled" id="sbx_dataPoint" meta_snippetCategory="10_입력폼" meta_snippetKeyComponent="true"
+    								meta_snippetName="10_02 SelectBox" ref="" renderType="" style="width: 100%;" submenuSize="auto" chooseOptionLabel="멤버를 선택하세요"
+    								ev:onchange="scwin.sbx_dataPoint_onchange">
+    								<xf:choices></xf:choices>
+    							</xf:select1>
+    						</xf:group>
+    					</xf:group>
+    				</xf:group>
+    			</xf:group>
+
+                <xf:group class="titbox" id="grp_content2_2" meta_snippetCategory="02_타이틀" meta_snippetKeyComponent="true" meta_snippetName="2_03 서브타이틀(h4)" style="">
+                    <w2:textbox class="" id="" label="ENUMERATION - MEMBER 매핑" ref="" style="" userData2=""></w2:textbox>
+                </xf:group>
+
+                <xf:group adaptiveThreshold="" class="gvwbox" id="grp_content2_3" meta_snippetCategory="06_그리드" meta_snippetKeyComponent="true" meta_snippetName="6_01 그리드" style="">
+        			<w2:gridView autoFit="allColumn" checkReadOnlyOnPasteEnable="" class="gvw" dataList="data:dlt_enum" focusMode="row"
+        				hideHeader="false" id="grd_enum" scrollByColumn="false" scrollByColumnAdaptive="false" style="height: 120px;"
+        				ev:oncellclick="scwin.grd_list1_oncellclick">
+        				<w2:caption id="caption2" style="" value="this is a grid caption."></w2:caption>
+        				<w2:header id="header2" style="">
+        					<w2:row id="row3" style="">
+        						<w2:column width="150" blockSelect="false" id="column1" displayMode="label" inputType="text"
+        							fixColumnWidth="false" removeBorderStyle="false" value="참조 값 (Enumeration)">
+        						</w2:column>
+        						<w2:column width="430" blockSelect="false" id="column2" displayMode="label" inputType="text"
+        							fixColumnWidth="false" removeBorderStyle="false" value="Member">
+        						</w2:column>
+        					</w2:row>
+        				</w2:header>
+        				<w2:gBody id="gBody2" style="">
+        					<w2:row id="row4" style="">
+        						<w2:column width="150" blockSelect="false" id="enumKorLabl" displayMode="label" inputType="text"
+        							escape="false" textAlign="left" removeBorderStyle="false" readOnly="true">
+        						</w2:column>
+        						<w2:column width="430" blockSelect="false" id="member" displayMode="label" inputType="select"
+        							removeBorderStyle="false" chooseOption="true" chooseOptionLabel="멤버를 선택하세요" editType="focus" editModeEvent="onclick">
+        							<w2:choices>
+        								<w2:itemset nodeset="data:dlt_com">
+        									<w2:label ref="elmtKorLabl"></w2:label>
+        									<w2:value ref="elmtId"></w2:value>
+        								</w2:itemset>
+        							</w2:choices>
+        						</w2:column>
+        					</w2:row>
+        				</w2:gBody>
+        			</w2:gridView>
+                </xf:group>
+
+                <w2:textbox class="txt_warning mt10" dataType="" id="tbx_content2" label="모든 Enumeration 값에 대한 멤버 매핑을 완료해주세요"
+    		        meta_snippetCategory="11_메시지" meta_snippetKeyComponent="true" meta_snippetName="11_01 경고메시지" style="">
+    		    </w2:textbox>
+                
+                <xf:group id="grp_content3_1" class="tblbox" meta_snippetCategory="05_입출력테이블" meta_snippetKeyComponent="true"
+    				meta_snippetName="5_02 2단테이블" style="">                    
+    				<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+    					<w2:attributes>
+    						<w2:summary></w2:summary>
+    					</w2:attributes>
+    					<xf:group tagname="colgroup">
+    						<xf:group style="width:150px;" tagname="col"></xf:group>
+    						<xf:group style="" tagname="col"></xf:group>
+    						<xf:group style="width:150px;" tagname="col"></xf:group>
+    						<xf:group style="" tagname="col"></xf:group>
+    					</xf:group>
+    					<xf:group tagname="tr">
+    						<xf:group class="w2tb_th " tagname="th">
+    							<w2:attributes>
+    								<w2:scope>row</w2:scope>
+    							</w2:attributes>
+    							<w2:textbox class="" id="" label="선택된 축" ref="" style="" userData2=""></w2:textbox>
+    						</xf:group>
+    						<xf:group class="w2tb_td" tagname="td">
+    							<w2:attributes>
+    								<w2:colspan>3</w2:colspan>
+    								<w2:rowspan>1</w2:rowspan>
+    							</w2:attributes>
+    							<xf:input class="" id="ibx_axis3" meta_snippetCategory="10_입력폼" meta_snippetKeyComponent="true"
+    								meta_snippetName="10_01 InputBox" placeholder="" style="width: 360px;" readOnly="true">
+    							</xf:input>
+    						</xf:group>
+    					</xf:group>
+    				</xf:group>
+    			</xf:group>    			
+                <xf:group id="grp_content3_2" class="tblbox" meta_snippetCategory="05_입출력테이블" meta_snippetKeyComponent="true"
+    				meta_snippetName="5_02 2단테이블" style="">
+    				<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+    					<w2:attributes>
+    						<w2:summary></w2:summary>
+    					</w2:attributes>
+    					<xf:group tagname="colgroup">
+    						<xf:group style="width:150px;" tagname="col"></xf:group>
+    						<xf:group style="" tagname="col"></xf:group>
+    						<xf:group style="width:150px;" tagname="col"></xf:group>
+    						<xf:group style="" tagname="col"></xf:group>
+    					</xf:group>
+    					<xf:group tagname="tr">
+    						<xf:group class="w2tb_th " tagname="th">
+    							<w2:attributes>
+    								<w2:scope>row</w2:scope>
+    							</w2:attributes>
+    							<w2:textbox class="" id="" label="TYPED 적용 유형" ref="" style="" userData2=""></w2:textbox>
+    						</xf:group>                        
+    						<xf:group class="w2tb_td" tagname="td">
+    							<w2:attributes>
+    								<w2:colspan>3</w2:colspan>
+    								<w2:rowspan>1</w2:rowspan>
+    							</w2:attributes>
+    							<xf:select1 appearance="full" cols="" disabled="" id="rdo_apply" ref="" renderType="radiogroup" rows="" selectedIndex="1" style="">
+    								    <xf:choices>
+    								    	<xf:item>
+    								    		<xf:label><![CDATA[행 가변]]></xf:label>
+    								    		<xf:value><![CDATA[]]></xf:value>
+    							    		</xf:item>
+    							    		<xf:item>
+    							    			<xf:label><![CDATA[단위서식 반복삽입]]></xf:label>
+    							    			<xf:value><![CDATA[]]></xf:value>
+    							    		</xf:item>
+    							    	</xf:choices>
+    					    		</xf:select1>
+    						</xf:group>
+    					</xf:group>
+    				</xf:group>
+    			</xf:group>                
+    		</xf:group>
+
+            <w2:textbox class="txt_warning mt10" dataType="" id="tbx_content3" label="Typed 축은 멤버를 별도로 지정하지 않습니다. 시스템이 고유 값을 자동으로 멤버로 설정합니다." meta_snippetCategory="11_메시지"
+        	    meta_snippetKeyComponent="true" meta_snippetName="11_01 경고메시지" style="">
+    		</w2:textbox>                            
+    			    		    		
+    		<xf:group class="btnbox" id="" meta_snippetCategory="08_버튼" meta_snippetKeyComponent="true" meta_snippetName="8_05 팝업전체제어버튼"
+    			style="">
+    			<xf:group class="rt" id="" style="">
+    				<xf:trigger class="btn_cm " id="btn_close" style="" type="button" ev:onclick="scwin.btn_close_onclick">
+    					<xf:label><![CDATA[취소]]></xf:label>
+    				</xf:trigger>
+    				<xf:trigger class="btn_cm pt" id="btn_select" style="" type="button" ev:onclick="scwin.btn_select_onclick">
+    					<xf:label><![CDATA[확인]]></xf:label>
+    				</xf:trigger>
+    			</xf:group>
+    		</xf:group>
+    	</xf:group>
+    </body>
+</html>

@@ -1,0 +1,557 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDFIS00400_00.gfm" meta_screenName="연결주석사항-항목 선택" meta_screenId="ULDFIS00400" meta_screenDesc="NICE수신정보 중 기업별 연결주석사항을 조회한다." meta_author="박태석" meta_date="2026-03-10" meta_memo="1. 조회\n- 기업명을 선택하여 연결주석사항(감사의견, 연결대상중속회사, 연결제외중속회사, 연결대상간주요거래, 우발채무) 등을 조회" meta_type="메인">
+		<w2:historyInfo>
+			<w2:history meta_no="1" meta_desc="최초 작성" meta_date="2026-03-10" meta_user="박태석"></w2:history>
+			<w2:history meta_no="2" meta_desc="연결주석사항-항목 선택 화면 최초 개발" meta_date="2026-05-26" meta_user="김용명"></w2:history>
+		</w2:historyInfo>
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<xf:model>
+			<w2:workflowCollection />
+			<w2:dataCollection baseNode="map">
+				<w2:dataList baseNode="list" repeatNode="map" id="dlt_consNotesAcntclsDtListRes" saveRemovedData="true" ev:ondataload="">
+					<w2:columnInfo>
+						<w2:column dataType="text" name="결산년월 value" id="value"></w2:column>
+						<w2:column dataType="text" name="결산년월 text" id="text"></w2:column>
+					</w2:columnInfo>
+				</w2:dataList>
+				<w2:dataMap baseNode="map" id="dma_consNotesAcntclsDtInfoReq">
+					<w2:keyInfo>
+						<w2:key dataType="text" name="기업코드" id="kisCd"></w2:key>
+						<w2:key dataType="text" name="연결주석코드" id="fg"></w2:key>
+					</w2:keyInfo>
+				</w2:dataMap>
+				<w2:dataList baseNode="list" repeatNode="map" id="dlt_comListRes" saveRemovedData="true" ev:ondataload="scwin.dlt_comListRes_ondataload">
+					<w2:columnInfo>
+						<w2:column dataType="text" name="회사약명" id="coSnm"></w2:column>
+						<w2:column dataType="text" name="기업코드" id="kisCd"></w2:column>
+						<w2:column dataType="text" name="업종유형" id="indPttn"></w2:column>
+					</w2:columnInfo>
+				</w2:dataList>
+				<w2:dataMap baseNode="map" id="dma_comInfoReq">
+					<w2:keyInfo>
+						<w2:key dataType="text" name="기업약명" id="coSnm"></w2:key>
+					</w2:keyInfo>
+				</w2:dataMap>
+			</w2:dataCollection>
+			<xf:submission mode="asynchronous" method="get" id="sbm_consNotesAcntclsDt" encoding="UTF-8" mediatype="application/json"
+				action="/api/listing/nice/financial/cons-notes/acntcls-dt" singleMode="true" ref="data:json,dma_consNotesAcntclsDtInfoReq"
+				target='data:json,{"action":"append","id":"dlt_consNotesAcntclsDtListRes"}'>
+			</xf:submission>
+			<xf:submission mode="asynchronous" method="get" id="sbm_comInfo" encoding="UTF-8" mediatype="application/json" ref="data:json,dma_comInfoReq" target='data:json,{"action":"append","id":"dlt_comListRes"}' action="/api/listing/nice/com-overview/com-info"></xf:submission>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[/* ★Wcraft guide★    
+스크립트 수작업 유의사항
+*/
+
+scwin.vScrenID = "ULDFIS00400_00.xml";
+
+/**
+ *  화면이 최초 로드될때 실행되는 초기화 이벤트
+ *  (초기 데이터 조회나 컴포넌트 설정) 
+ */
+scwin.onpageload = function() {
+    scwin.fn_Init();
+};
+
+/**
+ *  현재 로딩된 페이지가 초기화되거나 종료될때(다른 화면으로 이동하거나 페이지를 닫기전) 발생하는 이벤트
+ *  (주로 SPA(Single Page Application) 환경에서 전역 자원을 해제하거나 메모리 누수 방지)
+ */
+scwin.onpageunload = function() {
+};
+
+/**
+ *  화면 초기화
+ */
+scwin.fn_Init = function() {
+    
+    //라디오 기본값 : 감사의견및특기사항
+    rdo_fg.setValue("01");
+    // rdo_fg 값에따른 화면 처리
+    scwin.fn_RdoFgOnSelChange();
+
+};
+
+/**
+ *  조회조건 연결주석항목별 값이 변동될때 로직 처리
+ */
+scwin.fn_RdoFgOnSelChange = function() {
+
+    var pageNum = rdo_fg.getValue();
+
+    if (pageNum == "01" || pageNum == "02" || pageNum == "03") {
+        btn_excel.show();
+    } else {
+        btn_excel.hide();
+    }
+
+    // 라디오 클릭 시 하단 프레임에 적당한 화면 세팅.
+    scwin.fn_DisplayFrame(rdo_fg.getValue());
+
+    // 결산일자 visible
+    scwin.fn_DisplayAcntclsDt();
+
+};
+
+/**
+ *  하단 frame에 출력 그리드 설정
+ */
+scwin.fn_DisplayFrame = function(pVal) {
+
+    $p.parent().frame_body.setSrc(scwin.fn_GetUrl(pVal));
+
+};
+
+/**
+ *  프로그램 파일명 경로 설정
+ */
+scwin.fn_GetUrl = function(pVal) {
+    
+    var vUrl = "/ui/lst/fis/ULDFIS00400_" + pVal + ".xml";
+    return vUrl;
+
+};
+
+/**
+ * 결산일자 콤보박스 display 설정(보이기/숨김)
+ */
+scwin.fn_DisplayAcntclsDt = function() {
+
+    // 주요주주, 배당, 관계회사현황
+    if (rdo_fg.getValue() === "02" || rdo_fg.getValue() === "03" || rdo_fg.getValue() === "04" || rdo_fg.getValue() === "05" ||
+        rdo_fg.getValue() === "06" || rdo_fg.getValue() === "07" || rdo_fg.getValue() === "08") {
+        pnl_AcntclsDt.setStyle("display", "");
+    } else {
+        pnl_AcntclsDt.setStyle("display", "none");
+    }
+
+};
+
+/**
+ *  결산일자 조회
+ */
+scwin.fn_SrchAcntclsDt = async function() {
+
+    //데이터셋 초기화
+    scwin.fn_InitDs("2");
+
+    // 결산일자 visible = true인 경우만 조회, KisCd 필수
+    if (pnl_AcntclsDt.getStyle("display") === "none" || tbx_kisCd.getValue() === "") {
+        return;
+    }
+    
+    dma_consNotesAcntclsDtInfoReq.set("kisCd", tbx_kisCd.getValue()); // 기업코드
+    dma_consNotesAcntclsDtInfoReq.set("fg", rdo_fg.getValue()); // 연결주석코드
+
+    const res = await $c.sbm.execute(sbm_consNotesAcntclsDt);
+    dlt_consNotesAcntclsDtListRes.setJSON(res.responseJSON.body);
+
+    if (dlt_consNotesAcntclsDtListRes.getTotalRow() <= 0) {
+        alert("결산일자가 존재하지 않습니다.");
+    }
+
+};
+
+/**
+ *  조회조건 유효성 체크
+ */
+scwin.fn_ChkValid = function() {
+
+    // 필수항목 체크
+    if (tbx_coSnm.getValue() === "") {
+        alert("기업명을 입력하세요.");
+        tbx_coSnm.focus();
+        return false;
+    }
+
+    if (pnl_AcntclsDt.getStyle("display") != "none" && cmb_acntclsDt.getValue() === "") {
+        alert("결산일자를 입력하세요.");
+        cmb_acntclsDt.focus();
+        return false;
+    }
+
+    // 기업명은 있는데 기업코드가 없는 경우
+    if (tbx_coSnm.getValue() != "" && tbx_kisCd.getValue() === "") {
+        scwin.fn_ComInfoSrch();
+        return false;
+    }
+
+    return true;
+
+};
+
+/**
+ * 기업현황 조회
+ */
+scwin.fn_Search = function() {
+
+    // 조회조건 필수 체크
+    if (!scwin.fn_ChkValid()) {
+        return;
+    }
+
+    if ($p.parent().frame_body.getWindow().scwin.fn_Search) {
+        $p.parent().frame_body.getWindow().scwin.fn_Search();
+    }
+
+};
+
+/**
+ *  데이터셋 초기화
+ */
+scwin.fn_InitDs = function(pFg) {
+
+    if (pFg == "1") {
+        dlt_comListRes.setData([]);
+    } else if (pFg == "2") {
+        dlt_consNotesAcntclsDtListRes.setData([]);
+    }
+
+};
+
+/**
+ * 기업정보 조회(명으로 조회)
+ */
+scwin.fn_ComInfoSrch = async function() {
+
+    // 데이터셋 초기화
+    scwin.fn_InitDs("1");
+
+    // 기업명 없으면 return
+    if (tbx_coSnm.getValue() === "") {
+        return;
+    }
+
+    dma_comInfoReq.set("coSnm", tbx_coSnm.getValue()); // 기업명
+    const res = await $c.sbm.execute(sbm_comInfo);
+    dlt_comListRes.setJSON(res.responseJSON.body);
+
+};
+
+/**
+ * 기업검색 팝업 화면을 표시한다.
+ */
+scwin.fn_ComSrchOpen = async function() {
+
+    var url = "/ui/lst/fis/ULDFIS00101.xml";
+    var popTitle = "기업 검색";
+
+    const opts = {
+        id: "ULDFIS00101",
+        popupName: popTitle,
+        width: 750,
+        height: 490,
+        frameModal: "top",
+    };
+
+    const res = await $c.win.openPopup(url, opts);
+
+    tbx_coSnm.setValue(res.coSnm); // 기업명
+    tbx_kisCd.setValue(res.kisCd); // 기업코드
+
+};
+
+/**
+ * 팝업으로 값을 넘김.
+ */
+scwin.fn_GetParKisCd = function() {
+    var arrPar = new Array();
+    arrPar[0] = tbx_coSnm.getValue(); // 기업명
+    return arrPar;
+};
+
+/**
+ * 기업 겁색 팝업에서 넘어온 값 설정 및 조회 처리
+ */
+scwin.fn_SetParKisCd = function(arrPar) {
+
+    tbx_coSnm.setValue(arrPar[0].coSnm); //기업명
+    tbx_kisCd.setValue(arrPar[0].kisCd); //기업코드
+
+    if (tbx_kisCd.getValue() != "") {
+        // 결산일자 visible = true인 경우
+        if (pnl_AcntclsDt.getStyle("display") == "none") {
+            // 기업현황 조회
+            scwin.fn_Search();
+        } else {
+            // 결산일자 조회
+            scwin.fn_SrchAcntclsDt();
+        }
+    }
+
+};
+
+/**
+ *  조회조건의 기업코드를 리턴
+ */
+scwin.fn_GetKisCd = function() {
+    return tbx_kisCd.getValue();
+};
+
+/**
+ *  조회조건의 결산일자를 리턴
+ */
+scwin.fn_GetAcntclsDt = function() {
+    return cmb_acntclsDt.getValue();
+};
+
+/**
+ *  기업 검색 팝업화면을 표시한다.
+ */
+scwin.img_coSearch_onclick = function(e) {
+    scwin.fn_ComSrchOpen();
+};
+
+/**
+ *  기업명 입력후 키다운 이벤트 처리
+ */
+scwin.tbx_coSnm_onkeydown = function(e) {
+
+    if (e.keyCode == 13) {
+        
+        if (tbx_coSnm.getValue() === "") {           
+            scwin.fn_ComSrchOpen(); // 기업검색팝업 오픈
+        } else {        
+            scwin.fn_ComInfoSrch(); // 기업정보 조회
+        }
+
+    }
+};
+
+/**
+ *  엑셀 다운로드 버튼 처리
+ */
+scwin.btn_excel_onclick = function(e) {
+    
+    if ($p.parent().frame_body.getWindow().scwin.fn_excel_download) {
+        $p.parent().frame_body.getWindow().scwin.fn_excel_download();
+    }
+
+};
+
+/**
+ *  라디오 버튼 클릭시 화면명 설정 처리
+ */
+scwin.rdo_fg_onchange = function (info) {
+    scwin.fn_RdoFgOnSelChange();	
+};
+
+
+/**
+ *  연결주석 화면별 정보 조회
+ */
+scwin.btn_search_onclick = function (e) {
+    scwin.fn_Search();
+};
+
+/**
+ *  기업 정보 데이터 로드시 기능 처리(기업명으로 조회)
+ */
+scwin.dlt_comListRes_ondataload = function () {
+
+    // 조회결과가 1개이면 기업개황 조회 아니면 기업팝업 오픈
+    if (dlt_comListRes.getTotalRow() == 1) {
+        
+        // 조회조건에 값을 세팅
+        tbx_kisCd.setValue(dlt_comListRes.getCellData(0, "kisCd"));
+
+        // 결산일자 visible = true인 경우
+        if (pnl_AcntclsDt.getStyle("display") == "none") {
+            // 기업현황 조회
+            scwin.fn_Search();
+        } else {
+            // 결산일자 조회
+            scwin.fn_SrchAcntclsDt();
+        }
+    } else {
+        scwin.fn_ComSrchOpen(); //기업검색 팝업 오픈
+    }	
+};
+
+/**
+ *  기업명 입력값이 변경됐을때 이벤트 처리(사용자가 화면의 값을 변경했을때(예 : 입력값 수정, 선택값 변경) 발생)
+ */
+scwin.tbx_coSnm_onviewchange = function (info) {
+
+    //tbx_coSnm.setValue("");
+
+};
+
+/**
+ *  결산일자 항목이 변경되면 기업정보 재조회
+ */
+scwin.cmb_acntclsDt_onchange = function (info) {
+
+	scwin.fn_Search();
+
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload" metaev_onpageload_name="화면로드" metaev_onpageload_desc="검색조건의 라디오버튼은 '감사의견'이 선택되도록 한다.">
+		<xf:group id="" style="position: absolute;top: 450px;">
+		</xf:group>
+		<xf:group class="sub_contents" id="" meta_snippetCategory="00_화면시작" meta_snippetKeyComponent="true" meta_snippetName="0_01 페이지시작"
+			style="">
+			<xf:group class="pgtbox" id="" meta_snippetCategory="02_타이틀" meta_snippetKeyComponent="true" meta_snippetName="2_01 페이지타이틀"
+				style="">
+				<w2:textbox class="pgt_tit" id="" label="연결주석사항-항목 선택" style="" tagname=""></w2:textbox>
+				<xf:group class="breadcrumb" id="" style="">
+					<xf:group id="" style="" tagname="ul">
+						<xf:group class="home" id="" style="" tagname="li">
+							<w2:anchor id="" outerDiv="false" style="">
+								<xf:label><![CDATA[Home]]></xf:label>
+							</w2:anchor>
+						</xf:group>
+						<xf:group id="" style="" tagname="li">
+							<w2:anchor id="" outerDiv="false" style="">
+								<xf:label><![CDATA[1Depth Menu]]></xf:label>
+							</w2:anchor>
+						</xf:group>
+						<xf:group id="" style="" tagname="li">
+							<w2:anchor id="" outerDiv="false" style="">
+								<xf:label><![CDATA[2Depth Menu]]></xf:label>
+							</w2:anchor>
+						</xf:group>
+						<xf:group id="" style="" tagname="li">
+							<w2:span id="" label="3Depth Menu" style=""></w2:span>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+				<xf:trigger class="btn_fav" id="" style="" type="button">
+					<xf:label></xf:label>
+				</xf:trigger>
+			</xf:group>
+			<xf:group class="titbox" id="" meta_snippetCategory="02_타이틀" meta_snippetKeyComponent="true" meta_snippetName="2_02 서브타이틀(h3)"
+				style="">
+				<xf:select1 appearance="full" disabled="false" ev:onchange="scwin.rdo_fg_onchange" hierarchy="rdo_fg" id="rdo_fg"
+					item="01^감사의견,02^연결대상종속회사,03^연결제외종속회사,04^연결대상간주요거래,08^우발채무" orgid="rdo_fg" renderType="radiogroup" style=""
+					userData2=" class:TopCondition_Blue; cols:5; font-family:돋움;" metaev_onchange_name="연결주석사항 항목 변경" metaev_onchange_desc="해당 값에 따라 하단에 나오는 결과가 보여지는 페이지에 대한 페이지 명  설정\n- 코드값이 01, 02, 03 이면 엑셀 다운로드 버튼 보여지도록 하고 그외의 경우, 엑셀 다운로드 버튼 숨김\n해당 값에 따라서 검색 후 하단에 보여지는 조회 내용을 보여주는 페이지가 변경됨\n(예를 들어, '감사의견'을 누르면 'ULDFIS00400_02 페이지가 하단에 조회 내역에 보이도록)\n감사의견 코드값이 02, 03, 04, 05, 06, 07, 08 이면 결산일자가 보여지고, 그외면 결산일자 항목이 보이지 않도록 한다.">
+					<xf:choices>
+						<xf:item>
+							<xf:label><![CDATA[감사의견]]></xf:label>
+							<xf:value><![CDATA[01]]></xf:value>
+						</xf:item>
+						<xf:item>
+							<xf:label><![CDATA[연결대상종속회사]]></xf:label>
+							<xf:value><![CDATA[02]]></xf:value>
+						</xf:item>
+						<xf:item>
+							<xf:label><![CDATA[연결제외종속회사]]></xf:label>
+							<xf:value><![CDATA[03]]></xf:value>
+						</xf:item>
+						<xf:item>
+							<xf:label><![CDATA[연결대상간주요거래]]></xf:label>
+							<xf:value><![CDATA[04]]></xf:value>
+						</xf:item>
+						<xf:item>
+							<xf:label><![CDATA[우발채무]]></xf:label>
+							<xf:value><![CDATA[08]]></xf:value>
+						</xf:item>
+					</xf:choices>
+				</xf:select1>
+				<xf:group class="rt" id="" style="">
+					<xf:trigger class="btn_cm download" cursor="pointer" ev:onclick="scwin.btn_excel_onclick" hierarchy="btn_excel"
+						id="btn_excel" orgid="btn_excel" src="../img/btn_excelsave.gif" style="" text="엑셀다운로드" metaev_onclick_name="'엑셀 다운로드' 버튼 클릭" metaev_onclick_desc="조회된 그리드의 내용 엑셀로 다운로드 처리\n- 실제로는 하단의 각각의 페이지에 엑셀다운로드 함수를 호출하도록 지시">
+						<xf:label><![CDATA[엑셀다운로드]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+			<xf:group class="schbox" id="panel_Top" meta_snippetCategory="03_조회영역" meta_snippetKeyComponent="true" meta_snippetName="3_01 조회조건1행"
+				style="">
+				<xf:group class="schbox_inner" id="" style="">
+					<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl " id="" style="" tagname="table">
+						<w2:attributes>
+							<w2:summary></w2:summary>
+						</w2:attributes>
+						<xf:group tagname="colgroup">
+							<xf:group style="width:60px;" tagname="col"></xf:group>
+							<xf:group style="" tagname="col"></xf:group>
+							<xf:group style="width:100px;" tagname="col"></xf:group>
+							<xf:group style="" tagname="col"></xf:group>
+						</xf:group>
+						<xf:group class="" id="" style="" tagname="tr">
+							<xf:group class="w2tb_th" style="" tagname="th">
+								<w2:textbox hierarchy="label_82" id="label_82" label="기업명" orgid="label_82"
+									style=""
+									userData2=" class:TopCondition_01; font-family:돋움;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group class="w2tb_td" style="" tagname="td">
+								<xf:input ev:onkeydown="scwin.tbx_coSnm_onkeydown" hierarchy="tbx_coSnm" id="tbx_coSnm" maxlength="1000"
+									orgid="tbx_coSnm" style="width:185px;"
+									userData2=" class:TopCondition_01_write; font-family:돋움; border-color:#92b1f1; onchange:tbx_coSnm_onchange;" metaev_onkeydown_name="'기업명' 텍스트 값 입력" metaev_onkeydown_desc="해당 키 값이 '엔터(13)' 인 경우, 기업명 텍스트 값이 있으면 해당 값으로 기업정보조회처리\n기업명 텍스트 값이 없으면, 기업검색팝업 호출" ev:onchange="" ev:onviewchange="scwin.tbx_coSnm_onviewchange">
+								</xf:input>
+								<xf:trigger class="btn_cm icon search" cursor="pointer" ev:onclick="scwin.img_coSearch_onclick"
+									hierarchy="img_coSearch" id="img_coSearch" orgid="img_coSearch" src="../img/btn_search.gif" style="" metaev_onclick_name="'기업명' 돋보기 클릭" metaev_onclick_desc="기업검색팝업 오픈\n- 기업명을 조회 한 후, 해당 기업이 선택되면 결산일자 정보 데이터를 조회 한다.\n">
+									<xf:label><![CDATA[]]></xf:label>
+								</xf:trigger>
+								<xf:group hierarchy="panel_1" id="panel_1" orgid="panel_1"
+									style="display: none;"
+									userData2=" class:TopCondition_01;">
+									<xf:input hierarchy="tbx_kisCd" id="tbx_kisCd" maxlength="10" orgid="tbx_kisCd" readOnly="true"
+										style="width:62px;"
+										userData2=" class:TopCondition_01_write;">
+									</xf:input>
+								</xf:group>
+							</xf:group>
+							<xf:group class="w2tb_td in_tbl" style="" tagname="td">
+								<w2:attributes>
+									<w2:colspan>2</w2:colspan>
+									<w2:rowspan>1</w2:rowspan>
+								</w2:attributes>
+								<xf:group class="tblbox" id="pnl_AcntclsDt" meta_snippetCategory="05_입출력테이블" meta_snippetKeyComponent="true"
+									meta_snippetName="5_01 1단테이블" style="">
+									<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+										<w2:attributes>
+											<w2:summary></w2:summary>
+										</w2:attributes>
+										<xf:group tagname="colgroup">
+											<xf:group style="width:80px;" tagname="col"></xf:group>
+											<xf:group style="" tagname="col"></xf:group>
+										</xf:group>
+										<xf:group tagname="tr">
+											<xf:group class="w2tb_th " tagname="th">
+												<w2:attributes>
+													<w2:scope>row</w2:scope>
+												</w2:attributes>
+												<w2:textbox hierarchy="label_2" id="label_2" label="결산일자" orgid="label_2"
+													style=""
+													userData2=" class:TopCondition_01; font-family:돋움;">
+												</w2:textbox>
+											</xf:group>
+											<xf:group class="w2tb_td" tagname="td">
+												<w2:attributes></w2:attributes>
+												<xf:select1 appearance="minimal" disabledClass="w2selectbox_disabled" displayMode="label"
+													ev:onchange="scwin.cmb_acntclsDt_onchange" hierarchy="cmb_acntclsDt" id="cmb_acntclsDt" orgid="cmb_acntclsDt" ref=""
+													selectedData="true" style="width:121px;" tabIndex="2"
+													userData2=" class:TopCondition_01; bindcolumn:VALUE; index:0; listcount:10; listexprformat:TEXT^0^121; searchcolumn:TEXT;"
+													metaev_onchange_name="'결산일자' 콤보 값 변경" metaev_onchange_desc="결산일자가 변경되면 그리드 헤더의 헤더명을 가져온 후, 조회 로직 처리" allOption=""
+													chooseOption="">
+													<xf:choices>
+														<xf:itemset nodeset="data:dlt_consNotesAcntclsDtListRes">
+															<xf:label ref="text"></xf:label>
+															<xf:value ref="value"></xf:value>
+														</xf:itemset>
+													</xf:choices>
+												</xf:select1>
+											</xf:group>
+										</xf:group>
+									</xf:group>
+								</xf:group>
+							</xf:group>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+				<xf:group class="btn_schbox" id="" style="">
+					<xf:trigger class="btn_cm sch" cursor="pointer" ev:onclick="scwin.btn_search_onclick" hierarchy="btn_search"
+						id="btn_search" orgid="btn_search" src="../img/btn_select.gif"
+						style="" text="조회" metaev_onclick_name="'조회' 버튼 클릭" metaev_onclick_desc="검색조건에 해당되는 해당 기업정보를 이용해서 하단에 보여지는 페이지에 조회 로직 호출 지시">
+						<xf:label><![CDATA[조회]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+		</xf:group>
+	</body>
+</html>

@@ -15,7 +15,7 @@ xmlns:xf="http://www.w3.org/2002/xforms">
 		</xf:model>
 		<w2:layoutInfo>
 		</w2:layoutInfo>
-		<w2:publicInfo method="scwin.getValResultMsg,scwin.setDownloadGridViewOption,scwin.loadMessage,scwin.loadCommonMessage,scwin.initChangeCheckedDc,scwin.setChangeCheckedDc,scwin.getChangeCheckedMainFrame,scwin.setCommonCode,scwin.getCommonCodeDataList,scwin.executeCommonCode,scwin.getParameter,scwin.getColumnName,scwin.getDataCollection,scwin.getMessage,scwin.isModified,scwin.downloadMultipleDataList,scwin.downloadMultipleGridView,scwin.downloadGridViewExcel,scwin.downloadGridViewCSV,scwin.uploadGridViewExcel,scwin.uploadGridViewCSV,scwin.validateGroup,scwin.validateGridView,scwin.createDataList,scwin.createDataMap,scwin.undoAll,scwin.undoRow,scwin.undoGridView,scwin.deleteRow,scwin.insertRow,scwin.getMatchedJSON,scwin.setUserData,scwin.getUserData,scwin.createHolidayDataList,scwin.loadHoliday,scwin.serializeFormToQueryString,scwin.downFile"/>
+		<w2:publicInfo method="scwin.getValResultMsg,scwin.setDownloadGridViewOption,scwin.loadMessage,scwin.loadCommonMessage,scwin.initChangeCheckedDc,scwin.setChangeCheckedDc,scwin.getChangeCheckedMainFrame,scwin.setCommonCode,scwin.getCommonCodeDataList,scwin.executeCommonCode,scwin.getParameter,scwin.getColumnName,scwin.getDataCollection,scwin.getMessage,scwin.isModified,scwin.downloadMultipleDataList,scwin.downloadMultipleGridView,scwin.downloadGridViewExcel,scwin.downloadGridViewCSV,scwin.uploadGridViewExcel,scwin.uploadGridViewCSV,scwin.validateGroup,scwin.validateGridView,scwin.createDataList,scwin.createDataMap,scwin.undoAll,scwin.undoRow,scwin.undoGridView,scwin.deleteRow,scwin.insertRow,scwin.getMatchedJSON,scwin.getDiffJSON,scwin.setUserData,scwin.getUserData,scwin.createHolidayDataList,scwin.loadHoliday,scwin.serializeFormToQueryString,scwin.downFile"/>
 		<script type="text/javascript" lazy="false"><![CDATA[
 // 공통 코드 저장을 위한 DataList 속성 정보
 scwin.DATA_PREFIX = "dlt_commonCode";
@@ -2505,6 +2505,68 @@ scwin.getMatchedJSON = function (dataListObj, condArr) {
     }
 
     return returnData;
+};
+
+/**
+ * @method
+ * @name getDiffJSON
+ * @description 두 개의 데이터(DataMap 또는 JSON 객체)를 비교하여, 양쪽에 공통으로 존재하는 key(구조가 같은 key) 중 value가 서로 다른 key만 추출하여 반환한다. 파라미터가 DataMap인 경우 getJSON()으로 변환하여 비교한다.
+ * @param {Object} source 비교 기준 데이터. DataMap 객체 또는 JSON 객체.
+ * @param {Object} target 비교 대상 데이터. DataMap 객체 또는 JSON 객체.
+ * @returns {Object} value가 다른 key만 담은 JSON. { key : { source : 기준값, target : 대상값 } } 형태이며, 차이가 없으면 빈 객체({})를 반환한다.
+ * @hidden N
+ * @exception
+ * @example
+// 1) JSON 객체 비교
+$c.data.getDiffJSON({ nm : "홍길동", age : "20" }, { nm : "홍길동", age : "21" });
+// → { age : { source : "20", target : "21" } }
+
+// 2) DataMap 비교 (각각 getJSON()으로 변환하여 비교)
+$c.data.getDiffJSON(dma_before, dma_after);
+
+// 3) DataMap 과 JSON 혼합 비교
+$c.data.getDiffJSON(dma_org, { nm : "홍길동", age : "21" });
+ */
+scwin.getDiffJSON = function (source, target) {
+    const result = {};
+    try {
+        // 파라미터가 DataMap이면 getJSON()으로 변환, 그 외(JSON 객체)는 그대로 사용한다.
+        const toPlainJSON = function (param) {
+            if (param && (typeof param.getObjectType === "function") && (param.getObjectType() === "dataMap")) {
+                return param.getJSON();
+            }
+            return param;
+        };
+        // value 비교 : 객체/배열은 JSON 문자열로, 그 외는 문자열로 변환하여 비교한다.(숫자 20 과 문자 "20"은 동일값으로 처리)
+        const isDiffValue = function (v1, v2) {
+            const t1 = $c.util.getObjectType(v1);
+            const t2 = $c.util.getObjectType(v2);
+            if ((t1 === "json") || (t1 === "array") || (t2 === "json") || (t2 === "array")) {
+                return JSON.stringify(v1) !== JSON.stringify(v2);
+            }
+            return String(v1) !== String(v2);
+        };
+
+        const srcJson = toPlainJSON(source);
+        const tgtJson = toPlainJSON(target);
+
+        // 비교 가능한 JSON 객체가 아니면 빈 객체를 반환한다.
+        if (($c.util.getObjectType(srcJson) !== "json") || ($c.util.getObjectType(tgtJson) !== "json")) {
+            return result;
+        }
+
+        // 양쪽에 공통으로 존재하는 key 중 value가 다른 key만 추출한다.
+        for (const key in srcJson) {
+            if (Object.prototype.hasOwnProperty.call(srcJson, key) === false) { continue; }
+            if (Object.prototype.hasOwnProperty.call(tgtJson, key) === false) { continue; }
+            if (isDiffValue(srcJson[key], tgtJson[key]) === true) {
+                result[key] = { source : srcJson[key], target : tgtJson[key] };
+            }
+        }
+    } catch (ex) {
+        console.error("[$c.data.getDiffJSON] Exception :: " + ex.message);
+    }
+    return result;
 };
 
 /**

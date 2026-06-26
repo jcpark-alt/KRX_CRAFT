@@ -1,0 +1,493 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDMGT30309.gfm" meta_screenName="SMS전송">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<xf:model>
+			<w2:workflowCollection/>
+			<w2:dataCollection baseNode="map"/>
+			<xf:submission id="sbm_dts_Receiver" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json"/>
+			<xf:submission id="sbm_trs_Save" userData2=" keyname:toinb_dataid4; sendnulldata:True;" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json" ev:submitdone="scwin.trs_Save_OnSuccess" ev:submiterror="scwin.trs_Save_OnFail"/>
+			<xf:submission id="sbm_dts_msg" userData2=" syncload:True;" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json"/>
+			<xf:submission id="sbm_dts_rcv" userData2=" syncload:False;" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json" ev:submitdone="scwin.dts_rcv_OnLoadCompleted"/>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+/* ★Wcraft guide★    
+스크립트 수작업 유의사항
+*/
+
+
+
+	//----W-Craft WebSquare 변환 확인: include----//
+include("../js/libRoundPanel.js");
+
+	//----W-Craft WebSquare 변환 확인: include----//
+include("../js/mgt.js");
+
+	//----W-Craft WebSquare 변환 확인: include----//
+include("../js/session.js?today=20230728");
+scwin.vScrenID = 'ULDMGT30309.gfm';
+scwin.usrId = js_id;
+scwin.onpageload = function() {
+};
+scwin.onpageunload = function() {
+};
+scwin.setDefault = function() {
+    dts_msg.DataID = "/gauceSystemierAdaptor.do?method=getGauceDataHeader&messageId=SMS_MSG_IN";
+
+	//----W-Craft WebSquare 변환 확인: Reset----//
+    dts_msg.Reset();
+    dts_msg.insertRow();
+    dts_Receiver.DataID = "/gauceSystemierAdaptor.do?method=getGauceDataHeader&messageId=SMS_SEND_IN";
+
+	//----W-Craft WebSquare 변환 확인: Reset----//
+    dts_Receiver.Reset();
+    scwin.fn_getListSmsRcv();
+};
+scwin.fn_getListSmsRcv = function() {
+    var url = "/sms.do?method=smsRcvSelect";
+    url += "&SEARCH_DSC=SMS";
+    url += "&SCREN_ID=" + scwin.vScrenID;
+    url += "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01;
+    dts_rcv.DataID = encodeURI(url);
+
+	//----W-Craft WebSquare 변환 확인: Reset----//
+    dts_rcv.Reset();
+};
+scwin.getStringSize = function(message) {
+    var i, len = 0;
+    for (i = 0; i < message.length; i++) {
+        (message.charCodeAt(i) > 255) ? len += 2: len++;
+    }
+    return len;
+};
+scwin.sendSMS = function() {
+    if (scwin.isValidate()) {
+        var res = window.confirm("전송하시겠습니까?");
+        if (res) {
+            var url = "/sms.do?method=sendSMS" + "&SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_02;
+            trs_Save.Action = url;
+            trs_Save.KeyName = "toinb_dataid4";
+            trs_Save.KeyValue = "JSP(I:pInputMsg=dts_msg, I:pInputData=dts_Receiver)";
+
+	//----W-Craft WebSquare 변환 확인: post----//
+            trs_Save.post();
+        }
+    }
+};
+scwin.isValidate = function() {
+    if (scwin.is80bytes(0) && scwin.isSenderNotNull() && scwin.isReceiverNotNull()) {
+        scwin.allCheckReceiver();
+        return true;
+    } else return false;
+};
+scwin.allCheckReceiver = function() {
+    for (var i = 1; i <= dts_Receiver.getTotalRow(); i++) {
+        dts_Receiver.setCellData(i, "CHECK", "T");
+    }
+};
+scwin.isSenderNotNull = function() {
+    var sendNum = txb_snd_no.value;
+    if (sendNum == "" || sendNum.length == 0) {
+        alert("보내는 번호를 입력하십시오.");
+        return false;
+    }
+    return true;
+};
+scwin.isReceiverNotNull = function() {
+    if (dts_Receiver.getTotalRow() == 0) {
+        alert("받는 사람이 지정되지 않았습니다.");
+        return false;
+    } else {
+        for (var i = 1; i <= dts_Receiver.getTotalRow(); i++) {
+            if (dts_Receiver.getCellData(i, "RCV_PHONE") == "") {
+                alert("휴대폰 번호가 입력되지 않은 항목이 존재합니다. \r\n필요없는 항목을 삭제하고 진행하십시오.");
+                return false;
+            }
+        }
+    }
+    return true;
+};
+scwin.is80bytes = function(ver) {
+    var textVal = scwin.getStringSize(txa_title.text);
+    txb_title_size.setValue(textVal);
+    if (textVal > 2000) {
+        alert('2000byte가 초과되었습니다.');
+        txa_title.text = scwin.get2000bytes(txa_title.text);
+        txb_title_size.setValue(scwin.getStringSize(txa_title.text));
+
+	//----W-Craft WebSquare 변환 확인: Focus----//
+        txa_title.Focus();
+        return false;
+    } else if (textVal == 0) {
+        if (ver == 0) {
+            alert('보낼 메세지를 입력하십시오.');
+
+	//----W-Craft WebSquare 변환 확인: Focus----//
+            txa_title.Focus();
+            return false;
+        }
+    }
+    return true;
+};
+scwin.get2000bytes = function(message) {
+    var len = 0;
+    var i = 0;
+    for (i; i < message.length; i++) {
+        if (message.charCodeAt(i) > 255) {
+            if ((len + 2) > 2000) break;
+
+            else len += 2;
+        } else {
+            if ((len + 1) > 2000) break;
+
+            else len++;
+        }
+    }
+    return message.substring(0, i);
+};
+scwin.deleteRows = function(obj) {
+    grd_Receiver.Redraw = false;
+    for (var i = obj.countrow; i >= 1; i--) {
+        if (obj.NameValue(i, "CHECK") == "T") obj.DeleteRow(i);
+    }
+
+	//----W-Craft WebSquare 변환 확인: setColumnProp----//
+    $c.cm.setColumnProp(grd_Receiver, 'CHECK', 'HeadCheck', "false");
+    grd_Receiver.Redraw = true;
+};
+scwin.setClear = function() {
+    dts_Receiver.setJSON([]);
+
+	//----W-Craft WebSquare 변환 확인: setColumnProp----//
+    $c.cm.setColumnProp(grd_Receiver, 'CHECK', 'HeadCheck', "false");
+};
+scwin.fn_SetGrdReceiver = function() {
+    grd_Receiver.Redraw = false;
+    krxP = new Array();
+    grp = new Array();
+
+    //등록된 수신그룹 순서
+    for (i = 1; i <= dts_rcv.getTotalRow(); i++) {
+        grp[i - 1] = dts_rcv.getCellData(i, "TEXT").split(",");
+    }
+    if (dts_Receiver.getTotalRow() > 0) {
+        dts_Receiver.removeAll();
+    }
+
+    //0:IT현업,1:운영팀,2:현업기타
+    if (MxCombo_2.getSelectedIndex() == 0) {
+        //시작마감
+        krxP = grp[0].concat(grp[1]);
+    } else if (MxCombo_2.getSelectedIndex() == 1) {
+        //운영팀
+        krxP = grp[0];
+    } else if (MxCombo_2.getSelectedIndex() == 2) {
+        //KRX(BENIT)
+        krxP = grp[1];
+    } else if (MxCombo_2.getSelectedIndex() == 3) {
+        //기타
+        krxP = grp[2];
+    } else if (MxCombo_2.getSelectedIndex() == 4) {
+        //1차점검SMS
+        krxP = grp[0].concat(grp[2]).concat(grp[1]);
+    }
+    for (i = 0; i < krxP.length; i++) {
+        dts_Receiver.insertRow();
+        e = krxP[i].split("|");
+
+	//----W-Craft WebSquare 변환 확인: Focus----//
+        dts_Receiver.setCellData(dts_Receiver.getFocusedRowIndex(), "CHECK", "F");
+
+	//----W-Craft WebSquare 변환 확인: Focus----//
+        dts_Receiver.setCellData(dts_Receiver.getFocusedRowIndex(), "RCV_PHONE", e[0]);
+
+	//----W-Craft WebSquare 변환 확인: Focus----//
+        dts_Receiver.setCellData(dts_Receiver.getFocusedRowIndex(), "RCV_NAME", e[1]);
+
+	//----W-Craft WebSquare 변환 확인: Focus----//
+        dts_Receiver.setCellData(dts_Receiver.getFocusedRowIndex(), "RCV_TEAM", e[2]);
+    }
+    grd_Receiver.Redraw = true;
+};
+scwin.grd_Receiver_CanColumnPosChange = function(row, colid) {
+    return true;
+};
+scwin.txa_title_OnChange = function(info) {
+    scwin.is80bytes(1);
+};
+scwin.img_send_onclick = function(e) {
+    scwin.sendSMS();
+};
+scwin.MxCombo_1_OnSelChange = function(info) {
+    //alert(MxCombo_1.Index);
+    if (MxCombo_1.getSelectedIndex() == 2) {
+        txa_title.Text = "[운영]상장공시시스템 정상 가동.\r\nATS공개장 개시 수신 확인.\r\n시간외단일가공시 유,코 생성 확인.\r\n금일당번:";
+        MxCombo_2.Index = 0;
+    } else if (MxCombo_1.getSelectedIndex() == 3) {
+        txa_title.Text = "[운영]상장공시시스템 정상 마감(채권포함)";
+        MxCombo_2.Index = 4; // 0->2  마감시 현업문자전송 제외 20130926 yanghy  당분간 운영팀 부서장님까지 모두 넣은 2018.04.02
+
+    } else if (MxCombo_1.getSelectedIndex() == 0) {
+        txa_title.Text = "[운영]상장공시시스템 1차 점검 정상.금일당번: ";
+        MxCombo_2.Index = 4;
+    } else if (MxCombo_1.getSelectedIndex() == 1) {
+        txa_title.Text = "[운영]정보분배 정상확인 완료";
+        MxCombo_2.Index = 0;
+    } else {
+        txa_title.Text = "[운영]";
+    }
+
+    //삭제해도 다시 나오도록
+    //if(dts_Receiver.CountRow == 0) {
+    scwin.fn_SetGrdReceiver();
+    //}
+
+};
+scwin.MxCombo_2_OnSelChange = function(info) {
+    if (dts_rcv.getTotalRow() == 0) {
+        alert("수신자 그룹 조회 오류");
+        return;
+    }
+    scwin.fn_SetGrdReceiver();
+};
+scwin.gform_onload = function() {
+    $c.session.sessionCheck();
+    scwin.setDefault();
+};
+scwin.trs_Save_OnSuccess = function(e) {
+    txa_title.text = "";
+    alert('전송 완료');
+    scwin.setClear();
+};
+scwin.trs_Save_OnFail = function(e) {
+    txa_title.text = "";
+    alert('전송 실패');
+    scwin.setClear();
+};
+scwin.grd_Receiver_OnHeadCheckClick = function(headerId) {
+    var check = 'F';
+    if (col == 1) {
+        grd_Receiver.Redraw = false;
+        if (bCheck == 1) check = 'T';
+        for (i = 1; i <= dts_Receiver.getTotalRow(); i++) {
+            dts_Receiver.setCellData(i, "CHECK", check);
+        }
+        grd_Receiver.Redraw = true;
+    }
+};
+scwin.dts_rcv_OnLoadCompleted = function(e) {
+
+};
+scwin.img_srch_onclick = function(e) {
+    dts_Receiver.insertRow();
+
+	//----W-Craft WebSquare 변환 확인: Focus----//
+    dts_Receiver.setCellData(dts_Receiver.getFocusedRowIndex(), "CHECK", "T");
+
+	//----W-Craft WebSquare 변환 확인: Focus----//
+    dts_Receiver.setCellData(dts_Receiver.getFocusedRowIndex(), "RCV_PHONE", "");
+
+	//----W-Craft WebSquare 변환 확인: Focus----//
+    dts_Receiver.setCellData(dts_Receiver.getFocusedRowIndex(), "RCV_TEAM", "기타");
+
+	//----W-Craft WebSquare 변환 확인: Focus----//
+    dts_Receiver.setCellData(dts_Receiver.getFocusedRowIndex(), "RCV_NAME", "");
+};
+scwin.image_2_onclick = function(e) {
+    scwin.deleteRows(dts_Receiver);
+    //dts_Receiver.DeleteRow(dts_Receiver.RowPosition);
+
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+	<xf:group id="" class="sub_contents"><xf:group hierarchy="panel_1" userData2=" class:TopCondition_01;" style="" id="panel_1" orgid="panel_1">
+			<xf:group id="" class="titbox mt0">
+				<w2:textbox tagname="h3" hierarchy="lbl_tmp_1" userData2=" class:TopCondition_01; font-family:돋움;" style="" id="lbl_tmp_1" label="보내는 내용" orgid="lbl_tmp_1">
+				</w2:textbox><w2:textbox style="" id="" label=" (0~90bytes : SMS, 91~2000bytes : LMS)"></w2:textbox>
+				<xf:group id="" class="rt">
+					<xf:trigger cursor="pointer" src="../img/btn/btn_send2.gif" ev:onclick="scwin.img_send_onclick" hierarchy="img_send" style="" id="img_send" class="btn_cm" orgid="img_send">
+						<xf:label><![CDATA[전송]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+				
+			</xf:group>
+			<xf:group meta_snippetCategory="05_입출력테이블" meta_snippetName="5_01 1단테이블" meta_snippetKeyComponent="true" style="" id="" class="tblbox">
+				<xf:group adaptive="" adaptiveThreshold="768" tagname="table" style="" id="" class="w2tb tbl">
+					<w2:attributes>
+						<w2:summary></w2:summary>
+					</w2:attributes>
+					<xf:group tagname="colgroup">
+						<xf:group tagname="col" style="width:150.00px;"></xf:group>
+						<xf:group tagname="col" style="width:100px;"></xf:group>
+						<xf:group tagname="col" style=""></xf:group>
+					</xf:group>
+					<xf:group tagname="tr" style="">
+						<xf:group tagname="th" class="w2tb_th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+								<w2:colspan>1</w2:colspan>
+								<w2:rowspan>4</w2:rowspan>
+							</w2:attributes>
+							<xf:textarea ev:onchange="scwin.txa_title_OnChange" hierarchy="txa_title" style="width:100%;height:160px;" userData2=" class:TextArea_01; font-family:돋움;" id="txa_title" orgid="txa_title">
+							</xf:textarea><xf:group id="" class="flex mt10"><xf:group id="" class="rt"><w2:textbox maxlength="1000" hierarchy="txb_title_size" style="" userData2=" font-family:돋움; border-color:#92b1f1;" id="txb_title_size" label="0" orgid="txb_title_size">
+							</w2:textbox><w2:textbox hierarchy="label_6" style="" userData2=" class:TopCondition_01; font-family:돋움;" id="label_6" label="/2000 byte" orgid="label_6">
+							</w2:textbox></xf:group></xf:group></xf:group>
+						<xf:group tagname="th" style="" class="w2tb_th">
+							<w2:textbox hierarchy="lbl_tmp_5" style="" userData2=" class:TopCondition_01; font-family:돋움;" id="lbl_tmp_5" label="보내는 사람" orgid="lbl_tmp_5">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" style="" class="w2tb_td">
+							<xf:input class="" id="txb_fromName" meta_snippetCategory="10_입력폼" meta_snippetKeyComponent="true"
+								meta_snippetName="10_01 InputBox" placeholder="" style="width:150px;width:100%" readOnly="true">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_1" style="" userData2=" class:TopCondition_01; font-family:돋움;" id="label_1" label="보내는 번호" orgid="label_1">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:colspan>1</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:input class="" id="txb_snd_no" meta_snippetCategory="10_입력폼" meta_snippetKeyComponent="true"
+								meta_snippetName="10_01 InputBox" placeholder="" style="width:100%">
+							</xf:input>
+							<w2:textbox hierarchy="label_2" style="" userData2=" class:TopCondition_01; font-family:돋움;" id="label_2"
+								label='(발신번호는 "-"를 제외한 숫자만 가능합니다.)' class="blue" orgid="label_2">
+							</w2:textbox>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_3" style="" userData2=" class:TopCondition_01; font-family:돋움;" id="label_3" label="메세지선택" orgid="label_3">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:select1 item="1차전송_07시35분^1,코스콤정보분배^2,개시전송_08시00분^3,마감전송^4,수동입력^5" appearance="minimal"
+								ev:onchange="scwin.MxCombo_1_OnSelChange" disabledClass="w2selectbox_disabled" hierarchy="MxCombo_1" style="width:100%;"
+								userData2=" class:TopCondition_01; bindcolumn:Column1; cbdatacolumns:Column1,Column2; defaultstring:전송메세지선택; listcount:10; listexprformat:Column1^0^154; xpstyle:True;"
+								id="MxCombo_1" orgid="MxCombo_1" allOption="" chooseOption="true" ref="" chooseOptionLabel="전송메세지선택">
+								<xf:choices>
+									<xf:item>
+										<xf:label><![CDATA[1차전송_07시35분]]></xf:label>
+										<xf:value><![CDATA[1]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[코스콤정보분배]]></xf:label>
+										<xf:value><![CDATA[2]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[개시전송_08시00분]]></xf:label>
+										<xf:value><![CDATA[3]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[마감전송]]></xf:label>
+										<xf:value><![CDATA[4]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[수동입력]]></xf:label>
+										<xf:value><![CDATA[5]]></xf:value>
+									</xf:item>
+								</xf:choices>
+							</xf:select1>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_7" style="" userData2=" class:TopCondition_01; font-family:돋움;" id="label_7" label="그룹선택" orgid="label_7">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:select1 item="KRX(전체-시작/마감)^1,KRX(운영팀)^2,KRX(BENIT)^3,기타^4,1차점검SMS^5" appearance="minimal"
+								ev:onchange="scwin.MxCombo_2_OnSelChange" disabledClass="w2selectbox_disabled" hierarchy="MxCombo_2" style="width:100%;"
+								userData2=" class:TopCondition_01; bindcolumn:Column1; cbdatacolumns:Column1,Column2; defaultstring:전송그룹선택; index:-1; listcount:10; listexprformat:Column1^0^154; xpstyle:True;"
+								id="MxCombo_2" orgid="MxCombo_2" allOption="" chooseOption="true" chooseOptionLabel="전송그룹선택" ref="">
+								<xf:choices>
+									<xf:item>
+										<xf:label><![CDATA[KRX(전체-시작/마감)]]></xf:label>
+										<xf:value><![CDATA[1]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[KRX(운영팀)]]></xf:label>
+										<xf:value><![CDATA[2]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[KRX(BENIT)]]></xf:label>
+										<xf:value><![CDATA[3]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[기타]]></xf:label>
+										<xf:value><![CDATA[4]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[1차점검SMS]]></xf:label>
+										<xf:value><![CDATA[5]]></xf:value>
+									</xf:item>
+								</xf:choices>
+							</xf:select1>
+							<w2:textbox hierarchy="label_8" style="" userData2=" class:TopCondition_01; font-family:돋움;" id="label_8" label="당분간 마감전송의 그룹은 1차점검SMS 입니다." class="blue" orgid="label_8">
+							</w2:textbox>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+		</xf:group>
+		<xf:group id="" class="titbox">
+			<w2:textbox hierarchy="label_4" userData2=" class:Blue_Bold; font-weight:normal;" style="" id="label_4"
+				label="※ '선택항목 체크'는 삭제하기 위하여 사용. &lt;br/&gt;체크와 상관없이 리스트에 있는 모든 사람에게 전송됨." class="txt_info red" orgid="label_4" escape="false">
+			</w2:textbox>
+			<xf:group id="" class="rt">
+				<xf:trigger cursor="pointer" src="../img/btn_lineadd.gif" ev:onclick="scwin.img_srch_onclick" hierarchy="img_srch" style=""
+					id="img_srch" class="btn_cm row_add" orgid="img_srch">
+					<xf:label><![CDATA[행삽입]]></xf:label>
+				</xf:trigger>
+				<xf:trigger cursor="pointer" src="../img/btn_linedelete.gif" ev:onclick="scwin.image_2_onclick" hierarchy="image_2" style=""
+					id="image_2" class="btn_cm row_del" orgid="image_2">
+					<xf:label><![CDATA[행삭제]]></xf:label>
+				</xf:trigger>
+			</xf:group>
+		</xf:group>
+		<xf:group id="" class="gvwbox">
+			<w2:gridView dataList="dts_Receiver" hierarchy="grd_Receiver" resize="true" userData2=" class:Grid_01; cancolumnposchange:grd_Receiver_CanColumnPosChange; autoresizing:True; autoresizingallcol:True; autoresizingwithheader:True; enable:True; fillarea:True; gtitleheight:0; headborder:4; indwidth:0; usingoneclick:1; xtitleheight:0; font-family:돋움;" style="height:153px;" readOnly="false" id="grd_Receiver" class="gvw" ev:onheaderclick="scwin.grd_Receiver_OnHeadCheckClick" orgid="grd_Receiver" autoFit="allColumn">
+				<w2:caption style="" id="caption1" value="this is a grid caption."></w2:caption>
+				<w2:header style="" id="header1">
+					<w2:row>
+						<w2:column textAlign="center" width="50" userData2=" value:{ToString(CurRow)};" readOnly="true" inputType="text" id="column1" value="번호" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="50" userData2=" headcheckshow:True; headcheck:False;" inputType="text" id="h_CHECK" value="선택" displayMode="label"></w2:column>
+						<w2:column edit="any" textAlign="center" width="140" userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; color:#343434; sumbgcolor:#fefaef; sumcolor:#343434;" inputType="text" id="h_RCV_TEAM" value="회사명" displayMode="label"></w2:column>
+						<w2:column edit="any" textAlign="center" width="110" userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; color:#343434; sumbgcolor:#fefaef; sumcolor:#343434;" inputType="text" id="h_RCV_NAME" value="담당자" displayMode="label"></w2:column>
+						<w2:column edit="any" textAlign="center" width="180" userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; color:#343434; sumbgcolor:#fefaef; sumcolor:#343434;" inputType="text" id="h_RCV_PHONE" value="핸드폰" displayMode="label"></w2:column>
+						<w2:column hidden="true" textAlign="center" inputType="text" id="h_ISUR_CD" value="ISUR_CD" displayMode="label"></w2:column>
+						<w2:column hidden="true" textAlign="center" width="92" inputType="text" id="h_INTEG_USR_ID" value="INTEG_USR_ID" displayMode="label"></w2:column>
+					</w2:row>
+				</w2:header>
+				<w2:gBody style="" id="gBody1">
+					<w2:row style="" id="">
+						<w2:column textAlign="right" width="50" inputType="text" id="column2" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="50" inputType="checkbox" id="CHECK" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="140" inputType="text" id="RCV_TEAM" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="110" inputType="text" id="RCV_NAME" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="180" inputType="text" id="RCV_PHONE" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="" inputType="text" id="ISUR_CD" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="92" inputType="text" id="INTEG_USR_ID" displayMode="label"></w2:column>
+					</w2:row>
+				</w2:gBody>
+			</w2:gridView>
+		</xf:group></xf:group></body>
+</html>
