@@ -234,6 +234,23 @@
     * 셀렉터가 복합(`$('input[name=x]:radio:checked')`)·동적 결합이면 대응 컴포넌트를 일대일로 특정하기 어려우므로, 화면 설계를 확인해 라디오/그룹 컴포넌트의 `getValue()` 등으로 의미 보존 재작성하고 불명확하면 보류·리포트합니다.
     * 문자열/주석/정규식 리터럴 내부는 보호합니다(규칙 5 동일 원칙). HTML UI 텍스트(한글 라벨 등)는 치환 대상이 아닙니다.
 
+### 규칙 20: 그리드 엑셀 다운로드 메서드 → 공통함수 (`{gridView}.advancedExcelDownload(…)` → `$c.data.downloadGridViewExcel({gridView}, …)`)
+
+* 레거시 그리드 엑셀 다운로드 메서드 호출 `{gridView}.advancedExcelDownload(options[, infoArr])` 를 gcc 공통함수 `$c.data.downloadGridViewExcel({gridView}, options[, infoArr])` 로 치환합니다. **규칙 14 와 반대 방향**으로, 수신 객체(그리드 id)를 **첫 인자로 승격**하고 기존 인자는 순서대로 유지합니다.
+* **TO-BE 형태**(공통함수 시그니처):
+    ```javascript
+    const infoArr = [];
+    const options = {
+       fileName : "downLoadExcel.xlsx" // [default : excel.xlsx] options.fileName 없으면 default 세팅
+    };
+    $c.data.downloadGridViewExcel({gridView}, options, infoArr);
+    ```
+* **변환 규약**(결정적, convert.py 규칙 20):
+    * `{recv}.advancedExcelDownload(A, B)` → `$c.data.downloadGridViewExcel({recv}, A, B)` (2인자: 기존 `options`/`infoArr` 그대로).
+    * `{recv}.advancedExcelDownload({fileName:…, sheetName:…})` → `$c.data.downloadGridViewExcel({recv}, {fileName:…, sheetName:…})` (1인자 인라인 리터럴: 객체 그대로). `infoArr` 인자는 임의로 만들지 않습니다(공통함수가 선택 인자로 처리).
+* 수신 객체는 식별자 체인(`grd_x`, `$c.util.getComponent("grd_x")` 등)을 포괄합니다. 인자 안의 중첩 괄호·객체 리터럴은 `_scan_call` 로 정확히 파싱하고, 코드 세그먼트(문자열/주석/정규식 제외)만 치환하며 `await` 등 선행 토큰은 보존합니다. 변환 호출 바로 위의 W-Craft 검수 마커(메서드명 언급)는 함께 제거합니다(규칙 7m/12 동일 원칙).
+* 결과 호출에는 `.advancedExcelDownload` 가 없으므로 **재변환 시 no-op(멱등)** 입니다. 매핑표는 [substitution_map.md](substitution_map.md) §10 참조.
+
 ---
 
 ## 규칙 6 보충: Submission 변환 상세

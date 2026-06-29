@@ -645,6 +645,41 @@ def rule15_alert_error(code, report):
     return code
 
 
+def rule20_grid_excel_download(code, report):
+    """`{gridView}.advancedExcelDownload(options[, infoArr])` 그리드 엑셀 다운로드 메서드 호출을
+    공통함수 `$c.data.downloadGridViewExcel({gridView}, options[, infoArr])` 로 치환한다.
+    - 수신 객체(그리드 id/식별자 체인)를 첫 인자로 승격하고 기존 인자는 그대로 유지한다.
+    - 인자 안의 중첩 괄호/객체 리터럴(`{fileName:...}`)도 _scan_call 로 정확히 파싱한다.
+    - 코드 세그먼트(문자열/주석/정규식 제외)만 치환하고 `await` 등 선행 토큰은 보존한다.
+    - 변환된 호출 바로 위의 W-Craft 검수 마커(메서드명 언급)는 함께 제거(규칙 7m/12 동일 원칙).
+    - 결과 호출에는 `.advancedExcelDownload` 가 없으므로 재변환 시 no-op(멱등)."""
+    mask = code_mask(code)
+    pat = re.compile(r'(?<![.\w$])([\w$]+(?:\.[\w$]+)*)\.advancedExcelDownload\s*\(')
+    res, last = [], 0
+    for mo in pat.finditer(code):
+        if mo.start() < last or not mask[mo.start()]:
+            continue
+        scanned = _scan_call(code, mask, mo.end() - 1)
+        if scanned is None:
+            continue
+        args, end = scanned
+        recv = mo.group(1)
+        new_args = ", ".join([recv] + args)
+        prefix = code[last:mo.start()]
+        ls = code.rfind("\n", 0, mo.start()) + 1            # 호출 라인 시작
+        if ls > last:                                        # 바로 위 라인 검사(메서드명 언급 W-Craft 마커)
+            p_ls = code.rfind("\n", 0, ls - 1) + 1
+            prevline = code[p_ls:ls]
+            if p_ls >= last and _WCRAFT_MARK.match(prevline) and "advancedExcelDownload" in prevline:
+                prefix = code[last:p_ls] + code[ls:mo.start()]
+        res.append(prefix)
+        res.append("$c.data.downloadGridViewExcel(" + new_args + ")")
+        report["rule20"].append("%s.advancedExcelDownload(...) -> $c.data.downloadGridViewExcel(%s, ...)" % (recv, recv))
+        last = end
+    res.append(code[last:])
+    return "".join(res)
+
+
 def rule7_gcc_substitute(code, report):
     """substitution_dict() 의 함수 호출부를 단어경계로 치환(코드 세그먼트만, 메서드 호출 .fn() 제외).
     파일 내에 함수로 선언/정의된 이름은 치환에서 제외한다(로컬 정의 우선, 선언부 손상 방지)."""
@@ -1639,7 +1674,7 @@ def collect_judgment(script, head, body, report):
 
 # ---------- 파이프라인 ----------
 def convert(raw, filename):
-    report = {"rule1": "", "rule2": 0, "rule2_skip": [], "rule3": [], "rule4": None, "rule4_merge": None, "rule5a": 0, "rule5b": [], "rule5c": [], "rule5d": [], "rule6": {"converted": [], "deleted": 0}, "rule7": [], "rule7m": [], "rule7n": [], "rule8": {"const": 0, "let": 0}, "rule9": 0, "rule10": 0, "rule11": 0, "rule12": {"converted": []}, "rule13": [], "rule14": [], "rule15": [], "rule16": {"converted": [], "skipped": []}, "rule17": {"converted": [], "skipped": []}, "wcraft": 0, "judgment": []}
+    report = {"rule1": "", "rule2": 0, "rule2_skip": [], "rule3": [], "rule4": None, "rule4_merge": None, "rule5a": 0, "rule5b": [], "rule5c": [], "rule5d": [], "rule6": {"converted": [], "deleted": 0}, "rule7": [], "rule7m": [], "rule7n": [], "rule8": {"const": 0, "let": 0}, "rule9": 0, "rule10": 0, "rule11": 0, "rule12": {"converted": []}, "rule13": [], "rule14": [], "rule15": [], "rule16": {"converted": [], "skipped": []}, "rule17": {"converted": [], "skipped": []}, "rule20": [], "wcraft": 0, "judgment": []}
     reg = split_regions(raw)
     if reg is None:
         raise ValueError("SCRIPT(CDATA) 영역을 찾지 못했습니다.")
@@ -1662,6 +1697,7 @@ def convert(raw, filename):
     s = rule7n_normalize_module_fn(s, report)
     s = rule14_component_method(s, report)
     s = rule15_alert_error(s, report)
+    s = rule20_grid_excel_download(s, report)
     reg["head"], s, reg["body"] = rule13_rename_scwin_fn(reg["head"], s, reg["body"], report)
     s, reg["body"] = rule3_handlers(s, reg["body"], report)
     s, reg["body"] = rule4_structure(s, reg["body"], report)
@@ -1717,6 +1753,9 @@ def print_report(rep, filename):
         print("   -", s)
     print("규칙15 alert_error → $c.win.alert :", len(rep["rule15"]), "건")
     for s in rep["rule15"]:
+        print("   -", s)
+    print("규칙20 advancedExcelDownload → $c.data.downloadGridViewExcel :", len(rep["rule20"]), "건")
+    for s in rep["rule20"]:
         print("   -", s)
     print("규칙8 var→const/let : const %d, let %d" % (rep["rule8"]["const"], rep["rule8"]["let"]))
     print("규칙9 불필요 $c.cm.* 호출 제거 :", rep["rule9"], "건")
