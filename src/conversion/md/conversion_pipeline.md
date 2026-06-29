@@ -58,6 +58,8 @@ WebSquare XML 은 `head(xml) → script(JavaScript, CDATA) → body(xml)` 구조
 
 Python 이 남긴 **"추가 작업 목록"만** Claude Code 로 처리합니다. 기계가 판단하기 어려운 부분이 대상입니다.
 
+> **잔여 TODO 추적**: 단계 2에서도 화면 실행(런타임)·업무 로직 판단이 필요해 보류한 항목은 코드에 `// TODO Stage2:` 주석으로 남기고, 모듈·유형·파일·라인별로 [stage2_todo_worklist.md](stage2_todo_worklist.md) 에 집계합니다(자동 생성). mgt·stf·tms 변환분 기준 0-based 인덱스 검토·submitdone 핸들러 미정의·팝업 콜백·필터 재구현 등이 주요 유형입니다. 항목 해결 시 코드 주석 제거 + 워크리스트 갱신.
+
 * **검토 태그 매핑**: 시그니처·기본값·반환형이 다른 함수(`toNum`→`$c.num.parseFloat`, `showObj`→`$c.validate.setComponentProperty`, `cIsBupin`→`$c.str.isBizID` 등) — 인자 순서/개수를 확인해 조정.
 * **대체 태그 매핑**: 원시 XHR/`sendMessage` → `$c.sbm.execute`/`executeDynamic` 재작성, jQuery 풍 `$()` → `$c.util.getComponent`. 콜백·응답 처리 구조 재설계.
 * **원시 JSP/jQuery 페이지 재설계(규칙 19)**: WebSquare 가 아닌 HTML·JSP·jQuery 레거시 페이지(예: `inf/srch/ULDINF20000`, `inf/comm/ULDINF90400`)는 **단계 1(Python) 대상이 아니다**(`==`→`===`·`var`→`const/let` 등 표면 치환만 적용되고 DOM/jQuery 블록은 잔존). UI 마크업을 `<w2:*>` 컴포넌트로 재구성한 뒤 `$("#id").val()/.show()`·`document.{폼}.{필드}`·`window.open`·`new Date`·`<c:out>/${…}` 등을 컴포넌트 메서드(`getValue`/`setValue`/`setFocus`/`show`/`hide`)·`$c.*`(`sbm.executeDynamic`/`win.openPopup`/`date.*`/`util.getParameter`)로 옮긴다. 매핑표는 [substitution_map.md](substitution_map.md) §11, 식별 신호·선행조건은 [conversion_rules.md](conversion_rules.md) §규칙 19 참조.
