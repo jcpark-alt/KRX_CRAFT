@@ -81,6 +81,7 @@
 | `$c.win.moveUrl` | `goURL` | URL 이동 | |
 | `$c.win.getProgramId` | `InfoMenuID` | 현재 메뉴/프로그램 ID | |
 | `$c.win.alert` (+ `$c.data.getMessage`) | `alert_error` | 에러 객체 메시지 alert | |
+| `$c.win.getParent` | `{객체명}.Provider("../")` | 부모 pageFrame 접근 — `frame.Provider("../")` 전체를 `$c.win.getParent()` 로 치환(수신 객체 제거). `"../"` 만 대상이며 `/top`·`../../`·동적경로는 대응 함수 없어 제외(규칙 21) | 검토 |
 
 ## 7. `$c.sbm` — 서버 통신 (원시 XHR 대체)
 

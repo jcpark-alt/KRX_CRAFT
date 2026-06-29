@@ -715,6 +715,34 @@ def rule20b_normalize_excel_positional(code, report):
     return "".join(res)
 
 
+def rule21_frame_provider(code, report):
+    """레거시 Gauce 프레임 접근 `{recv}.Provider("../")`(부모 1단계)를 gcc 공통함수 `$c.win.getParent()` 로 치환한다.
+    - `$c.win.getParent()` 는 `$p.parent()`(부모 pageFrame)를 반환하며 `Provider("../")` 와 동일 의미.
+    - **정확히 `"../"`/`'../'` 리터럴 인자만** 대상. `/top`(상위)·`../../`·동적경로(`"../"+x`)·형제프레임(`../name`)은 대응 공통함수가 없어 미변환·리포트.
+    - 수신 객체(`frame` 등)는 제거. 반환된 부모 pageFrame 에서 데이터셋/컴포넌트는 직접(`getParent().dlt_x`), scwin 변수/함수는 `.scwin` 경유(JSDoc) — 후속 멤버 접근 형태는 단계 2 검토.
+    - 코드 세그먼트(문자열/주석/정규식 제외)만 치환. 결과에 `.Provider(` 없어 재변환 no-op(멱등)."""
+    mask = code_mask(code)
+    pat = re.compile(r'(?<![.\w$])[\w$]+(?:\.[\w$]+)*\.Provider\(\s*(?:"\.\./"|\'\.\./\')\s*\)')
+    res, last = [], 0
+    for mo in pat.finditer(code):
+        if mo.start() < last or not mask[mo.start()]:
+            continue
+        res.append(code[last:mo.start()])
+        res.append("$c.win.getParent()")
+        report["rule21"].append(mo.group(0).strip() + " -> $c.win.getParent()")
+        last = mo.end()
+    res.append(code[last:])
+    out = "".join(res)
+    # 미변환 Provider(비-"../": /top·../../·동적·형제프레임)는 대응 공통함수 없음 → 단계 2 검토 리포트
+    leftover = re.compile(r'(?<![.\w$])[\w$]+(?:\.[\w$]+)*\.Provider\(')
+    omask = code_mask(out)
+    for mo in leftover.finditer(out):
+        if omask[mo.start()]:
+            snippet = out[mo.start():out.find(")", mo.start()) + 1]
+            report["judgment"].append("규칙21 Provider 미변환(대응 공통함수 없음, 단계2 검토): " + snippet.strip())
+    return out
+
+
 def rule7_gcc_substitute(code, report):
     """substitution_dict() 의 함수 호출부를 단어경계로 치환(코드 세그먼트만, 메서드 호출 .fn() 제외).
     파일 내에 함수로 선언/정의된 이름은 치환에서 제외한다(로컬 정의 우선, 선언부 손상 방지)."""
@@ -1709,7 +1737,7 @@ def collect_judgment(script, head, body, report):
 
 # ---------- 파이프라인 ----------
 def convert(raw, filename):
-    report = {"rule1": "", "rule2": 0, "rule2_skip": [], "rule3": [], "rule4": None, "rule4_merge": None, "rule5a": 0, "rule5b": [], "rule5c": [], "rule5d": [], "rule6": {"converted": [], "deleted": 0}, "rule7": [], "rule7m": [], "rule7n": [], "rule8": {"const": 0, "let": 0}, "rule9": 0, "rule10": 0, "rule11": 0, "rule12": {"converted": []}, "rule13": [], "rule14": [], "rule15": [], "rule16": {"converted": [], "skipped": []}, "rule17": {"converted": [], "skipped": []}, "rule20": [], "wcraft": 0, "judgment": []}
+    report = {"rule1": "", "rule2": 0, "rule2_skip": [], "rule3": [], "rule4": None, "rule4_merge": None, "rule5a": 0, "rule5b": [], "rule5c": [], "rule5d": [], "rule6": {"converted": [], "deleted": 0}, "rule7": [], "rule7m": [], "rule7n": [], "rule8": {"const": 0, "let": 0}, "rule9": 0, "rule10": 0, "rule11": 0, "rule12": {"converted": []}, "rule13": [], "rule14": [], "rule15": [], "rule16": {"converted": [], "skipped": []}, "rule17": {"converted": [], "skipped": []}, "rule20": [], "rule21": [], "wcraft": 0, "judgment": []}
     reg = split_regions(raw)
     if reg is None:
         raise ValueError("SCRIPT(CDATA) 영역을 찾지 못했습니다.")
@@ -1734,6 +1762,7 @@ def convert(raw, filename):
     s = rule15_alert_error(s, report)
     s = rule20_grid_excel_download(s, report)
     s = rule20b_normalize_excel_positional(s, report)
+    s = rule21_frame_provider(s, report)
     reg["head"], s, reg["body"] = rule13_rename_scwin_fn(reg["head"], s, reg["body"], report)
     s, reg["body"] = rule3_handlers(s, reg["body"], report)
     s, reg["body"] = rule4_structure(s, reg["body"], report)
@@ -1792,6 +1821,9 @@ def print_report(rep, filename):
         print("   -", s)
     print("규칙20 advancedExcelDownload → $c.data.downloadGridViewExcel :", len(rep["rule20"]), "건")
     for s in rep["rule20"]:
+        print("   -", s)
+    print("규칙21 frame.Provider(\"../\") → $c.win.getParent() :", len(rep["rule21"]), "건")
+    for s in rep["rule21"]:
         print("   -", s)
     print("규칙8 var→const/let : const %d, let %d" % (rep["rule8"]["const"], rep["rule8"]["let"]))
     print("규칙9 불필요 $c.cm.* 호출 제거 :", rep["rule9"], "건")

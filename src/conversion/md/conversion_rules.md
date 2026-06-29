@@ -259,6 +259,14 @@
     * 인자 토큰은 원형 보존(문자열 리터럴·표현식 `MxCombo.text + "…"`·미따옴표 숫자 `type: 8` 모두 그대로), 뒤 trailing 주석(`//16` 등)도 유지.
 * **인자 개수로 형태 판별**: 객체 시그니처(2~3인자) 호출은 4인자가 아니므로 건드리지 않습니다. 규칙 20(advancedExcelDownload 승격)이 만든 2~3인자 결과와도 충돌하지 않으며, 결과는 2인자라 **재변환 시 no-op(멱등)** 입니다.
 
+### 규칙 21: 레거시 프레임 접근 `{recv}.Provider("../")` → `$c.win.getParent()`
+
+* 레거시 Gauce 프레임 접근 `frame.Provider("../")`(부모 1단계 pageFrame scope 반환)를 gcc 공통함수 `$c.win.getParent()` 로 치환합니다. `$c.win.getParent()` 는 `$p.parent()`(부모 pageFrame)를 반환하며 `Provider("../")` 와 동일 의미입니다(수신 객체 `frame` 제거).
+* **변환 규약**: `{recv}.Provider("../")` → `$c.win.getParent()`. **정확히 `"../"`/`'../'` 리터럴 인자만** 대상.
+    * 반환된 부모 pageFrame 에서 **데이터셋/컴포넌트는 직접 접근**(`$c.win.getParent().dlt_x` / `.dts_List`), **scwin 변수/함수는 `.scwin` 경유**(`$c.win.getParent().scwin.search()`) — JSDoc 규약. 따라서 `parentWin = $c.win.getParent()` 후 데이터셋 접근(`parentWin.dts_List.setCellData(...)`)은 안전하나, scwin 변수/함수 접근(`…js_com_market`/`…fn_x()`)은 `.scwin` 삽입이 필요할 수 있어 **단계 2 검토**입니다.
+* **미변환·리포트(대응 공통함수 없음)**: `Provider("/top")`(상위 프레임 — `$c.win` 에 top 헬퍼 없음), `Provider("../../")`(조부모), `Provider("../" + 변수)`(동적 경로), `Provider("../name")`(형제 프레임)는 1:1 공통함수가 없어 미변환하고 `judgment` 로 분리합니다(단계 2: `$p.top()` 등 네이티브 또는 헬퍼 추가 검토).
+* 코드 세그먼트(문자열/주석/정규식 제외)만 치환하며, 결과에 `.Provider(` 가 없으므로 **재변환 시 no-op(멱등)** 입니다. 매핑표는 [substitution_map.md](substitution_map.md) §6 참조.
+
 ---
 
 ## 규칙 6 보충: Submission 변환 상세
