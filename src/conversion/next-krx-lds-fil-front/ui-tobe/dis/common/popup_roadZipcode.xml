@@ -1,0 +1,492 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:ev="http://www.w3.org/2001/xml-events"
+    xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+    <head meta_screenName="우편번호검색">
+        <w2:type>COMPONENT</w2:type>
+        <w2:buildDate/>
+        <w2:MSA/>
+        <xf:model>
+        	<w2:dataCollection baseNode="map">
+        		<w2:dataMap baseNode="map" id="dma_Req">
+        			<w2:keyInfo>
+        				<w2:key id="searchType" name="검색구분(1:도로명, 2:건물명, 3:직접입력)" dataType="text"></w2:key>
+        				<w2:key id="roadNm" name="도로명주소" dataType="text"></w2:key>
+        				<w2:key id="bldgNo" name="건물번호" dataType="text"></w2:key>
+        				<w2:key id="bldgNm" name="건물명" dataType="text"></w2:key>
+        			</w2:keyInfo>
+        			<w2:data use="false">
+        			</w2:data>
+        		</w2:dataMap>
+        		<w2:dataList baseNode="list" repeatNode="map" id="dlt_AddrListRes">
+        			<w2:columnInfo>
+        				<w2:column id="zipCd" name="우편번호" dataType="text"></w2:column>
+        				<w2:column id="roadAddr" name="도로명주소" dataType="text"></w2:column>
+        				<w2:column id="jibunAddr" name="지번주소" dataType="text"></w2:column>
+        				<w2:column id="displayAddr" name="표시용 주소" dataType="text"></w2:column>
+        			</w2:columnInfo>
+        		</w2:dataList>
+        	</w2:dataCollection>
+        	<w2:workflowCollection />
+        </xf:model>
+        <w2:layoutInfo/>
+        <w2:publicInfo method=""/>
+        <script lazy="false" type="text/javascript"><![CDATA[
+scwin.vScrenID = "popup_roadZipcode.xml";
+
+// scwin.onpageload, scwin.onpageunload 함수
+scwin.onpageload = function() {
+	scwin.param = $c.data.getParameter();
+
+};
+
+// WebSquare 컴포넌트 이벤트 함수
+/// EVENT ///
+
+/**
+ * 검색조건 변경
+ */
+scwin.rd_searchType_onviewchange = function (info) {
+    const type = info.value;
+
+    scwin.searchResult(false); //검색 초기화
+    dma_Req.setEmptyValue(); //입력 초기화
+    dma_Req.set("searchType", type);
+
+    if(type === "1") {
+        //검색조건
+        grp_search1.show("");
+        grp_search2.hide();
+        grp_search3_1.hide();
+        grp_search3_2.hide();
+
+        //안내문구
+        grp_info1.show("");
+        grp_info2.hide();
+        grp_info3.hide();
+        
+        //조회버튼
+        btn_search.show("");
+    } else if(type === "2") {
+        //검색조건
+        grp_search1.hide();
+        grp_search2.show("");
+        grp_search3_1.hide();
+        grp_search3_2.hide();
+
+        //안내문구
+        grp_info1.hide();
+        grp_info2.show("");
+        grp_info3.hide();
+
+        //조회버튼
+        btn_search.show("");
+
+    } else if(type === "3") {
+        //검색조건
+        grp_search1.hide();
+        grp_search2.hide();
+        grp_search3_1.show("");
+        grp_search3_2.show("");
+
+        //안내문구
+        grp_info1.hide();
+        grp_info2.hide();
+        grp_info3.show("");
+
+        //조회버튼
+        btn_search.hide();
+    }
+    
+};
+
+/**
+ * 조회 버튼 클릭
+ */
+scwin.btn_search_onclick = function (e) {
+    let type = rd_searchType.getValue();
+    if(scwin.checkValues(type)) {
+	    const sbmOptions = {
+	        id : "sbm_SelectRoadZip",
+	        action : "/api/discls/common/popup/misc/zipcd/select-list",
+	        method : "get",
+	        ref : "dma_Req",
+	        target : "dlt_AddrListRes=body",
+	        submitDoneHandler : scwin.sbm_SelectRoadZip_submitdone,
+	        gridview : "grd_Grid",
+	        isProcessMsg : false
+	    };
+	    $c.sbm.executeDynamic(sbmOptions);
+
+    } else {
+        if(type === "1") {
+            ipt_raodNm1.focus();
+        } else if(type === "2") {
+            ipt_bldgNo.focus();
+        }
+    }
+};
+
+/**
+ * 직접입력 확인 버튼 클릭
+ */
+scwin.btn_confirm_onclick = function (e) {
+	scwin.otherZipCodeChk();
+};
+
+/**
+ * 닫기 버튼 클릭
+ */
+scwin.btn_cancel_onclick = function () {
+    $c.win.closePopup();
+};
+
+/**
+ * row 선택
+ */
+scwin.grd_Grid_oncellclick = function (rowIndex, columnIndex, columnId) {
+	let rowData = dlt_AddrListRes.getRowJSON(rowIndex);
+    if(rowData && rowData.zipCd && rowData.roadAddr) {
+        scwin.setZipCodePop(rowData.zipCd, rowData.roadAddr);
+    }
+};
+
+// 일반 함수
+/// SUBMISSION ///
+scwin.sbm_SelectRoadZip_submitdone = function (e) {
+    const res = e.responseJSON;
+    if(res.body && res.body.length > 0) {
+        scwin.searchResult(true);
+        scwin.fmtAddr(res.body);
+
+    } else {
+        scwin.searchResult(false);        
+    }
+};
+
+/// FUNCTION ///
+
+/**
+ * row에 표시되는 주소 컬럼 포맷
+ */
+scwin.fmtAddr = function (resList) {
+    for (let i = 0; i < resList.length; i++) {
+        let item = resList[i];
+        let addr = "<span class='txt_blue'>"+item.roadAddr+"</span>";
+        addr += "</br>";
+        addr += "<span style='padding: 0 4px;'> "+item.jibunAddr+"</span>";
+
+        dlt_AddrListRes.setCellData(i, "displayAddr", addr);
+    }
+};
+
+/**
+ * 검색결과 표시
+ */
+scwin.searchResult = function (isResult) {
+    if(isResult) {
+        grp_zipLoad.show("");
+        grp_resMsgBox.hide();
+        
+    } else {
+        txt_message.setValue("조회 내역이 없습니다.");
+        grp_zipLoad.hide();
+        grp_resMsgBox.show("");
+    }
+};
+
+/**
+ * 조회 필수값 검증
+ */
+scwin.checkValues = function (type) {
+    if(type === "1") { //도로명 검색
+        let roadNm = ipt_raodNm1.getValue();
+        let bldgNo = ipt_bldgNo.getValue();
+        if(!roadNm) {
+            alert ('검색할 도로명을 입력해 주세요.');
+            return false;
+        } else if(roadNm.length < 2) {
+            alert('도로명은 두글자 이상 입력되어야 합니다.');
+            return false;
+        } else if(scwin.specialWord(roadNm) || scwin.specialWord(bldgNo)) {
+            alert('%는 사용 할 수 없습니다.');
+            return false;
+        } else {
+            return true;
+        }
+
+    } else if(type === "2") { //건물명 검색
+        let roadNm = ipt_raodNm2.getValue();
+        let bldgNm = ipt_bldgNm.getValue();
+        if(!bldgNm) {
+            alert('검색할 건물명을 입력해 주세요.');
+            return false;
+        } else if(bldgNm.length < 2) {
+            alert('건물명은 두글자 이상 입력되어야 합니다.');
+            return false;
+        } else if(scwin.specialWord(bldgNm) || scwin.specialWord(roadNm)) {
+            alert('%는 사용 할 수 없습니다.');
+            return false;
+        } else {
+            return true;
+        }
+
+    } else {
+        alert("검색조건을 선택하세요.");
+        return false;
+    }
+};
+
+/**
+ * 특수문자(%) 사용 검증 - 전체조회 방지
+ */
+scwin.specialWord = function (str) {
+    let reg = /%/;
+    if (str === null || str === ""){
+        return false;
+    }
+    if(reg.test(str)){
+        return true;	
+    }
+};
+
+/**
+ * 직접입력 입력값 검증
+ */
+scwin.otherZipCodeChk = function () {
+    let zipNo = ipt_zipCode.getValue();
+    let addr = ipt_addr.getValue();
+    if(!zipNo) {
+        alert("우편번호를 입력해 주세요.");
+        ipt_zipCode.focus();
+        return;
+    }
+    
+    if(/[^0123456789]/g.test(zipNo)) {
+
+        if(zipNo !== "-") {
+            alert("우편번호는 숫자 또는 -만 가능합니다.");
+            ipt_zipCode.focus();
+            return;
+        }
+    }
+    
+    if(!addr) {
+        alert("주소를 입력해 주세요.");
+        ipt_addr.focus();
+        return;
+    }
+        
+    scwin.setZipCodePop(zipNo, addr);
+};
+
+/**
+ * 데이터 콜백(팝업 닫고 파라미터 전달)
+ */
+scwin.setZipCodePop = function (zipNo, addr) {
+    $c.win.closePopup({"zipNo":zipNo, "addr":addr, "req": scwin.param.data}, scwin.param.callbackFn);
+};
+]]></script>
+    </head>
+    <body ev:onpageload="scwin.onpageload">
+    	<xf:group class="pop_contents" id="" meta_componentContainer="true" meta_snippetCategory="00_화면시작" meta_snippetKeyComponent="true"
+    		meta_snippetName="0_02 팝업페이지시작">
+    		<xf:group class="schbox mb10" id="" meta_snippetCategory="03_조회영역" meta_snippetKeyComponent="true"
+    			meta_snippetName="3_02 조회조건2행" style="">
+    			<xf:group class="schbox_inner" id="" style="">
+    				<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl " id="" style="" tagname="table">
+    					<w2:attributes>
+    						<w2:summary></w2:summary>
+    					</w2:attributes>
+    					<xf:group tagname="colgroup">
+    						<xf:group style="width:80px;" tagname="col"></xf:group>
+    						<xf:group style="" tagname="col"></xf:group>
+    						<xf:group style="width:80px;" tagname="col"></xf:group>
+    						<xf:group style="" tagname="col"></xf:group>
+    					</xf:group>
+    					<xf:group class="" id="" style="" tagname="tr">
+    						<xf:group class="w2tb_th" style="" tagname="th">
+    							<w2:textbox class="" id="" label="검색조건" style=""></w2:textbox>
+    						</xf:group>
+    						<xf:group class="w2tb_td" style="" tagname="td">
+    							<w2:attributes>
+    								<w2:colspan>3</w2:colspan>
+    								<w2:rowspan>1</w2:rowspan>
+    							</w2:attributes>
+    							<xf:select1 appearance="full" cols="" disabled="" id="rd_searchType" meta_snippetCategory="10_입력폼"
+    								meta_snippetKeyComponent="true" meta_snippetName="10_05 Radio" ref="data:dma_Req.searchType" renderType="radiogroup" rows=""
+    								selectedIndex="0" style="" ev:onviewchange="scwin.rd_searchType_onviewchange">
+    								<xf:choices>
+    									<xf:item>
+    										<xf:label><![CDATA[도로명(권장)]]></xf:label>
+    										<xf:value><![CDATA[1]]></xf:value>
+    									</xf:item>
+    									<xf:item>
+    										<xf:label><![CDATA[건물명]]></xf:label>
+    										<xf:value><![CDATA[2]]></xf:value>
+    									</xf:item>
+    									<xf:item>
+    										<xf:label><![CDATA[직접입력(외국법인 등)]]></xf:label>
+    										<xf:value><![CDATA[3]]></xf:value>
+    									</xf:item>
+    								</xf:choices>
+    							</xf:select1>
+    						</xf:group>
+    					</xf:group>
+    					<xf:group class="" id="grp_search1" style="" tagname="tr">
+    						<xf:group class="w2tb_th" style="" tagname="th">
+    							<w2:textbox class="" id="" label="도로명" style=""></w2:textbox>
+    						</xf:group>
+    						<xf:group class="w2tb_td" style="" tagname="td">
+    							<xf:input class="" id="ipt_raodNm1" meta_snippetCategory="10_입력폼" meta_snippetKeyComponent="true"
+    								meta_snippetName="10_01 InputBox" placeholder="" style="width:100%;" ref="data:dma_Req.roadNm">
+    							</xf:input>
+    						</xf:group>
+    						<xf:group class="w2tb_th" style="" tagname="th">
+    							<w2:textbox class="" id="txt_bldgNo" label="건물번호" style=""></w2:textbox>
+    						</xf:group>
+    						<xf:group class="w2tb_td" id="" style="" tagname="td">
+    							<xf:input class="" id="ipt_bldgNo" meta_snippetCategory="10_입력폼" meta_snippetKeyComponent="true"
+    								meta_snippetName="10_01 InputBox" placeholder="" style="width:100%;" ref="data:dma_Req.bldgNo">
+    							</xf:input>
+    						</xf:group>
+    					</xf:group>
+    					<xf:group class="" id="grp_search2" style="display:none;" tagname="tr">
+    						<xf:group class="w2tb_th" style="" tagname="th">
+    							<w2:textbox class="" id="" label="도로명" style=""></w2:textbox>
+    						</xf:group>
+    						<xf:group class="w2tb_td" style="" tagname="td">
+    							<xf:input class="" id="ipt_raodNm2" meta_snippetCategory="10_입력폼" meta_snippetKeyComponent="true"
+    								meta_snippetName="10_01 InputBox" placeholder="" ref="data:dma_Req.roadNm" style="width:100%;">
+    							</xf:input>
+    						</xf:group>
+    						<xf:group class="w2tb_th" style="" tagname="th">
+    							<w2:textbox class="" id="tbx_textbox6" label="건물명" style=""></w2:textbox>
+    						</xf:group>
+    						<xf:group class="w2tb_td" id="" style="" tagname="td">
+    							<xf:input class="" id="ipt_bldgNm" meta_snippetCategory="10_입력폼" meta_snippetKeyComponent="true"
+    								meta_snippetName="10_01 InputBox" placeholder="" ref="data:dma_Req.bldgNm" style="width:100%;">
+    							</xf:input>
+    						</xf:group>
+    					</xf:group>
+    					<xf:group tagname="tr" id="grp_search3_1" style="display:none;">
+    						<xf:group tagname="th" class="w2tb_th">
+    							<w2:attributes>
+    								<w2:scope>row</w2:scope>
+    							</w2:attributes>
+    							<w2:textbox class="" id="" label="우편번호" style=""></w2:textbox>
+    						</xf:group>
+    						<xf:group tagname="td" class="w2tb_td">
+    							<w2:attributes>
+    								<w2:colspan>3</w2:colspan>
+    								<w2:rowspan>1</w2:rowspan>
+    							</w2:attributes>
+    							<xf:input class="" id="ipt_zipCode" meta_snippetCategory="10_입력폼" meta_snippetKeyComponent="true"
+    								meta_snippetName="10_01 InputBox" placeholder="" ref="" style="width:120px;">
+    							</xf:input>
+    							<w2:span style="" label="(없으면 - 표시)" id="spn_span1"></w2:span>
+    						</xf:group>
+    					</xf:group>
+    					<xf:group tagname="tr" id="grp_search3_2" style="display:none;">
+    						<xf:group tagname="th" class="w2tb_th">
+    							<w2:attributes>
+    								<w2:scope>row</w2:scope>
+    							</w2:attributes>
+    							<w2:textbox class="" id="" label="주소" style=""></w2:textbox>
+    						</xf:group>
+    						<xf:group tagname="td" class="w2tb_td">
+    							<w2:attributes>
+    								<w2:colspan>3</w2:colspan>
+    								<w2:rowspan>1</w2:rowspan>
+    							</w2:attributes>
+    							<xf:input class="" id="ipt_addr" meta_snippetCategory="10_입력폼" meta_snippetKeyComponent="true"
+    								meta_snippetName="10_01 InputBox" placeholder="" ref="" style="width:80%;">
+    							</xf:input>
+    							<xf:trigger ev:onclick="scwin.btn_confirm_onclick" disabled="" style="" id="btn_confirm" label="확인" type="button" class="btn_cm"
+    								escape="false">
+    								<xf:label><![CDATA[확인]]></xf:label>
+    							</xf:trigger>
+    						</xf:group>
+    					</xf:group>
+    				</xf:group>
+    			</xf:group>
+    			<xf:group class="btn_schbox" id="" style="">
+    				<xf:trigger class="btn_cm sch" disabled="" escape="false" id="btn_search" style="" type="button"
+    					ev:onclick="scwin.btn_search_onclick">
+    					<xf:label><![CDATA[조회]]></xf:label>
+    				</xf:trigger>
+    			</xf:group>
+    		</xf:group>
+    		<xf:group class="msgbox " id="" style="">
+    			<xf:group class="txt_list char num mt10" id="grp_info1" tagname="ol">
+    				<w2:textbox tagname="" for="" style="" id="" label="[검색방법] ex) 서울특별시 중구 소공로 38-12 금성빌딩" class="txt_con mt0"></w2:textbox>
+    				<xf:group id="" tagname="li">
+    					<w2:textbox class="" escape="false" for="" id="txt_info_1_2" label="도로명 : &lt;b&gt;소공로&lt;/b&gt;(도로명)" style=""
+    						tagname="">
+    					</w2:textbox>
+    				</xf:group>
+    				<xf:group id="" tagname="li">
+    					<w2:textbox class="" escape="false" for="" id="txt_info_1_3"
+    						label="도로명 + 건물번호(본번) : &lt;b&gt;소공로&lt;/b&gt;(도로명) &lt;b&gt;38&lt;/b&gt;(건물번호)" style="" tagname="">
+    					</w2:textbox>
+    				</xf:group>
+    			</xf:group>
+    			<xf:group tagname="ol" style="display:none;" id="grp_info2" class="txt_list char num mt10">
+    				<w2:textbox tagname="" for="" style="" id="" label="[검색방법] ex) 서울특별시 중구 소공로 38-12 금성빌딩" class="txt_con mt0"></w2:textbox>
+    				<xf:group tagname="li" id="">
+    					<w2:textbox tagname="" for="" style="" id="tbx_textbox4" label="건물명 : &lt;b&gt;금성빌딩&lt;/b&gt;(건물명)" class=""
+    						escape="false">
+    					</w2:textbox>
+    				</xf:group>
+    				<xf:group tagname="li" id="">
+    					<w2:textbox tagname="" for="" style="" id="tbx_textbox5"
+    						label="도로명 + 건물명 : &lt;b&gt;소공로&lt;/b&gt;(도로명) &lt;b&gt;금성빌딩&lt;/b&gt;(건물명)" class="" escape="false">
+    					</w2:textbox>
+    				</xf:group>
+    			</xf:group>
+    			<w2:textbox tagname="" for="" style="display:none;" id="grp_info3" label="도로명주소가 없을때만 직접 입력해주세요." class="txt_con red"></w2:textbox>
+    		</xf:group>
+    		<xf:group id="grp_resMsgBox"><w2:textbox ref="" style="width:100%; height:300px; border:1px solid #ccc; text-align:center; line-height:300px; box-sizing:border-box;" id="txt_message" label="입력할 지역의 동이나 읍/면의 이름을 입력해주세요.">
+    			</w2:textbox></xf:group>
+    		<xf:group id="grp_zipLoad" style="width:100%; border:1px solid #ccc; text-align:center; box-sizing:border-box; display:none;"
+    			class="">
+    			<w2:gridView autoFit="allColumn" checkReadOnlyOnPasteEnable="" class="gvw" dataList="data:dlt_AddrListRes"
+    				ev:oncellclick="scwin.grd_Grid_oncellclick" ev:onrowindexchange="" focusMode="row" id="grd_Grid"
+    				metaev_oncellclick_desc="제목 클릭시 Q&amp;A 상세 화면으로 이동" metaev_oncellclick_name="조회결과(그리드뷰) 클릭" rowNumHeaderValue=""
+    				rowNumVisible="false" rowNumWidth="" scrollByColumn="false" scrollByColumnAdaptive="false" sortOrderReverse=""
+    				style="" visibleRowNum="7" visibleRowNumFix="true" readOnly="true">
+    				<w2:caption style="" id="caption2" value="this is a grid caption."></w2:caption>
+    				<w2:header style="" id="header2">
+    					<w2:row style="" id="row3">
+    						<w2:column width="70" style="" inputType="text" id="column28" value="우편번호"></w2:column>
+    						<w2:column width="70" style="" inputType="text" id="column27" value="도로명주소" hidden="true"></w2:column>
+    						<w2:column width="300" style="" inputType="text" id="column25" value="주소" escape="false"></w2:column>
+    					</w2:row>
+    				</w2:header>
+    				<w2:gBody style="" id="gBody2">
+    					<w2:row style="" id="row4">
+    						<w2:column width="70" style="" inputType="text" id="zipCd" value=""></w2:column>
+    						<w2:column width="70" style="" inputType="text" id="roadAddr" value=""></w2:column>
+    						<w2:column width="300" style="text-align:left;" inputType="text" id="displayAddr" value="" escape="false"></w2:column>
+    					</w2:row>
+    				</w2:gBody>
+    			</w2:gridView>
+    		</xf:group>
+    		<xf:group style="" id="grp_bottombox">
+    			<w2:textbox style="" id=""
+    				label="※ 본 우편번호 정보는 우정사업본부 데이터로 서비스하고 있습니다.&lt;br/&gt; &amp;nbsp; &amp;nbsp; 건물명 검색이나 수정 관련 사항은 우정사업본부로 문의해주시기 바랍니다."
+    				class="txt_info mt10" escape="false">
+    			</w2:textbox>
+    			<xf:group meta_snippetCategory="08_버튼" meta_snippetName="8_05 팝업전체제어버튼" meta_snippetKeyComponent="true" style="" id=""
+    				class="btnbox">
+    				<xf:group style="" id="" class="rt">
+    					<xf:trigger ev:onclick="scwin.btn_cancel_onclick" style="" id="btn_cancel" label="닫기" type="button"
+    						class="btn_cm ">
+    						<xf:label><![CDATA[닫기]]></xf:label>
+    					</xf:trigger>
+    				</xf:group>
+    			</xf:group>
+    		</xf:group>
+    	</xf:group>
+    </body>
+</html>
