@@ -260,6 +260,7 @@ origin 은 fil·ins = `logger_tracking.xml`, mgt = `common.xml` (동일 `_trk_*`
 | `{컴포넌트}.src = v;` | `{컴포넌트}.setBackgroundImage(v);` | convert.py 규칙 5c | 대입만 치환(읽기 `x = obj.src` 제외), 문자열·주석·정규식 리터럴 보호 |
 | `{dataCollection}.getTotalRow()` | `{dataCollection}.getRowCount()` | convert.py 규칙 5d | 메서드명만 치환(수신 객체·인자 보존), 리터럴 보호. 맵 `_METHOD_RENAME_MAP` 으로 확장 가능 |
 | `{gridView}.advancedExcelDownload(options[, infoArr])` | `$c.data.downloadGridViewExcel({gridView}, options[, infoArr])` | convert.py 규칙 20 | 수신 객체(그리드)를 첫 인자로 승격, 기존 인자 순서 유지(규칙 14 반대 방향). 인라인 객체 리터럴 인자 보존, 리터럴 보호, 멱등 |
+| `$c.data.downloadGridViewExcel(grid, fileName, sheetName, type)`(위치인자 4개) | `$c.data.downloadGridViewExcel(grid, {fileName, [sheetName,] type})` | convert.py 규칙 20b | 2번째→fileName, 4번째→type, 3번째(빈값) 생략. 인자 수 4개로 형태 판별(객체형 2~3인자 제외), 토큰 원형 보존, 멱등 |
 
 > 규칙 정의는 [conversion_rules.md](conversion_rules.md) §규칙 5·§규칙 20, 파이프라인상 위치는 [conversion_pipeline.md](conversion_pipeline.md) 단계 1 표를 참조한다.
 

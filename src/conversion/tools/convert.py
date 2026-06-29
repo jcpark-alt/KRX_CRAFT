@@ -680,6 +680,41 @@ def rule20_grid_excel_download(code, report):
     return "".join(res)
 
 
+_EMPTY_ARG = ('""', "''", "")
+
+
+def rule20b_normalize_excel_positional(code, report):
+    """레거시 위치인자 형태 `$c.data.downloadGridViewExcel(grid, fileName, sheetName, type)`(정확히 4인자)를
+    공통함수 객체 시그니처 `$c.data.downloadGridViewExcel(grid, {fileName:…[, sheetName:…][, type:…]})` 로 정규화한다.
+    - 2번째(파일명)→options.fileName, 4번째(0/1/2/8 등)→options.type, 3번째(시트명)는 비어있으면 생략·아니면 sheetName.
+    - 객체 시그니처(2~3인자) 호출은 인자 수가 4가 아니므로 건드리지 않는다(멱등). 인자 토큰은 원형 보존.
+    - 코드 세그먼트(문자열/주석/정규식 제외)만 치환. 결과는 2인자라 재변환 시 no-op."""
+    mask = code_mask(code)
+    pat = re.compile(r'(?<![.\w$])\$c\.data\.downloadGridViewExcel\s*\(')
+    res, last = [], 0
+    for mo in pat.finditer(code):
+        if mo.start() < last or not mask[mo.start()]:
+            continue
+        scanned = _scan_call(code, mask, mo.end() - 1)
+        if scanned is None:
+            continue
+        args, end = scanned
+        if len(args) != 4:        # 위치인자 레거시 형태만(객체형 2~3인자는 제외)
+            continue
+        grid, fname, sheet, typ = args
+        opts = ["fileName: " + fname]
+        if sheet not in _EMPTY_ARG:
+            opts.append("sheetName: " + sheet)
+        if typ not in _EMPTY_ARG:
+            opts.append("type: " + typ)
+        res.append(code[last:mo.start()])
+        res.append("$c.data.downloadGridViewExcel(%s, {%s})" % (grid, ", ".join(opts)))
+        report["rule20"].append("downloadGridViewExcel(%s, 위치인자) -> 객체형 {%s}" % (grid, ", ".join(opts)))
+        last = end
+    res.append(code[last:])
+    return "".join(res)
+
+
 def rule7_gcc_substitute(code, report):
     """substitution_dict() 의 함수 호출부를 단어경계로 치환(코드 세그먼트만, 메서드 호출 .fn() 제외).
     파일 내에 함수로 선언/정의된 이름은 치환에서 제외한다(로컬 정의 우선, 선언부 손상 방지)."""
@@ -1698,6 +1733,7 @@ def convert(raw, filename):
     s = rule14_component_method(s, report)
     s = rule15_alert_error(s, report)
     s = rule20_grid_excel_download(s, report)
+    s = rule20b_normalize_excel_positional(s, report)
     reg["head"], s, reg["body"] = rule13_rename_scwin_fn(reg["head"], s, reg["body"], report)
     s, reg["body"] = rule3_handlers(s, reg["body"], report)
     s, reg["body"] = rule4_structure(s, reg["body"], report)

@@ -251,6 +251,14 @@
 * 수신 객체는 식별자 체인(`grd_x`, `$c.util.getComponent("grd_x")` 등)을 포괄합니다. 인자 안의 중첩 괄호·객체 리터럴은 `_scan_call` 로 정확히 파싱하고, 코드 세그먼트(문자열/주석/정규식 제외)만 치환하며 `await` 등 선행 토큰은 보존합니다. 변환 호출 바로 위의 W-Craft 검수 마커(메서드명 언급)는 함께 제거합니다(규칙 7m/12 동일 원칙).
 * 결과 호출에는 `.advancedExcelDownload` 가 없으므로 **재변환 시 no-op(멱등)** 입니다. 매핑표는 [substitution_map.md](substitution_map.md) §10 참조.
 
+#### 규칙 20b: `$c.data.downloadGridViewExcel` 위치인자 → 객체 시그니처 정규화
+
+* 원본 소스에 이미 `$c.data.downloadGridViewExcel(grid, fileName, sheetName, type)` 형태의 **레거시 위치인자(정확히 4인자)** 호출이 존재합니다. 공통함수 시그니처는 `(grdObj, options, infoArr)` 라 문자열을 `options` 자리에 넘기면 **기본옵션으로 무시**(다운로드명 `excel.xls`, type 0)되어 의도가 깨집니다. 이를 객체 시그니처로 정규화합니다(convert.py 규칙 20b).
+* **변환 규약**: `$c.data.downloadGridViewExcel(grid, A, B, C)`(4인자) → `$c.data.downloadGridViewExcel(grid, {fileName: A[, sheetName: B][, type: C]})`.
+    * 2번째 → `options.fileName`, 4번째 → `options.type`(0/1/2/8 등 원형 보존), 3번째(시트명)는 **비어있으면 생략**(`""`/`''`), 아니면 `options.sheetName`.
+    * 인자 토큰은 원형 보존(문자열 리터럴·표현식 `MxCombo.text + "…"`·미따옴표 숫자 `type: 8` 모두 그대로), 뒤 trailing 주석(`//16` 등)도 유지.
+* **인자 개수로 형태 판별**: 객체 시그니처(2~3인자) 호출은 4인자가 아니므로 건드리지 않습니다. 규칙 20(advancedExcelDownload 승격)이 만든 2~3인자 결과와도 충돌하지 않으며, 결과는 2인자라 **재변환 시 no-op(멱등)** 입니다.
+
 ---
 
 ## 규칙 6 보충: Submission 변환 상세
