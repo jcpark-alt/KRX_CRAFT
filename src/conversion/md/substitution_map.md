@@ -47,6 +47,7 @@
 | `$c.date.isDate` | `isDate` / `isDate0` | 날짜 유효성/빈 날짜 판별 | |
 | `$c.date.isLeafYear` | `cIsLeafYear` | 윤년 검사 | |
 | `$c.date.getLastDateOfMonth` | `cGetMaxDay` / `lastDay` | 해당 월 마지막 일수 | |
+| `$c.date.getServerDateTime` | `getSysDate` | 시스템(서버) 현재 일자 — 인자 없으면 기본 `yyyyMMdd` (규칙 18) | |
 
 ## 4. `$c.validate` — 검증
 
@@ -62,6 +63,10 @@
 | `$c.util.isEmpty` | `fn_IsNull` / `fn_NullChk` / `cIsNull` / `isEmpty` | Null/빈값 체크 | |
 | `$c.util.isNotEmpty` | `fn_IsNotNull` | Not Null 체크 | |
 | `$c.util.getCookie` | `getCookie` | 쿠키 조회 | |
+| `$c.util.setCookie` | `setCookie` | 쿠키 저장 (규칙 18) | |
+| `$c.util.removeCookie` | `removeCookie` | 쿠키 삭제 (규칙 18) | |
+| `$c.util.setLocalStorage` / `getLocalStorage` / `removeLocalStorage` / `clearLocalStorage` | `setLocalStorage` / `getLocalStorage` / `removeLocalStorage` / `clearLocalStorage` | localStorage 저장/조회/삭제/전체삭제 — 함수명 동일, 네임스페이스만 `$c.util` 로 변경 (규칙 18) | |
+| `$c.util.setSessionStorage` / `getSessionStorage` / `removeSessionStorage` / `clearSessionStorage` | `setSessionStorage` / `getSessionStorage` / `removeSessionStorage` / `clearSessionStorage` | sessionStorage 저장/조회/삭제/전체삭제 — 함수명 동일, 네임스페이스만 `$c.util` 로 변경 (규칙 18) | |
 | `$c.util.getParameter` | `getQuery` | URL 파라미터 추출 | |
 | `$c.util.getComponent` | `getObjectValue` / `setObjectValue` / `$`(jQuery 풍) | 컴포넌트 조회/값 제어 | 검토·대체 |
 | `$c.util.isArray` | `isInArr` | 배열 포함 여부 | 검토 |
@@ -256,3 +261,27 @@ origin 은 fil·ins = `logger_tracking.xml`, mgt = `common.xml` (동일 `_trk_*`
 | `{dataCollection}.getTotalRow()` | `{dataCollection}.getRowCount()` | convert.py 규칙 5d | 메서드명만 치환(수신 객체·인자 보존), 리터럴 보호. 맵 `_METHOD_RENAME_MAP` 으로 확장 가능 |
 
 > 규칙 정의는 [conversion_rules.md](conversion_rules.md) §규칙 5, 파이프라인상 위치는 [conversion_pipeline.md](conversion_pipeline.md) 단계 1 표를 참조한다.
+
+## 11. 규칙 19 원시 JSP/jQuery 페이지 → WebSquare/gcc (대체·재설계, 단계 2)
+
+이 표는 WebSquare 가 아닌 **원시 HTML·JSP·jQuery 레거시 페이지**(예: `inf/srch/ULDINF20000`, `inf/comm/ULDINF90400`)의 DOM/jQuery/JSP 호출을 WebSquare 컴포넌트 메서드·`$c.*` 로 옮기는 매핑이다. **전 항목 단계 2(Claude) 판단·재설계** 이며 `convert.py` 결정적 치환 대상이 아니다. **선행조건**: HTML `<input>/<select>/<form>` 을 `<w2:*>` 컴포넌트로 재구성한 뒤 적용한다(`#id` → 컴포넌트 id 일치 전제). 컴포넌트 참조는 id 직접 사용 또는 `$c.util.getComponent("id")`.
+
+| AS-IS (jQuery/DOM/JSP) | TO-BE (WebSquare/gcc) | 비고 |
+| --- | --- | --- |
+| `$("#id").val()` | `id.getValue()` | |
+| `$("#id").val(v)` | `id.setValue(v)` | |
+| `$("#id").focus()` | `id.setFocus()` | |
+| `$("#id").show()` / `.attr("style","display:;")` | `id.show("")` | 규칙 14 인자 규약 |
+| `$("#id").hide()` / `…display:none…` | `id.hide()` | |
+| `$("#id").css(p, v)` / 표시제어 외 `.attr("style", …)` | `id.setStyle(p, v)` | |
+| `$("#id").text(v)` / `$("#id").html(v)` | `id.setValue(v)` | 출력 컴포넌트 |
+| `$("#id").attr("disabled"\|"readonly", …)` | `id.setReadOnly(true/false)` | 컴포넌트 속성에 맞춤 |
+| `$(sel).bind/on("click"\|"change"…, fn)` | 컴포넌트 `ev:on*="scwin.{comp}_{event}"` | 규칙 3 계열, 스크립트 바인딩 제거 |
+| `document.{폼}.{필드}.value` (읽기/쓰기) | `{필드}.getValue()` / `{필드}.setValue(v)` | |
+| `document.{폼}.submit()` / `$.ajax`·`$.post(…)` | `$c.sbm.executeDynamic(sbmOptions)` | 규칙 6/16 계열(대체), 응답·콜백 재설계 |
+| `$.parseJSON(x)` | `$c.util.getJSON(x)` (또는 `JSON.parse(x)`) | |
+| `window.open(url, …)` | `$c.win.openPopup(url, options, data)` | 규칙 17 계열 |
+| `new Date(…)` / 수기 날짜연산(`getFullYear`/`substr`) | `$c.date.*` (`getServerDateTime`/`addDate`/`formatDate`) | 규칙 18 의 `date.xml` 소속 |
+| `<c:out value='${x}'/>` / `${x}` (JSP EL) | submission 응답(DataMap/DataList) 또는 `$c.util.getParameter` | 서버주입값 — 단순 치환 불가, 재설계 |
+
+> 규칙 정의·식별 신호·선행조건은 [conversion_rules.md](conversion_rules.md) §규칙 19 를 참조한다. 마크업 재구성 없이 스크립트만 바꾸면 참조가 깨지므로 마크업·스크립트를 함께 변환한다. 문자열/주석/리터럴·HTML UI 텍스트(한글 라벨)는 보호한다.

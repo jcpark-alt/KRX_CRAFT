@@ -184,6 +184,56 @@
 * **결정적 산출 보조**: `width`/`height` 는 정수 리터럴이면 `"{n}px"`, 표현식·변수면 원형 유지. `title`·`url` 은 원형 유지. `data` 객체는 레거시 호출에 페이로드가 없어 `// TO-DO` 플레이스홀더로 생성(browserPopup 만 `callbackFn` 포함). 같은 블록 다중 호출은 `options`/`data`/`result`, `options2`… 로 명명.
 * **유의사항**: 인자 8개가 아니거나 `url` 이 문자열 리터럴이 아니면(동적 결합) 미변환·리포트. `data` 채움·`result` 처리 업무 로직과 표현식 width/height 정리는 **단계 2(Claude) 검토 보강 대상**입니다. 상세·예시는 [createdialogframe_popup_guide.md](createdialogframe_popup_guide.md) 를 참조하세요. 문자열/주석/정규식 리터럴 내부는 보호합니다(규칙 5 동일 원칙).
 
+### 규칙 18: 모듈 네임스페이스의 시스템 날짜·쿠키·웹스토리지 함수 → gcc 공통함수 치환
+
+* 레거시 모듈 네임스페이스로 호출되는 시스템 날짜/쿠키/웹스토리지 공통함수(`$c.{모듈ns}.<fn>(...)`, 예: `$c.mgt.getSysDate()`)를 gcc 표준 공통함수로 치환합니다(네임스페이스 변경, 인자 보존). `{모듈ns}` 는 `$c.mgt`·`$c.fil`·`$c.ins`·`$c.stf` 등 무엇이든 대상입니다(규칙 15 와 동일 계열 — 네임스페이스 교체).
+* **대표 매핑**:
+    * **시스템 날짜** → `$c.date.*` (네임스페이스 + 함수명 변경)
+        * `$c.{ns}.getSysDate(...)` → `$c.date.getServerDateTime(...)` — 인자 없으면 기본 포맷 `yyyyMMdd`. **날짜 함수는 util.xml 이 아니라 `date.xml`(`$c.date`) 소속**이므로 cookie/storage 와 대상 네임스페이스가 다릅니다.
+    * **쿠키** → `$c.util.*` (함수명 동일, 네임스페이스만 변경)
+        * `$c.{ns}.getCookie(...)` → `$c.util.getCookie(...)`
+        * `$c.{ns}.setCookie(...)` → `$c.util.setCookie(...)`
+        * `$c.{ns}.removeCookie(...)` → `$c.util.removeCookie(...)`
+    * **localStorage** → `$c.util.*` (함수명 동일, 네임스페이스만 변경)
+        * `$c.{ns}.setLocalStorage / getLocalStorage / removeLocalStorage / clearLocalStorage(...)` → `$c.util.<동일명>(...)`
+    * **sessionStorage** → `$c.util.*` (함수명 동일, 네임스페이스만 변경)
+        * `$c.{ns}.setSessionStorage / getSessionStorage / removeSessionStorage / clearSessionStorage(...)` → `$c.util.<동일명>(...)`
+* **치환 시 유의사항**:
+    * 위 **대표 매핑의 정규 함수명에 한해** 자동 치환합니다. 함수명이 gcc 정규명과 다른 레거시 별칭(예: `sessionSaveKey`·`getSessionKey` 등)은 1:1 대응이 불명확하므로 자동 치환하지 않고 보류·리포트합니다.
+    * 인자는 그대로 보존하고 네임스페이스(및 `getSysDate` 의 경우 함수명)만 교체합니다. 시그니처 차이가 의심되면(예: 쿠키 `options`·웹스토리지 직렬화 동작) gcc 함수 시그니처(`src/gcc/util.xml`·`src/gcc/date.xml`)를 확인한 뒤 치환합니다.
+    * 같은 파일에 동일 이름으로 **정의된** 함수가 있으면 로컬 정의 우선 원칙에 따라 치환에서 제외합니다(규칙 7·13 동일 원칙).
+    * 주석 처리된 W-Craft 흔적과 문자열/주석/정규식 리터럴 내부는 보호합니다(규칙 5 동일 원칙).
+
+### 규칙 19: 원시 JSP/jQuery 레거시 페이지 → WebSquare/gcc 변환 (대체·재설계, 단계 2)
+
+* 일부 화면(예: `inf/srch/ULDINF20000`, `inf/srch/ULDINF91000`, `inf/comm/ULDINF90400`)은 WebSquare 컴포넌트가 아니라 **원시 HTML·JSP·jQuery 로 작성된 레거시 페이지**입니다. 규칙 1~18 의 결정적(Python) 치환 대상이 아니며, **UI 마크업을 WebSquare 컴포넌트로 재구성한 뒤** 스크립트의 DOM/jQuery 호출을 컴포넌트 메서드로 옮기는 **단계 2(Claude) 판단·재설계** 작업입니다.
+* **식별 신호**(아래가 보이면 본 규칙 대상): `$("…")`/`$('…')` jQuery 셀렉터, `document.{폼명}.{필드}`·`getElementById`·`getElementsByName` 원시 DOM, `<c:out .../>`·`${…}` JSP/JSTL 표현식, `$.ajax`/`$.post`/`$.parseJSON`, HTML 문자열 빌드(`var x = "<tr>…";`).
+
+* **대표 매핑 (jQuery/DOM → WebSquare 컴포넌트 메서드)** — `#id` 셀렉터의 id 가 재구성된 WebSquare 컴포넌트 id 와 일치한다는 전제. 컴포넌트 참조는 id 직접 사용 또는 `$c.util.getComponent("id")`:
+    * `$("#id").val()` → `id.getValue()`
+    * `$("#id").val(v)` → `id.setValue(v)`
+    * `$("#id").focus()` → `id.setFocus()`
+    * `$("#id").show()` / `$("#id").attr("style","display:;")` → `id.show("")` (규칙 14 와 동일 인자 규약)
+    * `$("#id").hide()` / `…display:none…` → `id.hide()`
+    * `$("#id").css(p, v)` / 표시제어 외 `.attr("style", …)` → `id.setStyle(p, v)`
+    * `$("#id").text(v)` / `$("#id").html(v)` → 출력 컴포넌트면 `id.setValue(v)`
+    * `$("#id").attr("disabled"|"readonly", …)` → `id.setReadOnly(true/false)` (컴포넌트 속성에 맞춰)
+    * `$(sel).each(…)`·DOM 순회 → DataList + `getRowCount()` 기반 반복으로 재작성
+* **이벤트 바인딩**(`$(sel).bind/on("click"|"change"|…, fn)`): 스크립트 내 바인딩을 제거하고 컴포넌트의 `ev:on*` 속성으로 이관합니다(규칙 3 계열). 핸들러는 `scwin.{컴포넌트}_{이벤트}` 로 표준화.
+* **원시 폼 DOM**:
+    * `document.{폼}.{필드}.value` (읽기/쓰기) → `{필드}.getValue()` / `{필드}.setValue(v)`
+    * `document.{폼}.submit()` / `$.ajax`·`$.post(…)` → `$c.sbm.executeDynamic(sbmOptions)` 로 재작성(규칙 6/16 계열, **대체**). 콜백·응답 처리 구조 재설계.
+    * `$.parseJSON(x)` → `$c.util.getJSON(x)` (또는 `JSON.parse(x)`).
+* **팝업**: `window.open(url, …)` → `$c.win.openPopup(url, options, data)` (규칙 17 계열).
+* **날짜**: `new Date(…)`·수기 날짜연산(`getFullYear`/`substr` 포맷 등) → `$c.date.*`(`getServerDateTime`/`addDate`/`formatDate` 등 — 규칙 18 의 `date.xml` 소속).
+* **JSP/JSTL 서버 표현식**: `<c:out value='${x}'/>`·`${x}` 는 **서버 렌더링 시점에 주입되던 값**입니다. WebSquare 에는 JSP EL 이 없으므로 해당 값은 **submission 응답(DataMap/DataList) 또는 진입 파라미터(`$c.util.getParameter`)로 전달받도록 재설계**합니다. 단순 문자열 치환으로 옮길 수 없습니다.
+
+* **치환 시 유의사항**:
+    * **선행조건**: 본 규칙은 HTML `<input>/<select>/<form>` 등이 WebSquare 컴포넌트(`<w2:*>`)로 재구성된 뒤에 적용 가능합니다. 마크업 재구성 없이 스크립트만 바꾸면 참조가 깨지므로 **마크업·스크립트를 함께** 변환합니다.
+    * 결정적(Python) 자동 치환 대상이 **아니며 전 항목 단계 2(Claude) 판단**입니다. 규칙 1~18 의 표면 치환(`==`→`===`, `var`→`const/let` 등)은 이미 적용돼 있을 수 있으나 jQuery/DOM 블록은 그대로 남으므로 본 규칙으로 재작성합니다.
+    * 셀렉터가 복합(`$('input[name=x]:radio:checked')`)·동적 결합이면 대응 컴포넌트를 일대일로 특정하기 어려우므로, 화면 설계를 확인해 라디오/그룹 컴포넌트의 `getValue()` 등으로 의미 보존 재작성하고 불명확하면 보류·리포트합니다.
+    * 문자열/주석/정규식 리터럴 내부는 보호합니다(규칙 5 동일 원칙). HTML UI 텍스트(한글 라벨 등)는 치환 대상이 아닙니다.
+
 ---
 
 ## 규칙 6 보충: Submission 변환 상세
