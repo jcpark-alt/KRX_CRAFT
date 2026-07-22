@@ -11,7 +11,7 @@
 			<w2:workflowCollection/>
 		</xf:model>
 		<w2:layoutInfo/>
-		<w2:publicInfo method="scwin.getUserAgent,scwin.getParameter,scwin.getObject,scwin.getFunction,scwin.getCallBackFunction,scwin.getJSON,scwin.isJSON,scwin.isArray,scwin.isEmpty,scwin.isEmptyPlainObject,scwin.getObjectType,scwin.isPlainObject,scwin.isMobile,scwin.isXmlDoc,scwin.setGridViewDelCheckBox,scwin.getChildren,scwin.getGridViewDataList,scwin.getComponent,scwin.createComponent,scwin.setInterval,scwin.clearInterval,scwin.setTimeout,scwin.clearTimeout,scwin.copyClipboard"/>
+		<w2:publicInfo method="scwin.getUserAgent,scwin.getParameter,scwin.getObject,scwin.getFunction,scwin.getCallBackFunction,scwin.getJSON,scwin.isJSON,scwin.isArray,scwin.isEmpty,scwin.isEmptyPlainObject,scwin.getObjectType,scwin.isPlainObject,scwin.isMobile,scwin.isXmlDoc,scwin.setGridViewDelCheckBox,scwin.setTextLengthCounter,scwin.getChildren,scwin.getGridViewDataList,scwin.getComponent,scwin.createComponent,scwin.setInterval,scwin.clearInterval,scwin.setTimeout,scwin.clearTimeout,scwin.copyClipboard,scwin.confirmThen,scwin.isNotEmpty,scwin.isEmptyArray,scwin.duplcRemove,scwin.assignDefined,scwin.encodeBase64,scwin.decodeBase64,scwin.encodeBase64Utf8,scwin.decodeBase64Utf8,scwin.getKeyCode,scwin.isMobileApp,scwin.setClipboard,scwin.getClipboard,scwin.checkDuplicateJsonKey,scwin.setCookie,scwin.getCookie,scwin.removeCookie,scwin.setLocalStorage,scwin.getLocalStorage,scwin.removeLocalStorage,scwin.clearLocalStorage,scwin.setSessionStorage,scwin.getSessionStorage,scwin.removeSessionStorage,scwin.clearSessionStorage,scwin.getUploadFileSize,scwin.onUploadClick"/>
 		<script lazy="false" type="text/javascript"><![CDATA[// =============================================================================
 /**
  * 웹스퀘어 컴포넌트 제어, 엑셀 파일 업로드/다운로드, 파일 업로드/다운로드, 기타 유틸리티 함수를 작성한다.
@@ -552,13 +552,14 @@ scwin.isXmlDoc = function (data) {
  * 이 함수가 정상 동작하려면 GridView의 Delete 처리용 CheckBox의 ColumnId와 Header Id를 "chk"로 설정해야 한다.
  * 
  * @param {Array} gridViewObjArr GridView 객체 배열
+ * @param {Boolean} checkDrilldown GridView drilldown checked 설정 옵션
  * @hidden N
  * @exception 
  * @example
 $c.util.setGridViewDelCheckBox(grd_OrganizationBasic);
 $c.util.setGridViewDelCheckBox([grd_Menu, grd_MenuAccess]);
  */
-scwin.setGridViewDelCheckBox = function (gridViewObjArr) {
+scwin.setGridViewDelCheckBox = function (gridViewObjArr, checkDrilldown = true) {
     try {
         if ($c.util.getObjectType(gridViewObjArr) === "array") {
             for (let idx in gridViewObjArr) {
@@ -580,7 +581,7 @@ scwin.setGridViewDelCheckBox = function (gridViewObjArr) {
                             realRowIndex = dltObj.getFilteredRowIndex(realRowIndex);
                         }
                         const newValue = dltObj.getCellData(realRowIndex, columnId);
-                        scwin._setGridViewRowCheckBox(this, realRowIndex, newValue === "1" ? true : false);
+                        scwin._setGridViewRowCheckBox(this, realRowIndex, newValue === "1" ? true : false, checkDrilldown);
                     }
                 }
             );
@@ -629,17 +630,128 @@ scwin.setGridViewDelCheckBox = function (gridViewObjArr) {
 };
 
 /**
- * @method 
+ * @method
+ * @name setTextLengthCounter
+ * @description 입력 컴포넌트의 입력값 길이를 실시간으로 계산하여 출력 컴포넌트에
+ *   "{현재}/{제한} {단위}" 형식으로 표시한다. 입력 시 제한 초과분을 자동으로 잘라내고
+ *   경고 스타일을 토글한다. byte/글자 모드를 자동 감지하며 옵션으로 재정의할 수 있다.
+ * @param {(Object|String)} comp 글자수를 체크할 입력 컴포넌트(객체 또는 id)
+ * @param {(Object|String)} displayComp 글자수 현황을 출력할 컴포넌트(객체 또는 id)
+ * @param {Object} options 옵션
+ * @param {Number} options.maxLength 제한값. 미지정 시 컴포넌트의 maxByteLength/maxlength에서 자동 조회
+ * @param {String} options.checkType "byte" 또는 "length". 미지정 시 자동 감지(maxByteLength가 있으면 byte)
+ * @param {String} options.ignoreChar 길이 계산 시 제외할 문자
+ * @param {String} options.unit 표시 단위. 기본값 byte 모드 "byte", length 모드 "자"
+ * @param {Boolean} options.limit 초과 입력 자동 차단 여부. 기본값 true
+ * @param {(String|Boolean)} options.warnClass 입력이 제한을 초과할 때 토글할 경고 클래스. 기본값 "red", false면 비활성
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+$c.util.setTextLengthCounter("ipbContent", "spnCount");                                     // 컴포넌트 maxByteLength 자동, byte 모드
+$c.util.setTextLengthCounter(ipbName, spnNameCnt, { maxLength: 100, checkType: "length" }); // 100자 제한, 글자 모드
+$c.util.setTextLengthCounter(txaMemo, spnMemoCnt, { maxLength: 4000, limit: false, warnClass: "warn" }); // 차단 없이 경고만
+ */
+scwin.setTextLengthCounter = function (comp, displayComp, options) {
+    try {
+        comp = (typeof comp === "string") ? $p.getComponentById(comp) : comp;
+        displayComp = (typeof displayComp === "string") ? $p.getComponentById(displayComp) : displayComp;
+        options = options || {};
+
+        const maxByte = (typeof comp.getMaxByteLength === "function") ? comp.getMaxByteLength() : 0;
+        const maxLen = (typeof comp.getMaxLength === "function") ? comp.getMaxLength() : 0;
+
+        const checkType = options.checkType || (maxByte ? "byte" : "length");
+        const ignoreChar = options.ignoreChar || "";
+        const unit = options.unit || (checkType === "byte" ? "byte" : "자");
+        const doLimit = (options.limit !== false);
+        const warnClass = (options.warnClass === undefined) ? "red" : options.warnClass;
+
+        const limit = (options.maxLength == null)
+            ? (checkType === "byte" ? maxByte : maxLen)
+            : options.maxLength;
+
+        const formatNumber = function (num) {
+            return String(num).replace(/\B(?=(\d{3})(?!\d))/g, ",");
+        };
+
+        // 제한값(limit) byte 이하가 되도록 문자열을 잘라 반환한다.
+        const limitByByte = function (text) {
+            let total = 0;
+            let result = "";
+            const chars = text.split("");
+            for (let i = 0; i < chars.length; i++) {
+                const byte = $c.str.getByteLength(chars[i], ignoreChar);
+                if (total + byte > limit) {
+                    break;
+                }
+                total += byte;
+                result += chars[i];
+            }
+            return result;
+        };
+
+        const getCurrentLength = function (text) {
+            if (checkType === "byte") {
+                return $c.str.getByteLength(text, ignoreChar);
+            }
+            let target = text;
+            if (ignoreChar) {
+                ignoreChar.split(",").forEach(function (ch) {
+                    target = $c.str.replaceAll(target, ch, "");
+                });
+            }
+            return target.length;
+        };
+
+        const update = function () {
+            let value = comp.getValue();
+            let current = getCurrentLength(value);
+            const over = current > limit;
+
+            if (doLimit && over) {
+                const limited = (checkType === "byte") ? limitByByte(value) : value.substring(0, limit);
+                comp.setEventPause(null, true);
+                comp.setValue(limited);
+                comp.setEventPause(null, false);
+                value = limited;
+                current = getCurrentLength(value);
+            }
+
+            displayComp.setValue(formatNumber(current) + " / " + formatNumber(limit) + " " + unit);
+
+            if (warnClass !== false) {
+                if (over) {
+                    displayComp.addClass(warnClass);
+                } else {
+                    displayComp.removeClass(warnClass);
+                }
+            }
+        };
+
+        comp.bind("oninput", update);
+        comp.bind("onchange", update);
+
+        // 초기 표시
+        update();
+    } catch (ex) {
+        console.error(ex);
+    }
+};
+
+/**
+ * @method
  * @name _setGridViewRowCheckBox
- * @description 
+ * @description
  * @param {Object} gridViewObj 그리드뷰 객체
  * @param {Number} rowIndex rowIndex 값
  * @param {String} newValue set할 값.
+ * @param {Boolean} checkDrilldown GridView drilldown checked 설정 옵션
  * @hidden Y
  * @exception 
  * @example
  */
-scwin._setGridViewRowCheckBox = function (gridViewObj, rowIndex, newValue) {
+scwin._setGridViewRowCheckBox = function (gridViewObj, rowIndex, newValue, checkDrilldown) {
     // const rowIndexArr = gridViewObj.getChildrenRowIndexArray(rowIndex);
     const isDrillDown = gridViewObj.isDrillDown;
     let rowIndexArr = isDrillDown ? gridViewObj.getChildrenRowIndexArray(rowIndex) : gridViewObj.getCheckedIndex("chk");
@@ -647,12 +759,12 @@ scwin._setGridViewRowCheckBox = function (gridViewObj, rowIndex, newValue) {
     // 사용하지 않는 DataList 객체 주석 처리 고려 중.
     const dltObj = $c.util.getGridViewDataList(gridViewObj);
     
-    if(isDrillDown) {
+    if (isDrillDown && checkDrilldown) {
         for (let idx in rowIndexArr) {
             let childRowIndexArr = gridViewObj.getChildrenRowIndexArray(rowIndexArr[idx]);
 
             if (childRowIndexArr.length > 0) {
-                scwin._setGridViewRowCheckBox(gridViewObj, rowIndexArr[idx], newValue);
+                scwin._setGridViewRowCheckBox(gridViewObj, rowIndexArr[idx], newValue, checkDrilldown);
             } else {
                 scwin._deleteGridViewRow(gridViewObj, rowIndexArr[idx], newValue);
             }
@@ -938,7 +1050,587 @@ scwin.copyClipboard = async function (comObj) {
     }
 }
 
-]]></script>
+/**
+ * @method
+ * @name confirmThen
+ * @description Event 함수 안에서 confirm을 사용할 때 보조하기 위한 함수. onbeforerowpositionchange 등의 return이 필요한 이벤트에서 async 선언을 하는 경우 WebSquare의 동작을 제대로 보장하기 위한 helper 함수다
+ * 이 함수는 Fire and Forget으로 사용해야하며 반환 받는 경우엔 별도 함수를 정의하거나 이 함수를 호출하는 영역에서 즉시 실행함수를 사용해야한다.
+ * @param {Array} message message로 사용할 Key  값의 배열
+ * @param {function} confirm 확인 버튼을 누른 이후의 callback 함수
+ * @param {function} cancel 취소 버튼을 누른 이후의 callback 함수
+ * @returns
+ * @hidden N
+ * @exception
+ * @migrationStatus
+ * @example $c.util.confirmThen(["MSG_CM_00001","MSG_CM_00002"], "scwin.btn_save_onclick")
+ */
+scwin.confirmThen = async function (message, confirm, cancel) {
+      // string 또는 function 을 함수 객체로 정규화
+      var resolveFn = function (target) {
+          if (typeof target === "function") return target;
+          if (typeof target === "string")   return $c.util.getFunction(target);
+          return null;
+      };
+      var confirmFn = resolveFn(confirm);
+      var cancelFn  = resolveFn(cancel);
+
+      // message — 배열이면 각 key 의 메시지를 공백으로 join, 단일 string 이면 그대로
+      var msgKeys = Array.isArray(message) ? message : [message];
+      var msg = msgKeys
+          .map(function (key) { return $c.data.getMessage(key); })
+          .join(" ");
+
+      try {
+          if (await $c.win.confirm(msg)) {
+              if (typeof confirmFn === "function") confirmFn();
+          } else {
+              if (typeof cancelFn === "function") cancelFn();
+          }
+      } catch (e) {
+          console.error("confirmThen failed:", e);
+      }
+  };
+
+// =============================================================================
+// 추가 범용 유틸 함수 (commonUtils.js 기준 정리)
+// =============================================================================
+
+/**
+ * @method
+ * @name isNotEmpty
+ * @description 값이 Not Empty 상태(undefined·null·"" 가 아님)인지 판별한다.
+ * @param {Object} value Not Empty 여부를 판단할 값
+ * @returns {Boolean} Not Empty 여부 (true : Not Empty, false : Empty)
+ * @hidden N
+ * @exception
+ * @example
+$c.util.isNotEmpty("");   // false
+$c.util.isNotEmpty(null); // false
+$c.util.isNotEmpty(1);    // true
+ */
+scwin.isNotEmpty = function (value) {
+    return !$c.util.isEmpty(value);
+};
+
+/**
+ * @method
+ * @name isEmptyArray
+ * @description 배열이 Empty 상태인지 판별한다. (배열이 아니거나 length 0, 옵션 시 모든 요소가 Empty)
+ * @param {Array} array Empty 여부를 판단할 배열
+ * @param {Boolean} childIsEmptyCheck 각 요소의 Empty 여부까지 검사할지 (기본값 false)
+ * @returns {Boolean} Empty 여부 (true : Empty, false : Not Empty)
+ * @hidden N
+ * @exception
+ * @example
+$c.util.isEmptyArray([]);              // true
+$c.util.isEmptyArray([""]);            // false
+$c.util.isEmptyArray([""], true);      // true
+$c.util.isEmptyArray(["", "1"], true); // false
+ */
+scwin.isEmptyArray = function (array, childIsEmptyCheck) {
+    if (!Array.isArray(array) || array.length === 0) {
+        return true;
+    }
+    if (childIsEmptyCheck) {
+        return array.filter(function (a) { return $c.util.isNotEmpty(a); }).length === 0;
+    }
+    return false;
+};
+
+/**
+ * @method
+ * @name duplcRemove
+ * @description 배열의 중복 요소를 제거한다. (객체 요소는 JSON 직렬화 기준으로 비교)
+ * @param {Array} arr 중복을 제거할 배열
+ * @returns {Array} 중복이 제거된 배열
+ * @hidden N
+ * @exception
+ * @example
+$c.util.duplcRemove([1, 2, 3, 1, 2]); // [1, 2, 3]
+ */
+scwin.duplcRemove = function (arr) {
+    const newArray = [];
+    const tempMap = {};
+    for (let i = 0, len = arr.length; i < len; i++) {
+        const key = JSON.stringify(arr[i]);
+        if (tempMap[key] == null) {
+            newArray.push(arr[i]);
+            tempMap[key] = 1;
+        }
+    }
+    return newArray;
+};
+
+/**
+ * @method
+ * @name assignDefined
+ * @description target 에 sources 의 값 중 undefined 가 아닌 값만 덮어쓴다. (부분 갱신)
+ * @param {Object} target 기본 값 객체
+ * @param {...Object} sources 덮어쓸 값 객체(가변 인자)
+ * @returns {Object} 갱신된 target
+ * @hidden N
+ * @exception
+ * @example
+$c.util.assignDefined({ v1: "a", v2: "b" }, { v1: "ㄱ", v3: undefined }); // { v1: "ㄱ", v2: "b" }
+ */
+scwin.assignDefined = function (target, ...sources) {
+    for (const source of sources) {
+        if (source == null) {
+            continue;
+        }
+        for (const key of Object.keys(source)) {
+            if (source[key] !== undefined) {
+                target[key] = source[key];
+            }
+        }
+    }
+    return target;
+};
+
+/**
+ * @method
+ * @name encodeBase64
+ * @description 문자열을 Base64 로 인코딩한다.
+ * @param {String} str 인코딩할 문자열
+ * @returns {String} Base64 인코딩 문자열
+ * @hidden N
+ * @exception
+ * @example
+$c.util.encodeBase64("WebSquare");
+ */
+scwin.encodeBase64 = function (str) {
+    return btoa(encodeURIComponent(str));
+};
+
+/**
+ * @method
+ * @name decodeBase64
+ * @description Base64 문자열을 디코딩한다.
+ * @param {String} str Base64 문자열
+ * @returns {String} 디코딩된 문자열
+ * @hidden N
+ * @exception
+ * @example
+$c.util.decodeBase64("V2ViU3F1YXJl");
+ */
+scwin.decodeBase64 = function (str) {
+    return decodeURIComponent(atob(str));
+};
+
+/**
+ * @method
+ * @name encodeBase64Utf8
+ * @description 문자열을 UTF-8 안전하게 Base64 로 인코딩한다. (한글 등 멀티바이트 포함)
+ * @param {String} str 인코딩할 문자열
+ * @returns {String} Base64 인코딩 문자열
+ * @hidden N
+ * @exception
+ * @example
+$c.util.encodeBase64Utf8("대한민국");
+ */
+scwin.encodeBase64Utf8 = function (str) {
+    return btoa(unescape(encodeURIComponent(str)));
+};
+
+/**
+ * @method
+ * @name decodeBase64Utf8
+ * @description UTF-8 안전하게 Base64 문자열을 디코딩한다. (한글 등 멀티바이트 포함)
+ * @param {String} str Base64 문자열
+ * @returns {String} 디코딩된 문자열
+ * @hidden N
+ * @exception
+ * @example
+$c.util.decodeBase64Utf8("64yA7ZWc66+86rWt");
+ */
+scwin.decodeBase64Utf8 = function (str) {
+    return decodeURIComponent(escape(atob(str)));
+};
+
+/**
+ * @method
+ * @name getKeyCode
+ * @description 키보드 이벤트 객체에서 키 코드(key / keyCode / which)를 추출한다.
+ * @param {Event} e 키보드 이벤트 객체
+ * @returns {String|Number} key 값 또는 keyCode
+ * @hidden N
+ * @exception
+ * @example
+$c.util.getKeyCode(event); // "Enter" 또는 13
+ */
+scwin.getKeyCode = function (e) {
+    return e.key || e.keyCode || e.which;
+};
+
+/**
+ * @method
+ * @name isMobileApp
+ * @description 모바일 앱(G2BKONEPS) 환경 여부를 userAgent로 판별한다.
+ * @returns {Boolean} 모바일 앱이면 true
+ * @hidden N
+ * @exception
+ * @example
+$c.util.isMobileApp();
+ */
+scwin.isMobileApp = function () {
+    return navigator.userAgent.match(/G2BKONEPS/i) !== null;
+};
+
+/**
+ * @method
+ * @name setClipboard
+ * @description 클립보드에 문자열을 쓴다. (navigator.clipboard 미지원 시 무시)
+ * @param {String} clip 클립보드에 쓸 문자열
+ * @returns {void}
+ * @hidden N
+ * @exception
+ * @example
+$c.util.setClipboard("복사할 텍스트");
+ */
+scwin.setClipboard = function (clip) {
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(clip);
+    }
+};
+
+/**
+ * @method
+ * @name getClipboard
+ * @description 클립보드의 문자열을 읽어 Promise로 반환한다.
+ * @returns {Promise<String>} 클립보드 문자열 Promise
+ * @hidden N
+ * @exception
+ * @example
+$c.util.getClipboard().then(function (clip) { console.log(clip); });
+ */
+scwin.getClipboard = function () {
+    return navigator.clipboard ? navigator.clipboard.readText() : Promise.resolve("");
+};
+
+/**
+ * @method
+ * @name checkDuplicateJsonKey
+ * @description JSON 배열에서 특정 key 값이 중복되는지 검사한다.
+ * @param {Array} json 검사할 객체 배열
+ * @param {String} key 중복을 검사할 키
+ * @returns {Boolean} 중복이 있으면 true
+ * @hidden N
+ * @exception
+ * @example
+$c.util.checkDuplicateJsonKey([{id:"a"},{id:"a"}], "id"); // true
+ */
+scwin.checkDuplicateJsonKey = function (json, key) {
+    const result = json.filter(function (item1, index1) {
+        return json.findIndex(function (item2) {
+            return item1[key] === item2[key];
+        }) !== index1;
+    });
+    return result.length > 0;
+};
+
+/**
+ * @method
+ * @name setCookie
+ * @description 쿠키를 저장한다. 값은 자동으로 encodeURIComponent 처리된다.
+ * @param {String} name 쿠키 이름
+ * @param {String} value 쿠키 값
+ * @param {Object} options 옵션 - expires(Number: 일수 또는 Date), path(기본 "/"), domain, secure(Boolean), sameSite("Lax"/"Strict"/"None")
+ * @returns {void}
+ * @hidden N
+ * @exception
+ * @example
+$c.util.setCookie("LANG", "ko", { expires: 7, path: "/" });
+ */
+scwin.setCookie = function (name, value, options) {
+    options = options || {};
+    let cookie = encodeURIComponent(name) + "=" + encodeURIComponent(value);
+    const expires = options.expires;
+    if (typeof expires === "number") {
+        const d = new Date();
+        d.setTime(d.getTime() + expires * 24 * 60 * 60 * 1000);
+        cookie += "; expires=" + d.toUTCString();
+    } else if (expires instanceof Date) {
+        cookie += "; expires=" + expires.toUTCString();
+    }
+    cookie += "; path=" + (options.path || "/");
+    if (options.domain) {
+        cookie += "; domain=" + options.domain;
+    }
+    if (options.sameSite) {
+        cookie += "; samesite=" + options.sameSite;
+    }
+    if (options.secure) {
+        cookie += "; secure";
+    }
+    document.cookie = cookie;
+};
+
+/**
+ * @method
+ * @name getCookie
+ * @description 지정한 이름의 쿠키 값을 반환한다. 없으면 빈 문자열.
+ * @param {String} name 쿠키 이름
+ * @returns {String} 쿠키 값(decodeURIComponent 처리). 없으면 ""
+ * @hidden N
+ * @exception
+ * @example
+const lang = $c.util.getCookie("LANG");
+ */
+scwin.getCookie = function (name) {
+    const key = encodeURIComponent(name) + "=";
+    const list = document.cookie ? document.cookie.split(";") : [];
+    for (let i = 0; i < list.length; i++) {
+        const item = list[i].replace(/^\s+/, "");
+        if (item.indexOf(key) === 0) {
+            return decodeURIComponent(item.substring(key.length));
+        }
+    }
+    return "";
+};
+
+/**
+ * @method
+ * @name removeCookie
+ * @description 지정한 이름의 쿠키를 삭제한다. (저장 시와 동일한 path/domain 필요)
+ * @param {String} name 쿠키 이름
+ * @param {Object} options 옵션 - path(기본 "/"), domain
+ * @returns {void}
+ * @hidden N
+ * @exception
+ * @example
+$c.util.removeCookie("LANG");
+ */
+scwin.removeCookie = function (name, options) {
+    options = options || {};
+    scwin.setCookie(name, "", { expires: -1, path: options.path || "/", domain: options.domain });
+};
+
+/**
+ * @method
+ * @name __setWebStorage
+ * @description (내부) Web Storage 에 값을 저장한다. 객체/배열은 JSON 문자열로 직렬화.
+ * @param {Storage} storage localStorage 또는 sessionStorage
+ * @param {String} key 키
+ * @param {*} value 값(문자열 또는 객체/배열)
+ * @returns {void}
+ * @hidden Y
+ * @exception
+ * @example
+ */
+scwin.__setWebStorage = function (storage, key, value) {
+    if (!storage) {
+        return;
+    }
+    const data = (typeof value === "object" && value !== null) ? JSON.stringify(value) : value;
+    try {
+        storage.setItem(key, data);
+    } catch (e) {
+        // 저장 실패(용량 초과/프라이빗 모드 등)는 무시한다.
+    }
+};
+
+/**
+ * @method
+ * @name __getWebStorage
+ * @description (내부) Web Storage 값을 읽는다. JSON 이면 파싱, 아니면 원본 문자열 반환.
+ * @param {Storage} storage localStorage 또는 sessionStorage
+ * @param {String} key 키
+ * @returns {*} 저장된 값(JSON 이면 객체/배열). 없으면 null
+ * @hidden Y
+ * @exception
+ * @example
+ */
+scwin.__getWebStorage = function (storage, key) {
+    if (!storage) {
+        return null;
+    }
+    const raw = storage.getItem(key);
+    if (raw === null) {
+        return null;
+    }
+    try {
+        return JSON.parse(raw);
+    } catch (e) {
+        return raw;
+    }
+};
+
+/**
+ * @method
+ * @name setLocalStorage
+ * @description localStorage 에 값을 저장한다. 객체/배열은 자동으로 JSON 직렬화된다.
+ * @param {String} key 키
+ * @param {*} value 값(문자열 또는 객체/배열)
+ * @returns {void}
+ * @hidden N
+ * @exception
+ * @example
+$c.util.setLocalStorage("user", { id: "kim", role: "admin" });
+ */
+scwin.setLocalStorage = function (key, value) {
+    scwin.__setWebStorage(window.localStorage, key, value);
+};
+
+/**
+ * @method
+ * @name getLocalStorage
+ * @description localStorage 값을 읽는다. JSON 이면 객체/배열로 파싱한다.
+ * @param {String} key 키
+ * @returns {*} 저장된 값. 없으면 null
+ * @hidden N
+ * @exception
+ * @example
+const user = $c.util.getLocalStorage("user");
+ */
+scwin.getLocalStorage = function (key) {
+    return scwin.__getWebStorage(window.localStorage, key);
+};
+
+/**
+ * @method
+ * @name removeLocalStorage
+ * @description localStorage 에서 지정한 키를 삭제한다.
+ * @param {String} key 키
+ * @returns {void}
+ * @hidden N
+ * @exception
+ * @example
+$c.util.removeLocalStorage("user");
+ */
+scwin.removeLocalStorage = function (key) {
+    if (window.localStorage) {
+        window.localStorage.removeItem(key);
+    }
+};
+
+/**
+ * @method
+ * @name clearLocalStorage
+ * @description localStorage 의 모든 값을 삭제한다.
+ * @returns {void}
+ * @hidden N
+ * @exception
+ * @example
+$c.util.clearLocalStorage();
+ */
+scwin.clearLocalStorage = function () {
+    if (window.localStorage) {
+        window.localStorage.clear();
+    }
+};
+
+/**
+ * @method
+ * @name setSessionStorage
+ * @description sessionStorage 에 값을 저장한다. 객체/배열은 자동으로 JSON 직렬화된다.
+ * @param {String} key 키
+ * @param {*} value 값(문자열 또는 객체/배열)
+ * @returns {void}
+ * @hidden N
+ * @exception
+ * @example
+$c.util.setSessionStorage("tab", { menu: "list", page: 2 });
+ */
+scwin.setSessionStorage = function (key, value) {
+    scwin.__setWebStorage(window.sessionStorage, key, value);
+};
+
+/**
+ * @method
+ * @name getSessionStorage
+ * @description sessionStorage 값을 읽는다. JSON 이면 객체/배열로 파싱한다.
+ * @param {String} key 키
+ * @returns {*} 저장된 값. 없으면 null
+ * @hidden N
+ * @exception
+ * @example
+const tab = $c.util.getSessionStorage("tab");
+ */
+scwin.getSessionStorage = function (key) {
+    return scwin.__getWebStorage(window.sessionStorage, key);
+};
+
+/**
+ * @method
+ * @name removeSessionStorage
+ * @description sessionStorage 에서 지정한 키를 삭제한다.
+ * @param {String} key 키
+ * @returns {void}
+ * @hidden N
+ * @exception
+ * @example
+$c.util.removeSessionStorage("tab");
+ */
+scwin.removeSessionStorage = function (key) {
+    if (window.sessionStorage) {
+        window.sessionStorage.removeItem(key);
+    }
+};
+
+/**
+ * @method
+ * @name clearSessionStorage
+ * @description sessionStorage 의 모든 값을 삭제한다.
+ * @returns {void}
+ * @hidden N
+ * @exception
+ * @example
+$c.util.clearSessionStorage();
+ */
+scwin.clearSessionStorage = function () {
+    if (window.sessionStorage) {
+        window.sessionStorage.clear();
+    }
+};
+
+/**
+ * @method
+ * @name getUploadFileSize
+ * @description 업로드 컴포넌트에 선택된 파일의 크기(byte)를 반환한다.
+ * @param {String|Object} upload 업로드 컴포넌트 아이디 또는 업로드 컴포넌트 객체
+ * @returns {Number} 선택된 파일의 크기(byte), 컴포넌트가 존재하지 않으면 -1
+ * @hidden N
+ * @exception
+ * @example
+const fileSize = $c.util.getUploadFileSize("ibx_upload1");
+ */
+scwin.getUploadFileSize = function (upload) {
+    if (typeof upload === "string") {
+        upload = $p.getComponentById(upload);
+    }
+    if ($c.util.isEmpty(upload)) {
+        return -1;
+    }
+    return upload.dom.fakeinput.files[0].size;
+};
+
+/**
+ * @method
+ * @name onUploadClick
+ * @description 업로드 컴포넌트의 파일 선택창을 클릭한다.
+ * @param {String|Object} upload 업로드 컴포넌트 아이디 또는 업로드 컴포넌트 객체
+ * @hidden N
+ * @exception
+ * @example
+$c.util.onUploadClick("upload1");
+$c.util.onUploadClick("multiupload1");
+ */
+scwin.onUploadClick = function (upload) {
+    if (typeof upload === "string") {
+        upload = $p.getComponentById(upload);
+    }
+    if ($c.util.isEmpty(upload)) {
+        return false;
+    }
+
+	const type = upload.getPluginName();
+
+	if (type === "upload") {
+		upload.dom.fakeinput?.click();
+	} else if (type === "multiupload") {
+		upload.dom.inputZone?.click();
+	}
+};]]></script>
 	</head>
 	<body ev:onpageload="scwin.onpageload"/>
 </html>

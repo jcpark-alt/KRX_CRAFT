@@ -3,7 +3,7 @@
 xmlns:ev="http://www.w3.org/2001/xml-events"
 xmlns:w2="http://www.inswave.com/websquare"
 xmlns:xf="http://www.w3.org/2002/xforms">
-	<head meta_screenId="$c.data" meta_screenName="외부 솔루션 연동 관련 함수" meta_desc="외부 솔루션 연동 관련 함수를 작성한다.">
+	<head meta_screenId="$c.ext" meta_screenName="외부 솔루션 연동 관련 함수" meta_desc="외부 솔루션 연동 관련 함수를 작성한다."> 
 		<w2:type>COMMON</w2:type>
 		<w2:buildDate/>
 		<w2:MSA/>
@@ -15,12 +15,92 @@ xmlns:xf="http://www.w3.org/2002/xforms">
 		</xf:model>
 		<w2:layoutInfo>
 		</w2:layoutInfo>
-		<w2:publicInfo method=""/>
+		<w2:publicInfo method="scwin.drawChartData,scwin.drawSBChart,scwin.renderChartData,scwin.renderChart,scwin.buildChartData,scwin.renderSBChart"/>
 		<script lazy="false" type="text/javascript"><![CDATA[
 scwin.onpageload = function () {
 
 };
-]]></script>
+
+/**
+ * @method 
+ * @name drawChartData
+ * @description [데이터/옵션 분리] 화면에서 조회한 데이터(raw)를 받아 type+옵션과 결합·변환하여 렌더한다. (조회 없음)
+ *              - raw 가 순수 배열이면 슬롯 키를 type/모양으로 조합: 배열의배열→columns, 객체배열→json (SLOT 예외테이블 우선)
+ *              - raw 가 {columns|json|rows|types|xs…} 형태면 슬롯 키를 그대로 병합 (하위호환)
+ *              - config.keys / config.dataOpts 는 data 로 이동
+ * @param {String} type       차트 타입 (스크립트에서 제공)  ← 첫번째 파라미터
+ * @param {Object} raw        화면에서 조회한 데이터 (executeDynamic 응답의 responseJSON)
+ * @param {Object} container  컨테이너(컴포넌트/엘리먼트/id)
+ * @param {Object} config     옵션 객체 (type 제외). 생략가능.
+ * @hidden N
+ * @example
+ * var res = await $c.sbm.executeDynamic({ id:"sbm_sbchart", action:url, method:"get", mediatype:"application/json", mode:"asynchronous", isProcessMsg:false });
+ * $c.ext.drawChartData("bar", res.responseJSON, chartWrap, { extend:{ bar:{ borderRadius:4 } } });
+ */
+scwin.drawChartData = function (type, raw, container, config) {
+    // 모양으로 슬롯 자동판별의 예외(타입 고정 슬롯). 객체배열이지만 rows 가 필요한 경우 등.
+    var SLOT = { imageSingle: "rows" };
+    var dataBlock = { type: type };                             // type 은 스크립트에서
+    if (raw instanceof Array) {
+        // JSON 은 순수 배열만: [[…]]→columns / [{…}]→json (SLOT 예외 우선) → 슬롯 키를 스크립트가 조합
+        var slot = SLOT[type] || ((raw.length && (raw[0] instanceof Array)) ? "columns" : "json");
+        dataBlock[slot] = raw;
+    } else if (raw && typeof raw === "object") {
+        // 하위호환: 이미 { columns|json|rows|… } 형태면 슬롯 키를 그대로 병합
+        for (var rk in raw) { if (raw.hasOwnProperty(rk) && rk !== "type") { dataBlock[rk] = raw[rk]; } }
+    }
+    var cfg = config || {};
+    var opts = {};
+    for (var k in cfg) { if (cfg.hasOwnProperty(k) && k !== "keys" && k !== "dataOpts") { opts[k] = cfg[k]; } }
+    if (cfg.keys)     { dataBlock.keys = cfg.keys; }            // 단축: keys 를 스크립트에서
+    if (cfg.dataOpts) { for (var dk in cfg.dataOpts) { if (cfg.dataOpts.hasOwnProperty(dk)) { dataBlock[dk] = cfg.dataOpts[dk]; } } }  // 데이터레벨 옵션(keys/labels/imageConf…)
+    scwin.__drawSBChart(container, opts, dataBlock);           // 조합: opts.data = dataBlock 후 렌더
+};
+
+/**
+ * @method 
+ * @name drawSBChart
+ * @description 화면에서 조회한 데이터블록(raw = {type, columns|json|…} 전체)을 옵션과 결합해 렌더. (조회 없음)
+ * @param {Object} container  컨테이너
+ * @param {Object} raw        데이터블록 전체 (type/columns/types/xs 등 포함)
+ * @param {Object} config     옵션 객체(data 제외)
+ * @hidden N
+ * @example
+ * var res = await $c.sbm.executeDynamic({ id:"sbm_sbchart", action:url, method:"get", mediatype:"application/json", mode:"asynchronous", isProcessMsg:false });
+ * scwin.drawSBChart(chartWrap, res.responseJSON, scwin.CHART_CONFIG);   // res.responseJSON = {columns,types,xs} 등
+ */
+scwin.drawSBChart = function (container, raw, config) {
+    scwin.__drawSBChart(container, config || {}, raw);
+};
+
+
+/**
+ * @method
+ * @name __drawSBChart
+ * @description 조회한 데이터를 설정에 결합하여 sb.chart.render 실행 (라이브러리 전역 로드 지연 방어 포함)
+ * @hidden Y
+ */
+scwin.__drawSBChart = function (comp, config, data) {
+    if (!(window.sb && sb.chart)) {                    // 전역 로드 지연 방어
+        setTimeout(function () { scwin.__drawSBChart(comp, config, data); }, 50);
+        return;
+    }
+    var id = __sbResolveId(comp);                      // 컴포넌트/엘리먼트/문자열 id 모두 허용
+    var el = document.getElementById(id);
+    if (el) { el.innerHTML = ""; }                     // 재진입 시 이전 SVG 제거
+    config.data = data;                                // 조회 데이터 결합 (type 포함)
+    sb.chart.render("#" + id, config);
+};
+
+
+// 컨테이너(컴포넌트/DOM엘리먼트/문자열id) → 실제 DOM id (중첩 wframe 스코프 대응). 내부 유틸(스코프 지역함수)
+function __sbResolveId(container) {
+    if (!container) { return null; }
+    if (typeof container === "string") { return container; }
+    if (typeof container.getID === "function") { return container.getID(); }
+    if (container.id) { return container.id; }
+    return null;
+}]]></script>
 	</head>
 	<body ev:onpageload="scwin.onpageload"/>
 </html>

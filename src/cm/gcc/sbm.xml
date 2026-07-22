@@ -12,7 +12,7 @@ xmlns:xf="http://www.w3.org/2002/xforms">
 			<w2:workflowCollection/>
 		</xf:model>
 		<w2:layoutInfo/>
-		<w2:publicInfo method="scwin.getContextPath,scwin.__preSubmitFunction,scwin.__setActionParam,scwin.__callbackSubmitFunction,scwin.__submitErrorHandler,scwin.execute,scwin.executeDynamic,scwin.executeWorkflow,scwin.create,scwin.getResultCode,scwin.getStatusMessage,scwin.resultMsg,scwin.setAction,scwin.getServiceURL,scwin.getMessageCode"/>
+		<w2:publicInfo method="scwin.__callbackSubmitFunction,scwin.__preSubmitFunction,scwin.__setActionParam,scwin.__submitErrorHandler,scwin.create,scwin.execute,scwin.executeDynamic,scwin.executeWorkflow,scwin.getContextPath,scwin.getMessageCode,scwin.getResultCode,scwin.getServiceURL,scwin.getStatusMessage,scwin.resultMsg,scwin.setAction,scwin.setPagingInfo"/>
 		<script lazy="false" type="text/javascript"><![CDATA[
 // 서버 통신 서비스 호출을 위한 Context Path
 scwin.CONTEXT_PATH = WebSquare.core.getConfiguration("/WebSquare/wpack/contextRoot/@value");
@@ -51,9 +51,6 @@ scwin.onpageload = function () {
  * @example $c.sbm.getContextPath();
  */
 scwin.getContextPath = function () {
-    if (scwin.CONTEXT_PATH == "/") {
-        return "";
-    }
     return scwin.CONTEXT_PATH;
 };
 
@@ -78,9 +75,6 @@ scwin.__preSubmitFunction = function (sbmObj) {
     if (scwin.IS_RESTFUL_URL === true) {
         $c.sbm.__setActionParam(sbmObj);
     }
-
-    //var token = sessionStorage.getItem('AUTH-TOKEN');
-    //sbmObj.setRequestHeader({'Authorization': "Bearer " + token})
 };
 
 /**
@@ -194,7 +188,7 @@ scwin.__setActionParam = function (sbmObj) {
                 }
             }
         }
-        //actionUrl = "http://localhost:8080" + actionUrl;
+
         sbmObj.action = actionUrl;
     }
 };
@@ -210,8 +204,6 @@ scwin.__setActionParam = function (sbmObj) {
  * @exception 
  */
 scwin.__callbackSubmitFunction = function (resObj, sbmObj) {
-    const $p = $c.win.__getScope(sbmObj).scwin.$w;
-
     // server와 연결을 할 수 없을 경우 responseStatusCode가 0으로 발생.
     if ((resObj.responseStatusCode < 100) || (resObj.responseStatusCode > 599)) {
         let detailStr = "HTTP STATUS INFO";
@@ -228,6 +220,33 @@ scwin.__callbackSubmitFunction = function (resObj, sbmObj) {
 
         $c.sbm.resultMsg(msgObj);
         return false;
+    }
+
+    // executeDynamic gridview : 통신 성공 시, refresh 대상 grid(들)를 자동 바인딩(__bindResponseToTargets) 호출 직전에 초기화(initGrid)한다.
+    // gridview는 단일(컴포넌트 ID 문자열 또는 컴포넌트 객체)뿐 아니라 콤마(,)로 구분한 다중 ID 문자열("grd_main,grd_sub")도 지원한다.
+    // 각 grid는 접미사 옵션으로 실행을 제어한다 : "id|nofocus"(포커스 끔), "id|norefresh"(refresh/initGrid 끔). 기본은 refresh + 첫 셀 포커스 모두 실행.
+    // grid.refresh()는 target DataCollection의 setJSON 시(ondataload) 호출되도록 __bindResponseToTargets에서 바인딩한다.
+    let gridViews = [];
+    if ($c.util.isEmpty(resObj.errorType) && sbmObj._gridview) {
+        const $p = sbmObj.getScopeWindow().$p;
+        // gridview를 grid별 { gv, refresh, focus } 디스크립터로 파싱/구성한다.
+        gridViews = scwin.__parseGridview(sbmObj._gridview).map(function (spec) {
+            const gv = (typeof spec.ref === "string") ? $p.getComponentById(spec.ref) : spec.ref;
+            if (!gv) { return null; }
+            return { gv: gv, refresh: spec.refresh, focus: spec.focus, message: spec.message };
+        }).filter(Boolean);
+        // refresh 대상 grid만 initGrid()로 초기화한다.(norefresh grid는 이 메커니즘이 건드리지 않음)
+        gridViews.forEach(function (entry) {
+            if (entry.refresh && entry.gv && (typeof entry.gv.initGrid === "function")) {
+                entry.gv.initGrid();
+            }
+        });
+    }
+
+    // executeDynamic 간소화 target 자동 바인딩 : 통신 성공 시 응답 본문을 대상 DataCollection에 적재한다.
+    // (done 핸들러/Promise resolve 이전에 수행하여 후속 핸들러가 적재된 데이터를 참조할 수 있게 한다.)
+    if ($c.util.isEmpty(resObj.errorType) && !$c.util.isEmpty(sbmObj._autoBindTargets)) {
+        scwin.__bindResponseToTargets(sbmObj, resObj, sbmObj._autoBindTargets, gridViews);
     }
 
     if ($c.util.isEmpty(resObj.errorType) && typeof sbmObj._promise_submitDoneHandler === "function") {
@@ -252,7 +271,12 @@ scwin.__callbackSubmitFunction = function (resObj, sbmObj) {
  */
 scwin.__submitErrorHandler = function (resObj) {
     const $p = $c.win.__getScope(resObj.id).scwin.$w;
-
+	let resBody;
+	let resMsg ="";
+	try{
+		resBody = JSON.parse(resObj.responseBody);
+		resMsg = resBody.message
+	}catch(e){console.log(e)}
     let detailStr = "HTTP STATUS INFO";
     detailStr += resObj.responseReasonPhrase;
     detailStr += " ";
@@ -261,11 +285,13 @@ scwin.__submitErrorHandler = function (resObj) {
     detailStr += resObj.resourceUri;
     detailStr += resObj.responseBody;
 
+    const message = ($c.util.isEmpty(resMsg)) ? "서버 오류입니다. 자세한 내용은 관리자에게 문의하시기 바랍니다." : resMsg;
+
     const msgObj = {
         statusCode: "E",
         errorCode: "E9998",
-        message: "서버 오류입니다. 자세한 내용은 관리자에게 문의하시기 바랍니다.",
-        messageDetail: detailStr
+        message: message,
+        messageDetail: detailStr                                                                                                                                                                                                                                                                                             
     };
 
     $c.sbm.resultMsg(msgObj);
@@ -316,6 +342,8 @@ scwin.__applyDuplicateGuard = function (sbmObj, execOptions) {
  * @method
  * @name execute
  * @description 서버 통신 확장 모듈, Submission를 실행합니다.
+ *  requestData를 전달하지 않은 경우, submission의 ref가 단건 DataCollection(DataMap)을 가리키면
+ *  해당 DataMap의 데이터 객체를 추출해 ref 대신 requestData로 전달한다.
  * @param {Object} sbmObj submission 객체
  * @param {Object} requestData [Default : null, JSON, XML] 요청 데이터로 submission에 등록된 ref를 무시하고 현재의 값이 할당된다.
  * @param {Object} compObj [Default : null] 전송중 disable시킬 컴포넌트
@@ -405,17 +433,249 @@ scwin.execute = function (sbmObj, requestData, compObj, options) {
             }
         }
 
+        // requestData가 비어 있고 ref가 단건 DataCollection(DataMap)을 가리키면,
+        // 해당 DataMap의 데이터 객체만 추출해 ref 대신 requestData 인자로 전달한다.
+        if ($c.util.isEmpty(requestData) && ($c.util.isEmpty(_sbmObj.ref) === false) && (_sbmObj.ref.indexOf("data:json,") === 0)) {
+            const refDcId = _sbmObj.ref.substring("data:json,".length).trim();
+            // 단순 단일 DataCollection ID(배열/객체/필드경로 표기 제외)인 경우만 처리한다.
+            if (/^[A-Za-z_$][\w$]*$/.test(refDcId)) {
+                const refDc = $p.getComponentById(refDcId);
+                if (refDc && (typeof refDc.getObjectType === "function") && (refDc.getObjectType().toLowerCase() === "datamap")) {
+                    requestData = refDc.getJSON();
+                }
+            }
+        }
+
         $p.executeSubmission(_sbmObj, requestData, compObj);
     });
 };
 
+
+/**
+ * @method
+ * @name __normalizeRefTarget
+ * @description executeDynamic 옵션의 간소화된 ref/target 문자열을 처리한다.
+ *  - 이미 "data:" 로 시작하거나 비어 있으면 변환하지 않는다(하위 호환). 이 경우 ref/target은 엔진이 직접 바인딩한다.
+ *  - 항목은 콤마(,)로 구분하며, 각 항목에 "id=key" 형식으로 key를 지정할 수 있다. (key는 점(.) 경로 허용. 예: "body.content")
+ *  - ref    : 서버로 보낼 DataCollection ID → WebSquare 표준 표현식(data:json,...)으로 변환한다(요청 측, 엔진 처리).
+ *      "dma_a"            → data:json,dma_a
+ *      "dma_a=body"      → data:json,{"id":"dma_a","key":"body"}
+ *      "dma_a,dlt_b"      → data:json,["dma_a","dlt_b"]
+ *  - target : 응답을 받을 DataCollection ID. 항목별 "|append" 로 Append 모드를 지정한다.
+ *      응답 본문을 직접 적재(setJSON)하기 위해 바인딩 디스크립터로 파싱하여 options.__bindTargets에 보관하고,
+ *      엔진 중복 바인딩(double-bind)을 막기 위해 options.target은 비운다. 실제 적재는 $c.sbm.__bindResponseToTargets에서 수행한다.
+ *      key가 지정되면 responseJSON.<key> 값을, 없으면 응답 본문(responseJSON.body)을 적재한다.
+ *      "dlt_a"                    → [{id:"dlt_a"}]
+ *      "dlt_a=body.content"       → [{id:"dlt_a", key:"body.content"}]
+ *      "dlt_a|append"             → [{id:"dlt_a", append:true}]
+ *      "dlt_a,dlt_b=body.x|append" → [{id:"dlt_a"},{id:"dlt_b", key:"body.x", append:true}]
+ * @param {Object} options executeDynamic/create 옵션 객체. ref는 in-place로 변환하고, 간소화 target은 __bindTargets로 분리한다.
+ * @hidden Y
+ * @exception
+ */
+scwin.__normalizeRefTarget = function (options) {
+    // ref : "id" 또는 "id=key" 를 콤마로 구분 → data:json 표현식 (요청 측, 엔진이 바인딩)
+    if (($c.util.isEmpty(options.ref) === false) && (options.ref.indexOf("data:") !== 0)) {
+        const refItems = options.ref.split(",").map(function (token) { return token.trim(); }).filter(Boolean).map(function (token) {
+            const idKey = token.split("=");
+            const id = idKey[0].trim();
+            const key = (idKey.length > 1) ? idKey[1].trim() : "";
+            // key가 없으면 ID 문자열, 있으면 {id, key} 객체로 표현한다.
+            return ($c.util.isEmpty(key) === false) ? { id: id, key: key } : id;
+        });
+        options.ref = (refItems.length === 1)
+            ? "data:json," + ((typeof refItems[0] === "string") ? refItems[0] : JSON.stringify(refItems[0]))
+            : "data:json," + JSON.stringify(refItems);
+    }
+
+    // target : "id[=key][|append]" → 응답 본문을 직접 적재할 바인딩 디스크립터로 분리 (응답 측, 수동 바인딩)
+    if (($c.util.isEmpty(options.target) === false) && (options.target.indexOf("data:") !== 0)) {
+        options.__bindTargets = options.target.split(",").map(function (token) {
+            const parts = token.split("|");
+            const idKey = parts[0].split("=");
+            const targetObj = { id: idKey[0].trim() };
+            if ((idKey.length > 1) && ($c.util.isEmpty(idKey[1].trim()) === false)) {
+                targetObj.key = idKey[1].trim();
+            }
+            if ((parts.length > 1) && (parts[1].trim() === "append")) {
+                targetObj.append = true;
+            }
+            return targetObj;
+        }).filter(function (t) { return $c.util.isEmpty(t.id) === false; });
+        // 엔진 target 바인딩과의 중복 적재를 막기 위해 표준 target은 비운다.
+        options.target = "";
+    }
+};
+
+/**
+ * @method
+ * @name __parseGridview
+ * @description executeDynamic options.gridview 값을 grid별 디스크립터 { ref, refresh, focus } 배열로 파싱한다.
+ *  ref는 컴포넌트 ID 문자열 또는 컴포넌트 객체. refresh/focus는 기본 true이며, 접미사 옵션으로 끈다.
+ *  - 접미사 옵션 : "id|nofocus"(focus 끔), "id|norefresh"(refresh 끔). 한 grid에 여러 옵션은 "id|nofocus,norefresh".
+ *  - 문자열에서 콤마(,)는 grid 구분자이자 옵션 구분자를 겸하므로 연속(continuation) 파싱한다.
+ *    예약 키워드(nofocus/norefresh/nomessage) 단독 토큰은 직전 grid의 추가 옵션으로 이어붙인다.
+ *    "grd_main|nofocus,norefresh,nomessage,grd_sub|norefresh" → grd_main{F,F,F}, grd_sub{refresh:F, focus:T}
+ *  - 배열은 각 요소가 자체 완결 토큰("id|opt,opt") 또는 컴포넌트 객체. 단일 컴포넌트 객체는 기본값으로 처리한다.
+ * @param {String|Object|Array} gridviewRef options.gridview 값
+ * @returns {Array} [{ ref:(String|Object), refresh:Boolean, focus:Boolean }]
+ * @hidden Y
+ * @exception
+ */
+scwin.__parseGridview = function (gridviewRef) {
+    const makeEntry = function (ref) { return { ref: ref, refresh: true, focus: true, message: true  }; };
+    const applyOpt = function (entry, opt) {
+        opt = (opt || "").trim().toLowerCase();
+        if (opt === "nofocus") { entry.focus = false; }
+        else if (opt === "norefresh") { entry.refresh = false; }
+		else if (opt === "nomessage") { entry.message = false; }
+    };
+    // 컴포넌트 객체(옵션 문법 없음) → 기본값
+    if ((typeof gridviewRef !== "string") && ($c.util.isArray(gridviewRef) === false)) {
+        return [makeEntry(gridviewRef)];
+    }
+    // 배열 : 각 요소가 자체 완결 토큰("id|opt,opt") 또는 컴포넌트
+    if ($c.util.isArray(gridviewRef)) {
+        return gridviewRef.map(function (el) {
+            if (typeof el !== "string") { return makeEntry(el); }
+            const parts = el.split(/[|,]/).map(function (s) { return s.trim(); }).filter(Boolean);
+            const entry = makeEntry(parts[0]);
+            parts.slice(1).forEach(function (o) { applyOpt(entry, o); });
+            return entry;
+        }).filter(function (e) { return $c.util.isEmpty(e.ref) === false; });
+    }
+    // 문자열 : 콤마가 grid/옵션 구분자 겸용 → 연속(continuation) 파싱
+    const RESERVED = { nofocus: true, norefresh: true, nomessage: true };
+    const entries = [];
+    gridviewRef.split(",").map(function (s) { return s.trim(); }).filter(Boolean).forEach(function (tok) {
+        const isOptOnly = (tok.indexOf("|") < 0) && (RESERVED[tok.toLowerCase()] === true);
+        if (isOptOnly && (entries.length > 0)) {
+            applyOpt(entries[entries.length - 1], tok); // 직전 grid 옵션 이어붙임
+        } else {
+            const parts = tok.split("|").map(function (s) { return s.trim(); }).filter(Boolean);
+            const entry = makeEntry(parts[0]);
+            parts.slice(1).forEach(function (o) { applyOpt(entry, o); });
+            entries.push(entry);
+        }
+    });
+    return entries;
+};
+
+/**
+ * @method
+ * @name __bindResponseToTargets
+ * @description executeDynamic 간소화 target으로 분리된 바인딩 디스크립터에 따라, 통신 응답을
+ *  대상 DataCollection에 직접 적재한다.
+ *  - key가 지정된 target은 responseJSON.<key>(점(.) 경로) 값을 적재한다. (예: key="body.content" → responseJSON.body.content)
+ *  - key가 없는 target은 응답 본문(body 래퍼 우선, 없으면 평면 responseJSON)을 기준으로 적재한다.
+ *    본문이 배열이면 선언 순서대로 순차 매핑(body[i] → targets[i]), 단일 객체이면 첫 번째 target에 적재한다.
+ *  - 각 target의 append가 true이면 기존 데이터를 유지하며 추가한다. (setJSON(data, true))
+ * @param {Object} sbmObj Submission 객체 (scope window의 $p를 도출하는 데 사용)
+ * @param {Object} rtn 통신 응답 객체 (rtn.responseJSON 에 실데이터)
+ * @param {Array} targets 바인딩 디스크립터 배열 [{id, key, append}]
+ * @param {Array} gridViews [Default : []] { gv:컴포넌트, refresh:Boolean, focus:Boolean } 디스크립터 배열. 지정 시, setJSON으로 데이터가 로드되는 각 target DataCollection의
+ *  ondataload 이벤트 핸들러를 1회만 바인딩한다(중복 등록 방지). 핸들러는 entry.refresh가 true면 gv.refresh()를, entry.focus가 true이고 로드된 데이터가 있으면 gv.setFocusedCell(0,0)으로 첫 셀에 포커스한다. 다중 gridView를 지원한다.
+ * @hidden Y
+ * @exception
+ */
+scwin.__bindResponseToTargets = function (sbmObj, rtn, targets, gridViews) {
+    const $p = sbmObj.getScopeWindow().$p;
+
+    if ($c.util.isEmpty(targets) || $c.util.isEmpty(rtn) || $c.util.isEmpty(rtn.responseJSON)) {
+        return;
+    }
+
+    const responseJSON = rtn.responseJSON;
+
+    // 대상 DataCollection에 데이터를 적재하는 내부 헬퍼 (data가 undefined면 적재하지 않음)
+    const bindOne = function (id, data, append) {
+        if (typeof data === "undefined") {
+            return;
+        }
+        const dc = $p.getComponentById(id);
+        if (!dc || typeof dc.setJSON !== "function") {
+            return;
+        }
+        // gridView(들) 지정 시 : setJSON으로 데이터가 로드(ondataload)될 때 각 grid.refresh()가 호출되도록 이벤트를 1회만 바인딩한다.
+        // (handler는 dc.__gridviewsToRefresh를 참조하므로, 매 호출마다 최신 gridView 목록으로 갱신하되 bind는 중복 등록하지 않는다.)
+        if (gridViews && gridViews.length > 0 && typeof dc.bind === "function") {
+            dc.__gridviewsToRefresh = gridViews;
+            if (dc.__gridviewRefreshBound !== true) {
+                dc.bind("ondataload", function () {
+                    const gvs = dc.__gridviewsToRefresh || [];
+                    // 데이터가 있을 때만 첫 셀 포커스(setFocusedCell)를 적용한다.(빈 그리드 가드)
+                    const hasRows = (typeof dc.getRowCount === "function") && (dc.getRowCount() > 0);
+                    // grid별 refresh/focus/message 플래그를 각각 독립 적용한다.(norefresh→refresh 생략, nofocus→포커스 생략, nomessage→message 생략)
+                    gvs.forEach(function (entry) {
+                        if (!entry.gv) { return; }
+                        if (entry.refresh && (typeof entry.gv.refresh === "function")) {
+                            entry.gv.refresh();
+                        }
+                        if (entry.focus && hasRows && (typeof entry.gv.setFocusedCell === "function")) {
+                            entry.gv.setFocusedCell(0, 0);
+                        }
+						// grid별 조회된 데이터가 없으면 메시지창 출력한다.
+						if (entry.message && !hasRows) {
+							$c.win.alert($c.data.getMessage("com_search_0011"));
+						}
+                    });
+                });
+                dc.__gridviewRefreshBound = true;
+            }
+        }
+        dc.setJSON(data, append === true);
+    };
+
+    // key가 지정된 target은 responseJSON.<key>(점 경로) 값을 직접 적재하고, 나머지는 본문 기반으로 적재한다.
+    const plainTargets = [];
+    targets.forEach(function (t) {
+        if ($c.util.isEmpty(t.key) === false) {
+            let val = responseJSON;
+            const keyPath = t.key.split(".");
+            for (let i = 0; (i < keyPath.length) && (val !== null) && (typeof val !== "undefined"); i++) {
+                val = val[keyPath[i]];
+            }
+            bindOne(t.id, val, t.append);
+        } else {
+            plainTargets.push(t);
+        }
+    });
+
+    if (plainTargets.length === 0) {
+        return;
+    }
+
+    // 응답 본문 : body 래퍼가 있으면 그 값을, 없으면 평면 응답(responseJSON)을 사용한다.
+    const body = (typeof responseJSON.body !== "undefined") ? responseJSON.body : responseJSON;
+    if ($c.util.isEmpty(body)) {
+        return;
+    }
+
+    if ($c.util.isArray(body)) {
+        // 배열 → 선언 순서대로 target에 순차 매핑
+        plainTargets.forEach(function (t, i) {
+            bindOne(t.id, body[i], t.append);
+        });
+    } else {
+        // 단일 객체 → 첫 번째 target에 적재
+        bindOne(plainTargets[0].id, body, plainTargets[0].append);
+    }
+};
 
 
 /**
  * @method
  * @name executeDynamic
  * @description Submission를 동적으로 생성해서 실행합니다.
+ *  options.ref / options.target 은 간소화 문법을 지원한다. DataCollection ID만 콤마(,)로 구분해서 전달하면,
+ *  ref는 WebSquare 표준 표현식(data:json,...)으로 변환되어 요청에 사용되고, target은 통신 성공 시 응답 본문(responseJSON.body)을
+ *  선언 순서대로 대상 DataCollection에 직접 적재한다. (본문이 배열이면 순차 매핑, 단일 객체면 첫 target) target 항목에 "|append" 를
+ *  붙이면 기존 데이터를 유지하며 추가한다(setJSON(data, true)). "data:" 로 시작하는 기존 표현식을 그대로 넘기면 엔진이 직접 바인딩한다.
+ *  자세한 규칙은 scwin.__normalizeRefTarget / scwin.__bindResponseToTargets 참고.
+ *  options.gridview 를 지정하면 통신 성공 시 refresh 대상 grid에 grid.initGrid()를 호출하고, target DataCollection의 데이터 로드(ondataload) 시 grid.refresh()와 첫 셀 포커스(setFocusedCell(0,0)), 조회된 데이터없음(alert)를 수행한다.
+ *  gridview는 콤마(,)로 구분한 다중 ID 문자열("grd_main,grd_sub")을 지원한다. grid별 접미사 옵션으로 실행을 제어한다 : "id|nofocus"(포커스 끔), "id|norefresh"(refresh/initGrid 끔), "id|nofocus,norefresh"(둘 다 끔), "id|nofocus,norefresh,message"(셋 다 끔). 옵션 미지정 시 refresh + 첫 셀 + message 포커스 모두 실행한다.
  * @param {Object} options $c.sbm.create의 options 참고
+ * @param {String|Object} options.gridview [Default : null] 통신 성공 시 처리할 gridView. 컴포넌트 ID 문자열(콤마로 구분한 다중 ID 가능, grid별 "|nofocus"/"|norefresh"/"|nomessage" 접미사 옵션 지원) 또는 컴포넌트 객체. 기본은 refresh 대상 grid initGrid() 호출, target DataCollection의 ondataload 시 refresh() + setFocusedCell(0,0) + alert() 호출.
  * @param {Object} requestData 요청 데이터
  * @param {Object} obj 전송중 disable시킬 컴퍼넌트
  * @param {Object} execOptions [Default : null] 중복 실행 제어 옵션. $c.sbm.execute의 options 참고(allowDuplicate / onDuplicate).
@@ -424,39 +684,88 @@ scwin.execute = function (sbmObj, requestData, compObj, options) {
  * @hidden N
  * @exception
  * @example
-const searchCodeGrpOption = {
-     id : "sbm_searchCodeGrp",
-     action : "serviceId=CD0001&action=R",
-     target : 'data:json,{"id":"dlt_codeGrp","key":"data"}',
-     submitDoneHandler : scwin.searchCodeGrpCallback, isProcessMsg : false };
-$c.sbm.executeDynamic(searchCodeGrpOption);
+// 간소화 문법 : DataCollection ID만 콤마(,)로 구분하고, 응답을 추가(Append)할 대상에는 "|append" 를 붙인다.
+// 통신 성공 시 응답 본문(responseJSON.body)이 선언 순서대로 [dlt_commonGrp, dlt_commonCode, dlt_commonSearchItem(append)] 에 적재된다.
+const sbmOptions = {
+     id : "sbm_SelectTempDynamic",
+     action : "/sample/tempSelect",
+     ref : "dma_search",
+     target : "dlt_commonGrp,dlt_commonCode,dlt_commonSearchItem|append",
+     submitDoneHandler : scwin.sbm_SelectTemp_submitdone, isProcessMsg : false };
+$c.sbm.executeDynamic(sbmOptions);
+
+// gridview : 통신 성공 시 자동 바인딩 직전 grid.initGrid() 호출, target DataCollection 데이터 로드(ondataload) 시 grid.refresh() 호출. (ID 문자열 또는 컴포넌트 객체)
+const sbmOptions = {
+     id : "sbm_SelectTempDynamic",
+     action : "/sample/tempSelect",
+     ref : "dma_search",
+     target : "dlt_commonGrp",
+     gridview : "grd_main", // 또는 gridview : grd_main
+     isProcessMsg : false };
+$c.sbm.executeDynamic(sbmOptions);
+
+// 다중 gridview : 콤마(,)로 구분하면 여러 grid를 함께 처리한다. (각 grid initGrid() 호출, target 데이터 로드 시 각 grid refresh() 호출)
+const sbmOptions = {
+     id : "sbm_SelectTempDynamic",
+     action : "/sample/tempSelect",
+     ref : "dma_search",
+     target : "dlt_commonGrp,dlt_commonCode",
+     gridview : "grd_main,grd_sub", // 콤마로 다중 gridview 설정
+     isProcessMsg : false };
+$c.sbm.executeDynamic(sbmOptions);
+
+// gridview 접미사 옵션 : grid별로 refresh()/setFocusedCell(0,0) 실행을 제어한다. (기본은 둘 다 실행)
+// "id|nofocus"(포커스 끔), "id|norefresh"(refresh/initGrid 끔), "id|nofocus,norefresh"(둘 다 끔), "id|nofocus,norefresh,nomessage"(셋 다 끔)
+const sbmOptions = {
+     id : "sbm_SelectTempDynamic",
+     action : "/sample/tempSelect",
+     ref : "dma_search",
+     target : "dlt_commonGrp,dlt_commonCode",
+     gridview : "grd_main,grd_sub1|nofocus,grd_sub2|nofocus", // grd_main : refresh + 포커스, grd_sub1 : refresh만(포커스 생략), grd_sub2 : message만(message 생략)
+     isProcessMsg : false };
+$c.sbm.executeDynamic(sbmOptions);
+
+// id=key 간소화 문법 : 각 항목에 "id=key"로 응답 경로(key, 점(.) 경로 허용)를 지정한다.
+const sbmOptions = {
+     id : "sbm_SelectTempDynamic",
+     action : "/sample/tempSelect",
+     ref : "dma_search=body",
+     target : "dlt_commonGrp=body.content",
+     gridview : grd_main,
+     submitDoneHandler : scwin.sbm_SelectTemp_submitdone, isProcessMsg : false };
+$c.sbm.executeDynamic(sbmOptions);
+// 통신 성공 시 dlt_commonGrp.setJSON(rtn.responseJSON.body.content) 으로 적재된다.
 
 // 진행 중 요청을 취소하고 최신 요청으로 재실행 (후행 우선)
-$c.sbm.executeDynamic(searchCodeGrpOption, null, null, { onDuplicate: "abort" });
+$c.sbm.executeDynamic(sbmOptions, null, null, { onDuplicate: "abort" });
 
 // 더블클릭 방지 : 진행 중 통신이 끝나기 전까지 재호출을 무시한다. (선행 우선)
-$c.sbm.executeDynamic(searchCodeGrpOption, null, null, { allowDuplicate: false });
+$c.sbm.executeDynamic(sbmOptions, null, null, { allowDuplicate: false });
 
 // allowDuplicate와 onDuplicate를 동시에 설정하는 경우 : allowDuplicate가 우선한다.
 // allowDuplicate가 true이면 중복 실행을 허용하므로 onDuplicate("abort")는 무시되고, 진행 중 요청을 취소하지 않고 그대로 동시 실행한다.
-$c.sbm.executeDynamic(searchCodeGrpOption, null, null, { allowDuplicate: true, onDuplicate: "abort" });
+$c.sbm.executeDynamic(sbmOptions, null, null, { allowDuplicate: true, onDuplicate: "abort" });
 
 // ignore(기본) 정책에서 중복으로 건너뛴 호출은 응답 없이 { skipped:true }로 resolve된다.
 // 응답 데이터를 사용하는 then 체인에서는 skipped를 먼저 확인해 후속 처리를 중단해야 한다.
-$c.sbm.executeDynamic(searchCodeGrpOption).then(function (res) {
+$c.sbm.executeDynamic(sbmOptions).then(function (res) {
     if (res && res.skipped) { return; } // 진행 중 통신이 있어 이번 호출은 건너뜀
     // ... 정상 응답 처리 ...
 });
 
 // async/await 사용 시에도 동일하게 skipped를 먼저 확인한다.
 scwin.btn_search_onclick = async function (e) {
-    const res = await $c.sbm.executeDynamic(searchCodeGrpOption);
+    const res = await $c.sbm.executeDynamic(sbmOptions);
     if (res && res.skipped) { return; } // 진행 중 통신이 있어 이번 호출은 건너뜀
     // ... 정상 응답 처리 ...
 };
  */
 scwin.executeDynamic = function (options, requestData, obj, execOptions) {
     execOptions = execOptions || {};
+
+    // 간소화된 ref/target 문자열을 WebSquare 표준 표현식(data:json,...)으로 변환한다. (create 호출 전에 수행)
+    scwin.__normalizeRefTarget(options);
+
     let submissionObj = $c.util.getComponent(options.id);
 
     // 중복 실행 제어 : executeDynamic은 매 호출마다 submission을 삭제/재생성(processStatus 0으로 초기화)하므로,
@@ -475,6 +784,20 @@ scwin.executeDynamic = function (options, requestData, obj, execOptions) {
         $p.deleteSubmission(options.id);
         $c.sbm.create(options);
         submissionObj = $c.util.getComponent(options.id);
+    }
+
+    // 간소화 target으로 분리된 바인딩 디스크립터를 submission 객체에 부착한다.
+    // 통신 성공 시 공통 콜백($c.sbm.__callbackSubmitFunction)에서 응답 본문을 대상 DataCollection에 적재한다.
+    if (($c.util.isEmpty(options.__bindTargets) === false) && (submissionObj !== null)) {
+        submissionObj._autoBindTargets = options.__bindTargets;
+    }
+
+    // gridview가 지정되면 submission 객체에 부착한다.
+    // 통신 성공 시 공통 콜백에서 refresh 대상 grid에 grid.initGrid()를 호출하고,
+    // target DataCollection의 ondataload 이벤트에서 grid.refresh()/setFocusedCell()이 호출되도록 한다.
+    // grid별 접미사 옵션(|nofocus, |norefresh, |nomessage)으로 실행을 제어한다. (컴포넌트 ID 문자열 또는 컴포넌트 객체)
+    if (options.gridview && (submissionObj !== null)) {
+        submissionObj._gridview = options.gridview;
     }
 
     return $c.sbm.execute(submissionObj, requestData, obj, execOptions);
@@ -708,6 +1031,144 @@ scwin.getServiceURL = function () {
  */
 scwin.getMessageCode = function (code) {
     return scwin.MESSAGE_CODE[code];
+};
+
+/**
+ * @method
+ * @name setPagingInfo
+ * @description 페이징 옵션(pagingInfo)을 기본값과 병합하고, 조회 DataMap(inData) 에
+ *  currentPage / recordCountPerPage 컬럼을 설정한다.
+ *  totalCnt 가 전달되면 페이지 리스트 컴포넌트(pageListComponent) 렌더링까지 수행한다.
+ *  (commonScope.js com.gfnExecute 의 페이징 옵션 + pageListComponent 처리 로직 분리)
+ * @param {Object} pagingInfo 페이징 옵션 객체 (sbmOptions.pagingInfo 가 아닌 값 자체)
+ * @param {String} inData (선택) submission inData 문자열. 조회 DataMap 컬럼 설정에 사용
+ * @param {Number} totalCnt (선택) 전체 건수. 전달 시 pageListComponent 렌더링 수행
+ * @returns {Object} 기본값이 병합된 pagingInfo (pagingInfo 미설정 시 빈 객체 {})
+ * @hidden N
+ * @exception
+ * @example
+const pagingInfo = {
+    pageType : "P",                 // S/P/A
+    pageListId : "pglList",         // 페이지 리스트 아이디
+    pageFunction : "scwin.fnSrch",  // 페이징 처리 함수
+    currentPage : 1,                // 현재 페이지
+    totalCountId : "tbxTotCnt",     // total count 출력 아이디
+    recordCountPerPage : 20         // 한 페이지에 보여줄 라인 수
+};
+// 통신 전: 기본값 병합 + DataMap 컬럼 설정
+$c.sbm.setPagingInfo(pagingInfo, "dataM=dlSearchM");
+// 통신 후: 전체 건수로 페이지 리스트 렌더링
+$c.sbm.setPagingInfo(pagingInfo, null, 135);
+ */
+scwin.setPagingInfo = function (pagingInfo, inData, totalCnt) {
+    // 페이징 옵션이 없으면 빈 객체 반환
+    if ($c.util.isEmpty(pagingInfo)) {
+        return {};
+    }
+
+    const pagingDefault = {
+        /* 필수 */
+        pageType : "",            // S/P/A
+        pageFunction : "",        // 페이징 처리 하는 함수
+        currentPage : 1,          // 현재 페이지
+
+        /* pageType:P 시 필수 */
+        pageListId : "",          // 페이지 리스트 아이디
+
+        /* pageType:S 시 필수 */
+        gridId : "",              // 그리드 아이디
+
+        /* 선택 */
+        totalCountId : "",        // total count 를 출력할 아이디
+        recordCountPerPage : "",  // 한 페이지에 보여줄 라인 수
+        pageSize : 10             // 페이징 시 출력해줄 페이지 번호 개수
+    };
+
+    pagingInfo = $c.util.assignDefined(pagingDefault, pagingInfo);
+
+    // 모바일 환경일 경우 pageSize 5로 변경
+    pagingInfo.pageSize = ($c.util.isMobile()) ? 5 : pagingInfo.pageSize;
+
+    // 조회 Map 키를 inData 첫 토큰에서 추출 (dataM=dataViewM → dataViewM)
+    if (!$c.util.isEmpty(inData)) {
+        let inDataKey = inData.split(" ")[0];
+        inDataKey = (inDataKey.split("=").length > 1) ? inDataKey.split("=")[1] : inDataKey.split("=")[0];
+
+        const inDataMap = $p.getComponentById(inDataKey);
+        if (!$c.util.isEmpty(inDataMap)) {
+            // DataMap 에 currentPage, recordCountPerPage 컬럼이 없으면 추가
+            if (typeof inDataMap.get("currentPage") === "undefined") {
+                inDataMap.addColumn({ id : "currentPage", name : "현재 페이지", dataType : "text", value : "" });
+            }
+            if (typeof inDataMap.get("recordCountPerPage") === "undefined") {
+                inDataMap.addColumn({ id : "recordCountPerPage", name : "한 페이지에 보여줄 라인 수", dataType : "text", value : "" });
+            }
+
+            inDataMap.set("currentPage", pagingInfo.currentPage);
+
+            // recordCountPerPage 결정 (옵션 지정 > Map 기존값 > 기본 10)
+            if (!$c.util.isEmpty(pagingInfo.recordCountPerPage)) {
+                inDataMap.set("recordCountPerPage", pagingInfo.recordCountPerPage);
+            } else if (!$c.util.isEmpty(inDataMap.get("recordCountPerPage"))) {
+                pagingInfo.recordCountPerPage = inDataMap.get("recordCountPerPage");
+            } else {
+                pagingInfo.recordCountPerPage = 10;
+            }
+        }
+    }
+
+    // totalCnt 가 전달되면 페이지 리스트(pageListComponent) 렌더링
+    if (!$c.util.isEmpty(totalCnt) && !$c.util.isEmpty(pagingInfo.pageListId)) {
+        const outTotalCnt = Math.ceil(totalCnt / pagingInfo.recordCountPerPage);
+        const selectCurrentPage = pagingInfo.currentPage;
+
+        pagingInfo.pageListId.split(",").forEach(function (id) {
+            const pageListComponent = $p.getComponentById(id);
+            if ($c.util.isEmpty(pageListComponent)) return;
+
+            pageListComponent.setPageSize(pagingInfo.pageSize);
+
+            if (outTotalCnt > 1) {
+                // 페이지 리스트 표시 및 페이지 변경 이벤트 등록
+                pageListComponent.show();
+                pageListComponent.setCount(outTotalCnt, true);
+                const scopeScwin = pageListComponent.scope_obj.getObj("scwin");
+
+                if (selectCurrentPage != 1 && selectCurrentPage <= outTotalCnt) {
+                    pageListComponent.setValue(selectCurrentPage);
+                } else {
+                    pageListComponent.setValue(1);
+                }
+
+                pageListComponent.unbind("onviewchange");
+                pageListComponent.bind("onviewchange", function (info) {
+                    $p.getComponentById(pageListComponent.getID() + "_page_" + info.newSelectedIndex)?.classList.remove("w2pageList_label_selected");
+
+                    let newSelectedIndex = info.newSelectedIndex;
+                    const oldSelectedIndex = info.oldSelectedIndex;
+
+                    const prevList = Math.ceil(oldSelectedIndex / pagingInfo.pageSize);
+                    const nowList = Math.ceil(newSelectedIndex / pagingInfo.pageSize);
+
+                    if (newSelectedIndex === 1 || (prevList === 1 && nowList === 1 && oldSelectedIndex > pagingInfo.pageSize)) {
+                        newSelectedIndex = 1;
+                    } else if ((prevList - 1) === nowList) {
+                        newSelectedIndex = newSelectedIndex - (pagingInfo.pageSize - 1);
+                    }
+
+                    const procFuncArr = pagingInfo.pageFunction.split(".");
+                    scopeScwin[procFuncArr[1]](newSelectedIndex, oldSelectedIndex);
+                });
+            } else {
+                // 페이지 리스트 미표시
+                pageListComponent.setValue(1);
+                pageListComponent.setCount(1, true);
+                pageListComponent.unbind("onclick");
+            }
+        });
+    }
+
+    return pagingInfo;
 };
 ]]></script>
 	</head>
