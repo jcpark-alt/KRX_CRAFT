@@ -105,7 +105,7 @@ Rough module focus (from filenames): `src/as-is/stf/` is the largest — securit
 ## Working in this repo
 
 - Edits are surgical changes to JavaScript **inside** CDATA blocks. Preserve the surrounding XML, the JSDoc format, and the file's existing naming generation (modern `$c`/`scwin.camelCase` in `src/gcc/`; match the legacy `fn_*`/`ins_*` style when editing `src/as-is/ins/`, `src/as-is/mgt/`, `src/as-is/stf/`, `src/as-is/fil/`).
-- When you add or rename a public function, update that file's `<w2:publicInfo method="...">` list — `npm run lint:xml` flags a declared-but-undefined method as **WS201**.
+- When you add or rename a public function, update that file's `<w2:publicInfo method="...">` list — `npm run lint:xml` flags a declared-but-undefined method as **WS201**. **For `src/gcc/` changes, also regenerate the API docs** with `npm run docs:gcc` — the committed `src/docs/api/gcc/index.html` is generated from `publicInfo` + JSDoc and goes stale otherwise (see [src/docs/gcc_api_docgen.md](src/docs/gcc_api_docgen.md)).
 - Comments, screen names, and descriptions are in **Korean**; keep new user-facing strings and doc text consistent with the file's language.
 - Do not introduce build/JS-module syntax (imports, bundler conventions) — these run as inline browser scripts under WebSquare, calling other screens only through the `$c` / `scwin` scopes.
 - After editing XML, run `npm run lint:xml` and keep **both halves at 0 warnings** (`src/gcc` strict, `src/as-is/ins|mgt|stf|fil` with the three conversion-gap rules ignored). A new warning there means a real, non-baseline issue — fix it rather than widening `--ignore`.
