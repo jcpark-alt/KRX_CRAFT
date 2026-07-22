@@ -18,6 +18,8 @@ A lint/test toolchain sits on top of the raw XML. All commands run from the repo
 
 > **Building a single-page HTML tool/doc under `src/docs/`?** Follow [src/docs/DESIGN.md](src/docs/DESIGN.md) — the shared design system (color tokens, typography, layout grid, components, interaction patterns) so tool pages keep a consistent look. Dependency-free, works from `file://`.
 
+> **Regenerating the gcc API docs (`src/docs/api/gcc/index.html`)?** Follow [src/docs/gcc_api_docgen.md](src/docs/gcc_api_docgen.md) — how `npm run docs:gcc` (the `wsxml_lint.docgen` pipeline) extracts `publicInfo`-listed `scwin.*` functions + their JSDoc and renders the single self-contained HTML. Never hand-edit the generated file.
+
 ### `wsxml_lint` — the primary check for this tree
 A Python/lxml linter under `tools/wsxml_lint/` that parses the WebSquare `.xml` pages directly (the only tool that actually inspects this project's source).
 
