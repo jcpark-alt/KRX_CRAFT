@@ -267,6 +267,25 @@
 * **미변환·리포트(대응 공통함수 없음)**: `Provider("/top")`(상위 프레임 — `$c.win` 에 top 헬퍼 없음), `Provider("../../")`(조부모), `Provider("../" + 변수)`(동적 경로), `Provider("../name")`(형제 프레임)는 1:1 공통함수가 없어 미변환하고 `judgment` 로 분리합니다(단계 2: `$p.top()` 등 네이티브 또는 헬퍼 추가 검토).
 * 코드 세그먼트(문자열/주석/정규식 제외)만 치환하며, 결과에 `.Provider(` 가 없으므로 **재변환 시 no-op(멱등)** 입니다. 매핑표는 [substitution_map.md](substitution_map.md) §6 참조.
 
+### 규칙 22: 검색 테이블 Enter 키 이벤트 자동 바인딩 (`tbl_search`/`tbl_Search` → `$c.win.setEnterKeyEvent`)
+
+* `<body>` XML 영역에 **id 가 `tbl_search` 또는 `tbl_Search` 인 WebSquare 컴포넌트가 존재하면**, `scwin.onpageload` 함수 본문에 아래 한 줄을 추가하여 해당 검색 영역에서 Enter 키 입력 시 조회 버튼 핸들러가 실행되도록 바인딩합니다.
+
+```javascript
+$c.win.setEnterKeyEvent(tbl_search, scwin.btn_Search_onclick);
+```
+
+* **변환 규약**:
+    1. **대상 판별**: `<body>` 를 스캔해 `id="tbl_search"` 또는 `id="tbl_Search"` 를 가진 컴포넌트(주로 `<w2:group>`/테이블 컨테이너)가 있는지 확인합니다. 없으면 이 규칙은 적용하지 않습니다.
+    2. **첫 인자 = 매칭된 id 원형**: `$c.win.setEnterKeyEvent(...)` 의 첫 인자로 **실제로 발견된 id**(대소문자 원형 그대로 — `tbl_search` 또는 `tbl_Search`)를 사용합니다.
+    3. **두 번째 인자 = 조회 버튼 핸들러**: `scwin.btn_Search_onclick` 을 지정합니다(검색 영역의 표준 조회 버튼 핸들러 — 규칙 3의 소문자 이벤트명 규약 `scwin.{컴포넌트명}_{이벤트명}` 준수).
+    4. **삽입 위치**: 규칙 4의 초기화 함수 영역인 `scwin.onpageload` 함수 **본문 내부**에 추가합니다(규칙 4에서 `scwin.gform_onload` 코드를 `scwin.onpageload` 로 이동·통합한 뒤이므로, 그 본문 말미에 배치). `scwin.onpageload` 가 없으면 규칙 4 규약에 따라 생성한 뒤 삽입합니다.
+* **유의사항**:
+    * 동일 파일에 `id="tbl_search"` 와 `id="tbl_Search"` 가 **동시에** 존재하면 각각에 대해 한 줄씩 추가합니다(중복 id 는 원래 비정상이므로 이 경우는 리포트).
+    * 이미 같은 `$c.win.setEnterKeyEvent(...)` 바인딩이 `scwin.onpageload` 에 존재하면 **중복 추가하지 않습니다**(재변환 시 no-op — 멱등).
+    * 두 번째 인자 핸들러명은 기본값 `scwin.btn_Search_onclick`(규칙 3 소문자 이벤트명 규약)을 사용하되, 해당 화면의 실제 조회 버튼 컴포넌트 id 가 다르면(예: `btn_search`·`btnSearch` → `scwin.btn_search_onclick` 등) **단계 2(Claude) 검토**로 실제 핸들러에 맞춥니다.
+    * 문자열/주석/정규식 리터럴 내부는 보호합니다(규칙 5 동일 원칙).
+
 ---
 
 ## 규칙 6 보충: Submission 변환 상세
