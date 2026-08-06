@@ -154,7 +154,7 @@ scwin.__setActionParam = function (sbmObj) {
 
         // DataMap에 저장된 데이터를 queryParam에 저장한다.
         for (let key in requestData) {
-            if (($c.util.isEmpty(requestData[key]) === false) && ($c.util.isJSON(requestData[key]) === false)) {
+            if (($c.util.isEmpty(requestData[key]) === false || requestData[key] === "") && ($c.util.isJSON(requestData[key]) === false)) {
                 queryParam[key] = encodeURIComponent(requestData[key]);
             } else if (($c.util.isJSON(requestData[key])) && ($c.util.isArray(requestData[key]) === false)) {
                 for (let subKey in requestData[key]) {
@@ -224,7 +224,7 @@ scwin.__callbackSubmitFunction = function (resObj, sbmObj) {
 
     // executeDynamic gridview : 통신 성공 시, refresh 대상 grid(들)를 자동 바인딩(__bindResponseToTargets) 호출 직전에 초기화(initGrid)한다.
     // gridview는 단일(컴포넌트 ID 문자열 또는 컴포넌트 객체)뿐 아니라 콤마(,)로 구분한 다중 ID 문자열("grd_main,grd_sub")도 지원한다.
-    // 각 grid는 접미사 옵션으로 실행을 제어한다 : "id|nofocus"(포커스 끔), "id|norefresh"(refresh/initGrid 끔). 기본은 refresh + 첫 셀 포커스 모두 실행.
+    // 각 grid는 접미사 옵션으로 실행을 제어한다 : "id|focus"(포커스), "id|refresh"(refresh/initGrid 끔), "id|nomessage"("조회된 데이터가 없습니다." 메시지 끔). 기본은 refresh, message 실행.
     // grid.refresh()는 target DataCollection의 setJSON 시(ondataload) 호출되도록 __bindResponseToTargets에서 바인딩한다.
     let gridViews = [];
     if ($c.util.isEmpty(resObj.errorType) && sbmObj._gridview) {
@@ -235,7 +235,7 @@ scwin.__callbackSubmitFunction = function (resObj, sbmObj) {
             if (!gv) { return null; }
             return { gv: gv, refresh: spec.refresh, focus: spec.focus, message: spec.message };
         }).filter(Boolean);
-        // refresh 대상 grid만 initGrid()로 초기화한다.(norefresh grid는 이 메커니즘이 건드리지 않음)
+        // refresh 대상 grid만 initGrid()로 초기화한다.(refresh grid는 이 메커니즘이 건드리지 않음)
         gridViews.forEach(function (entry) {
             if (entry.refresh && entry.gv && (typeof entry.gv.initGrid === "function")) {
                 entry.gv.initGrid();
@@ -273,10 +273,12 @@ scwin.__submitErrorHandler = function (resObj) {
     const $p = $c.win.__getScope(resObj.id).scwin.$w;
 	let resBody;
 	let resMsg ="";
-	try{
+	try {
 		resBody = JSON.parse(resObj.responseBody);
 		resMsg = resBody.message
-	}catch(e){console.log(e)}
+	} catch(e) {
+		console.log(e)
+	}
     let detailStr = "HTTP STATUS INFO";
     detailStr += resObj.responseReasonPhrase;
     detailStr += " ";
@@ -289,9 +291,9 @@ scwin.__submitErrorHandler = function (resObj) {
 
     const msgObj = {
         statusCode: "E",
-        errorCode: "E9998",
-        message: message,
-        messageDetail: detailStr                                                                                                                                                                                                                                                                                             
+        errorCode: resBody.errors.code ?? "",
+        message: message ?? "",
+        messageDetail: detailStr ?? ""                                                                                                                                                                                                                                                                         
     };
 
     $c.sbm.resultMsg(msgObj);
@@ -512,10 +514,10 @@ scwin.__normalizeRefTarget = function (options) {
  * @name __parseGridview
  * @description executeDynamic options.gridview 값을 grid별 디스크립터 { ref, refresh, focus } 배열로 파싱한다.
  *  ref는 컴포넌트 ID 문자열 또는 컴포넌트 객체. refresh/focus는 기본 true이며, 접미사 옵션으로 끈다.
- *  - 접미사 옵션 : "id|nofocus"(focus 끔), "id|norefresh"(refresh 끔). 한 grid에 여러 옵션은 "id|nofocus,norefresh".
+ *  - 접미사 옵션 : "id|focus"(focus), "id|refresh"(refresh 끔). 한 grid에 여러 옵션은 "id|focus,refresh".
  *  - 문자열에서 콤마(,)는 grid 구분자이자 옵션 구분자를 겸하므로 연속(continuation) 파싱한다.
- *    예약 키워드(nofocus/norefresh/nomessage) 단독 토큰은 직전 grid의 추가 옵션으로 이어붙인다.
- *    "grd_main|nofocus,norefresh,nomessage,grd_sub|norefresh" → grd_main{F,F,F}, grd_sub{refresh:F, focus:T}
+ *    예약 키워드(focus/refresh/nomessage) 단독 토큰은 직전 grid의 추가 옵션으로 이어붙인다.
+ *    "grd_main|focus,refresh,nomessage,grd_sub|refresh" → grd_main{F,F,F}, grd_sub{refresh:F, focus:T}
  *  - 배열은 각 요소가 자체 완결 토큰("id|opt,opt") 또는 컴포넌트 객체. 단일 컴포넌트 객체는 기본값으로 처리한다.
  * @param {String|Object|Array} gridviewRef options.gridview 값
  * @returns {Array} [{ ref:(String|Object), refresh:Boolean, focus:Boolean }]
@@ -523,11 +525,11 @@ scwin.__normalizeRefTarget = function (options) {
  * @exception
  */
 scwin.__parseGridview = function (gridviewRef) {
-    const makeEntry = function (ref) { return { ref: ref, refresh: true, focus: true, message: true  }; };
+    const makeEntry = function (ref) { return { ref: ref, refresh: true, focus: false, message: true  }; };
     const applyOpt = function (entry, opt) {
         opt = (opt || "").trim().toLowerCase();
-        if (opt === "nofocus") { entry.focus = false; }
-        else if (opt === "norefresh") { entry.refresh = false; }
+        if (opt === "focus") { entry.focus = true; }
+        else if (opt === "refresh") { entry.refresh = true; }
 		else if (opt === "nomessage") { entry.message = false; }
     };
     // 컴포넌트 객체(옵션 문법 없음) → 기본값
@@ -545,7 +547,7 @@ scwin.__parseGridview = function (gridviewRef) {
         }).filter(function (e) { return $c.util.isEmpty(e.ref) === false; });
     }
     // 문자열 : 콤마가 grid/옵션 구분자 겸용 → 연속(continuation) 파싱
-    const RESERVED = { nofocus: true, norefresh: true, nomessage: true };
+    const RESERVED = { focus: false, refresh: false, nomessage: true };
     const entries = [];
     gridviewRef.split(",").map(function (s) { return s.trim(); }).filter(Boolean).forEach(function (tok) {
         const isOptOnly = (tok.indexOf("|") < 0) && (RESERVED[tok.toLowerCase()] === true);
@@ -605,7 +607,7 @@ scwin.__bindResponseToTargets = function (sbmObj, rtn, targets, gridViews) {
                     const gvs = dc.__gridviewsToRefresh || [];
                     // 데이터가 있을 때만 첫 셀 포커스(setFocusedCell)를 적용한다.(빈 그리드 가드)
                     const hasRows = (typeof dc.getRowCount === "function") && (dc.getRowCount() > 0);
-                    // grid별 refresh/focus/message 플래그를 각각 독립 적용한다.(norefresh→refresh 생략, nofocus→포커스 생략, nomessage→message 생략)
+                    // grid별 refresh/focus/message 플래그를 각각 독립 적용한다.(focus→포커스, refresh→refresh 함수호출, nomessage→message 생략)
                     gvs.forEach(function (entry) {
                         if (!entry.gv) { return; }
                         if (entry.refresh && (typeof entry.gv.refresh === "function")) {
@@ -673,9 +675,9 @@ scwin.__bindResponseToTargets = function (sbmObj, rtn, targets, gridViews) {
  *  붙이면 기존 데이터를 유지하며 추가한다(setJSON(data, true)). "data:" 로 시작하는 기존 표현식을 그대로 넘기면 엔진이 직접 바인딩한다.
  *  자세한 규칙은 scwin.__normalizeRefTarget / scwin.__bindResponseToTargets 참고.
  *  options.gridview 를 지정하면 통신 성공 시 refresh 대상 grid에 grid.initGrid()를 호출하고, target DataCollection의 데이터 로드(ondataload) 시 grid.refresh()와 첫 셀 포커스(setFocusedCell(0,0)), 조회된 데이터없음(alert)를 수행한다.
- *  gridview는 콤마(,)로 구분한 다중 ID 문자열("grd_main,grd_sub")을 지원한다. grid별 접미사 옵션으로 실행을 제어한다 : "id|nofocus"(포커스 끔), "id|norefresh"(refresh/initGrid 끔), "id|nofocus,norefresh"(둘 다 끔), "id|nofocus,norefresh,message"(셋 다 끔). 옵션 미지정 시 refresh + 첫 셀 + message 포커스 모두 실행한다.
+ *  gridview는 콤마(,)로 구분한 다중 ID 문자열("grd_main,grd_sub")을 지원한다. grid별 접미사 옵션으로 실행을 제어한다 : "id|focus"(포커스), "id|refresh"(refresh/initGrid 끔), "id|focus,refresh"(포커스+refresh호출), "id|focus,refresh,message"(셋 다 옵션실행). 옵션 미지정 시 refresh + fous미지정 + message 모두 실행한다.
  * @param {Object} options $c.sbm.create의 options 참고
- * @param {String|Object} options.gridview [Default : null] 통신 성공 시 처리할 gridView. 컴포넌트 ID 문자열(콤마로 구분한 다중 ID 가능, grid별 "|nofocus"/"|norefresh"/"|nomessage" 접미사 옵션 지원) 또는 컴포넌트 객체. 기본은 refresh 대상 grid initGrid() 호출, target DataCollection의 ondataload 시 refresh() + setFocusedCell(0,0) + alert() 호출.
+ * @param {String|Object} options.gridview [Default : null] 통신 성공 시 처리할 gridView. 컴포넌트 ID 문자열(콤마로 구분한 다중 ID 가능, grid별 "|focus"/"|refresh"/"|nomessage" 접미사 옵션 지원) 또는 컴포넌트 객체. 기본은 refresh 대상 grid initGrid() 호출, target DataCollection의 ondataload 시 refresh() + setFocusedCell(0,0) + alert() 호출.
  * @param {Object} requestData 요청 데이터
  * @param {Object} obj 전송중 disable시킬 컴퍼넌트
  * @param {Object} execOptions [Default : null] 중복 실행 제어 옵션. $c.sbm.execute의 options 참고(allowDuplicate / onDuplicate).
@@ -715,13 +717,13 @@ const sbmOptions = {
 $c.sbm.executeDynamic(sbmOptions);
 
 // gridview 접미사 옵션 : grid별로 refresh()/setFocusedCell(0,0) 실행을 제어한다. (기본은 둘 다 실행)
-// "id|nofocus"(포커스 끔), "id|norefresh"(refresh/initGrid 끔), "id|nofocus,norefresh"(둘 다 끔), "id|nofocus,norefresh,nomessage"(셋 다 끔)
+// "id|focus"(포커스), "id|refresh"(refresh/initGrid 끔), "id|focus,refresh"(focus, refresh 끔), "id|focus,refresh,nomessage"(셋 다 옵션실행)
 const sbmOptions = {
      id : "sbm_SelectTempDynamic",
      action : "/sample/tempSelect",
      ref : "dma_search",
      target : "dlt_commonGrp,dlt_commonCode",
-     gridview : "grd_main,grd_sub1|nofocus,grd_sub2|nofocus", // grd_main : refresh + 포커스, grd_sub1 : refresh만(포커스 생략), grd_sub2 : message만(message 생략)
+     gridview : "grd_main,grd_sub1|focus,grd_sub2|focus", // grd_main : refresh + 포커스, grd_sub1 : refresh만(포커스 생략), grd_sub2 : message만(message 생략)
      isProcessMsg : false };
 $c.sbm.executeDynamic(sbmOptions);
 
@@ -781,7 +783,12 @@ scwin.executeDynamic = function (options, requestData, obj, execOptions) {
         $c.sbm.create(options);
         submissionObj = $c.util.getComponent(options.id);
     } else {
-        $p.deleteSubmission(options.id);
+		const sbmObj = $p.getSubmission(options.id);
+		if (sbmObj !== null) {
+        	$p.deleteSubmission(options.id);
+		} else {
+			WebSquare.ModelUtil.getSubmission(options.id);
+		}
         $c.sbm.create(options);
         submissionObj = $c.util.getComponent(options.id);
     }
@@ -795,7 +802,7 @@ scwin.executeDynamic = function (options, requestData, obj, execOptions) {
     // gridview가 지정되면 submission 객체에 부착한다.
     // 통신 성공 시 공통 콜백에서 refresh 대상 grid에 grid.initGrid()를 호출하고,
     // target DataCollection의 ondataload 이벤트에서 grid.refresh()/setFocusedCell()이 호출되도록 한다.
-    // grid별 접미사 옵션(|nofocus, |norefresh, |nomessage)으로 실행을 제어한다. (컴포넌트 ID 문자열 또는 컴포넌트 객체)
+    // grid별 접미사 옵션(|focus, |refresh, |nomessage)으로 실행을 제어한다. (컴포넌트 ID 문자열 또는 컴포넌트 객체)
     if (options.gridview && (submissionObj !== null)) {
         submissionObj._gridview = options.gridview;
     }
@@ -949,8 +956,10 @@ scwin.getStatusMessage = function (e) {
  * @name resultMsg
  * @description statusCode값에 따라 message를 출력한다.
  * @param {Object} resultData 상태코드값 및 메시지가 담긴 JSON.
- * @param {String} resultData.message 메시지
  * @param {String} resultData.statusCode 상태코드값
+ * @param {String} resultData.errorCode 오류코드값
+ * @param {String} resultData.message 메시지
+ * @param {String} resultData.messageDetail 메시지 상세 내용
  * @hidden N
  * @exception 
  */
@@ -959,15 +968,24 @@ scwin.resultMsg = function (resultData) {
         return;
     }
 
-    const message = resultData.message || resultData.statusMsg || "";
+    const message = resultData.message || resultData.messageDetail || "";
     const msgCode = scwin.MESSAGE_CODE;
 
     switch (resultData.statusCode) {
         case msgCode.STATUS_ERROR:
-            if (resultData.errorCode == "E0001") {
-                const alertMsg = $c.data.getMessage("MSG_CM_00003", message);
-                $c.win.alert(alertMsg, function () { $c.win.reload(); });
-            } else if ($c.util.isEmpty(message) === false) {
+            if (resultData.errorCode === "SESSION_EXPIRED") {
+				if (!$c.util.isEmpty($c.session.getUserInfo("usrId"))) {
+					const alertMsg = $c.data.getMessage("com_complete_0056"); // "세션이 종료되었습니다. 다시 로그인해 주세요."
+					$c.win.alert(alertMsg, function () { 
+						// 로그인 페이지로 이동
+						$c.session.goLogin();
+					});
+				} else {
+					break;
+				}
+            } else if (resultData.errorCode === "UNAUTHENTICATED") {
+				break;
+			} else if ($c.util.isEmpty(message) === false) {
                 $c.win.alert(message);
             }
             break;

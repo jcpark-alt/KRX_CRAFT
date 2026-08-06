@@ -15,7 +15,7 @@ xmlns:xf="http://www.w3.org/2002/xforms">
 		</xf:model>
 		<w2:layoutInfo>
 		</w2:layoutInfo>
-		<w2:publicInfo method="scwin.addMinute,scwin.addHour,scwin.addDate,scwin.addMonth,scwin.addYear,scwin.getServerDateTime,scwin.formatDate,scwin.formatTime,scwin.formatDateTime,scwin.validateTime,scwin.isDate,scwin.diffDate,scwin.diffTime,scwin.isLeafYear,scwin.isBirth,scwin.getDay,scwin.getLunar,scwin.getLastDateOfMonth,scwin.fromYmd,scwin.validatDate,scwin.validatYearMonth,scwin.addMonthCal,scwin.addYmd,scwin.dateFormat,scwin.dateUnFormat,scwin.getDateInterval,scwin.dateCompare,scwin.getWeekStartEndDay,scwin.compareFromToDate"/>
+		<w2:publicInfo method="scwin.addMinute,scwin.addHour,scwin.addDate,scwin.addMonth,scwin.getServerDateTime,scwin.formatDate,scwin.formatTime,scwin.formatDateTime,scwin.isDate,scwin.diffDate,scwin.isLeafYear,scwin.getDay,scwin.getLunar,scwin.getLastDateOfMonth,scwin.addYear,scwin.validateTime,scwin.diffTime,scwin.isBirth,scwin.fromYmd,scwin.validatDate,scwin.validatYearMonth,scwin.addMonthCal,scwin.addYmd,scwin.dateFormat,scwin.dateUnFormat,scwin.getDateInterval,scwin.dateCompare,scwin.getWeekStartEndDay,scwin.compareFromToDate,scwin.checkCalendarFormat"/>
 		<script lazy="false" type="text/javascript"><![CDATA[
 scwin.onpageload = function () {
 
@@ -197,11 +197,7 @@ $c.date.formatDate(20120319);
 // return 예시) 2012년 03월 19일
  */
 scwin.formatDate = function (str, type) {
-    if (typeof ($p) == 'string') {
-        type = str;
-        str = $p;
-        return scwin.__formatDate(str, type);
-    }
+    if ($c.util.isEmpty(str)) return "";
     return scwin.__formatDate(str, type);
 };
 
@@ -906,13 +902,94 @@ scwin.getWeekStartEndDay = function (dateVal) {
 
 /**
  * @method
+ * @name __checkDateFormat
+ * @description 날짜 문자열이 지정 포맷과 일치하고 실제 존재하는 유효한 날짜인지 검증한다.
+ * (연 4자리, 월 2자리, 일 2자리 기준. 구분자 위치·숫자 여부·월/일 실존 여부를 검사)
+ * checkCalendarFormat / compareFromToDate 가 공유하는 내부 검증 로직이다.
+ * @param {String} value 검증할 날짜 문자열
+ * @param {String} dateFormat 검증 포맷 (예: "yyyyMMdd", "yyyy-MM-dd", "yyyy/MM/dd", "yyyy.MM.dd")
+ * @returns {Boolean} 포맷·유효성 만족 여부
+ * @hidden Y
+ * @exception
+ * @example
+ */
+scwin.__checkDateFormat = function (value, dateFormat) {
+    value = String(value);
+
+    if ($c.util.isEmpty(dateFormat) || typeof dateFormat !== "string") {
+        return false;
+    }
+
+    // 빈 값이면 실패 처리 — 필수 여부는 업무 규칙에 따라 별도 판단
+    if ($c.util.isEmpty(value.trim())) {
+        return false;
+    }
+
+    // 길이 검증 (포맷 길이와 값 길이 일치)
+    if (value.length !== dateFormat.length) {
+        return false;
+    }
+
+    // 위치별 검증 (구분자 위치는 동일 문자, y/M/d 위치는 숫자) 및 연/월/일 추출
+    let yearStr = "", monthStr = "", dayStr = "";
+    for (let i = 0; i < dateFormat.length; i++) {
+        const fmtChar = dateFormat.charAt(i);
+        const valChar = value.charAt(i);
+
+        if (fmtChar === "y") {
+            yearStr += valChar;
+        } else if (fmtChar === "M") {
+            monthStr += valChar;
+        } else if (fmtChar === "d") {
+            dayStr += valChar;
+        } else {
+            // 구분자 위치 : 포맷과 값이 동일해야 함
+            if (fmtChar !== valChar) {
+                return false;
+            }
+            continue;
+        }
+
+        // y/M/d 위치 : 숫자만 허용
+        if (valChar === " " || isNaN(valChar)) {
+            return false;
+        }
+    }
+
+    // 자릿수 검증 (연 4자리, 월 2자리, 일 2자리)
+    if (yearStr.length !== 4 || monthStr.length !== 2 || dayStr.length !== 2) {
+        return false;
+    }
+
+    const year = parseInt(yearStr, 10);
+    const month = parseInt(monthStr, 10);
+    const day = parseInt(dayStr, 10);
+
+    // 월 범위 검증
+    if (month < 1 || month > 12) {
+        return false;
+    }
+
+    // 실존 날짜 검증 (예: 2026-02-31 방지)
+    const dateObj = new Date(year, month - 1, day);
+    if (dateObj.getFullYear() !== year || dateObj.getMonth() + 1 !== month || dateObj.getDate() !== day) {
+        return false;
+    }
+
+    return true;
+};
+
+/**
+ * @method
  * @name compareFromToDate
  * @description 시작일·종료일 inputCalendar 컴포넌트의 기간 유효성을 검증하고 위반 시 안내 후 날짜를 동기화한다.
  * 시작일 변경(onviewchange) 시 시작일 > 종료일이면 안내 후 시작일을 종료일로 원복한다.
  * 종료일 변경(onviewchange) 시 종료일 < 시작일이면 안내 후 종료일을 시작일로 원복한다.
+ * dateFormat 을 지정하면 변경된 값이 해당 포맷·실존 날짜인지 먼저 검증하고, 불일치 시 안내 후 기간 비교를 건너뛴다.
  * @param {Object} calStartDate 시작일 inputCalendar 컴포넌트 객체
  * @param {Object} calEndDate 종료일 inputCalendar 컴포넌트 객체
  * @param {Array} msgOptions 메시지 치환 명칭 배열 [시작일 명칭, 종료일 명칭] (기본값 ["검색시작일", "검색종료일"])
+ * @param {String} dateFormat 날짜 포맷 검증값 (예: "yyyyMMdd", "yyyy-MM-dd"). 생략 시 포맷 검증 미수행.
  * @returns {void}
  * @hidden N
  * @exception
@@ -921,8 +998,10 @@ scwin.getWeekStartEndDay = function (dateVal) {
 $c.date.compareFromToDate(cal_start1, cal_end1);
 // 사용자 정의 명칭 지정
 $c.date.compareFromToDate(cal_start2, cal_end2, ["조회 시작일자", "조회 종료일자"]);
+// 날짜 포맷 검증 추가
+$c.date.compareFromToDate(cal_start3, cal_end3, ["조회 시작일자", "조회 종료일자"], "yyyy-MM-dd");
  */
-scwin.compareFromToDate = function (calStartDate, calEndDate, msgOptions) {
+scwin.compareFromToDate = function (calStartDate, calEndDate, msgOptions, dateFormat) {
     if ($c.util.isEmpty(calStartDate) || $c.util.isEmpty(calEndDate)) {
         console.error("[compareFromToDate] 필수 인자(calStartDate, calEndDate)가 누락되었습니다.");
         return;
@@ -939,27 +1018,94 @@ scwin.compareFromToDate = function (calStartDate, calEndDate, msgOptions) {
         return label + ($c.str.isFinalConsonant(String(label)) ? "을" : "를");
     };
 
+    // dateFormat 지정 시 : 값이 포맷·실존 날짜가 아니면 안내하고 true 반환(비교 건너뜀 신호).
+    const isFormatInvalid = async function (value) {
+        if ($c.util.isEmpty(dateFormat) || $c.util.isEmpty(value)) {
+            return false;
+        }
+        if (!scwin.__checkDateFormat(value, dateFormat)) {
+            await $c.win.alert(dateFormat + " 형식의 올바른 날짜를 입력하세요.");
+            return true;
+        }
+        return false;
+    };
+
     // 시작일 변경 시 : 시작일 > 종료일이면 안내 후 시작일을 종료일로 원복한다.
     calStartDate.unbind("onviewchange");
-    calStartDate.bind("onviewchange", function () {
+    calStartDate.bind("onviewchange", async function (info) {
         const startVal = calStartDate.getValue();
         const endVal = calEndDate.getValue();
+		if (await isFormatInvalid(startVal)) {
+			calStartDate.focus();
+            return;
+        }
         if (!$c.util.isEmpty(startVal) && !$c.util.isEmpty(endVal) && startVal > endVal) {
-            $c.win.alert(withJosa(startLabel) + " " + endLabel + " 이전으로 선택하세요.");
+			console.log("calStartDate.setUserData();");
+			calStartDate.setUserData("onkeyup", false);
+            await $c.win.alert(withJosa(startLabel) + " " + endLabel + " 이전으로 선택하세요.");
             calStartDate.setValue(endVal);
+			calStartDate.setUserData("onkeyup", true);
         }
     });
 
     // 종료일 변경 시 : 종료일 < 시작일이면 안내 후 종료일을 시작일로 원복한다.
     calEndDate.unbind("onviewchange");
-    calEndDate.bind("onviewchange", function () {
+    calEndDate.bind("onviewchange", async function (info) {
         const startVal = calStartDate.getValue();
         const endVal = calEndDate.getValue();
+        if (await isFormatInvalid(endVal)) {
+			calEndDate.focus();
+            return;
+        }		
         if (!$c.util.isEmpty(startVal) && !$c.util.isEmpty(endVal) && endVal < startVal) {
-            $c.win.alert(withJosa(endLabel) + " " + startLabel + " 이후로 선택하세요.");
+			calEndDate.setUserData("onkeyup", false);
+            await $c.win.alert(withJosa(endLabel) + " " + startLabel + " 이후로 선택하세요.");
             calEndDate.setValue(startVal);
+			calEndDate.setUserData("onkeyup", true);
+        }
+    });	
+};
+
+/**
+ * @method
+ * @name checkCalendarFormat
+ * @description inputCalendar 컴포넌트의 입력값이 지정한 포맷과 일치하고 실제 존재하는 유효한 날짜인지 검증한다.
+ * (연 4자리, 월 2자리, 일 2자리 기준. 구분자 위치·숫자 여부·월/일 실존 여부를 검사)
+ * @param {Object|String} calendarObj inputCalendar 컴포넌트 객체 또는 컴포넌트 ID
+ * @param {String} dateFormat 검증할 날짜 포맷 (예: "yyyyMMdd", "yyyy-MM-dd", "yyyy/MM/dd", "yyyy.MM.dd")
+ * @returns {Boolean} 포맷·유효성 만족 여부 (true: 정상, false: 오류)
+ * @hidden N
+ * @exception
+ * @example
+$c.date.checkCalendarFormat(ica_startDate, "yyyy-MM-dd"); // 컴포넌트 객체 전달
+$c.date.checkCalendarFormat("ica_endDate", "yyyyMMdd");   // 컴포넌트 ID 전달
+ */
+scwin.checkCalendarFormat = function (calendarObj, dateFormat) {
+    // 1. 컴포넌트 객체 확보 및 유효성 검사
+    const comp = (typeof calendarObj === "string") ? $p.getComponentById(calendarObj) : calendarObj;
+    if ($c.util.isEmpty(comp) || typeof comp.getValue !== "function") {
+        console.error("[checkCalendarFormat] 올바른 inputCalendar 객체나 ID를 전달해야 합니다.");
+        return false;
+    }
+    if ($c.util.isEmpty(dateFormat) || typeof dateFormat !== "string") {
+        console.error("[checkCalendarFormat] dateFormat 문자열이 필요합니다.");
+        return false;
+    }
+
+    // 입력값이 포맷과 일치하고 실제 존재하는 유효한 날짜인지 검증한다. (공통 검증 로직 재사용)
+    const isValidFormat = function () {
+        return scwin.__checkDateFormat(comp.getValue(), dateFormat);
+    };
+
+    // compareFromToDate 와 같이 onviewchange 이벤트에서 검증 실패 시 $c.win.alert 로 안내한다.
+    comp.unbind("onviewchange");
+    comp.bind("onviewchange", function () {
+        if (!isValidFormat()) {
+            $c.win.alert(dateFormat + " 형식의 올바른 날짜를 입력하세요.");
         }
     });
+
+    return isValidFormat();
 };]]></script>
 	</head>
 	<body ev:onpageload="scwin.onpageload"/>

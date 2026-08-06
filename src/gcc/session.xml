@@ -17,7 +17,7 @@ xmlns:xf="http://www.w3.org/2002/xforms">
 		</w2:mfeSubmission>
 		<w2:layoutInfo>
 		</w2:layoutInfo>
-		<w2:publicInfo method="scwin.sessionCheck,scwin.getExcelDownPath,scwin.getUserInfo,scwin.setUserInfo,scwin.isLogin,scwin.goLogin,scwin.goIndex,scwin.goLogout"/>
+		<w2:publicInfo method="scwin.sessionCheck,scwin.getExcelDownPath,scwin.getUserInfo,scwin.setUserInfo,scwin.removeUserInfo,scwin.isLogin,scwin.goLogin,scwin.goIndex,scwin.goLogout"/>
 		<script type="text/javascript" lazy="false"><![CDATA[
 scwin.onpageload = async function() {
     console.log("session", "onpageload");
@@ -50,8 +50,6 @@ scwin.g_real_rcv_url = "https://rcv.krx.co.kr";
 scwin.g_dev_manager_url = "https://dev-manager.krx.co.kr";
 scwin.g_test_manager_url = "https://test-manager.krx.co.kr";
 scwin.g_real_manager_url = "https://manager.krx.co.kr";
-
-scwin.url = "/api/common/user-info";
 
 /**
  * @method
@@ -124,31 +122,46 @@ scwin.getUserInfo = function(param) {
  */
 scwin.setUserInfo = async function() {
     try {
-        let res = await fetch(scwin.url, { method: "GET" });
-        let rslt = await res.json();
+		const userInfoOption = {
+			id : "sbmUserInfo",
+			action : "/api/common/user-info",
+			method : "GET",
+			mediatype: "application/json",
+			isProcessMsg : false
+		};
 
-        if (!res.ok) {
-            if (!rslt.success) {
-                if (rslt.message.indexOf("인증이") > -1) {
-                    console.log("로그인으로 갑니다.");
-                    //$c.session.goLogin();
-                } else {
-                    console.log("다른 에러", rslt);
-                }
-            }
-            return false;
-        }
+		let userInfo = await $c.sbm.executeDynamic(userInfoOption);
+		const userInfoJson = userInfo.responseJSON;
 
-        if (rslt && rslt.success && rslt.body) {
-            // 서버가 내려준 사용자 정보(JSON)를 그대로 보관한다.
-            scwin.userInfo = rslt.body;
-            return true;
-        }
-        return false;
+		if (userInfoJson.success === true) {
+			if (userInfoJson && userInfoJson.body) {
+				// 서버가 내려준 사용자 정보(JSON)를 그대로 보관한다.
+				scwin.userInfo = userInfoJson.body;
+				return true;
+			} else {
+				return false;
+			}
+		} else {
+			return false;
+		}
     } catch (e) {
         console.log("사용자 정보 조회 실패", e);
         return false;
     }
+};
+
+/**
+ * @method
+ * @name removeUserInfo
+ * @description 사용자 정보(scwin.userInfo) 데이터를 초기화합니다.
+ * @hidden N
+ * @exception
+ * @example
+ *
+ *  $c.session.removeUserInfo();
+ */
+scwin.removeUserInfo = function() {
+	scwin.userInfo = {};
 };
 
 /**
@@ -252,8 +265,22 @@ scwin.goIndex = async function(isFirst = false) {
  *
  */
 scwin.goLogout = async function() {
-	scwin.userInfo = {};
-    await $p.main().pfm_main.setSrc(`/cm/main/${WebSquareExternal.contextPath}/login.xml`);
+	try {
+		// 사용자 데이터 초기화
+		$c.session.removeUserInfo();
+
+		const sbmOptions = {
+			id : "sbmLogout",
+			action : "/api/common/auth/logout-processing",
+			method : "POST",
+			isProcessMsg : false
+		};
+
+		await $c.sbm.executeDynamic(sbmOptions);
+	} finally {
+    	await $p.main().pfm_main.setSrc(`/cm/main/${WebSquareExternal.contextPath}/login.xml`);
+		//document.location.href = "/index.html";
+	}
 };]]></script>
 	</head>
 	<body ev:onpageload="scwin.onpageload">
