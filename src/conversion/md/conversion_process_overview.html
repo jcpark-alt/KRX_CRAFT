@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WebSquare 변환 프로세스 설명서 (구조도 포함)</title>
+<style>
+:root{
+  --bg:#f0f4f8; --card:#ffffff; --text:#1f2933; --h-strong:#243b53; --h-mid:#486581;
+  --muted:#627d98; --border:#e4e7eb; --border-input:#cbd2d9;
+  --primary:#2563eb; --primary-soft:#eef2f7; --code-bg:#f7f9fc;
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);line-height:1.6;font-size:13px;
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Malgun Gothic',sans-serif;}
+.wrap{max-width:1100px;margin:0 auto;padding:24px 20px 48px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:32px 40px;}
+h1{font-size:22px;color:var(--h-strong);margin:0 0 12px;padding-bottom:12px;border-bottom:2px solid var(--primary);}
+h2{font-size:17px;color:var(--h-strong);margin:2em 0 .6em;padding-bottom:.3em;border-bottom:1px solid var(--border);}
+h3{font-size:14px;color:var(--h-mid);margin:1.6em 0 .5em;}
+p{margin:.5em 0 1em;}
+a{color:var(--primary);text-decoration:none;}
+a:hover{text-decoration:underline;}
+strong{color:var(--h-strong);}
+code{font-family:Consolas,'D2Coding',monospace;font-size:12px;background:var(--primary-soft);
+  color:var(--h-strong);padding:.15em .4em;border-radius:5px;}
+pre{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:14px 16px;
+  overflow-x:auto;margin:.8em 0 1.2em;}
+pre code{background:none;padding:0;font-size:12.5px;line-height:1.5;white-space:pre;color:var(--text);}
+table{border-collapse:collapse;margin:.8em 0 1.2em;width:100%;}
+th,td{border:1px solid var(--border);padding:7px 12px;text-align:left;vertical-align:top;}
+th{background:var(--primary-soft);color:var(--h-strong);font-size:12px;}
+tr:nth-child(2n) td{background:var(--code-bg);}
+blockquote{border-left:3px solid var(--primary);background:var(--code-bg);
+  margin:.8em 0 1.2em;padding:10px 16px;border-radius:0 8px 8px 0;color:var(--muted);}
+blockquote p{margin:.3em 0;}
+blockquote table{width:auto;}
+hr{border:none;border-top:1px solid var(--border);margin:28px 0;}
+ul,ol{margin:.4em 0 1em;padding-left:1.6em;}
+li{margin:.25em 0;}
+@media (max-width:860px){.card{padding:20px 16px;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="card">
+<h1>WebSquare 변환 프로세스 설명서 (구조도 포함)</h1>
+<p>W-Craft 로 1차 변환된 레거시 WebSquare XML(Gauce/X-Internet 유래)을 **GCC 공통함수 체계(<code>$c.*</code>)와 표준 JS 규칙**으로 자동 변환하는 전체 프로세스를 한눈에 설명하는 문서입니다.</p>
+<blockquote>
+<p>이 문서는 <strong>개요·구조도</strong> 문서입니다. 규칙·매핑·도구의 세부는 아래 문서를 참조하세요.</p>
+<table><thead><tr><th>문서</th><th>내용</th></tr></thead><tbody><tr><td><a href="websquare_conversion_guide.md">websquare_conversion_guide.md</a></td><td>변환 목표·규칙 인덱스</td></tr><tr><td><a href="conversion_pipeline.md">conversion_pipeline.md</a></td><td>2단계 하이브리드 파이프라인 본문(규칙별 Python 처리 방식)</td></tr><tr><td><a href="conversion_rules.md">conversion_rules.md</a></td><td>규칙 1~22 상세 정의</td></tr><tr><td><a href="substitution_map.md">substitution_map.md</a></td><td>레거시 → gcc 치환 매핑표</td></tr><tr><td><a href="dynamic_submission_guide.md">dynamic_submission_guide.md</a></td><td>규칙 12 동적 Submission 상세</td></tr><tr><td><a href="createdialogframe_popup_guide.md">createdialogframe_popup_guide.md</a></td><td>규칙 17 팝업 변환 상세</td></tr><tr><td><a href="stage2_todo_worklist.md">stage2_todo_worklist.md</a></td><td>단계 2 잔여 TODO 집계</td></tr></tbody></table>
+</blockquote>
+<hr>
+<h2>1. 한눈에 보는 전체 흐름</h2>
+<pre><code>┌──────────────────────────────────────────────────────────────────────────┐
+│                     W-Craft 변환 프로세스 (End-to-End)                     │
+└──────────────────────────────────────────────────────────────────────────┘
+
+   [ 원본 ]              [ 단계 0 ]           [ 단계 1 ]              [ 단계 2 ]           [ 산출물 ]
+  Gauce/X-Internet   →   W-Craft 변환   →   Python 기계 치환   →   Claude Code 보강   →   운영 반영
+   레거시 화면             (외부 도구)         (결정적/일괄)          (판단/재설계)         WebSquare 화면
+
+        │                     │                    │                       │                   │
+        ▼                     ▼                    ▼                       ▼                   ▼
+   구 플랫폼 소스        ui/*.xml            ui-tobe/*.xml           ui-tobe/*.xml        src/as-is/**
+   (본 저장소 밖)      (1차 변환 결과)      + 미처리 리포트          (규칙 검증 완료)     (배포 대상 트리)</code></pre>
+<ul><li><strong>단계 0 (W-Craft, 외부 도구)</strong> — 구 플랫폼(Gauce/X-Internet) 화면을 WebSquare XML 골격으로 1차 변환. 결과물은 <code>ui/</code> 에 놓이며, 스크립트 최상단에 <code>/* ★Wcraft guide★ 스크립트 수작업 유의사항 */</code> 마커가 붙어 <strong>수작업 검토 대상</strong>임을 표시합니다. 이 저장소는 이 단계의 <strong>출력물부터</strong> 다룹니다.</li>
+<li><strong>단계 1 (Python)</strong> — <code>ui/</code> 를 입력받아 판단이 필요 없는 결정적 규칙(1~22)을 일괄 적용해 <code>ui-tobe/</code> 를 생성하고, 자동 치환하지 못한 항목을 <strong>리포트</strong>로 분리합니다.</li>
+<li><strong>단계 2 (Claude Code)</strong> — 리포트의 검토/대체 항목, 원시 JSP/jQuery 재설계, 통신 콜백 로직 등 <strong>판단이 필요한 부분만</strong> 보강하고 <code>npm run lint:xml</code> 로 검증합니다.</li></ul>
+<hr>
+<h2>2. 시스템 구조도 (디렉터리 · 도구 · 단일 출처)</h2>
+<pre><code>src/conversion/
+│
+├── md/                              ← 프로세스·규칙 문서 (본 문서 포함)
+│   ├── conversion_process_overview.md   (본 문서)
+│   ├── websquare_conversion_guide.md    (규칙 인덱스)
+│   ├── conversion_pipeline.md           (2단계 파이프라인 본문)
+│   ├── conversion_rules.md              (규칙 1~22 상세)
+│   ├── substitution_map.md              (치환 매핑표)
+│   ├── dynamic_submission_guide.md      (규칙 12)
+│   ├── createdialogframe_popup_guide.md (규칙 17)
+│   └── stage2_todo_worklist.md          (단계 2 TODO)
+│
+├── tools/                           ← 변환 엔진 (Python, 무의존성 stdlib)
+│   ├── convert.py       ── 단계 1 핵심 변환기(영역 분리 + 규칙 1~22 + 리포트)
+│   ├── convert_all.py   ── 배치 드라이버(모듈 순회 · 멱등성/well-formed 검증 · 집계)
+│   └── gcc_mapping.py   ── 치환 매핑 로더(SOT 파싱)
+│
+└── next-krx-lds-{fil,mgt,stf,tms}-front/   ← 모듈별 변환 작업 공간
+    ├── ui/          ← 입력: W-Craft 1차 변환 원본 (단계 0 산출)
+    └── ui-tobe/     ← 출력: 단계 1 기계 치환본 → 단계 2 보강본
+
+         [ 단일 출처(SOT) — 도구가 참조 ]
+         ├── src/docs/api/{fil,ins,mgt}/index_transfer.html  → gcc_mapping.substitution_dict()
+         ├── src/as-is/{fil,ins,mgt,stf}/gcc/*.xml (JSDoc)    → gcc_mapping.module_fn_dict()
+         └── src/docs/api/gcc/index.html                       → 치환 함수 시그니처 확인(단계 2)</code></pre>
+<p><strong>대상 모듈 4종</strong></p>
+<table><thead><tr><th>모듈</th><th>작업 공간</th><th>업무 영역</th></tr></thead><tbody><tr><td><strong>fil</strong></td><td><code>next-krx-lds-fil-front</code></td><td>파일링(ELW/ETN/디지털/예비상장), <code>bnf</code>(채권) · <code>inf</code>(발행사/코드설정) 하위 트리</td></tr><tr><td><strong>mgt</strong></td><td><code>next-krx-lds-mgt-front</code></td><td>상장·파일링 관리 화면</td></tr><tr><td><strong>stf</strong></td><td><code>next-krx-lds-stf-front</code></td><td>증권/상장 플로우(신규상장·ETN/ELW/채권/디지털 접수) — 최대 모듈</td></tr><tr><td><strong>tms</strong></td><td><code>next-krx-lds-tms-front</code></td><td>TMS 화면</td></tr></tbody></table>
+<hr>
+<h2>3. 단계 1 상세 — 영역 분리 후 규칙 적용</h2>
+<p>WebSquare XML 은 <code>head → script(CDATA) → body</code> 구조이며, 영역마다 변환 성격이 달라 <strong>먼저 3영역으로 분리한 뒤 영역별 변환기</strong>를 적용합니다.</p>
+<pre><code>                     ┌─────────────────────────────────────────────┐
+   ui/화면.xml  ───▶ │  영역 분리 (정규식/문자열 인덱스 · 결정적)   │
+                     └─────────────────────────────────────────────┘
+                        │                │                │
+              ┌─────────┘        ┌───────┘        └────────┐
+              ▼                  ▼                         ▼
+      ┌──────────────┐   ┌──────────────┐         ┌──────────────┐
+      │  HEAD (xml)  │   │ SCRIPT (js)  │         │  BODY (xml)  │
+      │ meta_* /     │   │ CDATA 내부   │         │ UI 마크업 +  │
+      │ dataCollection│  │ 전역·함수 JS │         │ ev:on* 속성  │
+      │ submission   │   │              │         │              │
+      └──────┬───────┘   └──────┬───────┘         └──────┬───────┘
+             │ 규칙 6           │ 규칙 1·2·4·5·7·8·9      │ 규칙 3·10
+             │                  │ 11·12·13·14·16·17       │ (핸들러명 동기화,
+             │                  │ 20·20b·21               │  이벤트요소 삭제)
+             └──────────┬───────┴─────────────────────────┘
+                        ▼
+              ┌───────────────────────┐
+              │  규칙 1~22 결정적 치환 │  ← 문자열/주석/정규식 리터럴 보호
+              │  (판단 불필요 1:1)     │  ← 단어경계 매칭 · 멱등성 보장
+              └───────────┬───────────┘
+                          ▼
+              ┌───────────────────────┐
+              │  포매팅 후처리         │  W-Craft 마커 정렬 · 함수 빈 줄 · 주석 컬럼0
+              └───────────┬───────────┘
+                          ▼
+         ┌────────────────┴────────────────┐
+         ▼                                 ▼
+  ui-tobe/화면.xml                   미처리 리포트
+  (변환본)                           (검토/대체 태그 · 시그니처 불일치 ·
+                                      매핑표 미존재 · 충돌 함수)
+                                              │
+                                              └──▶ 단계 2 입력</code></pre>
+<p><strong>핵심 원칙</strong></p>
+<ul><li><strong>결정적(deterministic)</strong>: 입력이 같으면 출력이 항상 같은 1:1 규칙만 Python 이 처리.</li>
+<li><strong>단어경계 매칭</strong>: <code>\b함수명\s*\(</code> 로 호출부만 매칭 — 부분 문자열 오치환 방지.</li>
+<li><strong>멱등성(idempotent)</strong>: 변환본을 다시 돌려도 결과 동일(예: <code>scwin.vScrenID</code> 중복 삽입 금지). <code>convert_all.py</code> 가 2-pass 동일성으로 검증.</li>
+<li><strong>리터럴 보호</strong>: <code>==</code>→<code>===</code> 등은 문자열/정규식/주석 내부를 건드리지 않음. body 의 한글 UI 텍스트(<code>&lt;xf:label&gt;</code>)는 절대 치환 대상 아님.</li>
+<li><strong>산출물 3종</strong>: ① 변환본 XML ② 전/후 diff ③ <strong>미처리 리포트</strong>(단계 2 입력).</li></ul>
+<hr>
+<h2>4. 변환 규칙 요약 (규칙 1~22)</h2>
+<p>각 규칙의 상세 정의는 <a href="conversion_rules.md">conversion_rules.md</a>, Python 처리 방식은 <a href="conversion_pipeline.md">conversion_pipeline.md</a> 참조.</p>
+<table><thead><tr><th>규칙</th><th>영역</th><th>AS-IS → TO-BE</th></tr></thead><tbody><tr><td>1</td><td>SCRIPT</td><td>파일명 변수 <code>scwin.vScrenID = "{파일명}";</code> 최상단 삽입</td></tr><tr><td>2</td><td>SCRIPT</td><td>전역 리터럴 변수를 <code>// 전역 변수 선언</code> 구역으로 이동</td></tr><tr><td>3</td><td>BODY+SCRIPT</td><td>이벤트 핸들러명 소문자화 + <code>ev:on*</code> ↔ 스크립트 함수 동시 동기화</td></tr><tr><td>4</td><td>SCRIPT</td><td>코드 재배치(전역 → init → 컴포넌트 이벤트 → 일반), <code>gform_onload</code>→<code>onpageload</code> 병합</td></tr><tr><td>5</td><td>SCRIPT</td><td><code>==</code>→<code>===</code>, <code>.value=</code>→<code>.setValue()</code>, <code>.src=</code>→<code>.setBackgroundImage()</code>, <code>getTotalRow()</code>→<code>getRowCount()</code></td></tr><tr><td>6</td><td>HEAD+SCRIPT</td><td><code>&lt;xf:submission&gt;</code> + <code>execute(id)</code> → <code>sbmOptions</code> + <code>executeDynamic()</code> + 노드 삭제</td></tr><tr><td>7</td><td>SCRIPT</td><td>태그 없는 레거시 함수 1:1 치환 <code>fn_Trim(</code>→<code>$c.str.trim(</code></td></tr><tr><td>7m</td><td>SCRIPT</td><td>레거시 메서드 <code>{obj}.CloseFrame()</code> → <code>$c.win.closePopup()</code> (수신 객체 제거)</td></tr><tr><td>7n</td><td>SCRIPT</td><td>같은 ns 이름 정규화 <code>$c.stf.fn_setFromToDate(</code>→<code>$c.stf.setFromToDate(</code></td></tr><tr><td>8</td><td>SCRIPT</td><td><code>var</code> → <code>const</code>/<code>let</code> (재할당 분석)</td></tr><tr><td>9</td><td>SCRIPT</td><td><code>$c.cm.ShowWin/CloseWin/ShowNoData</code> 등 불필요 단독 호출 삭제</td></tr><tr><td>10</td><td>BODY</td><td><code>&lt;xf:events&gt;…&lt;/xf:events&gt;</code> 블록 삭제(규칙 3 로 대체됨)</td></tr><tr><td>11</td><td>SCRIPT</td><td><code>include(...)</code> 라인 삭제 (gcc 는 <code>$c.*</code> 로 제공)</td></tr><tr><td>12</td><td>SCRIPT</td><td><code>{DC}.DataID=url</code> + <code>{DC}.reset()</code> → <code>sbmOptions</code> + <code>executeDynamic()</code></td></tr><tr><td>13</td><td>HEAD+SCRIPT+BODY</td><td><code>scwin.fn_*</code> 정의 정규화(<code>fn_</code> 제거 + camelCase) + 정의·호출·publicInfo 동기화</td></tr><tr><td>14</td><td>SCRIPT</td><td><code>$c.ns.showObj/getObjectValue/setObjectValue/removeRow</code> → <code>.show()/.getValue()/.setValue()/.removeRows()</code></td></tr><tr><td>15</td><td>SCRIPT</td><td><code>$c.ns.alert_error</code> → <code>$c.win.alert</code></td></tr><tr><td>16</td><td>SCRIPT</td><td>Gauce trs <code>Action/KeyValue/Parameters/Post()</code> → <code>sbmOptions</code> + <code>executeDynamic()</code></td></tr><tr><td>17</td><td>SCRIPT</td><td><code>CreateDialogFrame(8인자)</code> → <code>$c.win.openPopup(url, options, data)</code> (window→browserPopup / 그 외→pageFramePopup)</td></tr><tr><td>18</td><td>SCRIPT</td><td><code>$c.ns.getSysDate/getCookie</code> 등 → <code>$c.date/util.*</code> (네임스페이스 재배치)</td></tr><tr><td>19</td><td>SCRIPT+BODY</td><td>(단계 2) 원시 JSP/jQuery DOM → WebSquare 컴포넌트 재설계</td></tr><tr><td>20</td><td>SCRIPT</td><td><code>{grid}.advancedExcelDownload(opts)</code> → <code>$c.data.downloadGridViewExcel(grid, opts)</code> (수신 객체 첫 인자 승격)</td></tr><tr><td>20b</td><td>SCRIPT</td><td><code>downloadGridViewExcel(grid, name, sheet, type)</code> 위치인자 → <code>(grid, {fileName, type})</code> 객체 정규화</td></tr><tr><td>21</td><td>SCRIPT</td><td><code>{frame}.Provider("../")</code> → <code>$c.win.getParent()</code></td></tr><tr><td>22</td><td>SCRIPT+BODY</td><td><code>tbl_search</code>/<code>tbl_Search</code> 검색테이블에 Enter 키 → 검색 핸들러 자동 바인딩(onpageload)</td></tr></tbody></table>
+<blockquote>
+<p>규칙 6·12·16·17 은 <strong>정적/단순 케이스만</strong> 자동 변환하고, 동적 action·비리터럴 URL·표현식 인자 등은 <strong>미변환 리포트 → 단계 2</strong> 로 넘깁니다. 규칙 15·18·19 는 판단 비중이 커 주로 단계 2 대상입니다.</p>
+</blockquote>
+<hr>
+<h2>5. 단계 2 상세 — Claude Code 보강</h2>
+<p>Python 이 남긴 <strong>"추가 작업 목록"만</strong> 사람/AI 판단으로 처리합니다.</p>
+<pre><code>   미처리 리포트  +  // TODO Stage2: 주석
+          │
+          ▼
+   ┌──────────────────────────────────────────────────────────┐
+   │ ① 검토 태그 매핑  : 시그니처·기본값·반환형 다른 함수 조정   │
+   │    (toNum→$c.num.parseFloat, cIsBupin→$c.str.isBizID …)   │
+   │ ② 대체 태그 매핑  : 원시 XHR/sendMessage → $c.sbm.execute  │
+   │    jQuery $() → $c.util.getComponent · 콜백 구조 재설계     │
+   │ ③ 규칙 19 재설계  : 원시 JSP/jQuery 페이지 → &lt;w2:*&gt; 컴포넌트│
+   │ ④ 인자 형태 변환  : 날짜 가감 방향·포맷 규칙·반환 타입 차이 │
+   │ ⑤ 모호·충돌 해소  : 파일마다 다른 의미·커스텀 로직 판정     │
+   │ ⑥ 팝업/통신 보강  : popup data 채움·result 처리·submitDone │
+   │ ⑦ 0-based 인덱스  : Gauce 1-based → WebSquare 0-based 조정  │
+   └──────────────────────────────────────────────────────────┘
+          │
+          ▼
+   ┌──────────────────────────────────────────────────────────┐
+   │ 검증: 의미 보존 확인 · 잔존 레거시 grep 점검               │
+   │       npm run lint:xml (wsxml_lint) 통과                   │
+   └──────────────────────────────────────────────────────────┘
+          │
+          ▼
+   운영 반영 대상 ui-tobe/*.xml</code></pre>
+<p><strong>잔여 TODO 추적</strong> — 화면 실행(런타임)·업무 로직 판단이 필요해 보류한 항목은 코드에 <code>// TODO Stage2:</code> 주석으로 남기고 모듈·유형·파일·라인별로 <a href="stage2_todo_worklist.md">stage2_todo_worklist.md</a> 에 집계합니다(자동 생성). 항목 해결 시 코드 주석 제거 + 워크리스트 갱신.</p>
+<hr>
+<h2>6. 역할 분담 요약</h2>
+<pre><code>┌────────────────────────┬────────────────────────────────────────────┐
+│  Python (단계 1)        │  Claude Code (단계 2)                       │
+├────────────────────────┼────────────────────────────────────────────┤
+│  양 · 일관성 · 속도     │  판단 · 재설계 · 검증                        │
+│  결정적 1:1 치환·재배치 │  검토/대체 매핑 · 통신 재작성 · 최종 확인    │
+│  규칙 1~22 자동 처리    │  리포트/TODO 해소 · 규칙 19 재설계 · lint    │
+└────────────────────────┴────────────────────────────────────────────┘</code></pre>
+<hr>
+<h2>7. 실행 방법 (권장 순서)</h2>
+<pre><code># 단계 1 — 단일 파일 변환
+python src/conversion/tools/convert.py &lt;src.xml&gt; [out.xml]
+
+# 단계 1 — 모듈 일괄 변환 (fil / mgt / stf / tms, 인자 생략 시 전체)
+python src/conversion/tools/convert_all.py [module]
+
+# 단계 2 — 리포트/TODO 보강 후 검증
+npm run lint:xml        # src/gcc 엄격 + src/as-is 레거시(WS111~113 무시) 모두 0 경고 유지</code></pre>
+<ol><li><strong>(Python)</strong> 대상 파일을 HEAD/SCRIPT/BODY 3영역으로 분리.</li>
+<li><strong>(Python)</strong> 단계 1 결정적 규칙 일괄 적용 → 변환본 + 미처리 리포트 생성.</li>
+<li><strong>(Claude)</strong> 리포트의 검토·대체 항목을 <a href="substitution_map.md">substitution_map.md</a> 와 <code>gcc/index.html</code> 시그니처 기준으로 보강.</li>
+<li><strong>(Claude)</strong> 잔존 레거시 호출을 grep 으로 점검, 의미 검증 후 <code>npm run lint:xml</code> 로 마무리.</li></ol>
+<blockquote>
+<p><code>convert_all.py</code> 는 이미 존재하는 <code>ui-tobe/</code> 출력은 <strong>건너뛰어 단계 2 수작업을 보존</strong>합니다. 새 규칙을 반영할 때는 기존 정리본 위에 규칙을 적용하고, <code>ui/</code> 에서 통째로 재생성하지 마세요.</p>
+</blockquote>
+<hr>
+<h2>8. 배경 — UI 공통 프레임워크·공통함수·공통개발자의 필요성</h2>
+<p>본 변환 프로세스가 레거시 호출을 gcc 공통함수(<code>$c.*</code>) 체계로 수렴시키는 이유이기도 합니다. 웹스퀘어(WebSquare) 기반의 UI/UX 프로젝트에서 <strong>UI 공통 프레임워크의 도입과 이를 관리할 공통개발자의 존재는 프로젝트의 성공과 직결되는 핵심 요소</strong>입니다. 이는 화면 개발자뿐만 아니라 <strong>공통개발자 자체의 생산성 및 품질 체계화</strong>를 위해서도 절실히 필요합니다.</p>
+<h3>8.1 UI 공통 프레임워크가 절실히 필요한 이유</h3>
+<p>프로젝트 초기에 공통 프레임워크를 바닥부터(Scratch) 새로 만들 경우, 구조 설계 및 검증에 막대한 시간과 리소스가 소모됩니다. 따라서 이미 정형화되고 검증된 <strong>UI 공통 프레임워크 도입이 절실한 이유</strong>는 다음과 같습니다.</p>
+<p><strong>① 공통개발자의 개발 생산성 향상 및 초반 프로젝트 일정 준수</strong></p>
+<ul><li><strong>공통개발자의 재발명(re-invent) 방지</strong>: 공통개발자라 하더라도 매 프로젝트마다 통신, 세션, 권한, 메시지 처리, 그리드 제어 등의 기본 구조를 새로 구현하는 것은 비효율적입니다.</li>
+<li><strong>초기 구축 공수 대폭 단축</strong>: 정형화되고 체계화된 UI 공통 프레임워크를 활용하면 공통 개발진이 <strong>프로젝트 초기에 공통 아키텍처를 구축하는 기간을 획기적으로 단축</strong>할 수 있습니다. 이를 통해 화면 개발자들이 조기에 개발에 착수할 수 있는 기반을 마련해 줍니다.</li></ul>
+<p><strong>② 공통 영역의 체계화 및 향후 유지보수의 극대화 (Single Point of Management)</strong></p>
+<ul><li><strong>공통 코드의 표준화</strong>: 공통개발자가 작성하는 코드 역시 프레임워크라는 표준화된 틀 안에서 관리되므로, 공통 코드 자체의 가독성과 구조적 완성도가 높아집니다.</li>
+<li><strong>유지보수 용이성</strong>: 향후 엔진 업데이트, 웹 표준 변경, 공통 정책 변경(보안, 통신 암호화, 로그 정책 등)이 발생하더라도 <strong>체계화된 공통 프레임워크 및 공통함수 단 한 곳만 수정</strong>하면 프로젝트 전체에 안정적으로 일괄 적용됩니다.</li></ul>
+<h3>8.2 공통함수 위주의 개발 환경을 구성해야 하는 이유</h3>
+<p><strong>① 개발자 역량 격차 극복 및 표준화된 품질 보장 (템플릿화)</strong></p>
+<ul><li><strong>현실적인 인력 구조 반영</strong>: 프로젝트 현장에는 모든 개발자의 숙련도가 높지 않으며, 초/중급 등 상대적으로 역량이 낮은 개발자의 비중이 훨씬 높습니다.</li>
+<li><strong>템플릿을 통한 품질 제어</strong>: 데이터 조회/저장, 그리드 연동, 팝업, Validation 등 자주 쓰이는 패턴을 공통함수로 템플릿화하여 제공해야 합니다. 개발자는 복잡한 스크립트를 직접 작성하지 않고 정해진 공통 API를 호출함으로써 <strong>개발자의 역량 수준과 상관없이 일정한 고품질의 결과물</strong>을 도출할 수 있습니다.</li></ul>
+<p><strong>② 화면 간 코드의 일관성 유지</strong></p>
+<ul><li>개발자 개인의 취향이나 작성 스타일에 따라 코드가 파편화되는 것을 방지합니다. 수백 개의 화면 코드가 동일한 패턴과 일관성을 유지하므로, 타 개발자가 만든 화면을 인수받더라도 즉시 이해하고 수정할 수 있습니다.</li></ul>
+<p><strong>③ 신규 기능 추가 및 수정의 효율성 (단일점 수정)</strong></p>
+<ul><li>기능 추가나 로직 변경 시 개별 화면을 찾아다니며 수정하는 것이 아니라, <strong>공통함수 내부만 수정하여 모든 화면에 일괄 반영</strong>할 수 있어 개발 및 테스트 공수가 대폭 감소합니다.</li></ul>
+<h3>8.3 공통개발자의 역할 및 책임 (R&amp;R)</h3>
+<p>체계화된 UI 공통 프레임워크 위에서 공통개발자는 단순한 코드 작성을 넘어 프로젝트 전체 UI 아키텍처를 리드하는 핵심 역할을 수행합니다.</p>
+<ol><li><strong>UI 공통 프레임워크 기반의 공통 API 구축</strong> — 체계화된 프레임워크를 바탕으로 프로젝트 맞춤형 공통 라이브러리(통신, 그리드 제어, 데이터 변환, 팝업, 파일 처리, 공통 콤보 등)를 신속하게 커스텀 및 확장 개발합니다.</li>
+<li><strong>개발 표준 템플릿 및 가이드 제공</strong> — 역량이 낮은 화면 개발자도 쉽게 활용할 수 있도록 <strong>표준 패턴별 샘플 화면(Snippet, CRUD 템플릿)</strong> 및 공통함수 사용 가이드 문서를 작성하여 배포합니다.</li>
+<li><strong>공통 영역 일괄 유지보수 및 릴리즈 관리</strong> — 화면 수정 없이 <strong>공통함수/프레임워크 수준에서 이슈 수정 및 개선 작업을 일괄 수행</strong>하여 프로젝트 전체의 안정성을 유지합니다.</li>
+<li><strong>화면 개발자 기술 지원 및 성능 최적화</strong> — 화면 개발자가 겪는 웹스퀘어 특화 이슈, 스크립트 오류, 통신 장애 등을 해결하는 멘토링을 수행하고, 대량 데이터 처리 시 발생하는 그리드 렌더링 지연, 메모리 누수 등 성능 이슈를 공통 차원에서 분석·가이드합니다.</li></ol>
+<h3>8.4 결론 요약</h3>
+<blockquote>
+<p><strong>"체계적인 UI 공통 프레임워크와 공통개발자의 조합은 프로젝트 성공의 필수 보증수표입니다."</strong></p>
+<ol><li><strong>공통개발자</strong>는 검증된 <strong>UI 공통 프레임워크</strong>를 사용하여 <strong>프로젝트 초기 구축 일정을 획기적으로 단축</strong>하고 공통 구조의 안정성을 확보합니다.</li>
+<li>이를 바탕으로 제공되는 <strong>공통함수 및 템플릿</strong>은 <strong>개발자 역량 편차에 영향을 받지 않는 일정한 고품질 화면</strong>을 생산하게 합니다.</li>
+<li>결과적으로 신규 기능 추가나 수정 시 <strong>공통함수 한 곳만 수정함으로써 향후 유지보수의 용이성을 극대화</strong>할 수 있습니다.</li></ol>
+</blockquote>
+</div>
+</div>
+</body>
+</html>
