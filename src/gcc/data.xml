@@ -485,8 +485,8 @@ scwin.__getChangeCheckedMainFrame = function (scopeApi) {
  * 공통 코드 데이터를 서버에서 즉시(await) 받아온 뒤, 컴포넌트별로 필터/정렬/선두항목/초기값 등을
  * 적용하여 nodeSet 을 연동한다. (async 함수 — 호출 시 await 가능)
  * @param {Object} codeOptions 코드 옵션 배열. 각 요소:
- *   - {String} code 공통 코드 그룹 코드
- *   - {String} compID 바인딩할 컴포넌트 아이디(콤마 다중, "그리드:컬럼" 형태 지원)
+ *   - {String|Array} code 공통 코드 그룹 코드. 배열이면 다중 코드 목록 조회(cdEngNmList) 후 body 의 key 별로 매핑
+ *   - {String|Array} compID 바인딩할 컴포넌트 아이디(콤마 다중, "그리드:컬럼" 형태 지원). code 가 배열이면 code 와 병렬인 배열로 전달
  *   - {Boolean} useLocalCache 로컬 캐시 사용 여부 (기본 true)
  *   - {Array} filter (선택) 목록 필터 조건 ["COL==a,b", "COL!=x", "COL%%키워드"]
  *   - {String} sort (선택) 정렬 템플릿 labelAsc|labelDesc|valueAsc|valueDesc
@@ -495,6 +495,8 @@ scwin.__getChangeCheckedMainFrame = function (scopeApi) {
  *   - {Array} selectedValue (선택) 컴포넌트별 초기 선택값
  *   - {Array} labelColumn (선택) 컴포넌트별 label 컬럼 override
  *   - {Array} valueColumn (선택) 컴포넌트별 value 컬럼 override
+ *   - {Array} filedArr (선택) DataList 컬럼 구성 override (기본 COMMON_CODE_INFO.FILED_ARR)
+ *   - {Array} mappingKey (선택) code 가 배열일 때 responseJSON.body 에서 각 항목 데이터를 찾을 key 배열(기본: 각 code 값)
  * @param {requestCallback} callbackFunc 코드 로딩/바인딩 완료 후 콜백 함수
  * @returns {Promise<void>}
  * @hidden N
@@ -502,7 +504,9 @@ scwin.__getChangeCheckedMainFrame = function (scopeApi) {
  * @example const codeOptions = [
     { code : "00001", compID : "sbx_Duty", firstRow : ["", "선택"] },
     { code : "00005", compID : "sbx_CommCodePart1, sbx_CommCodePart2", sort : "labelAsc" },
-    { code : "00024", compID : "grd_CommCodeSample:JOB_CD", filter : ["COM_CD==01,02"], useLocalCache : false } ];
+    { code : "00024", compID : "grd_CommCodeSample:JOB_CD", filter : ["COM_CD==01,02"], useLocalCache : false },
+    // code 배열: 한 번의 목록 조회 후 body 의 "00001"/"00005" 데이터를 각각 sbx_A/sbx_B 에 매핑 (mappingKey 로 body key override 가능)
+    { code : ["00001", "00005"], compID : ["sbx_A", "sbx_B"] } ];
 
 await $c.data.setCommonCode(codeOptions);
  */
@@ -527,13 +531,39 @@ scwin.setCommonCode = async function (codeOptions, callbackFunc) {
 
         // 2. 컴포넌트별 적용
         codeOptions.forEach(function (codeObj) {
-            if (!codeObj.compID) {
+            if ($c.util.isEmpty(codeObj.compID)) {
                 return;
             }
 
-            const compArr = codeObj.compID.replaceAll(" ", "").split(",");
+            // 바인딩 작업 목록 구성 [{ compId, compIndex, sourceList, codeKey }]
+            //  - code 가 배열이면: compID 도 배열(병렬)로 받아, responseJSON.body 의 각 key 데이터를 대응 컴포넌트에 매핑.
+            //    매핑 key 는 codeObj.mappingKey[i] 우선, 없으면 code 값 사용.
+            //  - code 가 단일이면: compID 콤마 다중, 모두 같은 코드 목록을 바인딩(기존 동작).
+            const tasks = [];
+            if (Array.isArray(codeObj.code)) {
+                const bodyObj = codeData[scwin.DATA_PREFIX + codeObj.code] || {};
+                const compArr = Array.isArray(codeObj.compID)
+                    ? codeObj.compID
+                    : String(codeObj.compID).replaceAll(" ", "").split(",");
+                codeObj.code.forEach(function (codeVal, i) {
+                    const compId = compArr[i];
+                    if ($c.util.isEmpty(compId)) {
+                        return;
+                    }
+                    const mapKey = (!$c.util.isEmpty(codeObj.mappingKey) && codeObj.mappingKey[i] != null)
+                        ? codeObj.mappingKey[i] : codeVal;
+                    tasks.push({ compId: compId, compIndex: i, sourceList: bodyObj[mapKey] || [], codeKey: codeVal });
+                });
+            } else {
+                const sourceList = codeData[scwin.DATA_PREFIX + codeObj.code] || [];
+                String(codeObj.compID).replaceAll(" ", "").split(",").forEach(function (compId, compIndex) {
+                    tasks.push({ compId: compId, compIndex: compIndex, sourceList: sourceList, codeKey: codeObj.code });
+                });
+            }
 
-            compArr.forEach(function (compId, compIndex) {
+            tasks.forEach(function (task) {
+                const compId = task.compId;
+                const compIndex = task.compIndex;
                 try {
                     const tmpIdArr = compId.split(":");
                     const comp = $c.util.getComponent(tmpIdArr[0]);
@@ -543,8 +573,11 @@ scwin.setCommonCode = async function (codeOptions, callbackFunc) {
                     }
 
                     // 필터/정렬/선두항목이 컴포넌트마다 다를 수 있으므로 컴포넌트별 DataList 생성
-                    const dltId = scwin.DATA_PREFIX + codeObj.code + "___" + compId.replaceAll(":", "__");
-                    const dataListOption = _getCodeDataListOptions(scwin.COMMON_CODE_INFO.FILED_ARR);
+                    const dltId = scwin.DATA_PREFIX + task.codeKey + "___" + compId.replaceAll(":", "__");
+                    // DataList 컬럼 구성(FILED_ARR)은 codeObj.filedArr 로 재정의 가능(미지정 시 공통 기본값)
+                    const filedArr = (!$c.util.isEmpty(codeObj.filedArr) && Array.isArray(codeObj.filedArr))
+                        ? codeObj.filedArr : scwin.COMMON_CODE_INFO.FILED_ARR;
+                    const dataListOption = _getCodeDataListOptions(filedArr);
                     dataListOption.id = dltId;
                     $p.data.create(dataListOption); // 동일 id 존재 시 삭제 후 재생성
                     const dataListObj = $p.getComponentById(dltId);
@@ -554,10 +587,10 @@ scwin.setCommonCode = async function (codeOptions, callbackFunc) {
                     const valueColumn = (!$c.util.isEmpty(codeObj.valueColumn) && codeObj.valueColumn[compIndex]) || scwin.COMMON_CODE_INFO.VALUE;
 
                     // 원본 클론 → 필터 → 정렬 → 선두항목
-                    let jsonData = JSON.parse(JSON.stringify(codeData[scwin.DATA_PREFIX + codeObj.code] || []));
+                    let jsonData = JSON.parse(JSON.stringify(task.sourceList || []));
                     jsonData = scwin.__applyCommonCodeFilter(jsonData, codeObj.filter);
                     scwin.__applyCommonCodeSort(jsonData, codeObj, labelColumn, valueColumn);
-                    scwin.__applyCommonCodeFirstRow(jsonData, codeObj, comp, labelColumn, valueColumn);
+                    scwin.__applyCommonCodeFirstRow(jsonData, codeObj, comp, labelColumn, valueColumn, filedArr);
 
                     dataListObj.setJSON(jsonData);
 
@@ -612,7 +645,12 @@ scwin.__getCommonCodeData = async function (codeOptions) {
 
 		// code 옵션이 있는 경우 action 값을 새로 설정한다.
 		if (!$c.util.isEmpty(codeObj.code) && $c.util.isEmpty(codeObj.action)) {
-			codeObj.action = `${scwin.COMMON_CODE_INFO.URL}?cdEngNm=${codeObj.code}`;
+			if (Array.isArray(codeObj.code)) {
+				// code 가 배열이면 cdEngNmList 파라미터로 전달(공백으로 구분 후 encode)
+				codeObj.action = `${scwin.COMMON_CODE_INFO.URL}?cdEngNmList=${encodeURIComponent(codeObj.code.join(" "))}`;
+			} else {
+				codeObj.action = `${scwin.COMMON_CODE_INFO.URL}?cdEngNm=${codeObj.code}`;
+			}
 		}
 
         const rtn = await $c.sbm.executeDynamic({
@@ -721,12 +759,13 @@ scwin.__applyCommonCodeSort = function (jsonData, codeObj, labelColumn, valueCol
  * @param {Object} comp 대상 컴포넌트
  * @param {String} labelColumn label 컬럼명
  * @param {String} valueColumn value 컬럼명
+ * @param {Array} filedArr (선택) DataList 컬럼 구성(미지정 시 COMMON_CODE_INFO.FILED_ARR)
  * @returns {Array} 선두 항목이 추가된 배열
  * @hidden Y
  * @exception
  * @example
  */
-scwin.__applyCommonCodeFirstRow = function (jsonData, codeObj, comp, labelColumn, valueColumn) {
+scwin.__applyCommonCodeFirstRow = function (jsonData, codeObj, comp, labelColumn, valueColumn, filedArr) {
     const pluginName = ($c.util.isEmpty(comp.getPluginName)) ? "" : comp.getPluginName();
     if (pluginName === "radio" || pluginName === "checkbox") {
         return jsonData;
@@ -745,7 +784,8 @@ scwin.__applyCommonCodeFirstRow = function (jsonData, codeObj, comp, labelColumn
     }
 
     const rowObj = {};
-    scwin.COMMON_CODE_INFO.FILED_ARR.forEach(function (col) {
+    const cols = (!$c.util.isEmpty(filedArr) && Array.isArray(filedArr)) ? filedArr : scwin.COMMON_CODE_INFO.FILED_ARR;
+    cols.forEach(function (col) {
         rowObj[col] = "";
     });
     rowObj[valueColumn] = firstRow[0];
