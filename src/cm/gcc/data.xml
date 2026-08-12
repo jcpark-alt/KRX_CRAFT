@@ -21,10 +21,10 @@ xmlns:xf="http://www.w3.org/2002/xforms">
 scwin.DATA_PREFIX = "dlt_commonCode";
 
 scwin.COMMON_CODE_INFO = {
-    LABEL: "cdValNm",
-    VALUE: "cdVal",
-    FILED_ARR: ["DEP_CD", "cdVal", "cdValNm"],
-    ACTION: "/api/common/sample/common-codes?cdEngNmList="
+	URL: "/api/common/common-code",
+    LABEL: "text",
+    VALUE: "value",
+    FILED_ARR: ["value", "text"]
 }
 
 // 공통 코드 데이터
@@ -125,7 +125,7 @@ scwin.comboCbDataSetLimit = function (sval, index = 2) {
  */
 scwin.comboCbDataSetDynamic = function (sval, items = [0, 10, 15, 30, 50, 100, 1000], index = 0) {
 	const itemArr = items.map((num) => {
-		const labelText = (num === 0) ? "전체" : `${num}건`;
+		const labelText = (num === 0) ? "전체" : `${$c.num.formatNumber(num)}건`;
 
 		return {
 			label: labelText,
@@ -503,6 +503,7 @@ scwin.__getChangeCheckedMainFrame = function (scopeApi) {
     { code : "00001", compID : "sbx_Duty", firstRow : ["", "선택"] },
     { code : "00005", compID : "sbx_CommCodePart1, sbx_CommCodePart2", sort : "labelAsc" },
     { code : "00024", compID : "grd_CommCodeSample:JOB_CD", filter : ["COM_CD==01,02"], useLocalCache : false } ];
+
 await $c.data.setCommonCode(codeOptions);
  */
 scwin.setCommonCode = async function (codeOptions, callbackFunc) {
@@ -594,7 +595,7 @@ scwin.setCommonCode = async function (codeOptions, callbackFunc) {
  * @method
  * @name __getCommonCodeData
  * @description setCommonCode 용 공통 코드 데이터를 취득한다. 캐시에 없거나 useLocalCache=false 인
- *  그룹만 서버(COMMON_CODE_INFO.ACTION)에서 await 로 받아 캐시에 저장하고, code별 데이터 맵을 반환한다.
+ *  그룹만 서버(codeOptions.actions)에서 await 로 받아 캐시에 저장하고, code별 데이터 맵을 반환한다.
  * @param {Array} codeOptions 코드 옵션 배열
  * @returns {Promise:Object} { (DATA_PREFIX+code) : [코드 데이터], ... }
  * @hidden Y
@@ -602,24 +603,21 @@ scwin.setCommonCode = async function (codeOptions, callbackFunc) {
  * @example
  */
 scwin.__getCommonCodeData = async function (codeOptions) {
-    const paramCodes = [];
-
-    codeOptions.forEach(function (codeObj) {
+	for (let i = 0; i < codeOptions.length; i++) {
+		const codeObj = codeOptions[i];
         const cacheKey = scwin.DATA_PREFIX + codeObj.code;
         if (codeObj.useLocalCache === false) {
             delete scwin.commonCodeList[cacheKey];
         }
-        if (typeof scwin.commonCodeList[cacheKey] === "undefined" && paramCodes.indexOf(codeObj.code) < 0) {
-            paramCodes.push(codeObj.code);
-        }
-    });
 
-    if (paramCodes.length > 0) {
-        // COMMON_CODE_INFO.ACTION (REST GET) 으로 코드 목록을 조회한다. 조회할 코드들은 URL 쿼리스트링에 덧붙인다.
-        // ex) /api/common/sample/common-codes?cdEngNmList=04,00024
+		// code 옵션이 있는 경우 action 값을 새로 설정한다.
+		if (!$c.util.isEmpty(codeObj.code) && $c.util.isEmpty(codeObj.action)) {
+			codeObj.action = `${scwin.COMMON_CODE_INFO.URL}?cdEngNm=${codeObj.code}`;
+		}
+
         const rtn = await $c.sbm.executeDynamic({
             id: "_sbm_searchCode",
-            action: scwin.COMMON_CODE_INFO.ACTION + paramCodes.join(","),
+            action: codeObj.action,
             method: "get",
             mediatype: "application/json",
             isProcessMsg: false
@@ -628,18 +626,16 @@ scwin.__getCommonCodeData = async function (codeOptions) {
         // REST 응답은 body 래퍼에 코드별 데이터가 담겨 온다. (래퍼가 없으면 평면 응답으로 처리)
         const resJSON = (rtn && rtn.responseJSON && rtn.responseJSON.body) ? rtn.responseJSON.body
             : ((rtn && rtn.responseJSON) ? rtn.responseJSON : {});
-        for (let key in resJSON) {
-            // 응답 키가 코드(예: "04")면 DATA_PREFIX를 붙여 캐시 키(예: "dlt_commonCode04")로 정규화한다.
-            const cacheKey = (key.indexOf(scwin.DATA_PREFIX) === 0) ? key : (scwin.DATA_PREFIX + key);
-            scwin.commonCodeList[cacheKey] = resJSON[key];
-        }
-    }
+
+		scwin.commonCodeList[cacheKey] = resJSON;
+    };
 
     const codeData = {};
     codeOptions.forEach(function (codeObj) {
         const cacheKey = scwin.DATA_PREFIX + codeObj.code;
         codeData[cacheKey] = scwin.commonCodeList[cacheKey] || [];
     });
+
     return codeData;
 };
 
@@ -1030,9 +1026,9 @@ scwin.getMessage = function (msgId) {
                     tmpMessage = (tmpMessage.indexOf("$[" + (i - 2) + "]") != -1) ? $c.str.replaceAll(tmpMessage, "$[" + (i - 2) + "]", arguments[i]) : tmpMessage;
                 }
             }
-            return tmpMessage;
+            return $c.str.escapeToEnter(tmpMessage);
         } else {
-            return tmpMessage;
+            return $c.str.escapeToEnter(tmpMessage);
         }
     } else {
         return "";
@@ -1175,9 +1171,22 @@ const options = {
 $c.data.downloadMultipleDataList(options);
  */
 scwin.downloadMultipleDataList = function (optionsParam, infoArrParam) {
+
+	if (!$c.util.isEmpty(optionsParam.common.fileName)) {
+		optionsParam.common.fileName = encodeURIComponent(optionsParam.common.fileName);
+	} else {
+		const paramData = $p.getParameter("paramData");
+		const menuInfo = ($c.util.isEmpty(paramData)) ? null : paramData.menuInfo;
+		let menuId = "";
+		if (!$c.util.isEmpty(menuInfo) && menuInfo.src && (menuInfo.src.lastIndexOf("/") > -1 && menuInfo.src.lastIndexOf(".xml") > -1)) {
+			menuId = menuInfo.src.substring(menuInfo.src.lastIndexOf("/") + 1, menuInfo.src.lastIndexOf(".xml"));
+		}
+		optionsParam.common.fileName = encodeURIComponent(($c.util.isEmpty(menuInfo)) ? "dataList.xlsx" : `${menuId}_${menuInfo.menuNm}_${$c.date.getServerDateTime("yyyyMMddHHmmss")}.xlsx`);
+	}
+
     const options = {
         common: {
-            fileName: optionsParam.common.fileName || "dataList.xlsx",
+            fileName: optionsParam.common.fileName,
             showProcess: optionsParam.common.showProcess || true,
             autoSizeColumn: optionsParam.common.autoSizeColumn || true,
             multipleSheet: optionsParam.common.multipleSheet || true,
@@ -1322,9 +1331,22 @@ const options = {
 $c.data.downloadMultipleGridView(options);
  */
 scwin.downloadMultipleGridView = function (optionsParam, infoArrParam) {
+
+	if (!$c.util.isEmpty(optionsParam.common.fileName)) {
+		optionsParam.common.fileName = encodeURIComponent(optionsParam.common.fileName);
+	} else {
+		const paramData = $p.getParameter("paramData");
+		const menuInfo = ($c.util.isEmpty(paramData)) ? null : paramData.menuInfo;
+		let menuId = "";
+		if (!$c.util.isEmpty(menuInfo) && menuInfo.src && (menuInfo.src.lastIndexOf("/") > -1 && menuInfo.src.lastIndexOf(".xml") > -1)) {
+			menuId = menuInfo.src.substring(menuInfo.src.lastIndexOf("/") + 1, menuInfo.src.lastIndexOf(".xml"));
+		}
+		optionsParam.common.fileName = encodeURIComponent(($c.util.isEmpty(menuInfo)) ? "dataList.xlsx" : `${menuId}_${menuInfo.menuNm}_${$c.date.getServerDateTime("yyyyMMddHHmmss")}.xlsx`);
+	}
+
     const options = {
         common: {
-            fileName: optionsParam.common.fileName || "gridView.xlsx",
+            fileName: optionsParam.common.fileName,
             showProcess: optionsParam.common.showProcess || true,
             autoSizeColumn: optionsParam.common.autoSizeColumn || true,
             multipleSheet: optionsParam.common.multipleSheet || true,
@@ -1514,12 +1536,20 @@ scwin.downloadGridViewExcel = function (grdObj, options, infoArr) {
         infoArr = [];
     }
 
-	if(!$c.util.isEmpty(options.fileName)) {
+	if (!$c.util.isEmpty(options.fileName)) {
 		options.fileName = encodeURIComponent(options.fileName)
+	} else {
+		const paramData = $p.getParameter("paramData");
+		const menuInfo = ($c.util.isEmpty(paramData)) ? null : paramData.menuInfo;
+		let menuId = "";
+		if (!$c.util.isEmpty(menuInfo) && menuInfo.src && (menuInfo.src.lastIndexOf("/") > -1 && menuInfo.src.lastIndexOf(".xml") > -1)) {
+			menuId = menuInfo.src.substring(menuInfo.src.lastIndexOf("/") + 1, menuInfo.src.lastIndexOf(".xml"));
+		}		
+		options.fileName = encodeURIComponent(($c.util.isEmpty(menuInfo)) ? "excel.xlsx" : `${menuId}_${menuInfo.menuNm}_${$c.date.getServerDateTime("yyyyMMddHHmmss")}.xlsx`);
 	}
 
     const opts = {
-        fileName: options.fileName || "excel.xlsx", //String, [defalut: excel.xlsx] 다운로드하려는 파일의 이름으로 필수 입력 값이다.
+        fileName: options.fileName, //String, [defalut: excel.xlsx] 다운로드하려는 파일의 이름으로 필수 입력 값이다.
         sheetName: options.sheetName || "sheet", //String, [defalut: sheet] excel의 sheet의 이름
         type: options.type || "0", //String, [defalut: 0] type이 0인 경우 실제 데이터 1인 경우 눈에 보이는 데이터를  2이면 들어가 있는 data 그대로(filter무시 expression 타입의 셀은 나오지 않음)
         removeColumns: options.removeColumns || "", //String, [defalut: 없음] 다운로드시 excel에서 삭제하려는 열의 번호(여러 개일 경우 ,로 구분)

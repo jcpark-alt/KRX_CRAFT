@@ -1067,11 +1067,15 @@ scwin.getMessageCode = function (code) {
  * @example
 const pagingInfo = {
     pageType : "P",                 // S/P/A
+	rowNumVisble : "grdMain|asc",	// gridView에 rowNumVisible 값 설정(asc,desc 옵션)
+	maxRowNum : 50,			  		// gridView에 최대 visibleRowNum 값 설정	
     pageListId : "pglList",         // 페이지 리스트 아이디
     pageFunction : "scwin.fnSrch",  // 페이징 처리 함수
     currentPage : 1,                // 현재 페이지
     totalCountId : "tbxTotCnt",     // total count 출력 아이디
-    recordCountPerPage : 20         // 한 페이지에 보여줄 라인 수
+	recordPerPageId : sbxPerPage,	// 페이지 라인 수 컴포넌트 아이디
+    recordCountPerPage : 20,        // 한 페이지에 보여줄 라인 수
+	pageSize : 10					// 페이징 시 출력해줄 페이지 번호 개수
 };
 // 통신 전: 기본값 병합 + DataMap 컬럼 설정
 $c.sbm.setPagingInfo(pagingInfo, "dataM=dlSearchM");
@@ -1084,21 +1088,29 @@ scwin.setPagingInfo = function (pagingInfo, inData, totalCnt) {
         return {};
     }
 
+	// dataMap 동적 생성 옵션
+    function _getCodeDataListOptions(infoArr) {
+        const option = { "type": "dataMap", "option": { "baseNode": "map" }, "columnInfo": [] };
+        for (let idx in infoArr) {
+            option.columnInfo.push({ "id": infoArr[idx] });
+        }
+        return option;
+    }
+
+	// 필터/정렬/선두항목이 컴포넌트마다 다를 수 있으므로 컴포넌트별 DataList 생성
+	const dataMapOption = _getCodeDataListOptions(["currentPage", "text"]);
+	dataMapOption.id = "dmaPaging";
+	$p.data.create(dataMapOption); // 동일 id 존재 시 삭제 후 재생성
+
     const pagingDefault = {
-        /* 필수 */
-        pageType : "",            // S/P/A
+        pageType : "P",           // S/P/A
+		rowNumVisble : "",  	  // gridView에 rowNumVisible 값 설정
+		maxRowNum : 50,			  // gridView에 최대 visibleRowNum 값 설정
         pageFunction : "",        // 페이징 처리 하는 함수
         currentPage : 1,          // 현재 페이지
-
-        /* pageType:P 시 필수 */
         pageListId : "",          // 페이지 리스트 아이디
-
-        /* pageType:S 시 필수 */
-        gridId : "",              // 그리드 아이디
-
-        /* 선택 */
         totalCountId : "",        // total count 를 출력할 아이디
-        recordCountPerPage : "",  // 한 페이지에 보여줄 라인 수
+        recordCountPerPage : 10,  // 한 페이지에 보여줄 라인 수
         pageSize : 10             // 페이징 시 출력해줄 페이지 번호 개수
     };
 
@@ -1106,6 +1118,53 @@ scwin.setPagingInfo = function (pagingInfo, inData, totalCnt) {
 
     // 모바일 환경일 경우 pageSize 5로 변경
     pagingInfo.pageSize = ($c.util.isMobile()) ? 5 : pagingInfo.pageSize;
+
+	let gridObj = null;
+	let rowNumSort = "";
+	let pageListComponent = null;
+	let scopeScwin = $p.getFrame().scope.scwin;
+
+	// rowNumVisble 옵션에서 RowNum 시작 인덱스를 적용할 그리드와 정렬 방향을 확인한다.
+	if (!$c.util.isEmpty(pagingInfo.rowNumVisble)) {
+		if (typeof pagingInfo.rowNumVisble === "string") {
+			const rowNumVisble = pagingInfo.rowNumVisble.split("|");
+			gridObj = $p.getComponentById(rowNumVisble[0]);
+			rowNumSort = (rowNumVisble.length > 1) ? rowNumVisble[1] : "";
+		} else {
+			gridObj = pagingInfo.rowNumVisble;
+		}
+	}
+
+	// 페이지 라인 수 컴포넌트 아이디
+	if (!$c.util.isEmpty(pagingInfo.recordPerPageId) && gridObj) {
+		let recordPerPageObj = null;
+
+		if (typeof pagingInfo.recordPerPageId === "string") {
+			recordPerPageObj = $p.getComponentById(pagingInfo.recordPerPageId);
+		} else {
+			recordPerPageObj = pagingInfo.recordPerPageId;
+		}
+
+		// 한 페이지에 보여줄 라인 수
+		pagingInfo.recordCountPerPage = recordPerPageObj.getValue();
+
+		recordPerPageObj.unbind("onviewchange");
+		recordPerPageObj.bind("onviewchange", function (info) {
+			gridObj.setVisibleRowNum((Number.parseInt(info.newValue) > pagingInfo.maxRowNum) ? pagingInfo.maxRowNum : info.newValue);
+
+			const classArr = gridObj.render.classList;
+			classArr.forEach(cls => {
+				if (cls.startsWith("row")) {
+					gridObj.removeClass(cls);
+				}
+			});
+
+			gridObj.addClass((Number.parseInt(info.newValue) > pagingInfo.maxRowNum) ? `row${pagingInfo.maxRowNum}` : `row${info.newValue}`);
+
+			const procFuncArr = pagingInfo.pageFunction.split(".");
+			scopeScwin[procFuncArr[1]](1, info.oldSelectedIndex);
+		});
+	}	
 
     // 조회 Map 키를 inData 첫 토큰에서 추출 (dataM=dataViewM → dataViewM)
     if (!$c.util.isEmpty(inData)) {
@@ -1135,13 +1194,32 @@ scwin.setPagingInfo = function (pagingInfo, inData, totalCnt) {
         }
     }
 
+	// rowNumVisible=true 일때 표시되는 RowNum Column 의 시작 인덱스를 설정합니다.
+	if (gridObj) {
+		if (rowNumSort.toUpperCase() === "ASC") {
+			if (pagingInfo.currentPage === 1) {
+				gridObj.setStartRowNumber(0);
+			} else {
+				let startIdx = (pagingInfo.currentPage - 1) * pagingInfo.recordCountPerPage;
+				gridObj.setStartRowNumber(startIdx);
+			}			
+		} else if (rowNumSort.toUpperCase() === "DESC") {
+			// TO-DO : 별도의 컬럼을 추가 후 작업 가능
+		}
+	}
+
     // totalCnt 가 전달되면 페이지 리스트(pageListComponent) 렌더링
     if (!$c.util.isEmpty(totalCnt) && !$c.util.isEmpty(pagingInfo.pageListId)) {
         const outTotalCnt = Math.ceil(totalCnt / pagingInfo.recordCountPerPage);
         const selectCurrentPage = pagingInfo.currentPage;
 
+		if (!$c.util.isEmpty(pagingInfo.totalCountId)) {
+			const totalCountObj = $p.getComponentById(pagingInfo.totalCountId);
+			totalCountObj.setValue($c.num.formatNumber(totalCnt));
+		}
+
         pagingInfo.pageListId.split(",").forEach(function (id) {
-            const pageListComponent = $p.getComponentById(id);
+            pageListComponent = $p.getComponentById(id);
             if ($c.util.isEmpty(pageListComponent)) return;
 
             pageListComponent.setPageSize(pagingInfo.pageSize);
@@ -1150,7 +1228,6 @@ scwin.setPagingInfo = function (pagingInfo, inData, totalCnt) {
                 // 페이지 리스트 표시 및 페이지 변경 이벤트 등록
                 pageListComponent.show();
                 pageListComponent.setCount(outTotalCnt, true);
-                const scopeScwin = pageListComponent.scope_obj.getObj("scwin");
 
                 if (selectCurrentPage != 1 && selectCurrentPage <= outTotalCnt) {
                     pageListComponent.setValue(selectCurrentPage);
