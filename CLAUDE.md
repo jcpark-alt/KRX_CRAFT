@@ -20,6 +20,8 @@ A lint/test toolchain sits on top of the raw XML. All commands run from the repo
 
 > **Regenerating the gcc API docs (`src/docs/api/gcc/index.html`)?** Follow [src/docs/gcc_api_docgen.md](src/docs/gcc_api_docgen.md) — how `npm run docs:gcc` (the `wsxml_lint.docgen` pipeline) extracts `publicInfo`-listed `scwin.*` functions + their JSDoc and renders the single self-contained HTML. Never hand-edit the generated file.
 
+> **Regenerating the gcc transfer-mapping doc (`src/docs/api/gcc/index_transfer.html`)?** Follow [src/docs/gcc_index_transfer_docgen.md](src/docs/gcc_index_transfer_docgen.md) — `npm run docs:transfer` (`src/conversion/tools/gen_index_transfer.py`) aggregates the fil/ins/mgt `index_transfer.html` `DATA` arrays (the SOT, via `gcc_mapping.py`) + a `CONV_RULES` constant into the combined HTML. Edit the module `DATA` (not this generated file), then regenerate.
+
 ### `wsxml_lint` — the primary check for this tree
 A Python/lxml linter under `tools/wsxml_lint/` that parses the WebSquare `.xml` pages directly (the only tool that actually inspects this project's source).
 
