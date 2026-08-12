@@ -204,6 +204,11 @@ scwin.__setActionParam = function (sbmObj) {
  * @exception 
  */
 scwin.__callbackSubmitFunction = function (resObj, sbmObj) {
+    // gridview 스피너 오버레이 제거(성공/실패 공통 완료 지점 — abort 경로는 __applyDuplicateGuard에서 별도 제거)
+    if (sbmObj && sbmObj._gridview && sbmObj._gridSpinner && (typeof sbmObj.getScopeWindow === "function")) {
+        try { scwin.__hideGridSpinner(sbmObj.getScopeWindow().$p, sbmObj._gridview); } catch (e) { console.error(e); }
+    }
+
     // server와 연결을 할 수 없을 경우 responseStatusCode가 0으로 발생.
     if ((resObj.responseStatusCode < 100) || (resObj.responseStatusCode > 599)) {
         let detailStr = "HTTP STATUS INFO";
@@ -323,6 +328,10 @@ scwin.__applyDuplicateGuard = function (sbmObj, execOptions) {
         if (execOptions.onDuplicate === "abort") {
             // 후행 우선 : 진행 중 요청을 취소한다. (abort는 setSubmissionEnd를 동기 호출하여 processStatus를 0으로 리셋)
             WebSquare.ModelUtil.abort(sbmObj.id, sbmObj.scope_id);
+            // abort는 __callbackSubmitFunction을 호출하지 않으므로, 취소된 요청의 gridview 스피너 오버레이를 여기서 제거한다.
+            if (sbmObj._gridview && sbmObj._gridSpinner && (typeof sbmObj.getScopeWindow === "function")) {
+                try { scwin.__hideGridSpinner(sbmObj.getScopeWindow().$p, sbmObj._gridview); } catch (e) { console.error(e); }
+            }
             // abort는 defaultCallback(__callbackSubmitFunction)을 호출하지 않으므로, 취소된 직전 Promise를 수동으로 reject 처리한다.
             if (typeof sbmObj._promise_submitErrorHandler === "function") {
                 sbmObj._promise_submitErrorHandler({ aborted: true, reason: "duplicate-abort", id: sbmObj.id });
@@ -448,6 +457,11 @@ scwin.execute = function (sbmObj, requestData, compObj, options) {
             }
         }
 
+        // gridview 지정 + gridSpinner 사용 시, 통신 실행 직전 grid 하단에 스피너 오버레이를 표시한다.(완료 시 __callbackSubmitFunction/abort에서 제거)
+        if (_sbmObj._gridview && _sbmObj._gridSpinner && (typeof _sbmObj.getScopeWindow === "function")) {
+            try { scwin.__showGridSpinner(_sbmObj.getScopeWindow().$p, _sbmObj._gridview); } catch (e) { console.error(e); }
+        }
+
         $p.executeSubmission(_sbmObj, requestData, compObj);
     });
 };
@@ -565,6 +579,82 @@ scwin.__parseGridview = function (gridviewRef) {
 
 /**
  * @method
+ * @name __eachGridElement
+ * @description gridviewRef를 파싱해 각 grid 컴포넌트의 DOM 엘리먼트에 대해 콜백을 실행한다.
+ *  컴포넌트 미발견 또는 getElement 미지원 grid는 건너뛴다.
+ * @param {Object} scopeP grid가 속한 scope window의 $p
+ * @param {String|Object|Array} gridviewRef options.gridview 값
+ * @param {Function} fn (el, ref) => void 로 grid 엘리먼트마다 실행할 콜백
+ * @hidden Y
+ * @exception
+ */
+scwin.__eachGridElement = function (scopeP, gridviewRef, fn) {
+    if ($c.util.isEmpty(scopeP) || $c.util.isEmpty(gridviewRef)) { return; }
+    scwin.__parseGridview(gridviewRef).forEach(function (spec) {
+        const gv = (typeof spec.ref === "string") ? scopeP.getComponentById(spec.ref) : spec.ref;
+        if ($c.util.isEmpty(gv) || (typeof gv.getElement !== "function")) { return; }
+        const el = gv.getElement();
+        if (el) { fn(el, spec.ref); }
+    });
+};
+
+/**
+ * @method
+ * @name __gridSpinnerId
+ * @description grid 엘리먼트/참조로부터 스피너 wrap의 DOM id("{gridId}_gridSpinner")를 생성한다.
+ * @param {Object} el grid DOM 엘리먼트
+ * @param {String|Object} ref grid 참조(문자열 id 또는 컴포넌트 객체)
+ * @returns {String}
+ * @hidden Y
+ * @exception
+ */
+scwin.__gridSpinnerId = function (el, ref) {
+    const gid = (el && el.id) || ((typeof ref === "string") ? ref : "");
+    return gid + "_gridSpinner";
+};
+
+/**
+ * @method
+ * @name __showGridSpinner
+ * @description executeDynamic gridview 대상 gridView(들)의 DOM 하단에 스피너 오버레이를 삽입한다.
+ *  통신 실행 직전에 호출하며, 완료(성공/실패/중단) 시 __hideGridSpinner로 제거한다.
+ *  삽입 구조(스타일은 테마 CSS가 담당) : &lt;div class="spinner_wrap"&gt;&lt;div class="spinner_cont"&gt;&lt;div class="grid_spinner"&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;
+ * @param {Object} scopeP grid가 속한 scope window의 $p
+ * @param {String|Object|Array} gridviewRef options.gridview 값(문자열/배열/컴포넌트 객체)
+ * @hidden Y
+ * @exception
+ */
+scwin.__showGridSpinner = function (scopeP, gridviewRef) {
+    scwin.__eachGridElement(scopeP, gridviewRef, function (el, ref) {
+        const doc = el.ownerDocument;
+        const wrapId = scwin.__gridSpinnerId(el, ref);
+        if (doc.getElementById(wrapId)) { return; }   // 이미 표시 중이면 재사용(중복 삽입 방지)
+        const wrap = doc.createElement("div"); wrap.id = wrapId; wrap.className = "spinner_wrap";
+        const cont = doc.createElement("div"); cont.className = "spinner_cont";
+        const spin = doc.createElement("div"); spin.className = "grid_spinner";
+        cont.appendChild(spin); wrap.appendChild(cont);
+        el.appendChild(wrap);   // gridView 하단(마지막 자식)에 삽입
+    });
+};
+
+/**
+ * @method
+ * @name __hideGridSpinner
+ * @description __showGridSpinner로 삽입한 gridView 스피너 오버레이를 제거한다.
+ * @param {Object} scopeP grid가 속한 scope window의 $p
+ * @param {String|Object|Array} gridviewRef options.gridview 값
+ * @hidden Y
+ * @exception
+ */
+scwin.__hideGridSpinner = function (scopeP, gridviewRef) {
+    scwin.__eachGridElement(scopeP, gridviewRef, function (el, ref) {
+        const wrap = el.ownerDocument.getElementById(scwin.__gridSpinnerId(el, ref));
+        if (wrap && wrap.parentNode) { wrap.parentNode.removeChild(wrap); }
+    });
+};
+
+/**
+ * @method
  * @name __bindResponseToTargets
  * @description executeDynamic 간소화 target으로 분리된 바인딩 디스크립터에 따라, 통신 응답을
  *  대상 DataCollection에 직접 적재한다.
@@ -678,6 +768,7 @@ scwin.__bindResponseToTargets = function (sbmObj, rtn, targets, gridViews) {
  *  gridview는 콤마(,)로 구분한 다중 ID 문자열("grd_main,grd_sub")을 지원한다. grid별 접미사 옵션으로 실행을 제어한다 : "id|focus"(포커스), "id|refresh"(refresh/initGrid 끔), "id|focus,refresh"(포커스+refresh호출), "id|focus,refresh,message"(셋 다 옵션실행). 옵션 미지정 시 refresh + fous미지정 + message 모두 실행한다.
  * @param {Object} options $c.sbm.create의 options 참고
  * @param {String|Object} options.gridview [Default : null] 통신 성공 시 처리할 gridView. 컴포넌트 ID 문자열(콤마로 구분한 다중 ID 가능, grid별 "|focus"/"|refresh"/"|message" 접미사 옵션 지원) 또는 컴포넌트 객체. 기본은 refresh 대상 grid initGrid() 호출, target DataCollection의 ondataload 시 refresh() + setFocusedCell(0,0) 호출. 빈 결과 메시지("조회된 데이터가 없습니다.")는 "|message" 지정 시에만 출력.
+ * @param {Boolean} options.gridSpinner [Default : true] gridview 지정 시 통신 실행 전 grid 하단에 스피너 오버레이(spinner_wrap>spinner_cont>grid_spinner)를 표시하고 완료(성공/실패/중단) 시 제거한다. false면 미표시. (비동기 통신에서만 유효)
  * @param {Object} requestData 요청 데이터
  * @param {Object} obj 전송중 disable시킬 컴퍼넌트
  * @param {Object} execOptions [Default : null] 중복 실행 제어 옵션. $c.sbm.execute의 options 참고(allowDuplicate / onDuplicate).
@@ -805,6 +896,8 @@ scwin.executeDynamic = function (options, requestData, obj, execOptions) {
     // grid별 접미사 옵션(|focus, |refresh, |message)으로 실행을 제어한다. (컴포넌트 ID 문자열 또는 컴포넌트 객체)
     if (options.gridview && (submissionObj !== null)) {
         submissionObj._gridview = options.gridview;
+        // gridview 스피너 오버레이 사용 여부(기본 사용). options.gridSpinner === false 이면 미사용.
+        submissionObj._gridSpinner = (options.gridSpinner !== false);
     }
 
     return $c.sbm.execute(submissionObj, requestData, obj, execOptions);
