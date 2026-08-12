@@ -7,7 +7,9 @@ module.exports = {
   passWithNoTests: true,
   // Page logic is embedded in .xml CDATA; coverage applies only to pure helpers
   // extracted into .js under the business-module trees.
-  collectCoverageFrom: ["src/**/*.js"],
+  // src/engine 은 대용량 WebSquare 엔진 번들 — 계측 시 워커가 죽으므로 커버리지 대상에서 제외
+  // (eslint 도 src/engine/** 를 ignore 한다).
+  collectCoverageFrom: ["src/**/*.js", "!src/engine/**"],
   coverageReporters: ["text", "lcov"],
   // NOTE: the source repo enforced a global 80% threshold. It is omitted here
   // because no .js sources exist yet (the JS is in XML). Re-add a
