@@ -773,9 +773,9 @@ scwin.setLowercase = function (value) {
  * @method
  * @name getByteSubstring
  * @description 문자열을 바이트 기준 시작/종료 위치로 잘라 부분 문자열을 반환한다.
- * commonPrototype.js 의 String.substringByte 확장이 로드되어 있어야 한다.
+ * 바이트 계산은 $c.str.getByteLength 와 동일하게 서버 설정 인코딩을 따르며, 경계에 걸치는 문자는 제외한다.
  * @param {String} str 대상 문자열
- * @param {Number} startPosLen 시작 바이트 위치
+ * @param {Number} startPosLen 시작 바이트 위치 (0부터)
  * @param {Number} endPosLen 종료 바이트 위치 (생략 시 끝까지)
  * @returns {String} 부분 문자열
  * @hidden N
@@ -785,19 +785,35 @@ $c.str.getByteSubstring("가나다라마바사", 3); // "나다라마바사"
 $c.str.getByteSubstring("1234가나다", 3);     // "4가나다"
  */
 scwin.getByteSubstring = function (str, startPosLen, endPosLen) {
-    return String.substringByte(str, startPosLen, endPosLen);
+    str = String(str == null ? "" : str);
+    startPosLen = isNaN(startPosLen) ? 0 : Number(startPosLen);
+    const hasEnd = endPosLen != null && !isNaN(endPosLen);
+    let result = "";
+    let bytePos = 0;
+    for (let i = 0; i < str.length; i++) {
+        const chr = str.charAt(i);
+        const chrByte = WebSquare.util.getStringByteSize(chr);
+        if (hasEnd && bytePos + chrByte > Number(endPosLen)) {
+            break;
+        }
+        if (bytePos >= startPosLen) {
+            result += chr;
+        }
+        bytePos += chrByte;
+    }
+    return result;
 };
 
 /**
  * @method
  * @name stringFormat
  * @description 자릿수가 일정한 문자열에 포맷 문자열을 적용하여 반환한다. (마스킹 지원)
- * commonPrototype.js 의 String.format 확장이 로드되어 있어야 한다.
+ * 포맷의 fmtChr 자리에는 원본 문자를, encChr 자리에는 encChr(마스킹)를 넣고 그 외 문자는 구분자로 출력한다.
+ * 원본 문자가 소진되면 이후 포맷은 적용하지 않는다.
  * @param {String} str 포맷을 적용할 문자열
  * @param {String} format 포맷 문자열 (예: "####-##-##")
  * @param {String} fmtChr 포맷 구분 문자 (기본값 "#")
  * @param {String} encChr 마스킹(암호) 구분 문자 (기본값 "*")
- * @param {Number} delLength 삭제 길이 (기본값 0)
  * @returns {String} 포맷이 적용된 문자열
  * @hidden N
  * @exception
@@ -805,15 +821,33 @@ scwin.getByteSubstring = function (str, startPosLen, endPosLen) {
 $c.str.stringFormat("20220302145900", "####-##-## ##:##:##"); // "2022-03-02 14:59:00"
 $c.str.stringFormat("1234561234563", "######-#******");       // "123456-1******"
  */
-scwin.stringFormat = function (str, format, fmtChr, encChr, delLength) {
-    return String.format(str, format, fmtChr || "#", encChr || "*", delLength || 0);
+scwin.stringFormat = function (str, format, fmtChr, encChr) {
+    str = String(str == null ? "" : str);
+    format = String(format == null ? "" : format);
+    fmtChr = fmtChr || "#";
+    encChr = encChr || "*";
+    let result = "";
+    let pos = 0;
+    for (let i = 0; i < format.length; i++) {
+        const chr = format.charAt(i);
+        if (chr === fmtChr || chr === encChr) {
+            if (pos >= str.length) {
+                break;
+            }
+            result += (chr === encChr) ? encChr : str.charAt(pos);
+            pos++;
+        } else {
+            result += chr;
+        }
+    }
+    return result;
 };
 
 /**
  * @method
  * @name stringUnFormat
- * @description 포맷이 적용된 문자열에서 포맷을 제거한 원본 문자열을 반환한다. (마스킹된 부분은 복원되지 않음)
- * commonPrototype.js 의 String.unformat 확장이 로드되어 있어야 한다.
+ * @description 포맷이 적용된 문자열에서 포맷을 제거한 원본 문자열을 반환한다.
+ * 포맷의 fmtChr 위치에 해당하는 문자만 순서대로 추출한다. (마스킹된 부분은 복원되지 않고 제외됨)
  * @param {String} str 포맷이 적용된 문자열
  * @param {String} format 포맷 문자열
  * @param {String} fmtChr 포맷 구분 문자 (기본값 "#")
@@ -825,7 +859,17 @@ $c.str.stringUnFormat("2022-03-02 14:59:00", "####-##-## ##:##:##"); // "2022030
 $c.str.stringUnFormat("153-20", "###-##");                          // "15320"
  */
 scwin.stringUnFormat = function (str, format, fmtChr) {
-    return String.unformat(str, format, fmtChr || "#");
+    str = String(str == null ? "" : str);
+    format = String(format == null ? "" : format);
+    fmtChr = fmtChr || "#";
+    let result = "";
+    const len = Math.min(str.length, format.length);
+    for (let i = 0; i < len; i++) {
+        if (format.charAt(i) === fmtChr) {
+            result += str.charAt(i);
+        }
+    }
+    return result;
 };
 
 // =============================================================================
