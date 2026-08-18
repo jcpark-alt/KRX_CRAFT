@@ -55,6 +55,9 @@ scwin.CB_FUNCTION_MANAGER = {
 // 자식 팝업 창이 opener 경유($c.win.getOpenerScope)로 부모 화면 scope 를 복원할 때 사용한다.
 scwin.POPUP_OPENER_SCOPES = {};
 
+// history state 에 기록할 데이터(paramObj/dataInfo)의 직렬화 최대 길이. 초과 시 기록에서 제외한다.
+scwin.HISTORY_STATE_MAX_LENGTH = 1024 * 1024;
+
 // 대외망 홈(index) 이동 경로. 배포 모듈별로 경로가 다를 수 있어 상수로 분리한다. (scwin.goHomeEx 에서 사용)
 scwin.HOME_EX_URL = "/cm/main/fill/index.xml";
 
@@ -1054,10 +1057,20 @@ scwin.changePageState = function () {
  * @exception 
  */
 scwin.__changePageState = function () {
-    if (!$c.util.isEmpty(history.state) && !$c.util.isEmpty(history.state.data) && !$c.util.isEmpty(history.state.data.menuInfo)) {
+    if ($c.util.isEmpty(history.state) || $c.util.isEmpty(history.state.data)) {
+        return;
+    }
+    const data = history.state.data;
+
+    // 1) 프레임 내 이동(moveUrl/setPageFrameSrc) entry — 해당 프레임을 기록된 화면으로 되돌린다.
+    if (!$c.util.isEmpty(data.frameInfo) && scwin.__restoreFrameState(data)) {
+        return;
+    }
+
+    // 2) 메뉴 전환(openMenu) entry — 프레임 복원 실패(소멸 등) 시의 폴백이기도 하다.
+    if (!$c.util.isEmpty(data.menuInfo)) {
         const options = {};
         options.isHistory = false;
-        const data = history.state.data;
         // 저장된 data 는 {...paramObj, menuInfo} 구조 — data 자체를 paramObj 로 넘겨야 화면 파라미터가 복원된다.
         $c.win.openMenu(data.menuInfo.menuNm, data.menuInfo.src, data.menuInfo.menuCode, data, options);
     }
@@ -1554,63 +1567,263 @@ scwin.getPopupId = function () {
 };
 
 /**
- * @method 
+ * @method
  * @name moveUrl
  * @description 현재 화면을 특정 URL로 이동한다.
+ * option.isHistory 지정 시 브라우저 히스토리에 기록되어 뒤로/앞으로 가기로 화면이 복원되고,
+ * option.dataInfo 로 현재 화면의 DataCollection JSON 을 넘기면 뒤로가기로 돌아올 때 자동 재설정된다.
+ * 복원 진입 화면의 paramData 에는 _isHistoryRestore(true)가 전달되므로, 초기 자동조회 화면은
+ * 이를 확인해 조회를 생략해야 복원 데이터가 유지된다.
  * @param {String} moveUrl 화면 파일 경로
  * @param {Object} paramObj 이동 시 전달할 파라미터 값
+ * @param {Object} option 이동 옵션 (생략 가능)
+ * @param {Boolean} option.isHistory 브라우저 히스토리 기록 여부 (기본값 false)
+ * @param {Object} option.dataInfo 뒤로가기 복원용 현재 화면 데이터 { 컴포넌트ID : JSON } (isHistory:true 일 때만 사용)
  * @hidden N
- * @exception 
+ * @exception
  * @example
 const param = {
     id : "00001",
     name : "홍길동"
 };
 $c.win.moveUrl("/tmp/tmp01.xml", param);
+
+// 히스토리 기록 + 뒤로가기 시 현재 화면 데이터 자동 복원
+$c.win.moveUrl("/tmp/tmp02.xml", param, {
+    isHistory : true,
+    dataInfo : { dma_search : dma_search.getJSON(), dlt_list : dlt_list.getJSON() }
+});
  */
-scwin.moveUrl = function (moveUrl, paramObj) {
-
-    paramObj = {
-        "dataObject": {
-            "type": "json",
-            "name": "paramData",
-            "data": paramObj
-        }
-    };
-
-    const contextPath = $c.sbm.getContextPath();
-
-    return $p.getFrame().setSrc(contextPath + moveUrl, paramObj);
+scwin.moveUrl = function (moveUrl, paramObj, option) {
+    return scwin.__moveFrameSrc($p.getFrame(), moveUrl, paramObj, option);
 };
 
 /**
- * @method 
+ * @method
  * @name setPageFrameSrc
  * @description 특정 pageFrame의 웹스퀘어 페이지(XML)을 변경한다.
+ * option.isHistory/dataInfo 동작은 $c.win.moveUrl 과 동일하다. (뒤로/앞으로 가기 복원, 데이터 자동 재설정)
  * @param {Object} pageFrameObj pageFrame 객체
  * @param {String} moveUrl 웹스퀘어 페이지(XML) 파일 경로
  * @param {Object} paramObj pageFrame을 set할 시 전달할 파라미터 객체
+ * @param {Object} option 이동 옵션 (생략 가능)
+ * @param {Boolean} option.isHistory 브라우저 히스토리 기록 여부 (기본값 false)
+ * @param {Object} option.dataInfo 뒤로가기 복원용 현재 화면 데이터 { 컴포넌트ID : JSON } (isHistory:true 일 때만 사용)
  * @hidden N
- * @exception 
+ * @exception
  * @example
 const param = {
     id : "00001",
     name : "홍길동"
 };
 $c.win.setPageFrameSrc(pfm_content, "/tmp/tmp01.xml", param);
+
+// 히스토리 기록 + 뒤로가기 시 현재 화면 데이터 자동 복원
+$c.win.setPageFrameSrc(pfm_content, "/tmp/tmp02.xml", param, {
+    isHistory : true,
+    dataInfo : { dma_search : dma_search.getJSON() }
+});
  */
-scwin.setPageFrameSrc = function (pageFrameObj, moveUrl, paramObj) {
-    paramObj = {
+scwin.setPageFrameSrc = function (pageFrameObj, moveUrl, paramObj, option) {
+    return scwin.__moveFrameSrc(pageFrameObj, moveUrl, paramObj, option);
+};
+
+/**
+ * @method
+ * @name __moveFrameSrc
+ * @description moveUrl/setPageFrameSrc 공통 구현. isHistory 옵션 처리(떠나는 화면 entry 보강 → setSrc →
+ *  새 화면 entry push) 후 프레임 setSrc 결과를 반환한다.
+ * @param {Object} frameObj 이동할 pageFrame 객체
+ * @param {String} moveUrl 화면 파일 경로
+ * @param {Object} paramObj 전달 파라미터
+ * @param {Object} option 이동 옵션 ({ isHistory, dataInfo })
+ * @hidden Y
+ * @exception
+ */
+scwin.__moveFrameSrc = function (frameObj, moveUrl, paramObj, option) {
+    const isHistory = !$c.util.isEmpty(option) && option.isHistory === true;
+    if (isHistory) {
+        // 떠나는 화면의 history entry 에 복원 정보(프레임·데이터 스냅샷)를 병합해 둔다.
+        // 뒤로가기로 이 화면에 돌아올 때 popstate 가 전달하는 entry 가 바로 이것이다.
+        scwin.__stampFrameState(frameObj, option.dataInfo);
+    }
+
+    const setSrcParam = {
         "dataObject": {
             "type": "json",
             "name": "paramData",
             "data": paramObj
         }
     };
+    const result = frameObj.setSrc($c.sbm.getContextPath() + moveUrl, setSrcParam);
 
-    const contextPath = $c.sbm.getContextPath();
+    if (isHistory) {
+        // 이동 완료 후 새 화면의 entry 를 push 한다.
+        if (result && typeof result.then === "function") {
+            return result.then(function (ok) {
+                if (ok !== false) {
+                    scwin.__pushFrameState(frameObj, paramObj);
+                }
+                return ok;
+            });
+        }
+        scwin.__pushFrameState(frameObj, paramObj);
+    }
+    return result;
+};
 
-    return pageFrameObj.setSrc(contextPath + moveUrl, paramObj);
+/**
+ * @method
+ * @name __stampFrameState
+ * @description 떠나는 화면의 history entry(현재 entry)에 프레임 정보와 데이터 스냅샷을 replaceState 로 병합한다.
+ * @param {Object} frameObj 현재 pageFrame 객체
+ * @param {Object} dataInfo 복원용 데이터 { 컴포넌트ID : JSON } (생략 가능)
+ * @hidden Y
+ * @exception
+ */
+scwin.__stampFrameState = function (frameObj, dataInfo) {
+    try {
+        const curData = (history.state && history.state.data) ? history.state.data : {};
+        curData.frameInfo = {
+            frameId: (typeof frameObj.getFrameId === "function") ? frameObj.getFrameId() : frameObj.id,
+            src: (typeof frameObj.getSrc === "function") ? frameObj.getSrc() : ""
+        };
+        // 스냅샷은 이번 이동 시점 상태만 유지한다. (이전 이동에서 남은 dataInfo 가 복원되지 않도록 항상 초기화)
+        delete curData.dataInfo;
+        if (!$c.util.isEmpty(dataInfo)) {
+            const cleanInfo = scwin.__sanitizeStateData(dataInfo);
+            if (cleanInfo !== null) {
+                curData.dataInfo = cleanInfo;
+            }
+        }
+        history.replaceState({ "data": curData }, "");
+    } catch (ex) {
+        console.error(ex);
+    }
+};
+
+/**
+ * @method
+ * @name __pushFrameState
+ * @description 프레임 이동 완료 후 새 화면의 history entry 를 push 한다. (URL 은 pushState 와 동일하게 contextPath)
+ * @param {Object} frameObj 이동한 pageFrame 객체
+ * @param {Object} paramObj 새 화면에 전달한 파라미터 (앞으로 가기 복원 시 재전달)
+ * @hidden Y
+ * @exception
+ */
+scwin.__pushFrameState = function (frameObj, paramObj) {
+    try {
+        const data = ($c.util.isEmpty(paramObj) ? {} : scwin.__sanitizeStateData(paramObj)) || {};
+        data.frameInfo = {
+            frameId: (typeof frameObj.getFrameId === "function") ? frameObj.getFrameId() : frameObj.id,
+            src: (typeof frameObj.getSrc === "function") ? frameObj.getSrc() : ""
+        };
+        history.pushState({ "data": data }, "", $c.sbm.getContextPath().replace(/\/$/, ""));
+    } catch (ex) {
+        console.error(ex);
+    }
+};
+
+/**
+ * @method
+ * @name __sanitizeStateData
+ * @description history state 저장용으로 데이터를 정제한다. (함수 등 비직렬화 값 제거, 최대 크기 검사)
+ * @param {Object} obj 정제할 객체
+ * @returns {Object} JSON 라운드트립을 거친 객체. 직렬화 불가·크기 초과 시 null
+ * @hidden Y
+ * @exception
+ */
+scwin.__sanitizeStateData = function (obj) {
+    try {
+        const str = JSON.stringify(obj);
+        if (typeof str !== "string") {
+            return null;
+        }
+        if (str.length > scwin.HISTORY_STATE_MAX_LENGTH) {
+            console.warn("[$c.win] history state 데이터가 최대 크기(" + scwin.HISTORY_STATE_MAX_LENGTH + "자)를 초과하여 기록에서 제외합니다.");
+            return null;
+        }
+        return JSON.parse(str);
+    } catch (ex) {
+        console.error(ex);
+        return null;
+    }
+};
+
+/**
+ * @method
+ * @name __restoreFrameState
+ * @description popstate 로 전달된 프레임 이동 entry 를 복원한다. 프레임을 기록된 화면으로 되돌리고,
+ *  setSrc 완료 후 dataInfo 를 화면 DataCollection 에 자동 적용한다.
+ * @param {Object} data history.state.data ({ frameInfo, dataInfo?, ... })
+ * @returns {Boolean} 복원 착수 여부 (프레임 미발견 시 false — menuInfo 폴백 대상)
+ * @hidden Y
+ * @exception
+ */
+scwin.__restoreFrameState = function (data) {
+    try {
+        const frameObj = $c.util.getComponent(data.frameInfo.frameId);
+        if ($c.util.isEmpty(frameObj) || typeof frameObj.setSrc !== "function") {
+            console.warn("[$c.win.__restoreFrameState] 복원할 pageFrame(" + data.frameInfo.frameId + ")을 찾을 수 없습니다.");
+            return false;
+        }
+        const restoreParam = {
+            "dataObject": {
+                "type": "json",
+                "name": "paramData",
+                "data": Object.assign({ "_isHistoryRestore": true }, data)
+            }
+        };
+        const result = frameObj.setSrc(data.frameInfo.src, restoreParam);
+        if (result && typeof result.then === "function") {
+            result.then(function (ok) {
+                if (ok !== false) {
+                    scwin.__applyRestoreData(frameObj, data.dataInfo);
+                }
+            });
+        } else {
+            scwin.__applyRestoreData(frameObj, data.dataInfo);
+        }
+        return true;
+    } catch (ex) {
+        console.error(ex);
+        return false;
+    }
+};
+
+/**
+ * @method
+ * @name __applyRestoreData
+ * @description 복원된 화면의 DataCollection(dataMap/dataList)에 스냅샷 JSON 을 적용한다.
+ * @param {Object} frameObj 복원된 pageFrame 객체
+ * @param {Object} dataInfo { 컴포넌트ID : JSON } (없으면 무시)
+ * @hidden Y
+ * @exception
+ */
+scwin.__applyRestoreData = function (frameObj, dataInfo) {
+    if ($c.util.isEmpty(dataInfo)) {
+        return;
+    }
+    try {
+        const scopeWin = (typeof frameObj.getWindow === "function") ? frameObj.getWindow() : null;
+        if ($c.util.isEmpty(scopeWin)) {
+            console.warn("[$c.win.__applyRestoreData] 복원 대상 화면 scope 를 찾을 수 없습니다.");
+            return;
+        }
+        for (const compId in dataInfo) {
+            let comp = scopeWin[compId];
+            if ($c.util.isEmpty(comp) && scopeWin.$p && typeof scopeWin.$p.getComponentById === "function") {
+                comp = scopeWin.$p.getComponentById(compId);
+            }
+            if (!$c.util.isEmpty(comp) && typeof comp.setJSON === "function") {
+                comp.setJSON(dataInfo[compId]);
+            } else {
+                console.warn("[$c.win.__applyRestoreData] 복원 대상 컴포넌트(" + compId + ")를 찾을 수 없습니다.");
+            }
+        }
+    } catch (ex) {
+        console.error(ex);
+    }
 };
 
 /**
