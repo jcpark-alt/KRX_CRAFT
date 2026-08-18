@@ -1,10 +1,11 @@
-# gcc 공통 함수 업데이트 이력 (2026-08-14 기준)
+# gcc 공통 함수 업데이트 이력
 
-`src/gcc/` 공통 라이브러리(`$c.*`)의 최초 반입(2026-06-08, `92a35bd`) 이후 **2026-08-14 이전**까지의 변경 내역 정리.
-API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-08-13 기준 **11개 모듈 / 277개 공개 메서드**.
+`src/gcc/` 공통 라이브러리(`$c.*`)의 최초 반입(2026-06-08, `92a35bd`) 이후 변경 내역 정리 (최종 갱신 2026-08-18).
+API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-08-18 기준 **11개 모듈 / 280개 공개 메서드**.
 
-> `src/cm/gcc/`는 CM 모듈용 사본으로, 일반적 개선만 선별 반영한다(2026-06-10 병합, 2026-07-22 대규모 동기화로 11파일 체제).
-> 아래에서 별도 표기가 없으면 `src/gcc/` 기준이며, "cm 동기화"로 표기된 항목은 두 트리에 함께 반영되었다.
+> `src/cm/gcc/`는 CM 모듈용 사본으로 일반적 개선만 선별 반영해 왔으나(2026-06-10 병합, 2026-07-22 대규모 동기화로 11파일 체제),
+> **2026-08-18 `26af3d5`에서 사용 중단으로 삭제**되어 `src/gcc/`가 유일한 canonical 라이브러리다.
+> 아래에서 별도 표기가 없으면 `src/gcc/` 기준이며, "cm 동기화"로 표기된 항목은 삭제 이전 두 트리에 함께 반영되었던 것이다.
 
 ---
 
@@ -12,9 +13,9 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 모듈 | 주요 변화 |
 |------|-----------|
-| `sbm.xml` (`$c.sbm`) | 중복 제출 가드, `executeDynamic` 간소화 ref/target 문법·gridview 자동 바인딩·`autoFocus`·다중 gridview 바인딩·스피너 오버레이·message 옵션(opt-in), RESTful URL 활성화, 단건 ref(DataMap)→`requestData` 추출, 페이징(`setPagingInfo`) 개선 |
-| `data.xml` (`$c.data`) | 공통코드 로딩(`COMMON_CODE_INFO.ACTION` 연동, `setCommonCode` 배열 매핑), JSON 헬퍼 8종, 프로세스 메시지, 콤보 공통코드 세팅(`comboCbDataSet*`) 계열, 업로드/리포트 헬퍼 |
-| `win.xml` (`$c.win`) | 외부망 홈(`goHomeEx`), 프로그램 열기/내비게이션 단순화, `openFormSubmit`, 인쇄(`mainPrint`/`popupPrint`), `success`/`error` 알림, `openExternalPage` |
+| `sbm.xml` (`$c.sbm`) | 중복 제출 가드, `executeDynamic` 간소화 ref/target 문법·gridview 자동 바인딩·`autoFocus`·다중 gridview 바인딩·스피너 오버레이·message 옵션(opt-in), RESTful URL 활성화, 단건 ref(DataMap)→`requestData` 추출, 페이징(`setPagingInfo`) 개선, 그리드 DOM `render` 참조 전환 |
+| `data.xml` (`$c.data`) | 공통코드 로딩(`COMMON_CODE_INFO.ACTION` 연동, `setCommonCode` 배열 매핑·응답 언래핑), JSON 헬퍼 8종, 프로세스 메시지, 콤보 공통코드 세팅(`comboCbDataSet*`) 계열, 업로드/리포트 헬퍼, 엑셀 다운로드 기본 옵션 개선 |
+| `win.xml` (`$c.win`) | 외부망 홈(`goHomeEx`), 프로그램 열기/내비게이션 단순화, `openFormSubmit`, 인쇄(`mainPrint`/`popupPrint`), `success`/`error` 알림, `openExternalPage`, **browserPopup 부모 화면 접근**(`getOpenerScope`/`callOpener`) |
 | `util.xml` (`$c.util`) | 쿠키/웹스토리지 헬퍼 13종, 업로드(`onUploadClick`/`getUploadFiles` 등), `setTextLengthCounter`, `checkFileExtension`, 엑셀 다운로드 파일명 개선 |
 | `date.xml` (`$c.date`) | 날짜 포맷 검증(`checkCalendarFormat`/`compareFromToDate`), `getDateInterval` 단위 버그 수정, commonPrototype 의존 제거 |
 | `str.xml` (`$c.str`) | validate 중복 검증기 통합, 목적격 조사(`attachObjectPostposition`), 바이트/포맷 함수 자체 구현 전환 |
@@ -78,13 +79,27 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
   - `getDateInterval`/`getWeekStartEndDay`: `String.prototype.toDate`/`Date.prototype.format` 대신 자체 헬퍼(`$c.date.fromYmd`/`formatDateTime`) 사용
   - `dateFormat`: `formatDateTime` 위임 / `dateUnFormat`: 비숫자 제거 자체 구현(format 파라미터 제거)
   - `getByteSubstring`/`stringFormat`/`stringUnFormat`: 자체 구현 전환(바이트 계산은 `WebSquare.util.getStringByteSize` 재사용, `stringFormat`의 delLength 파라미터 제거)
+- `81ef0d1` (08-18) — KRX 신규 API 대응 및 결함 수정(cm 동기화):
+  - `$c.data.__getCommonCodeData`: 단일 code 조회의 key 래핑 응답을 첫 key 목록으로 **언래핑** (배열 code 조회의 key 맵은 배열 매핑에서 쓰므로 제외)
+  - `$c.data.downloadGridViewExcel`: 기본값 개선 — `type` "1"(보이는 데이터), `useStyle`/`useClass` "true", `bodyWordwrap` 기본 true(`|| true` 상시 참 버그를 null 병합으로 수정해 명시적 false 지원)
+  - `$c.sbm.__eachGridElement`: 그리드 DOM 참조를 `getElement()` 대신 `render` 속성으로 변경
+  - `$c.win`: `pushState` 단순화(contextPath 단일 URL), `openMenu` 들여쓰기·JSDoc 정리
+- `26af3d5` (08-18) — **`src/cm/` 폴더 삭제** (사용 중단): `src/gcc` 단일 canonical 체제로 전환.
+  Jest 테스트 대상을 gcc 단독으로 축소(34→17), CLAUDE.md·`cm-gcc-merge.md` 폐기 공지 반영.
+- `0a551a2` (08-18) — **browserPopup 부모 화면 접근 공통함수** 추가(`$c.win`, 277→280 메서드):
+  - `getOpenerScope`(부모 scope 복원 — browserPopup은 `window.opener`+오프너 등록 정보, pageFramePopup은 `$p.parent()` 폴백), `callOpener`(부모 scwin 함수 호출·반환값 전달), `getPopupOpenerScope`(opener 창 조회용)
+  - `_openPopup`이 browserPopup 오픈 시 호출 scope를 popupId로 자동 등록(닫힘 시 정리), 엔진이 자식에 전달하는 popupId를 키로 사용
+  - 가이드 문서 [popup-opener-guide.md](popup-opener-guide.md) 신설, 회귀 테스트 `test/popupOpenerScope.test.js` 9건
 
 ---
 
-## 커밋 이력 (src/gcc, 2026-08-14 이전)
+## 커밋 이력 (src/gcc)
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-08-18 | `0a551a2` | feat(gcc): browserPopup 팝업의 부모 화면 접근 공통함수 추가 |
+| 2026-08-18 | `26af3d5` | chore(cm): src/cm 폴더 제거 — src/gcc 단일 canonical 체제로 전환 |
+| 2026-08-18 | `81ef0d1` | feat(gcc): 공통코드 응답 언래핑·엑셀 기본옵션·그리드 render 참조 개선 |
 | 2026-08-13 | `918d0f7` | fix(gcc): date/str 유틸 오류 수정 및 commonPrototype 의존 제거 |
 | 2026-08-12 | `8746b80` | feat(sbm): executeDynamic gridview 스피너 오버레이 추가 (기본 사용) |
 | 2026-08-12 | `94ccf1a` | feat(sbm): executeDynamic gridview 옵션 nomessage → message (opt-in) |
