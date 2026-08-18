@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A **WebSquare (Inswave) source tree** for KRX (Korea Exchange) business systems. Every file is a `.xml` WebSquare *screen* document, normally authored in the WebSquare IDE; here they are edited as source. JavaScript lives inside `<script type="text/javascript"><![CDATA[ ... ]]>` blocks within each XML file.
 
-The XML lives under **`src/`**, which holds four top-level trees: `src/gcc/` (the modern common library), `src/cm/` (the cm module — currently just its own per-module `src/cm/gcc/` copy of the common library), `src/docs/` (docs + generated API HTML), and `src/as-is/` (the legacy W-Craft-converted business modules: `src/as-is/{fil,ins,mgt,stf}`, where `fil` additionally nests the `bnf` and `inf` sub-trees). The Python linter is under `tools/wsxml_lint/`; Node/Claude tooling sits at the repo root.
+The XML lives under **`src/`**, which holds three top-level trees: `src/gcc/` (the modern common library), `src/docs/` (docs + generated API HTML), and `src/as-is/` (the legacy W-Craft-converted business modules: `src/as-is/{fil,ins,mgt,stf}`, where `fil` additionally nests the `bnf` and `inf` sub-trees). (`src/cm/` — the cm module's per-module copy of the gcc library — was removed 2026-08-18; `src/gcc/` is the single canonical library. It survives in git history if ever needed.) The Python linter is under `tools/wsxml_lint/`; Node/Claude tooling sits at the repo root.
 
 There is no app build/run step you can invoke from the shell. "Running" a change means deploying the XML into a WebSquare server and opening the screen in a browser; that is outside this repo. Treat your job as editing the JavaScript inside these XML envelopes correctly and consistently. For **static checks**, the repo carries a lint/test toolchain — see [Toolchain & commands](#toolchain--commands) below.
 
@@ -83,9 +83,6 @@ The actively maintained core (most recent edits). Each file is one namespace und
 | `ext.xml` | `$c.data`* | External-solution integration |
 
 When writing code in `src/gcc/`, **reuse the `$c.*` helpers** instead of reimplementing (e.g. `$c.util.isEmpty(x)` over hand-rolled emptiness checks, `$c.str.*` for string ops, `$c.win.alert`/`$c.win.confirm` for dialogs, `$c.sbm.*` for all server calls). The files already cross-reference this way.
-
-### `src/cm/` — the cm module's per-module common-library copy
-Currently just `src/cm/gcc/` — a **per-module copy** of the `src/gcc/` library (9 files) that is an *older / CM-specific variant*, **not** a newer version. When reconciling it with the canonical `src/gcc/`, cherry-pick only genuinely general improvements into `src/gcc/` and keep CM-specific behavior (different backend endpoints/field names, `/cm/main/...` landing pages, etc.) **out** of the shared lib. `src/cm/` is **not** in the CI lint scope.
 
 ### `src/as-is/` — converted business modules (legacy style)
 The legacy W-Craft-converted screen libraries, grouped under **`src/as-is/`**: `ins`, `mgt`, `stf`, and `fil` (which additionally nests the `bnf` and `inf` sub-trees). Their scripts begin with the marker:

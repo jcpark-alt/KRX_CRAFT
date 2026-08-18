@@ -3,14 +3,13 @@
  *
  * setCommonCode 는 WebSquare 런타임($c/$p/컴포넌트 API)에 의존하므로, 런타임을 mock 으로
  * 대체한 vm 하네스로 data.xml 의 CDATA 를 로드해 실제 구동한다. code/compID 배열 매핑,
- * mappingKey override, 단일 code 회귀를 검증한다. src/gcc 와 src/cm/gcc 두 사본 모두 대상
- * (사본 divergence 도 감지).
+ * mappingKey override, 단일 code 회귀를 검증한다.
  */
 const fs = require("fs");
 const vm = require("vm");
 const path = require("path");
 
-const XML_FILES = ["src/gcc/data.xml", "src/cm/gcc/data.xml"];
+const XML_FILES = ["src/gcc/data.xml"];
 
 function extractCdata(xmlPath) {
   const xml = fs.readFileSync(xmlPath, "utf8");

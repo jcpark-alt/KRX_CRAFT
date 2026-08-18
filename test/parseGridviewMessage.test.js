@@ -3,14 +3,13 @@
  *
  * sbm.xml 의 __parseGridview 는 gridview 문자열을 grid별 디스크립터로 파싱한다.
  * 빈 결과 메시지("조회된 데이터가 없습니다.")는 "|message" 접미사가 있을 때만 출력되며
- * (opt-in), 기본은 미출력이다. WebSquare 런타임을 mock 으로 대체한 vm 하네스로 검증하고
- * src/gcc·src/cm/gcc 두 사본 모두 대상으로 한다(사본 divergence 감지).
+ * (opt-in), 기본은 미출력이다. WebSquare 런타임을 mock 으로 대체한 vm 하네스로 검증한다.
  */
 const fs = require("fs");
 const vm = require("vm");
 const path = require("path");
 
-const XML_FILES = ["src/gcc/sbm.xml", "src/cm/gcc/sbm.xml"];
+const XML_FILES = ["src/gcc/sbm.xml"];
 
 function extractCdata(xmlPath) {
   const xml = fs.readFileSync(xmlPath, "utf8");

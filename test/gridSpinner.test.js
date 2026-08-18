@@ -3,14 +3,13 @@
  *
  * gridview 옵션 지정 시 통신 실행 전 gridView DOM 하단에 스피너 오버레이
  * (spinner_wrap > spinner_cont > grid_spinner)를 삽입하고, 완료(성공/실패) 시 제거한다.
- * WebSquare 런타임 + 경량 가짜 DOM 을 mock 으로 대체한 vm 하네스로 검증하며,
- * src/gcc·src/cm/gcc 두 사본 모두 대상으로 한다.
+ * WebSquare 런타임 + 경량 가짜 DOM 을 mock 으로 대체한 vm 하네스로 검증한다.
  */
 const fs = require("fs");
 const vm = require("vm");
 const path = require("path");
 
-const XML_FILES = ["src/gcc/sbm.xml", "src/cm/gcc/sbm.xml"];
+const XML_FILES = ["src/gcc/sbm.xml"];
 
 const isEmpty = (v) =>
   v === undefined || v === null || v === "" ||
@@ -47,8 +46,7 @@ function makeEl(doc, id) {
 }
 function makeGrid(doc, id) {
   const el = makeEl(doc, id);
-  // render: src/gcc(sbm) 현행 참조 방식 · getElement: src/cm/gcc 사본 호환
-  return { id, _el: el, render: el, getElement: () => el, initGrid() {}, refresh() {}, setFocusedCell() {} };
+  return { id, _el: el, render: el, initGrid() {}, refresh() {}, setFocusedCell() {} };
 }
 
 function loadHarness(xmlPath) {
