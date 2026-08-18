@@ -47,7 +47,8 @@ function makeEl(doc, id) {
 }
 function makeGrid(doc, id) {
   const el = makeEl(doc, id);
-  return { id, _el: el, getElement: () => el, initGrid() {}, refresh() {}, setFocusedCell() {} };
+  // render: src/gcc(sbm) 현행 참조 방식 · getElement: src/cm/gcc 사본 호환
+  return { id, _el: el, render: el, getElement: () => el, initGrid() {}, refresh() {}, setFocusedCell() {} };
 }
 
 function loadHarness(xmlPath) {

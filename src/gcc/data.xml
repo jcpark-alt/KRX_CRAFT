@@ -667,9 +667,15 @@ scwin.__getCommonCodeData = async function (codeOptions) {
         });
 
         // REST 응답은 body 래퍼에 코드별 데이터가 담겨 온다. (래퍼가 없으면 평면 응답으로 처리)
-        const resJSON = (rtn && rtn.responseJSON && rtn.responseJSON.body) ? rtn.responseJSON.body
+        let resJSON = (rtn && rtn.responseJSON && rtn.responseJSON.body) ? rtn.responseJSON.body
             : ((rtn && rtn.responseJSON) ? rtn.responseJSON : {});
 
+		// 단일 code 조회인데 body 가 배열이 아니면(key 래핑 응답) 첫 key 의 목록으로 언래핑한다.
+		// code 배열 조회의 body 는 code별 key 맵 그 자체이므로 언래핑하지 않는다(배열 매핑에서 사용).
+		if (!Array.isArray(codeObj.code) && !Array.isArray(resJSON)) {
+			resJSON = resJSON[Object.keys(resJSON)[0]] || [];
+		}
+		
 		scwin.commonCodeList[cacheKey] = resJSON;
     };
 
@@ -1596,7 +1602,7 @@ scwin.downloadGridViewExcel = function (grdObj, options, infoArr) {
     const opts = {
         fileName: options.fileName, //String, [defalut: excel.xlsx] 다운로드하려는 파일의 이름으로 필수 입력 값이다.
         sheetName: options.sheetName || "sheet", //String, [defalut: sheet] excel의 sheet의 이름
-        type: options.type || "0", //String, [defalut: 0] type이 0인 경우 실제 데이터 1인 경우 눈에 보이는 데이터를  2이면 들어가 있는 data 그대로(filter무시 expression 타입의 셀은 나오지 않음)
+        type: options.type || "1", //String, [defalut: 0] type이 0인 경우 실제 데이터 1인 경우 눈에 보이는 데이터를  2이면 들어가 있는 data 그대로(filter무시 expression 타입의 셀은 나오지 않음)
         removeColumns: options.removeColumns || "", //String, [defalut: 없음] 다운로드시 excel에서 삭제하려는 열의 번호(여러 개일 경우 ,로 구분)
         convertIndex: options.convertIndex || "", // [default: 없음] type이 "0" 또는 "1"인 경우, 특정 컬럼만 type이 "1" 또는 "0"인 데이터로 다운로드. type="1"인 상태에서 convertIndex="0,2"인 경우, index가 0,2인 컬럼은 컬름은 type="1"로 다운로드.
         removeHeaderRows: options.removeHeaderRows || "", //String, [defalut: 없음]	다운로드시 excel에서 삭제하려는 Header의 row index(여러 개일 경우 ,로 구분)
@@ -1649,7 +1655,7 @@ scwin.downloadGridViewExcel = function (grdObj, options, infoArr) {
         dataProvider: options.dataProvider || "", // String, ExcelHeaderDown 설정을 위한 속성
         providerRequestXml: options.providerRequestXml || "", //String, [defalut: 없음] Provider 내부에서 사용할 XML 문자열
         userDataXml: options.userDataXml || "", //String, [defalut: 없음] 사용자가 서버모듈 개발 시 필요한 데이터를 전송 할 수 있는 변수
-        bodyWordwrap: WebSquare.util.getBoolean(options.bodyWordwrap) || false, //Boolean, [defalut: false] 다운로드시 바디의 줄 바꿈 기능
+        bodyWordwrap: options.bodyWordwrap == null ? true : WebSquare.util.getBoolean(options.bodyWordwrap), //Boolean, [defalut: true] 다운로드시 바디의 줄 바꿈 기능 (명시적 false 지정 가능)
         useEuroLocale: options.useEuroLocale || "false", //String, [defalut: false] 다운로드시 유로화 처리 기능(,와 .이 반대인 경우처리)
         useHeader: options.useHeader || "true", //String, [defalut: true] 다운로드시 Header를 출력 할지 여부( "true"인경우 출력, "false"인경우 미출력)
         useSubTotal: options.useSubTotal || "false", //String, [defalut: false] 다운로드시 SubTotal을 출력 할지 여부( "true"인경우 출력, "false"인경우 미출력), expression을 지정한 경우 avg,sum,min,max,targetColValue,숫자를 지원 함.
@@ -1657,7 +1663,8 @@ scwin.downloadGridViewExcel = function (grdObj, options, infoArr) {
         separator: options.separator || ",", //String, [defalut: ,] 다운로드시 서버로 데이터 전송할때, 데이터를 구분짓는 구분자, default는 comma(,)
         subTotalScale: options.subTotalScale || -1, //Number, [defalut: -1] 다운로드시 subTotal 평균계산시 소수점 자리수를 지정
         subTotalRoundingMode: options.subTotalRoundingMode || "", //String, [defalut: 없음] 다운로드시 subTotal 평균계산시 Round를 지정 한다. ("CEILING","FLOOR","HALF_UP")
-        useStyle: options.useStyle || "", //String, [defalut: false] 다운로드시 css를 제외한, style을 excel에도 적용할 지 여부 (배경색,폰트)
+        useStyle: options.useStyle || "true", //String, [defalut: false] 다운로드시 css를 제외한, style을 excel에도 적용할 지 여부 (배경색,폰트)
+		useClass: options.useClass || "true", //String, [default: false] 클래스 설정 시 클래스 내용 엑셀 적용 유무
         freezePane: options.freezePane || "", //String, [defalut: ""] 틀고정을 위한 좌표값 및 좌표값의 오픈셋 ( ex) freezePane="3,4" X축 3, Y축 4에서 틀고정, freezePane="0,1,0,5" X축 0, Y축 1에서 X축으로 0, Y축으로 5로 틀공정  )
         autoSizeColumn: options.autoSizeColumn || "true", //String, [defalut: false] 너비자동맞춤 설정 유무 - 2016.08.18 옵션 설정을 true로 변경
         displayGridlines: options.displayGridlines || "", //String, [defalut: false] 엑셀 전체 셀의 눈금선 제거 유무
