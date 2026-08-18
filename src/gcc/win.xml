@@ -11,7 +11,7 @@
 			<w2:workflowCollection/>
 		</xf:model>
 		<w2:layoutInfo/>
-		<w2:publicInfo method="scwin.getScope,scwin.__getScope,scwin.getActiveWindowInfo,scwin.showToastMessage,scwin.openMenu,scwin.openPopup,scwin.closePopup,scwin.closeAllPopup,scwin.isPopup,scwin.messageBox,scwin.setProgramAuthority,scwin.processCommonData,scwin.setHistoryBackEvent,scwin.pushState,scwin.changePageState,scwin.addEventOnBeforeUnload,scwin.removeEventOnBeforeUnload,scwin.__setOnBeforeUnload,scwin.__errorHandler,scwin.reload,scwin.getProgramId,scwin.goHome,scwin.goHomeEx,scwin.logout,scwin.isAdmin,scwin.getFullPath,scwin.setEnterKeyEvent,scwin.alert,scwin.success,scwin.error,scwin.confirm,scwin.getLanguage,scwin.getPopupId,scwin.moveUrl,scwin.setPageFrameSrc,scwin.getFrame,scwin.getParent,scwin.setLangCode,scwin.getLangCode,scwin.getCbFunctionManager,scwin.openExternalPage,scwin.openFormSubmit,scwin.mainPrint,scwin.popupPrint"/>
+		<w2:publicInfo method="scwin.getScope,scwin.__getScope,scwin.getActiveWindowInfo,scwin.showToastMessage,scwin.openMenu,scwin.openPopup,scwin.closePopup,scwin.closeAllPopup,scwin.isPopup,scwin.messageBox,scwin.setProgramAuthority,scwin.processCommonData,scwin.setHistoryBackEvent,scwin.pushState,scwin.changePageState,scwin.addEventOnBeforeUnload,scwin.removeEventOnBeforeUnload,scwin.__setOnBeforeUnload,scwin.__errorHandler,scwin.reload,scwin.getProgramId,scwin.goHome,scwin.goHomeEx,scwin.logout,scwin.isAdmin,scwin.getFullPath,scwin.setEnterKeyEvent,scwin.alert,scwin.success,scwin.error,scwin.confirm,scwin.getLanguage,scwin.getPopupId,scwin.moveUrl,scwin.setPageFrameSrc,scwin.getFrame,scwin.getParent,scwin.getPopupOpenerScope,scwin.getOpenerScope,scwin.callOpener,scwin.setLangCode,scwin.getLangCode,scwin.getCbFunctionManager,scwin.openExternalPage,scwin.openFormSubmit,scwin.mainPrint,scwin.popupPrint"/>
 		<script lazy="false" type="text/javascript"><![CDATA[
 /**
  * @component
@@ -50,6 +50,10 @@ scwin.CB_FUNCTION_MANAGER = {
     cbFuncIdx: 0, // 정보 저장 Index Key
     cbFuncSave: {} // 정보 저장 객체
 };
+
+// browserPopup 오프너(호출 화면) scope 저장소. popupId → { scope, scopeP }
+// 자식 팝업 창이 opener 경유($c.win.getOpenerScope)로 부모 화면 scope 를 복원할 때 사용한다.
+scwin.POPUP_OPENER_SCOPES = {};
 
 // 대외망 홈(index) 이동 경로. 배포 모듈별로 경로가 다를 수 있어 상수로 분리한다. (scwin.goHomeEx 에서 사용)
 scwin.HOME_EX_URL = "/cm/main/fill/index.xml";
@@ -625,6 +629,33 @@ scwin._openPopup = function (url, opt, data, closeActionFunc) {
     opt.frameModal = opt.frameModal || "";
 
     opt.className = opt.frameModal == "frame" ? opt.className ? opt.className + " f_pop" : "f_pop" : "";
+
+    // browserPopup(별도 브라우저 창)은 자식이 $p.parent() 로 부모 화면에 접근할 수 없다.
+    // 호출 화면 scope 를 popupId 로 등록해 두면 자식이 $c.win.getOpenerScope() 로 복원한다.
+    // (팝업 id 는 엔진이 창 이름/popupID 파라미터로 자식에게 전달하므로 별도 전달 채널이 필요 없다)
+    if (opt.type === "browserPopup") {
+        if ($c.util.isEmpty(opt.id)) {
+            opt.id = "popup" + new Date().getTime() + "_" + (++scwin.CB_FUNCTION_MANAGER["cbFuncIdx"]);
+        }
+        let openerScope = null;
+        try {
+            openerScope = $p.getFrame() ? $p.getFrame().scope : null;
+        } catch (ex) {
+            console.error(ex);
+        }
+        scwin.POPUP_OPENER_SCOPES[opt.id] = { scope: openerScope, scopeP: $p };
+
+        // 팝업이 닫히면 등록을 정리한다. (닫기가 거부되면 유지)
+        const openerPopupId = opt.id;
+        const orgCloseActionFunc = closeActionFunc;
+        closeActionFunc = function () {
+            const ret = (typeof orgCloseActionFunc === "function") ? orgCloseActionFunc.apply(this, arguments) : true;
+            if (ret !== false) {
+                delete scwin.POPUP_OPENER_SCOPES[openerPopupId];
+            }
+            return ret;
+        };
+    }
 
     let top, left;
 
@@ -1605,6 +1636,7 @@ scwin.getFrame = function (scopeApi) {
  * @method 
  * @name getParent
  * @description 자신의 부모 pageFrame 객체를 찾아 반환한다.
+ * browserPopup(별도 브라우저 창) 화면에서는 부모 화면에 접근할 수 없으므로 $c.win.getOpenerScope() 를 사용한다.
  * @returns {Object} 자신을 감싼 pageFrame object의 부모 pageFrame 객체
  * @hidden N
  * @exception 
@@ -1625,7 +1657,89 @@ scwin.getParent = function () {
 };
 
 /**
- * @method 
+ * @method
+ * @name getPopupOpenerScope
+ * @description browserPopup 오픈 시 등록된 오프너(호출 화면) scope 정보를 popupId 로 조회한다.
+ * 자식 팝업 창이 opener 창의 $c.win 을 경유해 호출하는 연동용 함수다. 업무 화면에서는 $c.win.getOpenerScope() 를 사용한다.
+ * @param {String} popupId 팝업 아이디
+ * @returns {Object} { scope, scopeP } 오프너 scope 정보 (미등록 시 null)
+ * @hidden N
+ * @exception
+ * @example
+const openerInfo = $c.win.getPopupOpenerScope("popup1755500000000_1");
+ */
+scwin.getPopupOpenerScope = function (popupId) {
+    if ($c.util.isEmpty(popupId)) {
+        return null;
+    }
+    return scwin.POPUP_OPENER_SCOPES[popupId] || null;
+};
+
+/**
+ * @method
+ * @name getOpenerScope
+ * @description 팝업 화면에서 자신을 연 부모 화면의 scope 를 반환한다. (scwin/컴포넌트 접근 가능)
+ * browserPopup(별도 브라우저 창)은 window.opener 와 오프너 등록 정보($c.win.openPopup 이 자동 등록)로,
+ * 그 외(pageFramePopup 등)는 pageFrame 계층으로 부모를 찾는다.
+ * 부모 창이 닫혔거나 접근 불가(COOP 정책 등)하면 null 을 반환한다.
+ * @returns {Object} 부모 화면 scope 객체, 접근 불가 시 null
+ * @hidden N
+ * @exception
+ * @example
+const openerScope = $c.win.getOpenerScope();
+if (!$c.util.isEmpty(openerScope)) {
+    openerScope.scwin.searchList(); // 부모 화면의 scwin.searchList 호출
+}
+ */
+scwin.getOpenerScope = function () {
+    try {
+        if (window.opener != null) {
+            // browserPopup: opener 창의 등록 정보에서 호출 화면 scope 복원
+            if (window.opener.closed || $c.util.isEmpty(window.opener.$c) || $c.util.isEmpty(window.opener.$c.win)) {
+                console.warn("[$c.win.getOpenerScope] 부모 창에 접근할 수 없습니다. (창 닫힘 또는 COOP 정책)");
+                return null;
+            }
+            const openerInfo = window.opener.$c.win.getPopupOpenerScope($c.win.getPopupId());
+            return ($c.util.isEmpty(openerInfo) || $c.util.isEmpty(openerInfo.scope)) ? null : openerInfo.scope;
+        }
+        // pageFramePopup 등 같은 창 안의 팝업: pageFrame 계층의 부모 scope
+        return $p.parent();
+    } catch (ex) {
+        console.error(ex);
+        return null;
+    }
+};
+
+/**
+ * @method
+ * @name callOpener
+ * @description 팝업 화면에서 부모 화면 scwin 의 함수를 호출하고 반환값을 전달한다. (browserPopup/pageFramePopup 공통)
+ * 부모 창 접근 불가 또는 함수 미존재 시 호출하지 않고 undefined 를 반환한다.
+ * @param {String} fnName 부모 화면 scwin 의 함수명
+ * @param {*} args 함수에 전달할 인자 (가변 인자)
+ * @returns {*} 부모 함수의 반환값 (호출 실패 시 undefined)
+ * @hidden N
+ * @exception
+ * @example
+$c.win.callOpener("searchList");          // 부모 화면의 scwin.searchList() 호출
+$c.win.callOpener("setRowData", rowJSON); // 인자 전달
+ */
+scwin.callOpener = function (fnName) {
+    try {
+        const openerScope = $c.win.getOpenerScope();
+        if ($c.util.isEmpty(openerScope) || $c.util.isEmpty(openerScope.scwin) || typeof openerScope.scwin[fnName] !== "function") {
+            console.warn("[$c.win.callOpener] 부모 화면의 함수를 찾을 수 없습니다. (" + fnName + ")");
+            return undefined;
+        }
+        return openerScope.scwin[fnName].apply(openerScope.scwin, Array.prototype.slice.call(arguments, 1));
+    } catch (ex) {
+        console.error(ex);
+        return undefined;
+    }
+};
+
+/**
+ * @method
  * @name setLangCode
  * @description 언어 코드를 설정한다.
  * @param {String} langCode 언어코드 (한국어 : "ko", 영어 : "en", 중국어 : "zh")
