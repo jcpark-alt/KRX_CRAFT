@@ -84,9 +84,9 @@ describe.each(XML_FILES)("setCommonCode 배열 매핑 (%s)", (xmlPath) => {
   test("code 배열 → 통합 목록을 mappingKey 컬럼 값으로 분리해 병렬 compID 에 매핑", async () => {
     h.state.comps = { sbx_A: h.makeComp("sbx_A"), sbx_B: h.makeComp("sbx_B") };
     h.state.serverBody = [
-      { grpCd: "00001", value: "A1", text: "A-one" },
-      { grpCd: "00001", value: "A2", text: "A-two" },
-      { grpCd: "00005", value: "B1", text: "B-one" },
+      { grpCd: "00001", cdVal: "A1", cdValNm: "A-one" },
+      { grpCd: "00001", cdVal: "A2", cdValNm: "A-two" },
+      { grpCd: "00005", cdVal: "B1", cdValNm: "B-one" },
     ];
     await h.scwin.setCommonCode([{
       code: ["00001", "00005"], compID: ["sbx_A", "sbx_B"], mappingKey: ["grpCd", "grpCd"],
@@ -95,42 +95,75 @@ describe.each(XML_FILES)("setCommonCode 배열 매핑 (%s)", (xmlPath) => {
     expect(h.state.lastServer.action).toMatch(/cdEngNmList=00001%2C00005/); // 콤마(%2C) 구분
     const rowsA = h.state.dls["dlt_commonCode_00001___sbx_A"]._rows;
     const rowsB = h.state.dls["dlt_commonCode_00005___sbx_B"]._rows;
-    expect(vals(rowsA, "value")).toEqual(expect.arrayContaining(["A1", "A2"]));
-    expect(vals(rowsB, "value")).toContain("B1");
-    expect(vals(rowsB, "value")).not.toContain("A1"); // 교차오염 없음
+    expect(vals(rowsA, "cdVal")).toEqual(expect.arrayContaining(["A1", "A2"]));
+    expect(vals(rowsB, "cdVal")).toContain("B1");
+    expect(vals(rowsB, "cdVal")).not.toContain("A1"); // 교차오염 없음
     expect(h.state.comps.sbx_A._bound.src).toBe("data:dlt_commonCode_00001___sbx_A");
-    expect(rowsA[0].text).toBe("선택"); // 기본 firstRow 선두 삽입
+    expect(rowsA[0].cdValNm).toBe("선택"); // 기본 firstRow 선두 삽입 (기본 LABEL 컬럼 = cdValNm)
   });
 
   test("mappingKey 미지정 시 전체 목록을 각 compID 에 바인딩 (예외 없음)", async () => {
     h.state.comps = { sbx_A: h.makeComp("sbx_A"), sbx_B: h.makeComp("sbx_B") };
     h.state.serverBody = [
-      { grpCd: "00001", value: "A1", text: "A-one" },
-      { grpCd: "00005", value: "B1", text: "B-one" },
+      { grpCd: "00001", cdVal: "A1", cdValNm: "A-one" },
+      { grpCd: "00005", cdVal: "B1", cdValNm: "B-one" },
     ];
     await h.scwin.setCommonCode([{ code: ["00001", "00005"], compID: ["sbx_A", "sbx_B"] }]);
 
     const rowsA = h.state.dls["dlt_commonCode_00001___sbx_A"]._rows;
     const rowsB = h.state.dls["dlt_commonCode_00005___sbx_B"]._rows;
-    expect(vals(rowsA, "value")).toEqual(expect.arrayContaining(["A1", "B1"]));
-    expect(vals(rowsB, "value")).toEqual(expect.arrayContaining(["A1", "B1"]));
+    expect(vals(rowsA, "cdVal")).toEqual(expect.arrayContaining(["A1", "B1"]));
+    expect(vals(rowsB, "cdVal")).toEqual(expect.arrayContaining(["A1", "B1"]));
   });
 
   test("단일 code(문자열)는 cdEngNm 사용 — 기존 동작 유지", async () => {
     h.state.comps = { sbx_S: h.makeComp("sbx_S") };
-    h.state.serverBody = [{ value: "S1", text: "single-one" }]; // 단일은 body 가 배열
+    h.state.serverBody = [{ cdVal: "S1", cdValNm: "single-one" }]; // 단일은 body 가 배열
     await h.scwin.setCommonCode([{ code: "00009", compID: "sbx_S" }]);
 
     expect(h.state.lastServer.action).toMatch(/cdEngNm=00009/);
     expect(h.state.lastServer.action).not.toMatch(/cdEngNmList/);
-    expect(vals(h.state.dls["dlt_commonCode_00009___sbx_S"]._rows, "value")).toContain("S1");
+    expect(vals(h.state.dls["dlt_commonCode_00009___sbx_S"]._rows, "cdVal")).toContain("S1");
+  });
+
+  test("labelColumn/valueColumn 문자열 지정 시 전체 컴포넌트 공통 적용", async () => {
+    h.state.comps = { sbx_A: h.makeComp("sbx_A"), sbx_B: h.makeComp("sbx_B") };
+    h.state.serverBody = [
+      { grpCd: "00001", custCd: "A1", custNm: "A-one" },
+      { grpCd: "00005", custCd: "B1", custNm: "B-one" },
+    ];
+    await h.scwin.setCommonCode([{
+      code: ["00001", "00005"], compID: ["sbx_A", "sbx_B"], mappingKey: ["grpCd", "grpCd"],
+      labelColumn: "custNm", valueColumn: "custCd", // 문자열 — 두 컴포넌트 모두 동일 컬럼
+    }]);
+
+    expect(h.state.comps.sbx_A._bound.label).toBe("custNm");
+    expect(h.state.comps.sbx_A._bound.value).toBe("custCd");
+    expect(h.state.comps.sbx_B._bound.label).toBe("custNm");
+    expect(vals(h.state.dls["dlt_commonCode_00005___sbx_B"]._rows, "custCd")).toContain("B1");
+  });
+
+  test("labelColumn/valueColumn 배열 지정 시 컴포넌트별 override (누락 인덱스는 기본값)", async () => {
+    h.state.comps = { sbx_A: h.makeComp("sbx_A"), sbx_B: h.makeComp("sbx_B") };
+    h.state.serverBody = [
+      { grpCd: "00001", custCd: "A1", custNm: "A-one", cdVal: "A1", cdValNm: "A-one" },
+      { grpCd: "00005", custCd: "B1", custNm: "B-one", cdVal: "B1", cdValNm: "B-one" },
+    ];
+    await h.scwin.setCommonCode([{
+      code: ["00001", "00005"], compID: ["sbx_A", "sbx_B"], mappingKey: ["grpCd", "grpCd"],
+      labelColumn: ["custNm"], valueColumn: ["custCd"], // 배열 — 첫 컴포넌트만 override
+    }]);
+
+    expect(h.state.comps.sbx_A._bound.label).toBe("custNm");
+    expect(h.state.comps.sbx_B._bound.label).toBe("cdValNm"); // 누락 인덱스 → 기본(COMMON_CODE_INFO.LABEL)
+    expect(h.state.comps.sbx_B._bound.value).toBe("cdVal");
   });
 
   test("단일 code 의 key 래핑 응답은 첫 key 목록으로 언래핑", async () => {
     h.state.comps = { sbx_S: h.makeComp("sbx_S") };
-    h.state.serverBody = { codeList: [{ value: "W1", text: "wrapped-one" }] }; // key 래핑 응답
+    h.state.serverBody = { codeList: [{ cdVal: "W1", cdValNm: "wrapped-one" }] }; // key 래핑 응답
     await h.scwin.setCommonCode([{ code: "00010", compID: "sbx_S" }]);
 
-    expect(vals(h.state.dls["dlt_commonCode_00010___sbx_S"]._rows, "value")).toContain("W1");
+    expect(vals(h.state.dls["dlt_commonCode_00010___sbx_S"]._rows, "cdVal")).toContain("W1");
   });
 });
