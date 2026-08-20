@@ -123,6 +123,12 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 - `e8dcf07` (08-20) — [연관] **2026-08 gcc 확장분을 변환(conversion) 프로세스에 반영** (`src/conversion`, gcc 라이브러리 무변경):
   - convert.py **규칙 23** 신설 — `{grid}.setVisibleRowNum("all")` → `$c.util.setGridVisibleRowNum(grid, "all")` 결정적 치환(+pytest 6건)
   - 변환 규칙·매핑표·단계 2 워크리스트에 browserPopup 부모 접근(`getOpenerScope`/`callOpener`), 목록↔상세 `restoreData` 복원, 페이징 옵션(`maxRowNum "all"`·desc) 대체, date/str 잉여 인자 정리 지침 추가
+- `8e1f43a` (08-20) — [연관] **5단계 정형화 구조 컨벤션 + 서브미션 async/await 순차 변환** (`src/docs/code-convention`·`src/conversion`, gcc 라이브러리 무변경):
+  - code-convention.md 정식 규약화: 5구역(선언/초기화/이벤트/**서브미션 콜백**/일반) 블록 헤더, camelCase 명명(fn_ 미사용), async/await 우선 원칙(**submitDoneHandler 를 넘기면 executeDynamic Promise 가 settle 되지 않음** 명기), Thin Event 지침
+  - convert.py 규칙 2/4 를 5구역 체계로 개정(콜백 구역 자동 분류·구 주석 마이그레이션), 규칙 6/12/16 이 `const sbmRtn = await executeDynamic(...)` 순차 스타일 방출, await 포함 함수 `async` 자동 부여(+호출부 await 전파 검토 리포트), pytest 8건
+- `b376f8e` (08-20) — [연관] **validate-generator 도구 구현** (`src/docs/validate-generator`, gcc 라이브러리 무변경):
+  - 화면 XML 분석(dataMap key·gridView 연결 dataList 컬럼·`ref="data:"` 컴포넌트)으로 `$c.validate.validateDataCollect` options 객체·await 호출 스니펫을 생성하는 단일 HTML 도구(의존성 0·file:// 동작·DESIGN.md 준수)
+  - 파싱·생성 순수 로직은 Jest 회귀 테스트 6건으로 보호(`test/validateGenerator.test.js`)
 
 ---
 
@@ -130,6 +136,8 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-08-20 | `b376f8e` | feat(docs): validate-generator 도구 구현 — validateDataCollect options 자동 생성 — [연관, gcc 무변경] |
+| 2026-08-20 | `8e1f43a` | feat(conversion): 5단계 정형화 구조 + 서브미션 async/await 순차 변환 — [연관, gcc 무변경] |
 | 2026-08-20 | `e8dcf07` | feat(conversion): 2026-08 gcc 확장분을 변환 프로세스에 반영 (규칙 23 신설) — [연관, gcc 무변경] |
 | 2026-08-20 | `21d6352` | feat(sbm): setPagingInfo rowNumVisble desc 내림차순 순번 구현 |
 | 2026-08-20 | `031b20f` | feat(sbm): setPagingInfo maxRowNum "all" 지원 — 전체 행 표시 전환 |
