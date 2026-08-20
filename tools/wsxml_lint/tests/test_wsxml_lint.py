@@ -123,6 +123,65 @@ def test_duplicate_id_reports_ws120():
     assert "WS120" in codes(StructureCheck().run(make_doc(body)))
 
 
+_WS120_HEAD = """
+      <head meta_screenId="x" meta_screenName="x">
+        <w2:type>COMMON</w2:type>
+        <xf:model><w2:dataCollection baseNode="map">{dc}</w2:dataCollection></xf:model>
+        <w2:layoutInfo/><w2:publicInfo method=""/>
+      </head>"""
+
+
+def _ws120_doc(dc: str, body: str = "") -> WsDocument:
+    return make_doc(f"<html {NS_DECL}>{_WS120_HEAD.format(dc=dc)}<body>{body}</body></html>")
+
+
+def test_ws120_gridview_column_matching_datalist_column_is_ok():
+    # gridView 컬럼 id == 바인딩 dataList 컬럼 id — 규약상 필수 매핑(오탐 방지)
+    dc = """<w2:dataList id="dlt_x" baseNode="list" repeatNode="map"><w2:columnInfo>
+              <w2:column id="email" name="이메일"/></w2:columnInfo></w2:dataList>"""
+    body = """<w2:gridView id="grd_x" dataList="data:dlt_x"><w2:gBody id="gb"><w2:row id="r1">
+                <w2:column id="email" inputType="text"/></w2:row></w2:gBody></w2:gridView>"""
+    assert "WS120" not in codes(StructureCheck().run(_ws120_doc(dc, body)))
+
+
+def test_ws120_same_field_name_across_collections_is_ok():
+    # 서로 다른 컬렉션 간 전문 필드명 재사용(dataMap key ↔ dataList column) — 정상
+    dc = """<w2:dataMap id="dma_a" baseNode="map"><w2:keyInfo>
+              <w2:key id="notiSvcId" name="n"/></w2:keyInfo></w2:dataMap>
+            <w2:dataList id="dlt_b" baseNode="list" repeatNode="map"><w2:columnInfo>
+              <w2:column id="notiSvcId" name="n"/></w2:columnInfo></w2:dataList>"""
+    assert "WS120" not in codes(StructureCheck().run(_ws120_doc(dc)))
+
+
+def test_ws120_duplicate_within_same_collection_reports():
+    dc = """<w2:dataList id="dlt_x" baseNode="list" repeatNode="map"><w2:columnInfo>
+              <w2:column id="email" name="a"/><w2:column id="email" name="b"/>
+            </w2:columnInfo></w2:dataList>"""
+    assert "WS120" in codes(StructureCheck().run(_ws120_doc(dc)))
+
+
+def test_ws120_duplicate_within_same_gridview_reports():
+    body = """<w2:gridView id="grd_x"><w2:gBody id="gb"><w2:row id="r1">
+                <w2:column id="email" inputType="text"/><w2:column id="email" inputType="text"/>
+              </w2:row></w2:gBody></w2:gridView>"""
+    assert "WS120" in codes(StructureCheck().run(_ws120_doc("", body)))
+
+
+def test_ws120_component_id_matching_collection_column_is_ok():
+    # 일반 컴포넌트 id 와 컬렉션 내부 컬럼 id 는 별개 네임스페이스
+    dc = """<w2:dataMap id="dma_a" baseNode="map"><w2:keyInfo>
+              <w2:key id="title" name="제목"/></w2:keyInfo></w2:dataMap>"""
+    body = '<xf:input id="title" ref="data:dma_a.title"/>'
+    assert "WS120" not in codes(StructureCheck().run(_ws120_doc(dc, body)))
+
+
+def test_ws120_collection_container_ids_stay_global():
+    # 컬렉션 컨테이너(dataMap/dataList) 자체의 id 는 전역 유일 규칙 유지
+    dc = """<w2:dataMap id="dma_a" baseNode="map"><w2:keyInfo/></w2:dataMap>
+            <w2:dataMap id="dma_a" baseNode="map"><w2:keyInfo/></w2:dataMap>"""
+    assert "WS120" in codes(StructureCheck().run(_ws120_doc(dc)))
+
+
 # ------------------------------------------------------------------ references
 
 

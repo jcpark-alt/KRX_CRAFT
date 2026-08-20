@@ -8,7 +8,12 @@
 - WS112 head 필수 자식(w2:type, xf:model, w2:layoutInfo, w2:publicInfo) 존재
 - WS113 xf:model 안에 w2:dataCollection 존재
 - WS114 dataCollection/@baseNode 값이 map|list 인지
-- WS120 문서 내 @id 중복
+- WS120 @id 중복 — WebSquare 스코프 규칙 반영:
+  · <w2:dataMap>/<w2:dataList> 내부(key/column)의 id 는 컬렉션별 네임스페이스
+    (같은 컬렉션 안의 중복만 오류 — 다른 컬렉션·전역과의 동일 이름은 전문 필드명 재사용으로 정상)
+  · <w2:gridView> 내부 <w2:column> 의 id 는 그리드별 네임스페이스
+    (바인딩된 dataList 컬럼 id 와의 일치는 규약상 필수 매핑이라 중복이 아님)
+  · 그 외 요소의 id 는 기존대로 문서 전역에서 유일해야 함
 """
 
 from __future__ import annotations
@@ -133,23 +138,57 @@ class StructureCheck(Check):
             )
 
     def _check_duplicate_ids(self, doc, root) -> Iterable[Finding]:
-        seen: dict[str, int] = {}
-        for el in root.iter():
-            # 주석/PI 등 비요소 노드는 tag 가 문자열이 아니다.
-            if not isinstance(el.tag, str):
+        """@id 중복 검사 — WebSquare 스코프 규칙 반영(모듈 docstring WS120 참조).
+
+        기존 '문서 전역 유일' 규칙은 (a) 서로 다른 DataCollection 간 전문 필드명 재사용과
+        (b) gridView 컬럼 id ↔ 바인딩 dataList 컬럼 id 의 규약상 필수 일치를 오탐했다.
+        컬렉션/그리드 내부 id 를 각자 스코프로 분리하고, 그 외 요소만 전역 검사한다.
+        (새 규칙의 검출 집합은 기존 전역 규칙의 부분집합 — 기존 0-오류 기준선은 그대로 유지된다.)
+        """
+        data_map_tag = q(W2, "dataMap")
+        data_list_tag = q(W2, "dataList")
+        grid_tag = q(W2, "gridView")
+        col_tag = q(W2, "column")
+
+        def dup_findings(elements, scope_label):
+            seen: dict[str, int] = {}
+            for el in elements:
+                el_id = el.get("id")
+                if not el_id:
+                    continue
+                line = getattr(el, "sourceline", 0) or 0
+                if el_id in seen:
+                    yield Finding(
+                        code="WS120",
+                        severity=Severity.ERROR,
+                        message=f"중복된 id='{el_id}' (최초 정의: {seen[el_id]} 행{scope_label}).",
+                        file=doc.path,
+                        line=line,
+                        check=self.name,
+                    )
+                else:
+                    seen[el_id] = line
+
+        scoped: set = set()  # 전역 검사에서 제외할 요소들(컬렉션/그리드 내부 id)
+
+        # 1) dataMap/dataList 내부(key/column 등) — 컬렉션별 스코프
+        for coll in root.iter():
+            if not isinstance(coll.tag, str) or coll.tag not in (data_map_tag, data_list_tag):
                 continue
-            el_id = el.get("id")
-            if not el_id:
+            label = "dataMap" if coll.tag == data_map_tag else "dataList"
+            inner = [el for el in coll.iter() if isinstance(el.tag, str) and el is not coll]
+            scoped.update(inner)
+            yield from dup_findings(inner, f" — 같은 {label}({coll.get('id', '')}) 내부")
+
+        # 2) gridView 내부 <w2:column> — 그리드별 스코프
+        #    (바인딩 dataList 컬럼 id 와의 일치는 정상 매핑이므로 전역 비교 대상이 아니다)
+        for grid in root.iter():
+            if not isinstance(grid.tag, str) or grid.tag != grid_tag:
                 continue
-            line = getattr(el, "sourceline", 0) or 0
-            if el_id in seen:
-                yield Finding(
-                    code="WS120",
-                    severity=Severity.ERROR,
-                    message=f"중복된 id='{el_id}' (최초 정의: {seen[el_id]} 행).",
-                    file=doc.path,
-                    line=line,
-                    check=self.name,
-                )
-            else:
-                seen[el_id] = line
+            cols = [el for el in grid.iter() if isinstance(el.tag, str) and el.tag == col_tag]
+            scoped.update(cols)
+            yield from dup_findings(cols, f" — 같은 gridView({grid.get('id', '')}) 내부")
+
+        # 3) 그 외 요소 — 문서 전역 유일 (주석/PI 등 비요소 노드는 tag 가 문자열이 아니다)
+        rest = (el for el in root.iter() if isinstance(el.tag, str) and el not in scoped)
+        yield from dup_findings(rest, "")

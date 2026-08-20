@@ -72,7 +72,7 @@ tools/wsxml_lint/
 | WS112 | 2 | error/warn | `head` 필수 자식 누락(type/model=error, layoutInfo/publicInfo=warn) |
 | WS113 | 2 | warning | `xf:model` 안에 `w2:dataCollection` 없음 |
 | WS114 | 2 | warning | `dataCollection/@baseNode` 가 map\|list 아님 |
-| WS120 | 2 | error | 문서 내 `@id` 중복 |
+| WS120 | 2 | error | `@id` 중복 — WebSquare 스코프 규칙: dataMap/dataList 내부(key/column)는 컬렉션별, gridView 내부 `<w2:column>` 은 그리드별 네임스페이스(바인딩 dataList 컬럼 id 와의 일치는 정상 매핑), 그 외 요소는 문서 전역 유일 |
 | WS201 | 3 | warning | `publicInfo` 에 선언됐으나 CDATA 에 정의 없는 함수 |
 | WS202 | 3 | warning | `publicInfo/@method` 항목이 비어있음 |
 | WS400 | 4 | error | XSD 스키마 위반(`--xsd` 시) |
