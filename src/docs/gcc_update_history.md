@@ -129,6 +129,15 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 - `b376f8e` (08-20) — [연관] **validate-generator 도구 구현** (`src/docs/validate-generator`, gcc 라이브러리 무변경):
   - 화면 XML 분석(dataMap key·gridView 연결 dataList 컬럼·`ref="data:"` 컴포넌트)으로 `$c.validate.validateDataCollect` options 객체·await 호출 스니펫을 생성하는 단일 HTML 도구(의존성 0·file:// 동작·DESIGN.md 준수)
   - 파싱·생성 순수 로직은 Jest 회귀 테스트 6건으로 보호(`test/validateGenerator.test.js`)
+- `a9671ab` (08-20) — [연관] **5단계 섹션 헤더를 한 줄 슬래시 형식으로 변경** (`src/conversion`, gcc 무변경):
+  - code-convention.md 개정(`///////// n. 영역명 /////////`)에 맞춰 convert.py 방출 형식 교체, 구(舊) 3줄 블록·한 줄 경계 주석 → 현행 헤더 자동 마이그레이션(멱등), pytest 22건
+- `f52447d` (08-20) — [연관] **샘플 화면 검증 로직을 validate.xml 공통함수로 전환** (`src/conversion/sample-front`, gcc 무변경):
+  - `ULDSTF07404` — 개별 if/alert/focus 검증을 `$c.validate.validateDataCollect`(async, 폼 컨테이너 `grp_mailForm`)로, 체크된 행 이메일 검증을 `$c.validate.validateDataCollection` 단건 검증으로 대체(행 선별 유지, 셀 포커스·편집모드 진입 자동)
+  - 샘플 화면 6종(JLDFIL25900/25910·ULDFIL35700/52100/59400/59410) 신규 등록 포함
+- `7684e1b` (08-20) — [연관] **wsxml_lint WS120 을 WebSquare 스코프 인지 규칙으로 개정** (`tools/wsxml_lint`, gcc 무변경):
+  - dataMap/dataList 내부 id 는 컬렉션별, gridView 내부 `<w2:column>` 은 그리드별 네임스페이스(바인딩 dataList 컬럼 id 일치 = 정상 매핑) — 전문 필드명 재사용·그리드 컬럼 매핑 오탐 해소
+  - 새 규칙은 기존 전역 규칙의 부분집합이라 기준선 유지(gcc 11·legacy 227파일 0/0), pytest +6, `ULDSTF07404` 오탐 7건 → 0건
+- `7513299` (08-20) — [연관] **Claude Code 스킬·서브에이전트 활용 가이드** 추가(`src/docs/skills/skill.md`, gcc 무변경)
 
 ---
 
@@ -136,6 +145,10 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-08-20 | `7513299` | docs(skills): Claude Code 스킬·서브에이전트 활용 가이드 추가 — [연관, gcc 무변경] |
+| 2026-08-20 | `7684e1b` | feat(lint): WS120 중복 id 검사를 WebSquare 스코프 인지 규칙으로 개정 — [연관, gcc 무변경] |
+| 2026-08-20 | `f52447d` | refactor(sample): ULDSTF07404 검증 로직을 validate.xml 공통함수로 전환 — [연관, gcc 무변경] |
+| 2026-08-20 | `a9671ab` | feat(conversion): 5단계 섹션 헤더를 한 줄 슬래시 형식으로 변경 — [연관, gcc 무변경] |
 | 2026-08-20 | `b376f8e` | feat(docs): validate-generator 도구 구현 — validateDataCollect options 자동 생성 — [연관, gcc 무변경] |
 | 2026-08-20 | `8e1f43a` | feat(conversion): 5단계 정형화 구조 + 서브미션 async/await 순차 변환 — [연관, gcc 무변경] |
 | 2026-08-20 | `e8dcf07` | feat(conversion): 2026-08 gcc 확장분을 변환 프로세스에 반영 (규칙 23 신설) — [연관, gcc 무변경] |
