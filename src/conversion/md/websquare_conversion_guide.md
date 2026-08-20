@@ -6,7 +6,7 @@ WebSquare XML 소스를 GCC 공통함수 체계·표준 JS 규칙으로 자동 �
 
 | 문서 | 내용 |
 | --- | --- |
-| [conversion_process_overview.md](conversion_process_overview.md) | **변환 프로세스 전체 개요·구조도**(단계 0~2 흐름, 디렉터리/도구 구조도, 규칙 1~22 요약, UI 공통 프레임워크·공통개발자 필요성) |
+| [conversion_process_overview.md](conversion_process_overview.md) | **변환 프로세스 전체 개요·구조도**(단계 0~2 흐름, 디렉터리/도구 구조도, 규칙 1~23 요약, UI 공통 프레임워크·공통개발자 필요성) |
 | [conversion_rules.md](conversion_rules.md) | **세부 변환 규칙(규칙 1~11)** + 규칙 6 Submission 변환 상세 + Claude Code용 영문 프롬프트 |
 | [substitution_map.md](substitution_map.md) | **레거시 → gcc 공통함수 치환 매핑표**(`$c.*` namespace별 AS-IS/TO-BE) |
 | [conversion_pipeline.md](conversion_pipeline.md) | **하이브리드 변환 파이프라인**(Python 기계 치환 → Claude Code 보강 2단계) |

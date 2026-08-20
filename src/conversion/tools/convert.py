@@ -743,6 +743,38 @@ def rule21_frame_provider(code, report):
     return out
 
 
+def rule23_grid_visible_rownum_all(code, report):
+    """그리드 전체 행 표시 `{grid}.setVisibleRowNum("all")` 을 `$c.util.setGridVisibleRowNum({grid}, "all")` 로 치환한다.
+    - 엔진 gridView.setVisibleRowNum 은 숫자 전용(parseInt NaN → false 반환)이라 "all" 인자는 **조용히 거부**됨 —
+      gcc 공통함수 $c.util.setGridVisibleRowNum 이 "all"(전체 행 재도색)을 지원한다.
+    - **정확히 "all"/'all' 리터럴 인자만** 대상. 숫자/변수 인자는 엔진 API 로 유효하므로 무변환.
+    - 수신 객체(그리드)를 첫 인자로 승격(규칙 20 동일 방향). 식별자 체인 수신만 대상이며,
+      호출 체인 수신(`$p.getComponentById("x").setVisibleRowNum("all")`)은 보류·리포트(단계 2).
+    - 코드 세그먼트(문자열/주석/정규식 제외)만 치환. 결과에 `.setVisibleRowNum("all")` 없어 재변환 no-op(멱등)."""
+    mask = code_mask(code)
+    pat = re.compile(r'(?<![.\w$])([\w$]+(?:\.[\w$]+)*)\.setVisibleRowNum\(\s*(?:"all"|\'all\')\s*\)')
+    res, last = [], 0
+    for mo in pat.finditer(code):
+        if mo.start() < last or not mask[mo.start()]:
+            continue
+        recv = mo.group(1)
+        res.append(code[last:mo.start()])
+        res.append('$c.util.setGridVisibleRowNum(%s, "all")' % recv)
+        report["rule23"].append(mo.group(0).strip() + ' -> $c.util.setGridVisibleRowNum(%s, "all")' % recv)
+        last = mo.end()
+    res.append(code[last:])
+    out = "".join(res)
+    # 호출 체인 수신 등 미변환 "all" 호출은 엔진이 거부하는 죽은 코드 → 단계 2 검토 리포트
+    leftover = re.compile(r'\.setVisibleRowNum\(\s*(?:"all"|\'all\')\s*\)')
+    omask = code_mask(out)
+    for mo in leftover.finditer(out):
+        if omask[mo.start()]:
+            line_start = out.rfind("\n", 0, mo.start()) + 1
+            snippet = out[line_start:mo.end()]
+            report["judgment"].append("규칙23 setVisibleRowNum(\"all\") 미변환(호출 체인 수신 등, 단계2 검토): " + snippet.strip())
+    return out
+
+
 def rule7_gcc_substitute(code, report):
     """substitution_dict() 의 함수 호출부를 단어경계로 치환(코드 세그먼트만, 메서드 호출 .fn() 제외).
     파일 내에 함수로 선언/정의된 이름은 치환에서 제외한다(로컬 정의 우선, 선언부 손상 방지)."""
@@ -1737,7 +1769,7 @@ def collect_judgment(script, head, body, report):
 
 # ---------- 파이프라인 ----------
 def convert(raw, filename):
-    report = {"rule1": "", "rule2": 0, "rule2_skip": [], "rule3": [], "rule4": None, "rule4_merge": None, "rule5a": 0, "rule5b": [], "rule5c": [], "rule5d": [], "rule6": {"converted": [], "deleted": 0}, "rule7": [], "rule7m": [], "rule7n": [], "rule8": {"const": 0, "let": 0}, "rule9": 0, "rule10": 0, "rule11": 0, "rule12": {"converted": []}, "rule13": [], "rule14": [], "rule15": [], "rule16": {"converted": [], "skipped": []}, "rule17": {"converted": [], "skipped": []}, "rule20": [], "rule21": [], "wcraft": 0, "judgment": []}
+    report = {"rule1": "", "rule2": 0, "rule2_skip": [], "rule3": [], "rule4": None, "rule4_merge": None, "rule5a": 0, "rule5b": [], "rule5c": [], "rule5d": [], "rule6": {"converted": [], "deleted": 0}, "rule7": [], "rule7m": [], "rule7n": [], "rule8": {"const": 0, "let": 0}, "rule9": 0, "rule10": 0, "rule11": 0, "rule12": {"converted": []}, "rule13": [], "rule14": [], "rule15": [], "rule16": {"converted": [], "skipped": []}, "rule17": {"converted": [], "skipped": []}, "rule20": [], "rule21": [], "rule23": [], "wcraft": 0, "judgment": []}
     reg = split_regions(raw)
     if reg is None:
         raise ValueError("SCRIPT(CDATA) 영역을 찾지 못했습니다.")
@@ -1763,6 +1795,7 @@ def convert(raw, filename):
     s = rule20_grid_excel_download(s, report)
     s = rule20b_normalize_excel_positional(s, report)
     s = rule21_frame_provider(s, report)
+    s = rule23_grid_visible_rownum_all(s, report)
     reg["head"], s, reg["body"] = rule13_rename_scwin_fn(reg["head"], s, reg["body"], report)
     s, reg["body"] = rule3_handlers(s, reg["body"], report)
     s, reg["body"] = rule4_structure(s, reg["body"], report)
@@ -1824,6 +1857,9 @@ def print_report(rep, filename):
         print("   -", s)
     print("규칙21 frame.Provider(\"../\") → $c.win.getParent() :", len(rep["rule21"]), "건")
     for s in rep["rule21"]:
+        print("   -", s)
+    print("규칙23 setVisibleRowNum(\"all\") → $c.util.setGridVisibleRowNum :", len(rep["rule23"]), "건")
+    for s in rep["rule23"]:
         print("   -", s)
     print("규칙8 var→const/let : const %d, let %d" % (rep["rule8"]["const"], rep["rule8"]["let"]))
     print("규칙9 불필요 $c.cm.* 호출 제거 :", rep["rule9"], "건")

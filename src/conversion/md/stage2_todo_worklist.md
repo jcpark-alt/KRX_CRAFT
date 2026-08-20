@@ -28,6 +28,16 @@
 | fn_ 정규화 충돌 | 1 | `fn_*` 함수명 정규화 시 이름 충돌로 보류. 수동 리네임. |
 | 기타 | 9 | 개별 확인 필요. |
 
+### 신규 보강 유형 (2026-08 gcc 확장 — 다음 집계부터 적용, 미집계)
+
+2026-08 gcc 공통함수 확장에 따라 아래 유형을 Stage 2 검토 시 추가로 점검한다. 해당 코드에 `// TODO Stage2:` 주석을 남기면 다음 자동 집계에 포함된다.
+
+| 유형 | 해결 방법 |
+| --- | --- |
+| browserPopup 부모 접근 | browserPopup 화면의 `window.opener.*`·부모 scwin 호출을 `$c.win.getOpenerScope()`/`callOpener()` 로 재작성(`getParent()` 불가). 실측 대상: `[inf] comm/ULDINF90400`(opener 25건)·`[stf] lst/fis/ULDFIS0010{1,2,3}` 등. 가이드: `src/docs/popup-opener-guide.md` |
+| 목록↔상세 복귀 상태 복원 | 목록→상세 moveUrl/setPageFrameSrc 화면에 `{isHistory:true, dataInfo}` 스냅샷 + 상세 [목록] 버튼 `{restoreData:true}` 적용, 목록 onpageload 에 `_isHistoryRestore` 자동조회 skip 관례 적용. 가이드: `src/docs/frame-history-guide.md` |
+| 페이징 전체보기/역순 순번 대체 | AS-IS 자체 구현(전체보기 토글·내림차순 순번 계산)을 `$c.sbm.setPagingInfo` 옵션(`maxRowNum:"all"`, `rowNumVisble:"{grid}|desc"`, `rowNumColumn`)으로 대체. 규칙 23(setVisibleRowNum "all") 리포트 항목 포함 |
+
 ## 0-based 인덱스 검토  (132)
 
 Gauce는 1-based, WebSquare는 0-based. 토큰만 치환하고 인덱스 산술은 유지한 상태. 화면을 띄워 그리드 행 접근이 한 칸 어긋나는지 확인 후 필요시 `-1`/`+1` 조정.

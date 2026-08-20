@@ -183,6 +183,7 @@
     5. `CreateDialogFrame` 바로 윗줄이 인자에 `row` 를 넘기는 함수 호출(예: `fn_setId(row);`)이면 삭제합니다.
 * **결정적 산출 보조**: `width`/`height` 는 정수 리터럴이면 `"{n}px"`, 표현식·변수면 원형 유지. `title`·`url` 은 원형 유지. `data` 객체는 레거시 호출에 페이로드가 없어 `// TO-DO` 플레이스홀더로 생성(browserPopup 만 `callbackFn` 포함). 같은 블록 다중 호출은 `options`/`data`/`result`, `options2`… 로 명명.
 * **유의사항**: 인자 8개가 아니거나 `url` 이 문자열 리터럴이 아니면(동적 결합) 미변환·리포트. `data` 채움·`result` 처리 업무 로직과 표현식 width/height 정리는 **단계 2(Claude) 검토 보강 대상**입니다. 상세·예시는 [createdialogframe_popup_guide.md](createdialogframe_popup_guide.md) 를 참조하세요. 문자열/주석/정규식 리터럴 내부는 보호합니다(규칙 5 동일 원칙).
+* **browserPopup 자식 화면의 부모 접근**: `"browserPopup"` 은 별도 브라우저 창이라 자식 화면의 부모 접근 코드(`window.opener.*`, 레거시 `Provider("../")` 후 scwin 호출 등)는 `$c.win.getParent()` 로 변환하면 **동작하지 않습니다**. 팝업 타입 무관 공통함수인 `$c.win.getOpenerScope()`(부모 scope)·`$c.win.callOpener(fnName, ...args)`(부모 scwin 함수 호출)로 재작성합니다 — **단계 2 검토 보강 대상**. 상세는 `src/docs/popup-opener-guide.md` 참조.
 
 ### 규칙 18: 모듈 네임스페이스의 시스템 날짜·쿠키·웹스토리지 함수 → gcc 공통함수 치환
 
@@ -265,6 +266,7 @@
 * **변환 규약**: `{recv}.Provider("../")` → `$c.win.getParent()`. **정확히 `"../"`/`'../'` 리터럴 인자만** 대상.
     * 반환된 부모 pageFrame 에서 **데이터셋/컴포넌트는 직접 접근**(`$c.win.getParent().dlt_x` / `.dts_List`), **scwin 변수/함수는 `.scwin` 경유**(`$c.win.getParent().scwin.search()`) — JSDoc 규약. 따라서 `parentWin = $c.win.getParent()` 후 데이터셋 접근(`parentWin.dts_List.setCellData(...)`)은 안전하나, scwin 변수/함수 접근(`…js_com_market`/`…fn_x()`)은 `.scwin` 삽입이 필요할 수 있어 **단계 2 검토**입니다.
 * **미변환·리포트(대응 공통함수 없음)**: `Provider("/top")`(상위 프레임 — `$c.win` 에 top 헬퍼 없음), `Provider("../../")`(조부모), `Provider("../" + 변수)`(동적 경로), `Provider("../name")`(형제 프레임)는 1:1 공통함수가 없어 미변환하고 `judgment` 로 분리합니다(단계 2: `$p.top()` 등 네이티브 또는 헬퍼 추가 검토).
+* **browserPopup 예외**: 변환 대상 화면이 **browserPopup 으로 열리는 팝업 화면**(규칙 17 `type:"window"` 계열)이면 `$c.win.getParent()` 는 부모 화면이 아니라 자기 자신을 가리켜 동작하지 않습니다. 이 경우 `$c.win.getOpenerScope()`/`$c.win.callOpener()` 로 치환합니다(팝업 타입 무관 동작 — pageFramePopup 은 내부에서 `$p.parent()` 폴백). **단계 2 검토** 대상이며, 상세는 `src/docs/popup-opener-guide.md` 참조.
 * 코드 세그먼트(문자열/주석/정규식 제외)만 치환하며, 결과에 `.Provider(` 가 없으므로 **재변환 시 no-op(멱등)** 입니다. 매핑표는 [substitution_map.md](substitution_map.md) §6 참조.
 
 ### 규칙 22: 검색 테이블 Enter 키 이벤트 자동 바인딩 (`tbl_search`/`tbl_Search` → `$c.win.setEnterKeyEvent`)
@@ -285,6 +287,15 @@ $c.win.setEnterKeyEvent(tbl_search, scwin.btn_Search_onclick);
     * 이미 같은 `$c.win.setEnterKeyEvent(...)` 바인딩이 `scwin.onpageload` 에 존재하면 **중복 추가하지 않습니다**(재변환 시 no-op — 멱등).
     * 두 번째 인자 핸들러명은 기본값 `scwin.btn_Search_onclick`(규칙 3 소문자 이벤트명 규약)을 사용하되, 해당 화면의 실제 조회 버튼 컴포넌트 id 가 다르면(예: `btn_search`·`btnSearch` → `scwin.btn_search_onclick` 등) **단계 2(Claude) 검토**로 실제 핸들러에 맞춥니다.
     * 문자열/주석/정규식 리터럴 내부는 보호합니다(규칙 5 동일 원칙).
+
+### 규칙 23: 그리드 전체 행 표시 `{grid}.setVisibleRowNum("all")` → `$c.util.setGridVisibleRowNum({grid}, "all")`
+
+* WebSquare 엔진의 `gridView.setVisibleRowNum` 은 **숫자 전용**(`parseInt` NaN → `false` 반환)이라 `"all"` 인자는 **조용히 거부**됩니다(화면에 아무 변화 없음). gcc 공통함수 `$c.util.setGridVisibleRowNum` 이 "all"(전체 행 재도색)을 지원하므로, `"all"` 리터럴 호출을 공통함수로 치환합니다.
+* **변환 규약**(결정적, convert.py 규칙 23): `{grid}.setVisibleRowNum("all")` → `$c.util.setGridVisibleRowNum({grid}, "all")` — 수신 객체(그리드)를 첫 인자로 승격(규칙 20 동일 방향).
+    * **정확히 `"all"`/`'all'` 리터럴 인자만** 대상입니다. 숫자/변수 인자 호출(`setVisibleRowNum(20)`)은 엔진 API 로 유효하므로 무변환.
+    * 수신 객체는 식별자 체인(`grd_x`, `scwin.grdObj`)만 자동 대상이며, **호출 체인 수신**(`$p.getComponentById("x").setVisibleRowNum("all")`)은 보류·리포트(단계 2)합니다 — 어차피 엔진이 거부하는 죽은 코드이므로 반드시 정리 대상.
+* **연관**: 페이징 화면에서 "전체보기"가 목적이라면 개별 호출 대신 `$c.sbm.setPagingInfo` 의 `maxRowNum : "all"` 옵션(행 수 제한 클래스 자동 제거 포함) 사용을 우선 검토합니다(단계 2). 대량 데이터 그리드에는 "all" 사용을 지양합니다(전 행 DOM 도색).
+* 코드 세그먼트(문자열/주석/정규식 제외)만 치환하며, 결과에 `.setVisibleRowNum("all")` 가 없으므로 **재변환 시 no-op(멱등)** 입니다.
 
 ---
 

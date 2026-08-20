@@ -98,9 +98,35 @@ const result = await $c.win.openPopup("../listingcommon/ULDSTF92017.gfm", option
 ## 4. 단계 2(Claude) 보강 포인트
 
 * `data` 객체에 실제로 팝업에 전달할 파라미터를 채웁니다(레거시는 전역/스코프 변수로 넘기던 값).
+  ⚠ `data`(paramData) 전달은 **pageFramePopup 전용**입니다 — browserPopup 은 데이터 전달을 콜백/부모 접근 공통함수로 대체합니다.
 * `result`(및 browserPopup 의 `scwin.popupCallback(result)`) 처리 업무 로직을 작성합니다.
 * `width`/`height` 가 표현식·변수로 남은 경우 `"...px"` 규약에 맞게 정리합니다.
 * `url` 이 동적 결합이라 미변환·리포트된 호출은 수동으로 `openPopup` 형태로 재작성합니다.
+
+## 4b. browserPopup 자식 화면의 부모 접근 (2026-08 gcc 확장)
+
+`type:"window"` → `browserPopup` 으로 변환된 팝업은 **별도 브라우저 창**이라, 자식 화면에 남아 있는
+부모 접근 레거시 코드(`window.opener.*`, `Provider("../")` 후 scwin 호출 등)를 `$c.win.getParent()` 로
+바꾸면 **동작하지 않습니다**. 팝업 타입 무관 공통함수로 재작성합니다(단계 2):
+
+```javascript
+// 부모 화면의 함수 호출 (권장 — 반환값도 전달받음)
+$c.win.callOpener("searchList");
+$c.win.callOpener("setRowData", dma_selected.getJSON());
+
+// 부모 컴포넌트/데이터 직접 접근이 필요한 경우
+const openerScope = $c.win.getOpenerScope();
+if (!$c.util.isEmpty(openerScope)) {
+    openerScope.scwin.searchList();
+    const v = openerScope.dma_search; // 부모 DataCollection 접근
+}
+```
+
+* `getOpenerScope()`/`callOpener()` 는 **pageFramePopup 에서도 동일하게 동작**하므로(내부 `$p.parent()` 폴백)
+  팝업 타입에 따라 코드를 분기할 필요가 없습니다.
+* 부모 창이 닫혔거나 COOP 정책으로 opener 가 끊긴 경우 null/undefined 반환(예외 없음) — 반환값 확인 후 사용.
+* 등록·복원 원리와 제약은 `src/docs/popup-opener-guide.md` 참조. **닫을 때 결과만** 넘기면 되는 경우는
+  기존 `callbackFn` + `$c.win.closePopup(callbackParam)` 채널을 유지합니다(본 문서 §3).
 
 ## 5. 참조 구현
 

@@ -43,7 +43,7 @@
 | `$c.date.diffDate` | `cGetDifTodayInputday` / `getDayInterval` / `getDuration` / `fn_getPeriod` | 두 날짜 차이(일수/기간) | |
 | `$c.date.dateCompare` | `validateStartDateAndToDate` / `compareFromToDate*` / `fn_checkDay` / `fn_CheckDateObj` | From/To 일자 비교 | |
 | `$c.date.dateFormat` | `cal_value2` / `fn_convCalDate` / `chkDate` / `chkDate2` | 8자리 → `YYYY-MM-DD` 마스킹 | |
-| `$c.date.dateUnFormat` | `fn_str2dte` / `cal_offMask*` | 마스킹 제거 / 문자열 → Date | |
+| `$c.date.dateUnFormat` | `fn_str2dte` / `cal_offMask*` | 마스킹 제거 / 문자열 → Date — 2026-08 개편으로 시그니처가 `(dateStr)` 1인자(비숫자 전체 제거). 레거시 format 인자는 무시되므로 치환 시 제거 | |
 | `$c.date.isDate` | `isDate` / `isDate0` | 날짜 유효성/빈 날짜 판별 | |
 | `$c.date.isLeafYear` | `cIsLeafYear` | 윤년 검사 | |
 | `$c.date.getLastDateOfMonth` | `cGetMaxDay` / `lastDay` | 해당 월 마지막 일수 | |
@@ -70,6 +70,7 @@
 | `$c.util.getParameter` | `getQuery` | URL 파라미터 추출 | |
 | `$c.util.getComponent` | `getObjectValue` / `setObjectValue` / `$`(jQuery 풍) | 컴포넌트 조회/값 제어 | 검토·대체 |
 | `$c.util.isArray` | `isInArr` | 배열 포함 여부 | 검토 |
+| `$c.util.setGridVisibleRowNum` | `{grid}.setVisibleRowNum("all")` | 그리드 전체 행 표시 — 엔진 API 는 숫자 전용이라 "all" 이 조용히 거부됨. `"all"` 리터럴 호출을 `$c.util.setGridVisibleRowNum({grid}, "all")` 로 치환(수신 객체 첫 인자 승격, 규칙 23). 숫자 인자는 무변환. 페이징 화면은 `setPagingInfo maxRowNum:"all"` 우선 검토 | |
 
 ## 6. `$c.win` — 화면/팝업/네비게이션
 
@@ -78,10 +79,11 @@
 | `$c.win.openPopup` | `fn_PopManual` / `pop` / `historyChgName` / `openNews` / `openDisclosureView` | 팝업/업무 윈도우 오픈 | |
 | `$c.win.closePopup` | `{객체명}.CloseFrame` | 팝업/프레임 닫기 — 메서드 호출 `{객체명}.CloseFrame()` 전체를 인자 없는 `$c.win.closePopup()` 로 치환(수신 객체 제거) | 검토 |
 | `$c.win.confirm` | `fn_alertDelConfirm` | 삭제 확인 confirm | |
-| `$c.win.moveUrl` | `goURL` | URL 이동 | |
+| `$c.win.moveUrl` | `goURL` | URL 이동 — 목록↔상세 왕복 화면은 `{isHistory:true, dataInfo}`(이동 시 스냅샷)·상세 [목록] 버튼 `{restoreData:true}` 옵션으로 상태 복원 적용 검토(단계 2, `src/docs/frame-history-guide.md`) | |
 | `$c.win.getProgramId` | `InfoMenuID` | 현재 메뉴/프로그램 ID | |
 | `$c.win.alert` (+ `$c.data.getMessage`) | `alert_error` | 에러 객체 메시지 alert | |
-| `$c.win.getParent` | `{객체명}.Provider("../")` | 부모 pageFrame 접근 — `frame.Provider("../")` 전체를 `$c.win.getParent()` 로 치환(수신 객체 제거). `"../"` 만 대상이며 `/top`·`../../`·동적경로는 대응 함수 없어 제외(규칙 21) | 검토 |
+| `$c.win.getParent` | `{객체명}.Provider("../")` | 부모 pageFrame 접근 — `frame.Provider("../")` 전체를 `$c.win.getParent()` 로 치환(수신 객체 제거). `"../"` 만 대상이며 `/top`·`../../`·동적경로는 대응 함수 없어 제외(규칙 21). **browserPopup 화면에서는 동작하지 않음 — 아래 `getOpenerScope`/`callOpener` 사용** | 검토 |
+| `$c.win.getOpenerScope` / `$c.win.callOpener` | `window.opener.*` / browserPopup 화면의 부모 scwin 호출 | 팝업에서 부모 화면 접근 — browserPopup(별도 창)은 `getParent()` 불가. `getOpenerScope()`(부모 scope 반환)·`callOpener(fnName, ...args)`(부모 scwin 함수 호출)는 pageFramePopup 에서도 동일 동작(타입 분기 불요). 상세 `src/docs/popup-opener-guide.md` | 검토 |
 
 ## 7. `$c.sbm` — 서버 통신 (원시 XHR 대체)
 

@@ -8,7 +8,7 @@ W-Craft 로 1차 변환된 레거시 WebSquare XML(Gauce/X-Internet 유래)을 *
 > | --- | --- |
 > | [websquare_conversion_guide.md](websquare_conversion_guide.md) | 변환 목표·규칙 인덱스 |
 > | [conversion_pipeline.md](conversion_pipeline.md) | 2단계 하이브리드 파이프라인 본문(규칙별 Python 처리 방식) |
-> | [conversion_rules.md](conversion_rules.md) | 규칙 1~22 상세 정의 |
+> | [conversion_rules.md](conversion_rules.md) | 규칙 1~23 상세 정의 |
 > | [substitution_map.md](substitution_map.md) | 레거시 → gcc 치환 매핑표 |
 > | [dynamic_submission_guide.md](dynamic_submission_guide.md) | 규칙 12 동적 Submission 상세 |
 > | [createdialogframe_popup_guide.md](createdialogframe_popup_guide.md) | 규칙 17 팝업 변환 상세 |
@@ -34,7 +34,7 @@ W-Craft 로 1차 변환된 레거시 WebSquare XML(Gauce/X-Internet 유래)을 *
 ```
 
 * **단계 0 (W-Craft, 외부 도구)** — 구 플랫폼(Gauce/X-Internet) 화면을 WebSquare XML 골격으로 1차 변환. 결과물은 `ui/` 에 놓이며, 스크립트 최상단에 `/* ★Wcraft guide★ 스크립트 수작업 유의사항 */` 마커가 붙어 **수작업 검토 대상**임을 표시합니다. 이 저장소는 이 단계의 **출력물부터** 다룹니다.
-* **단계 1 (Python)** — `ui/` 를 입력받아 판단이 필요 없는 결정적 규칙(1~22)을 일괄 적용해 `ui-tobe/` 를 생성하고, 자동 치환하지 못한 항목을 **리포트**로 분리합니다.
+* **단계 1 (Python)** — `ui/` 를 입력받아 판단이 필요 없는 결정적 규칙(1~23)을 일괄 적용해 `ui-tobe/` 를 생성하고, 자동 치환하지 못한 항목을 **리포트**로 분리합니다.
 * **단계 2 (Claude Code)** — 리포트의 검토/대체 항목, 원시 JSP/jQuery 재설계, 통신 콜백 로직 등 **판단이 필요한 부분만** 보강하고 `npm run lint:xml` 로 검증합니다.
 
 ---
@@ -48,14 +48,14 @@ src/conversion/
 │   ├── conversion_process_overview.md   (본 문서)
 │   ├── websquare_conversion_guide.md    (규칙 인덱스)
 │   ├── conversion_pipeline.md           (2단계 파이프라인 본문)
-│   ├── conversion_rules.md              (규칙 1~22 상세)
+│   ├── conversion_rules.md              (규칙 1~23 상세)
 │   ├── substitution_map.md              (치환 매핑표)
 │   ├── dynamic_submission_guide.md      (규칙 12)
 │   ├── createdialogframe_popup_guide.md (규칙 17)
 │   └── stage2_todo_worklist.md          (단계 2 TODO)
 │
 ├── tools/                           ← 변환 엔진 (Python, 무의존성 stdlib)
-│   ├── convert.py       ── 단계 1 핵심 변환기(영역 분리 + 규칙 1~22 + 리포트)
+│   ├── convert.py       ── 단계 1 핵심 변환기(영역 분리 + 규칙 1~23 + 리포트)
 │   ├── convert_all.py   ── 배치 드라이버(모듈 순회 · 멱등성/well-formed 검증 · 집계)
 │   └── gcc_mapping.py   ── 치환 매핑 로더(SOT 파싱)
 │
@@ -103,7 +103,7 @@ WebSquare XML 은 `head → script(CDATA) → body` 구조이며, 영역마다 �
              └──────────┬───────┴─────────────────────────┘
                         ▼
               ┌───────────────────────┐
-              │  규칙 1~22 결정적 치환 │  ← 문자열/주석/정규식 리터럴 보호
+              │  규칙 1~23 결정적 치환 │  ← 문자열/주석/정규식 리터럴 보호
               │  (판단 불필요 1:1)     │  ← 단어경계 매칭 · 멱등성 보장
               └───────────┬───────────┘
                           ▼
@@ -130,7 +130,7 @@ WebSquare XML 은 `head → script(CDATA) → body` 구조이며, 영역마다 �
 
 ---
 
-## 4. 변환 규칙 요약 (규칙 1~22)
+## 4. 변환 규칙 요약 (규칙 1~23)
 
 각 규칙의 상세 정의는 [conversion_rules.md](conversion_rules.md), Python 처리 방식은 [conversion_pipeline.md](conversion_pipeline.md) 참조.
 
@@ -161,6 +161,7 @@ WebSquare XML 은 `head → script(CDATA) → body` 구조이며, 영역마다 �
 | 20b | SCRIPT | `downloadGridViewExcel(grid, name, sheet, type)` 위치인자 → `(grid, {fileName, type})` 객체 정규화 |
 | 21 | SCRIPT | `{frame}.Provider("../")` → `$c.win.getParent()` |
 | 22 | SCRIPT+BODY | `tbl_search`/`tbl_Search` 검색테이블에 Enter 키 → 검색 핸들러 자동 바인딩(onpageload) |
+| 23 | SCRIPT | `{grid}.setVisibleRowNum("all")` → `$c.util.setGridVisibleRowNum(grid, "all")` (엔진은 숫자 전용 — "all" 거부) |
 
 > 규칙 6·12·16·17 은 **정적/단순 케이스만** 자동 변환하고, 동적 action·비리터럴 URL·표현식 인자 등은 **미변환 리포트 → 단계 2** 로 넘깁니다. 규칙 15·18·19 는 판단 비중이 커 주로 단계 2 대상입니다.
 
@@ -208,7 +209,7 @@ Python 이 남긴 **"추가 작업 목록"만** 사람/AI 판단으로 처리합
 ├────────────────────────┼────────────────────────────────────────────┤
 │  양 · 일관성 · 속도     │  판단 · 재설계 · 검증                        │
 │  결정적 1:1 치환·재배치 │  검토/대체 매핑 · 통신 재작성 · 최종 확인    │
-│  규칙 1~22 자동 처리    │  리포트/TODO 해소 · 규칙 19 재설계 · lint    │
+│  규칙 1~23 자동 처리    │  리포트/TODO 해소 · 규칙 19 재설계 · lint    │
 └────────────────────────┴────────────────────────────────────────────┘
 ```
 
