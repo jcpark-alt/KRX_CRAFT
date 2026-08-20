@@ -1,0 +1,985 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:ev="http://www.w3.org/2001/xml-events"
+    xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+    <head meta_screenName="[가이드] 신고 저장·수정 (원본 JLDFIL25910 배당기준일자 신고 저장 및 수정)" meta_screenId="JLDFIL25910_guide" meta_screenDesc="같은 화면이 파라미터 유무로 등록·수정을 갈라 동작하고, 선택값에 따라 입력칸을 바꿔 끼우며, 저장 전 서버에 작성 가능 여부를 확인하는 작성화면 표준 골격." meta_author="Inswave" meta_type="가이드">
+        <w2:type>COMPONENT</w2:type>
+        <w2:buildDate/>
+        <w2:MSA/>
+        <xf:model>
+            <w2:dataCollection baseNode="map">
+            	<w2:dataMap id="dma_divBasDdInfo" baseNode="map">
+            		<w2:keyInfo>
+            			<w2:key id="bzProcsNo" name="업무처리번호" dataType="text"></w2:key>
+
+            			<w2:key id="comNm" name="회사명" dataType="text"></w2:key>
+
+            			<w2:key id="isuCd" name="종목코드" dataType="text"></w2:key>
+            			<w2:key id="basYy" name="기준년도" dataType="text"></w2:key>
+            			<w2:key id="acntclsMm" name="결산월" dataType="text"></w2:key>
+            			<w2:key id="divBasDdYn" name="배당기준일여부" dataType="text" defaultValue="Y"></w2:key>
+            			<w2:key id="divBasDd" name="배당기준일" dataType="text"></w2:key>
+            			<w2:key id="shrhdNmlistClsBasddContn" name="주주명부의 폐쇄 및 기준일" dataType="text"></w2:key>
+            			<w2:key id="proftDivRemk" name="이익배당" dataType="text"></w2:key>
+            			<w2:key id="attachFileNm" name="첨부파일명" dataType="text"></w2:key>
+            		</w2:keyInfo>
+            	</w2:dataMap>
+            </w2:dataCollection>
+            <w2:workflowCollection/>
+        </xf:model>
+        <w2:layoutInfo/>
+        <w2:publicInfo method=""/>
+        <script lazy="false" type="text/javascript"><![CDATA[// 원본 : JLDFIL25910 배당기준일자 신고_저장 및 수정 (/ui/dis/account/JLDFIL25910.xml)
+///////// 1. 변수 및 선언 영역 /////////
+
+/*
+ * 화면 동작
+ * 1. 화면 로딩시 업무처리번호가 있으면 상세를 조회, 없으면 등록 모드로 시작
+ * 2. 「배당기준일」 구분 선택에 따라 달력과 고정표시 칸을 교체
+ * 3. 「찾아보기」 클릭시 첨부파일 선택, 등록된 파일명 클릭시 다운로드
+ * 4. 「등록」·「수정」 클릭시 제출 가능 여부 확인과 입력값 검증 후 첨부파일과 함께 저장
+ * 5. 「목록」 클릭시 변경된 내용이 있으면 확인 후 목록으로 이동
+ *
+ * 담긴 패턴
+ * - 파라미터 유무로 등록·수정 모드 판정 (버튼 전환)
+ * - 안내문구 + 접었다 펴는 입력예시 영역
+ * - 선택값에 따라 입력칸 교체 (달력 ↔ 고정표시)
+ * - 입력 바이트 카운터 ($c.util.setTextLengthCounter)
+ * - 첨부파일 : 등록 전·후 영역 전환, 다운로드, 삭제
+ * - 저장 전 서버에 작성 가능 여부 확인
+ * - 입력값과 파일을 upload 컴포넌트로 한 번에 전송
+ *
+ * 변환 샘플과 달라진 곳
+ * - 바이트 카운터를 onkeyup 마다 걸던 것을 init 에서 한 번만 건다.
+ *   이 공통함수가 안에서 oninput·onchange 를 스스로 bind 하므로,
+ *   키를 칠 때마다 다시 부르면 핸들러가 쌓여 입력이 점점 느려진다.
+ * - 필수 검증을 항목마다 isEmpty 로 확인하던 것을 $c.data.validateGroup 으로 바꿨다.
+ * - submitDoneHandler 옵션과 .catch(() => ({})) 를 걷어내고 await 뒤에서 직접 처리한다.
+ *   옵션으로 넘기면 await 가 풀린 뒤에 돌아 이어지는 코드와 순서가 어긋난다.
+ * - 저장 응답이 실패로 와도 아무 반응이 없던 것을 안내하도록 고쳤다.
+ * - $c.win.confirm 을 콜백 대신 await 로 받는다.
+ */
+scwin.screenId = "JLDFIL25910_guide";
+
+
+///////// 2. 초기화 영역 /////////
+
+/**
+ * @method
+ * @name scwin.onpageload
+ * @author Inswave
+ * @date 2026. 08. 19
+ * @description 페이지로드
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.onpageload = async function () {
+	// 초기화 함수
+	await scwin.init();
+};
+
+/**
+ * @method
+ * @name scwin.init
+ * @author Inswave
+ * @date 2026. 08. 19
+ * @description 초기화. 업무처리번호 유무로 등록·수정 모드를 정하고 상세를 조회한다.
+ *
+ * 복사해 쓸 때 바꿀 곳
+ *  - 받는 파라미터 이름
+ *  - 달력 컴포넌트 id
+ *  - 바이트 카운터 대상과 최대 길이
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.init = async function () {
+	// 이전 화면에서 전달받은 업무처리번호. 없으면 등록, 있으면 수정이다.
+	const bzProcsNo = $c.data.getParameter("bzProcsNo");
+
+	// 등록·수정 모드별 화면 설정
+	scwin.setScreenMode(bzProcsNo);
+
+	// 달력에 형식 검증을 걸어 둔다. 직접 타이핑한 값도 이 검증을 탄다.
+	$c.date.checkCalendarFormat("cal_divBasDd", "yyyyMMdd");
+
+	// 바이트 카운터는 여기서 한 번만 건다.
+	// 이 공통함수가 안에서 oninput·onchange 를 스스로 bind 하고 즉시 한 번 그린다.
+	// onkeyup 마다 다시 부르면 키를 칠 때마다 핸들러가 쌓여 입력이 점점 느려진다.
+	// 한글은 한 글자가 여러 바이트라 DB 가 바이트로 자르면 checkType 을 byte 로 둔다.
+	$c.util.setTextLengthCounter(ipt_shrhdNmlistClsBasddContn, txt_shrhdNmlistClsBasddContnCnt, {
+		maxLength : 4000, checkType : "byte", warnClass : "warn"
+	});
+	$c.util.setTextLengthCounter(ipt_proftDivRemk, txt_proftDivRemkCnt, {
+		maxLength : 4000, checkType : "byte", warnClass : "warn"
+	});
+
+	// 등록 모드면 조회할 것이 없다.
+	if ($c.util.isEmpty(bzProcsNo)) return;
+
+	await scwin.selectDivBasDdInfo(bzProcsNo);
+};
+
+
+///////// 3. 컴포넌트 이벤트 영역 /////////
+
+/**
+ * @event
+ * @name scwin.btn_info_onclick
+ * @author Inswave
+ * @date 2026. 08. 19
+ * @description 입력예시 보기 클릭. 예시 영역을 접었다 편다.
+ *
+ * 안내가 길면 화면이 밀리므로 평소에는 접어 둔다.
+ * 지금 접혀 있는지 펴져 있는지는 클래스로 기억한다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.btn_info_onclick = function (e) {
+	grp_info.toggleClass("active");
+
+	if (grp_info.hasClass("active")) {
+		grp_info.show("");
+	} else {
+		grp_info.hide();
+	}
+};
+
+/**
+ * @event
+ * @name scwin.rd_divBasDdYn_onchange
+ * @author Inswave
+ * @date 2026. 08. 19
+ * @description 배당기준일 구분 변경. 값에 따라 입력칸을 바꿔 끼운다.
+ *
+ * 라디오는 컴포넌트마다 이벤트 인자가 달라 값을 getValue() 로 읽는 편이 안전하다.
+ * onviewchange 는 newValue 가 없고 value 를 넘긴다.
+ *
+ * 복사해 쓸 때 바꿀 곳
+ *  - 교체할 두 컴포넌트
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.rd_divBasDdYn_onchange = function (info) {
+	// 구분이 바뀌면 이전에 고른 일자는 의미가 없다. 남겨 두면 보이지 않는 값이 저장된다.
+	cal_divBasDd.setValue("");
+
+	scwin.setDivBasDdInput(rd_divBasDdYn.getValue());
+};
+
+/**
+ * @event
+ * @name scwin.cal_divBasDd_onblur
+ * @author Inswave
+ * @date 2026. 08. 19
+ * @description 배당기준일에서 포커스가 빠질 때 날짜 형식을 확인한다.
+ *
+ * 달력으로 고르면 형식이 맞지만 직접 타이핑할 수 있으므로 여기서 한 번 더 본다.
+ * 컴포넌트 이름을 적지 않고 this 로 받으면 다른 달력에도 그대로 쓸 수 있다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.cal_divBasDd_onblur = function () {
+	const value = $c.str.trim(this.getValue());
+
+	if ($c.util.isEmpty(value)) return;
+
+	if (!$c.date.isDate(value, false)) {
+		$c.win.alert(this.getAttribute("title") + " : 날짜는 8자리 yyyyMMdd 형식입니다.");
+	}
+};
+
+/**
+ * @event
+ * @name scwin.txt_attachFileNm_onclick
+ * @author Inswave
+ * @date 2026. 08. 19
+ * @description 등록된 첨부파일명 클릭. 파일을 내려받는다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.txt_attachFileNm_onclick = function (e) {
+	scwin.downloadAttachFile();
+};
+
+/**
+ * @event
+ * @name scwin.btn_deleteFile_onclick
+ * @author Inswave
+ * @date 2026. 08. 19
+ * @description 파일 삭제 버튼 클릭. 첨부 영역을 등록 전 상태로 되돌린다.
+ *
+ * 화면에서만 지운다. 서버 파일은 새 파일과 함께 저장할 때 정리된다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.btn_deleteFile_onclick = function (e) {
+	dma_divBasDdInfo.set("attachFileNm", "");
+
+	scwin.setAttachFileMode(true);
+};
+
+/**
+ * @event
+ * @name scwin.btn_fileUp_onclick
+ * @author Inswave
+ * @date 2026. 08. 19
+ * @description 찾아보기 버튼 클릭. 파일 선택창을 연다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.btn_fileUp_onclick = function (e) {
+	// 공통 함수가 업로드 컴포넌트 내부 input 을 클릭해 파일 대화상자를 연다.
+	$c.util.onUploadClick(upd_compUpload);
+};
+
+/**
+ * @event
+ * @name scwin.upd_compUpload_onInputValueChange
+ * @author Inswave
+ * @date 2026. 08. 19
+ * @description 파일을 고른 순간 파일명을 화면에 표시한다.
+ *
+ * upload 는 고른 파일명을 인자로 그대로 넘겨준다.
+ * multiupload 처럼 목록을 다시 꺼내 마지막 항목을 찾을 필요가 없다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.upd_compUpload_onInputValueChange = function (fileName) {
+	txt_presentAttachFile.setValue(fileName);
+};
+
+/**
+ * @event
+ * @name scwin.btn_list_onclick
+ * @author Inswave
+ * @date 2026. 08. 19
+ * @description 목록 버튼 클릭. 저장하지 않고 목록으로 돌아간다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.btn_list_onclick = async function (e) {
+	// 고친 내용이 있는지 공통함수로 확인한다. 화면에서 값을 하나씩 비교하지 않는다.
+	// 인자는 DataCollection 객체나 그 배열이다. 아이디 문자열을 넘기면 항상 false 가 된다.
+	if ($c.data.isModified([dma_divBasDdInfo])) {
+		if (!await $c.win.confirm("저장하지 않은 내용이 있습니다. 목록으로 이동하시겠습니까?")) return;
+	}
+
+	scwin.goList();
+};
+
+/**
+ * @event
+ * @name scwin.btn_register_onclick
+ * @author Inswave
+ * @date 2026. 08. 19
+ * @description 등록 버튼 클릭
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.btn_register_onclick = async function (e) {
+	await scwin.register();
+};
+
+/**
+ * @event
+ * @name scwin.btn_update_onclick
+ * @author Inswave
+ * @date 2026. 08. 19
+ * @description 수정 버튼 클릭. 등록과 하는 일이 같아 같은 함수를 부른다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.btn_update_onclick = async function (e) {
+	await scwin.register();
+};
+
+
+///////// 4. 서브미션 콜백 영역 /////////
+
+/**
+ * @method
+ * @name scwin.selectDivBasDdInfo
+ * @author Inswave
+ * @date 2026. 08. 19
+ * @description 상세를 조회해 dma_divBasDdInfo 에 담는다.
+ *
+ * 복사해 쓸 때 바꿀 곳
+ *  - action 경로, target
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.selectDivBasDdInfo = async function (bzProcsNo) {
+	dma_divBasDdInfo.set("bzProcsNo", bzProcsNo);
+
+	const sbmOptions = {
+		id : "sbm_selectContent",
+		method : "get",
+		action : "/api/discls/info/div-bas-dd/select-one",
+		ref : "dma_divBasDdInfo",
+		target : "dma_divBasDdInfo=body",
+		isProcessMsg : false
+	};
+
+	// 통신 오류는 공통 오류 핸들러가 안내하고 예외를 던진다.
+	// 여기서 잡지 않으므로 오류가 나면 아래 처리는 실행되지 않는다.
+	const result = await $c.sbm.executeDynamic(sbmOptions);
+
+	// 조회 결과 처리는 submitDoneHandler 옵션 대신 여기서 직접 부른다.
+	// 옵션으로 넘기면 await 가 풀린 뒤에 돌아 이어지는 코드와 순서가 어긋난다.
+	scwin.sbm_selectContent_submitdone(result);
+};
+
+/**
+ * @method
+ * @name scwin.sbm_selectContent_submitdone
+ * @author Inswave
+ * @date 2026. 08. 19
+ * @description 상세 조회 완료. 조회된 값에 맞춰 화면을 맞춘다.
+ *
+ * submitDoneHandler 옵션이 아니라 조회 함수의 await 뒤에서 직접 부른다.
+ * 이름을 _submitdone 으로 두는 것은 어느 통신의 후처리인지 드러내기 위해서다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.sbm_selectContent_submitdone = function (e) {
+	const body = e.responseJSON?.body ?? {};
+
+	// 구분에 맞는 입력칸을 보여 준다.
+	scwin.setDivBasDdInput(body.divBasDdYn);
+
+	// 첨부가 없으면 등록 영역을, 있으면 다운로드 영역을 보여 준다.
+	scwin.setAttachFileMode($c.util.isEmpty(body.attachFileNm));
+};
+
+/**
+ * @event
+ * @name scwin.upd_compUpload_ondone
+ * @author Inswave
+ * @date 2026. 08. 19
+ * @description 저장 완료. 목록으로 돌아간다.
+ *
+ * upload 의 응답은 xml 로 온다. ret 태그 안에 결과 json 이 문자열로 들어 있다.
+ * 통신 자체가 실패하면 이 이벤트는 오지 않는다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.upd_compUpload_ondone = function (responseXML) {
+	const ret = responseXML.getElementsByTagName("ret")[0]?.textContent;
+	const result = $c.util.getJSON(ret);
+
+	// 실패도 알린다. 그냥 return 하면 사용자는 저장된 줄 안다.
+	if (!result?.success) {
+		$c.win.alert($c.data.getMessage("com_complete_0151", "저장"));
+		return;
+	}
+
+	$c.win.alert($c.data.getMessage("com_complete_0150", "저장"), () => { scwin.goList(); });
+};
+
+/**
+ * @method
+ * @name scwin.checkDeclarable
+ * @author Inswave
+ * @date 2026. 08. 19
+ * @description 지금 작성할 수 있는 상태인지 서버에 묻는다.
+ *
+ * 기간이 지났거나 이미 제출한 건을 화면에서 알 수 없을 때 쓴다.
+ * 저장을 눌러 실패로 알리는 것보다 미리 막는 편이 낫다.
+ *
+ * 복사해 쓸 때 바꿀 곳
+ *  - action 경로, 응답 코드의 뜻
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.checkDeclarable = async function () {
+	const sbmOptions = {
+		id : "sbm_selectDeclTp",
+		method : "get",
+		action : "/api/discls/info/div-bas-dd/decl-tp/select-one",
+		isProcessMsg : false
+	};
+
+	// 통신 오류는 공통 오류 핸들러가 안내하고 예외를 던진다.
+	const result = await $c.sbm.executeDynamic(sbmOptions);
+
+	// N 제출 시간 초과
+	if (result.responseJSON?.body === "N") {
+		await $c.win.alert("제출 시간을 초과했습니다.");
+		return false;
+	}
+
+	return true;
+};
+
+
+///////// 5. 일반/업무 함수 영역 /////////
+
+/**
+ * @method
+ * @name scwin.setScreenMode
+ * @author Inswave
+ * @date 2026. 08. 19
+ * @description 등록·수정 모드에 따라 버튼과 첨부 영역을 정한다.
+ *
+ * 모드 판정을 한 곳에 모아 두면 화면 곳곳에 같은 조건문이 흩어지지 않는다.
+ *
+ * 복사해 쓸 때 바꿀 곳
+ *  - 모드별로 보일 버튼
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.setScreenMode = function (bzProcsNo) {
+	const isUpdate = $c.util.isNotEmpty(bzProcsNo);
+
+	if (isUpdate) {
+		btn_update.show("");
+		return;
+	}
+
+	btn_register.show("");
+
+	// 등록 모드에는 기존 첨부가 없으므로 그 영역을 감춘다.
+	grp_quesAttachFile.hide();
+};
+
+/**
+ * @method
+ * @name scwin.setDivBasDdInput
+ * @author Inswave
+ * @date 2026. 08. 19
+ * @description 구분에 따라 달력과 고정표시 칸을 바꿔 끼운다.
+ *
+ * show 는 반드시 인자를 주어 부른다. 인자 없이 부르면 display:block 이 되어
+ * 표 안의 칸이 줄바꿈되며 배치가 무너진다.
+ *
+ * 복사해 쓸 때 바꿀 곳
+ *  - 교체할 두 컴포넌트
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.setDivBasDdInput = function (divBasDdYn) {
+	// Y 특정일자로 정한 경우 · N 이사회결의로 정하는 경우
+	const isFixedDate = divBasDdYn !== "N";
+
+	if (isFixedDate) {
+		cal_divBasDd.show("");
+		ipt_divBasDd.hide();
+		return;
+	}
+
+	cal_divBasDd.hide();
+	ipt_divBasDd.show("");
+};
+
+/**
+ * @method
+ * @name scwin.goList
+ * @author Inswave
+ * @date 2026. 08. 19
+ * @description 목록 화면으로 이동한다.
+ *
+ * 복사해 쓸 때 바꿀 곳
+ *  - 목록 화면 경로
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.goList = function () {
+	$c.win.moveUrl("/ui/sample/template/JLDFIL25900_guide.xml", {});
+};
+
+/**
+ * @method
+ * @name scwin.register
+ * @author Inswave
+ * @date 2026. 08. 19
+ * @description 작성 가능 여부를 확인하고 검증한 뒤 저장한다.
+ *
+ * 순서가 중요하다. 먼저 서버에 물어 기간이 지났는지 확인하고,
+ * 그 다음 입력값을 검증하고, 마지막에 사용자 확인을 받는다.
+ * 검증부터 하면 기간이 지난 건에도 입력을 요구하게 된다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.register = async function () {
+	if (!await scwin.checkDeclarable()) return;
+
+	if (!await scwin.validate()) return;
+
+	if (!await $c.win.confirm($c.data.getMessage("com_crud_0198", "저장"))) return;
+
+	scwin.upload();
+};
+
+/**
+ * @method
+ * @name scwin.validate
+ * @author Inswave
+ * @date 2026. 08. 19
+ * @description 저장 전 입력값을 검증한다.
+ *
+ * 필수·자리수 검증은 공통함수 $c.data.validateGroup 이 안내와 포커스까지 처리한다.
+ * 항목마다 isEmpty 로 확인하고 alert 을 띄우던 코드를 대신한다.
+ * id 는 컴포넌트가 ref 로 묶인 DataMap 의 키다.
+ *
+ * 공통함수로 표현할 수 없는 조건부 검증만 아래에 이어서 쓴다.
+ *
+ * 복사해 쓸 때 바꿀 곳
+ *  - valInfo 항목
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.validate = async function () {
+	const valInfo = [
+		{ id : "shrhdNmlistClsBasddContn", mandatory : true },
+		{ id : "proftDivRemk", mandatory : true }
+	];
+
+	if (!await $c.data.validateGroup(grp_form, valInfo)) return false;
+
+	// 배당기준일은 특정일자를 고른 경우에만 필수다. 조건이 붙어 valInfo 로 표현할 수 없다.
+	if (rd_divBasDdYn.getValue() === "Y") {
+		if ($c.util.isEmpty(cal_divBasDd.getValue())) {
+			await $c.win.alert($c.data.getMessage("com_crud_0199", "배당기준일"));
+			cal_divBasDd.focus();
+			return false;
+		}
+
+		if (!$c.date.checkCalendarFormat(cal_divBasDd, "yyyyMMdd")) {
+			await $c.win.alert("yyyyMMdd 형식의 올바른 날짜를 입력하세요.");
+			cal_divBasDd.focus();
+			return false;
+		}
+	}
+
+	// 첨부파일은 등록할 때만 필수다. 수정은 기존 파일을 그대로 둘 수 있다.
+	const isNew = $c.util.isEmpty(dma_divBasDdInfo.get("bzProcsNo"));
+
+	if (isNew && $c.util.isEmpty(txt_presentAttachFile.getValue())) {
+		await $c.win.alert($c.data.getMessage("com_crud_0199", "첨부파일"));
+		return false;
+	}
+
+	return scwin.validateAttachFile();
+};
+
+/**
+ * @method
+ * @name scwin.validateAttachFile
+ * @author Inswave
+ * @date 2026. 08. 19
+ * @description 고른 파일의 확장자와 파일명 길이를 확인한다.
+ *
+ * 확장자 검사는 공통함수를 쓴다. 화면에서 배열을 직접 돌며 비교하지 않는다.
+ * 안내 문구까지 공통함수가 띄운다.
+ *
+ * 복사해 쓸 때 바꿀 곳
+ *  - 허용 확장자, 파일명 최대 길이
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.validateAttachFile = function () {
+	const fileName = upd_compUpload.getValue();
+
+	// 고른 파일이 없으면 볼 것이 없다. 수정하면서 기존 파일을 그대로 두는 경우다.
+	if ($c.util.isEmpty(fileName)) return true;
+
+	const allowExt = ["drt", "bmp", "gif", "jpeg", "jpg", "png",
+		"hwp", "docx", "doc", "xls", "xlsx", "ppt", "pptx", "pdf", "zip", "txt"];
+
+	const extAlertMsg = "첨부할 수 없는 확장자를 가진 파일이 있습니다.\n사용가능 확장자 : " + allowExt.join(", ");
+
+	if (!$c.util.checkFileExtension(fileName, allowExt, extAlertMsg)) return false;
+
+	// 파일명 길이는 바이트로 잰다. 한글 파일명은 글자수와 바이트가 다르다.
+	if ($c.str.getByteLength(fileName) > 80) {
+		$c.win.alert("파일명 길이가 80byte 를 넘는 파일이 있습니다.");
+		return false;
+	}
+
+	return true;
+};
+
+/**
+ * @method
+ * @name scwin.setAttachFileMode
+ * @author Inswave
+ * @date 2026. 08. 19
+ * @description 첨부 영역을 등록 전·후 상태로 전환한다.
+ *
+ * show 는 반드시 인자를 주어 부른다. 인자 없이 부르면 display:block 이 되어
+ * flex 로 나란히 놓은 항목이 세로로 쌓인다.
+ *
+ * 복사해 쓸 때 바꿀 곳
+ *  - 전환할 영역
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.setAttachFileMode = function (isUploadable) {
+	if (isUploadable) {
+		// 등록된 파일 없음 : 업로드 영역을 연다.
+		grp_attachFile.hide();
+		grp_nofileMessage.show("");
+		grp_upload.show("");
+		grp_message.hide();
+		return;
+	}
+
+	// 등록된 파일 있음 : 파일명과 삭제 안내를 보여 주고 업로드를 막는다.
+	grp_attachFile.show("flex");
+	grp_nofileMessage.hide();
+	grp_upload.hide();
+	grp_message.show("");
+};
+
+/**
+ * @method
+ * @name scwin.downloadAttachFile
+ * @author Inswave
+ * @date 2026. 08. 19
+ * @description 저장된 첨부파일을 내려받는다.
+ *
+ * $c.data.downFile 은 async 라 실패 시 reject 한다.
+ * catch 를 붙이지 않으면 서버가 죽어 있어도 화면에 아무 반응이 없다.
+ *
+ * 복사해 쓸 때 바꿀 곳
+ *  - 내려받기 경로, 파라미터
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.downloadAttachFile = async function () {
+	const fileName = dma_divBasDdInfo.get("attachFileNm");
+
+	if ($c.util.isEmpty(fileName)) return;
+
+	await $c.data.downFile("/api/discls/info/div-bas-dd/file/download", fileName, {
+		bzProcsNo : dma_divBasDdInfo.get("bzProcsNo")
+	}).catch(() => { $c.win.alert("파일을 내려받지 못했습니다."); });
+};
+
+/**
+ * @method
+ * @name scwin.upload
+ * @author Inswave
+ * @date 2026. 08. 19
+ * @description 입력값을 실어 파일과 함께 보낸다.
+ *
+ * upload 는 addParam 으로 값을 싣고 submit() 으로 보낸다.
+ * 보낼 주소는 마크업의 action 에 적어 두었다.
+ * 결과는 ondone 이 받는다. 여기서 await 로 기다릴 수 없다.
+ *
+ * 복사해 쓸 때 바꿀 곳
+ *  - 서버가 받는 항목명
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.upload = function () {
+	// 서버가 받는 항목명이다. 화면 id 가 아니라 전문 규격을 그대로 적는다.
+	["bzProcsNo", "divBasDdYn", "divBasDd", "shrhdNmlistClsBasddContn", "proftDivRemk"].forEach(key => {
+		upd_compUpload.addParam(key, dma_divBasDdInfo.get(key));
+	});
+
+	upd_compUpload.submit();
+};]]></script>
+    </head>
+    <body ev:onpageload="scwin.onpageload">
+    	<xf:group class="sub_contents" id="" meta_componentContainer="true" style="">
+    		<w2:pageFrame id="pfmContentHeader" src="/cm/xml/contentHeader.xml" style=""></w2:pageFrame>
+    		<w2:textbox class="txt_info red bold" id="" label="제출한 배당기준일에 따라 배당락조치가 되므로 아래의 내용을 참조하여 입력하시기 바랍니다." style="" tagname="">
+    		</w2:textbox>
+    		<w2:textbox class="txt_info red bold" id=""
+    			label="만약, 정확한 정보를 입력하지 않아 발생한 배당조치 오류에 대해서는 해당 법인에 책임이 있으며, 불이익이 발생할 수 있으니 특별히 입력에 유의하시기 바랍니다." style="" tagname="">
+    		</w2:textbox>
+    		<w2:textbox class="txt_info blue bold" id=""
+    			label="배당기준일을 특정일로 입력한 경우(입력예시 1)에는 해당 일자를 기준으로 배당락 조치되고, 이사회 결의(입력예시 2)로 입력한 경우에는 별도 공시가 있는 경우에 한하여 배당락 조치가 됩니다." style=""
+    			tagname="">
+    		</w2:textbox>
+    		<w2:textbox class="txt_info blue " id=""
+    			label="※ 유가증권시장 상장법인의 경우, 배당기준일 입력 이후 배당기준일에 대한 변경사항이 발생할 경우 한국거래소에 공문으로 기존 입력사항에 대한 변경을 요청해야 합니다." style="" tagname="">
+    		</w2:textbox>
+    		<xf:group class="msgbox " id="" style="">
+    			<w2:textbox class="mb15 bold" for="" id="" label="&lt;입력 예시&gt;" style="" tagname=""></w2:textbox>
+    			<xf:group class="txt_list no_dot" id="" style="" tagname="ul">
+    				<xf:group id="" tagname="li">
+    					<w2:textbox class="" id=""
+    						label='1) 정관의 이익배당 조항에 직접 명시되거나, 타 조항의 인용을 통해 "12/31", "정기주총 권리기준일", "결산기말" 등 특정일자로 정한 경우 -&gt; "입력"을 선택한 후 해당 날짜 필수입력(달력 선택)'
+    						style="" tagname="">
+    					</w2:textbox>
+    				</xf:group>
+    				<xf:group id="" style="" tagname="li">
+    					<w2:textbox class="" id="" label='2) "이사회 결의"로 정하는 경우 -&gt; "미입력" 선택(목록에서 "-"로 표시됨)' style="" tagname=""></w2:textbox>
+    				</xf:group>
+    				<xf:group id="" style="" tagname="li">
+    					<w2:textbox class="" id="" label="3) 1) 또는 2)에 해당하는 경우 -&gt; 하나를 결정하여 선택" style="" tagname=""></w2:textbox>
+    				</xf:group>
+    				<xf:group id="" style="" tagname="li">
+    					<w2:textbox class="" id="" label="4) 투자회사 등 결산일이 다수인 경우 -&gt; 하나를 결정하여 입력" style="" tagname=""></w2:textbox>
+    				</xf:group>
+    				<xf:group id="" style="" tagname="li" class="mt20">
+    					<w2:textbox class="" id="" label="주주명부폐쇄기준일 및 이익배당 칼럼은 정관에 기재되어 있는 해당 조항을 텍스트로 입력해주시기 바랍니다." style="" tagname="">
+    					</w2:textbox>
+    				</xf:group>
+    				<xf:group id="" style="" tagname="li">
+    					<w2:textbox class="red bold" id="btn_info" label="&lt;☞ 입력예시 보기 클릭&gt;" style="cursor:pointer;" tagname="" ev:onclick="scwin.btn_info_onclick"></w2:textbox>
+    				</xf:group>
+    				<xf:group id="grp_info" style="display:none;" tagname="li" class="tblbox mt10">
+    					<xf:group adaptive="" adaptiveThreshold="768" tagname="table" style="" id="" class="w2tb tbl">
+    						<w2:attributes>
+    							<w2:summary></w2:summary>
+    						</w2:attributes>
+    						<xf:group tagname="colgroup">
+    							<xf:group tagname="col" style=""></xf:group>
+    							<xf:group tagname="col" style=""></xf:group>
+    						</xf:group>
+    						<xf:group tagname="tr" style="">
+    							<xf:group tagname="th" style="" class="w2tb_th tac">
+    								<w2:textbox ref="" style="" userData2="" id="" label="주주명부폐쇄기준일" class=""></w2:textbox>
+    							</xf:group>
+    							<xf:group tagname="th" style="" class="w2tb_th tac">
+    								<w2:textbox ref="" style="" userData2="" id="" label="이익배당" class=""></w2:textbox>
+    							</xf:group>
+    						</xf:group>
+    						<xf:group tagname="tr">
+    							<xf:group tagname="td" class="w2tb_td">
+    								<w2:attributes>
+    									<w2:scope>row</w2:scope>
+    								</w2:attributes>
+    								<w2:textbox ref="" style="" userData2="" id=""
+    									label="제16조 [주주명부의 폐쇄 및 기준일]&lt;br/&gt;&lt;br/&gt;①회사는 매년 1월 1일부터 1월 7일까지 주주의 권리에 관한 주주명부의 기재변경을 정지한다. 다만, 「주식·사채 등의 전자등록에 관한 법률」에 따라 전자등록계좌부에 주식 등을 전자 등록하는 경우에는 동 항은 적용하지 않는다.&lt;br/&gt;&lt;br/&gt;②회사는 매년 12월 31일현재 주주명부에 기재되어 있는 주주를 그 결산기에 관한 정기주주총회에서 권리를 행사할 주주로 한다.&lt;br/&gt;&lt;br/&gt;③회사는 임시주주총회의 소집 기타 필요한 경우 이사회의 결의로 3월을 경과하지 아니하는 일정한 기간을 정하여 권리에 관한 주주명부의 기재변경을 정지하거나, 이사회의 결의로 3월내로 정한 날에 주주명부에 기재되어 있는 주주를 그 권리를 행사할 주주로 할 수 있다. 이 경우 이사회는 필요하다고 인정하는 때에는 주주명부의 기재변경 정지와 기준일의 지정을 함께 할 수 있다. 이 경우 회사는 주주명부 폐쇄기간 또는 기준일의 2주간 전에 이를 공고하여야 한다."
+    									class="" escape="false">
+    								</w2:textbox>
+    							</xf:group>
+    							<xf:group tagname="td" class="w2tb_td" style="vertical-align:top;">
+    								<w2:attributes>
+    									<w2:colspan>1</w2:colspan>
+    									<w2:rowspan>1</w2:rowspan>
+    								</w2:attributes>
+    								<w2:textbox ref="" style="" userData2="" id=""
+    									label="제57조 [이익배당]&lt;br/&gt;&lt;br/&gt;①이익의 배당은 금전 또는 금전 외의 재산으로 할 수 있다.&lt;br/&gt;&lt;br/&gt;②이익의 배당을 주식으로 하는 경우 회사가 종류주식을 발행한 때에는 각각 그와 같은 종류의 주식으로 할 수 있다.&lt;br/&gt;&lt;br/&gt;③제1항의 배당은 결산기에 관한 정기주주총회에서 권리를 행사할 주주로 하거나이사회 결의로 정하는 배당기준일현재의 주주명부에 기재된 주주 또는 등록된 질권자에게 지급한다.&lt;br/&gt;&lt;br/&gt;④이익배당은 주주총회의 결의로 정한다."
+    									class="" escape="false">
+    								</w2:textbox>
+    							</xf:group>
+    						</xf:group>
+    					</xf:group>
+    				</xf:group>
+    				<xf:group id="" style="" tagname="li">
+    					<w2:textbox class="mt20" escape="false" id="" label="반드시 가장 최근의 주주총회에서 승인되었던 정관(최신 정관)을 첨부하시기 바랍니다." style=""
+    						tagname="">
+    					</w2:textbox>
+    				</xf:group>
+    			</xf:group>
+    		</xf:group>
+    		<xf:group class="tblbox" id="" style="">
+    			<xf:group adaptive="layout" adaptiveThreshold="768" class="w2tb tbl" id="grp_form" style="" tagname="table">
+    				<w2:attributes>
+    					<w2:summary></w2:summary>
+    				</w2:attributes>
+    				<xf:group tagname="colgroup">
+    					<xf:group style="width:150px;" tagname="col"></xf:group>
+    					<xf:group style="" tagname="col"></xf:group>
+    					<xf:group style="width:150px;" tagname="col"></xf:group>
+    					<xf:group style="" tagname="col"></xf:group>
+    				</xf:group>
+    				<xf:group style="" tagname="tr">
+    					<xf:group class="w2tb_th" style="" tagname="th">
+    						<w2:textbox class="" id="" label="회사명" ref="" style="" userData2=""></w2:textbox>
+    					</xf:group>
+    					<xf:group class="w2tb_td" style="" tagname="td">
+    						<w2:textbox class="" id="" label="" ref="data:dma_divBasDdInfo.comNm" style="" userData2=""></w2:textbox>
+    					</xf:group>
+    					<xf:group class="w2tb_th " tagname="th">
+    						<w2:attributes></w2:attributes>
+    						<w2:textbox class="" id="" label="종목코드" ref="" style="" userData2=""></w2:textbox>
+    					</xf:group>
+    					<xf:group class="w2tb_td" tagname="td">
+    						<w2:attributes></w2:attributes>
+    						<w2:textbox class="" id="" label="" ref="data:dma_divBasDdInfo.isuCd" style="" userData2=""></w2:textbox>
+    					</xf:group>
+    				</xf:group>
+    				<xf:group tagname="tr">
+    					<xf:group class="w2tb_th " tagname="th">
+    						<w2:attributes>
+    							<w2:scope>row</w2:scope>
+    						</w2:attributes>
+    						<w2:textbox class="" id="" label="기준년도" ref="" style="" userData2=""></w2:textbox>
+    					</xf:group>
+    					<xf:group class="w2tb_td" tagname="td">
+    						<w2:attributes>
+    							<w2:colspan>1</w2:colspan>
+    							<w2:rowspan>1</w2:rowspan>
+    						</w2:attributes>
+    						<w2:textbox class="" id="" label="" ref="data:dma_divBasDdInfo.basYy" style="" userData2="" displayFormat=" 년"></w2:textbox>
+    					</xf:group>
+    					<xf:group class="w2tb_th " tagname="th">
+    						<w2:attributes></w2:attributes>
+    						<w2:textbox class="" id="" label="결산월" ref="" style="" userData2=""></w2:textbox>
+    					</xf:group>
+    					<xf:group class="w2tb_td" tagname="td">
+    						<w2:attributes></w2:attributes>
+    						<w2:textbox class="" id="" label="" ref="data:dma_divBasDdInfo.acntclsMm" style="" userData2="" displayFormat=" 월"></w2:textbox>
+    					</xf:group>
+    				</xf:group>
+    				<xf:group tagname="tr">
+    					<xf:group class="w2tb_th " tagname="th">
+    						<w2:attributes>
+    							<w2:scope>row</w2:scope>
+    						</w2:attributes>
+    						<w2:textbox class="req" id="" label="배당기준일" ref="" style="" userData2=""></w2:textbox>
+    					</xf:group>
+    					<xf:group class="w2tb_td" tagname="td">
+    						<w2:attributes>
+    							<w2:colspan>3</w2:colspan>
+    							<w2:rowspan>1</w2:rowspan>
+    						</w2:attributes>
+    						<xf:group id="">
+    							<xf:select1 ref="data:dma_divBasDdInfo.divBasDdYn" appearance="full" disabled="" style="" id="rd_divBasDdYn" renderType="radiogroup" rows=""
+    								cols="" selectedIndex="0" ev:onchange="scwin.rd_divBasDdYn_onchange">
+    								<xf:choices>
+    									<xf:item>
+    										<xf:label><![CDATA[특정일자로 정한 경우]]></xf:label>
+    										<xf:value><![CDATA[Y]]></xf:value>
+    									</xf:item>
+    									<xf:item>
+    										<xf:label><![CDATA[이사회결의로 정하는 경우]]></xf:label>
+    										<xf:value><![CDATA[N]]></xf:value>
+    									</xf:item>
+    								</xf:choices>
+    							</xf:select1>
+    						</xf:group>
+    						<xf:group id="">
+    							<w2:inputCalendar footerDiv="true" rightAlign="false" focusOnDateSelect="false" style="width: 120px;" id="cal_divBasDd"
+    								renderType="" renderDiv="true" calendarValueType="yearMonthDate" readOnly="" ref="data:dma_divBasDdInfo.divBasDd" ev:onblur="scwin.cal_divBasDd_onblur" title="배당기준일" class="req">
+    							</w2:inputCalendar>
+    							<xf:input class="req" id="ipt_divBasDd" meta_snippetCategory="10_입력폼" meta_snippetKeyComponent="true"
+    								meta_snippetName="10_01 InputBox" placeholder="" ref="data:dma_QnaInfo.quesTitle" style="width:120px; display:none; text-align:center;" title="제목" readOnly="true" initValue="-">
+    							</xf:input>
+    						</xf:group>
+    					</xf:group>
+    				</xf:group>
+    				<xf:group tagname="tr">
+    					<xf:group tagname="th" class="w2tb_th ">
+    						<w2:attributes>
+    							<w2:scope>row</w2:scope>
+    						</w2:attributes>
+    						<w2:textbox class="req" id="" label="주주명부의폐쇄 및&lt;br/&gt;기준일" ref="" style="" userData2="" escape="false"></w2:textbox>
+    						<xf:group class="normal" id="grp_group1" style="">
+    							<w2:textbox class="" escape="false" id="" label="(" ref="" style="" userData2=""></w2:textbox>
+    							<w2:textbox class="" escape="false" id="txt_shrhdNmlistClsBasddContnCnt" label="0 / 4,000 byte" ref="" style="" userData2=""></w2:textbox>
+    							<w2:textbox class="" escape="false" id="" label=")" ref="" style="" userData2=""></w2:textbox>
+    						</xf:group>
+    					</xf:group>
+    					<xf:group tagname="td" class="w2tb_td">
+    						<w2:attributes>
+    							<w2:colspan>3</w2:colspan>
+    							<w2:rowspan>1</w2:rowspan>
+    						</w2:attributes>
+    						<xf:textarea class="req" id="ipt_shrhdNmlistClsBasddContn" placeholder="" style="width:100%;height: 82px;" maxByteLength="4000" ref="data:dma_divBasDdInfo.shrhdNmlistClsBasddContn"></xf:textarea>
+    					</xf:group>
+    				</xf:group>
+    				<xf:group tagname="tr">
+    					<xf:group tagname="th" class="w2tb_th ">
+    						<w2:attributes>
+    							<w2:scope>row</w2:scope>
+    						</w2:attributes>
+    						<w2:textbox class="req" id="" label="이익배당" ref="" style="" userData2=""></w2:textbox>
+    						<xf:group class="normal" id="grp_group2" style="">
+    							<w2:textbox class="" escape="false" id="" label="(" ref="" style="" userData2=""></w2:textbox>
+    							<w2:textbox class="" escape="false" id="txt_proftDivRemkCnt" label="0 / 4,000 byte" ref="" style="" userData2=""></w2:textbox>
+    							<w2:textbox class="" escape="false" id="" label=")" ref="" style="" userData2=""></w2:textbox>
+    						</xf:group>
+    					</xf:group>
+    					<xf:group tagname="td" class="w2tb_td">
+    						<w2:attributes>
+    							<w2:colspan>3</w2:colspan>
+    							<w2:rowspan>1</w2:rowspan>
+    						</w2:attributes>
+    						<xf:textarea class="req" id="ipt_proftDivRemk" placeholder="" style="width:100%;height: 82px;" maxByteLength="4000" ref="data:dma_divBasDdInfo.proftDivRemk"></xf:textarea>
+    					</xf:group>
+    				</xf:group>
+    				<xf:group tagname="tr" id="grp_">
+    					<xf:group tagname="th" class="w2tb_th "><w2:attributes>
+    							<w2:scope>row</w2:scope>
+    							<w2:colspan>1</w2:colspan>
+    							<w2:rowspan>2</w2:rowspan>
+    						</w2:attributes><w2:textbox class="req" id="" label="첨부파일" ref="" style="" userData2=""></w2:textbox></xf:group>
+    					<xf:group tagname="td" class="w2tb_td" style="" id="grp_quesAttachFile">
+    						<w2:attributes>
+    							<w2:colspan>3</w2:colspan>
+    							<w2:rowspan>1</w2:rowspan>
+    						</w2:attributes>
+    						<xf:group style="display:none;" id="grp_attachFile">
+    							<w2:textbox style="" id="" label="현재 등록된 파일 :&amp;nbsp;" escape="false"></w2:textbox>
+    							<w2:textbox ref="data:dma_QnaInfo.attachFileNm" displayFormatter=""
+    								ev:onclick="scwin.txt_attachFileNm_onclick" displayFormat="" style="cursor:pointer;" id="txt_attachFileNm" label="">
+    							</w2:textbox>
+    							<xf:trigger ev:onclick="scwin.btn_deleteFile_onclick" style="margin-left: 5px;" id="btn_deleteFile"
+    								label="X" type="image">
+    								<xf:label><![CDATA[X]]></xf:label>
+    							</xf:trigger>
+    						</xf:group>
+    						<xf:group id="grp_nofileMessage" style="">
+    							<w2:textbox style="" id="" label="현재 등록된 파일 : 없음."></w2:textbox>
+    						</xf:group>
+    					</xf:group>
+    				</xf:group>
+    				<xf:group tagname="tr">
+    					<xf:group tagname="td" class="w2tb_td">
+    						<w2:attributes>
+    							<w2:colspan>3</w2:colspan>
+    							<w2:rowspan>1</w2:rowspan>
+    						</w2:attributes>
+    						<xf:group id="grp_upload"><xf:group style="display:flex;" id="" class="flex">
+    							<xf:input ref="" meta_snippetCategory="10_입력폼" meta_snippetName="10_10 InputBox_조회버튼" ev:onclick="scwin.btn_fileUp_onclick" meta_snippetKeyComponent="true" style="width:150px;" readOnly="true" id="txt_presentAttachFile" placeholder="" title="첨부파일" class="">
+    							</xf:input>
+    							<xf:trigger meta_snippetCategory="10_입력폼" meta_snippetName="10_10 InputBox_조회버튼" ev:onclick="scwin.btn_fileUp_onclick" style="" id="btn_fileUp" type="button" class="btn_cm upload">
+    								<xf:label><![CDATA[찾아보기]]></xf:label>
+    							</xf:trigger>
+    							<w2:upload ev:ondone="scwin.upd_compUpload_ondone" useXHR="true" clickOpenFileDialog="true" inputStyle="vertical-align:middle;word-wrap:break-word" action="/api/discls/info/div-bas-dd/insert" style="display:none;" id="upd_compUpload" ev:onInputValueChange="scwin.upd_compUpload_onInputValueChange" type="" class="" imageStyle="position:absolute;vertical-align:middle;word-wrap:break-word" accept="">
+    							</w2:upload>
+    						</xf:group><w2:textbox ref="" style="" userData2="" id="" label="* 파일은 최대 20MB까지 첨부 가능합니다. " class="red"></w2:textbox></xf:group><xf:group id="grp_message" style="color:red; display:none;">
+    							<w2:textbox id="" label="※ 첨부파일을 수정하시려면 먼저 파일을 삭제해야 합니다." style=""></w2:textbox>
+    						</xf:group>
+    					</xf:group>
+    				</xf:group>
+    			</xf:group>
+    		</xf:group>
+    		<xf:group class="btnbox" id="">
+    			<xf:group class="rt" id="">
+    				<xf:trigger style="" id="btn_list" label="목록" type="button" class="btn_cm" ev:onclick="scwin.btn_list_onclick">
+    					<xf:label><![CDATA[목록]]></xf:label>
+    				</xf:trigger>
+    				<xf:trigger class="btn_cm pt" id="btn_update" style="display:none;" type="button" ev:onclick="scwin.btn_update_onclick">
+    					<xf:label><![CDATA[수정]]></xf:label>
+    				</xf:trigger>
+    				<xf:trigger class="btn_cm pt" id="btn_register" style="display:none;" type="button" ev:onclick="scwin.btn_register_onclick">
+    					<xf:label><![CDATA[등록]]></xf:label>
+    				</xf:trigger>
+    			</xf:group>
+    		</xf:group>
+    	</xf:group>
+    </body>
+</html>

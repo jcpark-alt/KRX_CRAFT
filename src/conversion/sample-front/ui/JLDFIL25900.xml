@@ -1,0 +1,318 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:ev="http://www.w3.org/2001/xml-events"
+    xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+    <head meta_screenName="[가이드] 신고 목록 + 작성 진입 (원본 JLDFIL25900 배당기준일자 신고)" meta_screenId="JLDFIL25900_guide" meta_screenDesc="안내문구와 목록만 있는 단순 조회 화면. 작성 버튼을 누르기 전에 서버에 작성 가능 여부를 먼저 묻고, 행 클릭으로 수정 화면에 들어간다." meta_author="Inswave" meta_type="가이드">
+    	<w2:type>COMPONENT</w2:type>
+    	<w2:buildDate />
+    	<w2:MSA />
+    	<xf:model>
+    		<w2:dataCollection baseNode="map">
+    			<!-- 목록. 컬럼은 업무에 맞게 교체한다. -->
+    			<w2:dataList baseNode="list" repeatNode="map" id="dlt_main" saveRemovedData="true">
+    				<w2:columnInfo>
+    					<w2:column id="bzProcsNo" name="업무처리번호" dataType="text"></w2:column>
+    					<w2:column id="comNm" name="회사명" dataType="text"></w2:column>
+    					<w2:column id="isuCd" name="종목코드" dataType="text"></w2:column>
+    					<w2:column id="basYy" name="기준년도" dataType="text"></w2:column>
+    					<w2:column id="acntclsMm" name="결산월" dataType="text"></w2:column>
+    					<w2:column id="declYn" name="신고여부" dataType="text"></w2:column>
+    					<w2:column id="declDd" name="신고일자" dataType="text"></w2:column>
+    					<w2:column id="declContn" name="신고내용" dataType="text"></w2:column>
+    					<w2:column id="declRemk" name="비고" dataType="text"></w2:column>
+    					<w2:column id="regDdtm" name="입력일" dataType="text"></w2:column>
+    				</w2:columnInfo>
+    			</w2:dataList>
+    		</w2:dataCollection>
+    		<w2:workflowCollection />
+    	</xf:model>
+    	<w2:layoutInfo />
+    	<w2:publicInfo method="" />
+    	<script lazy="false" type="text/javascript"><![CDATA[// 원본 : JLDFIL25900 배당기준일자 신고 (/ui/dis/account/JLDFIL25900.xml)
+///////// 1. 변수 및 선언 영역 /////////
+
+/*
+ * 화면 동작
+ * 1. 화면 로딩시 신고 목록을 조회
+ * 2. 「작성하기」 클릭시 서버에 작성 가능 여부를 확인한 후 작성 화면으로 이동
+ * 3. 목록의 신고명 클릭시 해당 건의 수정 화면으로 이동
+ */
+scwin.screenId = "JLDFIL25900_guide";
+
+
+///////// 2. 초기화 영역 /////////
+
+/**
+ * @method
+ * @name scwin.onpageload
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 페이지로드
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.onpageload = async function () {
+    // 초기화 함수
+    await scwin.init();
+};
+
+/**
+ * @method
+ * @name scwin.init
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 초기화. 안내문구의 연도를 채우고 목록을 조회한다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.init = async function () {
+    scwin.setNoticeYear();
+
+    await scwin.searchList();
+};
+
+
+///////// 3. 컴포넌트 이벤트 영역 /////////
+
+/**
+ * @event
+ * @name scwin.btn_write_onclick
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 작성하기 버튼 클릭.
+ *
+ * 화면을 열기 전에 서버에 작성 가능한 상태인지 먼저 묻는다.
+ * 화면을 연 뒤 저장할 때 막으면 사용자가 입력을 다 하고 나서 거절당한다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.btn_write_onclick = async function (e) {
+    if (!await scwin.checkDeclarable()) return;
+
+    $c.win.moveUrl("/ui/sample/template/JLDFIL25910_guide.xml", {});
+};
+
+/**
+ * @event
+ * @name scwin.grd_main_oncellclick
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 목록 행 클릭. 해당 건의 수정 화면으로 이동한다.
+ *
+ * 키만 넘기고 상세는 다음 화면이 다시 조회한다.
+ * 행 전체를 넘기면 화면 간 결합이 생겨 컬럼이 바뀔 때 같이 깨진다.
+ *
+ * 복사해 쓸 때 바꿀 곳
+ *  - 넘길 키 이름
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.grd_main_oncellclick = function (rowIndex, columnIndex, columnId) {
+    const bzProcsNo = dlt_main.getCellData(rowIndex, "bzProcsNo");
+
+    $c.win.moveUrl("/ui/sample/template/JLDFIL25910_guide.xml", { bzProcsNo: bzProcsNo });
+};
+
+
+///////// 4. 서브미션 콜백 영역 /////////
+
+/**
+ * @method
+ * @name scwin.searchList
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 목록 조회. 신고 목록은 건수가 적어 페이징을 두지 않았다.
+ *
+ * 건수가 늘 수 있는 업무면 ULDFIL59400_guide 의 페이징 부분을 가져다 쓴다.
+ *
+ * 복사해 쓸 때 바꿀 곳
+ *  - action, target
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.searchList = async function () {
+    const sbmOptions = {
+        id: "sbm_searchList",
+        method: "get",
+        action: "/api/discls/info/div-bas-dd/select-list",
+        target: "dlt_main=body",
+        gridview: "grd_main",
+        isProcessMsg: false
+    };
+
+    // 통신 오류는 공통 오류 핸들러가 안내하고 예외를 던진다.
+    // 여기서 잡지 않으므로 오류가 나면 아래 코드는 실행되지 않는다.
+    await $c.sbm.executeDynamic(sbmOptions);
+};
+
+/**
+ * @method
+ * @name scwin.checkDeclarable
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 지금 작성할 수 있는 상태인지 서버에 묻는다.
+ *
+ * 신고·접수처럼 기간이 정해진 업무는 화면을 열기 전과 저장 직전 두 번 확인한다.
+ * 화면을 열어 둔 채로 마감이 지날 수 있기 때문이다.
+ *
+ * 사전 확인이 없는 업무면 이 함수와 호출부를 통째로 삭제한다.
+ *
+ * 복사해 쓸 때 바꿀 곳
+ *  - action, 상태코드와 안내문구
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.checkDeclarable = async function () {
+    const sbmOptions = {
+        id: "sbm_checkDeclarable",
+        method: "get",
+        action: "/api/discls/info/div-bas-dd/decl-tp/select-one",
+        isProcessMsg: false
+    };
+
+    const result = await $c.sbm.executeDynamic(sbmOptions);
+
+    const declTpCd = result.responseJSON.body;
+
+    if (declTpCd === "N") {
+        await $c.win.alert("작성기간이 아닙니다.");
+        return false;
+    }
+
+    if (declTpCd === "U") {
+        await $c.win.alert("작성중인 건이 있습니다.");
+        return false;
+    }
+
+    return true;
+};
+
+
+///////// 5. 일반/업무 함수 영역 /////////
+
+/**
+ * @method
+ * @name scwin.setNoticeYear
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 안내문구의 연도를 채운다.
+ *
+ * 해가 바뀌면 저절로 따라가야 하는 값이라 마크업에 박아 두지 않는다.
+ * 서버 일자를 쓴다. new Date() 는 사용자 PC 시각이라 기준이 흔들린다.
+ *
+ * 복사해 쓸 때 바꿀 곳
+ *  - 표시할 연도 기준
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.setNoticeYear = function () {
+    const thisYear = $c.date.getServerDateTime("yyyy");
+
+    txt_thisYear.setValue(thisYear);
+    txt_lastYear.setValue(Number(thisYear) - 1);
+};
+
+/**
+ * @method
+ * @name scwin.dateFormatter
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 그리드 일자 컬럼 표시 형식. yyyyMMdd 를 yyyy-MM-dd 로 보여준다.
+ *
+ * 저장값은 그대로 두고 보이는 값만 바꾼다.
+ * formatDate 의 두 번째 인자는 포맷 문자열이 아니라 구분자 한 글자다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.dateFormatter = function (data) {
+    if ($c.util.isEmpty(data)) return "";
+
+    return $c.date.formatDate(String(data).substring(0, 8), "-");
+};
+]]></script>
+    </head>
+    <body ev:onpageload="scwin.onpageload">
+    	<xf:group class="sub_contents" id="" meta_componentContainer="true" style="">
+    		<w2:pageFrame id="pfmContentHeader" src="/cm/xml/contentHeader.xml" style=""></w2:pageFrame>
+
+    		<!--
+    			화면 안내문구.
+    			연도처럼 해마다 바뀌는 값은 마크업에 박지 않고 스크립트로 채운다.
+    		-->
+    		<xf:group class="txt_list" id="" style="" tagname="ul">
+    			<xf:group id="" style="" tagname="li">
+    				<w2:textbox class="" escape="false" id="" label="『신고』를 작성하는 화면입니다." style=""></w2:textbox>
+    			</xf:group>
+    			<xf:group id="" style="" tagname="li">
+    				<xf:group id="" style="display:ruby;">
+    					<w2:textbox class="red" escape="false" id="txt_thisYear" label="" style=""></w2:textbox>
+    					<w2:textbox class="" escape="false" id=""
+    						label='년도 신고는 반드시 &lt;span class="red"&gt;작성하기&lt;/span&gt; 버튼을 눌러서 제출해 주시기 바랍니다.' style="">
+    					</w2:textbox>
+    				</xf:group>
+    			</xf:group>
+    			<xf:group id="" style="" tagname="li">
+    				<xf:group id="" style="display:ruby;">
+    					<w2:textbox class="" escape="false" id="" label="(※&amp;nbsp;" style=""></w2:textbox>
+    					<w2:textbox class="" escape="false" id="txt_lastYear" label="" style=""></w2:textbox>
+    					<w2:textbox class="" escape="false" id="" label="년도 신고내용 수정·제출 금지)" style=""></w2:textbox>
+    				</xf:group>
+    			</xf:group>
+    		</xf:group>
+
+    		<xf:group class="titbox" id="" style="">
+    			<xf:group class="rt" id="" style="">
+    				<xf:trigger class="btn_cm" id="btn_write" style="" type="button" ev:onclick="scwin.btn_write_onclick">
+    					<xf:label><![CDATA[작성하기]]></xf:label>
+    				</xf:trigger>
+    			</xf:group>
+    		</xf:group>
+
+    		<!-- 행을 클릭하면 그 건의 수정 화면으로 이동한다. -->
+    		<xf:group adaptiveThreshold="" class="gvwbox" id="" style="">
+    			<w2:gridView autoFit="allColumn" checkReadOnlyOnPasteEnable="" class="gvw row15" dataList="data:dlt_main"
+    				focusMode="row" id="grd_main" scrollByColumn="false" scrollByColumnAdaptive="false" style=""
+    				visibleRowNum="15" ev:oncellclick="scwin.grd_main_oncellclick">
+    				<w2:header id="headerGuideDecl" style="">
+    					<w2:row id="rowGuideDeclHead" style="">
+    						<w2:column displayMode="label" id="hComNm" inputType="text" value="회사명" width="100"></w2:column>
+    						<w2:column displayMode="label" id="hIsuCd" inputType="text" value="종목코드" width="120"></w2:column>
+    						<w2:column displayMode="label" id="hBasYy" inputType="text" value="기준년도" width="100"></w2:column>
+    						<w2:column displayMode="label" id="hAcntclsMm" inputType="text" value="결산월" width="80"></w2:column>
+    						<w2:column displayMode="label" id="hDeclDd" inputType="text" value="신고일자" width="150"></w2:column>
+    						<w2:column displayMode="label" id="hDeclContn" inputType="text" value="신고내용" width="250"></w2:column>
+    						<w2:column displayMode="label" id="hDeclRemk" inputType="text" value="비고" width="200"></w2:column>
+    						<w2:column displayMode="label" id="hRegDdtm" inputType="text" value="입력일" width="120"></w2:column>
+    					</w2:row>
+    				</w2:header>
+    				<w2:gBody id="gBodyGuideDecl" style="">
+    					<w2:row id="rowGuideDeclBody" style="">
+    						<w2:column displayMode="label" id="comNm" inputType="text" width="100"></w2:column>
+    						<w2:column displayMode="label" id="isuCd" inputType="text" width="120"></w2:column>
+    						<w2:column displayMode="label" id="basYy" inputType="text" width="100"></w2:column>
+    						<w2:column displayMode="label" id="acntclsMm" inputType="text" width="80"></w2:column>
+
+    						<!-- 일자는 저장값(yyyyMMdd)과 보이는 값(yyyy-MM-dd)이 다르다. displayFormatter 로 가른다. -->
+    						<w2:column displayFormatter="scwin.dateFormatter" displayMode="label" id="declDd"
+    							inputType="text" width="150">
+    						</w2:column>
+    						<w2:column displayMode="label" id="declContn" inputType="text" width="250"></w2:column>
+    						<w2:column displayMode="label" id="declRemk" inputType="text" width="200"></w2:column>
+    						<w2:column displayFormatter="scwin.dateFormatter" displayMode="label" id="regDdtm"
+    							inputType="text" width="120">
+    						</w2:column>
+    					</w2:row>
+    				</w2:gBody>
+    			</w2:gridView>
+    		</xf:group>
+    	</xf:group>
+    </body>
+</html>

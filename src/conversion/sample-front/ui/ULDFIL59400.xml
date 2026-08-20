@@ -1,0 +1,513 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:ev="http://www.w3.org/2001/xml-events"
+    xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+    <head meta_screenName="[가이드] 목록 조회 + 페이징 (원본 ULDFIL59400 코스닥 전문평가신청 목록)" meta_screenId="ULDFIL59400_guide" meta_screenDesc="목록을 페이징 조회하고, 행 클릭으로 상세 이동하거나 상태에 따라 버튼을 표시하는 표준 골격." meta_author="Inswave" meta_type="가이드">
+    	<w2:type>COMPONENT</w2:type>
+    	<w2:buildDate />
+    	<w2:MSA />
+    	<xf:model>
+    		<w2:dataCollection baseNode="map">
+    			<!-- 조회 조건. 페이징은 page/size 두 개가 필수이고, 검색조건은 여기에 추가한다. -->
+    			<w2:dataMap baseNode="map" id="dma_search">
+    				<w2:keyInfo>
+    					<w2:key id="page" name="현재 페이지 번호" dataType="text"></w2:key>
+    					<w2:key id="size" name="페이지당 데이터 개수" dataType="text"></w2:key>
+    					<w2:key id="schKeyword" name="검색어" dataType="text"></w2:key>
+    				</w2:keyInfo>
+    			</w2:dataMap>
+    			<!-- 목록. 컬럼은 업무에 맞게 교체한다. -->
+    			<w2:dataList baseNode="list" repeatNode="map" id="dlt_main">
+    				<w2:columnInfo>
+    					<w2:column id="aplcNo" name="신청번호" dataType="text"></w2:column>
+    					<w2:column id="aplcNm" name="신청명" dataType="text"></w2:column>
+    					<w2:column id="aplcDd" name="신청일자" dataType="text"></w2:column>
+    					<w2:column id="chrgNm" name="담당자명" dataType="text"></w2:column>
+    					<w2:column id="procsStatCd" name="처리상태코드" dataType="text"></w2:column>
+    					<w2:column id="procsStatNm" name="처리상태명" dataType="text"></w2:column>
+    					<w2:column id="btnCol" name="버튼컬럼(라벨을 넣으면 버튼이 그려진다)" dataType="text"></w2:column>
+    				</w2:columnInfo>
+    			</w2:dataList>
+    		</w2:dataCollection>
+    		<w2:workflowCollection />
+    	</xf:model>
+    	<w2:layoutInfo />
+    	<w2:publicInfo method="" />
+    	<script lazy="false" type="text/javascript"><![CDATA[// 원본 : ULDFIL59400 코스닥 전문평가신청 목록 (/ui/lst/lstinvstg/ULDFIL59400.xml)
+///////// 1. 변수 및 선언 영역 /////////
+
+/*
+ * 화면 동작
+ * 1. 화면 로딩시 신청 목록을 페이징 조회
+ * 2. 「페이지당 건수」 변경시 첫 페이지부터 다시 조회
+ * 3. 신청명 클릭시 처리상태에 따라 수정 또는 조회 모드로 상세 화면 이동
+ * 4. 처리상태가 작성중·반려·보완요청이면 「제출」, 제출완료·접수완료면 「수정요청」 버튼을 표시
+ * 5. 「신규작성」 클릭시 작성 화면으로 이동
+ */
+scwin.screenId = "ULDFIL59400_guide";
+
+// 페이징 상태값
+scwin.pageIndex = 1;
+scwin.pageItemCnt = 15;
+
+
+///////// 2. 초기화 영역 /////////
+
+/**
+ * @method
+ * @name scwin.onpageload
+ * @author Inswave
+ * @date 2026. 08. 14
+ * @description 페이지로드
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.onpageload = async function () {
+	// 초기화 함수
+	await scwin.init();
+};
+
+/**
+ * @method
+ * @name scwin.init
+ * @author Inswave
+ * @date 2026. 08. 14
+ * @description 초기화. 페이징을 설정하고 첫 페이지를 조회한다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.init = async function () {
+	// 통신 전 : paging 설정
+	scwin.setPagingInfo();
+
+	// 목록 조회
+	await scwin.searchList(1);
+};
+
+
+///////// 3. 컴포넌트 이벤트 영역 /////////
+
+/**
+ * @event
+ * @name scwin.btn_reg_onclick
+ * @author Inswave
+ * @date 2026. 08. 14
+ * @description 신규작성 버튼 클릭. 작성화면을 신규 모드로 연다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.btn_reg_onclick = function (e) {
+	$c.win.moveUrl("/ui/sample/template/ULDFIL52100_guide.xml", { loadTp : "0" });
+};
+
+/**
+ * @event
+ * @name scwin.btn_regLarge_onclick
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 대형 작성화면으로 이동한다.
+ *
+ * 가이드용 진입 버튼이다. 실제 화면에서는 작성 버튼이 하나뿐이므로 지운다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.btn_regLarge_onclick = function (e) {
+	$c.win.moveUrl("/ui/sample/template/ULDFIL59410_guide.xml", {});
+};
+
+/**
+ * @event
+ * @name scwin.grd_main_oncellclick
+ * @author Inswave
+ * @date 2026. 08. 14
+ * @description 그리드 셀 클릭. 컬럼별로 동작을 나눈다.
+ * 클릭 가능한 컬럼은 body 에서 style="cursor:pointer;" 를 함께 준다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.grd_main_oncellclick = async function (rowIndex, columnIndex, columnId) {
+	const rowData = dlt_main.getRowJSON(rowIndex);
+
+	// 명칭 클릭 -> 상세 이동
+	if (columnId === "aplcNm") {
+		scwin.goDetail(rowData);
+		return;
+	}
+
+	// 버튼 컬럼 클릭 -> 상태에 따라 처리
+	if (columnId === "btnCol") {
+		await scwin.processRow(rowData);
+	}
+};
+
+
+///////// 4. 서브미션 콜백 영역 /////////
+
+/**
+ * @method
+ * @name scwin.searchList
+ * @author Inswave
+ * @date 2026. 08. 14
+ * @description 목록을 페이징 조회한다.
+ * 응답은 body.content(목록) / body.totalCount(전체건수) 형태를 전제로 한다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.searchList = async function (pageIndex) {
+	scwin.pageIndex = pageIndex;
+
+	dma_search.set("page", scwin.pageIndex);
+	dma_search.set("size", scwin.pageItemCnt);
+
+	const sbmOptions = {
+		id : "sbm_searchList",
+		method : "get",
+		action : "/api/listing/listinvstg/specialized-evaluation/select-list-paging",
+		ref : "dma_search",
+		target : "dlt_main=body.content",
+		gridview : "grd_main",	// 조회 전 그리드 초기화
+		isProcessMsg : false
+	};
+
+	// 통신 오류 시 reject 되므로 catch 로 받는다. 사용자 안내는 공통 오류 핸들러가 한다.
+	const result = await $c.sbm.executeDynamic(sbmOptions);
+
+	// 통신 후 : paging 설정
+	scwin.setPagingInfo(result);
+
+	// 상태에 따라 버튼 컬럼 라벨을 채운다.
+	scwin.setButtonLabel();
+};
+
+/**
+ * @method
+ * @name scwin.setPagingInfo
+ * @author Inswave
+ * @date 2026. 08. 14
+ * @description Paging 컴포넌트 설정. 통신 전(전체건수 0)과 통신 후 모두 호출한다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.setPagingInfo = function (result = {}) {
+	const pagingInfo = {
+		pageType : "P",                          // S/P/A Default=P
+		rowNumVisble : "grd_main|asc",            // gridView 에 rowNumVisible 값 설정
+		maxRowNum : 50,                          // gridView 에 최대 visibleRowNum 값 설정
+		pageListId : "pgl_list",                  // 페이지 리스트 아이디
+		pageFunction : "scwin.searchList",       // 페이징 처리 함수
+		currentPage : scwin.pageIndex,           // 현재 페이지
+		recordCountPerPage : scwin.pageItemCnt,  // 한 페이지 건수. 반드시 넘길 것 (아래 주석 참고)
+		totalCountId : "txt_totalCnt",            // total count 출력 아이디
+		pageSize : 10                            // 페이징 시 출력해줄 페이지 번호 개수
+	};
+
+	/* recordCountPerPage 를 빠뜨리면 공통 함수가 기본값 10 을 쓴다.
+	 * 페이지 수는 Math.ceil(전체건수 / recordCountPerPage) 로 계산되므로,
+	 * 화면에서 50건씩 조회해도 10 으로 나눠 페이지 번호가 과도하게 생긴다.
+	 * 행 번호 시작값((현재페이지-1) * recordCountPerPage) 도 같이 틀어진다. */
+	$c.sbm.setPagingInfo(pagingInfo, "dma_paging", result.responseJSON?.body?.totalCount || 0);
+};
+
+
+///////// 5. 일반/업무 함수 영역 /////////
+
+/**
+ * @method
+ * @name scwin.goDetail
+ * @author Inswave
+ * @date 2026. 08. 14
+ * @description 상세화면으로 이동한다. 조회/수정 모드는 상태로 판단해 넘긴다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.goDetail = function (rowData) {
+	const param = {
+		aplcNo : rowData.aplcNo,
+		loadTp : scwin.isWritable(rowData.procsStatCd) ? "1" : "8"	// 1:수정, 8:조회
+	};
+
+	$c.win.moveUrl("/ui/sample/template/ULDFIL52100_guide.xml", param);
+};
+
+/**
+ * @method
+ * @name scwin.processRow
+ * @author Inswave
+ * @date 2026. 08. 14
+ * @description 버튼 컬럼 클릭 처리. 상태에 따라 서로 다른 동작으로 분기한다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.processRow = async function (rowData) {
+	if (scwin.isWritable(rowData.procsStatCd)) {
+		await scwin.submitRow(rowData);
+		return;
+	}
+
+	if (scwin.isModifyRequestable(rowData.procsStatCd)) {
+		await scwin.openProcessPopup(rowData);
+	}
+};
+
+/**
+ * @method
+ * @name scwin.submitRow
+ * @author Inswave
+ * @date 2026. 08. 14
+ * @description 목록에서 바로 처리하는 API 호출. 확인 -> 호출 -> 결과판정 -> 재조회 순서.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.submitRow = async function (rowData) {
+	if (!await $c.win.confirm($c.data.getMessage("com_crud_0198", "제출"))) return;
+
+	const sbmOptions = {
+		id : "sbm_submitRow",
+		method : "post",
+		action : "/api/listing/listinvstg/specialized-evaluation/appl-submit",
+		isProcessMsg : false
+	};
+
+	const requestData = {
+		aplcNo : rowData.aplcNo
+	};
+
+	const result = await $c.sbm.executeDynamic(sbmOptions, requestData);
+
+	// 통신 오류는 공통 오류 핸들러가 안내하므로 화면은 중단만 한다.
+	if ($c.util.isEmpty(result.responseJSON)) return;
+
+	if (!result.responseJSON.success) {
+		$c.win.alert($c.data.getMessage("com_complete_0151", "제출"));
+		return;
+	}
+
+	await $c.win.alert($c.data.getMessage("com_complete_0150", "제출"));
+
+	// 처리 후 첫 페이지부터 재조회
+	await scwin.searchList(1);
+};
+
+/**
+ * @method
+ * @name scwin.openProcessPopup
+ * @author Inswave
+ * @date 2026. 08. 14
+ * @description 처리 팝업을 열고, 닫힌 뒤 목록을 다시 읽는다.
+ *
+ * 팝업은 두 종류가 있고 뒤처리가 다르다. 헷갈리기 쉬우니 구분해서 쓴다.
+ *
+ *  선택 팝업 : 고른 값을 돌려받는 것이 목적이다. 취소하면 결과가 비므로
+ *              결과가 비었는지 보고 아무것도 하지 않는다. (ULDFIL52100_guide 의 회사 찾기)
+ *
+ *  처리 팝업 : 팝업 안에서 등록·수정이 일어난다. 값을 돌려받지 않으므로
+ *              결과를 보고 분기하면 안 된다. 닫힌 뒤 무조건 다시 읽어야
+ *              팝업에서 바꾼 내용이 목록에 반영된다. (이 함수)
+ *
+ * 복사해 쓸 때 바꿀 곳
+ *  - 팝업 경로·크기, 넘길 파라미터
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.openProcessPopup = async function (rowData) {
+	const param = {
+		aplcNo : rowData.aplcNo
+	};
+
+	const options = {
+		id : "ULDFIL59411_guide",
+		popupName : "수정요청",
+		width : 900,
+		height : 400,
+		frameModal : "top"
+	};
+
+	await $c.win.openPopup("/ui/sample/template/ULDFIL59411_guide.xml", options, param);
+
+	// 팝업에서 처리가 일어났을 수 있으므로 반환값과 무관하게 재조회한다.
+	await scwin.searchList(1);
+};
+
+/**
+ * @method
+ * @name scwin.isWritable
+ * @author Inswave
+ * @date 2026. 08. 14
+ * @description 작성 가능 상태인지 판단한다. 상태 판정은 함수로 묶어 화면 곳곳의 조건문을 줄인다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.isWritable = function (procsStatCd) {
+	// 30 작성중 · 35 반려 · 37 보완요청. 아직 화면에서 고칠 수 있는 상태다.
+	return ["30", "35", "37"].includes(procsStatCd);
+};
+
+/**
+ * @method
+ * @name scwin.isModifyRequestable
+ * @author Inswave
+ * @date 2026. 08. 14
+ * @description 수정요청 가능 상태인지 반환한다.
+ *
+ * 상태 판정은 조건이 하나뿐이어도 함수로 묶는다. 나중에 상태가 늘어날 때
+ * 화면 곳곳에 흩어진 비교문을 찾아다니지 않아도 되고, 이름이 곧 설명이 된다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.isModifyRequestable = function (procsStatCd) {
+	// 33 제출완료 · 36 접수완료. 제출한 뒤라 수정요청으로만 고칠 수 있다.
+	return ["33", "36"].includes(procsStatCd);
+};
+
+/**
+ * @method
+ * @name scwin.setButtonLabel
+ * @author Inswave
+ * @date 2026. 08. 14
+ * @description 상태에 따라 버튼 컬럼의 라벨과 노출 여부를 정한다.
+ *
+ * 컬럼을 inputType="button" 으로 두면 셀 값이 그대로 버튼 라벨이 되고
+ * 공통 버튼 모양이 적용된다. 다만 값이 비어도 빈 버튼이 그려지므로,
+ * 버튼이 필요 없는 행은 setCellStyle 로 감춰야 한다.
+ *
+ * 다른 방법과 비교
+ *  - inputType="custom" + typeGetter : 행마다 타입을 바꿀 수 있으나 버튼 모양을 잃는다.
+ *  - customFormatter 로 "<button>" 문자열 반환 : 엑셀 다운로드에 태그가 그대로 찍힌다.
+ *
+ * 복사해 쓸 때 바꿀 곳
+ *  - 상태별 라벨
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.setButtonLabel = function () {
+	const rowCount = dlt_main.getRowCount();
+
+	for (let i = 0; i < rowCount; i++) {
+		const procsStatCd = dlt_main.getCellData(i, "procsStatCd");
+
+		let label = "";
+
+		if (scwin.isWritable(procsStatCd)) {
+			label = "제출";
+		} else if (scwin.isModifyRequestable(procsStatCd)) {
+			label = "수정요청";
+		}
+
+		dlt_main.setCellData(i, "btnCol", label);
+
+		// 라벨이 없는 행은 빈 버튼이 남으므로 감춘다.
+		// display 가 아니라 visibility 를 쓴다. 셀 높이가 무너지지 않는다.
+		grd_main.setCellStyle(i, "btnCol", "visibility", $c.util.isEmpty(label) ? "hidden" : "visible");
+	}
+};
+]]></script>
+    </head>
+    <body ev:onpageload="scwin.onpageload">
+    	<xf:group class="sub_contents" id="" meta_snippetCategory="00_화면시작" meta_snippetKeyComponent="true"
+    		meta_snippetName="0_01 페이지시작" style="">
+    		<w2:pageFrame src="/cm/xml/contentHeader.xml" style="" id="pfmContentHeader"></w2:pageFrame>
+
+    		<!-- 총건수 + 상단 버튼 + 페이지당 건수 -->
+    		<xf:group class="titbox" id="" meta_snippetCategory="02_타이틀" meta_snippetKeyComponent="true"
+    			meta_snippetName="2_02 서브타이틀(h3)" style="">
+    			<xf:group class="rt" id="" style="">
+    				<xf:group class="count" id="" meta_snippetCategory="02_타이틀" meta_snippetKeyComponent="true"
+    					meta_snippetName="총건수" style="">
+    					<w2:span id="" label="총" style=""></w2:span>
+    					<w2:span class="num" id="txt_totalCnt" label="0" style=""></w2:span>
+    					<w2:span id="" label="건" style=""></w2:span>
+    				</xf:group>
+    				<xf:trigger class="btn_cm" id="btn_reg" meta_snippetCategory="08_버튼" meta_snippetKeyComponent="true"
+    					meta_snippetName="8_01 기본버튼" style="" type="button" ev:onclick="scwin.btn_reg_onclick">
+    					<xf:label><![CDATA[신규작성]]></xf:label>
+    				</xf:trigger>
+
+    				<!-- 가이드용 진입 버튼. 실제 화면에서는 작성 버튼이 하나뿐이므로 지운다. -->
+    				<xf:trigger class="btn_cm" id="btn_regLarge" style="" type="button"
+    					ev:onclick="scwin.btn_regLarge_onclick">
+    					<xf:label><![CDATA[대형 작성화면]]></xf:label>
+    				</xf:trigger>
+    				<xf:select1 allOption="" appearance="minimal" chooseOption="" class="" direction="auto" disabled="false"
+    					disabledClass="w2selectbox_disabled" id="sel_perPage" meta_snippetCategory="10_입력폼" meta_snippetKeyComponent="true"
+    					meta_snippetName="10_02 SelectBox" ref="" renderType="" style="width:71px;position:relative;" submenuSize="auto"
+    					selectedIndex="0">
+    					<xf:choices>
+    						<xf:item>
+    							<xf:label><![CDATA[15개]]></xf:label>
+    							<xf:value><![CDATA[15]]></xf:value>
+    						</xf:item>
+    						<xf:item>
+    							<xf:label><![CDATA[30개]]></xf:label>
+    							<xf:value><![CDATA[30]]></xf:value>
+    						</xf:item>
+    						<xf:item>
+    							<xf:label><![CDATA[50개]]></xf:label>
+    							<xf:value><![CDATA[50]]></xf:value>
+    						</xf:item>
+    					</xf:choices>
+    				</xf:select1>
+    			</xf:group>
+    		</xf:group>
+
+    		<!-- 그리드. header/gBody 컬럼을 dlt_main 에 맞춰 교체한다.
+    		     header 의 column id 는 표시용이라 아무 값이나 되지만,
+    		     gBody 의 column id 는 dataList 컬럼 id 와 반드시 일치해야 한다. -->
+    		<xf:group adaptiveThreshold="" class="gvwbox" id="" meta_snippetCategory="06_그리드" meta_snippetKeyComponent="true"
+    			meta_snippetName="6_02 그리드_순번_상태" style="">
+    			<w2:gridView autoFit="allColumn" class="gvw row15" dataList="data:dlt_main" focusMode="row" id="grd_main"
+    				keepDefaultColumnWidth="false" rowNumHeaderValue="번호" rowNumVisible="true" rowNumWidth="70"
+    				scrollByColumn="false" style="" setCellInputTypeCustom="true" ev:oncellclick="scwin.grd_main_oncellclick"
+    				visibleRowNum="15">
+    				<w2:header id="headerGuideList" style="">
+    					<w2:row id="rowGuideListHead" style="">
+    						<w2:column displayMode="label" id="hAplcNo" inputType="text" value="신청번호" width="140"></w2:column>
+    						<w2:column displayMode="label" id="hAplcNm" inputType="text" value="신청명" width="260"></w2:column>
+    						<w2:column displayMode="label" id="hAplcDd" inputType="text" value="신청일자" width="120"></w2:column>
+    						<w2:column displayMode="label" id="hChrgNm" inputType="text" value="담당자" width="100"></w2:column>
+    						<w2:column displayMode="label" id="hProcsStatNm" inputType="text" value="처리상태" width="120"></w2:column>
+    						<w2:column displayMode="label" id="hBtnCol" inputType="text" value="처리" width="110"></w2:column>
+    					</w2:row>
+    				</w2:header>
+    				<w2:gBody id="gBodyGuideList" style="">
+    					<w2:row id="rowGuideListBody" style="">
+    						<w2:column displayMode="label" id="aplcNo" inputType="text" width="140" textAlign="center"></w2:column>
+    						<w2:column displayMode="label" id="aplcNm" inputType="text" width="260" textAlign="left"
+    							style="cursor:pointer;">
+    						</w2:column>
+    						<w2:column displayMode="label" id="aplcDd" inputType="text" width="120" textAlign="center"
+    							dataType="date" displayFormat="yyyy-MM-dd">
+    						</w2:column>
+    						<w2:column displayMode="label" id="chrgNm" inputType="text" width="100" textAlign="center"></w2:column>
+    						<w2:column displayMode="label" id="procsStatNm" inputType="text" width="120" textAlign="center"></w2:column>
+    						<w2:column displayMode="label" id="btnCol" inputType="button" width="110"
+    							textAlign="center" style="cursor:pointer;">
+    						</w2:column>
+    					</w2:row>
+    				</w2:gBody>
+    			</w2:gridView>
+    		</xf:group>
+
+    		<!-- 페이지 리스트. setPagingInfo 의 pageListId 와 id 가 일치해야 한다. -->
+    		<xf:group class="pglbox" id="" meta_snippetCategory="06_그리드" meta_snippetKeyComponent="true"
+    			meta_snippetName="6_03 페이지리스트">
+    			<w2:pageList class="pgl" displayButtonType="display" displayFormat="#" id="pgl_list" pageSize="10"
+    				pagingType="0" style="">
+    			</w2:pageList>
+    		</xf:group>
+    	</xf:group>
+    </body>
+</html>

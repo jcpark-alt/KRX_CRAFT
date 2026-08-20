@@ -1,0 +1,1211 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:ev="http://www.w3.org/2001/xml-events"
+    xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+    <head meta_screenName="[가이드] 메일 발송 팝업 (원본 ULDSTF07404 전문평가 메일발송)" meta_screenId="ULDSTF07404_guide" meta_screenDesc="대상에 따라 메일 제목·본문을 갈아끼우고, 수신자를 팝업이나 직접입력으로 채운 뒤 첨부파일과 함께 발송하는 팝업 표준 골격." meta_author="Inswave" meta_type="가이드">
+    	<w2:type>COMPONENT</w2:type>
+    	<w2:buildDate />
+    	<w2:MSA />
+    	<xf:model>
+    		<w2:dataCollection baseNode="map">
+    			<w2:dataMap baseNode="map" id="dma_master">
+    				<w2:keyInfo>
+    					<w2:key id="notiSvcId" name="알림서비스ID" dataType="text"></w2:key>
+    					<w2:key id="fromName" name="보낸이" dataType="text"></w2:key>
+    					<w2:key id="fromEmail" name="보낸이 이메일" dataType="text"></w2:key>
+    					<w2:key id="bccName" name="비밀참조 이름" dataType="text"></w2:key>
+    					<w2:key id="bccEmail" name="비밀참조 이메일" dataType="text"></w2:key>
+    					<w2:key id="title" name="메일 제목" dataType="text"></w2:key>
+    					<w2:key id="contn" name="발신내용" dataType="text"></w2:key>
+    				</w2:keyInfo>
+    			</w2:dataMap>
+
+    			<!-- 수신 담당자. 팝업으로 찾아 넣거나 그리드에서 직접 입력한다. -->
+    			<w2:dataList baseNode="list" repeatNode="map" id="dlt_receiver">
+    				<w2:columnInfo>
+    					<w2:column id="check" name="선택" dataType="text"></w2:column>
+    					<w2:column id="chrgNm" name="담당자명" dataType="text"></w2:column>
+    					<w2:column id="email" name="이메일" dataType="text"></w2:column>
+    					<w2:column id="integUsrId" name="사용자ID" dataType="text"></w2:column>
+    				</w2:columnInfo>
+    			</w2:dataList>
+
+    			<!-- 첨부파일 목록. 서버에 이미 있는 파일과 방금 고른 파일이 섞인다. -->
+    			<w2:dataList baseNode="list" repeatNode="map" id="dlt_fileList">
+    				<w2:columnInfo>
+    					<w2:column id="notiSvcId" name="알림서비스ID" dataType="text"></w2:column>
+    					<w2:column id="fileSeq" name="파일순번" dataType="text"></w2:column>
+    					<w2:column id="fileName" name="파일명" dataType="text"></w2:column>
+    					<w2:column id="fileSize" name="파일크기(표시용)" dataType="text"></w2:column>
+    					<w2:column id="attachFileSz" name="파일크기(바이트)" dataType="text"></w2:column>
+    				</w2:columnInfo>
+    			</w2:dataList>
+    		</w2:dataCollection>
+    		<w2:workflowCollection />
+    	</xf:model>
+    	<w2:layoutInfo />
+    	<w2:publicInfo method="" />
+    	<script lazy="false" type="text/javascript"><![CDATA[// 원본 : ULDSTF07404 (팝업)전문평가 메일발송 (/ui/sample/template/ULDSTF07404.xml)
+// 원본의 화면 구성과 흐름을 그대로 두고 전문평가 업무 문구만 예시로 바꾼 가이드다.
+
+///////// 1. 변수 및 선언 영역 /////////
+
+/*
+ * 화면 동작
+ * 1. 팝업 로딩시 발신자 기본값을 설정하고 메일 기본정보를 조회
+ * 2. 「대상」 선택시 대상에 맞는 메일제목과 발신내용을 자동으로 채움
+ * 3. 「받는곳 찾기」 클릭시 담당자 찾기 팝업 호출, 「행삽입」 으로 직접 입력도 가능
+ * 4. 「파일추가」 클릭시 첨부파일 선택, 파일명 더블클릭시 다운로드
+ * 5. 「발송」 클릭시 수신자·제목·내용 검증 후 첨부파일과 함께 전송하고, 부모 화면을 다시 조회한 뒤 닫음
+ *
+ * 담긴 패턴
+ * - 부모가 넘긴 파라미터 수신, 부모 화면 함수 호출 ($c.win.getParent)
+ * - 대상 선택에 따라 제목·본문 템플릿 교체
+ * - 수신자 : 팝업으로 찾아 추가 / 직접입력 / 행추가·삭제 / 전체선택 토글
+ * - 첨부파일 : 개수 제한, 전체 용량 제한, 목록 표시, 다운로드
+ * - 이메일 형식 검증 ($c.str.isEmail)
+ * - multiupload 로 입력값과 파일을 한 번에 전송
+ * - 전송 완료 후 부모 재조회하고 닫기
+ *
+ * 복사해서 쓰는 순서
+ * 1. 파일명과 meta_screenId 를 실제 화면ID 로 변경
+ * 2. 메일 템플릿 함수를 업무 문구로 교체
+ * 3. 발신자 기본값을 업무 발신자로 교체
+ * 4. 수신자 찾기 팝업 경로를 실제 수신자 찾기 팝업으로 교체
+ * 5. 각 통신의 action 경로를 실 API 로 교체
+ * 6. 대상 구분이 없는 화면이면 rd_target 과 changeTarget 계열을 통째로 삭제
+ */
+scwin.screenId = "ULDSTF07404_guide";
+
+// 화면 상태값
+scwin.notiSvcId = "";		// 알림서비스ID
+scwin.parentWin = null;		// 부모 화면 scope
+scwin.isAllChecked = false;	// 전체선택 토글 상태
+
+
+///////// 2. 초기화 영역 /////////
+
+/**
+ * @method
+ * @name scwin.onpageload
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 페이지로드
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.onpageload = async function () {
+	// 초기화 함수
+	await scwin.init();
+};
+
+/**
+ * @method
+ * @name scwin.init
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 초기화. 부모 화면 scope 와 팝업 파라미터를 확보하고 메일 기본정보를 조회한다.
+ *
+ * 그리드 조작은 조회보다 뒤에 둔다. 조회 앞에 두면 조회가 통째로 막힐 수 있다.
+ *
+ * 복사해 쓸 때 바꿀 곳
+ *  - 받는 파라미터 이름
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.init = async function () {
+	// 부모 화면 scope. 회사명·배정정보를 부모에서 가져올 때 쓴다.
+	scwin.parentWin = $c.win.getParent();
+
+	// openPopup 의 3번째 인자로 넘어온 값
+	const param = $c.data.getParameter();
+
+	scwin.notiSvcId = param?.notiSvcId ?? "";
+
+	// 발신자 / 비밀참조 기본값 설정
+	scwin.setSenderInfo();
+
+	// 메일 기본정보 조회
+	await scwin.selectMailInfo();
+};
+
+
+///////// 3. 컴포넌트 이벤트 영역 /////////
+
+/**
+ * @event
+ * @name scwin.rd_target_onviewchange
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 대상 선택 변경. 대상에 맞는 메일제목과 발신내용을 설정한다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.rd_target_onviewchange = function (info) {
+	scwin.changeTarget();
+};
+
+/**
+ * @event
+ * @name scwin.btn_findReceiver_onclick
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 받는곳 찾기 버튼 클릭. 팝업에서 고른 담당자를 수신자 목록에 추가한다.
+ *
+ * 값을 돌려주는 선택 팝업이라 결과가 비었는지로 취소를 판단한다.
+ * 팝업 안에서 처리를 끝내는 처리 팝업은 ULDFIL59411_guide 를 본다.
+ *
+ * 복사해 쓸 때 바꿀 곳
+ *  - openPopup 의 팝업 경로, 팝업 크기, 넘길 파라미터
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.btn_findReceiver_onclick = async function (e) {
+	const param = {
+		parScrenId : scwin.screenId
+	};
+
+	const options = {
+		id : "ULDFIL52110_guide",
+		popupName : "담당자 찾기",
+		width : 1000,
+		height : 600,
+		frameModal : "top"
+	};
+
+	const result = await $c.win.openPopup("/ui/sample/template/ULDFIL52110_guide.xml", options, param);
+
+	// 선택 없이 닫으면 결과가 없다.
+	if ($c.util.isEmpty(result)) return;
+
+	// 찾기 팝업은 한 건을 돌려준다.
+	// 여러 건을 받는 팝업이면 배열이 오므로 아래처럼 두 경우를 함께 받는다.
+	const receivers = $c.util.isArray(result) ? result : [result];
+
+	receivers.forEach(receiver => {
+		scwin.addReceiver(receiver.chrgNm, receiver.email);
+	});
+};
+
+/**
+ * @event
+ * @name scwin.btn_selectAll_onclick
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 전체선택/전체해제 토글 버튼 클릭
+ *
+ * 버튼 하나로 두 동작을 하므로 라벨도 함께 바꿔야 지금 상태를 알 수 있다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.btn_selectAll_onclick = function (e) {
+	scwin.isAllChecked = !scwin.isAllChecked;
+
+	// 그리드 checkbox inputType 은 "1"/"0" 을 쓴다.
+	const checkValue = scwin.isAllChecked ? "1" : "0";
+	const rowCount = dlt_receiver.getRowCount();
+
+	for (let i = 0; i < rowCount; i++) {
+		dlt_receiver.setCellData(i, "check", checkValue);
+	}
+
+	btn_selectAll.setValue(scwin.isAllChecked ? "전체해제" : "전체선택");
+};
+
+/**
+ * @event
+ * @name scwin.btn_rowAdd_onclick
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 행삽입 버튼 클릭. 담당자를 직접 입력할 빈 행을 추가한다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.btn_rowAdd_onclick = function (e) {
+	dlt_receiver.insertRow();
+};
+
+/**
+ * @event
+ * @name scwin.btn_rowDelete_onclick
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 행삭제 버튼 클릭. 체크한 담당자 행을 삭제한다.
+ *
+ * 뒤에서부터 지우지 않으면 앞 행을 지운 순간 뒤 인덱스가 하나씩 당겨져
+ * 엉뚱한 행이 지워진다. 이 순서는 바꾸지 말 것.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.btn_rowDelete_onclick = function (e) {
+	const checkedRows = grd_receiver.getCheckedIndex("check");
+
+	if ($c.util.isEmpty(checkedRows)) {
+		$c.win.alert($c.data.getMessage("com_crud_0199", "삭제할 담당자"));
+		return;
+	}
+
+	for (let i = checkedRows.length - 1; i >= 0; i--) {
+		dlt_receiver.removeRow(checkedRows[i]);
+	}
+};
+
+/**
+ * @event
+ * @name scwin.btn_fileAdd_onclick
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 파일추가 버튼 클릭. 최대 개수를 확인한 뒤 파일 선택창을 연다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.btn_fileAdd_onclick = function (e) {
+	if (dlt_fileList.getRowCount() >= 5) {
+		$c.win.alert("첨부파일은 최대 " + 5 + "개까지 등록할 수 있습니다.");
+		return;
+	}
+
+	// 공통함수가 multiupload 내부 input 을 클릭해 파일 대화상자를 연다.
+	$c.util.onUploadClick(mpd_attachFile);
+};
+
+/**
+ * @event
+ * @name scwin.btn_fileDelete_onclick
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 파일삭제 버튼 클릭. 그리드에서 선택한 첨부파일을 삭제한다.
+ *
+ * 아직 업로드 전인 파일은 multiupload 쪽에서도 빼야 전송 대상에서 빠진다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.btn_fileDelete_onclick = function (e) {
+	const rowIndex = dlt_fileList.getRowPosition();
+
+	if (rowIndex < 0) {
+		$c.win.alert($c.data.getMessage("com_crud_0199", "삭제할 첨부파일"));
+		return;
+	}
+
+	const fileName = dlt_fileList.getCellData(rowIndex, "fileName");
+
+	if (!$c.util.isEmpty(fileName)) {
+		mpd_attachFile.removeFile(fileName);
+	}
+
+	dlt_fileList.removeRow(rowIndex);
+};
+
+/**
+ * @event
+ * @name scwin.grd_fileList_oncelldblclick
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 첨부파일 파일명 더블클릭. 서버에 저장된 파일을 내려받는다.
+ *
+ * 방금 추가한 행은 아직 서버에 없어 내려받을 수 없다.
+ * 행 상태가 "R"(조회된 행)일 때만 다운로드한다.
+ *
+ * $c.data.downFile 은 async 라 실패 시 reject 한다.
+ * catch 를 붙이지 않으면 서버가 죽어 있어도 화면에 아무 반응이 없다.
+ *
+ * 복사해 쓸 때 바꿀 곳
+ *  - 내려받기 경로, 파라미터
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.grd_fileList_oncelldblclick = async function (rowIndex, columnIndex, columnId) {
+	if (dlt_fileList.getRowStatus(rowIndex) !== "R") return;
+
+	const fileName = dlt_fileList.getCellData(rowIndex, "fileName");
+
+	const param = {
+		notiSvcId : dlt_fileList.getCellData(rowIndex, "notiSvcId"),
+		seq : dlt_fileList.getCellData(rowIndex, "fileSeq")
+	};
+
+	await $c.data.downFile("/api/listing/lstproc/ksqexpeval-mail/file-download", fileName, param)
+		.catch(() => { $c.win.alert("파일을 내려받지 못했습니다."); });
+};
+
+/**
+ * @event
+ * @name scwin.btn_send_onclick
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 전송 버튼 클릭
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.btn_send_onclick = async function (e) {
+	await scwin.sendMail();
+};
+
+/**
+ * @event
+ * @name scwin.btn_cancel_onclick
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 취소 버튼 클릭. 작성한 내용을 초기 상태로 되돌린다.
+ *
+ * 취소는 닫기가 아니다. 처음 열었을 때 상태로 되돌리고 팝업은 그대로 둔다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.btn_cancel_onclick = async function (e) {
+	dlt_fileList.removeAll();
+
+	scwin.setSenderInfo();
+
+	await scwin.selectMailInfo();
+};
+
+/**
+ * @event
+ * @name scwin.btn_close_onclick
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 닫기 버튼 클릭. 팝업을 닫는다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.btn_close_onclick = function (e) {
+	$c.win.closePopup();
+};
+
+
+///////// 4. 서브미션 콜백 영역 /////////
+
+/**
+ * @method
+ * @name scwin.selectMailInfo
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 메일 기본정보(본문·첨부파일·담당자)를 조회한다.
+ *
+ * 복사해 쓸 때 바꿀 곳
+ *  - action 경로, 요청 파라미터
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.selectMailInfo = async function () {
+	const sbmOptions = {
+		id : "sbm_selectMailInfo",
+		method : "get",
+		action : "/api/listing/lstproc/ksqexpeval-mail/init",
+		isProcessMsg : false
+	};
+
+	const requestData = {
+		notiSvcId : scwin.notiSvcId
+	};
+
+	// 통신 오류는 공통 오류 핸들러가 안내하고 예외를 던진다.
+	// 여기서 잡지 않으므로 오류가 나면 아래 처리는 실행되지 않는다.
+	const result = await $c.sbm.executeDynamic(sbmOptions, requestData);
+
+	// 조회 결과 처리는 submitDoneHandler 옵션 대신 여기서 직접 부른다.
+	// 옵션으로 넘기면 await 가 풀린 뒤에 돌아 이어지는 코드와 순서가 어긋난다.
+	scwin.sbm_selectMailInfo_submitdone(result);
+};
+
+/**
+ * @method
+ * @name scwin.sbm_selectMailInfo_submitdone
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 메일 기본정보 조회 완료. 본문·첨부파일·담당자 목록을 화면에 채운다.
+ *
+ * 응답 한 번으로 여러 DataCollection 을 채우는 형태다.
+ * target 옵션으로 나눠 받아도 되지만, 서로 얽힌 값이면 이렇게 한 곳에서 푸는 편이 읽기 쉽다.
+ *
+ * 복사해 쓸 때 바꿀 곳
+ *  - 응답 구조
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.sbm_selectMailInfo_submitdone = function (e) {
+	const body = e.responseJSON?.body ?? {};
+
+	dma_master.setJSON(body.mailInfo ?? {});
+	dlt_fileList.setJSON(body.attchFileList ?? []);
+	dlt_receiver.setJSON(body.sendReceiverList ?? []);
+
+	// 대상 선택을 비운다. 다시 고르면 제목·본문이 다시 채워진다.
+	rd_target.setValue("");
+
+	// 전체선택 상태도 함께 초기화한다.
+	scwin.isAllChecked = false;
+	btn_selectAll.setValue("전체선택");
+};
+
+/**
+ * @method
+ * @name scwin.sendMail
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 입력값을 검증한 뒤 첨부파일과 함께 메일을 전송한다.
+ *
+ * 입력값과 파일을 한 번에 보내야 하므로 일반 통신이 아니라 multiupload 로 보낸다.
+ * setParam 으로 실은 값이 전문의 본문이 되고, 파일은 multipart 로 함께 간다.
+ *
+ * 복사해 쓸 때 바꿀 곳
+ *  - action 경로, 전문 이름과 구조
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.sendMail = async function () {
+	if (!await scwin.validate()) return;
+
+	if (!scwin.checkFileSize()) return;
+
+	// 되돌릴 수 없는 처리는 확인을 받는다.
+	if (!await $c.win.confirm($c.data.getMessage("com_crud_0198", "전송"))) return;
+
+	const requestDto = {
+		master : dma_master.getJSON(),
+		receiver : dlt_receiver.getAllJSON(),
+		fileCnt : dlt_fileList.getRowCount()
+	};
+
+	mpd_attachFile.changeAction("/api/listing/lstproc/ksqexpeval-mail/send");
+	mpd_attachFile.setParam(0, "ksqExpEvalSendMailRequestDto", JSON.stringify(requestDto));
+	mpd_attachFile.startUpload();
+};
+
+/**
+ * @event
+ * @name scwin.mpd_attachFile_selectCallback
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 파일 선택 시 마지막으로 추가된 파일을 첨부파일 목록에 담는다.
+ *
+ * multiupload 는 고른 파일을 자기 안에 쌓아 둔다.
+ * 화면에 보여줄 목록은 별도 DataList 라 여기서 옮겨 담는다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.mpd_attachFile_selectCallback = function (fileInfoArr) {
+	const fileInfos = mpd_attachFile.getFileInfos();
+
+	if ($c.util.isEmpty(fileInfos)) return;
+
+	// 방금 추가된 파일은 항상 목록의 마지막이다.
+	const fileInfo = fileInfos[fileInfos.length - 1];
+	const rowIndex = dlt_fileList.insertRow(dlt_fileList.getRowCount());
+
+	dlt_fileList.setCellData(rowIndex, "fileName", fileInfo.name);
+	dlt_fileList.setCellData(rowIndex, "fileSize", $c.num.formatNumber(fileInfo.size));
+	dlt_fileList.setCellData(rowIndex, "attachFileSz", fileInfo.size);
+};
+
+/**
+ * @event
+ * @name scwin.mpd_attachFile_onComplete
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 전송 완료. 부모 화면을 재조회하고 팝업을 닫는다.
+ *
+ * 부모에 재조회 함수가 있는지 확인하고 부른다.
+ * 팝업이 어디서 열릴지 모르므로 없을 수도 있다고 보고 짠다.
+ *
+ * 복사해 쓸 때 바꿀 곳
+ *  - 부모 재조회 함수 이름
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.mpd_attachFile_onComplete = function () {
+	$c.win.alert($c.data.getMessage("com_complete_0150", "전송"), () => {
+		if (typeof scwin.parentWin?.scwin?.searchList === "function") {
+			scwin.parentWin.scwin.searchList();
+		}
+
+		$c.win.closePopup();
+	});
+};
+
+/**
+ * @event
+ * @name scwin.mpd_attachFile_onerror
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 전송 실패
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.mpd_attachFile_onerror = function (data) {
+	$c.win.alert($c.data.getMessage("com_complete_0151", "전송"));
+};
+
+
+///////// 5. 일반/업무 함수 영역 /////////
+
+/**
+ * @method
+ * @name scwin.setSenderInfo
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 보낸이 / 비밀참조 수신을 기본값으로 설정한다.
+ *
+ * 복사해 쓸 때 바꿀 곳
+ *  - 보낸이·비밀참조의 이름과 메일주소
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.setSenderInfo = function () {
+	dma_master.set("fromName", "기술상장심사");
+	dma_master.set("fromEmail", "krxtechlisting@krx.co.kr");
+	dma_master.set("bccName", "기술상장심사");
+	dma_master.set("bccEmail", "krxtechlisting@krx.co.kr");
+};
+
+/**
+ * @method
+ * @name scwin.changeTarget
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 선택한 대상에 맞는 메일제목과 발신내용을 설정한다.
+ *
+ * 대상마다 제목·본문·수신자 처리가 다르다.
+ * 본문은 길어지므로 대상별 함수로 빼고 여기서는 무엇을 부를지만 정한다.
+ *
+ * 복사해 쓸 때 바꿀 곳
+ *  - 대상 구분과 제목·본문
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.changeTarget = function () {
+	const target = rd_target.getValue();
+	const comNm = scwin.getParentComNm();
+
+	if (target === "1") {
+		dma_master.set("title", "(한국거래소) (" + comNm + ") 전문평가 신청 관련");
+		dma_master.set("contn", scwin.getLeadComContent());
+
+		// 주관사는 부모 화면의 접수담당자를 수신자로 채운다.
+		scwin.setLeadComReceiver();
+		return;
+	}
+
+	if (target === "2" || target === "3") {
+		dma_master.set("title", "(한국거래소) (" + comNm + ") 전문평가 가능여부 회신 요청");
+		dma_master.set("contn", scwin.getReplyRequestContent(comNm, target === "2"));
+
+		dlt_receiver.removeAll();
+		return;
+	}
+
+	if (target === "4") {
+		dma_master.set("title", "(한국거래소) (" + comNm + ") 전문평가 배정의 건");
+		dma_master.set("contn", scwin.getAllocationContent(comNm));
+
+		dlt_receiver.removeAll();
+	}
+};
+
+/**
+ * @method
+ * @name scwin.getLeadComContent
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 주관사 대상 발신내용을 반환한다.
+ *
+ * 본문 템플릿은 업무 문구다. 복사해 쓸 때 통째로 교체한다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.getLeadComContent = function () {
+	return "안녕하세요. 한국거래소 기술기업상장부입니다.\n\n"
+		+ "신청하신 전문평가 관련 내용이 업데이트되었으니 제출시스템을 통해 확인하시기 바랍니다.\n"
+		+ "(전문평가기관 배정된 경우, 당해 기관에 전문평가 신청시 꼭 제출시스템을 통해 신청일을 입력해주시기\n"
+		+ "바랍니다. 필요시 미리 수정요청해주시기 바랍니다.)\n\n"
+		+ "감사합니다.";
+};
+
+/**
+ * @method
+ * @name scwin.getReplyRequestContent
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 국책기관·TCB 대상 회신요청 발신내용을 반환한다.
+ * 국책기관에만 배정순번 안내 문구가 추가된다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.getReplyRequestContent = function (comNm, isNatlInst) {
+	const common = "안녕하세요. 한국거래소 기술기업상장부(02-3774-9773)입니다.\n\n"
+		+ "전문평가대상기업(" + comNm + ")의 평가대상핵심기술/사업(첨부 참조)에 대해\n"
+		+ "이해관계여부(평가이력 등을 미기재하여 신청하는 경우가 있어서 확인 요망),\n"
+		+ "일정 등을 고려하여 전문평가 가능여부를 X/XX(X)까지 회신 부탁드립니다.\n\n"
+		+ "- 평가가 불가능한 경우에도 \"불가능\"으로 메일 회신을 부탁드리며,\n";
+
+	const natlInstOnly = "다수 기관이 평가의사를 밝힐 경우에는 거래소내 배정순번에 따라 평가기관이 배정됩니다.\n\n";
+
+	return common + (isNatlInst ? natlInstOnly : "\n") + "오늘도 좋은 하루 되시기 바랍니다. 감사합니다!";
+};
+
+/**
+ * @method
+ * @name scwin.getAllocationContent
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 평가기관 배정 대상 발신내용을 반환한다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.getAllocationContent = function (comNm) {
+	const allocationNm = (typeof scwin.parentWin?.scwin?.getAllocationNm === "function")
+		? scwin.parentWin.scwin.getAllocationNm() : "";
+
+	return "안녕하세요. 한국거래소 기술기업상장부(02-3774-9773)입니다.\n\n"
+		+ "전문평가대상기업(" + comNm + ")의 전문평가를 귀사가 담당하게 되었음을 알려드립니다.\n"
+		+ "(" + allocationNm + ")\n\n"
+		+ "평가인력이 최종 확정된 후 신청서를 접수하기 바라며,\n"
+		+ "신청 접수시까지 평가인력 현황표와 간단한 이력사항, 서약서를 회신해 주시기 바랍니다.\n\n"
+		+ "기술평가는 신청일로부터 30영업일 이내에 완료될 수 있도록 부탁드리며,\n"
+		+ "혹시 평가기간 연장이 필요한 경우 평가기간 만료전에 저희와 협의를 거쳐 처리해 주시기 바랍니다.\n\n"
+		+ "기술평가 완료시에는 기술평가서와 이해관계부존재 확인서를 회신해 주시기 바랍니다.\n\n"
+		+ "감사합니다.\n";
+};
+
+/**
+ * @method
+ * @name scwin.getParentComNm
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 부모 화면에서 대상 회사명을 가져온다. 부모가 없으면 빈 문자열을 반환한다.
+ *
+ * 팝업은 목록에서 바로 열릴 수도 있어 부모 함수가 없을 수 있다.
+ * 있는지 확인하고 부르지 않으면 팝업이 통째로 멈춘다.
+ *
+ * 복사해 쓸 때 바꿀 곳
+ *  - 부모 함수 이름
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.getParentComNm = function () {
+	if (typeof scwin.parentWin?.scwin?.getComNm !== "function") return "";
+
+	return scwin.parentWin.scwin.getComNm();
+};
+
+/**
+ * @method
+ * @name scwin.setLeadComReceiver
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 부모 화면의 접수담당자 정보를 담당자 목록에 채운다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.setLeadComReceiver = function () {
+	if (typeof scwin.parentWin?.scwin?.getAcptInfo !== "function") return;
+
+	// getAcptInfo 는 [담당자명, 이메일] 배열을 반환한다.
+	const acptInfo = scwin.parentWin.scwin.getAcptInfo();
+
+	if ($c.util.isEmpty(acptInfo)) return;
+
+	dlt_receiver.removeAll();
+
+	scwin.addReceiver(acptInfo[0], acptInfo[1]);
+};
+
+/**
+ * @method
+ * @name scwin.addReceiver
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 담당자 목록에 한 행을 추가한다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.addReceiver = function (chrgNm, email) {
+	const rowIndex = dlt_receiver.insertRow(dlt_receiver.getRowCount());
+
+	dlt_receiver.setCellData(rowIndex, "chrgNm", chrgNm);
+	dlt_receiver.setCellData(rowIndex, "email", email);
+};
+
+/**
+ * @method
+ * @name scwin.validate
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 전송 전 입력값을 검증한다.
+ *
+ * 입력 항목(보낸이 이메일·제목·내용)은 gcc 공통 검증 $c.validate.validateDataCollect 로 본다
+ * (validate.xml — 실패 시 표준 alert 과 대상 포커스를 공통이 처리, async 라 await 필요).
+ * 수신 담당자 선택 수와 체크된 행의 이메일 형식은 업무 조건이라 별도로 본다.
+ *
+ * 복사해 쓸 때 바꿀 곳
+ *  - options.fields 검증 항목 (키 = 컴포넌트 ID 또는 바인딩 컬럼 ID)
+ * @param
+ * @returns {Promise<Boolean>} 검증 통과 여부
+ * @hidden N
+*/
+scwin.validate = async function () {
+	// 보낸이 이메일·제목·내용 — 공통 검증 (required/format 규칙, 실패 시 alert + focus 자동)
+	const options = {
+		validateType : "alert", // alert|mark|all
+		checkType : "single", // single|multi
+		fields : {
+			fromEmail : { required : true, format : "email", name : "보낸이 이메일" },
+			title : { required : true, name : "제목" },
+			contn : { required : true, name : "내용" }
+		}
+	};
+	const validateResult = await $c.validate.validateDataCollect(grp_mailForm, options);
+	if (!validateResult) return false;
+
+	// 수신 담당자 선택 여부 (업무 조건 — 필드 규칙 대상 아님)
+	if (scwin.getCheckedReceiverCount() === 0) {
+		$c.win.alert($c.data.getMessage("com_crud_0199", "받는 담당자"));
+		return false;
+	}
+
+	// 수신 담당자 이메일 형식
+	if (!scwin.validateReceiverEmail()) return false;
+
+	return true;
+};
+
+/**
+ * @method
+ * @name scwin.validateReceiverEmail
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 체크한 담당자의 이메일 형식을 확인한다.
+ *
+ * 그리드에서 직접 입력할 수 있으므로 팝업으로 넣은 값만 믿을 수 없다.
+ * 체크된 행만 검증해야 하므로(공통 그리드 검증 validateDataCollect 는 전 행 대상)
+ * 행 선별은 유지하고, 셀 검증·알림·포커스(편집모드 진입)는 gcc 공통 단건 검증
+ * $c.validate.validateDataCollection 으로 수행한다 (validate.xml).
+ * @param
+ * @returns {Boolean} 검증 통과 여부
+ * @hidden N
+*/
+scwin.validateReceiverEmail = function () {
+	const emailColIndex = grd_receiver.getColumnIndex("email");
+	const rowCount = dlt_receiver.getRowCount();
+
+	for (let i = 0; i < rowCount; i++) {
+		if (!scwin.isChecked(dlt_receiver.getCellData(i, "check"))) continue;
+
+		const result = $c.validate.validateDataCollection(
+			"FORMAT", "email",
+			{ id : "email", name : (i + 1) + "번째 담당자 이메일", format : "email" },
+			grd_receiver, dlt_receiver, i, emailColIndex,
+			"SINGLE", "ALERT", { focus : true, editMode : true }
+		);
+		if (!result.validateResult) return false;
+	}
+
+	return true;
+};
+
+/**
+ * @method
+ * @name scwin.getCheckedReceiverCount
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 체크된 담당자 수를 반환한다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.getCheckedReceiverCount = function () {
+	let count = 0;
+	const rowCount = dlt_receiver.getRowCount();
+
+	for (let i = 0; i < rowCount; i++) {
+		if (scwin.isChecked(dlt_receiver.getCellData(i, "check"))) count++;
+	}
+
+	return count;
+};
+
+/**
+ * @method
+ * @name scwin.isChecked
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 체크박스 셀 값이 체크 상태인지 판정한다.
+ *
+ * 체크값은 넣는 경로에 따라 "1" 이나 "T" 로 들어온다.
+ * 한 곳에서만 판정해 두면 경로가 늘어도 여기만 고치면 된다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.isChecked = function (value) {
+	return value === "1" || value === "T";
+};
+
+/**
+ * @method
+ * @name scwin.checkFileSize
+ * @author Inswave
+ * @date 2026. 08. 18
+ * @description 첨부파일 전체 용량이 제한을 넘지 않는지 확인한다.
+ *
+ * 화면의 파일크기는 천단위 콤마가 붙은 표시용 값이다.
+ * 그대로 더하면 문자열이 이어붙으므로 콤마를 떼고 더한다.
+ *
+ * 복사해 쓸 때 바꿀 곳
+ *  - 전체 용량 상한
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.checkFileSize = function () {
+	let totalSize = 0;
+	const rowCount = dlt_fileList.getRowCount();
+
+	for (let i = 0; i < rowCount; i++) {
+		const size = dlt_fileList.getCellData(i, "fileSize");
+
+		if (!$c.util.isEmpty(size)) {
+			totalSize += Number($c.num.unFormatNumber(size));
+		}
+	}
+
+	if (totalSize > 31457280) {
+		$c.win.alert("첨부파일 전체 용량은 "
+			+ $c.num.formatByte(31457280) + " 를 넘을 수 없습니다.");
+		return false;
+	}
+
+	return true;
+};
+]]></script>
+    </head>
+    <body ev:onpageload="scwin.onpageload">
+    	<!--
+    		원본은 팝업으로만 열리는 화면이라 pop_contents 를 쓴다.
+    		이 가이드는 샘플 목록에서 바로 열어 볼 수 있도록 일반 화면(sub_contents)으로 두었다.
+    		실제 팝업으로 만들 때는 sub_contents 를 pop_contents 로 바꾸고 pageFrame 을 지운다.
+    	-->
+    	<xf:group class="sub_contents" id="" meta_componentContainer="true" style="">
+    		<w2:pageFrame id="pfmContentHeader" src="/cm/xml/contentHeader.xml" style=""></w2:pageFrame>
+
+    		<xf:group class="tblbox" id="" style="">
+    			<xf:group adaptive="layout" adaptiveThreshold="768" class="w2tb tbl" id="grp_mailForm" style="" tagname="table">
+    				<w2:attributes>
+    					<w2:summary></w2:summary>
+    				</w2:attributes>
+    				<xf:group tagname="colgroup">
+    					<xf:group style="width:150px;" tagname="col"></xf:group>
+    					<xf:group style="" tagname="col"></xf:group>
+    					<xf:group style="width:150px;" tagname="col"></xf:group>
+    					<xf:group style="" tagname="col"></xf:group>
+    				</xf:group>
+
+    				<!-- 대상. 고르면 제목과 본문이 통째로 바뀐다. -->
+    				<xf:group style="" tagname="tr">
+    					<xf:group class="w2tb_th" style="" tagname="th">
+    						<w2:attributes>
+    							<w2:scope>row</w2:scope>
+    						</w2:attributes>
+    						<w2:textbox id="" label="대상" style=""></w2:textbox>
+    					</xf:group>
+    					<xf:group class="w2tb_td" style="" tagname="td">
+    						<w2:attributes>
+    							<w2:colspan>3</w2:colspan>
+    							<w2:rowspan>1</w2:rowspan>
+    						</w2:attributes>
+    						<xf:select1 appearance="full" cols="4" id="rd_target" renderType="radiogroup" style=""
+    							ev:onviewchange="scwin.rd_target_onviewchange">
+    							<xf:choices>
+    								<xf:item>
+    									<xf:label><![CDATA[주관사]]></xf:label>
+    									<xf:value><![CDATA[1]]></xf:value>
+    								</xf:item>
+    								<xf:item>
+    									<xf:label><![CDATA[국책기관]]></xf:label>
+    									<xf:value><![CDATA[2]]></xf:value>
+    								</xf:item>
+    								<xf:item>
+    									<xf:label><![CDATA[TCB]]></xf:label>
+    									<xf:value><![CDATA[3]]></xf:value>
+    								</xf:item>
+    								<xf:item>
+    									<xf:label><![CDATA[배정]]></xf:label>
+    									<xf:value><![CDATA[4]]></xf:value>
+    								</xf:item>
+    							</xf:choices>
+    						</xf:select1>
+    					</xf:group>
+    				</xf:group>
+
+    				<xf:group style="" tagname="tr">
+    					<xf:group class="w2tb_th" style="" tagname="th">
+    						<w2:attributes>
+    							<w2:scope>row</w2:scope>
+    						</w2:attributes>
+    						<w2:textbox id="" label="보낸이" style=""></w2:textbox>
+    					</xf:group>
+    					<xf:group class="w2tb_td" style="" tagname="td">
+    						<xf:input id="ipt_fromName" maxByteLength="100" ref="data:dma_master.fromName" style="width:100%;"
+    							title="보낸이">
+    						</xf:input>
+    					</xf:group>
+    					<xf:group class="w2tb_th" style="" tagname="th">
+    						<w2:attributes>
+    							<w2:scope>row</w2:scope>
+    						</w2:attributes>
+    						<w2:textbox id="" label="보낸이 이메일" style=""></w2:textbox>
+    					</xf:group>
+    					<xf:group class="w2tb_td" style="" tagname="td">
+    						<xf:input id="ipt_fromEmail" maxByteLength="200" ref="data:dma_master.fromEmail" style="width:100%;"
+    							title="보낸이 이메일">
+    						</xf:input>
+    					</xf:group>
+    				</xf:group>
+
+    				<xf:group style="" tagname="tr">
+    					<xf:group class="w2tb_th" style="" tagname="th">
+    						<w2:attributes>
+    							<w2:scope>row</w2:scope>
+    						</w2:attributes>
+    						<w2:textbox id="" label="메일 제목" style=""></w2:textbox>
+    					</xf:group>
+    					<xf:group class="w2tb_td" style="" tagname="td">
+    						<w2:attributes>
+    							<w2:colspan>3</w2:colspan>
+    							<w2:rowspan>1</w2:rowspan>
+    						</w2:attributes>
+    						<xf:input id="ipt_title" maxByteLength="1000" ref="data:dma_master.title" style="width:100%;"
+    							title="메일 제목">
+    						</xf:input>
+    					</xf:group>
+    				</xf:group>
+
+    				<xf:group style="" tagname="tr">
+    					<xf:group class="w2tb_th" style="" tagname="th">
+    						<w2:attributes>
+    							<w2:scope>row</w2:scope>
+    						</w2:attributes>
+    						<w2:textbox id="" label="발신내용" style=""></w2:textbox>
+    					</xf:group>
+    					<xf:group class="w2tb_td" style="" tagname="td">
+    						<w2:attributes>
+    							<w2:colspan>3</w2:colspan>
+    							<w2:rowspan>1</w2:rowspan>
+    						</w2:attributes>
+    						<xf:textarea id="ipt_content" ref="data:dma_master.contn" style="width:100%;height:220px;"
+    							title="발신내용">
+    						</xf:textarea>
+    					</xf:group>
+    				</xf:group>
+
+    				<!-- 첨부파일. 고른 파일은 아래 목록에 쌓이고 전송 시 함께 간다. -->
+    				<xf:group style="" tagname="tr">
+    					<xf:group class="w2tb_th" style="" tagname="th">
+    						<w2:attributes>
+    							<w2:scope>row</w2:scope>
+    						</w2:attributes>
+    						<w2:textbox id="" label="첨부 파일" style=""></w2:textbox>
+    					</xf:group>
+    					<xf:group class="w2tb_td" style="" tagname="td">
+    						<w2:attributes>
+    							<w2:colspan>3</w2:colspan>
+    							<w2:rowspan>1</w2:rowspan>
+    						</w2:attributes>
+    						<!-- 표 안의 버튼 줄은 titbox mt0 을 쓴다. 위 여백 없이 우측에 붙는다. -->
+    						<xf:group class="titbox mt0" id="" style="">
+    							<xf:group class="lt" id="" style="">
+    								<w2:textbox id="" label="파일명을 더블클릭하면 내려받습니다." style=""></w2:textbox>
+    							</xf:group>
+    							<xf:group class="rt" id="" style="">
+    								<xf:trigger class="btn_cm" id="btn_fileAdd" style="" type="button"
+    									ev:onclick="scwin.btn_fileAdd_onclick">
+    									<xf:label><![CDATA[파일추가]]></xf:label>
+    								</xf:trigger>
+    								<xf:trigger class="btn_cm" id="btn_fileDelete" style="" type="button"
+    									ev:onclick="scwin.btn_fileDelete_onclick">
+    									<xf:label><![CDATA[파일삭제]]></xf:label>
+    								</xf:trigger>
+    							</xf:group>
+    						</xf:group>
+
+    						<xf:group class="gvwbox" id="" style="">
+    							<w2:gridView autoFit="allColumn" class="gvw row5" dataList="data:dlt_fileList" focusMode="row"
+    								id="grd_fileList" keepDefaultColumnWidth="false" style="" visibleRowNum="5"
+    								ev:oncelldblclick="scwin.grd_fileList_oncelldblclick">
+    								<w2:header id="headerGuideFile" style="">
+    									<w2:row id="rowGuideFileHead" style="">
+    										<w2:column displayMode="label" id="hFileNo" inputType="text" value="번호" width="50"></w2:column>
+    										<w2:column displayMode="label" id="hFileName" inputType="text" value="파일명" width="400"></w2:column>
+    										<w2:column displayMode="label" id="hFileSize" inputType="text" value="크기(byte)" width="140"></w2:column>
+    									</w2:row>
+    								</w2:header>
+    								<w2:gBody id="gBodyGuideFile" style="">
+    									<w2:row id="rowGuideFileBody" style="">
+    										<!-- expression 은 행 번호처럼 계산해서 보여줄 값에 쓴다. -->
+    										<w2:column displayMode="label" expression="rowIndex()+1" id="fileNo"
+    											inputType="expression" textAlign="center" width="50">
+    										</w2:column>
+    										<w2:column displayMode="label" id="fileName" inputType="text" readOnly="true"
+    											style="cursor:pointer;" textAlign="left" width="400">
+    										</w2:column>
+    										<w2:column displayMode="label" id="fileSize" inputType="text" readOnly="true"
+    											textAlign="right" width="140">
+    										</w2:column>
+    									</w2:row>
+    								</w2:gBody>
+    							</w2:gridView>
+    						</xf:group>
+    					</xf:group>
+    				</xf:group>
+
+    				<xf:group style="" tagname="tr">
+    					<xf:group class="w2tb_th" style="" tagname="th">
+    						<w2:attributes>
+    							<w2:scope>row</w2:scope>
+    						</w2:attributes>
+    						<w2:textbox id="" label="받는곳" style=""></w2:textbox>
+    					</xf:group>
+    					<xf:group class="w2tb_td" style="" tagname="td">
+    						<xf:trigger class="btn_cm" id="btn_findReceiver" style="" type="button"
+    							ev:onclick="scwin.btn_findReceiver_onclick">
+    							<xf:label><![CDATA[받는곳 찾기]]></xf:label>
+    						</xf:trigger>
+    					</xf:group>
+    					<xf:group class="w2tb_th" style="" tagname="th">
+    						<w2:attributes>
+    							<w2:scope>row</w2:scope>
+    						</w2:attributes>
+    						<w2:textbox id="" label="비밀참조수신" style=""></w2:textbox>
+    					</xf:group>
+    					<xf:group class="w2tb_td" style="" tagname="td">
+    						<xf:group class="flex flex_no" id="" style="">
+    							<xf:input id="ipt_bccName" maxByteLength="100" ref="data:dma_master.bccName"
+    								style="width:120px;" title="비밀참조 이름">
+    							</xf:input>
+    							<xf:input id="ipt_bccEmail" maxByteLength="200" ref="data:dma_master.bccEmail"
+    								style="width:100%;" title="비밀참조 이메일">
+    							</xf:input>
+    						</xf:group>
+    					</xf:group>
+    				</xf:group>
+    			</xf:group>
+    		</xf:group>
+
+    		<xf:group class="titbox" id="" style="">
+    			<xf:group class="lt" id="" style="">
+    				<w2:textbox id="" label="선택한 담당자에게 이메일이 전송됩니다." style=""></w2:textbox>
+    			</xf:group>
+    			<xf:group class="rt" id="" style="">
+    				<xf:trigger class="btn_cm" id="btn_selectAll" style="" type="button"
+    					ev:onclick="scwin.btn_selectAll_onclick">
+    					<xf:label><![CDATA[전체선택]]></xf:label>
+    				</xf:trigger>
+    				<xf:trigger class="btn_cm row_add" id="btn_rowAdd" style="" type="button"
+    					ev:onclick="scwin.btn_rowAdd_onclick">
+    					<xf:label><![CDATA[행삽입]]></xf:label>
+    				</xf:trigger>
+    				<xf:trigger class="btn_cm row_del" id="btn_rowDelete" style="" type="button"
+    					ev:onclick="scwin.btn_rowDelete_onclick">
+    					<xf:label><![CDATA[행삭제]]></xf:label>
+    				</xf:trigger>
+    			</xf:group>
+    		</xf:group>
+
+    		<!--
+    			수신자 그리드. 팝업으로 넣은 값도 여기서 고칠 수 있어야 하므로 직접입력을 켠다.
+    			그리드는 기본이 읽기전용이라 readOnly="false" 가 없으면 어느 컬럼도 수정되지 않는다.
+    		-->
+    		<xf:group class="gvwbox" id="" style="">
+    			<w2:gridView autoFit="allColumn" class="gvw row10" dataList="data:dlt_receiver" focusMode="row"
+    				id="grd_receiver" keepDefaultColumnWidth="false" readOnly="false" style="" visibleRowNum="10">
+    				<w2:header id="headerGuideReceiver" style="">
+    					<w2:row id="rowGuideReceiverHead" style="">
+    						<w2:column displayMode="label" id="hRcvNo" inputType="text" value="번호" width="50"></w2:column>
+    						<w2:column displayMode="label" id="hCheck" inputType="text" value="선택" width="50"></w2:column>
+    						<w2:column displayMode="label" id="hChrgNm" inputType="text" value="담당자" width="180"></w2:column>
+    						<w2:column displayMode="label" id="hEmail" inputType="text" value="이메일" width="260"></w2:column>
+    						<w2:column displayMode="label" id="hIntegUsrId" inputType="text" value="사용자ID" width="120"></w2:column>
+    					</w2:row>
+    				</w2:header>
+    				<w2:gBody id="gBodyGuideReceiver" style="">
+    					<w2:row id="rowGuideReceiverBody" style="">
+    						<w2:column displayMode="label" expression="rowIndex()+1" id="rcvNo" inputType="expression"
+    							readOnly="true" textAlign="center" width="50">
+    						</w2:column>
+    						<w2:column displayMode="label" id="check" inputType="checkbox" readOnly="false"
+    							textAlign="center" width="50">
+    						</w2:column>
+
+    						<!-- 직접입력 컬럼. 한 번 클릭으로 입력칸이 열리게 editModeEvent 를 준다. -->
+    						<w2:column displayMode="label" editModeEvent="onclick" id="chrgNm" inputType="text"
+    							readOnly="false" textAlign="left" width="180">
+    						</w2:column>
+    						<w2:column displayMode="label" editModeEvent="onclick" id="email" inputType="text"
+    							readOnly="false" textAlign="left" width="260">
+    						</w2:column>
+
+    						<!-- 시스템이 채우는 값이라 잠근다. -->
+    						<w2:column displayMode="label" id="integUsrId" inputType="text" readOnly="true"
+    							textAlign="center" width="120">
+    						</w2:column>
+    					</w2:row>
+    				</w2:gBody>
+    			</w2:gridView>
+    		</xf:group>
+
+    		<xf:group class="btnbox" id="" style="">
+    			<xf:group class="rt" id="" style="">
+    				<xf:trigger class="btn_cm" id="btn_cancel" style="" type="button" ev:onclick="scwin.btn_cancel_onclick">
+    					<xf:label><![CDATA[취소]]></xf:label>
+    				</xf:trigger>
+    				<xf:trigger class="btn_cm" id="btn_close" style="" type="button" ev:onclick="scwin.btn_close_onclick">
+    					<xf:label><![CDATA[닫기]]></xf:label>
+    				</xf:trigger>
+    				<xf:trigger class="btn_cm pt" id="btn_send" style="" type="button" ev:onclick="scwin.btn_send_onclick">
+    					<xf:label><![CDATA[전송]]></xf:label>
+    				</xf:trigger>
+    			</xf:group>
+    		</xf:group>
+
+    		<!-- 첨부파일 전송용. 화면에 보일 필요가 없으므로 display:none 으로 숨긴다.
+    		     mode="html5_transparent" 면 엔진이 이 자리에 파일 input 을 만들고,
+    		     $c.util.onUploadClick 이 그 input 을 클릭해 대화상자를 연다.
+    		     숨겨도 input 은 만들어지므로 업무화면들과 같이 display:none 을 유지한다.
+    		     selectCallback 은 ev: 를 붙이지 않는 속성이다. ev: 를 붙이면 걸리지 않는다. -->
+    		<w2:multiupload callbackSync="false" ev:onComplete="scwin.mpd_attachFile_onComplete"
+    			ev:onerror="scwin.mpd_attachFile_onerror" filter="*:*.*" id="mpd_attachFile" maxsize="52428800"
+    			mode="html5_transparent" selectCallback="scwin.mpd_attachFile_selectCallback" singleRequest="true"
+    			style="display:none;" uploadButton="" wmode="false">
+    		</w2:multiupload>
+    	</xf:group>
+    </body>
+</html>
