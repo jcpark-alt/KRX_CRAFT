@@ -101,8 +101,22 @@ def test_rule24_idempotent():
     once, _ = _run_rule24(SCRIPT_BASE)
     twice, _ = _run_rule24(once)
     assert twice == once
-    # 헤더 중복 없음
+    # 헤더 중복 없음 + 현행 한 줄 슬래시 형식
     assert once.count("4. 서브미션 콜백 영역") == 1
+    assert "///////// 4. 서브미션 콜백 영역 /////////" in once
+
+
+def test_legacy_block_header_migration():
+    # 구(舊) 3줄 블록 헤더가 남은 변환본 → 현행 슬래시 헤더로 교체(중복 없음)
+    legacy = SCRIPT_BASE.replace(
+        "// 일반 함수",
+        "/************************************************************************\n"
+        " * 5. 일반/업무 함수 영역\n"
+        " ************************************************************************/")
+    out, _ = _run_rule24(legacy)
+    assert "/*****" not in out                     # 블록 형식 잔존 없음
+    assert out.count("5. 일반/업무 함수 영역") == 1
+    assert "///////// 5. 일반/업무 함수 영역 /////////" in out
 
 
 def test_rule12_await_with_defined_handler():

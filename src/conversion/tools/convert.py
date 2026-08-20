@@ -129,10 +129,10 @@ def depth_array(code):
 # 이동 가능한 전역 변수의 RHS(순수 리터럴만). 호출/참조/연산식은 제외(실행순서 영향).
 _LITERAL_RE = re.compile(r'^(?:"[^"]*"|\'[^\']*\'|-?\d+(?:\.\d+)?|true|false|null|undefined|\[\s*\]|\{\s*\})$')
 
-# 규칙 4 영역 경계 — 5단계 정형화 구조 블록 헤더 (src/docs/code-convention/code-convention.md)
+# 규칙 4 영역 경계 — 5단계 정형화 구조 한 줄 슬래시 헤더 (src/docs/code-convention/code-convention.md)
 def _sec_header(num, title):
-    bar = "*" * 72
-    return "/%s\n * %d. %s\n %s/" % (bar, num, title, bar)
+    bar = "/" * 9
+    return "%s %d. %s %s" % (bar, num, title, bar)
 
 
 _SEC1_DECL = _sec_header(1, "변수 및 선언 영역")
@@ -146,11 +146,16 @@ _LEGACY_SEC = ("// 전역 변수 선언", "// scwin.onpageload, scwin.onpageunlo
                "// WebSquare 컴포넌트 이벤트 함수", "// 일반 함수")
 
 def _strip_section_headers(text, nums="2345", legacy=_LEGACY_SEC[1:]):
-    """블록 헤더(별줄/제목줄/별줄 3줄)와 구(舊) 한 줄 경계 주석을 제거한다(재삽입 전 정리 → 멱등).
-    기본값은 규칙 4 소관인 2~5구역만 제거한다(1구역 선언 헤더는 규칙 2 소관이라 보존)."""
-    pat = re.compile(r'(?m)^[ \t]*/\*{10,}[ \t]*\n[ \t]*\*[ \t]*[' + nums
-                     + r']\.[^\n]*영역[^\n]*\n[ \t]*\*{10,}/[ \t]*\r?\n?')
-    text = pat.sub("", text)
+    """섹션 헤더(현행 한 줄 슬래시 형식 + 구(舊) 3줄 블록 형식)와 구 한 줄 경계 주석을 제거한다
+    (재삽입 전 정리 → 멱등·형식 마이그레이션). 기본값은 규칙 4 소관인 2~5구역만 제거한다
+    (1구역 선언 헤더는 규칙 2 소관이라 보존)."""
+    # 현행: ///////// n. {영역명} /////////
+    line_pat = re.compile(r'(?m)^[ \t]*/{5,}[ \t]*[' + nums + r']\.[^\n]*영역[^\n]*?/{5,}[ \t]*\r?\n?')
+    # 구(舊) 3줄 블록: /**** \n * n. {영역명} \n ****/
+    block_pat = re.compile(r'(?m)^[ \t]*/\*{10,}[ \t]*\n[ \t]*\*[ \t]*[' + nums
+                           + r']\.[^\n]*영역[^\n]*\n[ \t]*\*{10,}/[ \t]*\r?\n?')
+    text = block_pat.sub("", text)
+    text = line_pat.sub("", text)
     return "\n".join(ln for ln in text.splitlines() if ln.strip() not in legacy)
 
 
@@ -192,8 +197,9 @@ def rule2_globals(code, report):
     res = code
     for s, e in sorted(spans, reverse=True):
         res = res[:s] + res[e:]
-    # 기존 경계 주석/1구역 블록 헤더 제거(중복 방지) 후 vScrenID 바로 아래에 재삽입
+    # 기존 경계 주석/1구역 헤더(현행 슬래시·구 블록 형식) 제거(중복 방지) 후 vScrenID 바로 아래에 재삽입
     res = re.sub(r'(?m)^[ \t]*//[ \t]*전역 변수 선언[ \t]*\r?\n?', '', res)
+    res = re.sub(r'(?m)^[ \t]*/{5,}[ \t]*1\.[^\n]*영역[^\n]*?/{5,}[ \t]*\r?\n?', '', res)
     res = re.sub(r'(?m)^[ \t]*/\*{10,}[ \t]*\n[ \t]*\*[ \t]*1\.[^\n]*영역[^\n]*\n[ \t]*\*{10,}/[ \t]*\r?\n?', '', res)
     a = re.search(r'scwin\.vScrenID\s*=\s*[^;\n]*;[ \t]*(?://[^\n]*)?\r?\n?', res)
     at = a.end()

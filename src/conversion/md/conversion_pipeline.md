@@ -29,8 +29,8 @@ WebSquare XML 은 `head(xml) → script(JavaScript, CDATA) → body(xml)` 구조
 | 규칙 | 처리 영역 | Python 처리 방식 | 비고 |
 | --- | --- | --- | --- |
 | 규칙 1 파일명 변수 | SCRIPT | 파일명 추출 → `scwin.vScrenID = "{파일명}";` 최상단 삽입(없을 때만) | 멱등 |
-| 규칙 2 전역변수 이동 | SCRIPT | 최상위 `scwin.X = <리터럴>;` 을 **1. 변수 및 선언 영역**(블록 헤더)으로 이동 | 호출/참조 RHS(예: `$c.x.f()`)는 실행순서 영향으로 이동 보류·리포트 |
-| 규칙 4 영역 재배치 | SCRIPT | 함수 정의를 **5단계 정형화 구조**(2 초기화 / 3 이벤트 / 4 서브미션 콜백 / 5 일반)로 분류·정렬 + 블록 헤더 삽입([code-convention.md](../../docs/code-convention/code-convention.md)). 콜백은 이름 패턴+핸들러 옵션 참조로 분류. `gform_onload`→`onpageload` 병합은 안전조건에서만 | 함수 사이/뒤 최상위 실행문 있으면 보류·리포트. 구 한 줄 경계 주석은 블록 헤더로 마이그레이션(멱등) |
+| 규칙 2 전역변수 이동 | SCRIPT | 최상위 `scwin.X = <리터럴>;` 을 **1. 변수 및 선언 영역**(`///////// 1. … /////////` 헤더)으로 이동 | 호출/참조 RHS(예: `$c.x.f()`)는 실행순서 영향으로 이동 보류·리포트 |
+| 규칙 4 영역 재배치 | SCRIPT | 함수 정의를 **5단계 정형화 구조**(2 초기화 / 3 이벤트 / 4 서브미션 콜백 / 5 일반)로 분류·정렬 + 슬래시 섹션 헤더 삽입([code-convention.md](../../docs/code-convention/code-convention.md)). 콜백은 이름 패턴+핸들러 옵션 참조로 분류. `gform_onload`→`onpageload` 병합은 안전조건에서만 | 함수 사이/뒤 최상위 실행문 있으면 보류·리포트. 구 형식(한 줄 경계 주석·3줄 블록 헤더)은 현행 헤더로 마이그레이션(멱등) |
 | 규칙 5 문법/API | SCRIPT | `==`/`!=` → `===`/`!==`, `X.value = v` → `X.setValue(v)`, `X.src = v` → `X.setBackgroundImage(v)`, `X.getTotalRow()` → `X.getRowCount()` | 문자열·정규식·주석 리터럴 보호. 속성 대입은 읽기 제외, 메서드명 치환은 수신 객체·인자 보존 |
 | 규칙 6 Submission | HEAD+SCRIPT | 정적 action + 단순 `execute(id)` 만, `const sbmOptions = {...}`(submitDoneHandler 제외) + `const sbmRtn = await executeDynamic(sbmOptions)` **async/await 순차 스타일**로 변환 + 노드 삭제. ev:submitdone 핸들러 존재 시 await 뒤 직접 호출 연결. target ID 역추적으로 body `<w2:gridView>` id 를 `gridview` 자동 삽입 | 동적 action/속성변형은 sbmOptions 스텁과 함께 리포트. **ev:submiterror 존재 시 콜백 스타일 유지**(단계2 검토) |
 | 규칙 7 (1:1) | SCRIPT | **태그 없는** 매핑만 함수명 단어경계 치환 (`fn_Trim(` → `$c.str.trim(`) | `gcc_mapping.substitution_dict()` 사용(태그없음·무충돌) |
