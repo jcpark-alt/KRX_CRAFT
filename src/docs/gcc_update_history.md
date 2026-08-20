@@ -120,6 +120,9 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 - `21d6352` (08-20) — `$c.sbm.setPagingInfo` **rowNumVisble desc 내림차순 순번 구현** (기존 TO-DO 해소):
   - `__setDescRowNum`: 그리드 연동 DataList 의 rowNum 컬럼에 "전체 건수 − ((현재 페이지−1) × 페이지당 행 수) − 행 인덱스" 순번 설정
   - 통신 후 호출(totalCnt 전달) 시점에 적용, 컬럼명 `rowNumColumn` 재정의 가능, asc 경로 무변경, 회귀 테스트 4건
+- `e8dcf07` (08-20) — [연관] **2026-08 gcc 확장분을 변환(conversion) 프로세스에 반영** (`src/conversion`, gcc 라이브러리 무변경):
+  - convert.py **규칙 23** 신설 — `{grid}.setVisibleRowNum("all")` → `$c.util.setGridVisibleRowNum(grid, "all")` 결정적 치환(+pytest 6건)
+  - 변환 규칙·매핑표·단계 2 워크리스트에 browserPopup 부모 접근(`getOpenerScope`/`callOpener`), 목록↔상세 `restoreData` 복원, 페이징 옵션(`maxRowNum "all"`·desc) 대체, date/str 잉여 인자 정리 지침 추가
 
 ---
 
@@ -127,6 +130,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-08-20 | `e8dcf07` | feat(conversion): 2026-08 gcc 확장분을 변환 프로세스에 반영 (규칙 23 신설) — [연관, gcc 무변경] |
 | 2026-08-20 | `21d6352` | feat(sbm): setPagingInfo rowNumVisble desc 내림차순 순번 구현 |
 | 2026-08-20 | `031b20f` | feat(sbm): setPagingInfo maxRowNum "all" 지원 — 전체 행 표시 전환 |
 | 2026-08-20 | `e25af76` | feat(gcc): moveUrl/setPageFrameSrc restoreData 옵션 — [목록] 버튼 복귀 시 화면 상태 복원 |
