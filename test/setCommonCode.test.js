@@ -2,8 +2,9 @@
  * $c.data.setCommonCode 배열 매핑 회귀 테스트.
  *
  * setCommonCode 는 WebSquare 런타임($c/$p/컴포넌트 API)에 의존하므로, 런타임을 mock 으로
- * 대체한 vm 하네스로 data.xml 의 CDATA 를 로드해 실제 구동한다. code/compID 배열 매핑,
- * mappingKey override, 단일 code 회귀를 검증한다.
+ * 대체한 vm 하네스로 data.xml 의 CDATA 를 로드해 실제 구동한다.
+ * 배열 code 는 한 번의 통합 목록 조회(cdEngNmList, 콤마 구분) 후 mappingKey[i] 컬럼 값이
+ * code 와 같은 행만 추출해 병렬 compID 에 바인딩한다(미지정 시 전체 목록). 단일 code 회귀 포함.
  */
 const fs = require("fs");
 const vm = require("vm");
@@ -53,7 +54,7 @@ function loadHarness(xmlPath) {
     console, JSON, Array, String, Object, Date, Boolean, Number, Promise, encodeURIComponent,
     scwin: {},
     $c: {
-      util: { isEmpty, getComponent: (id) => state.comps[id], getJSON: (x) => x },
+      util: { isEmpty, isArray: Array.isArray, getComponent: (id) => state.comps[id], getJSON: (x) => x },
       str: { escapeToChar: (s) => s },
       sbm: {
         executeDynamic: async (opts) => {
@@ -80,36 +81,39 @@ describe.each(XML_FILES)("setCommonCode 배열 매핑 (%s)", (xmlPath) => {
   let h;
   beforeEach(() => { h = loadHarness(xmlPath); }); // 매 테스트 fresh (캐시/상태 격리)
 
-  test("code 배열 → body[code]별로 병렬 compID 에 매핑 (기본 key=code)", async () => {
+  test("code 배열 → 통합 목록을 mappingKey 컬럼 값으로 분리해 병렬 compID 에 매핑", async () => {
     h.state.comps = { sbx_A: h.makeComp("sbx_A"), sbx_B: h.makeComp("sbx_B") };
-    h.state.serverBody = {
-      "00001": [{ value: "A1", text: "A-one" }, { value: "A2", text: "A-two" }],
-      "00005": [{ value: "B1", text: "B-one" }],
-    };
-    await h.scwin.setCommonCode([{ code: ["00001", "00005"], compID: ["sbx_A", "sbx_B"] }]);
+    h.state.serverBody = [
+      { grpCd: "00001", value: "A1", text: "A-one" },
+      { grpCd: "00001", value: "A2", text: "A-two" },
+      { grpCd: "00005", value: "B1", text: "B-one" },
+    ];
+    await h.scwin.setCommonCode([{
+      code: ["00001", "00005"], compID: ["sbx_A", "sbx_B"], mappingKey: ["grpCd", "grpCd"],
+    }]);
 
-    expect(h.state.lastServer.action).toMatch(/cdEngNmList=00001%2000005/); // 공백 encode
-    const rowsA = h.state.dls["dlt_commonCode00001___sbx_A"]._rows;
-    const rowsB = h.state.dls["dlt_commonCode00005___sbx_B"]._rows;
+    expect(h.state.lastServer.action).toMatch(/cdEngNmList=00001%2C00005/); // 콤마(%2C) 구분
+    const rowsA = h.state.dls["dlt_commonCode_00001___sbx_A"]._rows;
+    const rowsB = h.state.dls["dlt_commonCode_00005___sbx_B"]._rows;
     expect(vals(rowsA, "value")).toEqual(expect.arrayContaining(["A1", "A2"]));
     expect(vals(rowsB, "value")).toContain("B1");
     expect(vals(rowsB, "value")).not.toContain("A1"); // 교차오염 없음
-    expect(h.state.comps.sbx_A._bound.src).toBe("data:dlt_commonCode00001___sbx_A");
+    expect(h.state.comps.sbx_A._bound.src).toBe("data:dlt_commonCode_00001___sbx_A");
     expect(rowsA[0].text).toBe("선택"); // 기본 firstRow 선두 삽입
   });
 
-  test("mappingKey 로 body key 재정의", async () => {
+  test("mappingKey 미지정 시 전체 목록을 각 compID 에 바인딩 (예외 없음)", async () => {
     h.state.comps = { sbx_A: h.makeComp("sbx_A"), sbx_B: h.makeComp("sbx_B") };
-    h.state.serverBody = {
-      grpA: [{ value: "GA", text: "grpA-item" }],
-      grpB: [{ value: "GB", text: "grpB-item" }],
-    };
-    await h.scwin.setCommonCode([{
-      code: ["00001", "00005"], compID: ["sbx_A", "sbx_B"], mappingKey: ["grpA", "grpB"],
-    }]);
+    h.state.serverBody = [
+      { grpCd: "00001", value: "A1", text: "A-one" },
+      { grpCd: "00005", value: "B1", text: "B-one" },
+    ];
+    await h.scwin.setCommonCode([{ code: ["00001", "00005"], compID: ["sbx_A", "sbx_B"] }]);
 
-    expect(vals(h.state.dls["dlt_commonCode00001___sbx_A"]._rows, "value")).toContain("GA");
-    expect(vals(h.state.dls["dlt_commonCode00005___sbx_B"]._rows, "value")).toContain("GB");
+    const rowsA = h.state.dls["dlt_commonCode_00001___sbx_A"]._rows;
+    const rowsB = h.state.dls["dlt_commonCode_00005___sbx_B"]._rows;
+    expect(vals(rowsA, "value")).toEqual(expect.arrayContaining(["A1", "B1"]));
+    expect(vals(rowsB, "value")).toEqual(expect.arrayContaining(["A1", "B1"]));
   });
 
   test("단일 code(문자열)는 cdEngNm 사용 — 기존 동작 유지", async () => {
@@ -119,6 +123,14 @@ describe.each(XML_FILES)("setCommonCode 배열 매핑 (%s)", (xmlPath) => {
 
     expect(h.state.lastServer.action).toMatch(/cdEngNm=00009/);
     expect(h.state.lastServer.action).not.toMatch(/cdEngNmList/);
-    expect(vals(h.state.dls["dlt_commonCode00009___sbx_S"]._rows, "value")).toContain("S1");
+    expect(vals(h.state.dls["dlt_commonCode_00009___sbx_S"]._rows, "value")).toContain("S1");
+  });
+
+  test("단일 code 의 key 래핑 응답은 첫 key 목록으로 언래핑", async () => {
+    h.state.comps = { sbx_S: h.makeComp("sbx_S") };
+    h.state.serverBody = { codeList: [{ value: "W1", text: "wrapped-one" }] }; // key 래핑 응답
+    await h.scwin.setCommonCode([{ code: "00010", compID: "sbx_S" }]);
+
+    expect(vals(h.state.dls["dlt_commonCode_00010___sbx_S"]._rows, "value")).toContain("W1");
   });
 });
