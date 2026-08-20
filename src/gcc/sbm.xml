@@ -1146,6 +1146,38 @@ scwin.getMessageCode = function (code) {
 
 /**
  * @method
+ * @name __setDescRowNum
+ * @description rowNumVisble "desc" 옵션 처리 — 그리드에 연동된 DataList 의 rowNum 컬럼에
+ *  페이지별 내림차순 순번을 설정한다.
+ *  계산식: 전체 건수 - ((현재 페이지 - 1) × 페이지당 행 수) - 행 인덱스
+ *  (예: 전체 100건·페이지당 10건·2페이지 → 90, 89, ...)
+ *  컬럼명은 pagingInfo.rowNumColumn 으로 재정의 가능 (기본 "rowNum")
+ * @param {Object} gridObj GridView 객체
+ * @param {Number} totalCnt 전체 데이터 건수
+ * @param {Object} pagingInfo 페이징 옵션 (currentPage/recordCountPerPage 사용)
+ * @hidden Y
+ * @exception
+ */
+scwin.__setDescRowNum = function (gridObj, totalCnt, pagingInfo) {
+    try {
+        const dltObj = $c.util.getGridViewDataList(gridObj);
+        if ($c.util.isEmpty(dltObj)) {
+            console.warn("[$c.sbm.__setDescRowNum] 그리드에 연동된 DataList 를 찾을 수 없습니다.");
+            return;
+        }
+        const rowNumColumn = pagingInfo.rowNumColumn || "rowNum";
+        const baseRowNum = Number(totalCnt) - ((pagingInfo.currentPage - 1) * Number(pagingInfo.recordCountPerPage));
+        const rowCount = dltObj.getRowCount();
+        for (let i = 0; i < rowCount; i++) {
+            dltObj.setCellData(i, rowNumColumn, baseRowNum - i);
+        }
+    } catch (ex) {
+        console.error(ex);
+    }
+};
+
+/**
+ * @method
  * @name __removeGridRowNumClass
  * @description 그리드에 부여된 행 수 제한 클래스(row{n}, h{n}_row{n})를 모두 제거한다.
  *  (maxRowNum "all" 전환 시·라인 수 변경 시 기존 행 수 클래스 정리용)
@@ -1182,7 +1214,8 @@ scwin.__removeGridRowNumClass = function (gridObj) {
  * @example
 const pagingInfo = {
     pageType : "P",                 // S/P/A
-	rowNumVisble : "grdMain|asc",	// gridView에 rowNumVisible 값 설정(asc,desc 옵션)
+	rowNumVisble : "grdMain|asc",	// gridView에 rowNumVisible 값 설정(asc: 시작 인덱스, desc: DataList rowNum 컬럼에 내림차순 순번 — 통신 후 totalCnt 전달 시 적용)
+	rowNumColumn : "rowNum",		// desc 순번을 설정할 DataList 컬럼명 (기본값 "rowNum")
 	maxRowNum : 50,			  		// gridView에 최대 visibleRowNum 값 설정 ("all" 지정 시 상한 없이 전체 행 표시)
     pageListId : "pglList",         // 페이지 리스트 아이디
     pageFunction : "scwin.fnSrch",  // 페이징 처리 함수
@@ -1336,9 +1369,12 @@ scwin.setPagingInfo = function (pagingInfo, inData, totalCnt) {
 			} else {
 				let startIdx = (pagingInfo.currentPage - 1) * pagingInfo.recordCountPerPage;
 				gridObj.setStartRowNumber(startIdx);
-			}			
+			}
 		} else if (rowNumSort.toUpperCase() === "DESC") {
-			// TO-DO : 별도의 컬럼을 추가 후 작업 가능
+			// 내림차순 순번은 전체 건수(totalCnt)가 필요하므로 통신 후 호출(totalCnt 전달) 시점에 적용된다.
+			if (!$c.util.isEmpty(totalCnt)) {
+				scwin.__setDescRowNum(gridObj, totalCnt, pagingInfo);
+			}
 		}
 	}
 
