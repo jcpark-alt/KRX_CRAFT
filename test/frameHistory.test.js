@@ -48,7 +48,7 @@ function makeFrame(id, src, comps) {
   };
 }
 
-function loadHarness() {
+function loadHarness(contextPath = "") {
   const state = { frames: {}, pushed: [], replaced: [] };
   const sandbox = {
     console, JSON, Array, String, Object, Date, Boolean, Number, Promise, Math,
@@ -62,7 +62,7 @@ function loadHarness() {
     },
     $c: {
       util: { isEmpty, getComponent: (id) => state.frames[id] || null },
-      sbm: { getContextPath: () => "" },
+      sbm: { getContextPath: () => contextPath },
       win: {}, // 로드 후 scwin 으로 연결
     },
     $p: { getFrame: () => state.frames.pfm_current },
@@ -186,6 +186,55 @@ describe("moveUrl/setPageFrameSrc 히스토리 기록·복원 (src/gcc/win.xml)"
     expect(calls).toHaveLength(1);
     expect(calls[0].menuCode).toBe("C1");
     expect(calls[0].option).toEqual({ isHistory: false });
+  });
+
+  test("restoreData: 스냅샷이 있으면 복원 이동 — paramData 계약 + dataInfo 자동 적용 (컨텍스트패스·쿼리 정규화 포함)", async () => {
+    const h = loadHarness("/ctx");
+    const dma = makeDc(); const dlt = makeDc();
+    const frame = makeFrame("pfm_current", "/ctx/board/list.xml?menu=1", { dma_search: dma, dlt_list: dlt });
+    h.state.frames.pfm_current = frame;
+    h.sandbox.history.state = { data: { srchKey: "A" } };
+
+    // 목록 → 상세 (스냅샷 stamp: 키는 컨텍스트패스·쿼리 제거된 "/board/list.xml")
+    await h.scwin.moveUrl("/board/detail.xml", { docId: "7" }, {
+      isHistory: true,
+      dataInfo: { dma_search: { k: "A" }, _pagingInfo: { currentPage: 3, totalCnt: 135 } },
+    });
+
+    // 상세 → [목록] 버튼 (복원 이동)
+    await h.scwin.moveUrl("/board/list.xml", null, { restoreData: true });
+
+    const back = frame.setSrcCalls[1];
+    expect(back.url).toBe("/ctx/board/list.xml");
+    const paramData = back.param.dataObject.data;
+    expect(paramData._isHistoryRestore).toBe(true);
+    expect(paramData.srchKey).toBe("A"); // 원래 entry 파라미터 유지
+    expect(paramData.dataInfo._pagingInfo).toEqual({ currentPage: 3, totalCnt: 135 }); // 예약 키 전달
+    expect(dma.applied).toEqual([{ k: "A" }]); // 컴포넌트 자동 적용
+    expect(dlt.applied).toEqual([]); // 스냅샷에 없던 컴포넌트는 미적용, _pagingInfo 는 적용 시도 안 함
+  });
+
+  test("restoreData: 스냅샷이 없으면 일반 이동 (paramObj 그대로, _isHistoryRestore 없음)", async () => {
+    const h = loadHarness();
+    const frame = makeFrame("pfm_current", "/a.xml");
+    h.state.frames.pfm_current = frame;
+
+    await h.scwin.moveUrl("/board/list.xml", { p: 1 }, { restoreData: true });
+
+    expect(frame.setSrcCalls[0].param.dataObject.data).toEqual({ p: 1 });
+    expect(h.state.pushed).toHaveLength(0);
+  });
+
+  test("restoreData: 명시적 paramObj 가 스냅샷 값보다 우선", async () => {
+    const h = loadHarness();
+    const frame = makeFrame("pfm_current", "/list.xml", { dma_search: makeDc() });
+    h.state.frames.pfm_current = frame;
+    h.sandbox.history.state = { data: { srchKey: "A" } };
+
+    await h.scwin.moveUrl("/detail.xml", {}, { isHistory: true, dataInfo: { dma_search: { k: "A" } } });
+    await h.scwin.moveUrl("/list.xml", { srchKey: "B" }, { restoreData: true });
+
+    expect(frame.setSrcCalls[1].param.dataObject.data.srchKey).toBe("B");
   });
 
   test("복원 대상 컴포넌트 미존재 시 warn 만 하고 예외 없음", async () => {
