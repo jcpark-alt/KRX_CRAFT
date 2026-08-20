@@ -159,6 +159,48 @@ describe.each(XML_FILES)("setCommonCode 배열 매핑 (%s)", (xmlPath) => {
     expect(h.state.comps.sbx_B._bound.value).toBe("cdVal");
   });
 
+  test("url 옵션 지정 시 기본 API(COMMON_CODE_INFO.URL) 대신 해당 경로로 조회", async () => {
+    h.state.comps = { sbx_S: h.makeComp("sbx_S") };
+    h.state.serverBody = [{ cdVal: "U1", cdValNm: "url-one" }];
+    await h.scwin.setCommonCode([{ code: "00011", compID: "sbx_S", url: "/api/mgt/custom-code" }]);
+
+    expect(h.state.lastServer.action).toBe("/api/mgt/custom-code?cdEngNm=00011");
+    expect(vals(h.state.dls["dlt_commonCode_00011___sbx_S"]._rows, "cdVal")).toContain("U1");
+
+    // 배열 code + url 조합도 동일 경로 사용
+    h.state.serverBody = [
+      { grpCd: "00001", cdVal: "A1", cdValNm: "A-one" },
+      { grpCd: "00005", cdVal: "B1", cdValNm: "B-one" },
+    ];
+    h.state.comps.sbx_A = h.makeComp("sbx_A");
+    h.state.comps.sbx_B = h.makeComp("sbx_B");
+    await h.scwin.setCommonCode([{
+      code: ["00001", "00005"], compID: ["sbx_A", "sbx_B"], mappingKey: ["grpCd", "grpCd"],
+      url: "/api/mgt/custom-code",
+    }]);
+    expect(h.state.lastServer.action).toBe("/api/mgt/custom-code?cdEngNmList=00001%2C00005");
+  });
+
+  test("paramName 옵션 지정 시 기본 쿼리 파라미터명(cdEngNm/cdEngNmList) 대신 해당 이름으로 조회", async () => {
+    h.state.comps = { sbx_S: h.makeComp("sbx_S") };
+    h.state.serverBody = [{ cdVal: "P1", cdValNm: "param-one" }];
+    await h.scwin.setCommonCode([{ code: "00012", compID: "sbx_S", paramName: "grpCd" }]);
+    expect(h.state.lastServer.action).toBe("/api/common/common-code?grpCd=00012");
+
+    // 배열 code + paramName + url 조합
+    h.state.serverBody = [
+      { grpCd: "00001", cdVal: "A1", cdValNm: "A-one" },
+      { grpCd: "00005", cdVal: "B1", cdValNm: "B-one" },
+    ];
+    h.state.comps.sbx_A = h.makeComp("sbx_A");
+    h.state.comps.sbx_B = h.makeComp("sbx_B");
+    await h.scwin.setCommonCode([{
+      code: ["00001", "00005"], compID: ["sbx_A", "sbx_B"], mappingKey: ["grpCd", "grpCd"],
+      url: "/api/mgt/custom-code", paramName: "grpCdList",
+    }]);
+    expect(h.state.lastServer.action).toBe("/api/mgt/custom-code?grpCdList=00001%2C00005");
+  });
+
   test("단일 code 의 key 래핑 응답은 첫 key 목록으로 언래핑", async () => {
     h.state.comps = { sbx_S: h.makeComp("sbx_S") };
     h.state.serverBody = { codeList: [{ cdVal: "W1", cdValNm: "wrapped-one" }] }; // key 래핑 응답

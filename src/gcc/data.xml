@@ -22,6 +22,8 @@ scwin.DATA_PREFIX = "dlt_commonCode";
 
 scwin.COMMON_CODE_INFO = {
 	URL: "/api/common/common-code",
+	PARAM: "cdEngNm",          // 단일 code 조회 쿼리 파라미터명 기본값
+	PARAM_LIST: "cdEngNmList", // 배열 code 조회 쿼리 파라미터명 기본값
     LABEL: "cdValNm",
     VALUE: "cdVal",
     FILED_ARR: ["cdValNm", "cdVal"]
@@ -487,6 +489,10 @@ scwin.__getChangeCheckedMainFrame = function (scopeApi) {
  * @param {Object} codeOptions 코드 옵션 배열. 각 요소:
  *   - {String|Array} code 공통 코드 그룹 코드. 배열이면 다중 코드 목록 조회(cdEngNmList) 후 body 의 key 별로 매핑
  *   - {String|Array} compID 바인딩할 컴포넌트 아이디(콤마 다중, "그리드:컬럼" 형태 지원). code 가 배열이면 code 와 병렬인 배열로 전달
+ *   - {String} url (선택) 공통코드 조회 API 경로 override — 미지정 시 COMMON_CODE_INFO.URL 사용.
+ *     캐시는 code 기준으로 공유되므로, 같은 code 를 서로 다른 url 로 조회하는 화면은 useLocalCache:false 병행 권장
+ *   - {String} paramName (선택) code 쿼리 파라미터명 override — 미지정 시 단일 code 는 COMMON_CODE_INFO.PARAM("cdEngNm"),
+ *     배열 code 는 COMMON_CODE_INFO.PARAM_LIST("cdEngNmList") 사용
  *   - {Boolean} useLocalCache 로컬 캐시 사용 여부 (기본 true)
  *   - {Array} filter (선택) 목록 필터 조건 ["COL==a,b", "COL!=x", "COL%%키워드"]
  *   - {String} sort (선택) 정렬 템플릿 labelAsc|labelDesc|valueAsc|valueDesc
@@ -665,12 +671,17 @@ scwin.__getCommonCodeData = async function (codeOptions) {
         }
 
 		// code 옵션이 있는 경우 action 값을 새로 설정한다.
+		// url 옵션이 지정되면 기본 공통코드 API(COMMON_CODE_INFO.URL) 대신 해당 경로로,
+		// paramName 옵션이 지정되면 기본 쿼리 파라미터명(PARAM/PARAM_LIST) 대신 해당 이름으로 조회한다.
 		if (!$c.util.isEmpty(codeObj.code) && $c.util.isEmpty(codeObj.action)) {
+			const baseUrl = !$c.util.isEmpty(codeObj.url) ? codeObj.url : scwin.COMMON_CODE_INFO.URL;
 			if (Array.isArray(codeObj.code)) {
-				// code 가 배열이면 cdEngNmList 파라미터로 전달(공백으로 구분 후 encode)
-				codeObj.action = `${scwin.COMMON_CODE_INFO.URL}?cdEngNmList=${codeObj.code.join("%2C")}`;
+				// code 가 배열이면 목록 파라미터로 전달(콤마 %2C 구분)
+				const paramName = !$c.util.isEmpty(codeObj.paramName) ? codeObj.paramName : scwin.COMMON_CODE_INFO.PARAM_LIST;
+				codeObj.action = `${baseUrl}?${paramName}=${codeObj.code.join("%2C")}`;
 			} else {
-				codeObj.action = `${scwin.COMMON_CODE_INFO.URL}?cdEngNm=${codeObj.code}`;
+				const paramName = !$c.util.isEmpty(codeObj.paramName) ? codeObj.paramName : scwin.COMMON_CODE_INFO.PARAM;
+				codeObj.action = `${baseUrl}?${paramName}=${codeObj.code}`;
 			}
 		}
 
