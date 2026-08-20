@@ -17,15 +17,19 @@
 * **컴포넌트 이벤트 명명 규칙**: `scwin.{컴포넌트명}_{이벤트명}` (이때 `{이벤트명}`은 전체 **소문자**로 변환).
     * *예시:* `ev:onclick="scwin.btn_Search_onclick"`
 
-### 규칙 4: 코드 구조화 및 영역 분리 (정렬 순서)
-스크립트 영역의 코드를 아래의 4가지 파트로 분류하고, 지정된 고정 주석을 바운더리로 삼아 순서를 재정렬합니다.
+### 규칙 4: 코드 구조화 및 영역 분리 (5단계 정형화 구조)
+스크립트 영역의 코드를 **5단계 정형화 구조**([code-convention.md](../../docs/code-convention/code-convention.md))로 분류하고,
+표준 블록 헤더(`/**** * n. {영역명} ****/` 3줄)를 바운더리로 삼아 순서를 재정렬합니다.
 
-1. **전역 변수 선언 영역** (`// 전역 변수 선언`)
-2. **초기화 함수 영역** (`// scwin.onpageload, scwin.onpageunload 함수`)
+1. **변수 및 선언 영역** — `scwin.vScrenID`(규칙 1) + 리터럴 전역 변수(규칙 2가 이동·헤더 삽입)
+2. **초기화 영역** — `scwin.onpageload`, `scwin.onpageunload`
    - `scwin.gform_onload` 함수의 코드를 `scwin.onpageload` 내부로 이동하고, 기존 `scwin.gform_onload` 정의는 삭제.
-3. **WebSquare 컴포넌트 이벤트 함수 영역** (`// WebSquare 컴포넌트 이벤트 함수`)
-   - `<body>` 영역의 `ev:on` 으로 시작하는 함수들을 모두 이쪽으로 재배치 및 소문자화 가이드 적용.
-4. **일반 함수 영역** (`// 일반 함수`)
+3. **컴포넌트 이벤트 영역** — `<body>` 의 `ev:on*` 이 참조하는 핸들러(소문자화 가이드 적용, 규칙 3)
+4. **서브미션 콜백 영역** — 통신 후처리·팝업 콜백 함수. 이름 패턴(`*_submitdone`/`*_submiterror`/`*callback`)
+   **또는** 스크립트 내 `submitHandler`/`submitDoneHandler`/`submitErrorHandler` 옵션이 참조하는 함수를 자동 분류.
+5. **일반/업무 함수 영역** — 비즈니스 로직·데이터 가공·검증 함수 (**camelCase** — `fn_` 접두는 규칙 13이 제거)
+
+* 비어 있는 영역의 헤더는 생략합니다. 구(舊) 한 줄 경계 주석(`// 전역 변수 선언` 등)은 재변환 시 블록 헤더로 자동 마이그레이션됩니다(멱등).
 
 ### 규칙 5: 코드 문법 및 컴포넌트 API 최적화
 * **비교 연산자 엄격화**: `==` 및 `!=`를 찾아 타입 체크가 포함된 일치 연산자 `===` 및 `!==`로 수정.
@@ -35,7 +39,12 @@
 
 ### 규칙 6: Submission의 동적 함수($c.sbm.executeDynamic) 치환 및 XML 제거
 * `<head>` 내의 `<xf:submission>` 태그 속성을 파싱하여 `sbmOptions` 객체를 생성합니다.
-* 스크립트의 `$c.sbm.execute(sbm_commonCode);` 코드를 `$c.sbm.executeDynamic(sbmOptions);` 형태로 치환하고, 기존 `<xf:submission>` XML 노드는 완전히 삭제 처리합니다.
+* **async/await 순차 실행 우선**([code-convention.md](../../docs/code-convention/code-convention.md)): 스크립트의 `$c.sbm.execute(sbm_x);` 를
+  `const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);` 형태로 치환하고, 기존 `<xf:submission>` XML 노드는 완전히 삭제 처리합니다.
+  - `sbmOptions` 에 **`submitDoneHandler` 를 넣지 않습니다** — 핸들러를 넘기면 `executeDynamic` 의 Promise 가 settle 되지 않아 await 이 불가능합니다.
+  - 원본 노드에 `ev:submitdone` 핸들러가 있으면 await 뒤에 `scwin.{핸들러}(sbmRtn);` 직접 호출로 순차 실행을 보존하고, 없으면 `// TODO Stage2: 응답 처리` 주석을 남깁니다.
+  - await 이 삽입된 함수에는 `async` 키워드가 자동 부여되며, **호출부의 await 전파 필요 여부는 단계 2 검토**로 리포트됩니다.
+  - **예외(콜백 스타일 유지)**: `ev:submiterror` 가 있는 노드는 오류 흐름이 콜백 기반이므로 기존 `submitDoneHandler` 옵션 스타일로 변환하고 단계 2 검토로 리포트합니다. 규칙 12/16 도 동일한 await 규약을 따릅니다.
 * 상세 매핑·`gridview` 역추적 규칙은 아래 [규칙 6 보충: Submission 변환 상세](#규칙-6-보충-submission-변환-상세) 를 참조하세요.
 
 ### 규칙 7: 레거시 공통함수 → gcc 공통함수($c.*) 치환
@@ -333,11 +342,12 @@ const sbmOptions = {
     method : "get",
     ref : "dma_SearchReq",
     target : "dlt_FaqList=body",
-    submitDoneHandler : scwin.sbm_SelectFaqList_submitdone,
     gridview : "grd_jongmok", // body xml의 w2:gridView id를 역추적하여 자동 삽입
     isProcessMsg : false
 };
-$c.sbm.executeDynamic(sbmOptions);
+
+const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+scwin.sbm_SelectFaqList_submitdone(sbmRtn); // ev:submitdone 핸들러 존재 시 직접 호출로 순차 연결
 
 ```
 

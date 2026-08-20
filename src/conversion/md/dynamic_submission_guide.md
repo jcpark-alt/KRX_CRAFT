@@ -23,13 +23,19 @@
 
 
 
-### 규칙 3: sbmOptions 객체 자동 생성 명명 규칙
+### 규칙 3: sbmOptions 객체 자동 생성 명명 규칙 및 async/await 순차 실행
 
 * **`id`**: `"sbm_{dataCollection}"` 형태로 지정합니다. (예: `dts_jongmok` $\rightarrow$ `sbm_dts_jongmok`)
 * **`ref`**: `""` (빈 문자열 고정)
 * **`target`**: `"{dataCollection}=body.content"` 형태로 지정합니다. (예: `dts_jongmok=body.content`)
-* **`submitDoneHandler`**: `"scwin.sbm_{dataCollection}_submitdone"` 형태로 핸들러 함수 매핑 구조를 기본 정의합니다.
 * **`isProcessMsg`**: 기본값 `false`로 지정합니다.
+* **호출 형태 — async/await 순차 실행 우선**([code-convention.md](../../docs/code-convention/code-convention.md)):
+  `submitDoneHandler` 옵션은 **넣지 않고**(핸들러를 넘기면 `executeDynamic` 의 Promise 가 settle 되지 않음)
+  `const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);` 로 호출합니다.
+  - 파일에 `scwin.sbm_{dataCollection}_submitdone` 함수가 **정의되어 있으면** await 뒤에 `scwin.sbm_{dataCollection}_submitdone(sbmRtn);` 직접 호출로 순차 실행을 보존합니다.
+  - 정의가 없으면 `// TODO Stage2: sbmRtn 응답 처리 로직 작성` 주석을 남깁니다(단계 2 보강).
+  - await 이 삽입된 함수에는 `async` 키워드가 자동 부여되며, 호출부 await 전파는 단계 2 검토 항목입니다.
+  - 결과 변수는 옵션 변수와 짝으로 명명합니다(`sbmOptions`→`sbmRtn`, `sbmOptions2`→`sbmRtn2`, …).
 
 ### 규칙 4: 주석 처리된 레거시 코드 처리
 
@@ -65,11 +71,11 @@ const sbmOptions = {
     action : "/submitperson.do",
     ref : "",
     target : "dts_jongmok=body.content",
-    submitDoneHandler : scwin.sbm_dts_jongmok_submitdone,
     isProcessMsg : false
 };
 
-$c.sbm.executeDynamic(sbmOptions);
+const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+scwin.sbm_dts_jongmok_submitdone(sbmRtn); // 파일에 핸들러 정의가 있는 경우 — 없으면 TODO Stage2 주석
 
 ```
 
@@ -96,11 +102,11 @@ const sbmOptions = {
     action : "/tbmccdval.do",
     ref : "",
     target : "MxDataSet_code1=body.content",
-    submitDoneHandler : scwin.sbm_MxDataSet_code1_submitdone,
     isProcessMsg : false
 };
 
-$c.sbm.executeDynamic(sbmOptions);
+const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+// TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
 
 ```
 
@@ -127,11 +133,11 @@ const sbmOptions = {
     action : "/ui/dsclsrch/data/isurCode.jsp",
     ref : "",
     target : "dts_jongmok=body.content",
-    submitDoneHandler : scwin.sbm_dts_jongmok_submitdone,
     isProcessMsg : false
 };
 
-$c.sbm.executeDynamic(sbmOptions);
+const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+// TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
 
 ```
 
@@ -145,13 +151,15 @@ Claude Code가 해당 소스 코드 블록을 탐색할 때 인식할 수 있도
 10. Dynamic Submission Conversion for DataID & Reset Pattern:
     - Scan for the pattern where `{dataCollection}.DataID = encodeURI({url})` (or its commented-out variants like `////{dataCollection}.DataID`) and `{dataCollection}.reset()` coexist within the same function scope.
     - Extract the core `action` path from the URL string by stripping out all GET parameters after the '?' character.
-    - Generate a new `$c.sbm.executeDynamic(sbmOptions);` code block using the following properties:
+    - Generate a new `const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);` code block (sequential async/await style) using the following properties:
       * id: "sbm_{dataCollection}"
       * action: Extract pure URI path (e.g., "/submitperson.do")
       * ref: "" (Strictly empty string as requested)
       * target: "{dataCollection}=body.content"
-      * submitDoneHandler: scwin.sbm_{dataCollection}_submitdone
       * isProcessMsg: false
+      * Do NOT set submitDoneHandler (passing it prevents the executeDynamic Promise from settling).
+    - After the await line: if `scwin.sbm_{dataCollection}_submitdone` is defined in the file, call it directly with `sbmRtn`; otherwise leave a `// TODO Stage2:` comment for response handling.
+    - Mark the enclosing function `async` (the pipeline does this automatically) and report callers that may need `await` propagation for Stage 2 review.
     - Completely purge the old legacy URL assignment statements, `.reset()` calls, and any associated "W-Craft WebSquare" verification comments.
 
 ```

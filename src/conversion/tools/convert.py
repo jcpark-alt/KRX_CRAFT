@@ -129,13 +129,29 @@ def depth_array(code):
 # 이동 가능한 전역 변수의 RHS(순수 리터럴만). 호출/참조/연산식은 제외(실행순서 영향).
 _LITERAL_RE = re.compile(r'^(?:"[^"]*"|\'[^\']*\'|-?\d+(?:\.\d+)?|true|false|null|undefined|\[\s*\]|\{\s*\})$')
 
-# 규칙 4 영역 경계 주석
-_SEC_GLOBAL = "// 전역 변수 선언"
-_SEC_INIT = "// scwin.onpageload, scwin.onpageunload 함수"
-_SEC_EVENT = "// WebSquare 컴포넌트 이벤트 함수"
-_SEC_GENERAL = "// 일반 함수"
-_BOUNDARIES = (_SEC_GLOBAL, _SEC_INIT, _SEC_EVENT, _SEC_GENERAL)
-_RULE4_BOUNDARIES = (_SEC_INIT, _SEC_EVENT, _SEC_GENERAL)  # 규칙4가 직접 관리(전역 주석은 규칙2 소관)
+# 규칙 4 영역 경계 — 5단계 정형화 구조 블록 헤더 (src/docs/code-convention/code-convention.md)
+def _sec_header(num, title):
+    bar = "*" * 72
+    return "/%s\n * %d. %s\n %s/" % (bar, num, title, bar)
+
+
+_SEC1_DECL = _sec_header(1, "변수 및 선언 영역")
+_SEC2_INIT = _sec_header(2, "초기화 영역")
+_SEC3_EVENT = _sec_header(3, "컴포넌트 이벤트 영역")
+_SEC4_CALLBACK = _sec_header(4, "서브미션 콜백 영역")
+_SEC5_GENERAL = _sec_header(5, "일반/업무 함수 영역")
+
+# 구(舊) 한 줄 경계 주석 — 기존 변환분 재변환 시 블록 헤더로 마이그레이션(제거 후 재삽입)
+_LEGACY_SEC = ("// 전역 변수 선언", "// scwin.onpageload, scwin.onpageunload 함수",
+               "// WebSquare 컴포넌트 이벤트 함수", "// 일반 함수")
+
+def _strip_section_headers(text, nums="2345", legacy=_LEGACY_SEC[1:]):
+    """블록 헤더(별줄/제목줄/별줄 3줄)와 구(舊) 한 줄 경계 주석을 제거한다(재삽입 전 정리 → 멱등).
+    기본값은 규칙 4 소관인 2~5구역만 제거한다(1구역 선언 헤더는 규칙 2 소관이라 보존)."""
+    pat = re.compile(r'(?m)^[ \t]*/\*{10,}[ \t]*\n[ \t]*\*[ \t]*[' + nums
+                     + r']\.[^\n]*영역[^\n]*\n[ \t]*\*{10,}/[ \t]*\r?\n?')
+    text = pat.sub("", text)
+    return "\n".join(ln for ln in text.splitlines() if ln.strip() not in legacy)
 
 
 # ---------- 규칙별 변환 ----------
@@ -176,11 +192,12 @@ def rule2_globals(code, report):
     res = code
     for s, e in sorted(spans, reverse=True):
         res = res[:s] + res[e:]
-    # 기존 '// 전역 변수 선언' 주석 제거(중복 방지) 후 vScrenID 바로 아래에 재삽입
+    # 기존 경계 주석/1구역 블록 헤더 제거(중복 방지) 후 vScrenID 바로 아래에 재삽입
     res = re.sub(r'(?m)^[ \t]*//[ \t]*전역 변수 선언[ \t]*\r?\n?', '', res)
+    res = re.sub(r'(?m)^[ \t]*/\*{10,}[ \t]*\n[ \t]*\*[ \t]*1\.[^\n]*영역[^\n]*\n[ \t]*\*{10,}/[ \t]*\r?\n?', '', res)
     a = re.search(r'scwin\.vScrenID\s*=\s*[^;\n]*;[ \t]*(?://[^\n]*)?\r?\n?', res)
     at = a.end()
-    block = "// 전역 변수 선언\n" + "\n".join(moved) + "\n"
+    block = _SEC1_DECL + "\n" + "\n".join(moved) + "\n"
     res = res[:at] + block + res[at:]
     report["rule2"] = len(moved)
     return res
@@ -814,17 +831,18 @@ def _only_comment_blank(text):
 
 
 def _clean_lead(text):
-    """함수 앞 주석 블록에서 규칙4 경계 주석을 제거하고 앞뒤 빈줄 정리."""
-    out = [ln for ln in text.splitlines() if ln.strip() not in _RULE4_BOUNDARIES]
-    return "\n".join(out).strip("\n")
+    """함수 앞 주석 블록에서 규칙4 경계 주석(구 한 줄·신 블록 헤더)을 제거하고 앞뒤 빈줄 정리."""
+    return _strip_section_headers(text).strip("\n")
 
 
 def rule4_structure(script, body, report):
     """
-    최상위 함수 정의를 init / event / 일반 3구역으로 분류·재배치하고 경계 주석을 붙인다.
+    최상위 함수 정의를 초기화/이벤트/서브미션 콜백/일반 4구역으로 분류·재배치하고
+    5단계 정형화 구조 블록 헤더(2~5구역)를 붙인다. (1구역 헤더는 규칙 2 소관)
+    - 서브미션 콜백: 이름 패턴(*_submitdone/*_submiterror/*callback) 또는 submitDoneHandler 등 옵션 참조 기반.
     - 함수 사이/뒤에 최상위 실행문이 섞여 있으면 재정렬 보류(리포트).
     - gform_onload 는 onpageload 가 'scwin.gform_onload();' 단일 호출이고 참조가 1건일 때만 병합.
-    - doc 주석(경계 주석 제외)은 해당 함수와 함께 이동. 멱등.
+    - doc 주석(경계 주석 제외)은 해당 함수와 함께 이동. 구 한 줄 경계 주석은 블록 헤더로 마이그레이션. 멱등.
     """
     mask = code_mask(script)
     depth = depth_array(script)
@@ -893,17 +911,21 @@ def rule4_structure(script, body, report):
             report["rule4_merge"] = "gform_onload→onpageload"
 
     evon = set(re.findall(r'ev:on[\w-]+="\s*scwin\.([\w$]+)\s*"', body))
+    # 서브미션 옵션(submitHandler/submitDoneHandler/submitErrorHandler)이 참조하는 함수 → 콜백 구역
+    handler_refs = set(re.findall(r'submit(?:Done|Error)?Handler\s*:\s*scwin\.([\w$]+)', script))
 
     def category(name):
         if name in ("onpageload", "onpageunload"):
             return "init"
         if name == "gform_onload":
             return "general"   # 병합 안 된 경우 일반으로
+        if name in handler_refs or re.search(r'_submitdone$|_submiterror$|[Cc]allback$', name):
+            return "callback"
         if name in evon or re.search(r'_[Oo]n[A-Za-z]', name):
             return "event"
         return "general"
 
-    buckets = {"init": [], "event": [], "general": []}
+    buckets = {"init": [], "event": [], "callback": [], "general": []}
     for i, f in enumerate(funcs):
         if removed[i]:
             continue
@@ -917,12 +939,13 @@ def rule4_structure(script, body, report):
             out.append(block)
         return out
 
-    # preamble/tail 에서 규칙4 경계 주석 제거(재실행 시 중복 방지 → 멱등)
-    preamble_clean = "\n".join(ln for ln in preamble.splitlines() if ln.strip() not in _RULE4_BOUNDARIES).rstrip("\n")
-    tail_clean = "\n".join(ln for ln in tail.splitlines() if ln.strip() not in _RULE4_BOUNDARIES).strip("\n")
+    # preamble/tail 에서 규칙4 경계 주석(구 한 줄·신 블록 헤더) 제거(재실행 시 중복 방지 → 멱등)
+    preamble_clean = _strip_section_headers(preamble).rstrip("\n")
+    tail_clean = _strip_section_headers(tail).strip("\n")
 
     parts = [preamble_clean]
-    for cat, header in (("init", _SEC_INIT), ("event", _SEC_EVENT), ("general", _SEC_GENERAL)):
+    for cat, header in (("init", _SEC2_INIT), ("event", _SEC3_EVENT),
+                        ("callback", _SEC4_CALLBACK), ("general", _SEC5_GENERAL)):
         blocks = emit(cat)
         if not blocks:
             continue
@@ -933,6 +956,7 @@ def rule4_structure(script, body, report):
     if tail_clean:
         result += tail_clean + "\n"
     report["rule4"] = {"init": len(buckets["init"]), "event": len(buckets["event"]),
+                       "callback": len(buckets["callback"]),
                        "general": len(buckets["general"]), "merged": merged}
     return result, body
 
@@ -1180,7 +1204,17 @@ def rule6_submission(head, body, script, report):
         if dynamic:
             judged.append((sid, _build_sbm_options(attrs, gridview)))
             continue
+        # async/await 순차 스타일 우선(code-convention.md) — submitErrorHandler 가 있으면
+        # 오류 흐름이 콜백 기반이므로 기존 콜백 스타일을 유지하고 단계 2 검토로 리포트한다.
+        awaitable = not attrs.get("ev:submiterror")
         parts = _sbm_option_parts(attrs, gridview)
+        if awaitable:
+            parts = [pt for pt in parts if not pt.startswith("submitDoneHandler")]
+            done_expr = _sbm_handler(attrs["ev:submitdone"]) if attrs.get("ev:submitdone") else ""
+            if done_expr and not re.match(r'^[A-Za-z_$][\w$.]*$', done_expr):
+                done_expr = ""   # 문자열 핸들러명 등은 직접 호출로 못 옮김 → TODO 로 대체
+        else:
+            report["judgment"].append("규칙6 %s: submitErrorHandler 존재 — 콜백 스타일 유지(단계2 검토)" % sid)
         for m in calls:
             ls = script.rfind("\n", 0, m.start()) + 1
             prefix = script[ls:m.start()]
@@ -1191,8 +1225,29 @@ def rule6_submission(head, body, script, report):
             block_used[bk] = cnt + 1
             body = ",\n".join(indent + "    " + pt for pt in parts)
             const_block = "%sconst %s = {\n%s\n%s};\n" % (indent, name, body, indent)
-            edits.append((ls, ls, const_block))                                   # 옵션 변수 선언 삽입
-            edits.append((m.start(), m.end(), "$c.sbm.executeDynamic(%s)" % name))  # 호출부 치환
+            _, le = _line_bounds(script, m.start())
+            suffix = script[m.end():le]
+            stmt = prefix.strip() == "" and re.match(r'^\s*;', suffix) is not None
+            if awaitable and stmt:
+                # 단독 문장: 라인 전체를 `const sbmRtn = await ...;` + 후처리(핸들러 직접 호출/TODO)로 교체
+                rtn = name.replace("sbmOptions", "sbmRtn")
+                rest = suffix.split(";", 1)[1]   # 세미콜론 뒤 꼬리(주석·개행) 보존
+                block = const_block + "\n%sconst %s = await $c.sbm.executeDynamic(%s);%s" % (indent, rtn, name, rest)
+                if not rest.endswith("\n"):
+                    block += "\n"
+                if done_expr:
+                    block += "%s%s(%s);\n" % (indent, done_expr, rtn)
+                else:
+                    block += "%s// TODO Stage2: %s 응답 처리 로직 작성 (구 submitDoneHandler 자리)\n" % (indent, rtn)
+                edits.append((ls, le, block))
+            elif awaitable:
+                # 표현식 내 호출: rtn 캡처 없이 await 만 부여(응답 사용 여부는 단계 2 검토)
+                edits.append((ls, ls, const_block))
+                edits.append((m.start(), m.end(), "await $c.sbm.executeDynamic(%s)" % name))
+                report["judgment"].append("규칙6 %s: 표현식 내 호출 — await 전환했으나 응답(rtn) 캡처 없음(단계2 검토)" % sid)
+            else:
+                edits.append((ls, ls, const_block))                                   # 옵션 변수 선언 삽입
+                edits.append((m.start(), m.end(), "$c.sbm.executeDynamic(%s)" % name))  # 호출부 치환
         converted.append(sid)
         del_spans.append((mo.start(), mo.end()))
 
@@ -1216,6 +1271,64 @@ def rule6_submission(head, body, script, report):
     for sid, opts in judged:
         report["judgment"].append("규칙6 수동 변환: %s (동적 action/속성) → sbmOptions: %s" % (sid, opts))
     return head, script
+
+
+def mark_async_functions(script, report):
+    """await 를 포함하는 function 정의에 async 키워드를 부여한다(멱등).
+    - 규칙 6/12/16(await executeDynamic)·규칙 17(await openPopup)이 만든 await 의 최내곽 함수가 대상.
+    - 화살표 함수는 탐지 대상이 아니다(레거시 소스는 function 위주) — 소속 함수를 못 찾으면 리포트.
+    - async 로 바뀐 함수는 반환값이 Promise 로 변하므로 호출부 await 필요 여부를 단계 2 검토로 리포트."""
+    mask = code_mask(script)
+    n = len(script)
+    funcs = []
+    for mo in re.finditer(r'\bfunction\b', script):
+        if not mask[mo.start()]:
+            continue
+        b = script.find("{", mo.end())
+        if b < 0:
+            continue
+        d, j = 0, b
+        while j < n:
+            if mask[j]:
+                if script[j] == "{":
+                    d += 1
+                elif script[j] == "}":
+                    d -= 1
+                    if d == 0:
+                        break
+            j += 1
+        funcs.append((mo.start(), b, j))
+
+    need, orphan = {}, 0
+    for am in re.finditer(r'\bawait\b', script):
+        if not mask[am.start()]:
+            continue
+        inner = None
+        for f in funcs:
+            if f[1] < am.start() < f[2] and (inner is None or f[1] > inner[1]):
+                inner = f
+        if inner is None:
+            orphan += 1
+        else:
+            need[inner[0]] = inner
+
+    marked, ins = [], []
+    for kw in sorted(need, reverse=True):
+        if re.search(r'\basync\s+$', script[:kw]):
+            continue   # 이미 async — 멱등
+        nm = re.search(r'scwin\.([\w$]+)\s*=\s*$', script[:kw])
+        marked.append("scwin." + nm.group(1) if nm else "(무명 함수)")
+        ins.append(kw)
+    for kw in ins:   # ins 는 이미 위치 역순 — 오프셋 보존
+        script = script[:kw] + "async " + script[kw:]
+
+    report["async_marked"] = marked
+    for name in marked:
+        if name.startswith("scwin."):
+            report["judgment"].append("async 전환: %s — 호출부에서 await 필요 여부 검토(단계2)" % name)
+    if orphan:
+        report["judgment"].append("await 소속 함수 탐지 실패 %d건(함수 밖/화살표 함수) — async 부여 수동 확인" % orphan)
+    return script
 
 
 def _replace_in_code(script, pattern, repl):
@@ -1283,24 +1396,34 @@ def _find_url_literal(expr, loose=False):
     return None
 
 
-def _dyn_options_block(indent, name, dc, action, ref=""):
-    """샘플 스타일 sbmOptions 선언 + executeDynamic 호출 블록을 생성(끝에 개행 포함).
-    ref 기본값은 "" (규칙 12). 규칙 16(trs)은 KeyValue 에서 추출한 데이터셋명을 넘긴다."""
+def _dyn_options_block(indent, name, dc, action, ref="", handler_defined=False):
+    """sbmOptions 선언 + async/await 순차 실행 블록을 생성(끝에 개행 포함).
+    - 콜백(submitDoneHandler) 대신 `const sbmRtn = await executeDynamic(...)` 순차 스타일을 우선한다
+      (code-convention.md — submitDoneHandler 를 넘기면 Promise 가 settle 되지 않으므로 옵션에서 제외).
+    - handler_defined=True(파일에 scwin.sbm_{dc}_submitdone 정의 존재)면 await 후 해당 함수를 직접
+      호출해 순차 실행을 보존하고, 없으면 TODO Stage2 주석을 남긴다.
+    - ref 기본값은 "" (규칙 12). 규칙 16(trs)은 KeyValue 에서 추출한 데이터셋명을 넘긴다."""
     parts = [
         'id : "sbm_%s"' % dc,
         'action : "%s"' % action,
         'ref : "%s"' % ref,
         'target : "%s=body.content"' % dc,
-        'submitDoneHandler : scwin.sbm_%s_submitdone' % dc,
         'isProcessMsg : false',
     ]
     inner = ",\n".join(indent + "    " + p for p in parts)
-    return ("%sconst %s = {\n%s\n%s};\n\n%s$c.sbm.executeDynamic(%s);\n"
-            % (indent, name, inner, indent, indent, name))
+    rtn = name.replace("sbmOptions", "sbmRtn")
+    out = ("%sconst %s = {\n%s\n%s};\n\n%sconst %s = await $c.sbm.executeDynamic(%s);\n"
+           % (indent, name, inner, indent, indent, rtn, name))
+    if handler_defined:
+        out += "%sscwin.sbm_%s_submitdone(%s);\n" % (indent, dc, rtn)
+    else:
+        out += "%s// TODO Stage2: %s 응답 처리 로직 작성 (구 submitDoneHandler 자리)\n" % (indent, rtn)
+    return out
 
 
 def rule12_dynamic_submission(script, report):
     depth = depth_array(script)
+    defined_fns = _defined_function_names(script)
 
     def block_range(pos):
         d = depth[pos]
@@ -1374,7 +1497,8 @@ def rule12_dynamic_submission(script, report):
         line = script[d_ls:d_le]
         indent = line[:len(line) - len(line.lstrip())]
         name = next_name(bk, mo.start())
-        edits[d_ls] = (d_le, _dyn_options_block(indent, name, dc, action))
+        edits[d_ls] = (d_le, _dyn_options_block(indent, name, dc, action,
+                                                handler_defined=("sbm_%s_submitdone" % dc) in defined_fns))
         # reset 라인 삭제
         add_del(pair["start"], pair["end"])
         # url-const 라인 + 그 아래 url 참조 주석(예: //alert(url);) 삭제
@@ -1497,6 +1621,7 @@ def _render_param_value(parts):
 
 def rule16_trs_submission(script, report):
     depth = depth_array(script)
+    defined_fns = _defined_function_names(script)
 
     def block_range(pos):
         d = depth[pos]
@@ -1552,7 +1677,8 @@ def rule16_trs_submission(script, report):
         line = script[p_ls:p_le]
         indent = line[:len(line) - len(line.lstrip())]
         name = next_name(bk, pm.start())
-        block = _dyn_options_block(indent, name, obj, action, ref=ref)
+        block = _dyn_options_block(indent, name, obj, action, ref=ref,
+                                   handler_defined=("sbm_%s_submitdone" % obj) in defined_fns)
         if prm:
             pairs = _params_to_pairs(prm.group(3).strip())
             cmt = [indent + "// [전환검토] %s.Parameters → 동적 파라미터(필요 시 sbmOptions 에 반영)" % obj,
@@ -1769,7 +1895,7 @@ def collect_judgment(script, head, body, report):
 
 # ---------- 파이프라인 ----------
 def convert(raw, filename):
-    report = {"rule1": "", "rule2": 0, "rule2_skip": [], "rule3": [], "rule4": None, "rule4_merge": None, "rule5a": 0, "rule5b": [], "rule5c": [], "rule5d": [], "rule6": {"converted": [], "deleted": 0}, "rule7": [], "rule7m": [], "rule7n": [], "rule8": {"const": 0, "let": 0}, "rule9": 0, "rule10": 0, "rule11": 0, "rule12": {"converted": []}, "rule13": [], "rule14": [], "rule15": [], "rule16": {"converted": [], "skipped": []}, "rule17": {"converted": [], "skipped": []}, "rule20": [], "rule21": [], "rule23": [], "wcraft": 0, "judgment": []}
+    report = {"rule1": "", "rule2": 0, "rule2_skip": [], "rule3": [], "rule4": None, "rule4_merge": None, "rule5a": 0, "rule5b": [], "rule5c": [], "rule5d": [], "rule6": {"converted": [], "deleted": 0}, "rule7": [], "rule7m": [], "rule7n": [], "rule8": {"const": 0, "let": 0}, "rule9": 0, "rule10": 0, "rule11": 0, "rule12": {"converted": []}, "rule13": [], "rule14": [], "rule15": [], "rule16": {"converted": [], "skipped": []}, "rule17": {"converted": [], "skipped": []}, "rule20": [], "rule21": [], "rule23": [], "async_marked": [], "wcraft": 0, "judgment": []}
     reg = split_regions(raw)
     if reg is None:
         raise ValueError("SCRIPT(CDATA) 영역을 찾지 못했습니다.")
@@ -1784,6 +1910,7 @@ def convert(raw, filename):
     s = rule12_dynamic_submission(s, report)
     s = rule16_trs_submission(s, report)
     s = rule17_create_dialog_frame(s, report)
+    s = mark_async_functions(s, report)   # 규칙 6/12/16/17 이 만든 await 의 소속 함수 async 부여
     s = rule9_remove_obsolete(s, report)
     s = rule11_remove_include(s, report)
     s = rule8_var(s, report)
@@ -1832,8 +1959,8 @@ def print_report(rep, filename):
         print("   -", s)
     if rep["rule4"]:
         r4 = rep["rule4"]
-        print("규칙4 재정렬 : init %d, event %d, 일반 %d%s" % (
-            r4["init"], r4["event"], r4["general"],
+        print("규칙4 재정렬 : init %d, event %d, callback %d, 일반 %d%s" % (
+            r4["init"], r4["event"], r4.get("callback", 0), r4["general"],
             (" + gform_onload 병합" if r4["merged"] else "")))
     else:
         print("규칙4 재정렬 : 보류/미적용")
@@ -1873,6 +2000,9 @@ def print_report(rep, filename):
         print("   -", s)
     print("규칙17 CreateDialogFrame → openPopup :", len(rep["rule17"]["converted"]), "건")
     for s in rep["rule17"]["converted"]:
+        print("   -", s)
+    print("async 함수 전환(await 포함 함수) :", len(rep.get("async_marked", [])), "건")
+    for s in rep.get("async_marked", []):
         print("   -", s)
     print("규칙13 scwin.fn_* → camelCase 정규화 :", len(rep["rule13"]), "건")
     for s in rep["rule13"]:

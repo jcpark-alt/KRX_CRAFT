@@ -11,6 +11,7 @@ WebSquare XML 소스를 GCC 공통함수 체계·표준 JS 규칙으로 자동 �
 | [substitution_map.md](substitution_map.md) | **레거시 → gcc 공통함수 치환 매핑표**(`$c.*` namespace별 AS-IS/TO-BE) |
 | [conversion_pipeline.md](conversion_pipeline.md) | **하이브리드 변환 파이프라인**(Python 기계 치환 → Claude Code 보강 2단계) |
 | [dynamic_submission_guide.md](dynamic_submission_guide.md) | **URL/DataID 패턴 기반 동적 Submission 변환 지침**(규칙 12 상세) |
+| [code-convention.md](../../docs/code-convention/code-convention.md) | **업무 화면 5단계 정형화 구조 컨벤션**(규칙 2·4 구조 규약 + 서브미션 async/await 순차 실행 원칙) |
 
 ---
 

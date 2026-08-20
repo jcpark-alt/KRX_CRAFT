@@ -139,9 +139,9 @@ WebSquare XML 은 `head → script(CDATA) → body` 구조이며, 영역마다 �
 | 1 | SCRIPT | 파일명 변수 `scwin.vScrenID = "{파일명}";` 최상단 삽입 |
 | 2 | SCRIPT | 전역 리터럴 변수를 `// 전역 변수 선언` 구역으로 이동 |
 | 3 | BODY+SCRIPT | 이벤트 핸들러명 소문자화 + `ev:on*` ↔ 스크립트 함수 동시 동기화 |
-| 4 | SCRIPT | 코드 재배치(전역 → init → 컴포넌트 이벤트 → 일반), `gform_onload`→`onpageload` 병합 |
+| 4 | SCRIPT | **5단계 정형화 구조** 재배치(1 선언 → 2 초기화 → 3 이벤트 → 4 서브미션 콜백 → 5 일반) + 블록 헤더, `gform_onload`→`onpageload` 병합 |
 | 5 | SCRIPT | `==`→`===`, `.value=`→`.setValue()`, `.src=`→`.setBackgroundImage()`, `getTotalRow()`→`getRowCount()` |
-| 6 | HEAD+SCRIPT | `<xf:submission>` + `execute(id)` → `sbmOptions` + `executeDynamic()` + 노드 삭제 |
+| 6 | HEAD+SCRIPT | `<xf:submission>` + `execute(id)` → `sbmOptions` + `const sbmRtn = await executeDynamic()`(async/await 순차) + 노드 삭제 |
 | 7 | SCRIPT | 태그 없는 레거시 함수 1:1 치환 `fn_Trim(`→`$c.str.trim(` |
 | 7m | SCRIPT | 레거시 메서드 `{obj}.CloseFrame()` → `$c.win.closePopup()` (수신 객체 제거) |
 | 7n | SCRIPT | 같은 ns 이름 정규화 `$c.stf.fn_setFromToDate(`→`$c.stf.setFromToDate(` |
@@ -149,11 +149,11 @@ WebSquare XML 은 `head → script(CDATA) → body` 구조이며, 영역마다 �
 | 9 | SCRIPT | `$c.cm.ShowWin/CloseWin/ShowNoData` 등 불필요 단독 호출 삭제 |
 | 10 | BODY | `<xf:events>…</xf:events>` 블록 삭제(규칙 3 로 대체됨) |
 | 11 | SCRIPT | `include(...)` 라인 삭제 (gcc 는 `$c.*` 로 제공) |
-| 12 | SCRIPT | `{DC}.DataID=url` + `{DC}.reset()` → `sbmOptions` + `executeDynamic()` |
+| 12 | SCRIPT | `{DC}.DataID=url` + `{DC}.reset()` → `sbmOptions` + `await executeDynamic()`(순차) |
 | 13 | HEAD+SCRIPT+BODY | `scwin.fn_*` 정의 정규화(`fn_` 제거 + camelCase) + 정의·호출·publicInfo 동기화 |
 | 14 | SCRIPT | `$c.ns.showObj/getObjectValue/setObjectValue/removeRow` → `.show()/.getValue()/.setValue()/.removeRows()` |
 | 15 | SCRIPT | `$c.ns.alert_error` → `$c.win.alert` |
-| 16 | SCRIPT | Gauce trs `Action/KeyValue/Parameters/Post()` → `sbmOptions` + `executeDynamic()` |
+| 16 | SCRIPT | Gauce trs `Action/KeyValue/Parameters/Post()` → `sbmOptions` + `await executeDynamic()`(순차) |
 | 17 | SCRIPT | `CreateDialogFrame(8인자)` → `$c.win.openPopup(url, options, data)` (window→browserPopup / 그 외→pageFramePopup) |
 | 18 | SCRIPT | `$c.ns.getSysDate/getCookie` 등 → `$c.date/util.*` (네임스페이스 재배치) |
 | 19 | SCRIPT+BODY | (단계 2) 원시 JSP/jQuery DOM → WebSquare 컴포넌트 재설계 |
