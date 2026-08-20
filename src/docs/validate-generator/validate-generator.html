@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WebSquare 유효성 검증 옵션 생성기 (validate-generator)</title>
+<style>
+:root{
+  --bg:#f0f4f8; --card:#ffffff; --text:#1f2933; --h-strong:#243b53; --h-mid:#486581;
+  --muted:#627d98; --hint:#9aa5b1; --border:#e4e7eb; --border-input:#cbd2d9;
+  --primary:#2563eb; --primary-hover:#1d4ed8; --primary-soft:#eef2f7; --primary-soft-hover:#dde5ee;
+  --result-bg:#0f172a; --result-text:#e2e8f0; --toast-bg:#102a43; --error:#b91c1c; --code-bg:#f7f9fc;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);line-height:1.5;font-size:13px;
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Malgun Gothic',sans-serif;}
+.wrap{max-width:1500px;margin:0 auto;padding:24px 20px 48px}
+h1{font-size:20px;color:var(--h-strong);margin:0 0 4px}
+.desc{color:var(--h-mid);margin:0 0 20px}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,916px);gap:20px;align-items:start}
+@media (max-width:860px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:18px}
+.card h2{font-size:14px;color:var(--h-strong);margin:0 0 14px}
+.field{margin-bottom:16px}
+.field label{display:block;font-size:12px;font-weight:700;color:var(--h-mid);margin-bottom:6px}
+.hint{font-size:11px;color:var(--hint);margin-top:4px}
+textarea,input[type=text],input[type=number],select{
+  border:1px solid var(--border-input);border-radius:8px;padding:11px;width:100%;
+  font-family:Consolas,'D2Coding',monospace;font-size:13px;color:var(--text);background:#fff}
+textarea{resize:vertical}
+#srcText{min-height:280px}
+#result{background:var(--result-bg);color:var(--result-text);border:none;min-height:280px}
+input[type=file]{font-size:12px;color:var(--muted)}
+.radios{display:flex;gap:8px}
+.radios label{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;margin:0;
+  border:1px solid var(--border-input);border-radius:8px;padding:9px 6px;cursor:pointer;
+  font-size:12px;font-weight:700;color:var(--h-mid)}
+.radios label:hover{background:var(--code-bg)}
+input[type=radio],input[type=checkbox]{accent-color:var(--primary)}
+.btn{border:none;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer}
+.btn-primary{background:var(--primary);color:#fff;width:100%}
+.btn-primary:hover{background:var(--primary-hover)}
+.btn-ghost{background:var(--primary-soft);color:var(--h-strong)}
+.btn-ghost:hover{background:var(--primary-soft-hover)}
+.row2{display:flex;gap:8px;align-items:center}
+.row2 select{flex:1}
+.chk{display:flex;gap:16px;flex-wrap:wrap}
+.chk label{display:flex;align-items:center;gap:6px;margin:0;font-size:12px;font-weight:700;color:var(--h-mid)}
+.tblwrap{overflow-x:auto;border:1px solid var(--border);border-radius:8px;margin-bottom:12px}
+table{border-collapse:collapse;width:100%;font-size:12px;white-space:nowrap}
+th,td{border-bottom:1px solid var(--border);padding:6px 8px;text-align:left;vertical-align:middle}
+th{background:var(--code-bg);color:var(--h-mid);font-size:11px;position:sticky;top:0}
+td input[type=text],td input[type=number],td select{padding:5px 7px;font-size:12px;min-width:64px}
+td .w-name{min-width:110px} td .w-char{min-width:88px}
+.fid{font-family:Consolas,'D2Coding',monospace;color:var(--primary);font-weight:700}
+.adv{display:none}
+table.show-adv .adv{display:table-cell}
+.meta{font-size:11px;color:var(--hint);margin:6px 0 10px}
+details{margin-top:14px;border:1px solid var(--border);border-radius:8px;padding:10px 12px}
+summary{cursor:pointer;font-size:12px;font-weight:700;color:var(--h-mid)}
+details pre{background:var(--code-bg);border-radius:8px;padding:10px;font-size:11px;overflow-x:auto;
+  font-family:Consolas,'D2Coding',monospace}
+.result-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.result-head h2{margin:0}
+.toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,16px);opacity:0;pointer-events:none;
+  background:var(--toast-bg);color:#fff;border-radius:24px;padding:10px 22px;font-size:13px;font-weight:700;
+  transition:all .25s ease}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.toast.error{background:var(--error)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>WebSquare 유효성 검증 옵션 생성기</h1>
+  <p class="desc">화면 XML 을 분석해 <code>$c.validate.validateDataCollect</code> 의 <code>options</code> 객체와 호출 코드를 생성합니다. (dataMap key · gridView 연결 dataList 컬럼 · <code>ref="data:"</code> 컴포넌트 자동 추출)</p>
+
+  <div class="grid">
+    <!-- ============================ 입력 카드 ============================ -->
+    <section class="card" id="inputCard">
+      <h2>1. 화면 XML 입력</h2>
+      <div class="field">
+        <label for="srcFile">XML 파일 선택</label>
+        <input type="file" id="srcFile" accept=".xml">
+      </div>
+      <div class="field">
+        <label for="srcText">또는 XML 붙여넣기</label>
+        <textarea id="srcText" placeholder="<w2:dataMap id=&quot;dma_Req&quot;> ... 화면 XML 전체를 붙여넣으세요"></textarea>
+      </div>
+      <button class="btn btn-primary" id="btnParse">분석</button>
+
+      <div id="targetArea" style="display:none">
+        <h2 style="margin-top:20px">2. 검증 대상 선택</h2>
+        <div class="field">
+          <label for="targetSel">검증 대상 (validateObj)</label>
+          <div class="row2"><select id="targetSel"></select></div>
+          <input type="text" id="targetCustom" placeholder="컨테이너/그리드 id 직접 입력 (예: grp_search)" style="display:none;margin-top:8px">
+          <div class="hint" id="targetHint"></div>
+        </div>
+
+        <h2>3. 공통 옵션</h2>
+        <div class="field">
+          <label>validateType — 실패 표시 방식</label>
+          <div class="radios">
+            <label><input type="radio" name="vType" value="alert" checked>alert</label>
+            <label><input type="radio" name="vType" value="mark">mark</label>
+            <label><input type="radio" name="vType" value="all">all</label>
+          </div>
+        </div>
+        <div class="field">
+          <label>checkType — 검사 진행 방식</label>
+          <div class="radios">
+            <label><input type="radio" name="cType" value="single" checked>single (첫 실패 시 중단)</label>
+            <label><input type="radio" name="cType" value="multi">multi (전체 검사)</label>
+          </div>
+        </div>
+        <div class="field">
+          <div class="chk">
+            <label><input type="checkbox" id="optFocus" checked>focus (실패 항목 포커스)</label>
+            <label><input type="checkbox" id="optEdit" checked>editMode</label>
+            <label><input type="checkbox" id="optAdv">고급 규칙 열 표시</label>
+          </div>
+          <div class="hint">focus/editMode 는 기본값(true)과 다를 때만 코드에 출력됩니다.</div>
+        </div>
+      </div>
+
+      <details>
+        <summary>규칙 값 안내 (validateDataCollect JSDoc 기준)</summary>
+        <pre>required     : 필수 입력            allowChar  : "0-9"(정수) · "0-9."(실수) · "a-zA-Z"
+ignoreChar   : 입력 불가 문자        min/maxLength : 최소/최대 문자수
+num          : n(숫자)·i(정수)·f(실수)
+format       : email·date·phone·mobilePhone·bizNum·birth
+fromNum/toNum: 최소/최대 입력 숫자
+[고급] comparelength(문자수 비교) · min/maxLengthB(byte) · maxLengthF("10.2" 정수+소수 자릿수)
+※ gridView 는 입력 허용문자/자릿수 등을 Column 속성으로도 설정 가능 — 본 도구의 options 와 병행 시 중복 주의</pre>
+      </details>
+    </section>
+
+    <!-- ============================ 결과 카드 ============================ -->
+    <section class="card">
+      <div class="result-head">
+        <h2>필드 규칙 · 생성 결과</h2>
+        <div>
+          <button class="btn btn-ghost" id="btnGen">코드 생성</button>
+          <button class="btn btn-ghost" id="btnCopy">복사</button>
+        </div>
+      </div>
+      <div class="meta" id="fieldMeta">XML 을 분석하면 추출된 필드 목록이 표시됩니다.</div>
+      <div class="tblwrap" id="tblWrap" style="display:none">
+        <table id="fieldTbl">
+          <thead>
+            <tr>
+              <th>ID</th><th>name(라벨)</th><th>required</th><th>allowChar</th><th>ignoreChar</th>
+              <th>minLen</th><th>maxLen</th><th>num</th><th>format</th><th>fromNum</th><th>toNum</th>
+              <th class="adv">compareLen</th><th class="adv">minLenB</th><th class="adv">maxLenB</th><th class="adv">maxLenF</th>
+            </tr>
+          </thead>
+          <tbody id="fieldRows"></tbody>
+        </table>
+      </div>
+      <textarea id="result" readonly spellcheck="false" placeholder="// 필드 규칙 입력 후 [코드 생성]"></textarea>
+    </section>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<!-- ==================== 순수 로직 (DOM 미사용 — 테스트 대상) ==================== -->
+<script id="vg-core">
+var VG = (function () {
+    "use strict";
+
+    function attrsOf(tag) {
+        var o = {};
+        tag.replace(/([\w:.-]+)\s*=\s*"([^"]*)"/g, function (m, k, v) { o[k] = v; return m; });
+        return o;
+    }
+
+    function stripCdata(xml) {
+        // 스크립트(CDATA) 내부 문자열이 마크업 추출에 섞이지 않게 제거
+        return String(xml).replace(/<!\[CDATA\[[\s\S]*?\]\]>/g, "");
+    }
+
+    function collectBlocks(xml, tagName) {
+        // <tagName ...> ... </tagName> 블록 목록 (self-closing 미대상 — dataMap/dataList 용)
+        var re = new RegExp("<" + tagName + "\\b[^>]*>[\\s\\S]*?</" + tagName + ">", "g");
+        return xml.match(re) || [];
+    }
+
+    function collectTags(xml, tagName) {
+        var re = new RegExp("<" + tagName + "\\b[^>]*>", "g");
+        return (xml.match(re) || []).map(attrsOf);
+    }
+
+    // ---------- Phase 1 : XML 파싱 ----------
+    function parse(xmlText) {
+        var xml = stripCdata(xmlText);
+
+        var dataMaps = collectBlocks(xml, "w2:dataMap").map(function (b) {
+            var a = attrsOf(b.split(">", 1)[0] + ">");
+            return { id: a.id || "", keys: collectTags(b, "w2:key").map(function (k) {
+                return { id: k.id || "", name: k.name || "" };
+            }).filter(function (k) { return k.id; }) };
+        }).filter(function (d) { return d.id; });
+
+        var dataLists = collectBlocks(xml, "w2:dataList").map(function (b) {
+            var a = attrsOf(b.split(">", 1)[0] + ">");
+            return { id: a.id || "", cols: collectTags(b, "w2:column").map(function (c) {
+                return { id: c.id || "", name: c.name || "" };
+            }).filter(function (c) { return c.id; }) };
+        }).filter(function (d) { return d.id; });
+
+        var gridViews = collectTags(xml, "w2:gridView").map(function (a) {
+            return { id: a.id || "", dataList: (a.dataList || "").replace(/^data:/, "") };
+        });
+
+        // ref="data:..." 입력 컴포넌트 (중복 id 제거)
+        var refComps = [], seen = {};
+        var re = /<([\w]+:[\w-]+)\b[^>]*\bref="data:([^"]+)"[^>]*>/g, mo;
+        while ((mo = re.exec(xml)) !== null) {
+            var a = attrsOf(mo[0]);
+            if (!a.id || seen[a.id]) { continue; }
+            seen[a.id] = true;
+            refComps.push({ id: a.id, tag: mo[1], ref: mo[2] });
+        }
+
+        // ref 컴포넌트 라벨: ref 가 가리키는 dataMap key 의 name 으로 해석
+        var keyName = {};
+        dataMaps.forEach(function (d) {
+            d.keys.forEach(function (k) { keyName[d.id + "." + k.id] = k.name; });
+        });
+        refComps.forEach(function (c) { c.name = keyName[c.ref] || ""; });
+
+        return { dataMaps: dataMaps, dataLists: dataLists, gridViews: gridViews, refComps: refComps };
+    }
+
+    // ---------- Phase 3 : options 코드 생성 ----------
+    var NUM_RE = /^-?\d+(\.\d+)?$/;
+    var IDENT_RE = /^[A-Za-z_$][\w$]*$/;
+    // 출력 순서 — gcc JSDoc 예제 규약(name 은 마지막)
+    var RULE_ORDER = ["required", "allowChar", "ignoreChar", "minLength", "maxLength", "num", "format",
+                      "fromNum", "toNum", "comparelength", "minLengthB", "maxLengthB", "maxLengthF", "name"];
+    var STR_RULES = { allowChar: 1, ignoreChar: 1, num: 1, format: 1, name: 1 };
+
+    function jsStr(v) { return '"' + String(v).replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"'; }
+
+    function ruleVal(key, v) {
+        if (key === "required") { return "true"; }
+        if (STR_RULES[key]) { return jsStr(v); }
+        return NUM_RE.test(String(v).trim()) ? String(v).trim() : jsStr(v);
+    }
+
+    function buildCode(common, fields, targetId) {
+        var lines = ["const options = {"];
+        lines.push('    validateType : ' + jsStr(common.validateType) + ', // alert|mark|all');
+        lines.push('    checkType : ' + jsStr(common.checkType) + ', // single|multi');
+        if (common.focus === false) { lines.push("    focus : false,"); }
+        if (common.editMode === false) { lines.push("    editMode : false,"); }
+        lines.push("    fields : {");
+
+        var frows = fields.map(function (f) {
+            var parts = [];
+            RULE_ORDER.forEach(function (key) {
+                var v = f.rules[key];
+                if (v === undefined || v === null || v === "" || v === false) { return; }
+                parts.push(key + " : " + ruleVal(key, v));
+            });
+            var fkey = IDENT_RE.test(f.id) ? f.id : jsStr(f.id);
+            return "        " + fkey + " : { " + parts.join(", ") + " }";
+        });
+        lines.push(frows.join(",\n"));
+        lines.push("    }");
+        lines.push("};");
+        lines.push("");
+        var tgt = targetId && IDENT_RE.test(targetId) ? targetId : (targetId ? jsStr(targetId) : "/* TODO: 검증 대상 id */");
+        lines.push("const validateResult = await $c.validate.validateDataCollect(" + tgt + ", options);");
+        lines.push("if (!validateResult) {");
+        lines.push("    return;");
+        lines.push("}");
+        return lines.join("\n");
+    }
+
+    return { parse: parse, buildCode: buildCode, _attrsOf: attrsOf };
+})();
+if (typeof module !== "undefined" && module.exports) { module.exports = VG; }
+</script>
+
+<!-- ==================== DOM 연결 ==================== -->
+<script>
+(function () {
+    "use strict";
+    var $ = function (id) { return document.getElementById(id); };
+    var parsed = null;
+    var targets = [];   // {label, targetId, fields:[{id,name}], custom}
+
+    function toast(msg, isErr) {
+        var t = $("toast");
+        t.textContent = msg;
+        t.className = "toast show" + (isErr ? " error" : "");
+        clearTimeout(t._tm);
+        t._tm = setTimeout(function () { t.className = "toast"; }, 1800);
+    }
+
+    // ---- 입력 ----
+    $("srcFile").addEventListener("change", function () {
+        var f = this.files && this.files[0];
+        if (!f) { return; }
+        var r = new FileReader();
+        r.onload = function () { $("srcText").value = r.result; toast("파일을 불러왔습니다"); };
+        r.readAsText(f, "utf-8");
+    });
+
+    // ---- 분석 ----
+    $("btnParse").addEventListener("click", function () {
+        var xml = $("srcText").value;
+        if (!xml.trim()) { toast("XML 을 입력하세요", true); return; }
+        parsed = VG.parse(xml);
+        targets = [];
+        parsed.dataMaps.forEach(function (d) {
+            targets.push({ label: "dataMap : " + d.id + " (key " + d.keys.length + "개)", targetId: d.id, fields: d.keys });
+        });
+        parsed.gridViews.forEach(function (g) {
+            var dl = null;
+            parsed.dataLists.forEach(function (d) { if (d.id === g.dataList) { dl = d; } });
+            if (!dl) { return; }
+            targets.push({ label: "gridView : " + (g.id || "(id 없음)") + " → " + dl.id + " (컬럼 " + dl.cols.length + "개)",
+                           targetId: g.id, fields: dl.cols, needId: !g.id });
+        });
+        if (parsed.refComps.length) {
+            targets.push({ label: "ref 컴포넌트 그룹 (" + parsed.refComps.length + "개) — 컨테이너 id 직접 입력",
+                           targetId: "", fields: parsed.refComps, custom: true });
+        }
+        if (!targets.length) {
+            toast("추출된 dataMap/gridView/ref 컴포넌트가 없습니다", true);
+            $("targetArea").style.display = "none";
+            $("tblWrap").style.display = "none";
+            $("fieldMeta").textContent = "추출 결과 0건 — WebSquare 화면 XML 인지 확인하세요.";
+            return;
+        }
+        var sel = $("targetSel");
+        sel.innerHTML = "";
+        targets.forEach(function (t, i) {
+            var o = document.createElement("option");
+            o.value = i; o.textContent = t.label;
+            sel.appendChild(o);
+        });
+        $("targetArea").style.display = "";
+        renderTarget(0);
+        toast("분석 완료 — 대상 " + targets.length + "건");
+    });
+
+    $("targetSel").addEventListener("change", function () { renderTarget(+this.value); });
+    $("optAdv").addEventListener("change", function () {
+        $("fieldTbl").className = this.checked ? "show-adv" : "";
+    });
+
+    function renderTarget(idx) {
+        var t = targets[idx];
+        $("targetCustom").style.display = (t.custom || t.needId) ? "" : "none";
+        $("targetHint").textContent = t.custom
+            ? "그룹 검증: 필드 key 는 컴포넌트 ID, 검증 대상은 이를 감싼 컨테이너(grp_*) id 입니다."
+            : (t.needId ? "gridView 에 id 가 없습니다 — 실제 화면의 그리드 id 를 입력하세요." : "");
+        var tb = $("fieldRows");
+        tb.innerHTML = "";
+        t.fields.forEach(function (f, i) {
+            var tr = document.createElement("tr");
+            tr.innerHTML =
+                '<td class="fid">' + f.id + '</td>' +
+                '<td><input type="text" class="w-name" data-k="name" value="' + (f.name || "").replace(/"/g, "&quot;") + '"></td>' +
+                '<td style="text-align:center"><input type="checkbox" data-k="required"></td>' +
+                '<td><input type="text" class="w-char" data-k="allowChar" list="vgAllow"></td>' +
+                '<td><input type="text" class="w-char" data-k="ignoreChar"></td>' +
+                '<td><input type="number" data-k="minLength"></td>' +
+                '<td><input type="number" data-k="maxLength"></td>' +
+                '<td><select data-k="num"><option value=""></option><option>n</option><option>i</option><option>f</option></select></td>' +
+                '<td><select data-k="format"><option value=""></option><option>email</option><option>date</option><option>phone</option>' +
+                    '<option>mobilePhone</option><option>bizNum</option><option>birth</option></select></td>' +
+                '<td><input type="number" data-k="fromNum"></td>' +
+                '<td><input type="number" data-k="toNum"></td>' +
+                '<td class="adv"><input type="number" data-k="comparelength"></td>' +
+                '<td class="adv"><input type="number" data-k="minLengthB"></td>' +
+                '<td class="adv"><input type="number" data-k="maxLengthB"></td>' +
+                '<td class="adv"><input type="text" data-k="maxLengthF" placeholder="10.2"></td>';
+            tr.dataset.fid = f.id;
+            tb.appendChild(tr);
+        });
+        $("fieldTbl").className = $("optAdv").checked ? "show-adv" : "";
+        $("tblWrap").style.display = "";
+        $("fieldMeta").textContent = t.label + " — 규칙을 입력한 필드만 코드에 포함됩니다 (name 만 입력된 필드는 제외).";
+    }
+
+    // ---- 코드 생성 ----
+    $("btnGen").addEventListener("click", function () {
+        if (!targets.length) { toast("먼저 XML 을 분석하세요", true); return; }
+        var t = targets[+$("targetSel").value];
+        var fields = [];
+        var rows = $("fieldRows").children;
+        for (var i = 0; i < rows.length; i++) {
+            var rules = {}, hasRule = false;
+            Array.prototype.forEach.call(rows[i].querySelectorAll("[data-k]"), function (el) {
+                var k = el.getAttribute("data-k");
+                var v = el.type === "checkbox" ? el.checked : el.value.trim();
+                if (v === "" || v === false) { return; }
+                rules[k] = v;
+                if (k !== "name") { hasRule = true; }
+            });
+            if (hasRule) { fields.push({ id: rows[i].dataset.fid, rules: rules }); }
+        }
+        if (!fields.length) { toast("규칙이 입력된 필드가 없습니다", true); return; }
+        var common = {
+            validateType: document.querySelector('input[name=vType]:checked').value,
+            checkType: document.querySelector('input[name=cType]:checked').value,
+            focus: $("optFocus").checked,
+            editMode: $("optEdit").checked
+        };
+        var targetId = (t.custom || t.needId) ? $("targetCustom").value.trim() : t.targetId;
+        var code = VG.buildCode(common, fields, targetId);
+        var r = $("result");
+        r.value = code;
+        r.style.height = "auto";
+        r.style.height = Math.max(280, r.scrollHeight + 4) + "px";
+        toast("코드 생성 완료 — 필드 " + fields.length + "건");
+    });
+
+    // ---- 복사 ----
+    $("btnCopy").addEventListener("click", function () {
+        var v = $("result").value;
+        if (!v) { toast("생성된 코드가 없습니다", true); return; }
+        function fallback() {
+            $("result").select();
+            try { document.execCommand("copy"); toast("클립보드에 복사했습니다"); }
+            catch (e) { toast("복사 실패 — 수동으로 복사하세요", true); }
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(v).then(function () { toast("클립보드에 복사했습니다"); }, fallback);
+        } else { fallback(); }
+    });
+})();
+</script>
+<datalist id="vgAllow">
+  <option value="0-9"></option><option value="0-9."></option><option value="a-zA-Z"></option>
+  <option value="a-zA-Z0-9"></option><option value="가-힣"></option>
+</datalist>
+</body>
+</html>
