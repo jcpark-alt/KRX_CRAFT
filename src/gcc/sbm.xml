@@ -1146,6 +1146,28 @@ scwin.getMessageCode = function (code) {
 
 /**
  * @method
+ * @name __removeGridRowNumClass
+ * @description 그리드에 부여된 행 수 제한 클래스(row{n}, h{n}_row{n})를 모두 제거한다.
+ *  (maxRowNum "all" 전환 시·라인 수 변경 시 기존 행 수 클래스 정리용)
+ * @param {Object} gridObj GridView 객체
+ * @hidden Y
+ * @exception
+ */
+scwin.__removeGridRowNumClass = function (gridObj) {
+    try {
+        const classes = Array.prototype.slice.call(gridObj.render.classList);
+        classes.forEach(function (cls) {
+            if (/^(h\d+_)?row\d+$/.test(cls)) {
+                gridObj.removeClass(cls);
+            }
+        });
+    } catch (ex) {
+        console.error(ex);
+    }
+};
+
+/**
+ * @method
  * @name setPagingInfo
  * @description 페이징 옵션(pagingInfo)을 기본값과 병합하고, 조회 DataMap(inData) 에
  *  currentPage / recordCountPerPage 컬럼을 설정한다.
@@ -1161,7 +1183,7 @@ scwin.getMessageCode = function (code) {
 const pagingInfo = {
     pageType : "P",                 // S/P/A
 	rowNumVisble : "grdMain|asc",	// gridView에 rowNumVisible 값 설정(asc,desc 옵션)
-	maxRowNum : 50,			  		// gridView에 최대 visibleRowNum 값 설정	
+	maxRowNum : 50,			  		// gridView에 최대 visibleRowNum 값 설정 ("all" 지정 시 상한 없이 전체 행 표시)
     pageListId : "pglList",         // 페이지 리스트 아이디
     pageFunction : "scwin.fnSrch",  // 페이징 처리 함수
     currentPage : 1,                // 현재 페이지
@@ -1198,7 +1220,7 @@ scwin.setPagingInfo = function (pagingInfo, inData, totalCnt) {
     const pagingDefault = {
         pageType : "P",           // S/P/A
 		rowNumVisble : "",  	  // gridView에 rowNumVisible 값 설정
-		maxRowNum : 50,			  // gridView에 최대 visibleRowNum 값 설정
+		maxRowNum : 50,			  // gridView에 최대 visibleRowNum 값 설정 ("all" 지정 시 전체 행 표시)
         pageFunction : "",        // 페이징 처리 하는 함수
         currentPage : 1,          // 현재 페이지
         pageListId : "",          // 페이지 리스트 아이디
@@ -1228,6 +1250,16 @@ scwin.setPagingInfo = function (pagingInfo, inData, totalCnt) {
 		}
 	}
 
+	// maxRowNum 이 "all" 이면 행 수 제한 클래스(row{n}/h{n}_row{n})를 모두 제거하고 그리드를 전체 행
+	// 표시로 전환한다. (엔진 setVisibleRowNum 은 "all" 을 거부하므로 $c.util.setGridVisibleRowNum 사용.
+	// 이미 "all" 이면 재도색 생략)
+	if (gridObj && pagingInfo.maxRowNum === "all") {
+		scwin.__removeGridRowNumClass(gridObj);
+		if (gridObj.options.visibleRowNum !== "all") {
+			$c.util.setGridVisibleRowNum(gridObj, "all");
+		}
+	}
+
 	// 페이지 라인 수 컴포넌트 아이디
 	if (!$c.util.isEmpty(pagingInfo.recordPerPageId) && gridObj) {
 		let recordPerPageObj = null;
@@ -1243,23 +1275,29 @@ scwin.setPagingInfo = function (pagingInfo, inData, totalCnt) {
 
 		recordPerPageObj.unbind("onviewchange");
 		recordPerPageObj.bind("onviewchange", function (info) {
-			gridObj.setVisibleRowNum((Number.parseInt(info.newValue) > pagingInfo.maxRowNum) ? pagingInfo.maxRowNum : info.newValue);
+			// 표시 행 수 결정: maxRowNum "all" 은 상한 없이 전체 행, 선택값 "all" 은 maxRowNum 을 상한으로 적용
+			let visibleRowNum;
+			if (pagingInfo.maxRowNum === "all") {
+				visibleRowNum = "all";
+			} else if (info.newValue === "all") {
+				visibleRowNum = pagingInfo.maxRowNum;
+			} else {
+				visibleRowNum = (Number.parseInt(info.newValue) > pagingInfo.maxRowNum) ? pagingInfo.maxRowNum : info.newValue;
+			}
+			// 엔진 setVisibleRowNum 은 "all" 을 거부하므로 공통함수로 적용한다. (숫자는 엔진 API 위임)
+			$c.util.setGridVisibleRowNum(gridObj, visibleRowNum);
 
-			const headerRowCount = gridObj.htmlInfo.head.rowArr.length;
-			const rowClassName = (headerRowCount > 1) ? `h${headerRowCount}_row` : "row";
-
-			const classArr = gridObj.render.classList;
-			classArr.forEach(cls => {
-				if (cls.startsWith(rowClassName)) {
-					gridObj.removeClass(cls);
-				}
-			});
-
-			gridObj.addClass((Number.parseInt(info.newValue) > pagingInfo.maxRowNum) ? `${rowClassName}${pagingInfo.maxRowNum}` : `${rowClassName}${info.newValue}`);
+			// 기존 행 수 제한 클래스를 모두 제거하고, 숫자일 때만 새로 부여한다. ("all" 은 전체 표시라 미부여)
+			scwin.__removeGridRowNumClass(gridObj);
+			if (visibleRowNum !== "all") {
+				const headerRowCount = gridObj.htmlInfo.head.rowArr.length;
+				const rowClassName = (headerRowCount > 1) ? `h${headerRowCount}_row` : "row";
+				gridObj.addClass(`${rowClassName}${visibleRowNum}`);
+			}
 
 			const procFuncArr = pagingInfo.pageFunction.split(".");
 			scopeScwin[procFuncArr[1]](1, info.oldSelectedIndex);
-		});	
+		});
 	}	
 
     // 조회 Map 키를 inData 첫 토큰에서 추출 (dataM=dataViewM → dataViewM)
