@@ -138,6 +138,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
   - dataMap/dataList 내부 id 는 컬렉션별, gridView 내부 `<w2:column>` 은 그리드별 네임스페이스(바인딩 dataList 컬럼 id 일치 = 정상 매핑) — 전문 필드명 재사용·그리드 컬럼 매핑 오탐 해소
   - 새 규칙은 기존 전역 규칙의 부분집합이라 기준선 유지(gcc 11·legacy 227파일 0/0), pytest +6, `ULDSTF07404` 오탐 7건 → 0건
 - `7513299` (08-20) — [연관] **Claude Code 스킬·서브에이전트 활용 가이드** 추가(`src/docs/skills/skill.md`, gcc 무변경)
+- `d5d377c` (08-20) — [연관] **샘플 화면 3종 추가**(`src/conversion/sample-front/ui`, gcc 무변경): `ULDINF20000`·`ULDSTF30700`·`ULDSTF30702`
 
 ---
 
@@ -145,6 +146,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-08-20 | `d5d377c` | chore(sample): 샘플 화면 3종 추가 (ULDINF20000, ULDSTF30700, ULDSTF30702) — [연관, gcc 무변경] |
 | 2026-08-20 | `7513299` | docs(skills): Claude Code 스킬·서브에이전트 활용 가이드 추가 — [연관, gcc 무변경] |
 | 2026-08-20 | `7684e1b` | feat(lint): WS120 중복 id 검사를 WebSquare 스코프 인지 규칙으로 개정 — [연관, gcc 무변경] |
 | 2026-08-20 | `f52447d` | refactor(sample): ULDSTF07404 검증 로직을 validate.xml 공통함수로 전환 — [연관, gcc 무변경] |
