@@ -1,7 +1,7 @@
 # gcc 공통 함수 업데이트 이력
 
-`src/gcc/` 공통 라이브러리(`$c.*`)의 최초 반입(2026-06-08, `92a35bd`) 이후 변경 내역 정리 (최종 갱신 2026-08-18).
-API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-08-18 기준 **11개 모듈 / 280개 공개 메서드**.
+`src/gcc/` 공통 라이브러리(`$c.*`)의 최초 반입(2026-06-08, `92a35bd`) 이후 변경 내역 정리 (최종 갱신 2026-08-19).
+API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-08-19 기준 **11개 모듈 / 281개 공개 메서드**.
 
 > `src/cm/gcc/`는 CM 모듈용 사본으로 일반적 개선만 선별 반영해 왔으나(2026-06-10 병합, 2026-07-22 대규모 동기화로 11파일 체제),
 > **2026-08-18 `26af3d5`에서 사용 중단으로 삭제**되어 `src/gcc/`가 유일한 canonical 라이브러리다.
@@ -16,7 +16,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 | `sbm.xml` (`$c.sbm`) | 중복 제출 가드, `executeDynamic` 간소화 ref/target 문법·gridview 자동 바인딩·`autoFocus`·다중 gridview 바인딩·스피너 오버레이·message 옵션(opt-in), RESTful URL 활성화, 단건 ref(DataMap)→`requestData` 추출, 페이징(`setPagingInfo`) 개선, 그리드 DOM `render` 참조 전환 |
 | `data.xml` (`$c.data`) | 공통코드 로딩(`COMMON_CODE_INFO.ACTION` 연동, `setCommonCode` 배열 매핑·응답 언래핑), JSON 헬퍼 8종, 프로세스 메시지, 콤보 공통코드 세팅(`comboCbDataSet*`) 계열, 업로드/리포트 헬퍼, 엑셀 다운로드 기본 옵션 개선 |
 | `win.xml` (`$c.win`) | 외부망 홈(`goHomeEx`), 프로그램 열기/내비게이션 단순화, `openFormSubmit`, 인쇄(`mainPrint`/`popupPrint`), `success`/`error` 알림, `openExternalPage`, **browserPopup 부모 화면 접근**(`getOpenerScope`/`callOpener`), 히스토리 기록·복원(`pushState`/`changePageState`) 결함 수정 및 `moveUrl`/`setPageFrameSrc` 이동 복원 확장 |
-| `util.xml` (`$c.util`) | 쿠키/웹스토리지 헬퍼 13종, 업로드(`onUploadClick`/`getUploadFiles` 등), `setTextLengthCounter`, `checkFileExtension`, 엑셀 다운로드 파일명 개선 |
+| `util.xml` (`$c.util`) | 쿠키/웹스토리지 헬퍼 13종, 업로드(`onUploadClick`/`getUploadFiles` 등), `setTextLengthCounter`, `checkFileExtension`, 엑셀 다운로드 파일명 개선, `setGridVisibleRowNum`(gridView "all" 동적 적용) |
 | `date.xml` (`$c.date`) | 날짜 포맷 검증(`checkCalendarFormat`/`compareFromToDate`), `getDateInterval` 단위 버그 수정, commonPrototype 의존 제거 |
 | `str.xml` (`$c.str`) | validate 중복 검증기 통합, 목적격 조사(`attachObjectPostposition`), 바이트/포맷 함수 자체 구현 전환 |
 | `session.xml` (`$c.session`) | **신설**(2026-06-09) — 세션 체크, 로그인/사용자 정보 관리 |
@@ -101,6 +101,10 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
   - `__changePageState`에 frameInfo 분기: 프레임 재해석 → `setSrc` 복원(`_isHistoryRestore` 전달) → `dataInfo`를 DataCollection에 `setJSON` **자동 적용**, 프레임 소멸 시 menuInfo(`openMenu`) 폴백
   - 스냅샷 정제(`__sanitizeStateData`): 함수 제거, 1MB(`HISTORY_STATE_MAX_LENGTH`) 초과 시 제외, 재이동 시 이전 스냅샷 초기화
   - 가이드 [frame-history-guide.md](frame-history-guide.md) 신설(`_isHistoryRestore` 자동조회 skip 관례 포함), 회귀 테스트 `test/frameHistory.test.js` 7건
+- `b5875c9` (08-19) — `$c.util.setGridVisibleRowNum` 추가 (280→281 메서드):
+  - gridView `visibleRowNum` 동적 변경 — 엔진 `setVisibleRowNum`은 숫자 전용(`parseInt` NaN → false)이라 **"all"이 거부**되는 문제 대응
+  - 숫자는 엔진 API 위임, "all"은 `options.visibleRowNum` 직접 변경 후 그리드 재구성(초기화 → tbody 비움 → `drawDataTable(0)`)으로 전체 행 재도색
+  - 대량 데이터 사용 금지·엔진 버전 교체 시 재검증 필요 JSDoc 명기, 회귀 테스트 `test/setGridVisibleRowNum.test.js` 4건
 
 ---
 
@@ -108,6 +112,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-08-19 | `b5875c9` | feat(gcc): util에 setGridVisibleRowNum 추가 — gridView visibleRowNum "all" 동적 적용 |
 | 2026-08-18 | `59274e5` | feat(gcc): moveUrl/setPageFrameSrc 히스토리 기록·데이터 복원 지원 |
 | 2026-08-18 | `4d8d83e` | fix(gcc): 브라우저 히스토리 기록·복원 결함 3건 수정 (win.xml) |
 | 2026-08-18 | `0a551a2` | feat(gcc): browserPopup 팝업의 부모 화면 접근 공통함수 추가 |
