@@ -14,7 +14,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 | 모듈 | 주요 변화 |
 |------|-----------|
 | `sbm.xml` (`$c.sbm`) | 중복 제출 가드, `executeDynamic` 간소화 ref/target 문법·gridview 자동 바인딩·`autoFocus`·다중 gridview 바인딩·스피너 오버레이·message 옵션(opt-in), RESTful URL 활성화, 단건 ref(DataMap)→`requestData` 추출, 페이징(`setPagingInfo`) 개선 — `maxRowNum "all"` 전체 행 표시·`rowNumVisble desc` 내림차순 순번, 그리드 DOM `render` 참조 전환 |
-| `data.xml` (`$c.data`) | 공통코드 로딩(`COMMON_CODE_INFO.ACTION` 연동, `setCommonCode` 배열 매핑 → 통합 목록+`mappingKey` 필터 개편·응답 언래핑·기본 컬럼 cdVal/cdValNm·label/valueColumn 문자열 지원), JSON 헬퍼 8종, 프로세스 메시지, 콤보 공통코드 세팅(`comboCbDataSet*`) 계열, 업로드/리포트 헬퍼, 엑셀 다운로드 기본 옵션 개선 |
+| `data.xml` (`$c.data`) | 공통코드 로딩(`COMMON_CODE_INFO.ACTION` 연동, `setCommonCode` 배열 매핑 → 통합 목록+`mappingKey` 필터 개편·응답 언래핑·기본 컬럼 cdVal/cdValNm·label/valueColumn 문자열 지원·조회 url/paramName 옵션), JSON 헬퍼 8종, 프로세스 메시지, 콤보 공통코드 세팅(`comboCbDataSet*`) 계열, 업로드/리포트 헬퍼, 엑셀 다운로드 기본 옵션 개선 |
 | `win.xml` (`$c.win`) | 외부망 홈(`goHomeEx`), 프로그램 열기/내비게이션 단순화, `openFormSubmit`, 인쇄(`mainPrint`/`popupPrint`), `success`/`error` 알림, `openExternalPage`, **browserPopup 부모 화면 접근**(`getOpenerScope`/`callOpener`), 히스토리 기록·복원(`pushState`/`changePageState`) 결함 수정 및 `moveUrl`/`setPageFrameSrc` 이동 복원 확장(`restoreData` [목록] 복귀 포함) |
 | `util.xml` (`$c.util`) | 쿠키/웹스토리지 헬퍼 13종, 업로드(`onUploadClick`/`getUploadFiles` 등), `setTextLengthCounter`, `checkFileExtension`, 엑셀 다운로드 파일명 개선, `setGridVisibleRowNum`(gridView "all" 동적 적용) |
 | `date.xml` (`$c.date`) | 날짜 포맷 검증(`checkCalendarFormat`/`compareFromToDate`), `getDateInterval` 단위 버그 수정, commonPrototype 의존 제거 |
@@ -143,6 +143,10 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
   - `COMMON_CODE_INFO` 기본값 변경 — LABEL `"cdValNm"`, VALUE `"cdVal"`, FILED_ARR `["cdValNm","cdVal"]` (KRX 공통코드 API 응답 필드와 일치)
   - `setCommonCode`의 `labelColumn`/`valueColumn` 옵션이 **배열**(컴포넌트별 override, 누락 인덱스는 기본값 폴백)과 **문자열**(전체 공통 적용)을 모두 허용 — `_pickColumn` 헬퍼로 해석 통일(기존엔 문자열 전달 시 `"cdValNm"[compIndex]` 문자 하나가 컬럼명이 되던 잠재 결함)
   - JSDoc `{String|Array}` 갱신, 회귀 테스트 픽스처 cdVal/cdValNm 반영 + 신규 2건
+- `714e2d0` (08-20) — `$c.data.setCommonCode` **조회 API url·paramName 옵션 추가**:
+  - `url` 옵션 — 지정 시 `COMMON_CODE_INFO.URL` 대신 해당 경로로 조회 (캐시는 code 기준 공유 — 서로 다른 url 조회 시 `useLocalCache:false` 병행 권장 명기)
+  - `paramName` 옵션 — 지정 시 기본 쿼리 파라미터명 대신 해당 이름 사용. 기본값은 `COMMON_CODE_INFO.PARAM`("cdEngNm")·`PARAM_LIST`("cdEngNmList") 상수로 분리(배포별 커스터마이즈 지점)
+  - 기존 `action` 직접 지정 우선순위 유지, 회귀 테스트 2건 추가
 
 ---
 
@@ -150,6 +154,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-08-20 | `714e2d0` | feat(data): setCommonCode 조회 API url·paramName 옵션 추가 |
 | 2026-08-20 | `ef3aaaf` | feat(data): 공통코드 기본 컬럼 cdVal/cdValNm 전환 + labelColumn/valueColumn 문자열 지원 |
 | 2026-08-20 | `d5d377c` | chore(sample): 샘플 화면 3종 추가 (ULDINF20000, ULDSTF30700, ULDSTF30702) — [연관, gcc 무변경] |
 | 2026-08-20 | `7513299` | docs(skills): Claude Code 스킬·서브에이전트 활용 가이드 추가 — [연관, gcc 무변경] |
