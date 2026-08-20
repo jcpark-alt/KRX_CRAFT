@@ -1,7 +1,7 @@
 # gcc 공통 함수 업데이트 이력
 
-`src/gcc/` 공통 라이브러리(`$c.*`)의 최초 반입(2026-06-08, `92a35bd`) 이후 변경 내역 정리 (최종 갱신 2026-08-19).
-API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-08-19 기준 **11개 모듈 / 281개 공개 메서드**.
+`src/gcc/` 공통 라이브러리(`$c.*`)의 최초 반입(2026-06-08, `92a35bd`) 이후 변경 내역 정리 (최종 갱신 2026-08-20).
+API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-08-20 기준 **11개 모듈 / 281개 공개 메서드**.
 
 > `src/cm/gcc/`는 CM 모듈용 사본으로 일반적 개선만 선별 반영해 왔으나(2026-06-10 병합, 2026-07-22 대규모 동기화로 11파일 체제),
 > **2026-08-18 `26af3d5`에서 사용 중단으로 삭제**되어 `src/gcc/`가 유일한 canonical 라이브러리다.
@@ -13,9 +13,9 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 모듈 | 주요 변화 |
 |------|-----------|
-| `sbm.xml` (`$c.sbm`) | 중복 제출 가드, `executeDynamic` 간소화 ref/target 문법·gridview 자동 바인딩·`autoFocus`·다중 gridview 바인딩·스피너 오버레이·message 옵션(opt-in), RESTful URL 활성화, 단건 ref(DataMap)→`requestData` 추출, 페이징(`setPagingInfo`) 개선, 그리드 DOM `render` 참조 전환 |
-| `data.xml` (`$c.data`) | 공통코드 로딩(`COMMON_CODE_INFO.ACTION` 연동, `setCommonCode` 배열 매핑·응답 언래핑), JSON 헬퍼 8종, 프로세스 메시지, 콤보 공통코드 세팅(`comboCbDataSet*`) 계열, 업로드/리포트 헬퍼, 엑셀 다운로드 기본 옵션 개선 |
-| `win.xml` (`$c.win`) | 외부망 홈(`goHomeEx`), 프로그램 열기/내비게이션 단순화, `openFormSubmit`, 인쇄(`mainPrint`/`popupPrint`), `success`/`error` 알림, `openExternalPage`, **browserPopup 부모 화면 접근**(`getOpenerScope`/`callOpener`), 히스토리 기록·복원(`pushState`/`changePageState`) 결함 수정 및 `moveUrl`/`setPageFrameSrc` 이동 복원 확장 |
+| `sbm.xml` (`$c.sbm`) | 중복 제출 가드, `executeDynamic` 간소화 ref/target 문법·gridview 자동 바인딩·`autoFocus`·다중 gridview 바인딩·스피너 오버레이·message 옵션(opt-in), RESTful URL 활성화, 단건 ref(DataMap)→`requestData` 추출, 페이징(`setPagingInfo`) 개선 — `maxRowNum "all"` 전체 행 표시·`rowNumVisble desc` 내림차순 순번, 그리드 DOM `render` 참조 전환 |
+| `data.xml` (`$c.data`) | 공통코드 로딩(`COMMON_CODE_INFO.ACTION` 연동, `setCommonCode` 배열 매핑 → 통합 목록+`mappingKey` 필터 개편·응답 언래핑), JSON 헬퍼 8종, 프로세스 메시지, 콤보 공통코드 세팅(`comboCbDataSet*`) 계열, 업로드/리포트 헬퍼, 엑셀 다운로드 기본 옵션 개선 |
+| `win.xml` (`$c.win`) | 외부망 홈(`goHomeEx`), 프로그램 열기/내비게이션 단순화, `openFormSubmit`, 인쇄(`mainPrint`/`popupPrint`), `success`/`error` 알림, `openExternalPage`, **browserPopup 부모 화면 접근**(`getOpenerScope`/`callOpener`), 히스토리 기록·복원(`pushState`/`changePageState`) 결함 수정 및 `moveUrl`/`setPageFrameSrc` 이동 복원 확장(`restoreData` [목록] 복귀 포함) |
 | `util.xml` (`$c.util`) | 쿠키/웹스토리지 헬퍼 13종, 업로드(`onUploadClick`/`getUploadFiles` 등), `setTextLengthCounter`, `checkFileExtension`, 엑셀 다운로드 파일명 개선, `setGridVisibleRowNum`(gridView "all" 동적 적용) |
 | `date.xml` (`$c.date`) | 날짜 포맷 검증(`checkCalendarFormat`/`compareFromToDate`), `getDateInterval` 단위 버그 수정, commonPrototype 의존 제거 |
 | `str.xml` (`$c.str`) | validate 중복 검증기 통합, 목적격 조사(`attachObjectPostposition`), 바이트/포맷 함수 자체 구현 전환 |
@@ -105,6 +105,21 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
   - gridView `visibleRowNum` 동적 변경 — 엔진 `setVisibleRowNum`은 숫자 전용(`parseInt` NaN → false)이라 **"all"이 거부**되는 문제 대응
   - 숫자는 엔진 API 위임, "all"은 `options.visibleRowNum` 직접 변경 후 그리드 재구성(초기화 → tbody 비움 → `drawDataTable(0)`)으로 전체 행 재도색
   - 대량 데이터 사용 금지·엔진 버전 교체 시 재검증 필요 JSDoc 명기, 회귀 테스트 `test/setGridVisibleRowNum.test.js` 4건
+- `d086e29` (08-20) — `$c.data.setCommonCode` **통합 목록 매핑 개편** 및 결함 수정:
+  - 배열 code 조회를 통합 목록 응답 + `mappingKey` 컬럼 필터 방식으로 변경 (`cdEngNmList` 콤마(%2C) 구분, DataList 키 체계 `dlt_commonCode_{code}`)
+  - `mappingKey` 미지정 시 TypeError 가드(미지정 시 전체 목록 바인딩), `downloadGridViewExcel` bodyWordwrap `|| true` 재회귀 수정
+  - `setPagingInfo` 다중 헤더 그리드 rowClassName(`h{n}_row`) 처리 개선, 회귀 테스트 새 의미론으로 재작성(4건)
+- `e25af76` (08-20) — `$c.win` **moveUrl/setPageFrameSrc `restoreData` 옵션** — [목록] 버튼 복귀 시 화면 상태 복원:
+  - `FRAME_RESTORE_SNAPSHOTS` 레지스트리에 스냅샷 이중 저장(키 = 프레임 id + 정규화 src, `__normalizeFrameSrc`) — history entry 는 자기 것만 읽을 수 있는 제약의 우회
+  - 대상 화면 스냅샷이 있으면 popstate 복원과 동일 계약(`_isHistoryRestore`·dataInfo 전달 + `setJSON` 자동 적용), 없으면 일반 이동
+  - dataInfo `_` 접두 예약 키(`_pagingInfo` 등)는 paramData 로만 전달 — `setPagingInfo` 연동(페이지 리스트 재렌더링용), 가이드·테스트 +3건
+- `031b20f` (08-20) — `$c.sbm.setPagingInfo` **maxRowNum "all" 지원**:
+  - "all" 이면 `$c.util.setGridVisibleRowNum` 으로 전체 행 표시 전환(즉시 적용 + 라인 수 변경 시, 이미 "all" 이면 재도색 생략)
+  - 행 수 제한 클래스(`row{n}`/`h{n}_row{n}`)는 `__removeGridRowNumClass` 로 전부 제거(정규식 매칭), 숫자일 때만 새로 부여
+  - 선택값 "all" + 숫자 maxRowNum 은 상한 적용, 회귀 테스트 `test/setPagingInfoMaxRowNum.test.js` 4건
+- `21d6352` (08-20) — `$c.sbm.setPagingInfo` **rowNumVisble desc 내림차순 순번 구현** (기존 TO-DO 해소):
+  - `__setDescRowNum`: 그리드 연동 DataList 의 rowNum 컬럼에 "전체 건수 − ((현재 페이지−1) × 페이지당 행 수) − 행 인덱스" 순번 설정
+  - 통신 후 호출(totalCnt 전달) 시점에 적용, 컬럼명 `rowNumColumn` 재정의 가능, asc 경로 무변경, 회귀 테스트 4건
 
 ---
 
@@ -112,6 +127,10 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-08-20 | `21d6352` | feat(sbm): setPagingInfo rowNumVisble desc 내림차순 순번 구현 |
+| 2026-08-20 | `031b20f` | feat(sbm): setPagingInfo maxRowNum "all" 지원 — 전체 행 표시 전환 |
+| 2026-08-20 | `e25af76` | feat(gcc): moveUrl/setPageFrameSrc restoreData 옵션 — [목록] 버튼 복귀 시 화면 상태 복원 |
+| 2026-08-20 | `d086e29` | feat(gcc): setCommonCode 통합 목록 매핑 개편 및 결함 수정 |
 | 2026-08-19 | `b5875c9` | feat(gcc): util에 setGridVisibleRowNum 추가 — gridView visibleRowNum "all" 동적 적용 |
 | 2026-08-18 | `59274e5` | feat(gcc): moveUrl/setPageFrameSrc 히스토리 기록·데이터 복원 지원 |
 | 2026-08-18 | `4d8d83e` | fix(gcc): 브라우저 히스토리 기록·복원 결함 3건 수정 (win.xml) |
