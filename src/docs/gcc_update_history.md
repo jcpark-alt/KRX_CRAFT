@@ -153,6 +153,13 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
   - JSDoc·popup-opener-guide 에 `mf_` 접두 전체 id 체계 명기, 테스트 하니스를 실제 id 형식(`mf_frameA_{popupId}`)으로 현실화
 - `81cca81` (08-21) — [연관] **UDC 공통 컴포넌트 9종 추가**(`src/udc` 신설, gcc 무변경): bulkFileSaver·codeSelectBoxBasic·fileMultiUpload·fileMultiUploadGrd·fromToCalendar·gridViewFinder·qrCode·qrCode_popup·searchBadge
 - `86ab223` (08-21) — [연관] **샘플 화면 10종 갱신 + `ULDFIL52110` 추가**(`src/conversion/sample-front`, gcc 무변경)
+- `61c0cfb` (08-21) — [연관] **UDC bulkFileSaver `save`/`saveMapForm` 멀티 dataList·dataMap 지원**(`src/udc`, gcc 무변경):
+  - `dataMap`/`dataMapId`/`dataList`/`dataListId` 인자를 단일·배열 모두 수용(`__toArray`/`__partName` 헬퍼) — dataList 별 payload(C/U/D rowStatus 또는 sendAll), 멀티파트 파트명 `rows`/`rows2`…·`data`/`data2`… 자동 부여, 빈 payload 파트 제외 시에도 원래 인덱스 유지
+  - `saveMapForm` `onValidate` 하위호환(단일=JSON 객체, 멀티=JSON 배열), 파일 매칭 `{fieldKey}_file_index`+`files` 규약으로 정리(폐기된 `{fieldKey}File` suffix 규칙 사어코드·주석 제거), save 3종·saveMapForm 2종 `@example` 추가
+- `8a2973b` (08-21) — [연관] **UDC searchBadge publicInfo·JSDoc 정비 및 옵션 계약 구현**(`src/udc`, gcc 무변경):
+  - `publicInfo` 중복 `getDataBindInfo` → `getDataCollectionInfo` 교체(누락 해소), `getValue`/`getText` 를 문서 계약대로 **구분자 join 문자열 반환**으로 구현(`separator` 기본 ","), `bindColumn`·`separator` 옵션 실사용, 사어 `dataMap` 옵션 제거
+  - `setJSON([], false)` 전체 비우기 허용, `parseInt` radix, 내부 헬퍼 `__` 접두 리네임(`__initComponent`/`__generateSearchBadge`/`__getValuesByKey`/`__getDataCollection`) 및 오타·예제 일괄 교정
+- `8e83956` (08-21) — [연관] 샘플 `ULDFIL52110` 원본 화면 설명 주석 정정(`ULDFIL52100 의무보유주식의 처분` → `ULDFIL52110 법인명 찾기 팝업`, gcc 무변경)
 
 ---
 
@@ -160,6 +167,9 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-08-21 | `8e83956` | fix(sample): ULDFIL52110 원본 화면 설명 주석 정정 — [연관, gcc 무변경] |
+| 2026-08-21 | `8a2973b` | refactor(udc): searchBadge publicInfo·JSDoc 정비 및 옵션 계약 구현 — [연관, gcc 무변경] |
+| 2026-08-21 | `61c0cfb` | feat(udc): bulkFileSaver save/saveMapForm 멀티 dataList·dataMap 지원 + JSDoc 정비 — [연관, gcc 무변경] |
 | 2026-08-21 | `86ab223` | chore(sample): 샘플 화면 10종 갱신 및 ULDFIL52110 추가 — [연관, gcc 무변경] |
 | 2026-08-21 | `81cca81` | docs(gcc)+feat(udc): 이력 반영 및 UDC 공통 컴포넌트 9종 추가 — [연관, gcc 무변경] |
 | 2026-08-21 | `0d912ee` | feat(win): 팝업 오프너 등록 키 frameId 접두 + openMenu S 분기 레이아웃 경로 정정 |
