@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml"
     xmlns:ev="http://www.w3.org/2001/xml-events"
     xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
-    <head meta_screenName="[가이드] 메일 발송 팝업 (원본 ULDSTF07404 전문평가 메일발송)" meta_screenId="ULDSTF07404_guide" meta_screenDesc="대상에 따라 메일 제목·본문을 갈아끼우고, 수신자를 팝업이나 직접입력으로 채운 뒤 첨부파일과 함께 발송하는 팝업 표준 골격." meta_author="Inswave" meta_type="가이드">
+    <head meta_screenName="[가이드] 메일 발송 팝업 (원본 ULDSTF07404 전문평가 메일발송)" meta_screenId="ULDSTF07404" meta_screenDesc="대상에 따라 메일 제목·본문을 갈아끼우고, 수신자를 팝업이나 직접입력으로 채운 뒤 첨부파일과 함께 발송하는 팝업 표준 골격." meta_author="Inswave" meta_type="가이드">
     	<w2:type>COMPONENT</w2:type>
     	<w2:buildDate />
     	<w2:MSA />
@@ -48,8 +48,6 @@
     	<script lazy="false" type="text/javascript"><![CDATA[// 원본 : ULDSTF07404 (팝업)전문평가 메일발송 (/ui/sample/template/ULDSTF07404.xml)
 // 원본의 화면 구성과 흐름을 그대로 두고 전문평가 업무 문구만 예시로 바꾼 가이드다.
 
-///////// 1. 변수 및 선언 영역 /////////
-
 /*
  * 화면 동작
  * 1. 팝업 로딩시 발신자 기본값을 설정하고 메일 기본정보를 조회
@@ -75,7 +73,11 @@
  * 5. 각 통신의 action 경로를 실 API 로 교체
  * 6. 대상 구분이 없는 화면이면 rd_target 과 changeTarget 계열을 통째로 삭제
  */
-scwin.screenId = "ULDSTF07404_guide";
+
+
+///////// 1. 변수 및 선언 영역 /////////
+
+scwin.screenId = "ULDSTF07404";
 
 // 화면 상태값
 scwin.notiSvcId = "";		// 알림서비스ID
@@ -123,6 +125,7 @@ scwin.init = async function () {
 	const param = $c.data.getParameter();
 
 	scwin.notiSvcId = param?.notiSvcId ?? "";
+	scwin.notiSvcId = "16"; // test 값 설정
 
 	// 발신자 / 비밀참조 기본값 설정
 	scwin.setSenderInfo();
@@ -156,7 +159,7 @@ scwin.rd_target_onviewchange = function (info) {
  * @description 받는곳 찾기 버튼 클릭. 팝업에서 고른 담당자를 수신자 목록에 추가한다.
  *
  * 값을 돌려주는 선택 팝업이라 결과가 비었는지로 취소를 판단한다.
- * 팝업 안에서 처리를 끝내는 처리 팝업은 ULDFIL59411_guide 를 본다.
+ * 팝업 안에서 처리를 끝내는 처리 팝업은 ULDFIL59411 를 본다.
  *
  * 복사해 쓸 때 바꿀 곳
  *  - openPopup 의 팝업 경로, 팝업 크기, 넘길 파라미터
@@ -170,14 +173,14 @@ scwin.btn_findReceiver_onclick = async function (e) {
 	};
 
 	const options = {
-		id : "ULDFIL52110_guide",
+		id : "ULDFIL52110",
 		popupName : "담당자 찾기",
 		width : 1000,
 		height : 600,
 		frameModal : "top"
 	};
 
-	const result = await $c.win.openPopup("/ui/sample/template/ULDFIL52110_guide.xml", options, param);
+	const result = await $c.win.openPopup("/ui/sample/template/ULDFIL52110.xml", options, param);
 
 	// 선택 없이 닫으면 결과가 없다.
 	if ($c.util.isEmpty(result)) return;
@@ -269,7 +272,8 @@ scwin.btn_rowDelete_onclick = function (e) {
 */
 scwin.btn_fileAdd_onclick = function (e) {
 	if (dlt_fileList.getRowCount() >= 5) {
-		$c.win.alert("첨부파일은 최대 " + 5 + "개까지 등록할 수 있습니다.");
+		// "com_file_0023": "첨부파일은 $[0]개까지 가능합니다."
+		$c.win.alert($c.data.getMessage("com_file_0023", [5]));
 		return;
 	}
 
@@ -335,8 +339,9 @@ scwin.grd_fileList_oncelldblclick = async function (rowIndex, columnIndex, colum
 		seq : dlt_fileList.getCellData(rowIndex, "fileSeq")
 	};
 
+	// "com_file_0106": "파일을 다운로드 할 수 없습니다."
 	await $c.data.downFile("/api/listing/lstproc/ksqexpeval-mail/file-download", fileName, param)
-		.catch(() => { $c.win.alert("파일을 내려받지 못했습니다."); });
+		.catch(() => { $c.win.alert($c.data.getMessage("com_file_0106")); });
 };
 
 /**
@@ -408,6 +413,7 @@ scwin.selectMailInfo = async function () {
 		id : "sbm_selectMailInfo",
 		method : "get",
 		action : "/api/listing/lstproc/ksqexpeval-mail/init",
+		target : "dma_master=body.mailInfo,dlt_fileList=body.attchFileList,dlt_receiver=body.sendReceiverList",
 		isProcessMsg : false
 	};
 
@@ -418,34 +424,6 @@ scwin.selectMailInfo = async function () {
 	// 통신 오류는 공통 오류 핸들러가 안내하고 예외를 던진다.
 	// 여기서 잡지 않으므로 오류가 나면 아래 처리는 실행되지 않는다.
 	const result = await $c.sbm.executeDynamic(sbmOptions, requestData);
-
-	// 조회 결과 처리는 submitDoneHandler 옵션 대신 여기서 직접 부른다.
-	// 옵션으로 넘기면 await 가 풀린 뒤에 돌아 이어지는 코드와 순서가 어긋난다.
-	scwin.sbm_selectMailInfo_submitdone(result);
-};
-
-/**
- * @method
- * @name scwin.sbm_selectMailInfo_submitdone
- * @author Inswave
- * @date 2026. 08. 18
- * @description 메일 기본정보 조회 완료. 본문·첨부파일·담당자 목록을 화면에 채운다.
- *
- * 응답 한 번으로 여러 DataCollection 을 채우는 형태다.
- * target 옵션으로 나눠 받아도 되지만, 서로 얽힌 값이면 이렇게 한 곳에서 푸는 편이 읽기 쉽다.
- *
- * 복사해 쓸 때 바꿀 곳
- *  - 응답 구조
- * @param
- * @returns
- * @hidden N
-*/
-scwin.sbm_selectMailInfo_submitdone = function (e) {
-	const body = e.responseJSON?.body ?? {};
-
-	dma_master.setJSON(body.mailInfo ?? {});
-	dlt_fileList.setJSON(body.attchFileList ?? []);
-	dlt_receiver.setJSON(body.sendReceiverList ?? []);
 
 	// 대상 선택을 비운다. 다시 고르면 제목·본문이 다시 채워진다.
 	rd_target.setValue("");
@@ -899,8 +877,7 @@ scwin.checkFileSize = function () {
 	}
 
 	if (totalSize > 31457280) {
-		$c.win.alert("첨부파일 전체 용량은 "
-			+ $c.num.formatByte(31457280) + " 를 넘을 수 없습니다.");
+		$c.win.alert($c.data.getMessage("com_empty_0235", [ $c.num.formatByte(31457280)]));
 		return false;
 	}
 
