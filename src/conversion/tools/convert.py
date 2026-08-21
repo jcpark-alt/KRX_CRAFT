@@ -201,10 +201,20 @@ def rule2_globals(code, report):
     res = re.sub(r'(?m)^[ \t]*//[ \t]*전역 변수 선언[ \t]*\r?\n?', '', res)
     res = re.sub(r'(?m)^[ \t]*/{5,}[ \t]*1\.[^\n]*영역[^\n]*?/{5,}[ \t]*\r?\n?', '', res)
     res = re.sub(r'(?m)^[ \t]*/\*{10,}[ \t]*\n[ \t]*\*[ \t]*1\.[^\n]*영역[^\n]*\n[ \t]*\*{10,}/[ \t]*\r?\n?', '', res)
-    a = re.search(r'scwin\.vScrenID\s*=\s*[^;\n]*;[ \t]*(?://[^\n]*)?\r?\n?', res)
-    at = a.end()
+    # 앵커는 "최상위" vScrenID 대입만 — 원본이 onpageload 등 함수 내부에서만 설정하는 파일에서
+    # 함수 몸통 안으로 선언 블록이 삽입되던 결함 방지. 최상위 대입이 없으면 스크립트 최상단에 둔다.
+    res_depth = depth_array(res)
+    at = None
+    for a in re.finditer(r'scwin\.vScrenID\s*=\s*[^;\n]*;[ \t]*(?://[^\n]*)?\r?\n?', res):
+        if res_depth[a.start()] == 0:
+            at = a.end()
+            break
     block = _SEC1_DECL + "\n" + "\n".join(moved) + "\n"
-    res = res[:at] + block + res[at:]
+    if at is None:
+        lead = re.match(r'\s*', res).group(0)   # 선두 개행 유지
+        res = lead + block + res[len(lead):]
+    else:
+        res = res[:at] + block + res[at:]
     report["rule2"] = len(moved)
     return res
 

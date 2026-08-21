@@ -89,6 +89,29 @@ scwin.btn_search_onclick = function () {
     assert rep1["rule4_merge"] == "gform_onload→onpageload"
 
 
+def test_rule2_anchor_toplevel_only():
+    """vScrenID 가 함수 내부에서만 설정되는 파일 — 선언 블록이 함수 몸통 안으로 들어가면 안 된다."""
+    script = '''
+scwin.onpageload = function() {
+    scwin.vScrenID = "TEST0001";
+    scwin.searchList();
+};
+
+scwin.skw = "";
+
+scwin.searchList = function () {
+    console.log(scwin.skw);
+};
+'''
+    r1, r2, _ = _convert_twice(_xml(script, body='<w2:gridView id="grd_list"/>'))
+    assert r1 == r2
+    m = __import__("re").search(r"<!\[CDATA\[(.*?)\]\]>", r1, __import__("re").S)
+    js = m.group(1)
+    # 선언 블록(1구역 헤더 + skw)이 onpageload 정의보다 앞(최상위)에 있어야 한다
+    assert js.index("scwin.skw") < js.index("scwin.onpageload = ")
+    assert "1. 변수 및 선언 영역" in js.split("scwin.onpageload")[0]
+
+
 def test_collapse_blank_runs_protects_strings():
     """collapse_blank_runs 는 문자열/블록주석 내부의 빈 줄은 보존한다."""
     code = 'const t = `a\n\n\n\nb`;\n\n\n\nconst u = 1;\n/**\n *\n *\n */\nconst v = 2;\n'
