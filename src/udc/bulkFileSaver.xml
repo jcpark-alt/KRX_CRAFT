@@ -252,6 +252,36 @@ scwin.transferFile = function (oldKey, newKey) {
 };
 
 // ═══════════════════════════════════════════════════════════════
+// 내부 헬퍼 — 단일/멀티 인자 정규화
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * @method
+ * @name __toArray
+ * @description 단일 값/배열을 배열로 정규화한다. (빈 값은 빈 배열)
+ * @hidden Y
+ */
+scwin.__toArray = function (v) {
+	if ($c.util.isEmpty(v)) return [];
+	return Array.isArray(v) ? v : [v];
+};
+
+/**
+ * @method
+ * @name __partName
+ * @description FormData 파트 이름 결정 — 명시 id(단일/배열) 우선, 미지정 시 base, base2, base3…
+ * @hidden Y
+ */
+scwin.__partName = function (ids, idx, base) {
+	if (Array.isArray(ids)) {
+		if (!$c.util.isEmpty(ids[idx])) return ids[idx];
+	} else if (idx === 0 && !$c.util.isEmpty(ids)) {
+		return ids;
+	}
+	return idx === 0 ? base : base + (idx + 1);
+};
+
+// ═══════════════════════════════════════════════════════════════
 // 목록 조회
 // ═══════════════════════════════════════════════════════════════
 
@@ -290,84 +320,127 @@ scwin.loadList = async function (opts) {
 };
 
 /**
- * @method 
+ * @method
  * @name save
- * @description 일괄 저장 — 신규(C) + 수정(U) 로우와 파일을 한 요청으로 서버 전송.
- * rows  파트: JSON 배열 (application/json)
- * files 파트: 같은 이름으로 여러 개 append
- * 매칭 : rows[i].fileIndex 로 files.get(i) 참조. 파일 없는 행은 fileIndex=null.
- * @param {Object}   opts
+ * @description 일괄 저장 — 신규(C)/수정(U)/삭제(D) 로우와 파일을 한 요청(multipart)으로 서버 전송.
+ * dataList/dataMap 은 단일 또는 배열(멀티)로 전달할 수 있다.
+ * FormData 구성:
+ *   - dataList 별 파트: { "{파트명}": rows } JSON Blob ("{파트명}.json", application/json)
+ *   - dataMap  별 파트: dataMap JSON Blob (opts.dataMap 지정 시)
+ *   - files 파트: 같은 이름으로 여러 개 append
+ * 파트 이름: dataListId/dataMapId(단일 문자열 또는 병렬 배열) 우선, 미지정 시 rows, rows2… / data, data2…
+ * 매칭 : rows[i].fileIndex 로 files 의 i 번째 파일 참조(모든 dataList 공용 인덱스). 파일 없는 행은 fileIndex=null.
+ * @param {Object}         opts
  * @hidden N
- * @param {Object}   opts.dataList
- * @param {string}   opts.saveUrl
- * @param {Function} opts.onValidate   row → err|null
- * @param {Function} opts.onSuccess    (res)
- * @param {Function} opts.onAfterSave  (res)
- * @param {Function} opts.onError
+ * @param {Object|Array}   opts.dataList     단일 dataList 또는 배열(멀티)
+ * @param {string}         opts.saveUrl
+ * @param {boolean}        opts.sendAll      true 면 변경분(C/U/D) 대신 전체 로우 전송 (기본 false)
+ * @param {string|Array}   opts.dataListId   rows 파트 이름 — 단일 문자열 또는 dataList 와 병렬인 배열 (기본 rows, rows2…)
+ * @param {Object|Array}   opts.dataMap      (선택) 함께 전송할 dataMap — 단일 또는 배열(멀티)
+ * @param {string|Array}   opts.dataMapId    dataMap 파트 이름 — 단일 문자열 또는 병렬 배열 (기본 data, data2…)
+ * @param {Function}       opts.onValidate   row → err|null (모든 dataList 의 로우에 적용)
+ * @param {Function}       opts.onSuccess    (res)
+ * @param {Function}       opts.onAfterSave  (res)
+ * @param {Function}       opts.onError
+ * @example
+// 1) 단일 dataList — 변경분(C/U/D)만 저장, 파일은 attachFile 로 첨부해 둔 것 자동 동봉
+//    → FormData 파트: rows, files
+udc_saver.getScope().save({
+    dataList : dlt_list,
+    saveUrl : "/api/x/bulk-save",
+    onValidate : function (row) { return $c.util.isEmpty(row.title) ? "제목을 입력하세요." : null; },
+    onAfterSave : async function (res) { await scwin.searchList(); }
+});
+
+// 2) 단일 dataList + 조회조건 dataMap 동봉 → 파트: rows, data, files
+udc_saver.getScope().save({ dataList : dlt_list, dataMap : dma_search, saveUrl : "/api/x/bulk-save" });
+
+// 3) 멀티 dataList/dataMap — 파트 이름은 병렬 배열로 지정(미지정 인덱스는 rows2/data2… 자동)
+//    → 파트: master, rows2, cond, data2, files
+udc_saver.getScope().save({
+    dataList : [dlt_master, dlt_detail],
+    dataListId : ["master"],              // 두 번째는 자동 "rows2"
+    dataMap : [dma_search, dma_etc],
+    dataMapId : ["cond"],                 // 두 번째는 자동 "data2"
+    saveUrl : "/api/x/bulk-save",
+    sendAll : true                        // 변경분 대신 전체 로우 전송
+});
  */
 scwin.save = async function (opts) {
-	const dl = opts.dataList;
-	let payload = [];
+	const dataLists = scwin.__toArray(opts.dataList);
+	const listPayloads = [];
+	let totalRows = 0;
 
-	if (opts.sendAll === true) {
-		payload = dl.getAllJSON() || [];
-		if (payload.length === 0) { $c.win.alert("저장할 데이터가 없습니다."); return; }
-	} else {
-		const newRows = dl.getInsertedJSON() || [];
-		const updRows = dl.getUpdatedJSON() || [];
-		const delRows = dl.getDeletedJSON() || [];
+	// dataList 별 payload 수집 (sendAll: 전체 / 기본: 변경분 C·U·D)
+	for (let li = 0; li < dataLists.length; li++) {
+		const dl = dataLists[li];
+		const payload = [];
 
-		if (newRows.length === 0 && updRows.length === 0 && delRows.length === 0) {
-			$c.win.alert("저장할 변경 사항이 없습니다."); return;
+		if (opts.sendAll === true) {
+			payload.push.apply(payload, dl.getAllJSON() || []);
+		} else {
+			const newRows = dl.getInsertedJSON() || [];
+			const updRows = dl.getUpdatedJSON() || [];
+			const delRows = dl.getDeletedJSON() || [];
+
+			for (let n = 0; n < newRows.length; n++) { newRows[n].rowStatus = "C"; payload.push(newRows[n]); }
+			for (let u = 0; u < updRows.length; u++) { updRows[u].rowStatus = "U"; payload.push(updRows[u]); }
+			for (let d = 0; d < delRows.length; d++) { delRows[d].rowStatus = "D"; payload.push(delRows[d]); }
 		}
 
-		for (let n = 0; n < newRows.length; n++) { newRows[n].rowStatus = "C"; payload.push(newRows[n]); }
-		for (let u = 0; u < updRows.length; u++) { updRows[u].rowStatus = "U"; payload.push(updRows[u]); }
-		for (let d = 0; d < delRows.length; d++) { delRows[d].rowStatus = "D"; payload.push(delRows[d]); }
+		listPayloads.push(payload);
+		totalRows += payload.length;
+	}
+
+	if (dataLists.length > 0 && totalRows === 0) {
+		$c.win.alert(opts.sendAll === true ? "저장할 데이터가 없습니다." : "저장할 변경 사항이 없습니다.");
+		return;
 	}
 
 	if (typeof opts.onValidate === "function") {
-		for (let v = 0; v < payload.length; v++) {
-			const err = opts.onValidate(payload[v]);
-			if (err) { $c.win.alert(err); return; }
+		for (let p = 0; p < listPayloads.length; p++) {
+			for (let v = 0; v < listPayloads[p].length; v++) {
+				const err = opts.onValidate(listPayloads[p][v]);
+				if (err) { $c.win.alert(err); return; }
+			}
 		}
 	}
 
-	// 파일 있는 행에만 fileIndex 부여, 파일은 별도 배열
+	// 파일 있는 행에만 fileIndex 부여(모든 dataList 공용 files 배열 기준)
 	const files = [];
-	for (let i = 0; i < payload.length; i++) {
-		const row = payload[i];
-		row.fileIndex = null;
-		if (row.rowStatus !== "D" && row.fileChanged === "Y") {
-			const f = scwin.fileMap[row.uid];
-			if (f) {
-				row.fileIndex = files.length;
-				files.push(f);
+	for (let p2 = 0; p2 < listPayloads.length; p2++) {
+		const payload = listPayloads[p2];
+		for (let i = 0; i < payload.length; i++) {
+			const row = payload[i];
+			row.fileIndex = null;
+			if (row.rowStatus !== "D" && row.fileChanged === "Y") {
+				const f = scwin.fileMap[row.uid];
+				if (f) {
+					row.fileIndex = files.length;
+					files.push(f);
+				}
 			}
 		}
 	}
 
 	const formData = new FormData();
 
-	if (!$c.util.isEmpty(payload)) {
-		const dataListId = opts.dataListId || "rows";
+	// dataList 별 rows 파트 (빈 payload 는 제외 — 파트 이름은 원래 인덱스 기준 유지)
+	for (let li2 = 0; li2 < listPayloads.length; li2++) {
+		if ($c.util.isEmpty(listPayloads[li2])) continue;
+		const dataListId = scwin.__partName(opts.dataListId, li2, "rows");
 		const newPayload = {};
-		newPayload[dataListId] = payload;
+		newPayload[dataListId] = listPayloads[li2];
 		formData.append(dataListId, new Blob([JSON.stringify(newPayload)], { type: "application/json;charset=UTF-8" }), `${dataListId}.json`);
 	}
 
-	// dataMap이 있는 경우 데이를 추가해서 전송한다.
-	const data = opts.dataMap?.getJSON();
-
-	if (!$c.util.isEmpty(data)) {
-		const dataMapId = opts.dataMapId || "data";
+	// dataMap 별 파트 — 데이터를 JSON Blob 로 추가해서 전송한다.
+	const dataMaps = scwin.__toArray(opts.dataMap);
+	for (let mi = 0; mi < dataMaps.length; mi++) {
+		const data = dataMaps[mi].getJSON();
+		if ($c.util.isEmpty(data)) continue;
+		const dataMapId = scwin.__partName(opts.dataMapId, mi, "data");
 		formData.append(dataMapId, new Blob([JSON.stringify(data)], { type: "application/json;charset=UTF-8" }), `${dataMapId}.json`);
-		// // 텍스트 필드
-		// for (let k in data) {
-		// 	if (data.hasOwnProperty(k)) {
-		// 		formData.append(k, data[k] == null ? "" : data[k]);
-		// 	}
-		// }
 	}
 
 	for (let j = 0; j < files.length; j++) {
@@ -392,7 +465,8 @@ scwin.save = async function (opts) {
 
 // ═══════════════════════════════════════════════════════════════
 // dataMap 기반 (flat 폼 — 여러 테이블에 필드 분산)
-// FormData 규칙: 텍스트는 필드명 그대로, 파일은 <필드명>File 접미어
+// FormData 규칙: 텍스트는 {dataMapId} JSON Blob 파트,
+//               파일은 files 다중 append + "{fieldKey}_file_index"(files 내 인덱스)로 매칭
 // ═══════════════════════════════════════════════════════════════
 
 /**
@@ -457,56 +531,79 @@ scwin.loadMapForm = async function (opts) {
 /**
  * @method
  * @name saveMapForm
- * @description dataMap 텍스트 + fileMap 파일을 flat FormData 로 저장
- *   FormData 규칙: 파일 필드명 = fieldKey + "File" (예: profileImageFile)
- * @param opts.dataMap
+ * @description dataMap 텍스트 + fileMap 파일을 하나의 FormData 로 저장.
+ * dataMap/dataList 는 단일 또는 배열(멀티)로 전달할 수 있다.
+ * FormData 규칙:
+ *   - dataMap  별 파트: dataMap JSON Blob ("{파트명}.json", application/json)
+ *   - dataList 별 파트: opts.dataList 지정 시 { "{파트명}": rows } JSON Blob (전체 로우)
+ *   - files 파트: fileMap 의 파일들을 다중 append
+ *   - "{fieldKey}_file_index" 파트: 해당 필드 파일의 files 내 인덱스 (서버 매칭용)
+ * 파트 이름: dataMapId/dataListId(단일 문자열 또는 병렬 배열) 우선, 미지정 시 data, data2… / rows, rows2…
+ * @param {Object|Array} opts.dataMap    단일 dataMap 또는 배열(멀티)
  * @hidden N
  * @param opts.saveUrl
- * @param opts.fileSuffix  파일 필드 접미어 (기본 "File")
- * @param opts.onValidate  (data) → err|null
+ * @param {string|Array} opts.dataMapId  dataMap 파트 이름 — 단일 문자열 또는 병렬 배열 (기본 data, data2…)
+ * @param {Object|Array} opts.dataList   (선택) 함께 전송할 dataList — 단일 또는 배열, 전체 로우를 파트로 추가
+ * @param {string|Array} opts.dataListId dataList 파트 이름 — 단일 문자열 또는 병렬 배열 (기본 rows, rows2…)
+ * @param opts.onValidate  (data) → err|null — 단일 dataMap 이면 해당 JSON, 멀티면 JSON 배열이 전달됨
  * @param opts.onSuccess   (res)
  * @param opts.onAfterSave (res)
  * @param opts.onError
+ * @example
+// 1) 단일 dataMap 폼 — 파일은 attachFileToMap("photo", dma_form) 으로 첨부해 둔 것 자동 동봉
+//    → FormData 파트: data, photo_file_index, files
+udc_saver.getScope().saveMapForm({
+    dataMap : dma_form,
+    saveUrl : "/api/x/save-form",
+    onValidate : function (data) { return $c.util.isEmpty(data.userNm) ? "이름을 입력하세요." : null; },
+    onAfterSave : async function (res) { await scwin.searchDetail(); }
+});
+
+// 2) 멀티 dataMap + dataList 동봉 — onValidate 에는 JSON "배열"([기본정보, 부가정보])이 전달됨
+//    → 파트: basic, data2, rows, {fieldKey}_file_index, files
+udc_saver.getScope().saveMapForm({
+    dataMap : [dma_basic, dma_extra],
+    dataMapId : ["basic"],                // 두 번째는 자동 "data2"
+    dataList : dlt_subItems,              // 전체 로우가 rows 파트로 동봉
+    saveUrl : "/api/x/save-form",
+    onValidate : function (arr) { return $c.util.isEmpty(arr[0].userNm) ? "이름을 입력하세요." : null; }
+});
  */
 scwin.saveMapForm = async function (opts) {
-	const data = opts.dataMap.getJSON();
-	const suffix = opts.fileSuffix || "File";
+	const dataMaps = scwin.__toArray(opts.dataMap);
+	const dataJsons = dataMaps.map(function (dm) { return dm.getJSON(); });
 
 	if (typeof opts.onValidate === "function") {
-		const err = opts.onValidate(data);
+		// 하위호환: 단일 dataMap 이면 JSON 객체, 멀티면 JSON 배열 전달
+		const err = opts.onValidate(dataJsons.length > 1 ? dataJsons : dataJsons[0]);
 		if (err) {
 			$c.win.alert(err); return;
 		}
 	}
-	
+
 	const formData = new FormData();
 
-	// dataList가 있는 경우 rows 객체에 담아 전송한다.
-	const dl = opts.dataList;
-	let payload = dl?.getAllJSON();
-
-	if (!$c.util.isEmpty(payload)) {
-		const dataListId = opts.dataListId || "rows";
+	// dataList(들)가 있는 경우 각자 rows 파트에 담아 전송한다. (빈 목록 제외 — 파트 이름은 원래 인덱스 기준)
+	const dataLists = scwin.__toArray(opts.dataList);
+	for (let li = 0; li < dataLists.length; li++) {
+		const payload = dataLists[li].getAllJSON();
+		if ($c.util.isEmpty(payload)) continue;
+		const dataListId = scwin.__partName(opts.dataListId, li, "rows");
 		const newPayload = {};
 		newPayload[dataListId] = payload;
 		formData.append(dataListId, new Blob([JSON.stringify(newPayload)], { type: "application/json;charset=UTF-8" }), `${dataListId}.json`);
 	}
 
-	// 텍스트 필드
-	if (!$c.util.isEmpty(data)) {
-		const dataMapId = opts.dataMapId || "data";
-		formData.append(dataMapId, new Blob([JSON.stringify(data)], { type: "application/json;charset=UTF-8" }), `${dataMapId}.json`);
-		
-		// for (let k in data) {
-		// 	if (data.hasOwnProperty(k)) {
-		// 		formData.append(k, data[k] == null ? "" : data[k]);
-		// 	}
-		// }
+	// 텍스트 필드 — dataMap 별 JSON Blob 파트
+	for (let mi = 0; mi < dataJsons.length; mi++) {
+		if ($c.util.isEmpty(dataJsons[mi])) continue;
+		const dataMapId = scwin.__partName(opts.dataMapId, mi, "data");
+		formData.append(dataMapId, new Blob([JSON.stringify(dataJsons[mi])], { type: "application/json;charset=UTF-8" }), `${dataMapId}.json`);
 	}
 
 	const keys = Object.keys(scwin.fileMap);
 
-	// 파일 필드 — <fieldKey>File 로 append
+	// 파일 — files 다중 append + "{fieldKey}_file_index" 로 files 내 인덱스 전달(서버 매칭용)
 	for (let f in scwin.fileMap) {
 		let file = null;
 		if (scwin.fileMap.hasOwnProperty(f)) {
@@ -514,7 +611,6 @@ scwin.saveMapForm = async function (opts) {
 		}
 
 		if (file) {
-			//formData.append(f + suffix, file, file.name);
 			formData.append(`${f}_file_index`, keys.indexOf(f));
 			formData.append("files", file, file.name);
 		}
