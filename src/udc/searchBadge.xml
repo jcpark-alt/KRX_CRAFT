@@ -18,7 +18,7 @@
 		</xf:model>
 		<w2:mfeSubmission />
 		<w2:layoutInfo />
-		<w2:publicInfo method="scwin.getValue,scwin.getText,scwin.getAllJSON,scwin.setJSON,scwin.setRowJSON,scwin.getRowCount,scwin.getDisabled,scwin.getReadOnly,scwin.setDisabled,scwin.setReadOnly,scwin.getDataBindInfo,scwin.getDataBindInfo" exposeType=""/>
+		<w2:publicInfo method="scwin.getValue,scwin.getText,scwin.getAllJSON,scwin.setJSON,scwin.setRowJSON,scwin.getRowCount,scwin.getDisabled,scwin.getReadOnly,scwin.setDisabled,scwin.setReadOnly,scwin.getDataBindInfo,scwin.getDataCollectionInfo" exposeType=""/>
 		<script lazy="false" type="text/javascript"><![CDATA[
 /**
  * @component
@@ -133,7 +133,7 @@
 
 /**
  * @property
- * @name disbled
+ * @name disabled
  * @category 01.Basic & ETC
  * @type combobox
  * @option [true,false]
@@ -181,8 +181,8 @@ scwin.onwframeload = function () {
 		readOnly : false,
 		ref : "",
 		bindColumn : "label",
-		dataList : "",
-		dataMap : ""
+		separator : ",",
+		dataList : ""
 	};
 
 	scwin.options = $p.getOptions(defaultOptions);
@@ -191,10 +191,10 @@ scwin.onwframeload = function () {
 	scwin.options.readOnly = (scwin.options.readOnly.toString().trim().toLowerCase() === "true");	
 
 	if (!$c.util.isEmpty(scwin.options.dataList)) {
-		scwin.dataList = scwin.getDataCollection(scwin.options.dataList);
+		scwin.dataList = scwin.__getDataCollection(scwin.options.dataList);
 	} else {
 		scwin.dataList = dltSearchBadge;
-	}	
+	}
 };
 
 /**
@@ -202,24 +202,24 @@ scwin.onwframeload = function () {
  * @name onpageload
  * @description 화면이 열렸을 때 엔진 초기화 작업이 끝난 뒤에 발생하는 이벤트. 화면 초기화에 필요한 코드를 작성한다.
  */
-scwin.onpageload = function () { 
+scwin.onpageload = function () {
 	// UDC 컴포넌트 초기 속성 설정
-	scwin.initComponent();
+	scwin.__initComponent();
 };
 
 /**
  * @method
- * @name initComponent
- * @description UDC 컴포넌트 초기 속성 설정
+ * @name __initComponent
+ * @description UDC 컴포넌트 초기 속성 설정 (내부용)
  * @param
  * @returns
  * @hidden Y
  * @exception
  * @migrationStatus
- * @example  // "," 문자를 구분자로 선택된 아이템들의 Value 값 조회 ("0,2,3" 형식으로 반환)
- * searchBadge1.getValue(",");
+ * @example // UDC 컴포넌트 초기 속성 설정
+ * scwin.__initComponent();
  */
-scwin.initComponent = function() {
+scwin.__initComponent = function() {
 	genSearchBadge.setDisabled(scwin.options.disabled);
 	genSearchBadge.setReadOnly(scwin.options.readOnly);
 
@@ -228,13 +228,13 @@ scwin.initComponent = function() {
 	}
 
 	// UDC 컴포넌트의 Badge 생성 함수
-	scwin.genaratorSearchBadge();
+	scwin.__generateSearchBadge();
 };
 
 /**
  * @method
- * @name genaratorSearchBadge
- * @description UDC 컴포넌트의 Badge 생성 함수
+ * @name __generateSearchBadge
+ * @description UDC 컴포넌트의 Badge 생성 함수 (내부용)
  * @param
  * @returns
  * @hidden Y
@@ -242,78 +242,80 @@ scwin.initComponent = function() {
  * @migrationStatus
  * @example
  * // UDC 컴포넌트의 Badge 생성 함수
- * scwin.genaratorSearchBadge();
+ * scwin.__generateSearchBadge();
  */
-scwin.genaratorSearchBadge = function() {
+scwin.__generateSearchBadge = function() {
 	genSearchBadge.removeAll();
 
 	scwin.dataList.getAllJSON().forEach((row, i) => {
 		genSearchBadge.insertChild(i);
 
 		const tmpBadge = genSearchBadge.getChild(i, "btnBadge");
-		const tmpLabel = genSearchBadge.getChild(i , "lblLabel");
+		const tmpLabel = genSearchBadge.getChild(i, "lblLabel");
 
 		tmpBadge.setUserData("index", i);
 		tmpLabel.setValue(row.label ?? "");
 	});
 
-	iptRef.setValue(scwin.getValuesBykey("label"));
+	// ref 바인딩 값은 bindColumn 옵션 컬럼을 separator 로 연결한 문자열
+	iptRef.setValue(scwin.__getValuesByKey(scwin.options.bindColumn).join(scwin.options.separator));
 };
 
 /**
  * @method
- * @name getValuesBykey
- * @description UDC 컴포넌트의 dataList에서 특정 key의 값  을 배열로 리턴하는 함수.
- * @param
- * @returns
+ * @name __getValuesByKey
+ * @description UDC 컴포넌트의 dataList에서 특정 key의 값을 배열로 리턴하는 함수 (내부용)
+ * @param {string} key 조회할 컬럼(key) id
+ * @returns {array} 각 Row 의 key 컬럼 값 배열
  * @hidden Y
  * @exception
  * @migrationStatus
  * @example
- * // UDC 컴포넌트의 Badge 생성 함수
- * scwin.getValuesBykey();
+ * // 전체 Row 의 label 값 배열 조회
+ * const labelArr = scwin.__getValuesByKey("label");
  */
-scwin.getValuesBykey = function(key) {
+scwin.__getValuesByKey = function(key) {
 	return scwin.dataList.getAllJSON().map(item => item[key]);
 };
 
 /**
  * @method
  * @name getValue
- * @description 컴포넌트에 선택된 아이템들의 Value 값을 구분자로 구분한 문자열로 반환합니다.
- * @param {string} delimeter 선택된 아이템들의 Value 값을 구분하는 구분자를 텍스트로 설정합니다.
- * 파라미터를 설정하지 않거나 ""(Empty String)으로 설정 시 separator 속성값이 적용됩니다.
- * @returns {string} result 선택된 아이템들의 Value 값을 구분자가 포함된 문자열로 반환합니다.
- * 컴포넌트에 선택된 아이템이 한 개인 경우 구분자 없이 해당 아이템의 Value 값만 반환합니다.
- * 컴포넌트에 선택된 아이템이 없는 경우 falseValue 속성값을 반환합니다.
- * renderType=native 일때 컴포넌트가 선택 상태이면 컴포넌트의 value 속성값을 반환합니다.
+ * @description 배지 아이템들의 value 값을 구분자로 구분한 문자열로 반환합니다.
+ * @param {string} delimiter 아이템들의 value 값을 구분하는 구분자를 텍스트로 설정합니다.
+ * 파라미터를 설정하지 않거나 ""(Empty String)으로 설정 시 separator 속성값(기본 ",")이 적용됩니다.
+ * @returns {string} result 아이템들의 value 값을 구분자가 포함된 문자열로 반환합니다.
+ * 아이템이 한 개인 경우 구분자 없이 해당 아이템의 value 값만 반환하고,
+ * 아이템이 없는 경우 ""(Empty String)을 반환합니다.
  * @hidden N
  * @exception
  * @migrationStatus
- * @example  // "," 문자를 구분자로 선택된 아이템들의 Value 값 조회 ("0,2,3" 형식으로 반환)
+ * @example  // "," 문자를 구분자로 아이템들의 value 값 조회 ("0,2,3" 형식으로 반환)
  * searchBadge1.getValue(",");
  */
-scwin.getValue = function () {
-	return scwin.getValuesBykey("value");
+scwin.getValue = function (delimiter) {
+	const sep = $c.util.isEmpty(delimiter) ? scwin.options.separator : delimiter;
+	return scwin.__getValuesByKey("value").join(sep);
 };
 
 /**
  * @method
  * @name getText
- * @description 컴포넌트에 선택된 아이템들의 라벨값을 구분자로 구분한 문자열로 반환합니다.
- * @param {string} delimeter 선택된 아이템들의 라벨값을 구분하는 구분자를 텍스트로 설정합니다.
- * 파라미터를 설정하지 않거나 ""(Empty String)으로 설정 시 separator 속성값이 적용됩니다.
- * @returns {String} result 선택된 아이템들의 라벨값을 구분자가 포함된 문자열로 반환합니다.
- * 컴포넌트에 선택된 아이템이 한 개인 경우 구분자 없이 해당 아이템의 라벨값만 반환합니다.
- * renderType=native 이거나 컴포넌트에 선택된 아이템이 없는 경우 ""(Empty String)을 반환합니다.
+ * @description 배지 아이템들의 라벨(label)값을 구분자로 구분한 문자열로 반환합니다.
+ * @param {string} delimiter 아이템들의 라벨값을 구분하는 구분자를 텍스트로 설정합니다.
+ * 파라미터를 설정하지 않거나 ""(Empty String)으로 설정 시 separator 속성값(기본 ",")이 적용됩니다.
+ * @returns {string} result 아이템들의 라벨값을 구분자가 포함된 문자열로 반환합니다.
+ * 아이템이 한 개인 경우 구분자 없이 해당 아이템의 라벨값만 반환하고,
+ * 아이템이 없는 경우 ""(Empty String)을 반환합니다.
  * @hidden N
  * @exception
  * @migrationStatus
- * @example // "," 문자를 구분자로 선택된 아이템들의 라벨값 조회 ("0,2,3" 형식으로 반환)
+ * @example // "," 문자를 구분자로 아이템들의 라벨값 조회 ("발행사,종목명" 형식으로 반환)
  * searchBadge1.getText(",");
  */
-scwin.getText = function (delimeter) {
-	return scwin.getValuesBykey("label");
+scwin.getText = function (delimiter) {
+	const sep = $c.util.isEmpty(delimiter) ? scwin.options.separator : delimiter;
+	return scwin.__getValuesByKey("label").join(sep);
 };
 
 /**
@@ -340,6 +342,7 @@ scwin.getAllJSON = function () {
  * @param {boolean} append jsonData 파라미터의 데이터를 기존 데이터에 추가할지 true/false 로 설정합니다.
  * • true : 기존 데이터에 jsonData 파라미터의 데이터를 마지막 위치에 추가합니다.
  * • false : 기존 데이터를 모두 삭제하고 jsonData 파라미터의 데이터로 새로 설정합니다.
+ * (빈 배열 [] 을 append=false 로 전달하면 전체 데이터가 삭제됩니다.)
  * @returns
  * @hidden N
  * @exception
@@ -356,11 +359,12 @@ scwin.getAllJSON = function () {
  * searchBadge1.setJSON(jsonData, false);
  */
 scwin.setJSON = function (jsonData, append = false) {
-	if (!$c.util.isEmpty(jsonData)) {
+	// 빈 배열 + 전체 교체(append=false)는 "전체 비우기"로 허용, null/undefined 는 무시
+	if (!$c.util.isEmpty(jsonData) || (Array.isArray(jsonData) && !append)) {
 		scwin.dataList.setJSON(jsonData, append);
 
 		// UDC 컴포넌트의 Badge 생성 함수
-		scwin.genaratorSearchBadge();		
+		scwin.__generateSearchBadge();
 	}
 };
 
@@ -370,7 +374,7 @@ scwin.setJSON = function (jsonData, append = false) {
  * @description 지정한 Row 인덱스 위치에 JSON 객체로 Row 데이터를 한 건 삽입하거나 덮어쓰기 합니다.
  * @param {number} rowIndex Row 데이터가 삽입 또는 덮어쓰기 될 위치의 인덱스값을 숫자로 설정합니다.
  * Row 의 인덱스는 0 부터 시작하며 필터/정렬 설정에 맞게 인덱스를 설정합니다.
- * @param {object} rowData j삽입 또는 덮어쓰기 하려는 Row 데이터를 JSON 객체로 설정합니다.
+ * @param {object} rowData 삽입 또는 덮어쓰기 하려는 Row 데이터를 JSON 객체로 설정합니다.
  * DataList 모듈의 Column ID 를 Key 로 "Column ID:Value" 형태의 Key-Value 쌍으로 구성합니다.
  * Key-Value 쌍으로 설정하지 않은 Column 엔 값이 설정되지 않습니다.
  * @param {boolean} overwrite rowData 파라미터의 Row 데이터를 덮어쓰기 할지 true/false 로 설정합니다.
@@ -389,7 +393,7 @@ scwin.setRowJSON = function (rowIndex, rowData, overwrite = false) {
 		scwin.dataList.setRowJSON(rowIndex, rowData, overwrite);
 
 		// UDC 컴포넌트의 Badge 생성 함수
-		scwin.genaratorSearchBadge();		
+		scwin.__generateSearchBadge();
 	}
 };
 
@@ -398,7 +402,7 @@ scwin.setRowJSON = function (rowIndex, rowData, overwrite = false) {
  * @name getRowCount
  * @description DataList 모듈의 전체 Row 데이터의 Count를 반환합니다.
  * @param
- * @returns {object} scwin.dataList의 Row Count 리턴
+ * @returns {number} scwin.dataList의 Row Count 리턴
  * @hidden N
  * @exception
  * @migrationStatus
@@ -412,7 +416,7 @@ scwin.getRowCount = function () {
 /**
  * @method
  * @name getDisabled
- * @description trigger 컴포넌트에 적용된 비활성화(disabled) 상태값을 반환합니다.
+ * @description 컴포넌트에 적용된 비활성화(disabled) 상태값을 반환합니다.
  * @param 
  * @returns {boolean} result 비활성화(disabled) 상태를 true/false 로 반환합니다.
  * @hidden N
@@ -429,8 +433,8 @@ scwin.getDisabled = function () {
  * @method
  * @name getReadOnly
  * @description 컴포넌트에 적용된 읽기 전용(readonly) 상태값을 반환합니다.
- * @param 
- * @returns {boolean} result 비활성화(disabled) 상태를 true/false 로 반환합니다.
+ * @param
+ * @returns {boolean} result 읽기 전용(readonly) 상태를 true/false 로 반환합니다.
  * @hidden N
  * @exception
  * @migrationStatus
@@ -453,7 +457,7 @@ scwin.getReadOnly = function () {
  * @exception
  * @migrationStatus
  * @example // 컴포넌트의 disabled 상태값을 설정
- * searchBadge1.setDisabled(true));
+ * searchBadge1.setDisabled(true);
  */
 scwin.setDisabled = function (disabled) {
 	genSearchBadge.setDisabled(disabled);
@@ -470,7 +474,8 @@ scwin.setDisabled = function (disabled) {
  * @hidden N
  * @exception
  * @migrationStatus
- * @example
+ * @example // 컴포넌트의 readonly 상태값을 설정
+ * searchBadge1.setReadOnly(true);
  */
 scwin.setReadOnly = function (readOnly) {
 	genSearchBadge.setReadOnly(readOnly);
@@ -485,18 +490,19 @@ scwin.setReadOnly = function (readOnly) {
  * @hidden N
  * @exception
  * @migrationStatus
- * @example
+ * @example // 부모 화면 DataMap 바인딩 문자열의 컬렉션 id 를 런타임 전체 id 로 치환
+ * iptRef.setRef(scwin.getDataBindInfo("data:dmSearch.isurNm"));
  */
 scwin.getDataBindInfo = function (ref) {
 	let returnData = "";
 
 	try {
 		if (typeof ref === "string" && ref.startsWith("data:")) {
-			const dataMapId = scwin.getDataCollection(ref).getID();
+			const dataMapId = scwin.__getDataCollection(ref).getID();
 			returnData = ref.replace(/:([^.]+)/, `:${dataMapId}`);
 		}
 	} catch(e) {
-		console.error("getDataBindInfo 함수 오류 발생");
+		console.error("getDataBindInfo 함수 오류 발생", e);
 	} finally {
 		return returnData;
 	}
@@ -504,25 +510,24 @@ scwin.getDataBindInfo = function (ref) {
 
 /**
  * @method
- * @name getDataBindInfo
- * @description 바인딩한 DataCollection의 객체를 리턴해주는 함수
+ * @name getDataCollectionInfo
+ * @description 바인딩한 DataCollection의 객체를 리턴하고, 컴포넌트 내부 dataList 참조를 해당 객체로 교체하는 함수
  * @param {string} dataList 바인드 데이터 String(data:dltSearch)
- * @returns {object} DataCollection 객체
+ * @returns {object} DataCollection 객체 (조회 실패 시 null)
  * @hidden N
  * @exception
  * @migrationStatus
- * @example
- * scwin.getDataCollectionInfo(scwin.options.dataMap);
- * scwin.getDataCollectionInfo(scwin.options.dataList);
+ * @example // 부모 화면의 dltSearch 로 데이터 소스를 교체
+ * searchBadge1.getDataCollectionInfo("data:dltSearch");
  */
 scwin.getDataCollectionInfo = function(dataList) {
 	let returnCollection = null;
 
 	try {
-		returnCollection = scwin.getDataCollection(dataList);
+		returnCollection = scwin.__getDataCollection(dataList);
 		scwin.dataList = returnCollection;
 	} catch(e) {
-		console.error("getDataCollectionInfo 함수 오류 발생");
+		console.error("getDataCollectionInfo 함수 오류 발생", e);
 	} finally {
 		return returnCollection;
 	}
@@ -530,19 +535,18 @@ scwin.getDataCollectionInfo = function(dataList) {
 
 /**
  * @method
- * @name getDataCollection
- * @description 문자열에 포함된 DataCollection의 객체를 리턴해주는 함수
- * @param {string} dataList 바인드 데이터 String(data:dltSearch)
- * @returns {object} DataCollection 객체
+ * @name __getDataCollection
+ * @description 문자열에 포함된 DataCollection의 객체를 부모 화면에서 찾아 리턴해주는 함수 (내부용)
+ * @param {string} dataString 바인드 데이터 String(data:dltSearch)
+ * @returns {object} DataCollection 객체 ("data:" 형식이 아니면 null)
  * @hidden Y
  * @exception
  * @migrationStatus
  * @example
- * scwin.dataList = scwin.getDataCollection(scwin.options.ref);
- * scwin.dataList = scwin.getDataCollection(scwin.options.dataMap);
- * scwin.dataList = scwin.getDataCollection(scwin.options.dataList);
+ * scwin.dataList = scwin.__getDataCollection(scwin.options.ref);
+ * scwin.dataList = scwin.__getDataCollection(scwin.options.dataList);
  */
-scwin.getDataCollection = function(dataString) {
+scwin.__getDataCollection = function(dataString) {
 	if (typeof dataString === "string" && dataString.startsWith("data:")) {
 		const arr = dataString.slice(5).split(".");
 
@@ -567,19 +571,20 @@ scwin.emit_onclick = function (e) {
 
 	const btnObj = $p.getComponentById(e.target?.id);
 
+	// 클릭 대상이 배지 버튼 자신인 경우에만 삭제 (내부 라벨 textbox 클릭은 무시)
 	if (this === btnObj) {
-		const index = Number.parseInt(btnObj.getUserData("index") || 0);
+		const index = Number.parseInt(btnObj.getUserData("index") || 0, 10);
 		scwin.dataList.removeRow(index);
-		
+
 		// UDC 컴포넌트의 Badge 생성 함수
-		scwin.genaratorSearchBadge();
+		scwin.__generateSearchBadge();
 	}
 };
 
 /**
  * @event
  * @name onViewChange
- * @description 키보드 또는 마우스 조직을 통해 값이 변경된 경우 발생
+ * @description 키보드 또는 마우스 조작을 통해 값이 변경된 경우 발생
  * 스크립트를 통해 값이 변경된 경우에는 발생하지 않음.
  * @param {object} info info.oldValue, info.newValue를 포함한 JSON을 반환한다.
  * @migrationStatus
