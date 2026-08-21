@@ -38,11 +38,11 @@ scwin.gEmpNm = $c.stf.getUserInfo($p, "empNm");
 scwin.gLdMktTp = $c.stf.getUserInfo($p, "market");
 scwin.gUsrTpCd = $c.stf.getUserInfo($p, "usrTpCd");
 scwin.vScrenID = "ULDSTF30403.xml";
-// 전역 변수 선언
+///////// 1. 변수 및 선언 영역 /////////
 scwin.gLastJob = "";
 scwin.vCONTN_ID = "";
 
-// scwin.onpageload, scwin.onpageunload 함수
+///////// 2. 초기화 영역 /////////
 scwin.onpageload = function () {
     // 영문공시제출 오픈시 아래 부분 삭제
     //--------------------------------------------------
@@ -59,7 +59,7 @@ scwin.onpageload = function () {
 scwin.onpageunload = function () {
 };
 
-// WebSquare 컴포넌트 이벤트 함수
+///////// 3. 컴포넌트 이벤트 영역 /////////
 scwin.btn_AddRow_onclick = function (e) {
     // 공시발간자료 일 경우에만 파일첨부 6개까지 허용 가능토록 수정 by LDJ_20130219
     if (sbx_MENU_FLAG.getValue() === "04") {
@@ -244,7 +244,46 @@ scwin.cbx_OBJ_SYSTEM5_onviewchange = function (info) {
     }
 };
 
-// 일반 함수
+///////// 4. 서브미션 콜백 영역 /////////
+//파일업로드시 파일정보 dataList에 세팅
+scwin.selectCallback = function () {
+    const fileInfos = mpd_file.getFileInfos();
+    // dlt_FILE_LIST.setJSON(fileInfos);
+
+    for (let i = 0; i < fileInfos.length; i++) {
+        let vFileNm = fileInfos[i].name;
+        let vSize = fileInfos[i].size;
+
+        if (vFileNm !== "") {
+            //파일 확장자 체크 추가
+            if (scwin.checkMaxLength1(vFileNm, '80', "파일명")) return; //파일명 80자 체크
+            if (scwin.checkExtension(vFileNm)) return; // 파일 확장자 체크
+
+            if (!scwin.canUploadFile(vSize)) {
+                $c.win.alert('30MB 이하의 파일만 첨부 가능합니다.');
+                return;
+            } else {
+                let newRow = dlt_FILE_LIST.insertRow();
+                dlt_FILE_LIST.setCellData(newRow, "attachFileNm", returnArr[i]);
+            }
+        } else {
+            return;
+        }
+    }    
+};
+
+scwin.sbm_Save_submitdone = async function (e) {
+    if (!e.responseJSON.success) {
+        return;
+    }
+
+    const msg = $c.stf.getMessageParam("MSG-A001", scwin.gLastJob);
+    $c.win.alert(msg);
+    $p.parent().scwin.fn_listDsclBbs();
+    $c.win.closePopup();
+};
+
+///////// 5. 일반/업무 함수 영역 /////////
 scwin.initPage = function () {
     if ($p.getPopupId().includes("INTEBBS_NEW")) {
         // gfm은 정적인 화면이라 변수값을 받을 수 없어. 창의 이름으로 신규와 수정을 구별한다. 
@@ -423,15 +462,17 @@ scwin.save = async function () {
     if (res) {
         scwin.gLastJob = "저장";
         let url = "/IntegratedBBS.do?method=registerDsclBbs" + "&SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_02;
-        // TODO Stage2: trs action 확인 - 원본 KeyValue "JSP(I:pInputMaster=dlt_MASTER, I:pFile=dlt_FILE_LIST)" 의 ref 매핑 검증
+        trs_Save.KeyValue = "JSP(I:pInputMaster=dlt_MASTER, I:pFile=dlt_FILE_LIST)";
+        $c.sbm.setAction(sbm_Save, url);
         const sbmOptions = {
             id : "sbm_Save",
-            action : url,
+            action : "/api/discls/issueinfo/update-new-password-approval",
             ref : "dma_MASTER",
-            submitDoneHandler : scwin.sbm_Save_submitdone,
             isProcessMsg : false
         };
-        $c.sbm.executeDynamic(sbmOptions);
+
+        const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+        scwin.sbm_Save_submitdone(sbmRtn);
         //--------------------------------------------------
 
         mpd_file.changeAction("http://localhost/api/discls/dsclinfo/insert-notice-content");	//action 설정
@@ -454,15 +495,17 @@ scwin.delete = async function () {
     if (res) {
         scwin.gLastJob = "삭제";
         let url = "/IntegratedBBS.do?method=removeDsclBbs" + "&SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_04;
-        // TODO Stage2: trs action 확인 - 원본 KeyValue "JSP(I:pInputMaster=dlt_MASTER)" 의 ref 매핑 검증
+        trs_Save.KeyValue = "JSP(I:pInputMaster=dlt_MASTER)";
+        $c.sbm.setAction(sbm_Save, url);
         const sbmOptions = {
             id : "sbm_Save",
-            action : url,
+            action : "/api/discls/issueinfo/update-new-password-approval",
             ref : "dma_MASTER",
-            submitDoneHandler : scwin.sbm_Save_submitdone,
             isProcessMsg : false
         };
-        $c.sbm.executeDynamic(sbmOptions);
+
+        const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+        scwin.sbm_Save_submitdone(sbmRtn);
     }
 };
 
@@ -562,44 +605,6 @@ scwin.checkMaxLength1 = function (filestr, size, lbl) {
         return true;
     }
     return false;
-};
-
-//파일업로드시 파일정보 dataList에 세팅
-scwin.selectCallback = function () {
-    const fileInfos = mpd_file.getFileInfos();
-    // dlt_FILE_LIST.setJSON(fileInfos);
-
-    for (let i = 0; i < fileInfos.length; i++) {
-        let vFileNm = fileInfos[i].name;
-        let vSize = fileInfos[i].size;
-
-        if (vFileNm !== "") {
-            //파일 확장자 체크 추가
-            if (scwin.checkMaxLength1(vFileNm, '80', "파일명")) return; //파일명 80자 체크
-            if (scwin.checkExtension(vFileNm)) return; // 파일 확장자 체크
-
-            if (!scwin.canUploadFile(vSize)) {
-                $c.win.alert('30MB 이하의 파일만 첨부 가능합니다.');
-                return;
-            } else {
-                let newRow = dlt_FILE_LIST.insertRow();
-                dlt_FILE_LIST.setCellData(newRow, "attachFileNm", returnArr[i]);
-            }
-        } else {
-            return;
-        }
-    }    
-};
-
-scwin.sbm_Save_submitdone = async function (e) {
-    if (!e.responseJSON.success) {
-        return;
-    }
-
-    const msg = $c.stf.getMessageParam("MSG-A001", scwin.gLastJob);
-    $c.win.alert(msg);
-    $p.parent().scwin.fn_listDsclBbs();
-    $c.win.closePopup();
 };
 ]]></script>
 	</head>
