@@ -8,10 +8,12 @@
 - 소스 폴더가 없거나 비어 있으면 건너뛰고 사유를 출력한다.
 
 - ui 폴더를 재귀 탐색하여 하위폴더 구조를 ui-tobe 에 미러링한다.
-- 이미 존재하는 산출물(수기 보강 가능)은 덮어쓰지 않고 건너뛴다.
+- 이미 존재하는 산출물(수기 보강 가능)은 덮어쓰지 않고 건너뛴다. (--force 로 재생성)
 
-CLI: python convert_all.py                          # 아래 MAPPINGS 전체 변환
-     python convert_all.py next-krx-lds-fil-front   # 지정 모듈만 변환
+CLI: python convert_all.py                                  # 아래 MAPPINGS 전체 변환
+     python convert_all.py next-krx-lds-fil-front           # 지정 모듈만 변환
+     python convert_all.py --force [module]                 # 기존 산출물도 덮어쓰며 재생성
+                                                            # (수기 단계2 보강이 있으면 유실 — 사전 확인 필수)
 """
 import sys
 import io
@@ -33,7 +35,7 @@ MAPPINGS = [
 ]
 
 
-def convert_dir(src_rel, dst_rel):
+def convert_dir(src_rel, dst_rel, force=False):
     src, dst = BASE / src_rel, BASE / dst_rel
     if not src.is_dir():
         return {"status": "소스 폴더 없음", "files": 0}
@@ -48,8 +50,8 @@ def convert_dir(src_rel, dst_rel):
         name = os.path.basename(f)
         rel = Path(f).relative_to(src)
         out_path = dst / rel
-        # 이미 변환된 산출물(수기 단계2 보강 가능)은 덮어쓰지 않고 건너뛴다. 재생성하려면 대상 파일을 먼저 삭제.
-        if out_path.exists():
+        # 이미 변환된 산출물(수기 단계2 보강 가능)은 덮어쓰지 않고 건너뛴다. 재생성은 --force.
+        if out_path.exists() and not force:
             agg["skipped"].append(str(rel)); continue
         raw = io.open(f, "r", encoding="utf-8").read()
         try:
@@ -91,13 +93,15 @@ def convert_dir(src_rel, dst_rel):
 
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
-    only = sys.argv[1:]  # 선택: 지정한 모듈 폴더명만 변환(미지정 시 MAPPINGS 전체)
+    args = sys.argv[1:]
+    force = "--force" in args  # 기존 산출물 덮어쓰기(수기 보강 유실 주의)
+    only = [a for a in args if a != "--force"]  # 선택: 지정한 모듈 폴더명만 변환(미지정 시 MAPPINGS 전체)
     mappings = [m for m in MAPPINGS if not only or m[0].split("/")[0] in only]
-    print("== 일괄 변환 (ui → ui-tobe) ==\n")
+    print("== 일괄 변환 (ui → ui-tobe)%s ==\n" % (" [--force 재생성]" if force else ""))
     total = 0
     for src_rel, dst_rel in mappings:
         mod = src_rel.split("/")[0]
-        r = convert_dir(src_rel, dst_rel)
+        r = convert_dir(src_rel, dst_rel, force=force)
         if r["status"] != "변환완료":
             print("[%s] %s" % (mod, r["status"]))
             continue

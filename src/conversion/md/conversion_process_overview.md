@@ -13,6 +13,8 @@ W-Craft 로 1차 변환된 레거시 WebSquare XML(Gauce/X-Internet 유래)을 *
 > | [dynamic_submission_guide.md](dynamic_submission_guide.md) | 규칙 12 동적 Submission 상세 |
 > | [createdialogframe_popup_guide.md](createdialogframe_popup_guide.md) | 규칙 17 팝업 변환 상세 |
 > | [stage2_todo_worklist.md](stage2_todo_worklist.md) | 단계 2 잔여 TODO 집계 |
+> | [sample_templates.md](sample_templates.md) | 최종 샘플 11종 카탈로그 + 화면 유형 매칭 가이드 (단계 2 정답지) |
+> | [conversion_playbook.md](conversion_playbook.md) | 다른 전환 프로젝트 적용 절차(착수 체크리스트) |
 
 ---
 
@@ -52,12 +54,16 @@ src/conversion/
 │   ├── substitution_map.md              (치환 매핑표)
 │   ├── dynamic_submission_guide.md      (규칙 12)
 │   ├── createdialogframe_popup_guide.md (규칙 17)
-│   └── stage2_todo_worklist.md          (단계 2 TODO)
+│   ├── stage2_todo_worklist.md          (단계 2 TODO)
+│   ├── sample_templates.md              (최종 샘플 카탈로그 — 단계 2 정답지)
+│   └── conversion_playbook.md           (다른 프로젝트 적용 절차)
 │
 ├── tools/                           ← 변환 엔진 (Python, 무의존성 stdlib)
 │   ├── convert.py       ── 단계 1 핵심 변환기(영역 분리 + 규칙 1~23 + 리포트)
-│   ├── convert_all.py   ── 배치 드라이버(모듈 순회 · 멱등성/well-formed 검증 · 집계)
+│   ├── convert_all.py   ── 배치 드라이버(모듈 순회 · 멱등성/well-formed 검증 · 집계, --force 재생성)
 │   └── gcc_mapping.py   ── 치환 매핑 로더(SOT 파싱)
+│
+├── sample-front/ui/                 ← 최종 샘플 11종 (gcc 공통함수 활용 표준 템플릿)
 │
 └── next-krx-lds-{fil,mgt,stf,tms}-front/   ← 모듈별 변환 작업 공간
     ├── ui/          ← 입력: W-Craft 1차 변환 원본 (단계 0 산출)
@@ -185,6 +191,8 @@ Python 이 남긴 **"추가 작업 목록"만** 사람/AI 판단으로 처리합
    │ ⑤ 모호·충돌 해소  : 파일마다 다른 의미·커스텀 로직 판정     │
    │ ⑥ 팝업/통신 보강  : popup data 채움·result 처리·submitDone │
    │ ⑦ 0-based 인덱스  : Gauce 1-based → WebSquare 0-based 조정  │
+   │ ⑧ 샘플 매칭 보강  : 화면 유형을 최종 샘플 11종에 매칭해     │
+   │    구조·공통함수 사용을 샘플 수준으로 정렬 (sample_templates)│
    └──────────────────────────────────────────────────────────┘
           │
           ▼
@@ -198,6 +206,8 @@ Python 이 남긴 **"추가 작업 목록"만** 사람/AI 판단으로 처리합
 ```
 
 **잔여 TODO 추적** — 화면 실행(런타임)·업무 로직 판단이 필요해 보류한 항목은 코드에 `// TODO Stage2:` 주석으로 남기고 모듈·유형·파일·라인별로 [stage2_todo_worklist.md](stage2_todo_worklist.md) 에 집계합니다(자동 생성). 항목 해결 시 코드 주석 제거 + 워크리스트 갱신.
+
+**샘플 기준 보강(⑧)** — 단계 2 보강의 도달 목표는 [sample_templates.md](sample_templates.md) 의 최종 샘플 11종입니다. 전환 대상 화면의 유형(목록+페이징, 작성, 팝업, 탭, 엑셀 등)을 매칭 표에서 찾아 해당 샘플의 5단계 구조·async/await 서브미션·검증(`$c.validate.*`)·페이징(`setPagingInfo`) 사용 방식과 일치하도록 정렬합니다.
 
 ---
 
@@ -224,6 +234,9 @@ python src/conversion/tools/convert.py <src.xml> [out.xml]
 # 단계 1 — 모듈 일괄 변환 (fil / mgt / stf / tms, 인자 생략 시 전체)
 python src/conversion/tools/convert_all.py [module]
 
+# 단계 1 — 규칙 개정 후 전체 재생성 (기존 산출물 덮어씀 — 수기 보강 유무 사전 확인)
+python src/conversion/tools/convert_all.py --force [module]
+
 # 단계 2 — 리포트/TODO 보강 후 검증
 npm run lint:xml        # src/gcc 엄격 + src/as-is 레거시(WS111~113 무시) 모두 0 경고 유지
 ```
@@ -233,7 +246,7 @@ npm run lint:xml        # src/gcc 엄격 + src/as-is 레거시(WS111~113 무시)
 3. **(Claude)** 리포트의 검토·대체 항목을 [substitution_map.md](substitution_map.md) 와 `gcc/index.html` 시그니처 기준으로 보강.
 4. **(Claude)** 잔존 레거시 호출을 grep 으로 점검, 의미 검증 후 `npm run lint:xml` 로 마무리.
 
-> `convert_all.py` 는 이미 존재하는 `ui-tobe/` 출력은 **건너뛰어 단계 2 수작업을 보존**합니다. 새 규칙을 반영할 때는 기존 정리본 위에 규칙을 적용하고, `ui/` 에서 통째로 재생성하지 마세요.
+> `convert_all.py` 는 이미 존재하는 `ui-tobe/` 출력은 **건너뛰어 단계 2 수작업을 보존**합니다. 새 규칙을 반영할 때는 기존 정리본 위에 규칙을 적용하는 것이 원칙이며, `--force` 재생성은 **수기 보강이 없음을 확인한 경우에만** 사용하세요(2026-08-21 4개 모듈 전체 재생성이 그 사례 — 당시 ui-tobe 는 구버전 기계 산출물뿐이었음).
 
 ---
 
