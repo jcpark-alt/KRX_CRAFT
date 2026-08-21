@@ -7,14 +7,14 @@
 			<w2:workflowCollection/>
 			<w2:dataCollection baseNode="map"/>
 			<xf:submission id="sbm_dts_Receiver" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json"/>
+			<xf:submission id="sbm_trs_Save" userData2=" keyname:toinb_dataid4; sendnulldata:True;" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json" ev:submitdone="scwin.trs_Save_OnSuccess" ev:submiterror="scwin.trs_Save_OnFail"/>
 			<xf:submission id="sbm_dts_msg" userData2=" syncload:True;" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json"/>
+			<xf:submission id="sbm_dts_rcv" userData2=" syncload:False;" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json" ev:submitdone="scwin.dts_rcv_OnLoadCompleted"/>
 		</xf:model>
 		<script type="text/javascript" lazy="false"><![CDATA[
 /* ★Wcraft guide★    
 스크립트 수작업 유의사항
 */
-
-
 
 //----W-Craft WebSquare 변환 확인: include----//
 
@@ -24,14 +24,14 @@
 scwin.vScrenID = 'ULDMGT30309.gfm';
 scwin.usrId = js_id;
 
-// scwin.onpageload, scwin.onpageunload 함수
+///////// 2. 초기화 영역 /////////
 scwin.onpageload = function() {
 };
 
 scwin.onpageunload = function() {
 };
 
-// WebSquare 컴포넌트 이벤트 함수
+///////// 3. 컴포넌트 이벤트 영역 /////////
 scwin.txa_title_onchange = function(info) {
     scwin.is80bytes(1);
 };
@@ -43,20 +43,20 @@ scwin.img_send_onclick = function(e) {
 scwin.MxCombo_1_onselchange = function(info) {
     //alert(MxCombo_1.Index);
     if (MxCombo_1.getSelectedIndex() === 2) {
-        txa_title.setValue("[운영]상장공시시스템 정상 가동.\r\nATS공개장 개시 수신 확인.\r\n시간외단일가공시 유,코 생성 확인.\r\n금일당번:");
-        MxCombo_2.setSelectedIndex(0);
+        txa_title.Text = "[운영]상장공시시스템 정상 가동.\r\nATS공개장 개시 수신 확인.\r\n시간외단일가공시 유,코 생성 확인.\r\n금일당번:";
+        MxCombo_2.Index = 0;
     } else if (MxCombo_1.getSelectedIndex() === 3) {
-        txa_title.setValue("[운영]상장공시시스템 정상 마감(채권포함)");
-        MxCombo_2.setSelectedIndex(4); // 0->2  마감시 현업문자전송 제외 20130926 yanghy  당분간 운영팀 부서장님까지 모두 넣은 2018.04.02
+        txa_title.Text = "[운영]상장공시시스템 정상 마감(채권포함)";
+        MxCombo_2.Index = 4; // 0->2  마감시 현업문자전송 제외 20130926 yanghy  당분간 운영팀 부서장님까지 모두 넣은 2018.04.02
 
     } else if (MxCombo_1.getSelectedIndex() === 0) {
-        txa_title.setValue("[운영]상장공시시스템 1차 점검 정상.금일당번: ");
-        MxCombo_2.setSelectedIndex(4);
+        txa_title.Text = "[운영]상장공시시스템 1차 점검 정상.금일당번: ";
+        MxCombo_2.Index = 4;
     } else if (MxCombo_1.getSelectedIndex() === 1) {
-        txa_title.setValue("[운영]정보분배 정상확인 완료");
-        MxCombo_2.setSelectedIndex(0);
+        txa_title.Text = "[운영]정보분배 정상확인 완료";
+        MxCombo_2.Index = 0;
     } else {
-        txa_title.setValue("[운영]");
+        txa_title.Text = "[운영]";
     }
 
     //삭제해도 다시 나오도록
@@ -75,13 +75,13 @@ scwin.MxCombo_2_onselchange = function(info) {
 };
 
 scwin.trs_Save_OnSuccess = function(e) {
-    txa_title.setValue("");
+    txa_title.text = "";
     alert('전송 완료');
     scwin.setClear();
 };
 
 scwin.trs_Save_OnFail = function(e) {
-    txa_title.setValue("");
+    txa_title.text = "";
     alert('전송 실패');
     scwin.setClear();
 };
@@ -89,10 +89,12 @@ scwin.trs_Save_OnFail = function(e) {
 scwin.grd_Receiver_onheadcheckclick = function(headerId) {
     let check = 'F';
     if (col === 1) {
+        grd_Receiver.Redraw = false;
         if (bCheck === 1) check = 'T';
-        for (let i = 1; i <= dts_Receiver.getRowCount(); i++) {
+        for (i = 1; i <= dts_Receiver.getRowCount(); i++) {
             dts_Receiver.setCellData(i, "CHECK", check);
         }
+        grd_Receiver.Redraw = true;
     }
 };
 
@@ -122,19 +124,18 @@ scwin.image_2_onclick = function(e) {
 
 };
 
-// 일반 함수
-scwin.setDefault = function() {
+///////// 5. 일반/업무 함수 영역 /////////
+scwin.setDefault = async function() {
     const sbmOptions = {
         id : "sbm_dts_msg",
         action : "/gauceSystemierAdaptor.do",
         ref : "",
         target : "dts_msg=body.content",
-        submitDoneHandler : scwin.sbm_dts_msg_submitdone,
         isProcessMsg : false
     };
 
-    $c.sbm.executeDynamic(sbmOptions);
-
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
 
     dts_msg.insertRow();
     const sbmOptions2 = {
@@ -142,17 +143,16 @@ scwin.setDefault = function() {
         action : "/gauceSystemierAdaptor.do",
         ref : "",
         target : "dts_Receiver=body.content",
-        submitDoneHandler : scwin.sbm_dts_Receiver_submitdone,
         isProcessMsg : false
     };
 
-    $c.sbm.executeDynamic(sbmOptions2);
-
+    const sbmRtn2 = await $c.sbm.executeDynamic(sbmOptions2);
+    // TODO Stage2: sbmRtn2 응답 처리 로직 작성 (구 submitDoneHandler 자리)
 
     scwin.getListSmsRcv();
 };
 
-scwin.getListSmsRcv = function() {
+scwin.getListSmsRcv = async function() {
     url += "&SEARCH_DSC=SMS";
     url += "&SCREN_ID=" + scwin.vScrenID;
     url += "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01;
@@ -161,12 +161,11 @@ scwin.getListSmsRcv = function() {
         action : "/sms.do",
         ref : "",
         target : "dts_rcv=body.content",
-        submitDoneHandler : scwin.dts_rcv_OnLoadCompleted,
         isProcessMsg : false
     };
 
-    $c.sbm.executeDynamic(sbmOptions);
-
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
 
 };
 
@@ -183,20 +182,12 @@ scwin.sendSMS = function() {
         const res = window.confirm("전송하시겠습니까?");
         if (res) {
             let url = "/sms.do?method=sendSMS" + "&SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_02;
+            trs_Save.Action = url;
+            trs_Save.KeyName = "toinb_dataid4";
+            trs_Save.KeyValue = "JSP(I:pInputMsg=dts_msg, I:pInputData=dts_Receiver)";
 
             //----W-Craft WebSquare 변환 확인: post----//
-            const sbmOptions = {
-                id : "sbm_trs_Save",
-                action : url,
-                // TODO Stage2: trs KeyValue 입력 매핑(ref) 확인 - 원본: JSP(I:pInputMsg=dts_msg, I:pInputData=dts_Receiver)
-                ref : "pInputMsg=dts_msg pInputData=dts_Receiver",
-                target : "",
-                submitDoneHandler : scwin.trs_Save_OnSuccess,
-                submitErrorHandler : scwin.trs_Save_OnFail,
-                isProcessMsg : false
-            };
-
-            $c.sbm.executeDynamic(sbmOptions);
+            trs_Save.post();
         }
     }
 };
@@ -239,12 +230,12 @@ scwin.isReceiverNotNull = function() {
 };
 
 scwin.is80bytes = function(ver) {
-    const textVal = scwin.getStringSize(txa_title.getValue());
+    const textVal = scwin.getStringSize(txa_title.text);
     txb_title_size.setValue(textVal);
     if (textVal > 2000) {
         alert('2000byte가 초과되었습니다.');
-        txa_title.setValue(scwin.get2000bytes(txa_title.getValue()));
-        txb_title_size.setValue(scwin.getStringSize(txa_title.getValue()));
+        txa_title.text = scwin.get2000bytes(txa_title.text);
+        txb_title_size.setValue(scwin.getStringSize(txa_title.text));
 
         //----W-Craft WebSquare 변환 확인: Focus----//
         txa_title.Focus();
@@ -279,13 +270,14 @@ scwin.get2000bytes = function(message) {
 };
 
 scwin.deleteRows = function(obj) {
-    // TODO Stage2: 0-based 검토
-    for (let i = obj.getRowCount() - 1; i >= 0; i--) {
-        if (obj.getCellData(i, "CHECK") === "T") obj.deleteRow(i);
+    grd_Receiver.Redraw = false;
+    for (let i = obj.countrow; i >= 1; i--) {
+        if (obj.NameValue(i, "CHECK") === "T") obj.DeleteRow(i);
     }
 
     //----W-Craft WebSquare 변환 확인: setColumnProp----//
     $c.cm.setColumnProp(grd_Receiver, 'CHECK', 'HeadCheck', "false");
+    grd_Receiver.Redraw = true;
 };
 
 scwin.setClear = function() {
@@ -296,11 +288,12 @@ scwin.setClear = function() {
 };
 
 scwin.setGrdReceiver = function() {
+    grd_Receiver.Redraw = false;
     krxP = new Array();
     grp = new Array();
 
     //등록된 수신그룹 순서
-    for (let i = 1; i <= dts_rcv.getRowCount(); i++) {
+    for (i = 1; i <= dts_rcv.getRowCount(); i++) {
         grp[i - 1] = dts_rcv.getCellData(i, "TEXT").split(",");
     }
     if (dts_Receiver.getRowCount() > 0) {
@@ -324,7 +317,7 @@ scwin.setGrdReceiver = function() {
         //1차점검SMS
         krxP = grp[0].concat(grp[2]).concat(grp[1]);
     }
-    for (let i = 0; i < krxP.length; i++) {
+    for (i = 0; i < krxP.length; i++) {
         dts_Receiver.insertRow();
         e = krxP[i].split("|");
 
@@ -340,6 +333,7 @@ scwin.setGrdReceiver = function() {
         //----W-Craft WebSquare 변환 확인: Focus----//
         dts_Receiver.setCellData(dts_Receiver.getFocusedRowIndex(), "RCV_TEAM", e[2]);
     }
+    grd_Receiver.Redraw = true;
 };
 
 scwin.grd_Receiver_CanColumnPosChange = function(row, colid) {
