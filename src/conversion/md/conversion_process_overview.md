@@ -63,7 +63,8 @@ src/conversion/
 │   ├── convert_all.py   ── 배치 드라이버(모듈 순회 · 멱등성/well-formed 검증 · 집계, --force 재생성)
 │   └── gcc_mapping.py   ── 치환 매핑 로더(SOT 파싱)
 │
-├── sample-front/ui/                 ← 최종 샘플 11종 (gcc 공통함수 활용 표준 템플릿)
+├── sample-front/                    ← 최종 샘플 작업 공간
+│   └── ui/          ← gcc 공통함수 활용 최종 샘플 11종 (화면 유형별 표준 템플릿 — 단계 2 정답지)
 │
 └── next-krx-lds-{fil,mgt,stf,tms}-front/   ← 모듈별 변환 작업 공간
     ├── ui/          ← 입력: W-Craft 1차 변환 원본 (단계 0 산출)
@@ -83,6 +84,12 @@ src/conversion/
 | **mgt** | `next-krx-lds-mgt-front` | 상장·파일링 관리 화면 |
 | **stf** | `next-krx-lds-stf-front` | 증권/상장 플로우(신규상장·ETN/ELW/채권/디지털 접수) — 최대 모듈 |
 | **tms** | `next-krx-lds-tms-front` | TMS 화면 |
+
+**최종 샘플 폴더 (`sample-front/ui/`)**
+
+- gcc 공통함수(`$c.*`)만으로 화면을 구성한 **최종 샘플 11종**을 보관한다 — 목록 조회+페이징, 작성(등록·수정), 탭+입력 계산, 입력폼+팝업조회+첨부저장, 조회 팝업, 메일 발송 팝업, 엑셀 다운로드 등 **화면 유형별 표준 템플릿**.
+- 모든 샘플은 5단계 정형화 구조와 서브미션 async/await 순차 실행 규약을 따르는 **단계 2 보강의 도달 목표(정답지)**다. 전환 대상 화면의 유형을 샘플에 매칭해 구조·공통함수 사용을 정렬한다.
+- WebSquare 서버 배포 경로는 `/ui/sample/template/*.xml`. 파일 목록·원본 화면·유형 매칭 표·표준 패턴 상세는 [sample_templates.md](sample_templates.md) 참조.
 
 ---
 
