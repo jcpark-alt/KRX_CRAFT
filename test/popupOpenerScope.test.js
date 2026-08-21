@@ -46,6 +46,8 @@ function loadWindow(overrides = {}) {
     },
     $p: {
       id: "scopeA",
+      // 웹스퀘어 컴포넌트/팝업 id 는 현재 frame id 가 접두되어 빌드된다 — 등록 키 = `${frameId}_${opt.id}`
+      getFrameId: () => "mf_frameA",
       getFrame: () => ({ scope: frameScope }),
       parent: () => ({ scwin: { fromPageFrameParent: () => "pf-parent" } }),
       getPopupId: () => null,
@@ -71,7 +73,8 @@ describe("browserPopup 오프너 scope 접근 (src/gcc/win.xml)", () => {
 
     const popupId = parent.state.openedPopup.options.id;
     expect(popupId).toMatch(/^popup\d+_\d+$/); // 자동 생성 id
-    const info = parent.scwin.getPopupOpenerScope(popupId);
+    // 조회는 frameId 접두 전체 id 로 (자식의 getPopupId() 가 반환하는 형식)
+    const info = parent.scwin.getPopupOpenerScope("mf_frameA_" + popupId);
     expect(info).toBeTruthy();
     expect(info.scope).toBe(parent.frameScope);
     expect(info.scopeP.id).toBe("scopeA");
@@ -80,21 +83,21 @@ describe("browserPopup 오프너 scope 접근 (src/gcc/win.xml)", () => {
   test("_openPopup(browserPopup): 명시적 id 유지 · pageFramePopup 은 등록하지 않음", () => {
     const parent = loadWindow();
     parent.scwin._openPopup("/tmp/pop01.xml", { type: "browserPopup", id: "myPopup" }, {}, () => true);
-    expect(parent.scwin.getPopupOpenerScope("myPopup")).toBeTruthy();
+    expect(parent.scwin.getPopupOpenerScope("mf_frameA_myPopup")).toBeTruthy();
 
     parent.scwin._openPopup("/tmp/pop02.xml", { type: "pageFramePopup", id: "pfPopup" }, {}, () => true);
-    expect(parent.scwin.getPopupOpenerScope("pfPopup")).toBeNull();
+    expect(parent.scwin.getPopupOpenerScope("mf_frameA_pfPopup")).toBeNull();
   });
 
   test("closeAction: 닫힘 시 등록 정리, 닫기 거부(false) 시 유지", () => {
     const parent = loadWindow();
     parent.scwin._openPopup("/t.xml", { type: "browserPopup", id: "p1" }, {}, () => false);
     parent.state.openedPopup.options.closeAction(); // 닫기 거부
-    expect(parent.scwin.getPopupOpenerScope("p1")).toBeTruthy();
+    expect(parent.scwin.getPopupOpenerScope("mf_frameA_p1")).toBeTruthy();
 
     parent.scwin._openPopup("/t.xml", { type: "browserPopup", id: "p2" }, {}, () => true);
     parent.state.openedPopup.options.closeAction(); // 정상 닫힘
-    expect(parent.scwin.getPopupOpenerScope("p2")).toBeNull();
+    expect(parent.scwin.getPopupOpenerScope("mf_frameA_p2")).toBeNull();
   });
 
   test("자식 창 getOpenerScope: opener 등록 정보로 부모 scope 복원", () => {
@@ -104,7 +107,7 @@ describe("browserPopup 오프너 scope 접근 (src/gcc/win.xml)", () => {
 
     const child = loadWindow({
       opener: { closed: false, $c: parent.$c },
-      $p: { getPopupId: () => "popA" },
+      $p: { getPopupId: () => "mf_frameA_popA" }, // 자식이 받는 팝업 id 는 frameId 접두 전체 id
     });
     const openerScope = child.scwin.getOpenerScope();
     expect(openerScope).toBe(parent.frameScope);
@@ -118,7 +121,7 @@ describe("browserPopup 오프너 scope 접근 (src/gcc/win.xml)", () => {
 
     const child = loadWindow({
       opener: { closed: false, $c: parent.$c },
-      $p: { getPopupId: () => "popB" },
+      $p: { getPopupId: () => "mf_frameA_popB" },
     });
     expect(child.scwin.callOpener("setRowData", { a: 1 }, true)).toBe("ok");
     expect(calls).toEqual([[{ a: 1 }, true]]);
@@ -129,7 +132,7 @@ describe("browserPopup 오프너 scope 접근 (src/gcc/win.xml)", () => {
     parent.scwin._openPopup("/t.xml", { type: "browserPopup", id: "popC" }, {}, () => true);
     const child = loadWindow({
       opener: { closed: false, $c: parent.$c },
-      $p: { getPopupId: () => "popC" },
+      $p: { getPopupId: () => "mf_frameA_popC" },
     });
     expect(child.scwin.callOpener("notExists")).toBeUndefined();
   });

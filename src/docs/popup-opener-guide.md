@@ -17,10 +17,11 @@ browserPopup 자식이 opener 셸 내부 구조(`pfm_main` → 탭/MDI/single �
 ## 동작 원리
 
 1. `$c.win.openPopup(url, { type: "browserPopup", ... })` 호출 시 내부(`_openPopup`)에서
-   **호출 화면의 scope 를 popupId 로 등록**한다 (`$c.win` 의 `POPUP_OPENER_SCOPES` 저장소).
+   **호출 화면의 scope 를 `${frameId}_${popupId}` 키로 등록**한다 (`$c.win` 의 `POPUP_OPENER_SCOPES` 저장소).
    `opts.id` 를 지정하지 않으면 popupId 가 자동 생성된다.
-2. WebSquare 엔진은 popupId 를 자식 창 이름/`popupID` 파라미터로 전달하므로,
-   자식 화면은 `$c.win.getPopupId()` 로 자기 popupId 를 알 수 있다.
+2. 웹스퀘어 컴포넌트/팝업 id 는 현재 frame id 가 접두되어 빌드되고, frame id 에는 메인프레임
+   접두어(`mf_`)가 포함된다(예: `mf_pfm_body_popup1755500000000_1`). 따라서 자식 화면이
+   `$c.win.getPopupId()` 로 얻는 **전체 id 가 등록 키와 일치**한다(엔진이 자식 창 이름/`popupID` 로 전달).
 3. 자식의 `$c.win.getOpenerScope()` 가 `window.opener.$c.win.getPopupOpenerScope(popupId)` 를 경유해
    **부모 화면 scope 를 복원**한다. (pageFramePopup 이면 pageFrame 계층 부모를 반환)
 4. 팝업이 닫히면 등록 정보는 자동 정리된다.
