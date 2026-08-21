@@ -1006,6 +1006,20 @@ def align_wcraft(script, report=None):
     return "\n".join(lines)
 
 
+def collapse_blank_runs(script):
+    """연속 빈 줄(개행 3개 이상)을 빈 줄 1개로 축소한다. 문자열/블록주석 내부는 보호. 멱등.
+    규칙 2/4 재배치·헤더 삽입이 남긴 다중 빈 줄을 최종 수렴시켜 1·2회차 출력 차이를 없앤다."""
+    mask = code_mask(script)
+    out, last = [], 0
+    for m in re.finditer(r'\n(?:[ \t]*\n){2,}', script):
+        if all(mask[i] for i in range(m.start(), m.end())):
+            out.append(script[last:m.start()])
+            out.append("\n\n")
+            last = m.end()
+    out.append(script[last:])
+    return "".join(out)
+
+
 def format_script(script):
     """
     변환 후 스크립트 정리: 최상위 함수 정의마다
@@ -1328,12 +1342,15 @@ def mark_async_functions(script, report):
     for kw in ins:   # ins 는 이미 위치 역순 — 오프셋 보존
         script = script[:kw] + "async " + script[kw:]
 
-    report["async_marked"] = marked
+    # 파이프라인에서 2회 호출(규칙4 병합 후 재탐지)되므로 누적·중복 방지
+    report["async_marked"] = report.get("async_marked", []) + marked
     for name in marked:
         if name.startswith("scwin."):
             report["judgment"].append("async 전환: %s — 호출부에서 await 필요 여부 검토(단계2)" % name)
     if orphan:
-        report["judgment"].append("await 소속 함수 탐지 실패 %d건(함수 밖/화살표 함수) — async 부여 수동 확인" % orphan)
+        msg = "await 소속 함수 탐지 실패 %d건(함수 밖/화살표 함수) — async 부여 수동 확인" % orphan
+        if msg not in report["judgment"]:
+            report["judgment"].append(msg)
     return script
 
 
@@ -1901,6 +1918,21 @@ def collect_judgment(script, head, body, report):
 
 # ---------- 파이프라인 ----------
 def convert(raw, filename):
+    """단계 1 변환 진입점 — 규칙 파이프라인(_convert_once)을 고정점까지 반복 적용한다.
+    개별 규칙은 멱등이지만 재배치·헤더 삽입·공백 정리의 상호작용으로 1회차에 미세 공백이
+    남는 사례가 있어, 출력이 더 이상 변하지 않을 때까지(최대 2회 추가) 재적용해 수렴시킨다.
+    리포트는 실질 변환이 일어난 1회차 것을 반환한다. a↔b 진동은 수렴하지 않으므로
+    convert_all 의 IDEM 검사에 그대로 검출된다."""
+    result, report = _convert_once(raw, filename)
+    for _ in range(2):
+        again, _rep = _convert_once(result, filename)
+        if again == result:
+            break
+        result = again
+    return result, report
+
+
+def _convert_once(raw, filename):
     report = {"rule1": "", "rule2": 0, "rule2_skip": [], "rule3": [], "rule4": None, "rule4_merge": None, "rule5a": 0, "rule5b": [], "rule5c": [], "rule5d": [], "rule6": {"converted": [], "deleted": 0}, "rule7": [], "rule7m": [], "rule7n": [], "rule8": {"const": 0, "let": 0}, "rule9": 0, "rule10": 0, "rule11": 0, "rule12": {"converted": []}, "rule13": [], "rule14": [], "rule15": [], "rule16": {"converted": [], "skipped": []}, "rule17": {"converted": [], "skipped": []}, "rule20": [], "rule21": [], "rule23": [], "async_marked": [], "wcraft": 0, "judgment": []}
     reg = split_regions(raw)
     if reg is None:
@@ -1932,8 +1964,10 @@ def convert(raw, filename):
     reg["head"], s, reg["body"] = rule13_rename_scwin_fn(reg["head"], s, reg["body"], report)
     s, reg["body"] = rule3_handlers(s, reg["body"], report)
     s, reg["body"] = rule4_structure(s, reg["body"], report)
+    s = mark_async_functions(s, report)   # 규칙4 병합(gform_onload→onpageload)으로 이동한 await 재탐지
     s = align_wcraft(s, report)   # //----W-Craft 마커 주석 정렬
     s = format_script(s)          # 함수 단위 빈 줄 + 주석 맨앞 정렬
+    s = collapse_blank_runs(s)    # 잔존 다중 빈 줄 수렴(멱등성 보장)
     reg["head"] = rule10_remove_events(reg["head"], report)   # <xf:events>/<xf:event> 삭제
     reg["body"] = rule10_remove_events(reg["body"], report)
     collect_judgment(s, reg["head"], reg["body"], report)
