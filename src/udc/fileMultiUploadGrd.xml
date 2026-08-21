@@ -1,0 +1,739 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:ev="http://www.w3.org/2001/xml-events"
+    xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+    <head meta_screenId="fileMultiUploadGrd" meta_screenName="파일 멀티 업로드 UDC (통합)" meta_screenDesc="fileUpLoadBase 통합 — 단일 UDC">
+    	<w2:type palette="support">COMPONENT</w2:type>
+    	<w2:buildDate />
+    	<w2:MSA />
+    	<xf:model>
+    		<xf:instance>
+    			<data xmlns="" />
+    		</xf:instance>
+    		<w2:dataCollection baseNode="map">
+    			<!-- dataList 옵션으로 받은 부모 dataList 를 setScope 로 매핑 (내부 dataList 없음) -->
+    			<w2:aliasDataList scope="" id="adl_FileInfoList"></w2:aliasDataList>
+    		</w2:dataCollection>
+    		<w2:workflowCollection />
+    	</xf:model>
+    	<w2:mfeSubmission />
+    	<w2:layoutInfo />
+    	<w2:publicInfo method="scwin.openFileDialog,scwin.setParam,scwin.startUpload,scwin.changeAction,scwin.setMaxFileCount,scwin.getFileInfos,scwin.getSelectFileListCount,scwin.getSelectFileList,scwin.getOptions,scwin.setOptions,scwin.setOption,scwin.getOption,scwin.setFileUpload,scwin.removeFiles,scwin.removeFile,scwin.getGeneratedIndex" />
+    	<script lazy="false" type="text/javascript"><![CDATA[
+/**
+ * @component
+ * @componentName udc_fileMultiUploadGrd
+ * @pluginName
+ * @company
+ * @developer
+ * @category /cm/udc
+ * @variableClone true
+ * @notSupportBrowser
+ * @version 2.0
+ * @htmlRender
+ * @icon
+ * @disableIcon
+ * @description 그리드 표시 + 파일 업로드 (fileUpLoadBase 통합)
+ * @width 100%
+ * @height 165px
+ * @license
+ * @imagePath
+ * @homepage
+ */
+
+/**
+ * @property
+ * @name style
+ * @category 01.Basic & ETC
+ * @type string
+ * @default width:100%; height:191px
+ * @necessary N
+ * @description desc
+ */
+
+/**
+ * @property
+ * @name class
+ * @category 01.Basic & ETC
+ * @type string
+ * @default
+ * @necessary N
+ * @description desc
+ */
+
+/**
+ * @property
+ * @name id
+ * @category 01.Basic & ETC
+ * @type string
+ * @default
+ * @necessary N
+ * @description desc
+ */
+
+/**
+ * @property
+ * @name maxFileCount
+ * @category 01.Basic & ETC
+ * @type number
+ * @default 10
+ * @necessary N
+ * @description 최대 업로드 파일 개수 기본값 10
+ */
+
+/**
+ * @property
+ * @name maxFileSize
+ * @category 01.Basic & ETC
+ * @type number
+ * @default 536870912
+ * @necessary N
+ * @description 업로드할 개별 파일 사이즈 (websquare.xml 환경설정 파일의 maxUploadSize 값보다 커서는 안됨)
+ */
+
+/**
+ * @property
+ * @name totalFileSize
+ * @category 01.Basic & ETC
+ * @type number
+ * @default 2009715200
+ * @necessary N
+ * @description 업로드할 전체 파일 사이즈
+ */
+
+/**
+ * @property
+ * @name filter
+ * @category 01.Basic & ETC
+ * @type string
+ * @default gif, jpg, bmp, png, zip, txt, ppt, pptx, xls, xlsx, doc, docx, xml, csv, pdf
+ * @necessary N
+ * @description gif, jpg, bmp, png, zip, txt, ppt, pptx, xls, xlsx, doc, docx, xml, csv, pdf
+ * 공백("")으로 설정하면 모든 파일(*.*)로 설정됨
+ */
+
+/**
+ * @property
+ * @name isdrag
+ * @category 01.Basic & ETC
+ * @type combobox
+ * @option [true,false]
+ * @default false
+ * @necessary N
+ * @description 드래그앤 드랍 기능 사용여부
+ */
+
+/**
+ * @property
+ * @name downloadUrl
+ * @category 01.Basic & ETC
+ * @type string
+ * @default
+ * @necessary N
+ * @description downloadUrl
+ */
+
+/**
+ * @property
+ * @name uploadUrl
+ * @category 01.Basic & ETC
+ * @type string
+ * @default
+ * @necessary N
+ * @description uploadUrl
+ */
+
+/**
+ * @property
+ * @name dataList
+ * @category 03.Data
+ * @type bindDataList
+ * @necessary Y
+ * @description desc
+ */
+
+
+
+/* ==============================================================
+ * onwframeload / onpageload — 초기화
+ * ============================================================== */
+scwin.onwframeload = function () {
+
+	// 옵션 초기화 (dataListTarget 폐기 — adl_FileInfoList 가 부모 dataList 참조)
+	scwin.option = $p.getOptions({
+		maxFileCount:  3,
+		maxFileSize:   536870912,
+		totalFileSize: 2009715200,
+		subDir:        "",
+		filter:        "gif, jpg, bmp, png, zip, txt, ppt, pptx, xls, xlsx, doc, docx, xml, csv, pdf",
+		fileGrpSeq:    0,
+		dragtarget:    "gridView1"
+	});
+
+	scwin.HOST     = location.origin;
+	scwin.BASE_URL = scwin.HOST + "/api/files";
+	scwin.fileType = "host";
+
+	// 부모 화면의 dataList 매핑
+	var bindPath = $p.data.bindPath(scwin.option.dataList || "");
+	adl_FileInfoList.setScope("../" + bindPath.collectionId);
+	adl_FileInfoList.setIgnoreStatus("chk", true);
+	grd_fileList.setColumnReadOnly("chk", false);
+};
+
+scwin.onpageload = function () {
+	btn_fileSelecting.hide();
+	scwin.setFileUpload(scwin.option);
+	scwin.setDropEventHandler();
+};
+
+
+/* ==============================================================
+ * 옵션 관련
+ * ============================================================== */
+scwin.getOptions = function () {
+	return scwin.option;
+};
+
+scwin.setOptions = function (optionsObj) {
+	for (var optKey in optionsObj) {
+		scwin.option[optKey] = optionsObj[optKey];
+	}
+	scwin.setFileUpload(scwin.option);
+};
+
+scwin.setOption = function (optionKey, value) {
+	scwin.option[optionKey] = value;//
+	scwin.setFileUpload(scwin.option);
+};
+
+scwin.getOption = function (optionKey) {
+	return scwin.option[optionKey];
+};
+
+
+/* ==============================================================
+ * 파일 업로드 초기 설정
+ * ============================================================== */
+scwin.setFileUpload = function (option) {
+	try {
+		if ($c.util.isEmpty(option.fileGrpSeq) === false) {
+			scwin.option.fileGrpSeq = option.fileGrpSeq;
+		} else {
+			scwin.option.fileGrpSeq = 0;
+		}
+
+		scwin.option.maxFileCount  = option.maxFileCount;
+		scwin.option.maxFileSize   = option.maxFileSize;
+		scwin.option.totalFileSize = option.totalFileSize;
+
+		if ($c.util.isEmpty(option.filter) == false) {
+			scwin.option.filter = option.filter;
+		}
+
+		mpd_multiFileUpload.setMaxFileCount(option.maxFileCount);
+		mpd_multiFileUpload.setMaxFileSize(option.maxFileSize);
+		mpd_multiFileUpload.setSubDir(option.subDir);
+		if (option.uploadUrl) {
+			mpd_multiFileUpload.changeAction(option.uploadUrl);
+		}
+
+		if (typeof option.subDir !== "undefined") {
+			scwin.option.subDir = option.subDir;
+		}
+
+		scwin.callbackFileUploadSetting();
+	} catch (ex) {
+		console.error(ex);
+	}
+};
+
+scwin.callbackFileUploadSetting = function () {
+	var filter = "";
+	if ($c.util.isEmpty(scwin.option.filter) === false) {
+		var extArr = scwin.option.filter.split(",");
+		for (var idx in extArr) {
+			filter += "*." + extArr[idx].trim() + ";";
+		}
+	} else {
+		filter = "*.*";
+	}
+	mpd_multiFileUpload.setFilter("Filter", filter);
+};
+
+
+/* ==============================================================
+ * 드래그앤드롭 지원
+ * ============================================================== */
+scwin.setDropEventHandler = function () {
+	var dragGrpComp = $p.getParentWindow()?.$p.getComponentById(scwin.getOption("dragtarget"));
+	if (!$c.util.isEmpty(dragGrpComp)) {
+		var fileDragDom = dragGrpComp.render;
+		fileDragDom.addEventListener("dragover",  scwin.doHandleDrop, false);
+		fileDragDom.addEventListener("dragenter", scwin.doHandleDrop, false);
+		fileDragDom.addEventListener("dragleave", scwin.doHandleDrop, false);
+		fileDragDom.addEventListener("drop",      scwin.doHandleDrop, false);
+	}
+};
+
+scwin.doHandleDrop = function (e) {
+	try {
+		WebSquare.event.stopEvent(e);
+		var fileData = e.dataTransfer.files;
+		var uploadFileData = [];
+		for (var idx = 0; idx < fileData.length; idx++) {
+			var isExisted = false;
+			for (var fileIdx in mpd_multiFileUpload.fileArray) {
+				if (fileData[idx].name === mpd_multiFileUpload.fileArray[fileIdx].name) {
+					isExisted = true;
+				}
+			}
+			if (isExisted === false) {
+				uploadFileData.push(fileData[idx]);
+				mpd_multiFileUpload.fileArray.push(fileData[idx]);
+				mpd_multiFileUpload.fileNameArr.push(fileData[idx].name);
+				mpd_multiFileUpload._inx++;
+			}
+		}
+		scwin.selectCallback(uploadFileData);
+	} catch (ex) {
+		console.error(ex);
+	}
+};
+
+
+/* ==============================================================
+ * 파일 선택 / 다이얼로그
+ * ============================================================== */
+
+/**
+ * @method
+ * @name openFileDialog
+ * @description 파일선택
+ * @hidden N
+ */
+scwin.openFileDialog = function (e) {
+	mpd_multiFileUpload.dom.inputZone.click();
+};
+
+
+/**
+ * 파일 선택 완료 콜백 (multiupload 의 selectCallback 옵션)
+ */
+scwin.selectCallback = function (data) {debugger
+	var isValid = true;
+	// ★ adl_FileInfoList (기존 dataList) 기준으로 개수/사이즈 조회
+	var fileInfo = scwin.getCurrentFileInfo();
+
+	var newFileInfo = {
+		fileCount: 0,
+		fileSize:  0
+	};
+
+	// ★ 허용 확장자 배열
+	var allowedExtArr = [];
+	if (!$c.util.isEmpty(scwin.option.filter)) {
+		allowedExtArr = scwin.option.filter.split(",")
+			.map(function (ext) { return ext.trim().toLowerCase().replace(/^\*?\.?/, ""); })
+			.filter(function (ext) { return ext.length > 0; });
+	}
+	var deniedExtFiles = [];
+
+	// 1) 개별 파일 검증 (엔진이 안 하는 확장자 + 이미 있던 개별 사이즈)
+	for (var idx in data) {
+		if (!data[idx]) continue;
+
+		// ★ 확장자 검증 (엔진 미지원)
+		if (allowedExtArr.length > 0) {
+			var extIdx = (data[idx].name || "").lastIndexOf(".");
+			var fileExt = (extIdx >= 0) ? data[idx].name.substring(extIdx + 1).toLowerCase() : "";
+			if (allowedExtArr.indexOf(fileExt) === -1) {
+				deniedExtFiles.push(data[idx].name);
+				mpd_multiFileUpload.removeFile(data[idx].name);
+				delete data[idx];
+				continue;
+			}
+		}
+
+		// 개별 파일 사이즈 검증
+		if (scwin.option.maxFileSize < data[idx].size) {
+			var alertMsg = $c.data.getMessage("MSG_CM_00007", data[idx].name, $c.num.formatByte(scwin.option.maxFileSize));
+			$c.win.alert(alertMsg);
+			mpd_multiFileUpload.removeFile(data[idx].name);
+			delete data[idx];
+		} else {
+			newFileInfo.fileCount++;
+			newFileInfo.fileSize += data[idx].size;
+		}
+	}
+
+	// 확장자 거부 파일 일괄 안내
+	if (deniedExtFiles.length > 0) {
+		$c.win.alert("허용되지 않은 확장자 파일이 제외되었습니다.\n\n"
+			+ "제외 파일:\n - " + deniedExtFiles.join("\n - ")
+			+ "\n\n허용 확장자:\n" + allowedExtArr.join(", "));
+	}
+
+	// 2) 누적 검증 (기존 dataList + 신규 통과분)
+	//   예: 기존 3개 + 신규 3개 = 6개 > maxFileCount(5) → 전체 취소
+	if (Number(scwin.option.maxFileCount) < (fileInfo.fileCount + newFileInfo.fileCount)) {
+		var alertMsg = $c.data.getMessage("MSG_CM_00008", scwin.option.maxFileCount);
+		$c.win.alert(alertMsg);
+		isValid = false;
+	}
+
+	if ((scwin.option.totalFileSize < (fileInfo.fileSize + newFileInfo.fileSize)) && (isValid === true)) {
+		var alertMsg = $c.data.getMessage("MSG_CM_00009", $c.num.formatByte(scwin.option.totalFileSize));
+		$c.win.alert(alertMsg);
+		isValid = false;
+	}
+
+	// 3) 누적 검증 실패 시 이번 선택분 전체 취소 (insert 안 함)
+	if (isValid === false) {
+		for (var idx in data) {
+			if (data[idx]) {
+				mpd_multiFileUpload.removeFile(data[idx].name);
+			}
+		}
+		return;
+	}
+
+	// 4) 통과 파일 → adl_FileInfoList 에 insert
+	if (!$c.util.isEmpty(adl_FileInfoList)) {
+		var fileInfoList = [];
+		var fileCnt = adl_FileInfoList.getRowCount();
+		var addIdx  = 0;
+		for (var idx in data) {
+			if (!data[idx]) continue;
+			fileInfoList.push({
+				"contnAttachSeq": fileCnt + 1 + addIdx,
+				"attachFileNm":   data[idx].name,
+				"fileSize":       data[idx].size
+			});
+			addIdx++;
+		}
+		if (fileInfoList.length > 0) {
+			adl_FileInfoList.insertJSON(adl_FileInfoList.getRowCount(), fileInfoList);
+		}
+	}
+
+	var udcObj = scwin.getUdcObj();
+	$p.emit("onFileSelectDone", udcObj, data);
+};
+
+
+/* ==============================================================
+ * 파일 정보 조회
+ * ============================================================== */
+
+/**
+ * @method
+ * @name getFileInfos
+ * @description 현재 업로드된 파일 정보를 반환한다.
+ * @hidden N
+ */
+scwin.getFileInfos = function () {
+	return mpd_multiFileUpload.getFileInfos();
+};
+
+/**
+ * @method
+ * @name getSelectFileList
+ * @description 선택 (Created) 파일 목록
+ * @hidden N
+ */
+scwin.getSelectFileList = function () {
+	return adl_FileInfoList.getModifiedJSON("C");
+};
+
+/**
+ * @method
+ * @name getSelectFileListCount
+ * @description 선택한 파일목록 갯수
+ * @hidden N
+ */
+scwin.getSelectFileListCount = function () {
+	return adl_FileInfoList.getRowCount();
+};
+
+/**
+ * 현재 dataList 파일 정보 (파일 개수 / 크기 합계)
+ *  - adl_FileInfoList = 부모 dataList 의 alias → 실제 부모 데이터를 봄
+ */
+scwin.getCurrentFileInfo = function () {
+	var fileInfo = { fileCount: 0, fileSize: 0 };
+	if ($c.util.isEmpty(adl_FileInfoList)) return fileInfo;
+
+	var fileList = adl_FileInfoList.getAllJSON();
+	for (var idx in fileList) {
+		var rowStatus = fileList[idx].rowStatus;
+		// C=Created, U=Updated, R=Retrieved, 미지정(초기데이터)도 카운트
+		if ((rowStatus === "C") || (rowStatus === "U") || (rowStatus === "R") || $c.util.isEmpty(rowStatus)) {
+			fileInfo.fileCount++;
+			fileInfo.fileSize += $c.num.parseInt(fileList[idx].fileSize || 0);
+		}
+	}
+	return fileInfo;
+};
+
+
+/* ==============================================================
+ * 파일 삭제
+ * ============================================================== */
+
+/**
+ * @method
+ * @name removeFiles
+ * @description 파일삭제 (다중)
+ * @hidden N
+ */
+scwin.removeFiles = async function (idxArrIdex) {
+	var removeRowTarget = [];
+	var deleteRowTarget = [];
+
+	for (var i = 0; i < idxArrIdex.length; i++) {
+			var rowStatus = adl_FileInfoList.getRowStatus(idxArrIdex[i]);
+			var rowJSON   = adl_FileInfoList.getRowJSON(idxArrIdex[i]);
+			var fileName  = rowJSON.attachFileNm;
+			if (rowStatus == "C") {
+				mpd_multiFileUpload.removeFile(fileName);
+				removeRowTarget.push(idxArrIdex[i]);
+			} else if (rowStatus == "R") {
+				deleteRowTarget.push(idxArrIdex[i]);
+			}
+	}
+
+		adl_FileInfoList.removeRows(removeRowTarget);
+		adl_FileInfoList.deleteRows(deleteRowTarget);
+
+      adl_FileInfoList.getRemovedJSON()
+	$p.emit("onRemoveSelectFile", scwin.getUdcObj(), removeRowTarget, deleteRowTarget, idxArrIdex);
+};
+
+/**
+ * @method
+ * @name removeFile
+ * @description 파일삭제 (단일 파일명)
+ * @hidden N
+ */
+scwin.removeFile = function (fileNm) {
+	mpd_multiFileUpload.removeFile(fileNm);
+};
+
+scwin.btn_linedelete_onclick = function (e) {
+	var idxArrIdex = grd_fileList.getCheckedIndex("chk");
+	scwin.removeFiles(idxArrIdex);
+};
+
+/* ==============================================================
+ * 업로드 실행 / 파라미터
+ * ============================================================== */
+
+/**
+ * @method
+ * @name startUpload
+ * @description 파일 업로드 실행
+ * @hidden N
+ */
+scwin.startUpload = async function (option) {
+	scwin.setUploadParam();
+	mpd_multiFileUpload.startUpload();
+};
+
+scwin.setUploadParam = function () {
+	mpd_multiFileUpload.setParam(0, "subDir", scwin.option.subDir);
+	var fileCount = mpd_multiFileUpload.getFileCount();
+	for (var idx = 1; idx <= fileCount; idx++) {
+		mpd_multiFileUpload.setParam(idx, "FILE_GRP_SEQ", scwin.option.fileGrpSeq);
+	}
+};
+
+/**
+ * @method
+ * @name changeAction
+ * @description upload url 변경
+ * @hidden N
+ */
+scwin.changeAction = function (uploadUrl) {
+	mpd_multiFileUpload.changeAction(uploadUrl);
+};
+
+/**
+ * @method
+ * @name setParam
+ * @description upload param 설정
+ * @hidden N
+ */
+scwin.setParam = function (index, name, value) {
+	mpd_multiFileUpload.setParam(index, name, value);
+};
+
+/**
+ * @method
+ * @name setMaxFileCount
+ * @description 최대 파일 개수 변경
+ * @hidden N
+ */
+scwin.setMaxFileCount = function (maxFileCount) {
+	scwin.option.maxFileCount = maxFileCount;
+	mpd_multiFileUpload.setMaxFileCount(maxFileCount);
+};
+
+
+/* ==============================================================
+ * multiupload 이벤트 핸들러
+ * ============================================================== */
+
+/**
+ * 파일 업로드 진행 상황 — 부모로 emit
+ */
+scwin.mpd_multiFileUpload_onprogress = function (data) {
+	$p.emit("onFileProgress", scwin.getUdcObj(), data);
+};
+
+/**
+ * 파일 업로드 완료
+ */
+scwin.mpd_multiFileUpload_ondone = function (data, resJSON) {
+	var udcObj = scwin.getUdcObj();
+	$p.emit("onFileUploadDone", udcObj, data, resJSON);
+};
+
+/**
+ * 파일 업로드 에러
+ */
+scwin.mpd_multiFileUpload_onerror = function (data) {
+	$c.win.alert("파일 업로드에 실패했습니다.");
+};
+
+
+/* ==============================================================
+ * UDC 헬퍼
+ * ============================================================== */
+scwin.getUdcObj = function () {
+	var frame = $p.getFrame();
+	if (!$c.util.isEmpty(frame.udc2Parent)) {
+		return frame.udc2Parent;
+	} else {
+		return frame;
+	}
+};
+
+scwin.getGeneratedIndex = function () {
+	return scwin.getUdcObj().parentControl.getGeneratedIndex();
+};
+
+scwin.displayFileSize = function (value) {
+	return $c.num.formatByte(value);
+};
+
+
+
+/* ==============================================================
+ * 그리드 이벤트 → 외부 emit
+ * ============================================================== */
+scwin.grd_fileList_oncellclick = function (rowIndex, columnIndex, columnId) {
+	$p.emit("onGrdcellclick", rowIndex, columnIndex, columnId);
+};
+
+
+/* ==============================================================
+ * 외부에 노출하는 이벤트 (샘플용 JSDoc)
+ * ============================================================== */
+
+/**
+ * @event
+ * @name onFileSelectDone
+ * @description 파일을 선택하면 호출되는 이벤트
+ * @param {object} udcObj udc객체
+ * @param {object} selectFileList 선택한 파일 목록
+ */
+
+/**
+ * @event
+ * @name onFileUploadDone
+ * @description 파일 업로드 완료 이벤트
+ * @param {object} udcObj udc객체
+ * @param {object} fileList 파일목록
+ * @param {string} resJSON 응답데이터
+ */
+
+/**
+ * @event
+ * @name onRemoveSelectFile
+ * @description 파일삭제 후 호출되는 이벤트
+ * @param {object} udcObj udc객체
+ * @param {array} removeRow 신규로우 삭제 인덱스
+ */
+
+/**
+ * @event
+ * @name onGrdcellclick
+ * @description 셀클릭 이벤트
+ * @param {object} rowIndex desc
+ * @param {object} columnIndex desc
+ * @param {object} columnId desc
+ */
+
+]]></script>
+    </head>
+    <body ev:onpageload="scwin.onpageload" ev:onwframeload="scwin.onwframeload">
+    	<xf:group class="lybox mt0" id="" meta_snippetCategory="01_화면분할" meta_snippetKeyComponent="true"
+    		meta_snippetName="1_05 좌측 고정 2단 분할_width값 200px" style="">
+    		<!-- 좌측: 파일 목록 그리드 -->
+    		<xf:group adaptiveThreshold="" class="" id="" meta_componentContainer="true" style="">
+    			<xf:group class="gvwbox" id="" style="">
+    				<w2:gridView autoFit="allColumn" class="gvw" dataList="data:adl_FileInfoList"
+    					ev:oncellclick="scwin.grd_fileList_oncellclick" ev:oncelldblclick="" hierarchy="grd_fileList"
+    					id="grd_fileList" orgid="grd_fileList" style="height:153px;"
+    					rowStatusVisible="true" rowNumVisible="true">
+    					<w2:caption id="caption1" style="" value="this is a grid caption."></w2:caption>
+    					<w2:header id="header1" style="">
+    						<w2:row>
+    							<w2:column id="chk" inputType="checkbox" width="70"></w2:column>
+    							<w2:column displayMode="label" id="h_filename" inputType="text" readOnly="true"
+    								textAlign="center" value="순번" width="80">
+    							</w2:column>
+    							<w2:column displayMode="label" id="column2" inputType="text" value="첨부파일명" width="396"></w2:column>
+    						</w2:row>
+    					</w2:header>
+    					<w2:gBody id="gBody1" style="">
+    						<w2:row id="" style="">
+    							<w2:column id="chk" inputType="checkbox" width="70"></w2:column>
+    							<w2:column displayMode="label" id="contnAttachSeq" inputType="text" textAlign="center" width="80"></w2:column>
+    							<w2:column displayMode="label" id="attachFileNm" inputType="text" style="cursor:pointer;" width="396"></w2:column>
+    						</w2:row>
+    					</w2:gBody>
+    				</w2:gridView>
+    			</xf:group>
+    		</xf:group>
+
+    		<!-- 우측: 버튼 + 파일 업로드 컴포넌트 (fileUpLoadBase 통합) -->
+    		<xf:group class="col_fix flex flex_column" id="" meta_componentContainer="true" style="width:150px;">
+    			<xf:trigger class="btn_cm" ev:onclick="scwin.openFileDialog" id="trigger1" label="파일추가"
+    				style="width:100%;" type="button">
+    				<xf:label><![CDATA[파일추가]]></xf:label>
+    			</xf:trigger>
+    			<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.btn_linedelete_onclick"
+    				hierarchy="btn_linedelete" id="trigger2" orgid="btn_linedelete"
+    				src="../img/btn_filedelete.gif" style="width:100%;">
+    				<xf:label><![CDATA[파일삭제]]></xf:label>
+    			</xf:trigger>
+
+    			<!-- fileUpLoadBase 의 mpd_multiFileUpload 통합 -->
+    			<w2:textbox for="mpd_multiFileUpload" style="" id="btn_fileSelecting" label="업로드"
+    				class="btn_cm row_add"></w2:textbox>
+    			<w2:multiupload singleRequest="true" callbackSync="true" ev:onComplete=""
+    				maxcount="" clearOnError="false"
+    				ev:onprogress="scwin.mpd_multiFileUpload_onprogress"
+    				fireEventOnError="false" filter="" mode="html5_transparent"
+    				ev:ondone="scwin.mpd_multiFileUpload_ondone"
+    				ev:onerror="scwin.mpd_multiFileUpload_onerror"
+    				displaySizeUnit="MB" action="" style="display: none" wmode="false"
+    				id="mpd_multiFileUpload" maxsize="1000000000" uploadButton=""
+    				selectCallback="scwin.selectCallback">
+    			</w2:multiupload>
+    		</xf:group>
+    	</xf:group>
+    </body>
+</html>

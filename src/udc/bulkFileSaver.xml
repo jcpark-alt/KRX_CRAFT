@@ -1,0 +1,548 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare"
+	xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_screenId="bulkFileSaver" meta_screenName="일괄 저장 UDC"
+		meta_screenDesc="dataList 신규/수정 로우와 파일을 한 번의 요청으로 서버에 저장. 파일 다이얼로그 트리거 + File 관리 통합.">
+		<w2:type palette="support">COMPONENT</w2:type>
+		<w2:buildDate />
+		<w2:publicInfo
+			method="scwin.getUdcObj,scwin.attachFile,scwin.detachFile,scwin.selectCallback,scwin.clearFileMap,scwin.getFileMap,scwin.transferFile,scwin.loadList,scwin.save,scwin.attachFileToMap,scwin.detachFileFromMap,scwin.loadMapForm,scwin.saveMapForm"></w2:publicInfo>
+		<xf:model>
+			<xf:instance>
+				<data xmlns="" />
+			</xf:instance>
+			<w2:dataCollection baseNode="map" />
+			<w2:workflowCollection />
+		</xf:model>
+		<script lazy="false" type="text/javascript"><![CDATA[/**
+ * @component
+ * @componentName udc_bulkFileSaver
+ * @pluginName 
+ * @company Inswave
+ * @developer Inswave
+ * @category /cm/udc
+ * @notSupportBrowser 
+ * @version
+ * @htmlRender
+ * @icon
+ * @disableIcon
+ * @description dataList 신규/수정 로우 + 파일을 하나의 XHR 로 저장하는 공통 UDC.
+ *              내부에 히든 multiupload 를 포함해 파일 다이얼로그 트리거 + File 저장소 관리.
+ * @width
+ * @height
+ * @license
+ * @imagePath
+ * @homepage
+ */
+
+/**
+ * @property
+ * @name id
+ * @category 01.Basic & ETC
+ * @type string
+ * @option
+ * @default
+ * @necessary N
+ * @bindparent
+ * @migrationStatus
+ * @description 컴포넌트의 ID 를 설정합니다.
+ */
+
+/**
+ * @property
+ * @name class
+ * @category 01.Basic & ETC
+ * @type string
+ * @option
+ * @default
+ * @necessary N
+ * @bindparent
+ * @migrationStatus
+ * @description 컴포넌트에 적용하려는 클래스의 이름을 설정합니다.
+ */
+
+/**
+ * @property
+ * @name style
+ * @category 01.Basic & ETC
+ * @type string
+ * @option
+ * @default
+ * @necessary N
+ * @bindparent
+ * @migrationStatus
+ * @description 컴포넌트에 적용하려는 style을 설정합니다.
+ */
+
+/**
+ * @property
+ * @name fileNameColumn
+ * @category 03.Data
+ * @type string
+ * @option
+ * @default fileName
+ * @necessary N
+ * @bindparent
+ * @migrationStatus
+ * @description [Default : fileName] 파일명의 컬럼 아이디
+ */
+
+/**
+ * @property
+ * @name fileSizeColumn
+ * @category 03.Data
+ * @type string
+ * @option
+ * @default fileSize
+ * @necessary N
+ * @bindparent
+ * @migrationStatus
+ * @description [Default : fileSize] 파일사이즈 컬럼명 설정
+ */
+
+// ═══════════════════════════════════════════════════════════════
+// 라이프사이클
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * @event 
+ * @name onwframeload
+ * @description 화면이 열리기 전 발생하는 이벤트. UDC 초기화에 필요한 코드를 작성한다.
+ */
+scwin.onwframeload = function () {
+	scwin.option = $p.getOptions({});
+	// uid → File 매핑
+	scwin.fileMap = {};
+	// 파일 다이얼로그 오픈 시 컨텍스트 (부모 dataList + rowIdx)
+	scwin.ctx = { rowIdx: -1, dataList: null };
+};
+
+/**
+ * @event 
+ * @name onpageload
+ * @description 화면이 열렸을 때 엔진 초기화 작업이 끝난 뒤에 발생하는 이벤트. 화면 초기화에 필요한 코드를 작성한다.
+ */
+scwin.onpageload = function () { 
+	if ($c.util.isEmpty(scwin.option.fileNameColumn)) { scwin.option.fileNameColumn = "fileName"; }
+	if ($c.util.isEmpty(scwin.option.fileSizeColumn)) { scwin.option.fileSizeColumn = "fileSize"; }
+};
+
+/**
+ * @method 
+ * @name getUdcObj
+ * @description UDC 자신 참조
+ * @hidden N
+ * @return UDC 참조 리턴
+ */
+scwin.getUdcObj = function () {
+	const frame = $p.getFrame();
+	if (!$c.util.isEmpty(frame.udc2Parent)) return frame.udc2Parent;
+	return frame;
+};
+
+// ═══════════════════════════════════════════════════════════════
+// 파일 첨부/제거 (부모에서 호출)
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * @method 
+ * @name attachFile
+ * @description 지정 행에 파일 첨부 다이얼로그 오픈.
+ * @param {number} rowIdx    그리드 행 인덱스
+ * @hidden N
+ * @param {object} dataList  부모 dataList (uid/fileName/fileSize/fileChanged 컬럼 필요)
+ */
+scwin.attachFile = function (rowIdx, dataList) {
+	scwin.ctx.rowIdx = rowIdx;
+	scwin.ctx.dataList = dataList;
+	if (!mpu_hidden.dom || !mpu_hidden.dom.inputZone) {
+		$c.win.alert("업로드 컴포넌트 초기화 오류"); return;
+	}
+
+	mpu_hidden.dom.inputZone.value = "";
+	mpu_hidden.dom.inputZone.click();
+};
+
+/**
+ * @method 
+ * @name detachFile
+ * @description 지정 행의 파일 제거 (fileChanged=Y 세팅)
+ * @param {number} rowIdx    그리드 행 인덱스
+ * @hidden N
+ * @param {object} dataList  부모 dataList (uid/fileName/fileSize/fileChanged 컬럼 필요)
+ */
+scwin.detachFile = function (rowIdx, dataList) {
+	const uid = dataList.getCellData(rowIdx, "uid");
+	if (scwin.fileMap[uid]) {
+		delete scwin.fileMap[uid];
+	}
+
+	dataList.setCellData(rowIdx, scwin.option.fileNameColumn, "");
+	dataList.setCellData(rowIdx, scwin.option.fileSizeColumn, 0);
+	dataList.setCellData(rowIdx, "fileChanged", "Y");
+};
+
+/**
+ * @method 
+ * @name selectCallback
+ * @description multiupload selectCallback — File 획득 → fileMap 저장 + dataList 표시 갱신
+ * @param {object} data  부모 dataList (uid/fileName/fileSize/fileChanged 컬럼 필요)
+ * @hidden N
+ */
+scwin.selectCallback = function (data) {
+	const ctx = scwin.ctx || {};
+	scwin.ctx = { rowIdx: -1, dataList: null };
+	if (!data || data.length === 0) return;
+
+	const files = mpu_hidden.fileArray || [];
+	const file = files[files.length - 1];
+	if (!file) return;
+
+	// 두 컨텍스트 지원 — dataList (rowIdx) or dataMap (fieldKey)
+	if (ctx.dataList && ctx.rowIdx >= 0) {
+		const uid = ctx.dataList.getCellData(ctx.rowIdx, "uid");
+		scwin.fileMap[uid] = file;
+		ctx.dataList.setCellData(ctx.rowIdx, scwin.option.fileNameColumn, file.name);
+		ctx.dataList.setCellData(ctx.rowIdx, scwin.option.fileSizeColumn, file.size);
+		ctx.dataList.setCellData(ctx.rowIdx, "fileChanged", "Y");
+	} else if (ctx.dataMap && ctx.fieldKey) {
+		scwin.fileMap[ctx.fieldKey] = file;
+		ctx.dataMap.set(ctx.fieldKey, file.name);   // input(ref) 자동 갱신
+	}
+
+	mpu_hidden.removeFile(file.name);
+};
+
+/**
+ * @method 
+ * @name clearFileMap
+ * @description fileMap 초기화 (필요 시 부모에서 호출)
+ * @hidden N
+ */
+scwin.clearFileMap = function () {
+	for (let k in scwin.fileMap) {
+		if (scwin.fileMap.hasOwnProperty(k)) {
+			delete scwin.fileMap[k];
+		}
+	};
+};
+
+/**
+ * @method 
+ * @name getFileMap
+ * @description 내부 fileMap 참조 반환 (제너레이터 방식에서 임시 슬롯 조작용)
+ * @hidden N
+ * @return fileMap 내부 fileMap 리턴
+ */
+scwin.getFileMap = function () {
+	return scwin.fileMap;
+};
+
+/**
+ * @method 
+ * @name transferFile
+ * @description fileMap key 변경 (임시 슬롯 → 실제 uid 로 이동)
+ * @hidden N
+ */
+scwin.transferFile = function (oldKey, newKey) {
+	if (scwin.fileMap[oldKey]) {
+		scwin.fileMap[newKey] = scwin.fileMap[oldKey];
+		delete scwin.fileMap[oldKey];
+	}
+};
+
+// ═══════════════════════════════════════════════════════════════
+// 목록 조회
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * @method 
+ * @name loadList
+ * @description GET 목록 조회 → mapper 변환 → dataList.setJSON
+ * @param {Object}   opts
+ * @hidden N
+ * @param {Object}   opts.dataList
+ * @param {string}   opts.listUrl
+ * @param {Function} opts.mapper     서버 row → dataList row 변환
+ * @param {string}   opts.listKey    응답 안 목록 배열 key (기본 "list")
+ * @param {Function} opts.onSuccess
+ * @param {Function} opts.onError
+ */
+scwin.loadList = async function (opts) {
+	try {
+		const res = await fetch(opts.listUrl).then(function (r) {
+			if (!r.ok) throw new Error("HTTP " + r.status);
+			return r.json();
+		});
+
+		const raw = res[opts.listKey || "list"] || [];
+		const mapper = opts.mapper || function (r) { return r; };
+		opts.dataList.setJSON(raw.map(mapper));
+
+		if (typeof opts.onSuccess === "function") opts.onSuccess(res);
+	} catch (e) {
+		if (typeof opts.onError === "function") {
+			opts.onError(e);
+		} else {
+			$c.win.alert("조회 실패: " + e.message);
+		}
+	}
+};
+
+/**
+ * @method 
+ * @name save
+ * @description 일괄 저장 — 신규(C) + 수정(U) 로우와 파일을 한 요청으로 서버 전송.
+ * rows  파트: JSON 배열 (application/json)
+ * files 파트: 같은 이름으로 여러 개 append
+ * 매칭 : rows[i].fileIndex 로 files.get(i) 참조. 파일 없는 행은 fileIndex=null.
+ * @param {Object}   opts
+ * @hidden N
+ * @param {Object}   opts.dataList
+ * @param {string}   opts.saveUrl
+ * @param {Function} opts.onValidate   row → err|null
+ * @param {Function} opts.onSuccess    (res)
+ * @param {Function} opts.onAfterSave  (res)
+ * @param {Function} opts.onError
+ */
+scwin.save = async function (opts) {
+	const dl = opts.dataList;
+	let payload = [];
+
+	if (opts.sendAll === true) {
+		payload = dl.getAllJSON() || [];
+		if (payload.length === 0) { $c.win.alert("저장할 데이터가 없습니다."); return; }
+	} else {
+		const newRows = dl.getInsertedJSON() || [];
+		const updRows = dl.getUpdatedJSON() || [];
+		const delRows = dl.getDeletedJSON() || [];
+
+		if (newRows.length === 0 && updRows.length === 0 && delRows.length === 0) {
+			$c.win.alert("저장할 변경 사항이 없습니다."); return;
+		}
+
+		for (let n = 0; n < newRows.length; n++) { newRows[n].rowStatus = "C"; payload.push(newRows[n]); }
+		for (let u = 0; u < updRows.length; u++) { updRows[u].rowStatus = "U"; payload.push(updRows[u]); }
+		for (let d = 0; d < delRows.length; d++) { delRows[d].rowStatus = "D"; payload.push(delRows[d]); }
+	}
+
+	if (typeof opts.onValidate === "function") {
+		for (let v = 0; v < payload.length; v++) {
+			const err = opts.onValidate(payload[v]);
+			if (err) { $c.win.alert(err); return; }
+		}
+	}
+
+	// 파일 있는 행에만 fileIndex 부여, 파일은 별도 배열
+	const files = [];
+	for (let i = 0; i < payload.length; i++) {
+		const row = payload[i];
+		row.fileIndex = null;
+		if (row.rowStatus !== "D" && row.fileChanged === "Y") {
+			const f = scwin.fileMap[row.uid];
+			if (f) {
+				row.fileIndex = files.length;
+				files.push(f);
+			}
+		}
+	}
+
+	const formData = new FormData();
+
+	if (!$c.util.isEmpty(payload)) {
+		const dataListId = opts.dataListId || "rows";
+		const newPayload = {};
+		newPayload[dataListId] = payload;
+		formData.append(dataListId, new Blob([JSON.stringify(newPayload)], { type: "application/json;charset=UTF-8" }), `${dataListId}.json`);
+	}
+
+	// dataMap이 있는 경우 데이를 추가해서 전송한다.
+	const data = opts.dataMap?.getJSON();
+
+	if (!$c.util.isEmpty(data)) {
+		const dataMapId = opts.dataMapId || "data";
+		formData.append(dataMapId, new Blob([JSON.stringify(data)], { type: "application/json;charset=UTF-8" }), `${dataMapId}.json`);
+		// // 텍스트 필드
+		// for (let k in data) {
+		// 	if (data.hasOwnProperty(k)) {
+		// 		formData.append(k, data[k] == null ? "" : data[k]);
+		// 	}
+		// }
+	}
+
+	for (let j = 0; j < files.length; j++) {
+		formData.append("files", files[j], files[j].name);
+	}
+
+	try {
+		const res = await fetch(opts.saveUrl, { method: "POST", body: formData }).then(function (r) {
+			if (!r.ok) throw new Error("HTTP " + r.status);
+			return r.json();
+		});
+
+		scwin.clearFileMap();
+
+		if (typeof opts.onSuccess === "function") opts.onSuccess(res);
+		if (typeof opts.onAfterSave === "function") await opts.onAfterSave(res);
+	} catch (e) {
+		if (typeof opts.onError === "function") opts.onError(e);
+		else $c.win.alert("저장 실패: " + e.message);
+	}
+};
+
+// ═══════════════════════════════════════════════════════════════
+// dataMap 기반 (flat 폼 — 여러 테이블에 필드 분산)
+// FormData 규칙: 텍스트는 필드명 그대로, 파일은 <필드명>File 접미어
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * @method
+ * @name attachFileToMap
+ * @description dataMap 의 특정 fieldKey 에 파일 첨부. 파일명은 dataMap.set 으로 자동 반영 (input ref 자동 갱신)
+ * @param {string} fieldKey  dataMap 의 key
+ * @hidden N
+ * @param {object} dataMap   대상 dataMap
+ */
+scwin.attachFileToMap = function (fieldKey, dataMap) {
+	scwin.ctx = { fieldKey: fieldKey, dataMap: dataMap };
+	if (!mpu_hidden.dom || !mpu_hidden.dom.inputZone) {
+		$c.win.alert("업로드 초기화 오류"); return;
+	}
+
+	mpu_hidden.dom.inputZone.value = "";
+	mpu_hidden.dom.inputZone.click();
+};
+
+/**
+ * @method
+ * @name detachFileFromMap
+ * @description dataMap 파일 제거 — 파일명 비우고 fileMap 정리
+ * @param {string} fieldKey  dataMap 의 key
+ * @hidden N
+ * @param {object} dataMap   대상 dataMap
+ */
+scwin.detachFileFromMap = function (fieldKey, dataMap) {
+	if (scwin.fileMap[fieldKey]) delete scwin.fileMap[fieldKey];
+	dataMap.set(fieldKey, "");
+};
+
+/**
+ * @method
+ * @name loadMapForm
+ * @description GET → dataMap.setJSON — 모든 input(ref) 자동 갱신
+ * @param opts.dataMap   대상
+ * @hidden N
+ * @param opts.listUrl   GET API
+ * @param opts.dataKey   응답 안 데이터 오브젝트 key (기본 "data")
+ * @param opts.onSuccess (res)
+ * @param opts.onError
+ */
+scwin.loadMapForm = async function (opts) {
+	try {
+		const res = await fetch(opts.listUrl).then(function (r) {
+			if (!r.ok) throw new Error("HTTP " + r.status);
+			return r.json();
+		});
+
+		const data = res[opts.dataKey || "data"] || {};
+		opts.dataMap.setJSON(data);
+
+		if (typeof opts.onSuccess === "function") opts.onSuccess(res);
+	} catch (e) {
+		if (typeof opts.onError === "function") opts.onError(e);
+		else $c.win.alert("조회 실패: " + e.message);
+	}
+};
+
+/**
+ * @method
+ * @name saveMapForm
+ * @description dataMap 텍스트 + fileMap 파일을 flat FormData 로 저장
+ *   FormData 규칙: 파일 필드명 = fieldKey + "File" (예: profileImageFile)
+ * @param opts.dataMap
+ * @hidden N
+ * @param opts.saveUrl
+ * @param opts.fileSuffix  파일 필드 접미어 (기본 "File")
+ * @param opts.onValidate  (data) → err|null
+ * @param opts.onSuccess   (res)
+ * @param opts.onAfterSave (res)
+ * @param opts.onError
+ */
+scwin.saveMapForm = async function (opts) {
+	const data = opts.dataMap.getJSON();
+	const suffix = opts.fileSuffix || "File";
+
+	if (typeof opts.onValidate === "function") {
+		const err = opts.onValidate(data);
+		if (err) {
+			$c.win.alert(err); return;
+		}
+	}
+	
+	const formData = new FormData();
+
+	// dataList가 있는 경우 rows 객체에 담아 전송한다.
+	const dl = opts.dataList;
+	let payload = dl?.getAllJSON();
+
+	if (!$c.util.isEmpty(payload)) {
+		const dataListId = opts.dataListId || "rows";
+		const newPayload = {};
+		newPayload[dataListId] = payload;
+		formData.append(dataListId, new Blob([JSON.stringify(newPayload)], { type: "application/json;charset=UTF-8" }), `${dataListId}.json`);
+	}
+
+	// 텍스트 필드
+	if (!$c.util.isEmpty(data)) {
+		const dataMapId = opts.dataMapId || "data";
+		formData.append(dataMapId, new Blob([JSON.stringify(data)], { type: "application/json;charset=UTF-8" }), `${dataMapId}.json`);
+		
+		// for (let k in data) {
+		// 	if (data.hasOwnProperty(k)) {
+		// 		formData.append(k, data[k] == null ? "" : data[k]);
+		// 	}
+		// }
+	}
+
+	const keys = Object.keys(scwin.fileMap);
+
+	// 파일 필드 — <fieldKey>File 로 append
+	for (let f in scwin.fileMap) {
+		let file = null;
+		if (scwin.fileMap.hasOwnProperty(f)) {
+			file = scwin.fileMap[f];
+		}
+
+		if (file) {
+			//formData.append(f + suffix, file, file.name);
+			formData.append(`${f}_file_index`, keys.indexOf(f));
+			formData.append("files", file, file.name);
+		}
+	}
+
+	try {
+		const res = await fetch(opts.saveUrl, { method: "POST", body: formData }).then(function (r) {
+			if (!r.ok) throw new Error("HTTP " + r.status);
+			return r.json();
+		});
+
+		scwin.clearFileMap();
+
+		if (typeof opts.onSuccess === "function") opts.onSuccess(res);
+		if (typeof opts.onAfterSave === "function") await opts.onAfterSave(res);
+	} catch (e) {
+		if (typeof opts.onError === "function") {
+			opts.onError(e);
+		} else {
+			$c.win.alert("저장 실패: " + e.message);
+		}
+	}
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onwframeload="scwin.onwframeload" useExternalClass="true">
+		<w2:multiupload id="mpu_hidden" mode="html5_transparent" multiple="false" singleRequest="false" fireEventOnError="true"
+			filter="" maxsize="1000000000" action="" selectCallback="scwin.selectCallback"
+			style="position:absolute;left:-9999px;top:-9999px;width:1px;height:1px;overflow:hidden;" />
+	</body>
+</html>

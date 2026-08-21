@@ -1,0 +1,1366 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:ev="http://www.w3.org/2001/xml-events"
+    xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+    <head meta_screenName="FromToCalendar UDC" meta_desc="FromToCalendar UDC\n시작일부터 마감일까지의 날짜를 지정할 수 있으며, 선택한 기간을 일반일자, 영업일자 2가지로 보여줄 수 있다." meta_memo="" meta_author="Max" meta_date="2024.11.06">
+        <w2:type palette="support">COMPONENT</w2:type>
+        <w2:buildDate/>
+        <w2:MSA/>
+        <xf:model>
+            <w2:dataCollection baseNode="map"/>
+            <w2:workflowCollection/>
+        </xf:model>
+        <w2:layoutInfo/>
+        <w2:publicInfo method="scwin.businessDay_Calculate,scwin.calulateDays,scwin.day_Calcultate,scwin.formattedDate,scwin.getFromInValue,scwin.getFromValue,scwin.getToInValue,scwin.getToValue,scwin.month_calculate,scwin.parseStringDate,scwin.quareterSelect,scwin.removeCellFocus,scwin.setBusinessDays,scwin.setDisplayLocation,scwin.setTimeDisplay,scwin.setValue,scwin.validationDate"/>
+        <script lazy="false" type="text/javascript"><![CDATA[
+/**
+ * @component
+ * @componentName udc_fromToCalendar
+ * @pluginName 
+ * @company Inswave
+ * @developer Max
+ * @category /cm/udc
+ * @notSupportBrowser 
+ * @version
+ * @htmlRender
+ * @icon
+ * @disableIcon
+ * @description
+ * @width
+ * @height
+ * @license
+ * @imagePath
+ * @homepage
+ */
+
+/**
+ * @property
+ * @name id
+ * @category 01.Basic & ETC
+ * @type string
+ * @option
+ * @default
+ * @necessary N
+ * @bindparent
+ * @description udc의 id값을 설정한다.
+ */
+
+/**
+ * @property
+ * @name class
+ * @category 01.Basic & ETC
+ * @type string
+ * @option
+ * @default
+ * @necessary N
+ * @bindparent
+ * @description udc의 CSS Class를 지정한다.
+ */
+
+/**
+ * @property
+ * @name style
+ * @category 01.Basic & ETC
+ * @type string
+ * @option
+ * @default
+ * @necessary N
+ * @bindparent
+ * @description style을 지정한다.
+ */
+
+/**
+ * @property
+ * @name period
+ * @category 01.Basic & ETC
+ * @type string
+ * @option [true, false]
+ * @default false
+ * @necessary N
+ * @bindparent
+ * @description 주간, 당월의 기간 선택 버튼을 보여준다. 해당 기능을 사용하는 경우 true값으로 설정한다.
+ * ex) From Calendar에 20241101 선택 시 해당 일자의 일요일부터 토요일까지 1주간 선택
+ */
+
+/**
+ * @property
+ * @name quarter
+ * @category 01.Basic & ETC
+ * @type string
+ * @option [true, false]
+ * @default false
+ * @necessary N
+ * @bindparent
+ * @description 분기별 기간을 선택한다. 선택한 날짜의 연도가 기준이며 분기별 첫 번째 날짜와 마지막 날짜로 기간이 설정된다.
+ * ex) 2025년 기준 1분기 선택 시 2025.01.01 ~ 2025.03.31이 값이 바인딩.
+ */
+
+/**
+ * @property
+ * @name time
+ * @category 01.Basic & ETC
+ * @type string
+ * @option [none, HH:mm, HH:mm:ss]
+ * @default none
+ * @necessary N
+ * @bindparent
+ * @description FromToCalendar의 시간 데이터를 입력할 수 있도록 추가하는 설정
+ * 기본 값은 HH:mm 이며, HH:mm:ss 까지 설정 가능
+ */
+
+// 전역변수
+scwin.isOpen = false;
+scwin.isBusiness = false;
+scwin.previousDate = ['from', 'to'];
+
+scwin.onpageload = function () { 
+
+    const opt = $p.getOptions();
+    // 속성 period 확인
+    if (opt.period === 'true') {
+        btn_weekend.show();
+        btn_onMonth.show();
+    }
+    // 속성 quarter 확인
+    if (opt.quarter === 'true') {
+        btn_quarter1.show();
+        btn_quarter2.show();
+        btn_quarter3.show();
+        btn_quarter4.show();
+    }
+    // 속성 time 확인
+    if (opt.time != undefined && opt.time !== 'none') {
+        scwin.setTimeDisplay(opt.time);
+    }
+    scwin.setDisplayLocation();
+    scwin.focusRemove();
+    // oninput으로 상시 입력 값 체크를 하는 경우 아래의 주석 해제하여 함수 구현
+    // ipt_start.bind('oninput', scwin.oninput_ipt_calendar);
+    // ipt_exit.bind('oninput', scwin.oninput_ipt_calendar);
+};
+
+/**
+ * @method
+ * @name focusRemove
+ * @description 최초 load시 To Calendar에 focus를 없앤다.
+ * @hidden N
+ * @exception 
+ */
+scwin.focusRemove = function () {
+    const obj = document.getElementsByClassName('w2calendar_selected');
+    const selObj = document.getElementsByClassName('w2calendar_today');
+
+    // ES6
+    Array.from(obj).forEach(obj => {
+        if(obj.id.includes('exit') || obj.id.includes('start')) obj.classList.remove('w2calendar_selected'); 
+    });
+
+    Array.from(selObj).forEach(selObj => {
+        selObj.classList.remove('w2calendar_today');
+    });
+}
+
+/**
+ * @method
+ * @name setTimeDisplay
+ * @description time 옵션을 설정한 경우 시간 데이터 입력이 가능한 input과 calendar를 호출한다.
+ * @param {string} mode time의 option 값 'HH:mm', 'HH:mm:ss'의 2가지 값 중 하나
+ * @hidden N
+ * @exception 
+ */
+scwin.setTimeDisplay = function (mode) {
+    // display
+    cal_start.hide();
+    cal_exit.hide();
+    cal_startTime.show();
+    cal_exitTime.show();
+
+    // validation option
+    ipt_sTime.setMandatory(true);
+    ipt_fTime.setMandatory(true);
+
+    if (mode === 'HH:mm') {
+        scwin.timeMode = 'HH:mm';
+        grp_wrap.addClass('minute');
+        ipt_sTime.setDisplayFormat('HH:mm');
+        ipt_fTime.setDisplayFormat('HH:mm');
+    } else if (mode === 'HH:mm:ss') {
+        scwin.timeMode = 'HH:mm:ss';
+        grp_wrap.addClass('second');
+        ipt_sTime.setDisplayFormat('HH:mm:ss');
+        ipt_fTime.setDisplayFormat('HH:mm:ss');
+        ipt_sTime.setMaxLength(6);
+        ipt_fTime.setMaxLength(6);
+    }
+};
+
+/**
+ * @method
+ * @name setDisplayLocation
+ * @description UDC의 위치에 따른 Calendar Display의 위치를 동적으로 설정한다.
+ * 예시) udc가 왼쪽 가장자리인 경우 Calendar Display는 오른쪽으로 호출된다.
+ * @hidden N
+ * @exception 
+ * @example ${example}
+ */
+scwin.setDisplayLocation = function () {
+    // getBoundingClient
+    const parent = document.getElementById($c.win.getParent().$p.getFrameId()).getBoundingClientRect();
+    const x = grp_wrap.getPosition('left');
+    const y = grp_wrap.getPosition('top');
+    let left, top;
+
+    if (parent.width - x < 560) {
+        const space = parent.width - x - grp_wrap.getSize('outerMarginWidth');
+        left = parent.width - (560 + space);
+    }
+
+    if (parent.height - y < 440) {
+        const space = parent.height - y - grp_wrap.getSize('outerMarginHeight');
+        top = parent.height - (450 + space); // calendar height 429, input outerHeight 32, calendar margin-top 8px;
+    }
+
+    grp_cal.setPosition(left, top);
+}
+
+/**
+ * @method
+ * @name setBusinessDays
+ * @description 영업일 기준으로 특정일 이후를 계산하는 수식
+ * @param {Number} opt 기간일 수
+ * @hidden N
+ * @exception 
+ */
+scwin.setBusinessDays = function (opt) {
+    let start = $c.util.isEmpty(scwin.timeMode) ? cal_start.getValue() : cal_startTime.getValue();
+    start = scwin.formattedDate(start);
+
+    const data = $p.top().dlt_holiday.getAllJSON();
+    // es6
+    const holidays = data.map(data => parseDateString(data.REST_DATE));
+
+    // es5로 전환한 문법 사용 추후 업데이트 필요.
+    let businessCnt = 0;
+    let fromData = new Date(start);
+
+    while (businessCnt <= opt) {
+        let day = start.getDay();
+        const isHoliday = holidays.some(data => data.getTime() === start.getTime());
+
+        // 주말 확인
+        if (day !== 0 && day !== 6 && !isHoliday) {
+            businessCnt++;
+            if (businessCnt > opt) break;
+        };
+
+        start = start.setDate(start.getDate() + 1);
+        start = new Date(start);
+    }
+
+    scwin.businessDay_Calculate(fromData, start);
+    const diff = scwin.calulateDays(fromData, start);
+    scwin.setClassFromToCalendar(fromData, start, diff);
+
+    const finish = scwin.parseStringDate(start);
+    scwin.setValue(finish, 1);
+
+    function parseDateString(dateString) {
+        const year = parseInt(dateString.substring(0, 4), 10);
+        const month = parseInt(dateString.substring(4, 6), 10) - 1; // 월은 0부터 시작
+        const day = parseInt(dateString.substring(6, 8), 10);
+        return new Date(year, month, day);
+    }
+}
+
+/**
+ * @method
+ * @name calulateDays
+ * @description 선택한 날짜 사이의 간격을 계산한다. 
+ * @param {string} start fromCalendar의 Date 값
+ * @param {string} finish toCalendar의 Date 값
+ * @param {boolean} isAbs 절대값 사용여부 default : true;
+ * @retrun {Number} diff from과 to의 날짜사이 간격 계산 값.
+ * @exception 
+ * @example const days = scwin.calulateDays(start, finish);
+ */
+scwin.calulateDays = function (start, finish, isAbs) {
+    start = start instanceof Date ? start : new Date(start)
+    finish = finish instanceof Date ? finish : new Date(finish)
+    isAbs = isAbs || true;
+
+    const diff = calculate(start, finish, isAbs);
+
+    // isDisplay 표시인 경우 TextBox 표시.
+    if (diff > 0) tbx_period.setValue(diff + '일');
+
+    return diff;
+
+    function calculate(start, finish, isAbs) {
+        start = start.getTime();
+        finish = finish.getTime();
+
+        // 당일을 1일로 계산
+        let diff = (finish - start) / (1000 * 60 * 60 * 24) + 1;
+        return isAbs ? Math.floor(diff) : diff;
+    }
+};
+
+/**
+ * @method
+ * @name businessDay_Calculate
+ * @description 영업일 기준 선택일자의 간격을 계산한다.
+ * @param {string} start fromCalendar의 Date 값
+ * @param {string} finish toCalendar의 Date 값
+ * @hidden N
+ * @example const days = scwin.businessDay_Calculate(start, finish)
+ */
+scwin.businessDay_Calculate = function (start, finish) {
+    const data = $p.top().dlt_holiday.getAllJSON();
+    const holidays = data.map(data => parseDateString(data.REST_DATE));
+    let businessCnt = 0;
+    let current = new Date(start);
+
+    while (current <= finish) {
+        let day = current.getDay();
+        // 주말 확인
+        if (day !== 0 && day !== 6) {
+            const isHoliday = holidays.some(data => data.getTime() === current.getTime());
+            if (!isHoliday) {
+                businessCnt++;
+            }
+        }
+        current = current.setDate(current.getDate() + 1);
+        current = new Date(current);
+    }
+
+    tbx_busiPeriod.setValue(businessCnt + '일');
+
+    function parseDateString(dateString) {
+        const year = parseInt(dateString.substring(0, 4), 10);
+        const month = parseInt(dateString.substring(4, 6), 10) - 1; // 월은 0부터 시작
+        const day = parseInt(dateString.substring(6, 8), 10);
+        return new Date(year, month, day);
+    }
+}
+
+/**
+ * @method
+ * @name formattedDate
+ * @description string형태의 Date값을 Date객체로 formatting 한다.
+ * @param {string} date string형태로 들어온 날짜 값
+ * @param {boolean} ignore scwin.timeMode를 무시 요청 기본 값 == false
+ * @return {Date} date Date객체로 변환된 date 값.
+ * @hidden N
+ * @exception 
+ * @example
+ * const today = cal_start.getValue(); 
+ * const date = scwin.formattedDate(today);
+ */
+scwin.formattedDate = function (date, ignore) {
+    let year, month, day;
+    // ignore의 default 값은 false;
+    ignore = ignore || false;
+    if (ignore != true && !$c.util.isEmpty(scwin.timeMode)) {
+        year = date.slice(0, 4);
+        month = date.slice(4, 6);
+        day = date.slice(6, 8);
+        let hour = date.slice(8, 10);
+        let minute = date.slice(10, 12);
+        let second = date.slice(12, 14);
+
+        return new Date(year, month - 1, day, hour, minute, second);
+    } else {
+        year = date.slice(0, 4);
+        month = date.slice(4, 6);
+        day = date.slice(6, 8);
+        return new Date(year, month - 1, day);
+    }
+}
+
+/**
+ * @method
+ * @name parseStringDate
+ * @description Date객체를 Calendar의 파라미터로 사용할 수 있게 변환한다
+ * @param {Date} date string 형태로 전환하려는 Date값
+ * @param {boolean} ignore scwin.timeMode 무시여부 default는 false
+ * @hidden N
+ * @exception 
+ * @example
+ * const date = scwin.parseStringDate(today);
+ */
+scwin.parseStringDate = function (date, ignore) {
+    date = new Date(date);
+    let year, month, day, hour, minute, second;
+    ignore = ignore || false;
+
+    if (ignore != true && !$c.util.isEmpty(scwin.timeMode)) {
+        year = date.getFullYear().toString();
+        month = (date.getMonth() + 1).toString().padStart(2, '0');
+        day = date.getDate().toString().padStart(2, '0');
+        hour = date.getHours().toString().padStart(2, '0');
+        minute = date.getMinutes().toString().padStart(2, '0');
+        second = date.getSeconds().toString().padStart(2, '0');
+
+        if (scwin.timeMode === 'HH:mm') {
+            return year + month + day + hour + minute;
+        } else if (scwin.timeMode === 'HH:mm:ss') {
+            return year + month + day + hour + minute + second;
+        }
+
+    } else {
+        year = date.getFullYear().toString();
+        month = (date.getMonth() + 1).toString().padStart(2, '0');
+        day = date.getDate().toString().padStart(2, '0');
+        return year + month + day;
+    }
+}
+
+/**
+ * @method
+ * @name day_Calcultate
+ * @description 일자 계산을 위한 함수, opt 값에 따라 특정일 이후 값을 toCalendar에 넣어준다.
+ * @param {Number} opt 기간 수
+ * @hidden N
+ * @exception 
+ */
+scwin.day_Calcultate = function (opt) {
+    // ipt_start의 값이 없는 경우 계산하지 않는다.
+    if ($c.util.isEmpty(ipt_start.getValue())) return;
+
+    let date = $c.util.isEmpty(scwin.timeMode) ? cal_start.getValue() : cal_startTime.getValue();
+    date = scwin.formattedDate(date);
+
+    const start = new Date(date);
+    date = date.setDate(date.getDate() + opt);
+
+    // 기간계산
+    const diff = scwin.calulateDays(start, date);
+
+    // 영업일 적용 시
+    if (scwin.isBusiness) scwin.businessDay_Calculate(start, date)
+    date = scwin.parseStringDate(date);
+
+    // 계산 값 적용
+    scwin.setValue(date, 1);
+
+    // class
+    scwin.setClassFromToCalendar(start, date, diff);
+}
+
+/**
+ * @method
+ * @name month_calculate
+ * @description 월별 계산 수식, opt의 값 만큼 이후의 달까지의 일자를 계산한다.
+ * @param {Number} opt 기간 월
+ * @hidden N
+ * @exception 
+ */
+scwin.month_calculate = function (opt) {
+    // ipt_start의 값이 없는 경우 계산하지 않는다.
+    if ($c.util.isEmpty(ipt_start.getValue())) return;
+
+    // opt Default 값은 1이다.
+    opt = $c.util.isEmpty(opt) ?  1 : opt;
+
+    let date = $c.util.isEmpty(scwin.timeMode) ? cal_start.getValue() : cal_startTime.getValue();
+
+    date = scwin.formattedDate(date);
+    const currentDay = date.getDate();
+    const start = new Date(date);
+
+    date = date.setMonth(date.getMonth() + opt);
+    date = new Date(date);
+
+    if (date.getDate() < currentDay) date.setDate(0)
+
+    // 영업일 적용 시
+    if (scwin.isBusiness) scwin.businessDay_Calculate(start, date)
+
+    // class
+    const diff = scwin.calulateDays(start, date);
+    scwin.setClassFromToCalendar(start, date, diff);
+
+    date = scwin.parseStringDate(date);
+    scwin.setValue(date, 1);
+}
+
+/**
+ * @method
+ * @name quareterSelect
+ * @description 분기 선택을 위한 수식 함수, opt의 기준 만큼 분기를 선택한다.
+ * @param {Number} opt 분기 값
+ * @hidden N
+ * @exception 
+ * @example ${example}
+ */
+scwin.quareterSelect = function (opt) {
+    // ipt_start의 값이 없는 경우 계산하지 않는다.
+    if ($c.util.isEmpty(ipt_start.getValue())) return;
+
+    let date = $c.util.isEmpty(scwin.timeMode) ? cal_start.getValue() : cal_startTime.getValue();
+    // 현재 연도 값을 가져온다
+    date = scwin.formattedDate(date);
+
+    const year = date.getFullYear().toString();
+    let start, finish
+
+    if (opt == 1) {
+        start = new Date(year, '0', '1');
+        finish = new Date(year, '2', '31');
+    } else if (opt == 2) {
+        start = new Date(year, '3', '1');
+        finish = new Date(year, '5', '30');
+    } else if (opt == 3) {
+        start = new Date(year, '6', '1');
+        finish = new Date(year, '8', '30');
+    } else if (opt == 4) {
+        start = new Date(year, '9', '1');
+        finish = new Date(year, '11', '31');
+    } else {
+        console.warn("There's no Quarter option, you must to check option");
+        return;
+    }
+
+    // 기간 계산
+    const diff = scwin.calulateDays(start, finish);
+    scwin.setClassFromToCalendar(start, finish, diff);
+
+    // 영업일 적용 시
+    if (scwin.isBusiness) scwin.businessDay_Calculate(start, finish)
+
+    // '20240101' 형식 적용
+    start = scwin.parseStringDate(start);
+    finish = scwin.parseStringDate(finish);
+
+    // 분기에 해당하는 날짜가 input에 표시되고, calendar 이동
+    scwin.setValue(start, 0);
+    scwin.setValue(finish, 1);
+}
+
+/**
+ * @method
+ * @name validationDate
+ * @description 날짜의 유효성을 검사한다.
+ * @param {string} date string형태의 날짜값
+ * @return {boolean} res 유효성 검사 결과 [true, false]
+ * @hidden N
+ * @exception 
+ * @example ${example}
+ */
+scwin.validationDate = function (date) {
+    // 입력 값이 8자리 이하인 경우 무조건 false
+    if (date.length < 8) return false;
+
+    let year = parseInt(date.slice(0, 4));
+    let month = parseInt(date.slice(4, 6));
+    let day = parseInt(date.slice(6, 8));
+
+    if (year < 1970 || year > 2100) return false;
+    if (month < 0 || month > 12) return false;
+
+    const daysInMonth = [31, ($c.date.isLeafYear(date) ? 29 : 28), 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    if (day < 1 || day > daysInMonth[month - 1]) return false;
+
+    return true;
+}
+
+/**
+ * @method
+ * @name getFromInValue
+ * @description From Calendar로 설정된 InputBox의 값을 가져온다.
+ * @param
+ * @returns {string} From Calendar로 설정되거나 사용자가 직접 입력한 InputBox의 값
+ * @hidden N
+ * @exception
+ * @example const fromInput = udc_fromToCalendar.getFromInValue();
+ */
+scwin.getFromInValue = function () {
+    if (!$c.util.isEmpty(scwin.timeMode)) {
+        return ipt_start.getValue() + ipt_sTime.getValue();
+    } else {
+        return ipt_start.getValue();
+    }
+};
+
+/**
+ * @method
+ * @name getToInValue
+ * @description To Calendar로 설정된 inputBox의 값을 가져온다.
+ * @param
+ * @returns {string} To Calendar로 설정되거나 사용자가 직접 입력한 InputBox의 값.
+ * @hidden N
+ * @exception
+ * @example const toInput = udc_fromToCalendar.getToInValue();
+ */
+scwin.getToInValue = function () {
+    if (!$c.util.isEmpty(scwin.timeMode)) {
+        return ipt_exit.getValue() + ipt_fTime.getValue();
+    } else {
+        return ipt_exit.getValue();
+    }
+};
+
+/**
+ * @method
+ * @name setValue
+ * @description inputBox에 date값을 set하고 calendar의 값을 셋팅.
+ * @param {string} date 날짜형식의 string 파라미터
+ * @param {Number} division start, exit 구분자 0은 start, 1은 exit
+ * @hidden N
+ * @exception
+ */
+scwin.setValue = function (date, division) {
+    if (date.length <= 8) {
+        if (division == 0) {
+            ipt_start.setValue(date);
+            cal_start.gotoCalendar(date);
+        } else if (division == 1) {
+            ipt_exit.setValue(date);
+            cal_exit.gotoCalendar(date);
+        }
+    } else if (date.length >= 12) {
+        let time;
+        let day = date.slice(0, 8);
+        time = scwin.timeMode === 'HH:mm' ? date.slice(8, 12) : date.slice(8, 14);
+
+        if (division == 0) {
+            ipt_start.setValue(day);
+            ipt_sTime.setValue(time);
+            $c.util.isEmpty(scwin.timeMode) ? cal_start.gotoCalendar(day) : cal_startTime.gotoCalendar(date);
+        } else if (division == 1) {
+            ipt_exit.setValue(day);
+            ipt_fTime.setValue(time);
+            $c.util.isEmpty(scwin.timeMode) ? cal_exit.gotoCalendar(day) : cal_exitTime.gotoCalendar(date);
+        }
+    }
+}
+
+/**
+ * @method
+ * @name setClassFromToCalendar
+ * @description From Calendar에 설정된 날짜와 To Calendar의 설정된 날짜값 사이의 일별로 CSS Class를 적용한다.
+ * @param {string} fromDate FromCalendar에 설정된 날짜
+ * @param {string} toDate ToCalendar에 설정된 날짜
+ * @param {Number} diff From과 To사이의 날짜 간격일자
+ * @hidden N
+ * @exception
+ */
+scwin.setClassFromToCalendar = function (fromDate, toDate, diff) {
+
+    // 20241015 -> 20241031 => 16부터 30까지 selected_area class 적용
+    let from = fromDate instanceof Date ? scwin.parseStringDate(fromDate) : fromDate; // 20241201
+    let to = toDate instanceof Date ? scwin.parseStringDate(toDate) : toDate;    // 20241205
+    let start = cal_start;
+    let exit = cal_exit;
+
+    // TimeMode 적용 시 data 및 calendar 변경
+    if (!$c.util.isEmpty(scwin.timeMode)) {
+        from = from.slice(0, 8);
+        to = to.slice(0, 8);
+        start = cal_startTime;
+        exit = cal_exitTime;
+    }
+
+    // 초기화
+    start.removeAllCellClass();
+    exit.removeAllCellClass();
+
+    if (diff === 1) {
+        start.setCellClass(from, 'w2calendar_selected');
+        exit.setCellClass(from, 'w2calendar_selected');
+        return;
+    }
+
+    for (let i = 1; i <= diff; i++) {
+        i != 1 ? start.setCellClass(from, 'selected_area') : start.setCellClass(from, 'date_start');
+        diff != i ? exit.setCellClass(from, 'selected_area') : exit.setCellClass(from, 'date_end');
+        from = scwin.formattedDate(from, true);
+        from = new Date(from.setDate(from.getDate() + 1));
+        from = scwin.parseStringDate(from, true);
+    };
+
+    // today css 삭제
+    scwin.delete_todayCSS();
+}
+
+/**
+ * @method
+ * @name delete_todayCSS
+ * @description today, 오늘 날짜에 동작하는 엔진 CSS 제거
+ * @hidden N
+ * @exception
+ */
+scwin.delete_todayCSS = function () {
+    const obj = document.getElementsByClassName('w2calendar_today');
+    Array.from(obj).forEach(obj => {
+        obj.classList.remove('w2calendar_today')
+    });
+}
+
+/**
+ * @method
+ * @name setFromInValue
+ * @description From Input과 calendar에 값을 설정한다. TimeMode에 따라 달라진다. 형식에 맞지 않는 경우 값이 대입되지 않는다.
+ * @param {string} date FromCalendar 및 input에 설정할 값. ex) '20241201', '202412011230', '20241201123030'
+ * @hidden N
+ * @exception
+ */
+scwin.setFromInValue = function (date) {
+    if (!$c.util.isEmpty(scwin.timeMode)) {
+        const day = date.slice(0, 8);
+        const time = scwin.timeMode === 'HH:mm' ? date.slice(9, 12) : date.slice(9, 14);
+        if (scwin.validationDate(day) && scwin.validationTime(time)) {
+            ipt_start.setValue(day);
+            ipt_sTime.setValue(time);
+            cal_startTime.gotoCalendar(day)
+        } else {
+            return;
+        }
+    } else {
+        const day = date.slice(0, 8);
+        if (scwin.validationDate(day)) {
+            ipt_start.setValue(day);
+            cal_start.gotoCalendar(day);
+        } else {
+            return;
+        }
+    }
+}
+
+/**
+ * @method
+ * @name setToInValue
+ * @description To Input과 calendar에 값을 설정한다. TimeMode에 따라 달라진다. 형식에 맞지 않는 경우 값이 대입되지 않는다.
+ * @param {string} date ToCalendar 및 input에 설정할 값.
+ * @hidden N
+ * @exception
+ */
+scwin.setToInValue = function (date) {
+    if (!$c.util.isEmpty(scwin.timeMode)) {
+        const day = date.slice(0, 8);
+        const time = scwin.timeMode === 'HH:mm' ? date.slice(9, 12) : date.slice(9, 14);
+        if (scwin.validationDate(day) && scwin.validationTime(time)) {
+            ipt_exit.setValue(day);
+            ipt_fTime.setValue(time);
+            cal_exitTime.gotoCalendar(day)
+        } else {
+            return;
+        }
+    } else {
+        const day = date.slice(0, 8);
+        if (scwin.validationDate(day)) {
+            ipt_exit.setValue(day);
+            cal_exitTime.gotoCalendar(day);
+        } else {
+            return;
+        }
+    }
+}
+
+//Event
+/**
+ * @event
+ * @name calendarValue_onviewchange
+ * @description input의 데이터를 사용자가 편집했을 때 실행되는 이벤트
+ * @param {Object} info 이전 값, 새로 입력한 값의 정보가 있는 객체
+ * @example
+ */
+scwin.calendarValue_onviewchange = function (info) {
+    const res = scwin.validationDate(info.newValue);
+    let inStart = ipt_start.getValue();
+    let inFinish = ipt_exit.getValue();
+    const division = this.getUserData('userData1');
+    let today = new Date(new Date().toDateString());
+    let todayStr = scwin.parseStringDate(today, true);
+
+    if (res) {
+        if (division == 'start') {
+            if (!$c.util.isEmpty(inFinish) && scwin.validationDate(inFinish)) {
+                const val = scwin.calulateDays(scwin.formattedDate(inStart), scwin.formattedDate(inFinish), false);
+                val > 0 ? ipt_start.setValue(info.newValue) : ipt_start.setValue(todayStr);
+            }
+            $c.util.isEmpty(scwin.timeMode) ? cal_start.gotoCalendar(ipt_start.getValue()) : cal_startTime.gotoCalendar(ipt_start.getValue());
+            scwin.previousDate[0] = ipt_start.getValue();
+        } else if (division == 'exit') {
+            if (!$c.util.isEmpty(inStart) && scwin.validationDate(inStart)) {
+                const val = scwin.calulateDays(scwin.formattedDate(inStart), scwin.formattedDate(inFinish), false);
+                val > 0 ? ipt_exit.setValue(info.newValue) : ipt_exit.setValue(todayStr);
+            }
+            $c.util.isEmpty(scwin.timeMode) ? cal_exit.gotoCalendar(ipt_exit.getValue()) : cal_exitTime.gotoCalendar(ipt_exit.getValue());
+            scwin.previousDate[1] = ipt_exit.getValue();
+        }
+    } else {
+        setInvalidData(division);
+    }
+
+    // CSS Class 적용
+    if (!$c.util.isEmpty(inStart) && !$c.util.isEmpty(inFinish)) {
+        const diff = scwin.calulateDays(scwin.formattedDate(inStart), scwin.formattedDate(inFinish));
+        scwin.setClassFromToCalendar(inStart, inFinish, diff);
+    }
+
+    // 직전일자 전역변수 저장
+    if(division === 'start') { 
+        scwin.previousDate[0] = ipt_start.getValue()
+    } else if(division === 'exit') {
+        scwin.previousDate[1] = ipt_exit.getValue()
+    }
+
+    scwin.delete_todayCSS();
+
+    // 유효성 검사를 통과하지 못한 경우의 Date set
+    function setInvalidData(division) {
+        if (division == 'start' && !$c.util.isEmpty(inFinish)) {
+            // To 값이 있는 상태에서 From의 유효성 검사가 false인 경우 To의 -1로 보낸다
+            inStart = scwin.formattedDate(inFinish);
+            inStart = new Date(inStart.setDate(inStart.getDate() - 1));
+            inStart = scwin.parseStringDate(inStart);
+            scwin.setValue(inStart, 0);
+        } else if (division == 'exit' && !$c.util.isEmpty(inStart)) {
+            // From 값이 있는 상태에서 To의 유효성 검사가 false인 경우 From의 +1 보낸다
+            inFinish = scwin.formattedDate(inStart);
+            inFinish = new Date(inFinish.setDate(inFinish.getDate() + 1));
+            inFinish = scwin.parseStringDate(inFinish);
+            scwin.setValue(inFinish, 1);
+        } else {
+            // From 또는 To 값이 없는 경우 오늘 날짜로 보낸다.
+            if (division == 'start') {
+                scwin.setValue(todayStr, 0);
+            } else if (division == 'exit') {
+                scwin.setValue(todayStr, 1);
+            }
+        }
+    }
+}
+
+/**
+ * @event
+ * @name time_onviewchange
+ * @description time input에 사용자가 값을 입력 또는 수정 후 발생되는 이벤트
+ * @param {Object} info 이전 값과 현재 값이 들어있는 객체
+ * @example
+ */
+scwin.time_onviewchange = function (info) {
+    if (scwin.validationTime(info.newValue)) {
+        this.setValue(info.newValue);
+
+        let start = ipt_start.getValue();
+        let exit = ipt_exit.getValue();
+
+        const hour = info.newValue.slice(0, 2);
+        const minute = info.newValue.slice(2, 4);
+
+        let second = $c.util.isEmpty(scwin.timeMode) ? '' : info.newValue.slice(4, 6);
+
+        if (!$c.util.isEmpty(start) && this.getUserData('userData1') === 'start') {
+            if (scwin.timeMode === 'HH:mm') {
+                cal_startTime.gotoTime(hour, minute);
+            } else {
+                cal_startTime.gotoTime(hour, minute, second);
+            }
+        } else if (!$c.util.isEmpty(exit) && this.getUserData('userData1') === 'exit') {
+            if (scwin.timeMode === 'HH:mm') {
+                cal_exitTime.gotoTime(hour, minute);
+            } else {
+                cal_exitTime.gotoTime(hour, minute, second);
+            }
+        }
+    } else {
+        // 유효성 false 시 이전 값으로 돌아간다.
+        this.setValue(info.oldValue);
+    }
+}
+
+/**
+ * @method
+ * @name validationTime
+ * @description 시간의 유효성을 검사한다.
+ * @param {string} time string형태의 시간값
+ * @return {boolean} res 유효성 검사 결과 [true, false]
+ * @hidden N
+ * @exception 
+ * @example ${example}
+ */
+scwin.validationTime = function (time) {
+    // string이 아니거나, 지원하지 않는 길이는 false 반환
+    if (typeof time !== 'string' || (time.length !== 4 && time.length !== 6)) return false;
+
+    if (time.length === 4) {
+        const hours = parseInt(time.substring(0, 2), 10);
+        const minute = parseInt(time.substring(2, 4), 10);
+        return hours >= 0 && hours <= 24 && minute < 60 && minute >= 0;
+    }
+
+    if (time.length === 6) {
+        const hours = parseInt(time.substring(0, 2), 10);
+        const minute = parseInt(time.substring(2, 4), 10);
+        const second = parseInt(time.substring(4, 6), 10);
+        return hours >= 0 && hours <= 24 && minute < 60 && minute >= 0 && second >= 0 && second < 60;
+    }
+}
+
+/**
+ * @event
+ * @name calendar_ondateselect
+ * @description calendar의 data가 선택됐을 때 실행되는 이벤트
+ * @param {Object} date 사용자가 클릭한 날짜 값
+ * @example
+ */
+scwin.calendar_ondateselect = function (date, dateObject) {
+    const division = this.getUserData('userData1');
+
+    let start = scwin.timeMode != undefined ? cal_startTime.getValue() : cal_start.getValue();
+    let finish = scwin.timeMode != undefined ? cal_exitTime.getValue() : cal_exit.getValue();
+    let current;
+    let inStart = ipt_start.getValue();
+    let inFinish = ipt_exit.getValue();
+
+    start = scwin.formattedDate(start);
+    finish = scwin.formattedDate(finish);
+
+    if (division == 'start') {
+        current = scwin.parseStringDate(finish, true);
+        if (!$c.util.isEmpty(inFinish) && scwin.validationDate(current)) {
+            // 선택한 값이 ToCalendar보다 큰 경우 ToCalendar - 1일로 강제 변경
+            current = scwin.formattedDate(current);
+            date = start <= finish ? date : date = new Date(current.setDate(current.getDate() - 1));
+            date = date instanceof Date ? scwin.parseStringDate(date, true) : date;
+            $c.util.isEmpty(scwin.timeMode) ? cal_start.gotoCalendar(date) : cal_startTime.gotoCalendar(date);
+        }
+        scwin.setValue(date, 0);
+        start = scwin.formattedDate(date);
+        inStart = ipt_start.getValue();
+    } else if (division == 'exit') {
+        current = scwin.parseStringDate(start, true);
+        if (!$c.util.isEmpty(inStart) && scwin.validationDate(current)) {
+            // 선택한 값이 from Calendar보다 작은 경우 시작날짜 +1일로 강제 변경
+            current = scwin.formattedDate(current);
+            date = start <= finish ? date : date = new Date(current.setDate(current.getDate() + 1));
+            date = date instanceof Date ? scwin.parseStringDate(date, true) : date;
+            $c.util.isEmpty(scwin.timeMode) ? cal_exit.gotoCalendar(date) : cal_exitTime.gotoCalendar(date);
+        }
+        scwin.setValue(date, 1);
+        finish = scwin.formattedDate(date);
+        inFinish = ipt_exit.getValue();
+    }
+
+    // 선택일자 계산 함수
+    if (!$c.util.isEmpty(inStart) && !$c.util.isEmpty(inFinish)) {
+
+        const diff = scwin.calulateDays(start, finish);
+
+        // 새로 설정된 기간에 CSS Class Set
+        scwin.setClassFromToCalendar(start, finish, diff);
+
+        // 영업일기준 기간 계산 함수
+        scwin.isBusiness && scwin.businessDay_Calculate(start, finish);
+    }
+
+    // 직전일자 전역변수 저장
+    if(division === 'start') {
+        scwin.previousDate[0] = ipt_start.getValue();  
+    }else if(division === 'exit') {
+        scwin.previousDate[1] = ipt_exit.getValue();
+    }
+
+    scwin.delete_todayCSS();
+}
+
+/**
+ * @event
+ * @name btn_init_onclick
+ * @description 초기화 버튼 클릭, inputBox의 내용, calendar Class 모두 초기화된다.
+ * @param {Object} e 이벤트객체
+ * @example
+ */
+scwin.btn_init_onclick = function (e) {
+    ipt_start.setValue('');
+    ipt_exit.setValue('');
+    ipt_sTime.setValue('');
+    ipt_fTime.setValue('');
+    if ($c.util.isEmpty(scwin.timeMode)) {
+        cal_start.removeAllCellClass();
+        cal_exit.removeAllCellClass();
+    } else {
+        cal_startTime.removeAllCellClass();
+        cal_exitTime.removeAllCellClass();
+    }
+};
+
+/**
+ * @event
+ * @name btn_close_onclick
+ * @description 닫기 버튼 클릭 시 이벤트, 창을 숨긴다.
+ * @param {Object} e 이벤트객체
+ * @example
+ */
+scwin.btn_close_onclick = function (e) {
+    // validation
+    let opt = [{ id: "ipt_start", mandatory: true }, { id: "ipt_exit", mandatory: true }];
+    if (!$c.util.isEmpty(scwin.timeMode)) {
+        opt.push({ id: 'ipt_sTime', mandatory: true });
+        opt.push({ id: 'ipt_fTime', mandatory: true });
+    }
+    if ($c.data.validateGroup(grp_head, opt)) {
+        grp_cal.hide();
+        scwin.isOpen = false;
+    } else {
+        return;
+    }
+};
+
+/**
+ * @event
+ * @name btn_today_onclick
+ * @description 오늘 버튼을 눌렀을 때의 이벤트
+ * @param {Object} e 이벤트객체
+ * @example
+ */
+scwin.btn_today_onclick = function (e) {
+    $c.util.isEmpty(scwin.timeMode) ? cal_start.gotoToday() : cal_startTime.gotoToday();
+    $c.util.isEmpty(scwin.timeMode) ? cal_exit.gotoToday() : cal_exitTime.gotoToday();
+
+    let date = $c.util.isEmpty(scwin.timeMode) ? cal_start.getValue() : cal_startTime.getValue();
+
+    scwin.setValue(date, 0);
+    scwin.setValue(date, 1);
+    const start = ipt_start.getValue();
+    const exit = ipt_exit.getValue();
+    const diff = scwin.calulateDays(scwin.formattedDate(start), scwin.formattedDate(exit));
+    scwin.setClassFromToCalendar(start, exit, diff);
+};
+
+/**
+ * @event
+ * @name btn_basic_onclick
+ * @description 내일 등의 일단위 버튼을 눌렀을 때의 이벤트
+ * @param {Object} e 이벤트객체
+ * @example
+ */
+scwin.btn_basic_onclick = function (e) {
+    let opt = parseInt(this.getUserData('userData1'));
+    scwin.day_Calcultate(opt);
+}
+
+/**
+ * @event
+ * @name btn_nextMonth_onclick
+ * @description 다음달 버튼을 누를 시 동작하는 이벤트
+ * @param {Object} e 이벤트객체
+ * @example
+ */
+scwin.month_btn_onclick = function (e) {
+    let opt = parseInt(this.getUserData('userData1'));
+    scwin.month_calculate(opt);
+}
+
+/**
+ * @event
+ * @name quarter_btn_onclick
+ * @description 분기별 버튼을 누를 시 동작하는 이벤트
+ * @param {Object} e 이벤트객체
+ * @example
+ */
+scwin.quarter_btn_onclick = function (e) {
+    let opt = parseInt(this.getUserData('userData1'));
+    scwin.quareterSelect(opt);
+}
+
+/**
+ * @event
+ * @name btn_weekend_onclick
+ * @description 주간 버튼을 누를 시 동작하는 이벤트, fromCalendar 값 기준
+ * 해당 주간의 시작과 끝일을 선택한다.
+ * @param {Object} e 이벤트객체
+ * @example
+ */
+scwin.btn_weekend_onclick = function (e) {
+    let date = $c.util.isEmpty(scwin.timeMode) ? cal_start.getValue() : cal_startTime.getValue();
+
+    //요일이 포함된 주간의 날짜를 추적
+    date = scwin.formattedDate(date);
+
+    // 선택한 일자의 요일
+    const day = date.getDay();
+
+    // 일, 월요일이 선택되야한다.
+    let start = new Date(date.setDate(date.getDate() - day));
+    let finish = new Date(date.setDate(date.getDate() + (6 - date.getDay())));
+
+    const diff = scwin.calulateDays(start, finish);
+    scwin.setClassFromToCalendar(start, finish, diff);
+
+    if (scwin.isBusiness) scwin.businessDay_Calculate(start, finish);
+
+    start = scwin.parseStringDate(start);
+    finish = scwin.parseStringDate(finish);
+
+    scwin.setValue(start, 0);
+    scwin.setValue(finish, 1);
+};
+
+/**
+ * @event
+ * @name btn_onMonth_onclick
+ * @description 당월 버튼을 누를 시 동작하는 이벤트, 당월의 시작과 끝 날짜를 선택한다.
+ * @param {Object} e 이벤트객체
+ * @example
+ */
+scwin.btn_onMonth_onclick = function (e) {
+    // 현재 날짜 추적
+    let date = $c.util.isEmpty(scwin.timeMode) ? cal_start.getValue() : cal_startTime.getValue();
+    date = scwin.formattedDate(date);
+    let start, finish;
+
+    // 해당 월의 첫 번째날
+    start = new Date(date.getFullYear().toString(), date.getMonth().toString(), '1');
+
+    // 해당 월의 마지막날
+    finish = new Date(date.getFullYear().toString(), (date.getMonth() + 1).toString(), 0);
+
+    const diff = scwin.calulateDays(start, finish);
+    scwin.setClassFromToCalendar(start, finish, diff);
+    if (scwin.isBusiness) scwin.businessDay_Calculate(start, finish);
+
+    start = scwin.parseStringDate(start);
+    finish = scwin.parseStringDate(finish);
+
+    scwin.setValue(start, 0);
+    scwin.setValue(finish, 1);
+};
+
+/**
+ * @event
+ * @name btn_year_onclick
+ * @description 1년 버튼을 누를 시 동작하는 이벤트, 1년의 시작과 끝 날짜를 선택한다.
+ * 기준은 fromCalendar의 선택 값
+ * @param {Object} e 이벤트객체
+ * @example
+ */
+scwin.btn_year_onclick = function (e) {
+    let start = $c.util.isEmpty(scwin.timeMode) ? cal_start.getValue() : cal_startTime.getValue();
+    start = scwin.formattedDate(start);
+
+    const year = (start.getFullYear() + 1).toString();
+    const month = start.getMonth().toString().padStart(2, "0");
+    const day = (start.getDate()).toString();
+    let finish = new Date(year, month, day);
+
+    const diff = scwin.calulateDays(start, finish);
+    scwin.setClassFromToCalendar(start, finish, diff);
+    if (scwin.isBusiness) scwin.businessDay_Calculate(start, finish);
+
+    finish = scwin.parseStringDate(finish);
+    scwin.setValue(finish, 1);
+};
+
+/**
+ * @event
+ * @name btn_businessDay_onclick
+ * @description 영업일 기준 2~7일후 까지의 버튼 선택 시의 이벤트
+ * @param {Object} e 이벤트객체
+ * @example
+ */
+scwin.btn_businessDay_onclick = function (e) {
+    let opt = parseInt(this.getUserData('userData1'));
+    scwin.setBusinessDays(opt);
+}
+
+/**
+ * @event
+ * @name grp_img_onclick
+ * @description 달력 클릭 시 FromToCalendar의 Display 호출
+ * @param {Object} e 이벤트객체
+ * @example
+ */
+scwin.grp_img_onclick = function (e) {
+    if (scwin.isOpen) {
+        const start = ipt_start.getValue();
+        const finish = ipt_exit.getValue();
+        const opt = [{ id: "ipt_start", mandatory: true }, { id: "ipt_exit", mandatory: true }];
+        // timeMode일 경우 시간 input 추가.
+        if (!$c.util.isEmpty(scwin.timeMode)) {
+            opt.push({ id: 'ipt_sTime', mandatory: true });
+            opt.push({ id: 'ipt_fTime', mandatory: true });
+        }
+        if ($c.data.validateGroup(grp_head, opt) && scwin.validationDate(start) && scwin.validationDate(finish)) {
+            grp_cal.hide();
+            scwin.isOpen = false;
+        } else {
+            return;
+        }
+    } else {
+        grp_cal.show();
+        scwin.isOpen = true;
+    }
+};
+
+/**
+ * @event
+ * @name cbx_business_onviewchange
+ * @description 영업일 체크박스 클릭 시 값의 변동 여부에 따라 발생하는 이벤트
+ * @param {Object} info 이전 값, 변경 값이 들어있는 객체
+ * @example
+ */
+scwin.cbx_business_onviewchange = function (info) {
+    if (!scwin.isBusiness) {
+        scwin.isBusiness = true;
+        tbx_busiPeriod.show();
+
+        // 영업일 버튼 표시
+        btn_busi2.show();
+        btn_busi3.show();
+        btn_busi4.show();
+        btn_busi5.show();
+        grp_busiPeriod.setStyle('display', 'flex');
+        grp_busiPeriod.setStyle('visibility', 'visible');
+    } else {
+        scwin.isBusiness = false;
+        tbx_busiPeriod.hide();
+
+        // 영업일 버튼 숨기기
+        btn_busi2.hide();
+        btn_busi3.hide();
+        btn_busi4.hide();
+        btn_busi5.hide();
+        grp_busiPeriod.hide();
+    }
+};
+]]></script>
+    </head>
+    <body ev:onpageload="scwin.onpageload">
+    	<xf:group class="wrap_period" id="grp_wrap" style="">
+    		<xf:group style="" id="grp_head" class="grp_period">
+    			<xf:input maxlength="8" dataType="date" ev:onviewchange="scwin.calendarValue_onviewchange" displayFormat="yyyy-MM-dd"
+    				style="" readOnly="false" id="ipt_start" userData1="start" class="ipt_period" mandatory="true">
+    			</xf:input>
+    			<xf:input class="ipt_period time" id="ipt_sTime" readOnly="false" style="" userData1="start" maxlength="4" dataType="time" ev:onviewchange="scwin.time_onviewchange"></xf:input>
+    			<w2:span style="" label="~" id="" class="tilde_period"></w2:span>
+    			<xf:input maxlength="8" dataType="date" ev:onviewchange="scwin.calendarValue_onviewchange" displayFormat="yyyy-MM-dd"
+    				style="" readOnly="false" id="ipt_exit" userData1="exit" class="ipt_period" mandatory="true">
+    			</xf:input>
+    			<xf:input class="ipt_period time" id="ipt_fTime" readOnly="false" style="" userData1="start" maxlength="4" dataType="time" ev:onviewchange="scwin.time_onviewchange"></xf:input>
+    			<xf:trigger class="btn_period" ev:onclick="scwin.grp_img_onclick" id="grp_img" style="" type="button">
+    				<xf:label><![CDATA[]]></xf:label>
+    			</xf:trigger>
+    		</xf:group>
+    		<xf:group style="display:none;" id="grp_cal" class="pop_period">
+    			<xf:group style="" id="grp_header" class="grp_period_header">
+
+
+
+
+
+
+
+    				<xf:group style="" id="grp_nonBusiness" class="grp_period_set">
+    					<xf:trigger ev:onclick="scwin.btn_today_onclick" style="" id="btn_today" type="button" class="btn_period_set">
+    						<xf:label><![CDATA[오늘]]></xf:label>
+    					</xf:trigger>
+    					<xf:trigger ev:onclick="scwin.btn_basic_onclick" style="" id="btn_tomorrow" type="button"
+    						class="btn_period_set" userData1="1">
+    						<xf:label><![CDATA[내일]]></xf:label>
+    					</xf:trigger>
+    					<xf:trigger ev:onclick="scwin.btn_basic_onclick" style="" id="btn_nextWeek" type="button"
+    						class="btn_period_set" userData1="7">
+    						<xf:label><![CDATA[다음주]]></xf:label>
+    					</xf:trigger>
+    					<xf:trigger ev:onclick="scwin.month_btn_onclick" style="" id="btn_nextMonth" type="button"
+    						class="btn_period_set" userData1="1">
+    						<xf:label><![CDATA[다음달]]></xf:label>
+    					</xf:trigger>
+    					<xf:trigger ev:onclick="scwin.month_btn_onclick" style="" id="btn_3mos" type="button" class="btn_period_set" userData1="3">
+    						<xf:label><![CDATA[3개월]]></xf:label>
+    					</xf:trigger>
+    					<xf:trigger ev:onclick="scwin.btn_year_onclick" style="" id="btn_year" type="button" class="btn_period_set" userData1="1">
+    						<xf:label><![CDATA[1년]]></xf:label>
+    					</xf:trigger>
+    					<xf:trigger ev:onclick="scwin.btn_weekend_onclick" style="display:none;" id="btn_weekend" type="button" class="btn_period_set">
+    						<xf:label><![CDATA[주간]]></xf:label>
+    					</xf:trigger>
+    					<xf:trigger ev:onclick="scwin.btn_onMonth_onclick" style="display:none;" id="btn_onMonth" type="button" class="btn_period_set">
+    						<xf:label><![CDATA[당월]]></xf:label>
+    					</xf:trigger>
+    					<xf:trigger ev:onclick="scwin.quarter_btn_onclick" style="display:none;" id="btn_quarter1" type="button"
+    						class="btn_period_set" userData1="1">
+    						<xf:label><![CDATA[1분기]]></xf:label>
+    					</xf:trigger>
+    					<xf:trigger ev:onclick="scwin.quarter_btn_onclick" style="display:none;" id="btn_quarter2" type="button"
+    						class="btn_period_set" userData1="2">
+    						<xf:label><![CDATA[2분기]]></xf:label>
+    					</xf:trigger>
+    					<xf:trigger ev:onclick="scwin.quarter_btn_onclick" style="display:none;" id="btn_quarter3" type="button"
+    						class="btn_period_set" userData1="3">
+    						<xf:label><![CDATA[3분기]]></xf:label>
+    					</xf:trigger>
+    					<xf:trigger ev:onclick="scwin.quarter_btn_onclick" style="display:none;" id="btn_quarter4" type="button"
+    						class="btn_period_set" userData1="4">
+    						<xf:label><![CDATA[4분기]]></xf:label>
+    					</xf:trigger>
+    					<xf:trigger ev:onclick="scwin.btn_businessDay_onclick" style="display:none;" id="btn_busi2" type="button" class="btn_period_set" userData1="2">
+    						<xf:label><![CDATA[2일후]]></xf:label>
+    					</xf:trigger>
+    					<xf:trigger ev:onclick="scwin.btn_businessDay_onclick" style="display:none;" id="btn_busi3" type="button" class="btn_period_set" userData1="3">
+    						<xf:label><![CDATA[3일후]]></xf:label>
+    					</xf:trigger>
+    					<xf:trigger ev:onclick="scwin.btn_businessDay_onclick" style="display:none;" id="btn_busi4" type="button" class="btn_period_set" userData1="4">
+    						<xf:label><![CDATA[4일후]]></xf:label>
+    					</xf:trigger>
+    					<xf:trigger ev:onclick="scwin.btn_businessDay_onclick" style="display:none;" id="btn_busi5" type="button" class="btn_period_set" userData1="5">
+    						<xf:label><![CDATA[5일후]]></xf:label>
+    					</xf:trigger>
+    				</xf:group>
+
+    			</xf:group>
+    			<xf:group style="" id="grp_content" class="grp_period_content">
+    				<xf:group id="" class="grp_period_start">
+    					<w2:calendar ev:ondateselect="scwin.calendar_ondateselect" footerDiv="true" style="" id="cal_start"
+    						userData1="start">
+    					</w2:calendar>
+    					<w2:calendar ev:ondateselect="scwin.calendar_ondateselect" footerDiv="true" id="cal_startTime" style="display:none;"
+    						userData1="start" calendarValueType="yearMonthDateTimeSec">
+    					</w2:calendar>
+    				</xf:group>
+    				<xf:group id="" class="grp_period_end">
+    					<w2:calendar ev:ondateselect="scwin.calendar_ondateselect" footerDiv="true" style="" id="cal_exit" userData1="exit"
+    						calendarValueType="yearMonthDate">
+    					</w2:calendar>
+    					<w2:calendar calendarValueType="yearMonthDateTimeSec" ev:ondateselect="scwin.calendar_ondateselect" footerDiv="true"
+    						id="cal_exitTime" style="display:none;" userData1="exit">
+    					</w2:calendar>
+    				</xf:group>
+    			</xf:group>
+    			<xf:group style="" id="grp_footer" class="grp_period_footer">
+    				<xf:group id="" class="grp_period_btn">
+    					<xf:group style="" id="grp_result" class="lt">
+    						<xf:group id="grp_period" class="grp_period_info"><w2:textbox tagname="span" style="" id="" label="선택기간 : " class="tit_period"></w2:textbox><w2:textbox tagname="span" style="" id="tbx_period" label="1일" class="txt_period">
+    						</w2:textbox></xf:group>
+    					<xf:group id="grp_busiPeriod" class="grp_period_info" style="display:none;"><w2:textbox tagname="span" style="" id="" label="영업일 :" class="tit_period"></w2:textbox><w2:textbox tagname="span" style="" id="tbx_busiPeriod" label="1일" class="txt_period txt_point">
+    						</w2:textbox></xf:group></xf:group>
+    					<xf:group style="" id="grp_btn" class="rt">
+    						<xf:trigger ev:onclick="scwin.btn_business_onclick" style="display: none;" id="btn_business"
+    							type="button" class="btn_cm">
+    							<xf:label><![CDATA[영업일]]></xf:label>
+    						</xf:trigger>
+    						<xf:select appearance="full" cols="" disabled="" id="cbx_business" ref="" renderType="checkboxgroup" rows=""
+    							selectedindex="1" style="" ev:onviewchange="scwin.cbx_business_onviewchange">
+    							<xf:choices>
+    								<xf:item>
+    									<xf:label><![CDATA[영업일 보기]]></xf:label>
+    									<xf:value><![CDATA[]]></xf:value>
+    								</xf:item>
+    							</xf:choices>
+    						</xf:select>
+    						<xf:trigger ev:onclick="scwin.btn_init_onclick" style="" id="btn_init" type="button" class="btn_cm">
+    							<xf:label><![CDATA[초기화]]></xf:label>
+    						</xf:trigger>
+    						<xf:trigger ev:onclick="scwin.btn_close_onclick" style="" id="btn_trigger2" type="button" class="btn_cm">
+    							<xf:label><![CDATA[닫기]]></xf:label>
+    						</xf:trigger>
+    					</xf:group>
+    				</xf:group>
+    			</xf:group>
+    		</xf:group>
+    	</xf:group>
+    </body>
+</html>

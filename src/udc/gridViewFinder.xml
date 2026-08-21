@@ -1,0 +1,1072 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:ev="http://www.w3.org/2001/xml-events"
+    xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+    <head meta_screenName="GridView Finder UDC" meta_desc="화면에 있는 GridView의 데이터를 검색하여 강조 표시를 하는 UDC입니다.&lt;br&gt;* 대상 GridVeiw와 본UDC를 하나의 Group으로 묶어 사용합니다. &lt;br&gt;* 지정한 hotkey에 의해 검색 키워드 입력 팝업이 Group의 우측 상단에 표시가 됩니다.&lt;br&gt;* 키워드 검색후 일정시간동안 입력이 없거나, Enter키를 입력하면 검색을 시작합니다.&lt;br&gt;* 검색키워드와 일치하는 문자열은 그리드뷰에서 강조표시가 되어 표현됩니다.&lt;br&gt;" meta_author="InswaveSystems" meta_date="2024.10.11" meta_screenId="gridViewFinder">
+        <w2:type palette="support">COMPONENT</w2:type>
+        <w2:buildDate/>
+        <w2:MSA/>
+        <xf:model>
+            <w2:dataCollection baseNode="map"/>
+            <w2:workflowCollection/>
+        </xf:model>
+        <w2:layoutInfo/>
+        <w2:publicInfo method="scwin.search,scwin.setSplitSearchRowCount,scwin.setHighlightColor,scwin.clearSearch"/>
+        <w2:historyInfo>
+        	<w2:history meta_no="" meta_desc="" meta_date="" meta_user=""></w2:history>
+        </w2:historyInfo>
+        <script lazy="false" type="text/javascript"><![CDATA[
+/**
+ * @component
+ * @componentName udc_gridView_Finder
+ * @pluginName 
+ * @company
+ * @developer
+ * @category /cm/udc
+ * @notSupportBrowser 
+ * @version
+ * @htmlRender
+ * @icon
+ * @disableIcon
+ * @description
+ * @width
+ * @height
+ * @license
+ * @imagePath
+ * @homepage
+ */
+
+/**
+ * @property
+ * @name id
+ * @category 01.Basic & ETC
+ * @type string
+ * @option
+ * @default
+ * @necessary N
+ * @bindparent
+ * @description id
+ */
+
+/**
+ * @property
+ * @name class
+ * @category 01.Basic & ETC
+ * @type string
+ * @option
+ * @default
+ * @necessary N
+ * @bindparent
+ * @description class
+ */
+
+/**
+ * @property
+ * @name style
+ * @category 01.Basic & ETC
+ * @type string
+ * @option
+ * @default
+ * @necessary N
+ * @bindparent
+ * @description style
+ */
+
+/**
+ * @property
+ * @name highlightColor
+ * @category 01.Basic & ETC
+ * @type string
+ * @option 
+ * @default yellow
+ * @necessary N
+ * @bindparent
+ * @description 검색된 문자를 강조할때 사용할 background-color를 설정합니다. (default : yellow)
+ * 색상이름이나 색상코드로 설정합니다.
+ */
+
+
+
+/**
+ * @property
+ * @name splitSearchRowCount
+ * @category 01.Basic & ETC
+ * @type number
+ * @option
+ * @default 1000
+ * @necessary N
+ * @bindparent
+ * @description 검색 프로세스가 한번에 처리할 행의 개수를 설정합니다. (default : 1000)
+ * 대량 데이터의 검색을 스크립트에서 한번에 모두 처리할 경우 브라우져가 프리징되는 문제가 있습니다. 
+ * 이를 방지하기 위해 비동기로 분할해서 검색처리를 합니다.
+ */
+
+/**
+ * @property
+ * @name autoSearchDelay
+ * @category 01.Basic & ETC
+ * @type number
+ * @option
+ * @default 1000
+ * @necessary N
+ * @bindparent
+ * @description 검색 키워드 입력이 되고 자동 검색이 실행되기 까지의 지연시간을 설정합니다. (default : 1000)
+ * (millisecond 단위로 입력)
+ */
+
+/**
+ * @property
+ * @name hotKey
+ * @category 01.Basic & ETC
+ * @type string
+ * @option
+ * @default f2
+ * @necessary N
+ * @bindparent
+ * @description 검색창을 사용을 위한 단축키를 설정합니다.  (default : f2)
+ * 수정키(ctrl, alt, shift)와 일반키의 조합으로 설정합니다.
+ * 수정키는 중복으로 조합하여 설정할 수 있습니다.
+ * 각 키는 "+" 를 사용하여 조합을 설정합니다.
+ * ※ 단축키는 본 UDC를 포함하고 있는 부모 Group내에서만 동작 합니다. 
+ * ※ 브라우져 예약 단축기는 사용하지 못합니다. (F1, CTRL+F 등) 
+ * ※ 일반키 단독으로 사용할 경우에는 F1~F12 만 사용 가능합니다.
+ * 
+ * 예시) 
+ * f2 , ctrl+f2 , ctrl+shift+f2, ctrl+shift+alt+f2, ctrl+t
+ */
+
+
+// 전역 GridView 정보 객체
+scwin.gridInfo = [];
+scwin.displayOpt = [];
+scwin.nodeSet = [];
+scwin.select = [];
+scwin.sIdx = 0;
+scwin.cIdx = 0;
+scwin.arr = [];
+scwin.hotKeyInfo = {
+    "complexKey": [],
+    "lastKey": ""
+};
+scwin.searchManager = {
+    onceProcCnt: 1000,     // 검색 프로세스의 1회 동작당 처리할 행의 개수를 설정한다.
+    procId: -1,            // 프로세스 timer id
+    procInterval: 10,      // 프로세스 timer interval
+    statusInfo: {          // 검색 처리를 위한 정보
+        grdObj: undefined,		  // 처리 대상 그리드뷰 객체
+        regExp: undefined,       // 검색에서 사용할 정규식
+        colCnt: -1,              // 처리 대상 그리드뷰의 컬럼개수        
+        curRowIdx: 0,            // 처리 대상 그리드뷰의 현재 처리중인 행의 인덱스
+        isFirstFocus: false      // 검색 정규식에 매칭되는 첫번째 항목에 포커스 처리를 했는지에 대한 여부
+    },
+    // 현재 검색 작업이 진행중인지의 여부를 판단.
+    isRun: function () {
+        return this.procId > -1 ? true : false;
+    },
+    setOnceProcRowCount: function (v) {
+        let newValue = v | 0;
+        let oldValue = this.onceProcCnt;
+        if (newValue > 0 && oldValue != newValue) {
+            this.onceProcCnt = newValue;
+        }
+    },
+    // 현재 검색 작업을 중단.
+    stopSearch: function (callbackFunc) {
+        if (this.procId > -1) {
+            this.procId = -1;
+            clearTimeout(this.procId);
+        }
+        this.initStatus();
+
+        if (callbackFunc && typeof callbackFunc == "function") {
+            callbackFunc();
+        }
+    },
+    // 검색처리를 위한 정보를 초기화.
+    initStatus: function () {
+        this.statusInfo.grdObj = undefined;
+        this.statusInfo.regExp = undefined;
+        this.statusInfo.colCnt = -1;
+        this.statusInfo.curRowIdx = 0;
+        this.isFirstFocus = false;
+
+    },
+    // 검색처리를 위한 정보를 설정.
+    setStatus: function (grdObj, keyword) {
+        this.statusInfo.grdObj = grdObj;
+        this.statusInfo.regExp = new RegExp(keyword.replace(/[.*++?^${}()|[\]\\]/g, '\\$&'), 'i');;
+        this.statusInfo.colCnt = grdObj.getColumnCount();
+        this.statusInfo.curRowIdx = 0;
+        this.isFirstFocus = false;
+    },
+    // 검색처리를 시작.
+    runSearch: function () {
+        this.procId = setTimeout((function (o) {
+            return function () {
+                o.procFunc();
+            }
+        })(this), this.procInterval);
+    },
+    // 검색처리 진행 함수.
+    procFunc: function () {
+        if (this.procId < 0)
+            return;
+        let grd = this.statusInfo.grdObj;
+        let re = this.statusInfo.regExp;
+        let cc = this.statusInfo.colCnt;
+        let r = this.statusInfo.curRowIdx;
+        let l = this.onceProcCnt;
+        let stopProc = false;
+        let appliedFormatterIdxList = [];
+        let len = grd.getRowCount();
+        let curText = txb_result.getValue();
+        let dispText;
+        let data;
+
+        if (r == 0)
+            scwin.emit_onSearchProgress(grd, scwin.keyword, [], r, 0);
+
+        for (let i = r, cnt = 0; i < r + l; i++, cnt++) {
+            if (i >= len) { //총 행의 개수를 넘어가면 stop
+                stopProc = true;
+                break;
+            }
+
+            // 정규식
+            for (let j = 0; j < cc; j++) {
+                if (!stopProc) {
+                    data = grd.getCellDisplayData(i, j);
+                    if (!$c.util.isEmpty(data) && re.test(data)) {
+                        scwin.arr.push([i, j]);
+                    }
+                }
+                let resCnt = scwin.arr.length;
+
+                // 마지막행 검색처리 및 현재 검색처리중인 행의 개수가 highlightRowCnt에 다달했을때 그리드뷰에 검색결과를 반영.
+                if (resCnt > 0 && appliedFormatterIdxList.indexOf(j) < 0) {
+                    appliedFormatterIdxList.push(j);
+
+                    // 검색된 결과에 CustomFormatter 적용
+                    const type = grd.getColumnType(j);
+
+                    // select,  autoComplete Formatter 처리
+                    if (type === 'select' || type === 'autoComplete') {
+                        grd.setCustomFormatter(j, scwin.searchItemFormatter);
+                        continue;
+                    };
+
+                    // button, calendar, spinner 처리
+                    if (type == 'calendar' || type == 'button' || type == 'spinner') {
+                        scwin.cIdx = j;
+                        grd.setDisplayFormatter(j, scwin.dpFormatter);
+                        continue;
+                    };
+
+                    // text 등 기본 Formatter 처리
+                    grd.setCustomFormatter(j, scwin.searchFormatter);
+                }
+            }
+
+            if (!this.isFirstFocus && scwin.arr.length > 0) {
+                //키워드에 매칭되는 첫번째 항목으로 이동
+
+                /* setFocusedCell을 사용하면 키워드입력 input에서 포커스가 빠지고 그리드뷰로 포커스가 이동하기때문에
+                    * 포커스는 이동하지 않고 그리드뷰의 특정셀/행을 선택상태로 변경하는 기능이 필요함.
+                    * 기능이 추가되면 해당 기능으로 변경이 필요.
+                **/
+                grd.setFocusedCell(scwin.arr[0][0], scwin.arr[0][1]);
+                setTimeout(() => ipt_search.focus(), 10);
+                this.isFirstFocus = true;
+            }
+
+            this.statusInfo.curRowIdx = i + 1;
+        }
+
+        if (!stopProc) {
+            scwin.emit_onSearchProgress(grd, scwin.keyword, [...scwin.arr], this.statusInfo.curRowIdx, 1);
+            this.runSearch();
+        } else {
+            scwin.emit_onSearchProgress(grd, scwin.keyword, [...scwin.arr], this.statusInfo.curRowIdx, 2);
+            this.stopSearch(scwin.stopCallback);
+        }
+
+        // 전체 검색된 값
+        let resCnt = scwin.arr.length;
+        dispText = "[" + (resCnt > 0 ? 1 : 0) + "/" + resCnt + "]";
+        if (curText != dispText)
+            txb_result.setValue(curText = dispText);
+    }
+};
+
+// 검색창 상태값
+scwin.isExist = false;
+scwin.autoSearchDelayTimerId = -1;
+
+scwin.defaultAutoSearchDelay = 1000;
+scwin.autoSearchDelay = scwin.defaultAutoSearchDelay;
+
+scwin.defaultHighlightColor = "yellow";
+scwin.highlightColor = scwin.defaultHighlightColor;
+scwin.defaultHotKey = "F2";
+
+scwin.onpageload = function () {
+    const opt = $p.getOptions() || {};
+    scwin.autoSearchDelay = opt.autoSearchDelay || scwin.defaultAutoSearchDelay;
+    scwin.highlightColor = opt.highlightColor || scwin.defaultHighlightColor;
+
+    scwin.searchManager.setOnceProcRowCount(opt.splitSearchRowCount);
+    scwin.setHotKeyInfo(opt.hotKey || scwin.defaultHotKey);
+
+    // UDC Load 후 검색창 표시를 위한 이벤트 등록
+    let elem = document.getElementById($p.getFrame().render.id);
+    let parentElem = elem?.parentElement;
+    if (parentElem) {
+        parentElem.addEventListener("keyup", scwin.searchBoxShow);
+    } else {
+        console.log("gridVeiw_Finder UDC : failed init");
+        return;
+    }
+    const parent = $c.win.getParent();
+    //$c.win.getFrame(parent.$p).bind('onkeyup', scwin.searchBoxShow);
+
+    // GridView 정보 등록
+    scwin.collectGridView(parent);
+
+    ipt_search.bind('onkeyup', function (e) {
+        const keyword = ipt_search.getValue();
+
+        if (e.keyCode == 27) {       //esc
+            scwin.btn_close_onclick();
+        }
+
+        if ($c.util.isEmpty(keyword)) {
+            scwin.clearSearch();
+        } else {
+            if ((e.shiftKey && e.keyCode == 13) || e.keyCode == 38) {   // Arrow Up
+                scwin.btn_up_onclick();
+            } else if (e.keyCode == 40) {    //shift + enter, 	Arrow Down        
+                scwin.btn_down_onclick();
+            } else if (e.keyCode == 13) {    //enter
+                if (keyword == scwin.keyword) {
+                    if (!scwin.searchManager.isRun()) {
+                        scwin.btn_down_onclick();
+                    }
+                } else {
+                    if (scwin.autoSearchDelayTimerId > 0) {
+                        clearTimeout(scwin.autoSearchDelayTimerId);
+                    }
+                    scwin.autoSearchDelayTimerId = setTimeout((function (func, k) {
+                        func(k);
+                    })(scwin.search, keyword), scwin.autoSearchDelay);
+                }
+            } else {
+                if (keyword != scwin.keyword) {
+                    if (scwin.autoSearchDelayTimerId > 0) {
+                        clearTimeout(scwin.autoSearchDelayTimerId);
+                    }
+                    scwin.autoSearchDelayTimerId = setTimeout((function (func, inputObj, k) {
+                        return function () {
+                            let v = inputObj.getValue();
+                            if (v == k)
+                                func(k);
+                        };
+                    })(scwin.search, ipt_search, keyword), scwin.autoSearchDelay);
+                }
+            }
+        }
+    });
+};
+
+/*
+* hotkey를 설정
+*/
+scwin.setHotKeyInfo = function (v) {
+    if (!v)
+        return;
+
+    let complexKeyOrder = ["CTRL", "ALT", "SHIFT"];
+
+    let hkey = v + ""; //to string    
+    let delimiter = "+";
+    hkey = v.replace(" ", "");
+
+    let hkeys = hkey.toUpperCase().split(delimiter);
+
+    scwin.hotKeyInfo.lastKey = hkeys.pop() || "";
+    scwin.hotKeyInfo.complexKey = hkeys.sort((a, b) => { return complexKeyOrder.indexOf(a) - complexKeyOrder.indexOf(b) });
+};
+
+/**
+ * @name checkKey
+ * @description 단축키를 이벤트를 확인한다.
+ * @param {Object} e 이벤트 객체
+ */
+scwin.checkKey = function (e = {}) {
+    let complexKey = [];
+    let lastKey = "";
+    let f_number = ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12"];
+    let fireHotKey = false;
+
+    lastKey = e.key || e.keyCode || e.which;
+
+    if ($c.util.isEmpty(lastKey)) {
+        return ret;
+    }
+
+    if (e.ctrlKey) {
+        complexKey.push("CTRL");
+    }
+    if (e.altKey) {
+        complexKey.push("ALT");
+    }
+    if (e.shiftKey) {
+        complexKey.push("SHIFT");
+    }
+
+    // Ctrl, Alt, Shift가 아닌 lastKey가 인식될 경우
+    if (lastKey != "Control" && lastKey != "Alt" && lastKey != "Shift") {
+        lastKey = lastKey.toUpperCase();
+    } else {
+        lastKey = "";
+    }
+
+    let optComplexKey = scwin.hotKeyInfo.complexKey;
+    let optLastKey = scwin.hotKeyInfo.lastKey;
+
+    if (optLastKey === lastKey) {
+        fireHotKey = optComplexKey.join("") == complexKey.join("");
+        if (fireHotKey && optComplexKey.length == 0) {
+            if (f_number.indexOf(lastKey) > -1)     //single key는 F1~F12 만 허용
+                fireHotKey = true;
+            else
+                fireHotKey = false;
+        }
+    }
+
+    return fireHotKey;
+};
+
+/**
+ * @name initSearch
+ * @description 검색 초기화
+ */
+scwin.initSearch = function () {
+    scwin.arr = [];
+    scwin.sIdx = 0;
+
+    scwin.searchManager.stopSearch();
+
+    btn_down.setDisabled(true);
+    btn_up.setDisabled(true);
+
+    txb_result.setValue("[0/0]");
+}
+
+/**
+ * @name initFormatter
+ * @description 검색 표시 초기화
+ */
+scwin.initFormatter = function () {
+    let cnt = scwin.gridInfo[scwin.gIdx].getColumnCount();
+    for (let i = 0; i < cnt; i++) {
+        scwin.gridInfo[scwin.gIdx].redrawColumn(i);
+    };
+};
+
+
+/**
+ * @name _getRootComponent
+ * @description 특정 html element를 포함하고 있는 루트 컴퍼넌트를 반환함
+ * @param {Object} html element
+ * @returns {Object} WebSquare Component Object
+ */
+scwin._getRootComponent = function (elem) {
+    if (!elem)
+        return;
+    function findComp(p) {
+        if (!p || p === document.body)
+            return;
+
+        if (p.id) {
+            let comp = $p.getComponentById(p.id);
+            if (!comp)
+                return;
+            if (comp.getPluginName) {
+                return comp;
+            }
+        } else {
+            if (p.parentElement)
+                return findComp(p.parentElement);
+            else
+                return;
+        }
+
+        return findComp(p.parentElement);
+    }
+
+    return findComp(elem);
+};
+
+
+/**
+ * @name searchBoxShow
+ * @description gridView_Finder의 검색박스를 보여준다.
+ * @param {Object} e 이벤트 객체
+ */
+scwin.searchBoxShow = function (e) {
+
+    // focus 객체 추적  
+    const activeObj = scwin._getRootComponent(document.activeElement);
+    if (!activeObj)
+        return;
+    let comObj = getComponentId(activeObj.id);
+    const status = $c.util.isEmpty(comObj);
+    let fireHotkey = scwin.checkKey(e);
+    // 오픈 시 
+    //if (!scwin.isExist && e.keyCode == 113 && !status) {
+    if (!scwin.isExist && fireHotkey && !status) {
+        // focus된 GridView에 맞춰 이동
+        scwin.moveToBox(comObj);
+
+        // 상태 값 변경
+        scwin.isExist = true;
+
+        // 기존 열린 상태에서 F2 누른 경우
+    } else if (scwin.isExist && fireHotkey) {
+
+        // 검색 입력창 초기화
+        //ipt_search.setValue('');
+
+        if ($c.util.isEmpty(comObj)) {
+            // grp_wrap.hide();
+            // scwin.isExist = false;
+            // scwin.keyword = '';
+            // scwin.gridInfo[scwin.gIdx].focus();
+            scwin.btn_close_onclick();
+            return;
+        };
+
+        // 이전 GridView와 다른 경우
+        if (scwin.currentGrid != comObj) {
+            scwin.initFormatter();
+            scwin.initSearch();
+            scwin.moveToBox(comObj);
+        };
+    };
+
+    // gridView Idx 저장
+    scwin.gIdx = scwin.generateIdx(comObj);
+
+    // focus 부여 Event Queue 최하단.
+    setTimeout(() => {
+        ipt_search.focus();
+    }, 0);
+
+    // 내부함수
+    function getComponentId(obj) {
+        let name = '';
+        for (let i = 0; i < obj.split('_').length; i++) {
+            if (obj.split('_')[i] == 'grd') {
+                name = obj.split('_')[i] + "_" + obj.split('_')[i + 1];
+            }
+        };
+        return name;
+    };
+};
+
+/**
+ * @name moveToBox
+ * @description gridView_Finder의 검색 박스를 이동시킨다. 
+ * @param {Object} comObj 이동할 기준의 GridView 객체
+ */
+scwin.moveToBox = function (comObj, noShow) {
+    let grid;
+    let top = -24;
+    let left = "";
+
+    // comObj가 빈 경우 1번째 GridView 지정
+    if ($c.util.isEmpty(comObj)) {
+        grid = scwin.gridInfo[0];
+    } else {
+        // 검색 박스가 이동할 GridView 지정
+        grid = $c.win.getParent().$p.getComponentById(comObj);
+    }
+
+    // 이동
+    grp_wrap.setPosition(left, top, 'absolute');
+
+    //오른쪽으로 사이즈 늘어남 방지
+    grp_wrap.setStyle("right", 0);
+    // 등록
+    scwin.currentGrid = grid.getOriginalID();
+
+    if (!noShow) {
+        grp_wrap.show();
+    }
+}
+
+/**
+ * @name collectGridView
+ * @description gridView_Finder가 로드 시 화면의 GridView정보를 가져온다.
+ * @param {Object} parent 부모 화면의 $p scope 객체
+ */
+scwin.collectGridView = function (parent) {
+    const frame = $c.win.getFrame(parent.$p);
+    scwin.gridInfo = WebSquare.util.getChildren(frame, { recursive: true, includePlugin: 'gridView' });
+}
+
+/**
+ * @event
+ * @name btn_up_onclick
+ * @description up 버튼의 이벤트
+ * @param {Object} e event객체
+ * @example
+ */
+scwin.emit_btn_up_onclick = function (e) {
+    $p.emit("btn_up_onclick", e);
+};
+scwin.btn_up_onclick = function (e) {
+    if (btn_up.getDisabled())
+        return;
+
+    scwin.sIdx = scwin.sIdx < 0 ? 0 : scwin.sIdx;
+
+    scwin.sIdx--;
+
+    if (scwin.sIdx < 0) return;
+
+    const point = scwin.arr[scwin.sIdx];
+    scwin.gridInfo[scwin.gIdx].setFocusedCell(point[0], point[1], false);
+    txb_result.setValue("[" + (scwin.sIdx + 1) + "/" + scwin.arr.length + "]");
+};
+
+/**
+ * @event
+ * @name btn_down_onclick
+ * @description down 버튼의 이벤트
+ * @param {Object} e event객체
+ * @example
+ */
+scwin.emit_btn_down_onclick = function (e) {
+    $p.emit("btn_down_onclick", e);
+};
+scwin.btn_down_onclick = function (e) {
+    if (btn_down.getDisabled())
+        return;
+
+    // enter 및 ↓ 방향키 입력 시 인덱스가 올라간다.
+    scwin.sIdx = scwin.sIdx < 0 ? 0 : scwin.sIdx;
+    scwin.sIdx++;
+
+    // 다음 검색 결과 idx 값이 마지막인 경우 return;
+    if (scwin.sIdx >= scwin.arr.length) {
+        scwin.sIdx--;
+        return;
+    }
+
+    // 인덱스 좌표 배열 값 지정
+    const point = scwin.arr[scwin.sIdx];
+
+    // 다음 인덱스 focus 지정
+    scwin.gridInfo[scwin.gIdx].setFocusedCell(point[0], point[1], false);
+
+    // 결과 값 변동.
+    txb_result.setValue("[" + (scwin.sIdx + 1) + "/" + scwin.arr.length + "]");
+};
+
+/**
+ * @event
+ * @name btn_close_onclick
+ * @description 닫힘 버튼 클릭 이벤트
+ * @param {Object} e event객체
+ * @example
+ */
+scwin.emit_btn_close_onclick = function (e) {
+    $p.emit("btn_close_onclick", e);
+};
+
+/**
+ * @event
+ * @name onSearchProgress
+ * @description 검색 진행중에 발생하는 이벤트입니다. 
+ * 
+ * @param {Object} obj 검색 대상의 그리드뷰 객체
+ * @param {String} keyword 현재 검색중인 키워드
+ * @param {Array} result rowIndex, columnIndex가 포함된 검색 결과의 배열
+ * @param {Number} curRowIdx 현재 처리중인 row의 index
+ * * 0 : 시작
+ * * 1 : 진행중
+ * * 2 : 완료
+ * @param {Number} status 검색 처리상태
+ * @example
+ */
+scwin.emit_onSearchProgress = function (obj, keyword, result, curRowIdx, status) {
+    $p.emit("onSearchProgress", obj, keyword, result, curRowIdx, status);
+};
+
+/**
+ * @name btn_close_onclick
+ * @description 닫힘 버튼 클릭 이벤트
+ * @param {Object} e event객체
+ */
+scwin.btn_close_onclick = function (e) {
+    grp_wrap.hide();
+    ipt_search.setValue('');
+    scwin.isExist = false;
+    scwin.keyword = "";
+
+    // redrawColumn
+    scwin.initFormatter();
+    scwin.gridInfo[scwin.gIdx].focus();
+
+    if (scwin.searchManager.isRun()) {
+        scwin.searchManager.stopSearch();
+    }
+
+    txb_result.setValue("[" + 0 + "/" + 0 + "]");
+};
+
+/**
+ * @method
+ * @name search
+ * @description gridView의 데이터를 검색한다
+ * @param {string} keyword 검색키워드
+ * @param {boolean} noHighLight 검색된 키워드의 강조처리 스킵 여부 (default : false)
+ * @param {string} targetGridViewId 대상 gridView 객체, 설정하지 않을경우 현재 포커스를 받고 있는 gridview가 설정됨.
+ * @hidden N
+ * @exception 
+ * @example ${example}
+ */
+scwin.search = function (keyword, noHighLight, targetGridViewId) {
+    let grdObj;
+    scwin.keyword = keyword;
+
+    if (noHighLight && (noHighLight === true || noHighLight == "true" || noHighLight == "TRUE")) {
+        scwin.noHighLight = true;
+    } else {
+        scwin.noHighLight = false;
+    }
+
+    if (targetGridViewId) {
+        if (typeof targetGridViewId == "object") {
+            targetGridViewId = targetGridViewId.getOriginalID ? targetGridViewId.getOriginalID() : "";
+        }
+        scwin.gIdx = scwin.generateIdx(targetGridViewId);
+    }
+    grdObj = scwin.gridInfo[scwin.gIdx];
+    if (!grdObj)
+        return;
+
+    // formatter 수집
+    scwin.collectCustomFormatter();
+
+    // GridView NodeSet 등록
+    scwin.collectNodeSet();
+
+    scwin.initSearch();
+
+    scwin.searchManager.setStatus(grdObj, keyword, scwin.stopCallback);
+    scwin.searchManager.runSearch();
+};
+
+/**
+ * highLight 처리할지 여부를 판단
+ */
+scwin.checkHighLight = function () {
+    let ret = true;
+    if (!scwin.keyword || scwin.noHighLight) {
+        ret = false;
+    }
+    return ret;
+};
+
+/**
+ * 검색완료후 호출되는 callback
+ */
+scwin.stopCallback = function () {
+    btn_down.setDisabled(false);
+    btn_up.setDisabled(false);
+};
+
+/**
+ * @name generateIdx
+ * @description gridView의 Idx 검색해 추출한다. 파라미터 값이 없거나 공백인 경우 기존 scwin.gIdx를 반환한다.
+ * @param {Object} currentGrid 현재 선택된 GridView 정보
+ */
+scwin.generateIdx = function (currentGrid) {
+    let idx;
+    for (let i = 0; i < scwin.gridInfo.length; i++) {
+        if (scwin.gridInfo[i].getOriginalID() == currentGrid) {
+            idx = i;
+            return idx;
+        }
+    }
+    return scwin.gIdx;
+}
+
+/**
+ * @name searchFormatter
+ * @description 검색 결과를 반영하는 customFormatter
+ * @param {string} data cell의 Data 값
+ * @param {string} formattedData formatting 처리된 Cell의 Data 값
+ * @param {number} rowIdx 현재 data의 rowIndex 값 
+ * @param {number} colIdx 현재 data의 colIndex 값
+ * @return {string} data cell에 표시할 Data 값
+ */
+scwin.searchFormatter = function (data, formattedData, rowIdx, colIdx) {
+    // 기존 displayFormatter, CustomFormatter, displayFomat 적용
+    data = scwin.invokeFormatter(data, formattedData, rowIdx, colIdx)
+
+    // number일 경우 형변환
+    if (typeof data == 'number') data = data.toString();
+
+    // highlight 처리 여부 판단.
+    if (!scwin.checkHighLight()) return data;
+
+    // 정규식
+    const regEx = new RegExp(`(${scwin.keyword.replace(/[.*++?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+    if (regEx.test(data)) {
+        data = data.replace(regEx, `<span style="background-color:${scwin.highlightColor}">$1</span>`);
+    };
+
+    return data;
+}
+
+/**
+ * @name searchItemFormatter
+ * @description inputType select, autoComplete의 검색 결과를 반영하는 customFormatter
+ * @param {string} data cell의 Data 값
+ * @param {string} formattedData formatting 처리된 Cell의 Data 값
+ * @param {number} rowIndex 현재 data의 rowIndex 값 
+ * @param {number} colIndex 현재 data의 colIndex 값
+ * @return {string} cell에 표시될 data 값
+ */
+scwin.searchItemFormatter = function (data, formattedData, rowIdx, colIdx) {
+    // 기존 displayFormatter, displayFormat, customFormatter 적용
+    data = scwin.invokeFormatter(data, formattedData, rowIdx, colIdx);
+
+    // inputType select인 경우 동작하는 CustomFormatter
+    let val, label;
+    for (let j = 0; j < scwin.select.length; j++) {
+        if (scwin.select[j].colIdx == colIdx) {
+            val = scwin.select[j].value;
+            label = scwin.select[j].label;
+
+            // nodeSet에 따른 Label 처리.
+            for (let i = 0; i < scwin.nodeSet[j].length; i++) {
+                if (scwin.nodeSet[j][i][val] == data) {
+                    data = scwin.nodeSet[j][i][label];
+                    break;
+                }
+            }
+            break;
+        }
+    };
+
+    // highlight 처리 여부 판단.
+    if (!scwin.checkHighLight()) return data;
+
+    // 정규식
+    const regEx = new RegExp(`(${scwin.keyword.replace(/[.*++?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+    if (regEx.test(data)) {
+        data = data.replace(regEx, '<span style="background-color:yellow">$1</span>');
+    }
+
+    return data;
+}
+
+/**
+ * @name dpFormatter
+ * @description inputType button, calendar, spinner 시 사용되는 formatter
+ * @param {string} data cell의 data 값
+ * @return {string} data cell에 표시될 data값
+ */
+scwin.dpFormatter = function (data) {
+
+    // displayFormatter를 가진 경우 함수를 가져와서 선 적용
+    for (let col of scwin.displayOpt) {
+        // displayFormatter가 있는 경우 Data 적용
+        if (col.g == scwin.gIdx && col.c == scwin.cIdx && !$c.util.isEmpty(col.displayFormatter)) {
+            // 함수 찾고
+            const dpFunc = scwin.findDisplayFormatter(col.displayFormatter);
+            // 데이터 적용
+            data = dpFunc(data);
+        }
+    };
+
+    // scwin.cIdx = column 인덱스, scwin.gIdx = GridView 인덱스
+    if (scwin.gridInfo[scwin.gIdx].getColumnType(scwin.cIdx) == 'calendar') {
+        const format = scwin.displayOpt[scwin.cIdx].displayFormat;
+        data = WebSquare.date.getFormattedDate(data, format);
+    }
+
+    // highlight 처리 여부 판단.
+    if (!scwin.checkHighLight()) return data;
+
+    const regEx = new RegExp(`(${scwin.keyword.replace(/[.*++?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+    if (regEx.test(data)) {
+        data = data.replace(regEx, '<span style="background-color:yellow">$1</span>');
+    }
+
+    return data;
+}
+
+/**
+ * @name collectCustomFormatter
+ * @description 직전 customFormatter, displayFormat을 수집한다.
+ */
+scwin.collectCustomFormatter = function () {
+    // 최초 1회만 동작한다.
+    if (scwin.displayOpt.length > 0) {
+        return;
+    } else {
+        for (let g = 0; g < scwin.gridInfo.length; g++) {
+            const grd = scwin.gridInfo[g]
+            for (let c = 0; c < grd.getColumnCount(); c++) {
+                const displayFormat = grd.getColumnOption(grd.getColumnID(c), 'displayFormat');
+                const customFormatter = grd.getColumnOption(grd.getColumnID(c), 'customFormatter');
+                const displayFormatter = grd.getColumnOption(grd.getColumnID(c), 'displayFormatter');
+                scwin.displayOpt.push({ g, c, displayFormat, customFormatter, displayFormatter });
+            }
+        }
+    }
+}
+
+/**
+ * @name collectNodeSet
+ * @description 화면 GridView의 모든 NodeSet 정보를 가져온다.
+ */
+scwin.collectNodeSet = function () {
+    // 최초 1회만 동작한다.
+    if (scwin.select.length > 0) {
+        return;
+    } else {
+        const cnt = scwin.gridInfo.length
+        for (let i = 0; i < cnt; i++) {
+            const colCnt = scwin.gridInfo[i].getColumnCount();
+            for (let j = 0; j < colCnt; j++) {
+                const type = scwin.gridInfo[i].getColumnType(j);
+                if (type == 'select' || type == 'autoComplete') {
+                    const colDltInfo = scwin.gridInfo[i].getColumnDataListInfo(j);
+                    colDltInfo.colIdx = j;
+                    scwin.select.push(colDltInfo);
+
+                    const dltSet = $c.win.getParent().$p.getComponentById(colDltInfo.id).getAllJSON();
+                    dltSet.dlt_name = colDltInfo.id;
+                    scwin.nodeSet.push(dltSet);
+                }
+            }
+        }
+    };
+}
+
+/**
+ * @name findDisplayFormatter
+ * @description 기존 GridView Column에 적용된 DisplayFormatter 함수를 가져온다.
+ * @param {string} name displayFormatter의 함수명을 가진 문자열 
+ * @return {function || false} 함수 객체 반환, 함수가 아닌 경우 false 반환.
+ */
+scwin.findDisplayFormatter = function (name) {
+    // scope의 경우 전역변수로 교체하여 나중에 UDC Option 제공 업데이트 필요.
+    // displayFormatter가 부모창에 존재하는 가정 
+    const scope = $c.win.getParent();
+
+    // name 가공
+    name = name.split('.')[1];
+
+    let func = scope.scwin[name];
+    if (typeof func == 'function') {
+        return func;
+    } else {
+        return false;
+    }
+};
+
+/**
+ * @name invokeFormatter
+ * @description 기존 적용된 displayFormatter, customFormatter, displayFormat 등을 data에 적용 시킨다.
+ * @param {string} data cell에 들어갈 데이터
+ * @param {string} formattedData 표시될 데이터 형식이 적용된 데이터
+ * @param {number} rowIdx cell의 row 값
+ * @param {number} colIdx cell의 col 값
+ * @return {string} cell에 표시될 Data 값
+ */
+scwin.invokeFormatter = function (data, formattedData, rowIdx, colIdx) {
+    for (let col of scwin.displayOpt) {
+        // displayFormat이 있는 경우
+        if (col.g == scwin.gIdx && col.c == colIdx && !$c.util.isEmpty(col.displayFormat)) {
+            data = formattedData;
+        }
+
+        // customFormatter가 있는 경우 Data 적용
+        if (col.g == scwin.gIdx && col.c == colIdx && typeof col.customFormatter == 'function') {
+            data = col.customFormatter(data, formattedData, rowIdx, colIdx);
+            break;
+        }
+
+        // displayFormatter가 있는 경우 Data 적용
+        if (col.g == scwin.gIdx && col.c == colIdx && !$c.util.isEmpty(col.displayFormatter)) {
+            // 함수 찾고
+            const dpFunc = scwin.findDisplayFormatter(col.displayFormatter);
+            // 데이터 적용
+            data = dpFunc(data);
+        }
+    };
+
+    return data;
+}
+/**
+ * @method
+ * @name setSplitSearchRowCount
+ * @description splitSearchRowCount 를 설정합니다.
+ * @param {Number} v 한번에 처리할 행의 개수
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.setSplitSearchRowCount = function (v) {
+    scwin.searchManager.setOnceProcRowCount(v);
+};
+
+/**
+ * @method
+ * @name setHighlightColor
+ * @description highlightColor 를 설정합니다.
+ * @param {string} v 색상이름이나 색상코드
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.setHighlightColor = function (v) {
+    scwin.highlightColor = v || scwin.defaultHighlightColor;
+};
+
+/**
+ * @method
+ * @name clearSearch
+ * @description 그리드뷰의 강조표시 제거등의 검색정보 초기화합니다.
+ * @param
+ * @returns
+ * @hidden N
+ * @exception
+ * @example
+ */
+scwin.clearSearch = function () {
+    scwin.keyword = "";
+    scwin.initFormatter();
+    scwin.initSearch();
+};
+]]></script>
+    </head>
+    <body ev:onpageload="scwin.onpageload" class="w2grid_finder">
+    <xf:group id="grp_wrap" class="w2grid_finder gvw_finder">
+    	<xf:group style="" id="" class="w2grid_finder_form">
+    		<xf:input style="width: 200px;height: 30px;" id="ipt_search"></xf:input>
+    		<w2:textbox tagname="p" style="" id="txb_result" label="[0/0]" class="message"></w2:textbox>
+    		<w2:textbox tagname="button" style="" id="btn_up" label="&lt;" class="btn_movePrevious" ev:onclick="scwin.btn_up_onclick"></w2:textbox>
+    		<w2:textbox tagname="button" style="" id="btn_down" label="&gt;" class="btn_moveNext" ev:onclick="scwin.btn_down_onclick"></w2:textbox>
+    		<w2:textbox tagname="button" style="" id="btn_close" label="X" class="btn_finder_close" ev:onclick="scwin.btn_close_onclick"></w2:textbox>
+    	</xf:group></xf:group></body>
+</html>

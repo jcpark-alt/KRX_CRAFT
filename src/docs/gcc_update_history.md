@@ -1,7 +1,7 @@
 # gcc 공통 함수 업데이트 이력
 
-`src/gcc/` 공통 라이브러리(`$c.*`)의 최초 반입(2026-06-08, `92a35bd`) 이후 변경 내역 정리 (최종 갱신 2026-08-20).
-API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-08-20 기준 **11개 모듈 / 281개 공개 메서드**.
+`src/gcc/` 공통 라이브러리(`$c.*`)의 최초 반입(2026-06-08, `92a35bd`) 이후 변경 내역 정리 (최종 갱신 2026-08-21).
+API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-08-21 기준 **11개 모듈 / 281개 공개 메서드**.
 
 > `src/cm/gcc/`는 CM 모듈용 사본으로 일반적 개선만 선별 반영해 왔으나(2026-06-10 병합, 2026-07-22 대규모 동기화로 11파일 체제),
 > **2026-08-18 `26af3d5`에서 사용 중단으로 삭제**되어 `src/gcc/`가 유일한 canonical 라이브러리다.
@@ -147,6 +147,10 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
   - `url` 옵션 — 지정 시 `COMMON_CODE_INFO.URL` 대신 해당 경로로 조회 (캐시는 code 기준 공유 — 서로 다른 url 조회 시 `useLocalCache:false` 병행 권장 명기)
   - `paramName` 옵션 — 지정 시 기본 쿼리 파라미터명 대신 해당 이름 사용. 기본값은 `COMMON_CODE_INFO.PARAM`("cdEngNm")·`PARAM_LIST`("cdEngNmList") 상수로 분리(배포별 커스터마이즈 지점)
   - 기존 `action` 직접 지정 우선순위 유지, 회귀 테스트 2건 추가
+- `0d912ee` (08-21) — `$c.win` **팝업 오프너 등록 키 frameId 접두 + openMenu S 분기 레이아웃 경로 정정**:
+  - `POPUP_OPENER_SCOPES` 등록 키를 `${$p.getFrameId()}_${opt.id}` 로 변경 — 웹스퀘어 컴포넌트/팝업 id 는 메인프레임 접두어(`mf_`) 포함 frame id 가 접두되어 빌드되므로 자식의 `getPopupId()` **전체 id 와 등록 키가 일치**(화면 간 동일 팝업 id 충돌 방지)
+  - `openMenu` S 분기 — `pfm_gnb` 접근을 `$p.main().pfm_main?.scope` 경유로 변경, `noside` 클래스 제거 대상을 `grp_wrap`(기존 오류) → `pfm_gnb` 로 정정
+  - JSDoc·popup-opener-guide 에 `mf_` 접두 전체 id 체계 명기, 테스트 하니스를 실제 id 형식(`mf_frameA_{popupId}`)으로 현실화
 
 ---
 
@@ -154,6 +158,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-08-21 | `0d912ee` | feat(win): 팝업 오프너 등록 키 frameId 접두 + openMenu S 분기 레이아웃 경로 정정 |
 | 2026-08-20 | `714e2d0` | feat(data): setCommonCode 조회 API url·paramName 옵션 추가 |
 | 2026-08-20 | `ef3aaaf` | feat(data): 공통코드 기본 컬럼 cdVal/cdValNm 전환 + labelColumn/valueColumn 문자열 지원 |
 | 2026-08-20 | `d5d377c` | chore(sample): 샘플 화면 3종 추가 (ULDINF20000, ULDSTF30700, ULDSTF30702) — [연관, gcc 무변경] |
