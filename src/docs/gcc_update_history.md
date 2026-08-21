@@ -151,6 +151,8 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
   - `POPUP_OPENER_SCOPES` 등록 키를 `${$p.getFrameId()}_${opt.id}` 로 변경 — 웹스퀘어 컴포넌트/팝업 id 는 메인프레임 접두어(`mf_`) 포함 frame id 가 접두되어 빌드되므로 자식의 `getPopupId()` **전체 id 와 등록 키가 일치**(화면 간 동일 팝업 id 충돌 방지)
   - `openMenu` S 분기 — `pfm_gnb` 접근을 `$p.main().pfm_main?.scope` 경유로 변경, `noside` 클래스 제거 대상을 `grp_wrap`(기존 오류) → `pfm_gnb` 로 정정
   - JSDoc·popup-opener-guide 에 `mf_` 접두 전체 id 체계 명기, 테스트 하니스를 실제 id 형식(`mf_frameA_{popupId}`)으로 현실화
+- `81cca81` (08-21) — [연관] **UDC 공통 컴포넌트 9종 추가**(`src/udc` 신설, gcc 무변경): bulkFileSaver·codeSelectBoxBasic·fileMultiUpload·fileMultiUploadGrd·fromToCalendar·gridViewFinder·qrCode·qrCode_popup·searchBadge
+- `86ab223` (08-21) — [연관] **샘플 화면 10종 갱신 + `ULDFIL52110` 추가**(`src/conversion/sample-front`, gcc 무변경)
 
 ---
 
@@ -158,6 +160,8 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-08-21 | `86ab223` | chore(sample): 샘플 화면 10종 갱신 및 ULDFIL52110 추가 — [연관, gcc 무변경] |
+| 2026-08-21 | `81cca81` | docs(gcc)+feat(udc): 이력 반영 및 UDC 공통 컴포넌트 9종 추가 — [연관, gcc 무변경] |
 | 2026-08-21 | `0d912ee` | feat(win): 팝업 오프너 등록 키 frameId 접두 + openMenu S 분기 레이아웃 경로 정정 |
 | 2026-08-20 | `714e2d0` | feat(data): setCommonCode 조회 API url·paramName 옵션 추가 |
 | 2026-08-20 | `ef3aaaf` | feat(data): 공통코드 기본 컬럼 cdVal/cdValNm 전환 + labelColumn/valueColumn 문자열 지원 |
