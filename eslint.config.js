@@ -13,7 +13,8 @@ const globals = require("globals");
 // `no-undef` from firing on them.
 module.exports = [
   {
-    ignores: ["node_modules/**", "coverage/**", "tools/wsxml_lint/**", "src/engine/**"],
+    // src/conversion/sample-front: 샘플 갤러리에 동봉된 벤더 배포본(sbchart.js 압축본 등) — lint 대상 아님
+    ignores: ["node_modules/**", "coverage/**", "tools/wsxml_lint/**", "src/engine/**", "src/conversion/sample-front/**"],
   },
   {
     files: ["**/*.js"],
