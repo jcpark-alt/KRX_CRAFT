@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_screenId="BulkFileUpload" meta_screenName="샘플화면-멀티파트 List DTO 일괄 CRUD"
+		meta_desc="udc_bulkFileSaver 를 활용한 조회/신규/수정/파일첨부/저장/재조회 시나리오" meta_author="Inswave Systems" meta_date="2026-07-11">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate />
+		<xf:model>
+			<xf:instance>
+				<data xmlns="" />
+			</xf:instance>
+			<w2:dataCollection baseNode="map">
+				<w2:dataList id="dltRowDatas" baseNode="list" saveRemovedData="true" repeatNode="map">
+					<w2:columnInfo>
+						<w2:column id="id"          dataType="number"></w2:column>
+						<w2:column id="uid"         dataType="text"></w2:column>
+						<w2:column id="empNo"       dataType="text"></w2:column>
+						<w2:column id="empName"     dataType="text"></w2:column>
+						<w2:column id="fileName"    dataType="text"></w2:column>
+						<w2:column id="fileSize"    dataType="number" defaultValue="0"></w2:column>
+						<w2:column id="fileChanged" dataType="text"></w2:column>
+					</w2:columnInfo>
+				</w2:dataList>
+			</w2:dataCollection>
+			<w2:workflowCollection></w2:workflowCollection>
+		</xf:model>
+		<w2:layoutInfo></w2:layoutInfo>
+		<w2:publicInfo method=""></w2:publicInfo>
+
+		<script type="text/javascript" lazy="false"><![CDATA[
+
+/*
+ * 샘플 — udc_bulkFileSaver 활용
+ * UDC 가 파일 다이얼로그 + fileMap + loadList/save 공통 로직 캡슐화
+ * 화면은 그리드/컬럼/도메인 로직만 담당
+ */
+
+/**
+ * @event 
+ * @name onpageload
+ * @description 화면이 열렸을 때 엔진 초기화 작업이 끝난 뒤에 발생하는 이벤트. 화면 초기화에 필요한 코드를 작성한다.
+ */
+scwin.onpageload = async function () {
+	await scwin.loadList();
+}; 
+
+/**
+ * @event
+ * @name btn_reload_onclick
+ * @description 데이터 재조회 버튼 click 이벤트
+*/ 
+scwin.btn_reload_onclick = async function () {
+	await scwin.loadList();
+};
+
+/**
+ * @event
+ * @name btnAddRow_onclick
+ * @description 데이터 행추가 버튼 click 이벤트
+*/ 
+scwin.btnAddRow_onclick = function () {
+	// 행추가 시 uid 값을 업데이트
+	const uid = "NEW_" + new Date().getTime() + "_" + Math.floor(Math.random() * 10000);
+	const newIdx = dltRowDatas.getRowCount();
+
+	dltRowDatas.insertRow(newIdx, {
+		id: 0, 
+		uid: uid, 
+		empNo: "", 
+		empName: "", 
+		fileName: "", 
+		fileSize: 0, 
+		fileChanged: ""
+	});
+
+	dltRowDatas.setCellData(newIdx, "uid", uid);
+	spnCount.setValue(dltRowDatas.getRowCount());
+};
+
+/**
+ * @event
+ * @name btnAddRow_onclick
+ * @description 데이터 행삭제 버튼 click 이벤트
+*/ 
+scwin.btnDelRow_onclick = function () {
+	const idx = grd_rows.getFocusedRowIndex();
+	if (idx < 0) { $c.win.alert("삭제할 행을 선택하세요."); return; }
+
+	udcSaver.detachFile(idx, dltRowDatas);
+	dltRowDatas.removeRow(idx);
+	spnCount.setValue(dltRowDatas.getRowCount());
+};
+
+/**
+ * @event
+ * @name grd_rows_oncellclick
+ * @description gridView cell click 이벤트
+*/ 
+scwin.grd_rows_oncellclick = function (rowIndex, columnIndex, columnId) {
+	if (columnId === "btn_pick") {
+		// 수정 시 uid 값을 업데이트
+		const uid = "MOD_" + new Date().getTime() + "_" + Math.floor(Math.random() * 10000);
+		dltRowDatas.setCellData(row, "uid", uid);
+
+		udcSaver.attachFile(rowIndex, dltRowDatas);
+	} else if (columnId === "btn_clear") {
+		udcSaver.detachFile(rowIndex, dltRowDatas);
+	}
+};
+
+/**
+ * @method
+ * @name grd_rows_oncellclick
+ * @description 재조회 통신 submission 호출
+*/ 
+scwin.loadList = async function () {
+	const sbmOptions = {
+		id : "sbmBulkUploadList",
+		action : "/sample/bulkFileUpload/list",
+		method : "get",
+		submitDoneHandler : scwin.sbmBulkUploadList_submitdone,
+		isProcessMsg : false
+	};
+
+	const res = await $c.sbm.executeDynamic(sbmOptions);
+
+	 // 진행 중 통신이 있어 이번 호출은 건너뜀
+	if (res && res.skipped) { return; }
+};
+
+/**
+ * @method
+ * @name sbmBulkUploadList_submitdone
+ * @description 재조회 통신 submission의 submitDoneHandler 함수
+*/ 
+scwin.sbmBulkUploadList_submitdone = function (e) {
+	const raw = (e.responseJSON && e.responseJSON.list) || [];
+	
+	dltRowDatas.setJSON(raw.map(function (r) {
+		return {
+			id: r.id, uid: "R_" + r.id,
+			empNo: r.empNo, empName: r.empName,
+			fileName: r.fileName || "", fileSize: r.fileSize || 0,
+			fileChanged: ""
+		};
+	}));
+
+	spnCount.setValue(dltRowDatas.getRowCount());
+};
+
+/**
+ * @event
+ * @name btnSave_onclick
+ * @description 저장 버튼 click 이벤트 — UDC.save 사용
+*/ 
+scwin.btnSave_onclick = async function () {
+	await udcSaver.save({
+		dataList: dltRowDatas,
+		dataListId: "dltList",
+		saveUrl:  "/sample/bulkFileUpload",
+		onValidate: function (row) {
+			if ($c.util.isEmpty(row.empNo))   return "사번을 입력하세요.";
+			if ($c.util.isEmpty(row.empName)) return "이름을 입력하세요.";
+			return null;
+		},
+		onSuccess: function (res) {
+			$c.win.alert("저장 완료: 신규 " + res.insertedCount + "건, 수정 " + res.updatedCount + "건, 삭제 " + res.deletedCount + "건");
+		},
+		onAfterSave: scwin.loadList
+	});
+};
+		]]></script>
+		<w2:require as="udc_bulkFileSaver" type="page" variableClone="" src="/cm/udc/bulkFileSaver.xml"></w2:require>
+	</head>
+	<body ev:onpageload="scwin.onpageload">
+		<xf:group class="sub_contents" id="" style="">
+			<w2:pageFrame style="" id="pfmContentHeader" src="/cm/xml/contentHeader.xml"></w2:pageFrame>
+
+			<xf:group style="" id="" class="titbox">
+				<xf:group class="lt" id="" style="">
+					<xf:group class="count" id="">
+						<w2:textbox class="" id="" label="총" style=""></w2:textbox>
+						<w2:textbox class="num" id="spnCount" label="0" style=""></w2:textbox>
+						<w2:textbox class="" id="" label="건" style=""></w2:textbox>
+					</xf:group>
+				</xf:group>
+				<xf:group style="" id="" class="rt">
+					<xf:trigger type="button" id="btnReload" class="btn_cm "
+						ev:onclick="scwin.btn_reload_onclick" toolTip="목록 재조회">
+						<xf:label><![CDATA[재조회]]></xf:label>
+					</xf:trigger>
+					<xf:trigger type="button" id="btnAddRow" class="btn_cm "
+						ev:onclick="scwin.btnAddRow_onclick" toolTip="빈 행을 추가한다.">
+						<xf:label><![CDATA[행 추가]]></xf:label>
+					</xf:trigger>
+					<xf:trigger type="button" id="btnDelRow" class="btn_cm "
+						ev:onclick="scwin.btnDelRow_onclick" toolTip="선택된 행을 삭제한다.">
+						<xf:label><![CDATA[행 삭제]]></xf:label>
+					</xf:trigger>
+					<xf:trigger type="button" id="btnSave" class="btn_cm "
+						ev:onclick="scwin.btnSave_onclick" toolTip="신규+수정 행을 서버에 저장.">
+						<xf:label><![CDATA[저장]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+
+			<xf:group adaptiveThreshold="" class="gvwbox" id="" style="">
+				<!-- 일괄 저장 UDC — 파일 다이얼로그 + fileMap + loadList/save 캡슐화 -->
+				<w2:udc_bulkFileSaver id="udcSaver" style="" class="hide" fileNameColumn="fileName" fileSizeColumn="fileSize"/>
+
+				<w2:gridView autoFit="allColumn" class="gvw" dataList="data:dltRowDatas" id="grd_rows" rowNumHeaderValue="순서"
+					rowNumVisible="true" rowStatusHeaderValue="상태" rowStatusVisible="true" sortable="true" style="height:360px;" rowNumWidth="50"
+					visibleRowNum="8" ev:oncellclick="scwin.grd_rows_oncellclick" readOnly="false">
+					<w2:header id="header1" style="">
+						<w2:row id="row_h" style="">
+							<w2:column blockSelect="false" displayMode="label" id="col_empNo"    inputType="text" style="" value="사번"       width="120"></w2:column>
+							<w2:column blockSelect="false" displayMode="label" id="col_empName"  inputType="text" style="" value="이름"       width="180"></w2:column>
+							<w2:column blockSelect="false" displayMode="label" id="col_fileName" inputType="text" style="" value="파일명"     width="280"></w2:column>
+							<w2:column blockSelect="false" displayMode="label" id="col_fileSize" inputType="text" style="" value="크기(byte)" width="120"></w2:column>
+							<w2:column blockSelect="false" displayMode="label" id="col_pick"     inputType="text" style="" value="파일선택"   width="100"></w2:column>
+							<w2:column blockSelect="false" displayMode="label" id="col_clear"    inputType="text" style="" value=""           width="60"></w2:column>
+						</w2:row>
+					</w2:header>
+					<w2:gBody id="gBody1" style="">
+						<w2:row id="row_b" style="">
+							<w2:column blockSelect="false" displayMode="label" id="empNo"     inputType="text"   style="" textAlign="center" editable="true"></w2:column>
+							<w2:column blockSelect="false" displayMode="label" id="empName"   inputType="text"   style="" textAlign="left"   editable="true"></w2:column>
+							<w2:column blockSelect="false" displayMode="label" id="fileName"  inputType="text"   style="" textAlign="left"   readOnly="true"></w2:column>
+							<w2:column blockSelect="false" displayMode="label" id="fileSize"  inputType="text"   style="" textAlign="right"  readOnly="true"
+								dataType="number" displayFormat="#,###"></w2:column>
+							<w2:column blockSelect="false" displayMode="label" id="btn_pick"  inputType="button" style="" value="파일선택"></w2:column>
+							<w2:column blockSelect="false" displayMode="label" id="btn_clear" inputType="button" style="" value="X"></w2:column>
+						</w2:row>
+					</w2:gBody>
+				</w2:gridView>
+			</xf:group>
+		</xf:group>
+	</body>
+</html>

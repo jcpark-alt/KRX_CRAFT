@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 기능샘플: 주식차트 = 캔들스틱(상단) + 거래량 막대(하단) 2단, x축(날짜) 정렬 -->
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events"
+      xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+<head meta_screenId="SPCHART_STOCK" meta_screenName="주식차트 (캔들+거래량)" meta_desc="candlestick + volume 2단" meta_author="WRM" meta_date="2026.07.09">
+    <w2:type>COMPONENT</w2:type>
+    <w2:buildDate/><w2:MSA/>
+    <xf:model><xf:instance><data xmlns=""/></xf:instance><w2:dataCollection baseNode="map"/><w2:workflowCollection/></xf:model>
+    <w2:layoutInfo/><w2:publicInfo method=""/>
+    <script lazy="false" type="text/javascript"><![CDATA[
+// 같은 데이터(CANDLESTICK.json: OHLC + trdvolume)로 두 차트를 상하 렌더
+scwin.URL ="/ui/sample/SBChart/CANDLESTICK/data/CANDLESTICK.json";
+scwin.DATES = [];   // 인덱스→날짜 매핑용 (x축은 인덱스를 주므로 사전 조회한 날짜로 변환)
+
+// 날짜 MM-DD 로 변환 (인덱스 v → scwin.DATES[v]); 과밀 방지로 3개당 1개만
+scwin.fn_xdate = function (v) {
+    var d = scwin.DATES[v];
+    if (!d) { return ""; }
+    return (v % 3 === 0) ? d.slice(5) : "";
+};
+
+// 화면에서 1회 조회(await) → 날짜 매핑 + 같은 데이터로 두 차트 렌더 (공통함수는 변환+렌더만)
+scwin.onpageload = async function () {
+    var res = await $c.sbm.executeDynamic({ id: "sbm_sbchart", action: scwin.URL, method: "get", mediatype: "application/json", mode: "asynchronous", isProcessMsg: false });
+    var data = res.responseJSON;
+    var rows = (data && data.json) ? data.json : [];
+    scwin.DATES = rows.map(function (r) { return r.date; });
+    scwin.fn_render(data);
+};
+
+scwin.fn_render = function (data) {
+    // ── 상단: 캔들스틱 (x축 날짜 MM-DD) ──
+    $c.ext.drawChartData("candlestick", data, chartTop, {
+        legend: { show: false },                                  // 캔들 범례 숨김
+        tooltip: { width: "200px" },
+        axis: {
+            y: { min: 78000 },
+            x: { tick: { format: scwin.fn_xdate } }               // 인덱스 → 날짜(MM-DD)
+        },
+        extend: {
+            candlestick: {
+                auto: true,                                       // 상승/하락 자동 색
+                marker: { show: true, color: "#c0392b" }          // 고점/저점 값 마커
+            }
+        },
+        dataOpts: {
+            keys: { x: "date", value: [ { open: "openprc", close: "closeprc", low: "lowprc", high: "highprc" } ] }
+        }
+    });
+
+    // ── 하단: 거래량 막대 (라벨 숨김, 날짜는 캔들 쪽에 표시) ──
+    $c.ext.drawChartData("bar", data, chartVol, {
+        legend: { show: false },
+        axis: {
+            y: { tick: { format: function (v) { return Math.round(v / 10000) + "만"; } } },  // 거래량 만 단위
+            x: { tick: { format: function () { return ""; } } }   // 하단 라벨 숨김
+        },
+        extend: { bar: { width: { ratio: 0.5 } } },
+        dataOpts: { keys: { x: "date", value: [ "trdvolume" ] } }
+    });
+};
+    ]]></script>
+</head>
+<body ev:onpageload="scwin.onpageload">
+    <!-- SAMPLE_DESC -->
+    <xf:group style="padding:8px 12px;margin-bottom:8px;background:#eef6f3;border-left:4px solid #0a8060;border-radius:4px;">
+        <w2:span label="주식차트 : 캔들스틱 + 하단 거래량 (2단 조합)" style="display:block;font-weight:bold;color:#0a7a52;"/>
+        <w2:span label="같은 데이터의 OHLC로 상단 캔들, trdvolume으로 하단 거래량 막대를 그려 날짜축을 정렬합니다." style="display:block;font-size:12px;color:#555;margin-top:2px;"/>
+    </xf:group>
+    <w2:group id="chartTop" style="width:100%;height:340px;"/>
+    <w2:group id="chartVol" style="width:100%;height:150px;margin-top:4px;"/>
+</body>
+</html>
