@@ -1,7 +1,7 @@
 # gcc 공통 함수 업데이트 이력
 
 `src/gcc/` 공통 라이브러리(`$c.*`)의 최초 반입(2026-06-08, `92a35bd`) 이후 변경 내역 정리 (최종 갱신 2026-08-25).
-API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-08-25 기준 **11개 모듈 / 283개 공개 메서드**.
+API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-08-25 기준 **11개 모듈 / 284개 공개 메서드**.
 
 > `src/cm/gcc/`는 CM 모듈용 사본으로 일반적 개선만 선별 반영해 왔으나(2026-06-10 병합, 2026-07-22 대규모 동기화로 11파일 체제),
 > **2026-08-18 `26af3d5`에서 사용 중단으로 삭제**되어 `src/gcc/`가 유일한 canonical 라이브러리다.
@@ -14,8 +14,8 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 | 모듈 | 주요 변화 |
 |------|-----------|
 | `sbm.xml` (`$c.sbm`) | 중복 제출 가드, `executeDynamic` 간소화 ref/target 문법·gridview 자동 바인딩·`autoFocus`·다중 gridview 바인딩·스피너 오버레이·message 옵션(opt-in), RESTful URL 활성화, 단건 ref(DataMap)→`requestData` 추출, 페이징(`setPagingInfo`) 개선 — `maxRowNum "all"` 전체 행 표시·`rowNumVisble desc` 내림차순 순번, 그리드 DOM `render` 참조 전환 |
-| `data.xml` (`$c.data`) | 공통코드 로딩(`COMMON_CODE_INFO.ACTION` 연동, `setCommonCode` 배열 매핑 → 통합 목록+`mappingKey` 필터 개편·응답 언래핑·기본 컬럼 cdVal/cdValNm·label/valueColumn 문자열 지원·조회 url/paramName 옵션), JSON 헬퍼 8종, 프로세스 메시지, 콤보 공통코드 세팅(`comboCbDataSet*`) 계열, 업로드/리포트 헬퍼, 엑셀 다운로드 기본 옵션 개선 |
-| `win.xml` (`$c.win`) | 외부망 홈(`goHomeEx`), 프로그램 열기/내비게이션 단순화, `openFormSubmit`, 인쇄(`mainPrint`/`popupPrint`), `success`/`error` 알림, `openExternalPage`, **browserPopup 부모 화면 접근**(`getOpenerScope`/`callOpener`), 히스토리 기록·복원(`pushState`/`changePageState`) 결함 수정 및 `moveUrl`/`setPageFrameSrc` 이동 복원 확장(`restoreData` [목록] 복귀 포함) |
+| `data.xml` (`$c.data`) | 공통코드 로딩(`COMMON_CODE_INFO.ACTION` 연동, `setCommonCode` 배열 매핑 → code별 키잉 응답 매핑(`mappingKey` = 응답 조회 key) 개편·응답 언래핑·기본 컬럼 cdVal/cdValNm·조회 URL 이원화(url/paramName 옵션은 추가 후 제거)), JSON 헬퍼 8종, 프로세스 메시지, 콤보 공통코드 세팅(`comboCbDataSet*`) 계열, 업로드/리포트 헬퍼, 엑셀 다운로드 기본 옵션 개선 |
+| `win.xml` (`$c.win`) | 외부망 홈(`goHomeEx`), 프로그램 열기/내비게이션 단순화, `openFormSubmit`, 인쇄(`mainPrint`/`popupPrint`), `success`/`error` 알림, `openExternalPage`, **browserPopup 부모 화면 접근**(`getOpenerScope`/`callOpener`), 히스토리 기록·복원(`pushState`/`changePageState`) 결함 수정 및 `moveUrl`/`setPageFrameSrc` 이동 복원 확장(`restoreData` [목록] 복귀 포함), 프레임 초기화 `reinitialize` |
 | `util.xml` (`$c.util`) | 쿠키/웹스토리지 헬퍼 13종, 업로드(`onUploadClick`/`getUploadFiles` 등), `setTextLengthCounter`, `checkFileExtension`, 엑셀 다운로드 파일명 개선, `setGridVisibleRowNum`(gridView "all" 동적 적용) |
 | `date.xml` (`$c.date`) | 날짜 포맷 검증(`checkCalendarFormat`/`compareFromToDate`), `getDateInterval` 단위 버그 수정, commonPrototype 의존 제거 |
 | `str.xml` (`$c.str`) | validate 중복 검증기 통합, 목적격 조사(`attachObjectPostposition`), 바이트/포맷 함수 자체 구현 전환 |
@@ -200,6 +200,12 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 - `fd2f1c8` (08-25) — [연관] **미사용 UDC 4종 삭제**(`src/udc`, gcc 무변경): codeSelectBoxBasic·fromToCalendar·qrCode·qrCode_popup 제거 — 잔여 UDC 는 bulkFileSaver·fileMultiUpload·fileMultiUploadGrd·gridViewFinder·searchBadge 5종
 - `4c5768c` (08-25) — [연관] **SB차트 샘플 갤러리·업로드 샘플 추가**(`src/conversion/sample-front`, gcc 무변경): `sbchart/` — SBChart 라이브러리(js·css)와 차트 유형별 샘플 XML 47종·데이터·이미지 리소스, `upload/` — 업로드 샘플 6종(BulkFileUpload·gridViewUploadSample/UDC·multiUploadSample·saveBulkFileUpload·upload1)
 - `a3a40fd` (08-25) — [연관] **validate-generator UI 개선**(`src/docs/validate-generator`, gcc 무변경): 고급 규칙 열(조건부·중복·checked) 기본 표시, 필드 규칙 표·생성 결과를 입력 카드 하단 전체 폭으로 배치
+- `95d7994` (08-25) — [연관] **SB차트 샘플 주석 URL 36건 교정 + HEATMAP 빈 데이터 수정**(`src/conversion/sample-front/sbchart`, gcc 무변경)
+- `b1f9fdf` (08-25) — `$c.data.setCommonCode` **code별 응답 매핑 개편·paramName 제거** + `$c.win.reinitialize` 추가 (283→284 메서드):
+  - 배열 code 응답(body)을 code별 목록으로 분리 저장 — `mappingKey[i]` 를 응답 JSON 에서 목록을 찾을 key 로 사용(미지정/null 인덱스는 code 값 폴백), 캐시·DataList·`codeData` 키는 code 기준 유지(소비부 키 계약 불변)
+  - `paramName` 옵션 제거 — 쿼리 파라미터명은 `PARAM`("cdEngNm")·`PARAM_LIST`("cdEngNmList") 상수 고정, `useLocalCache:false` 캐시 삭제 키를 실제 저장 키(code)로 정합, 죽은 `mapKey` 표현식(`null ?? code`) 정리
+  - `win.xml`: 현재 프레임 초기화 `scwin.reinitialize`(`$p.reinitialize` 래퍼) 공개 추가
+  - 회귀 테스트 신 계약 재작성(setCommonCode 8건), API 문서 재생성
 
 ---
 
@@ -207,6 +213,8 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-08-25 | `b1f9fdf` | feat(gcc): setCommonCode code별 응답 매핑 개편·paramName 제거 + win.reinitialize 추가 |
+| 2026-08-25 | `95d7994` | fix(sample): SB차트 샘플 주석 URL 36건 교정 + HEATMAP 빈 데이터 수정 — [연관, gcc 무변경] |
 | 2026-08-25 | `a3a40fd` | feat(docs): validate-generator 고급 열 기본 표시 + 결과 영역 하단 전체 폭 배치 — [연관, gcc 무변경] |
 | 2026-08-25 | `4c5768c` | chore(sample): SB차트 샘플 갤러리·업로드 샘플 추가 — [연관, gcc 무변경] |
 | 2026-08-25 | `fd2f1c8` | chore(udc): 미사용 UDC 컴포넌트 4종 삭제 — [연관, gcc 무변경] |
