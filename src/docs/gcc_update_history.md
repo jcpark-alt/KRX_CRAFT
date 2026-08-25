@@ -194,6 +194,10 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 - `653b080` (08-25) — [연관] **통합 입력 검증 가이드 샘플 `SMPVAL10000` 신설**(`src/conversion/sample-front`, gcc 무변경):
   - 발행기관 등록 시나리오 합성 가이드 — `validateDataCollect` 전 규칙 한 벌 시연(필수/byte/형식/조건부 `emptyIf` 외국국적·`requiredIf` 선행조건/`duplicateGroup`·그리드 `duplicate`/약관 `checked`) + `checkFileTotalSize` 총용량
   - 샘플 카탈로그 12번째 등록, overview·playbook·pipeline 샘플 개수 표기 12종 동기화
+- `db1dbc9` (08-25) — **코드리뷰(websquare-code-reviewer) 지적 3건 수정**:
+  - `$c.util.getUploadFileSize`: 파일 미선택 시 `files[0].size` 접근 예외를 옵셔널 체이닝+`-1` 로 교정 — JSDoc 계약("-1 반환")과 일치, `checkFileTotalSize` 경유 첨부 없는 저장 경로 정상화
+  - `SMPVAL10000` 샘플: 미존재 API `getSelectedRowIndex` → `getFocusedRowIndex` 교체, `executeDynamic` 응답에 `skipped` 가드 추가(중복 제출을 저장 실패로 오탐하던 문제 방지)
+- `fd2f1c8` (08-25) — [연관] **미사용 UDC 4종 삭제**(`src/udc`, gcc 무변경): codeSelectBoxBasic·fromToCalendar·qrCode·qrCode_popup 제거 — 잔여 UDC 는 bulkFileSaver·fileMultiUpload·fileMultiUploadGrd·gridViewFinder·searchBadge 5종
 
 ---
 
@@ -201,6 +205,8 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-08-25 | `fd2f1c8` | chore(udc): 미사용 UDC 컴포넌트 4종 삭제 — [연관, gcc 무변경] |
+| 2026-08-25 | `db1dbc9` | fix(gcc,sample): 코드리뷰 지적 3건 수정 — getUploadFileSize 미선택 예외·행삭제 API·skipped 가드 |
 | 2026-08-25 | `653b080` | feat(sample): 통합 입력 검증 가이드 SMPVAL10000 신설 (validateDataCollect 전체 옵션) — [연관, gcc 무변경] |
 | 2026-08-25 | `cbbdf88` | feat(docs): validate-generator 를 확장된 검증 규칙에 맞춰 갱신 — [연관, gcc 무변경] |
 | 2026-08-25 | `eb13261` | feat(validate): validateDataCollect 결함 수정 및 검증 규칙 대폭 확장 |
