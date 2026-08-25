@@ -160,6 +160,20 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
   - `publicInfo` 중복 `getDataBindInfo` → `getDataCollectionInfo` 교체(누락 해소), `getValue`/`getText` 를 문서 계약대로 **구분자 join 문자열 반환**으로 구현(`separator` 기본 ","), `bindColumn`·`separator` 옵션 실사용, 사어 `dataMap` 옵션 제거
   - `setJSON([], false)` 전체 비우기 허용, `parseInt` radix, 내부 헬퍼 `__` 접두 리네임(`__initComponent`/`__generateSearchBadge`/`__getValuesByKey`/`__getDataCollection`) 및 오타·예제 일괄 교정
 - `8e83956` (08-21) — [연관] 샘플 `ULDFIL52110` 원본 화면 설명 주석 정정(`ULDFIL52100 의무보유주식의 처분` → `ULDFIL52110 법인명 찾기 팝업`, gcc 무변경)
+- `71c4f68` (08-21) — [연관] **최종 샘플 카탈로그 `sample_templates.md` 신설**(`src/conversion/md`, gcc 무변경):
+  - 샘플 11종 목록(소스·원본·배포 경로 `/ui/sample/template/`)·화면 유형→샘플 매칭 가이드·표준 패턴 7항 — 단계 2 보강의 "정답지" 규약화
+  - `ULDSTF30700` 3구역 헤더 슬래시 오타 교정, `ULDSTF30702` 배포명(`ULDSTF30710.xml`) 주의 명기
+- `d113354` (08-21) — [연관] **conversion 프로세스 현행화 + 적용 플레이북 신설**(gcc 무변경):
+  - `conversion_playbook.md` — 다른 전환 프로젝트 착수 절차(전제 조건·작업 공간 규격·실행·검증 체크리스트·산출물 인계·규칙 개정 순서)
+  - overview/pipeline 에 단계 2 "샘플 매칭 보강(⑧)" 추가, `convert_all.py` **`--force` 재생성 옵션**(수기 보강 유실 경고 명기)
+- `2d1ec59`, `406d1dd` (08-21) — [연관] **convert.py 결함 3건 수정**(gcc 무변경, pytest 26건):
+  - 규칙4 `gform_onload→onpageload` 병합으로 이동한 await 가 1회차에 async 를 못 받던 순서 결함(`mark_async_functions` 재호출), 다중 빈 줄 비수렴(`collapse_blank_runs`), `convert()` 고정점 수렴 래퍼
+  - 규칙2 선언 블록 앵커를 **최상위 vScrenID 대입으로 한정** — 함수 내부에만 vScrenID 가 있는 파일에서 전역 선언이 함수 몸통 안으로 삽입되던 기존 결함 해소
+- `d8d1fed`, `53a416f`, `7d9675b`, `6ec313e` (+재수렴 `a3d94f1`, `e766a03`) (08-21) — [연관] **next-krx-lds 4개 모듈 전환 재실행**(gcc 무변경):
+  - `convert_all --force` 로 fil 34·tms 36·stf 101·mgt 165 = **336화면 전체를 5단계 정형화 구조 + async/await 순차 스타일로 재생성**, 전 모듈 WF·IDEM OK
+  - `ULDTMS03150` 원본 ui 결함 승계분(label 속성 내 원시 span)은 엔티티 이스케이프로 수기 정정
+- `a16c35c`, `b59e201`, `ed6a75f`, `80e64f5` (08-21) — [연관] **overview HTML 정비**(gcc 무변경): 개정 md 동기화, 구조도 `sample-front/ui` 설명 추가, 8번 배경 절 제거 후 **gcc 업데이트 이력 전문을 8절로 수록**(`history:begin/end` 마커 구간 — 이력 갱신 시 구간 교체)
+- `10ee305` (08-21) — [연관] **UDC bulkFileSaver `save` 빈 변경분 차단 가드 비활성화**(`src/udc`, gcc 무변경): 변경 행 0건 조기 반환을 주석 처리 — 데이터 변경 없이 파일 첨부만으로도 저장 요청 가능
 
 ---
 
@@ -167,6 +181,21 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-08-21 | `10ee305` | fix(udc): bulkFileSaver save의 빈 변경분 차단 가드 비활성화 — [연관, gcc 무변경] |
+| 2026-08-21 | `80e64f5` | docs(conversion): overview HTML 8번 절로 gcc 업데이트 이력 전문 수록 — [연관, gcc 무변경] |
+| 2026-08-21 | `ed6a75f` | docs(conversion): overview HTML에서 8번 배경 절 제거 — [연관, gcc 무변경] |
+| 2026-08-21 | `b59e201` | docs(conversion): 시스템 구조도에 sample-front/ui 최종 샘플 폴더 설명 추가 — [연관, gcc 무변경] |
+| 2026-08-21 | `a16c35c` | docs(conversion): overview HTML을 개정 md와 동기화 — [연관, gcc 무변경] |
+| 2026-08-21 | `e766a03` | feat(conversion): rule2 앵커 수정 반영 재수렴 (mgt 1·tms 30파일) — [연관, gcc 무변경] |
+| 2026-08-21 | `406d1dd` | fix(conversion): rule2 선언 블록 앵커를 최상위 vScrenID 대입으로 한정 — [연관, gcc 무변경] |
+| 2026-08-21 | `6ec313e` | feat(conversion): mgt 모듈 ui-tobe 최신 프로세스 재변환 (165화면) — [연관, gcc 무변경] |
+| 2026-08-21 | `7d9675b` | feat(conversion): stf 모듈 ui-tobe 최신 프로세스 재변환 (101화면) — [연관, gcc 무변경] |
+| 2026-08-21 | `53a416f` | feat(conversion): tms 모듈 ui-tobe 최신 프로세스 재변환 (36화면) — [연관, gcc 무변경] |
+| 2026-08-21 | `a3d94f1` | feat(conversion): fil 모듈 ui-tobe 멱등성 수정판 재수렴 (15파일) — [연관, gcc 무변경] |
+| 2026-08-21 | `2d1ec59` | fix(conversion): 변환기 멱등성 결함 2건 수정 + 고정점 수렴 래퍼 — [연관, gcc 무변경] |
+| 2026-08-21 | `d8d1fed` | feat(conversion): fil 모듈 ui-tobe 최신 프로세스 재변환 (34화면) — [연관, gcc 무변경] |
+| 2026-08-21 | `d113354` | docs(conversion)+feat(tools): 프로세스 현행화·플레이북 신설 및 convert_all --force 재생성 옵션 — [연관, gcc 무변경] |
+| 2026-08-21 | `71c4f68` | docs(conversion): 최종 샘플 카탈로그 sample_templates.md 신설 — [연관, gcc 무변경] |
 | 2026-08-21 | `8e83956` | fix(sample): ULDFIL52110 원본 화면 설명 주석 정정 — [연관, gcc 무변경] |
 | 2026-08-21 | `8a2973b` | refactor(udc): searchBadge publicInfo·JSDoc 정비 및 옵션 계약 구현 — [연관, gcc 무변경] |
 | 2026-08-21 | `61c0cfb` | feat(udc): bulkFileSaver save/saveMapForm 멀티 dataList·dataMap 지원 + JSDoc 정비 — [연관, gcc 무변경] |
