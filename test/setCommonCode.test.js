@@ -4,8 +4,9 @@
  * setCommonCode 는 WebSquare 런타임($c/$p/컴포넌트 API)에 의존하므로, 런타임을 mock 으로
  * 대체한 vm 하네스로 data.xml 의 CDATA 를 로드해 실제 구동한다.
  * 단일 code 는 COMMON_CODE_INFO.URL + PARAM(cdEngNm), 배열 code 는 URL_LIST + PARAM_LIST(cdEngNmList,
- * 콤마 구분) 통합 목록 조회 후 mappingKey[i] 컬럼 값이 code 와 같은 행만 추출해 병렬 compID 에
- * 바인딩한다(미지정 시 전체 목록). label/value 컬럼은 FILED_ARR([label, value]) 고정(filedArr 로 재정의).
+ * 콤마 구분)로 조회한다. 배열 code 응답 body 는 key 별로 목록이 담긴 객체({ key: [rows], ... })이며,
+ * 각 code 의 목록은 mappingKey[i](미지정 시 code 값) key 로 찾아 대응 compID 에 바인딩한다.
+ * label/value 컬럼은 FILED_ARR([label, value]) 고정(filedArr 로 재정의).
  */
 const fs = require("fs");
 const vm = require("vm");
@@ -82,15 +83,17 @@ describe.each(XML_FILES)("setCommonCode 배열 매핑 (%s)", (xmlPath) => {
   let h;
   beforeEach(() => { h = loadHarness(xmlPath); }); // 매 테스트 fresh (캐시/상태 격리)
 
-  test("code 배열 → 통합 목록을 mappingKey 컬럼 값으로 분리해 병렬 compID 에 매핑", async () => {
+  test("code 배열 → code별 키잉된 응답 목록을 병렬 compID 에 매핑", async () => {
     h.state.comps = { sbx_A: h.makeComp("sbx_A"), sbx_B: h.makeComp("sbx_B") };
-    h.state.serverBody = [
-      { grpCd: "00001", cdVal: "A1", cdValNm: "A-one" },
-      { grpCd: "00001", cdVal: "A2", cdValNm: "A-two" },
-      { grpCd: "00005", cdVal: "B1", cdValNm: "B-one" },
-    ];
+    h.state.serverBody = {
+      "00001": [
+        { cdVal: "A1", cdValNm: "A-one" },
+        { cdVal: "A2", cdValNm: "A-two" },
+      ],
+      "00005": [{ cdVal: "B1", cdValNm: "B-one" }],
+    };
     await h.scwin.setCommonCode([{
-      code: ["00001", "00005"], compID: ["sbx_A", "sbx_B"], mappingKey: ["grpCd", "grpCd"],
+      code: ["00001", "00005"], compID: ["sbx_A", "sbx_B"],
     }]);
 
     expect(h.state.lastServer.action).toMatch(/cdEngNmList=00001%2C00005/); // 콤마(%2C) 구분
@@ -114,18 +117,36 @@ describe.each(XML_FILES)("setCommonCode 배열 매핑 (%s)", (xmlPath) => {
     expect(vals(rows, "cdVal")).toContain("F1");
   });
 
-  test("mappingKey 미지정 시 전체 목록을 각 compID 에 바인딩 (예외 없음)", async () => {
+  test("mappingKey 지정 시 응답 body 에서 mappingKey[i] key 의 목록을 각 code 에 매핑", async () => {
     h.state.comps = { sbx_A: h.makeComp("sbx_A"), sbx_B: h.makeComp("sbx_B") };
-    h.state.serverBody = [
-      { grpCd: "00001", cdVal: "A1", cdValNm: "A-one" },
-      { grpCd: "00005", cdVal: "B1", cdValNm: "B-one" },
-    ];
-    await h.scwin.setCommonCode([{ code: ["00001", "00005"], compID: ["sbx_A", "sbx_B"] }]);
+    h.state.serverBody = {
+      grpA: [{ cdVal: "A1", cdValNm: "A-one" }],
+      grpB: [{ cdVal: "B1", cdValNm: "B-one" }],
+    };
+    await h.scwin.setCommonCode([{
+      code: ["00001", "00005"], compID: ["sbx_A", "sbx_B"], mappingKey: ["grpA", "grpB"],
+    }]);
 
+    // DataList/조회 키는 code 기준 유지, 목록만 mappingKey 로 찾는다.
     const rowsA = h.state.dls["dlt_commonCode_00001___sbx_A"]._rows;
     const rowsB = h.state.dls["dlt_commonCode_00005___sbx_B"]._rows;
-    expect(vals(rowsA, "cdVal")).toEqual(expect.arrayContaining(["A1", "B1"]));
-    expect(vals(rowsB, "cdVal")).toEqual(expect.arrayContaining(["A1", "B1"]));
+    expect(vals(rowsA, "cdVal")).toContain("A1");
+    expect(vals(rowsB, "cdVal")).toContain("B1");
+    expect(vals(rowsB, "cdVal")).not.toContain("A1");
+  });
+
+  test("mappingKey 일부만 지정(null) 시 나머지는 code 값을 key 로 사용", async () => {
+    h.state.comps = { sbx_A: h.makeComp("sbx_A"), sbx_B: h.makeComp("sbx_B") };
+    h.state.serverBody = {
+      grpA: [{ cdVal: "A1", cdValNm: "A-one" }],
+      "00005": [{ cdVal: "B1", cdValNm: "B-one" }],
+    };
+    await h.scwin.setCommonCode([{
+      code: ["00001", "00005"], compID: ["sbx_A", "sbx_B"], mappingKey: ["grpA", null],
+    }]);
+
+    expect(vals(h.state.dls["dlt_commonCode_00001___sbx_A"]._rows, "cdVal")).toContain("A1");
+    expect(vals(h.state.dls["dlt_commonCode_00005___sbx_B"]._rows, "cdVal")).toContain("B1");
   });
 
   test("단일 code(문자열)는 cdEngNm 사용 — 기존 동작 유지", async () => {
@@ -140,12 +161,12 @@ describe.each(XML_FILES)("setCommonCode 배열 매핑 (%s)", (xmlPath) => {
 
   test("filedArr 지정 시 [label, value] 컬럼으로 바인딩 (미지정 시 FILED_ARR 기본)", async () => {
     h.state.comps = { sbx_A: h.makeComp("sbx_A"), sbx_B: h.makeComp("sbx_B") };
-    h.state.serverBody = [
-      { grpCd: "00001", custCd: "A1", custNm: "A-one", cdVal: "A1", cdValNm: "A-one" },
-      { grpCd: "00005", custCd: "B1", custNm: "B-one", cdVal: "B1", cdValNm: "B-one" },
-    ];
+    h.state.serverBody = {
+      "00001": [{ custCd: "A1", custNm: "A-one", cdVal: "A1", cdValNm: "A-one" }],
+      "00005": [{ custCd: "B1", custNm: "B-one", cdVal: "B1", cdValNm: "B-one" }],
+    };
     await h.scwin.setCommonCode([{
-      code: ["00001", "00005"], compID: ["sbx_A", "sbx_B"], mappingKey: ["grpCd", "grpCd"],
+      code: ["00001", "00005"], compID: ["sbx_A", "sbx_B"],
       filedArr: ["custNm", "custCd"], // [label, value] 재정의
     }]);
 
@@ -170,36 +191,16 @@ describe.each(XML_FILES)("setCommonCode 배열 매핑 (%s)", (xmlPath) => {
     expect(vals(h.state.dls["dlt_commonCode_00011___sbx_S"]._rows, "cdVal")).toContain("U1");
 
     // 배열 code 는 통합 목록 API(URL_LIST) 사용
-    h.state.serverBody = [
-      { grpCd: "00001", cdVal: "A1", cdValNm: "A-one" },
-      { grpCd: "00005", cdVal: "B1", cdValNm: "B-one" },
-    ];
+    h.state.serverBody = {
+      "00001": [{ cdVal: "A1", cdValNm: "A-one" }],
+      "00005": [{ cdVal: "B1", cdValNm: "B-one" }],
+    };
     h.state.comps.sbx_A = h.makeComp("sbx_A");
     h.state.comps.sbx_B = h.makeComp("sbx_B");
     await h.scwin.setCommonCode([{
-      code: ["00001", "00005"], compID: ["sbx_A", "sbx_B"], mappingKey: ["grpCd", "grpCd"],
+      code: ["00001", "00005"], compID: ["sbx_A", "sbx_B"],
     }]);
     expect(h.state.lastServer.action).toBe("/api/common/common-codes?cdEngNmList=00001%2C00005");
-  });
-
-  test("paramName 옵션 지정 시 기본 쿼리 파라미터명(cdEngNm/cdEngNmList) 대신 해당 이름으로 조회", async () => {
-    h.state.comps = { sbx_S: h.makeComp("sbx_S") };
-    h.state.serverBody = [{ cdVal: "P1", cdValNm: "param-one" }];
-    await h.scwin.setCommonCode([{ code: "00012", compID: "sbx_S", paramName: "grpCd" }]);
-    expect(h.state.lastServer.action).toBe("/api/common/common-code?grpCd=00012");
-
-    // 배열 code + paramName 조합 (경로는 URL_LIST 고정)
-    h.state.serverBody = [
-      { grpCd: "00001", cdVal: "A1", cdValNm: "A-one" },
-      { grpCd: "00005", cdVal: "B1", cdValNm: "B-one" },
-    ];
-    h.state.comps.sbx_A = h.makeComp("sbx_A");
-    h.state.comps.sbx_B = h.makeComp("sbx_B");
-    await h.scwin.setCommonCode([{
-      code: ["00001", "00005"], compID: ["sbx_A", "sbx_B"], mappingKey: ["grpCd", "grpCd"],
-      paramName: "grpCdList",
-    }]);
-    expect(h.state.lastServer.action).toBe("/api/common/common-codes?grpCdList=00001%2C00005");
   });
 
   test("단일 code 의 key 래핑 응답은 첫 key 목록으로 언래핑", async () => {
