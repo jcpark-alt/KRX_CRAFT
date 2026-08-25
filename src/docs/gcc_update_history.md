@@ -1,7 +1,7 @@
 # gcc 공통 함수 업데이트 이력
 
 `src/gcc/` 공통 라이브러리(`$c.*`)의 최초 반입(2026-06-08, `92a35bd`) 이후 변경 내역 정리 (최종 갱신 2026-08-25).
-API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-08-25 기준 **11개 모듈 / 281개 공개 메서드**.
+API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-08-25 기준 **11개 모듈 / 283개 공개 메서드**.
 
 > `src/cm/gcc/`는 CM 모듈용 사본으로 일반적 개선만 선별 반영해 왔으나(2026-06-10 병합, 2026-07-22 대규모 동기화로 11파일 체제),
 > **2026-08-18 `26af3d5`에서 사용 중단으로 삭제**되어 `src/gcc/`가 유일한 canonical 라이브러리다.
@@ -177,6 +177,20 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 - `c636f0c` (08-25) — `$c.data.setCommonCode` **기본 "선택" firstRow 자동 삽입 제거** + JSDoc 정비:
   - `__applyCommonCodeFirstRow`: firstRow 미지정 시 기본 `["", "선택"]` 선두 삽입을 비활성화 — **명시 `firstRow` 옵션일 때만 삽입**(회귀 테스트 새 의미론 갱신 + 명시 경로 테스트 1건 추가)
   - `$c.util.getComponent` JSDoc 예제 오타 정정, `$c.win.getPopupOpenerScope`/`POPUP_OPENER_SCOPES` 주석 간소화(등록 코드 무변경), API 문서 재생성
+- `c9aa3ba` (08-25) — `$c.data.setCommonCode` **공통코드 조회 URL 이원화 및 옵션 정리**:
+  - `COMMON_CODE_INFO`: `URL_LIST`(`/api/common/common-codes`) 추가, `LABEL`/`VALUE` 삭제 — 단일 code 는 `URL`+`PARAM`(cdEngNm), 배열 code 는 `URL_LIST`+`PARAM_LIST`(cdEngNmList) **고정 라우팅**
+  - `url`·`action`·`labelColumn`·`valueColumn` 옵션 제거 — label/value 컬럼은 `filedArr[0]/[1]` 고정(`_pickColumn` 삭제), action 은 내부 로컬 변수로 조립(`paramName` 만 유지)
+  - 회귀 테스트 새 계약으로 재작성(8건), API 문서 재생성
+- `eb13261` (08-25) — `$c.validate` **validateDataCollect 결함 수정 및 검증 규칙 대폭 확장** (281→283 메서드):
+  - 결함 수정: `finally` 의 return 이 `catch` 를 덮어 **예외 시 true 반환** 가능하던 구조 해소(컴포넌트 수집도 try 내부로 — 예외 시 항상 false), 그리드 경로 FORMAT 체인의 `phone`/`email` 누락 보강
+  - JSDoc 에만 있고 조용히 무시되던 규칙 실제 구현(`__getExtendedRuleMessage`): `ignoreChar`·`min/maxLengthB`(byte)·`maxLengthF`(정수.소수 자리수)·`num`(n/i/f)·`from/toNum`·`format:bizNum` — 빈 값 통과(required 소관), 문서 목록 현행화(`comparelength`→`fixLength`)
+  - 조건부·그룹 규칙 신설(`__getConditionalRuleMessage`): `checked`(체크박스 필수 — "0"/false 도 실패), `emptyIf`/`requiredIf`(조건 객체 `equals|notEquals|in|notEmpty` — 국가코드 410 외 = 외국국적 판별, 참조 값 빈 경우 조건 불충족), `duplicate`(그리드 행 간 중복)·`duplicateGroup`(폼 그룹 중복)
+  - `format:corpNum`(**`$c.str.isCorpNum` 신설** — 13자리+가중치 1,2 체크섬)·`format:urlNoProtocol` 추가, `validateSiteUrl` `forbidProtocol` 옵션
+  - **`$c.util.checkFileTotalSize` 신설** — 첨부 총용량 검사(기본 100MB, 업로드 컴포넌트/File 객체 혼용 배열)
+  - `validateDataCollect` JSDoc 을 전체 옵션 샘플로 교체, 회귀 테스트 `test/validateDataCollect.test.js` 12건 신설
+- `cbbdf88` (08-25) — [연관] **validate-generator 를 확장된 검증 규칙에 맞춰 갱신**(`src/docs/validate-generator`, gcc 무변경):
+  - 필드 규칙 표 `compareLen`→`fixLength` 교체 + `checked`/`emptyIf`/`requiredIf`/`duplicate`/`dupGroup` 고급 열, format 선택지 `securityNumber`·`corpNum`·`urlNoProtocol` 확장
+  - `VG.buildCode` 에 BOOL_RULES(true 출력)·RAW_RULES(조건 객체 원문) 분류 신설, README 동기화, 생성 테스트 +1건
 
 ---
 
@@ -184,6 +198,9 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-08-25 | `cbbdf88` | feat(docs): validate-generator 를 확장된 검증 규칙에 맞춰 갱신 — [연관, gcc 무변경] |
+| 2026-08-25 | `eb13261` | feat(validate): validateDataCollect 결함 수정 및 검증 규칙 대폭 확장 |
+| 2026-08-25 | `c9aa3ba` | feat(data): setCommonCode 공통코드 조회 URL 이원화 및 옵션 정리 |
 | 2026-08-25 | `c636f0c` | feat(gcc): setCommonCode 기본 '선택' firstRow 자동 삽입 제거 + JSDoc 정비 |
 | 2026-08-21 | `10ee305` | fix(udc): bulkFileSaver save의 빈 변경분 차단 가드 비활성화 — [연관, gcc 무변경] |
 | 2026-08-21 | `80e64f5` | docs(conversion): overview HTML 8번 절로 gcc 업데이트 이력 전문 수록 — [연관, gcc 무변경] |
