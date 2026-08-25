@@ -99,7 +99,18 @@ describe.each(XML_FILES)("setCommonCode 배열 매핑 (%s)", (xmlPath) => {
     expect(vals(rowsB, "cdVal")).toContain("B1");
     expect(vals(rowsB, "cdVal")).not.toContain("A1"); // 교차오염 없음
     expect(h.state.comps.sbx_A._bound.src).toBe("data:dlt_commonCode_00001___sbx_A");
-    expect(rowsA[0].cdValNm).toBe("선택"); // 기본 firstRow 선두 삽입 (기본 LABEL 컬럼 = cdValNm)
+    expect(rowsA[0].cdValNm).toBe("A-one"); // 기본 firstRow("선택") 자동 삽입 없음 — 명시 옵션일 때만
+  });
+
+  test("firstRow 명시 시에만 선두 항목이 삽입된다", async () => {
+    h.state.comps = { sbx_F: h.makeComp("sbx_F") };
+    h.state.serverBody = [{ cdVal: "F1", cdValNm: "F-one" }];
+    await h.scwin.setCommonCode([{ code: "00011", compID: "sbx_F", firstRow: ["", "선택"] }]);
+
+    const rows = h.state.dls["dlt_commonCode_00011___sbx_F"]._rows;
+    expect(rows[0].cdValNm).toBe("선택");
+    expect(rows[0].cdVal).toBe("");
+    expect(vals(rows, "cdVal")).toContain("F1");
   });
 
   test("mappingKey 미지정 시 전체 목록을 각 compID 에 바인딩 (예외 없음)", async () => {
