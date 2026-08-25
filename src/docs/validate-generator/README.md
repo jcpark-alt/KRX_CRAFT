@@ -19,8 +19,11 @@
    (focus/editMode 는 기본값 true 와 다를 때만 코드에 출력)
 4. **필드 규칙 입력** — name(라벨)은 XML 에서 자동 선입력. 규칙이 입력된 필드만 코드에 포함됩니다.
    - 기본: `required` · `allowChar`(프리셋: 0-9 / 0-9. / a-zA-Z / 가-힣) · `ignoreChar` · `minLength`/`maxLength` ·
-     `num`(n/i/f) · `format`(email/date/phone/mobilePhone/bizNum/birth) · `fromNum`/`toNum`
-   - 고급(토글): `comparelength` · `minLengthB`/`maxLengthB`(byte) · `maxLengthF`(예: 10.2 — 정수+소수 자릿수)
+     `num`(n/i/f) · `format`(email/date/phone/mobilePhone/securityNumber/bizNum/corpNum/urlNoProtocol/birth) · `fromNum`/`toNum`
+   - 고급(토글): `checked`(체크박스 필수 체크) · `fixLength`(고정 문자수) · `minLengthB`/`maxLengthB`(byte) ·
+     `maxLengthF`(예: 10.2 — 정수+소수 자릿수) ·
+     `emptyIf`/`requiredIf`(조건 객체 원문 입력 — `{ compID : "sbx_nation", notEquals : "410" }`, equals|notEquals|in|notEmpty) ·
+     `duplicate`(그리드 컬럼 행 간 중복 금지) · `duplicateGroup`(폼 그룹 필드 간 중복 금지)
 5. **[코드 생성] → [복사]** — 생성 예:
 
 ```javascript

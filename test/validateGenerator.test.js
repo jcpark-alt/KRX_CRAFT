@@ -102,4 +102,20 @@ describe("VG.buildCode — options 코드 생성", () => {
     ], "grd_main");
     expect(code).toContain('"COL-1" : { format : "email", name : "별칭\\"테스트\\"" }');
   });
+
+  test("신규 규칙 — checked/duplicate 는 true, emptyIf/requiredIf 는 조건 객체 원문, duplicateGroup 은 문자열", () => {
+    const code = VG.buildCode(common, [
+      { id: "chkAgree", rules: { checked: true, name: "개인정보 처리방침 동의" } },
+      { id: "ipbZip", rules: { emptyIf: '{ compID : "sbx_nation", notEquals : "410" }', name: "우편번호" } },
+      { id: "calChgDt1", rules: { requiredIf: '{ compID : "ipb_chgNm2", notEmpty : true }', name: "변경일1" } },
+      { id: "sbxMonth1", rules: { duplicateGroup: "settleMonth", name: "결산월1" } },
+      { id: "MONTH", rules: { duplicate: true, fixLength: "2" } },
+    ], "grp_form");
+
+    expect(code).toContain('chkAgree : { checked : true, name : "개인정보 처리방침 동의" }');
+    expect(code).toContain('ipbZip : { emptyIf : { compID : "sbx_nation", notEquals : "410" }, name : "우편번호" }');
+    expect(code).toContain('calChgDt1 : { requiredIf : { compID : "ipb_chgNm2", notEmpty : true }, name : "변경일1" }');
+    expect(code).toContain('sbxMonth1 : { duplicateGroup : "settleMonth", name : "결산월1" }');
+    expect(code).toContain("MONTH : { fixLength : 2, duplicate : true }");
+  });
 });
