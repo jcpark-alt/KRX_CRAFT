@@ -1,7 +1,7 @@
 # gcc 공통 함수 업데이트 이력
 
-`src/gcc/` 공통 라이브러리(`$c.*`)의 최초 반입(2026-06-08, `92a35bd`) 이후 변경 내역 정리 (최종 갱신 2026-08-21).
-API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-08-21 기준 **11개 모듈 / 281개 공개 메서드**.
+`src/gcc/` 공통 라이브러리(`$c.*`)의 최초 반입(2026-06-08, `92a35bd`) 이후 변경 내역 정리 (최종 갱신 2026-08-25).
+API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-08-25 기준 **11개 모듈 / 281개 공개 메서드**.
 
 > `src/cm/gcc/`는 CM 모듈용 사본으로 일반적 개선만 선별 반영해 왔으나(2026-06-10 병합, 2026-07-22 대규모 동기화로 11파일 체제),
 > **2026-08-18 `26af3d5`에서 사용 중단으로 삭제**되어 `src/gcc/`가 유일한 canonical 라이브러리다.
@@ -174,6 +174,9 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
   - `ULDTMS03150` 원본 ui 결함 승계분(label 속성 내 원시 span)은 엔티티 이스케이프로 수기 정정
 - `a16c35c`, `b59e201`, `ed6a75f`, `80e64f5` (08-21) — [연관] **overview HTML 정비**(gcc 무변경): 개정 md 동기화, 구조도 `sample-front/ui` 설명 추가, 8번 배경 절 제거 후 **gcc 업데이트 이력 전문을 8절로 수록**(`history:begin/end` 마커 구간 — 이력 갱신 시 구간 교체)
 - `10ee305` (08-21) — [연관] **UDC bulkFileSaver `save` 빈 변경분 차단 가드 비활성화**(`src/udc`, gcc 무변경): 변경 행 0건 조기 반환을 주석 처리 — 데이터 변경 없이 파일 첨부만으로도 저장 요청 가능
+- `c636f0c` (08-25) — `$c.data.setCommonCode` **기본 "선택" firstRow 자동 삽입 제거** + JSDoc 정비:
+  - `__applyCommonCodeFirstRow`: firstRow 미지정 시 기본 `["", "선택"]` 선두 삽입을 비활성화 — **명시 `firstRow` 옵션일 때만 삽입**(회귀 테스트 새 의미론 갱신 + 명시 경로 테스트 1건 추가)
+  - `$c.util.getComponent` JSDoc 예제 오타 정정, `$c.win.getPopupOpenerScope`/`POPUP_OPENER_SCOPES` 주석 간소화(등록 코드 무변경), API 문서 재생성
 
 ---
 
@@ -181,6 +184,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-08-25 | `c636f0c` | feat(gcc): setCommonCode 기본 '선택' firstRow 자동 삽입 제거 + JSDoc 정비 |
 | 2026-08-21 | `10ee305` | fix(udc): bulkFileSaver save의 빈 변경분 차단 가드 비활성화 — [연관, gcc 무변경] |
 | 2026-08-21 | `80e64f5` | docs(conversion): overview HTML 8번 절로 gcc 업데이트 이력 전문 수록 — [연관, gcc 무변경] |
 | 2026-08-21 | `ed6a75f` | docs(conversion): overview HTML에서 8번 배경 절 제거 — [연관, gcc 무변경] |
