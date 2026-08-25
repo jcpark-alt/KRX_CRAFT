@@ -206,6 +206,8 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
   - `paramName` 옵션 제거 — 쿼리 파라미터명은 `PARAM`("cdEngNm")·`PARAM_LIST`("cdEngNmList") 상수 고정, `useLocalCache:false` 캐시 삭제 키를 실제 저장 키(code)로 정합, 죽은 `mapKey` 표현식(`null ?? code`) 정리
   - `win.xml`: 현재 프레임 초기화 `scwin.reinitialize`(`$p.reinitialize` 래퍼) 공개 추가
   - 회귀 테스트 신 계약 재작성(setCommonCode 8건), API 문서 재생성
+- `49efe07` (08-25) — [연관] **sample-front 벤더 JS를 ESLint 대상에서 제외**(`eslint.config.js`, gcc 무변경): SBChart 배포본(sbchart.js 압축본)의 no-undef 에러로 실패하던 Node lint CI 잡 복구
+- `cc7c67c` (08-25) — `$c.data.setCommonCode` **바인딩 블록 죽은 코드 정리**(동작 무변경): 미사용 `mapKey` 선언·낡은 매핑 주석 제거(mappingKey 해석은 `__getCommonCodeData` 로 일원화), 중복 `bodyObj` 조회 제거·`sourceList` 폴백 `[]` 정상화
 
 ---
 
@@ -213,6 +215,8 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-08-25 | `cc7c67c` | refactor(data): setCommonCode 바인딩 블록 죽은 코드 정리 |
+| 2026-08-25 | `49efe07` | fix(ci): sample-front 벤더 JS를 ESLint 대상에서 제외 — [연관, gcc 무변경] |
 | 2026-08-25 | `b1f9fdf` | feat(gcc): setCommonCode code별 응답 매핑 개편·paramName 제거 + win.reinitialize 추가 |
 | 2026-08-25 | `95d7994` | fix(sample): SB차트 샘플 주석 URL 36건 교정 + HEATMAP 빈 데이터 수정 — [연관, gcc 무변경] |
 | 2026-08-25 | `a3a40fd` | feat(docs): validate-generator 고급 열 기본 표시 + 결과 영역 하단 전체 폭 배치 — [연관, gcc 무변경] |
