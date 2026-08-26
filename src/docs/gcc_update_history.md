@@ -1,7 +1,7 @@
 # gcc 공통 함수 업데이트 이력
 
 `src/gcc/` 공통 라이브러리(`$c.*`)의 최초 반입(2026-06-08, `92a35bd`) 이후 변경 내역 정리 (최종 갱신 2026-08-26).
-API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-08-26 기준 **11개 모듈 / 285개 공개 메서드**.
+API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-08-26 기준 **12개 모듈 / 285개 공개 메서드**.
 
 > `src/cm/gcc/`는 CM 모듈용 사본으로 일반적 개선만 선별 반영해 왔으나(2026-06-10 병합, 2026-07-22 대규모 동기화로 11파일 체제),
 > **2026-08-18 `26af3d5`에서 사용 중단으로 삭제**되어 `src/gcc/`가 유일한 canonical 라이브러리다.
@@ -15,7 +15,8 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 |------|-----------|
 | `sbm.xml` (`$c.sbm`) | 중복 제출 가드, `executeDynamic` 간소화 ref/target 문법·gridview 자동 바인딩·`autoFocus`·다중 gridview 바인딩·스피너 오버레이·message 옵션(opt-in), RESTful URL 활성화, 단건 ref(DataMap)→`requestData` 추출, 페이징(`setPagingInfo`) 개선 — `maxRowNum "all"` 전체 행 표시·`rowNumVisble desc` 내림차순 순번, 그리드 DOM `render` 참조 전환 |
 | `data.xml` (`$c.data`) | 공통코드 로딩(`COMMON_CODE_INFO.ACTION` 연동, `setCommonCode` 배열 매핑 → code별 키잉 응답 매핑(`mappingKey` = 응답 조회 key) 개편·응답 언래핑·기본 컬럼 cdVal/cdValNm·조회 URL 이원화(url/paramName 옵션은 추가 후 제거)), JSON 헬퍼 8종, 프로세스 메시지, 콤보 공통코드 세팅(`comboCbDataSet*`) 계열, 업로드/리포트 헬퍼, 엑셀 다운로드 기본 옵션 개선 |
-| `win.xml` (`$c.win`) | 외부망 홈(`goHomeEx`), 프로그램 열기/내비게이션 단순화, `openFormSubmit`, 인쇄(`mainPrint`/`popupPrint`), `success`/`error` 알림, `openExternalPage`, **browserPopup 부모 화면 접근**(`getOpenerScope`/`callOpener`), 히스토리 기록·복원(`pushState`/`changePageState`) 결함 수정 및 `moveUrl`/`setPageFrameSrc` 이동 복원 확장(`restoreData` [목록] 복귀 포함), 프레임 초기화 `reinitialize`, try/catch 공통 오류 처리기 `handleError` |
+| `win.xml` (`$c.win`) | 외부망 홈(`goHomeEx`), 프로그램 열기/내비게이션 단순화, `openFormSubmit`, 인쇄(`mainPrint`/`popupPrint`), `success`/`error` 알림, `openExternalPage`, **browserPopup 부모 화면 접근**(`getOpenerScope`/`callOpener`), 히스토리 기록·복원(`pushState`/`changePageState`) 결함 수정 및 `moveUrl`/`setPageFrameSrc` 이동 복원 확장(`restoreData` [목록] 복귀 포함), 프레임 초기화 `reinitialize` |
+| `exception.xml` (`$c.exception`) | **신설**(2026-08-26, win.xml 에서 분리) — 화면 try/catch 공통 오류 처리기 `handleError`(예외 분류·이중 알림 방지), 오류 수집 훅 `__reportError`(`ERROR_REPORT_INFO.URL` 설정 시 활성화) |
 | `util.xml` (`$c.util`) | 쿠키/웹스토리지 헬퍼 13종, 업로드(`onUploadClick`/`getUploadFiles` 등), `setTextLengthCounter`, `checkFileExtension`, 엑셀 다운로드 파일명 개선, `setGridVisibleRowNum`(gridView "all" 동적 적용) |
 | `date.xml` (`$c.date`) | 날짜 포맷 검증(`checkCalendarFormat`/`compareFromToDate`), `getDateInterval` 단위 버그 수정, commonPrototype 의존 제거 |
 | `str.xml` (`$c.str`) | validate 중복 검증기 통합, 목적격 조사(`attachObjectPostposition`), 바이트/포맷 함수 자체 구현 전환 |
@@ -224,6 +225,11 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
   - `handleError` 가 수집한 예외 객체에 `_errorReported` 마킹 — sbm(공통 계층)·화면 catch 중복 호출 시에도 수집 1회 보장
   - 결함 수정: ① 연결 불가 시 promise 핸들러 연결 전 조기 return 으로 `executeDynamic` Promise 영구 pending → reject 종결(+`errorType` 표식 보장), ② action 누락 시 문자열 reject 로 화면 handleError 이중 알림 → `{errorType:"invalid-option"}` 객체 reject, ③ 500 응답 본문 비JSON 시 `resBody.errors.code` 접근으로 핸들러 사망·알림 누락 → 안전 접근
   - 회귀 테스트 `test/sbmErrorFlow.test.js` 4건 신설 + handleError 재수집 방지 1건(총 96건)
+- `57de52d` (08-26) — **예외 처리 체계를 `exception.xml`(`$c.exception`)로 분리** (11→12 모듈, 285 메서드 불변):
+  - `handleError`(공개)·`__reportError`(hidden)·`ERROR_REPORT_INFO`·`__errorReportState` 를 win.xml 에서 신설 exception.xml 로 이동(`__errorHandler` 는 WebSquare 설정의 이름 참조 가능성으로 win 잔류)
+  - 참조 일괄 변경(위임 래퍼 없음) — sbm.xml 수집 합류 가드 2곳·`SMPVAL10000` 2곳·code-convention.md·sample_templates.md → `$c.exception.handleError`
+  - CLAUDE.md gcc 모듈 표·lint 기준선(12 files) 현행화, handleError 테스트 하니스를 exception.xml 로드로 전환
+  - **배포 주의**: 배포 환경에 `$c.exception` 공통 XML 등록과 함께 반영 필요
 
 ---
 
@@ -231,6 +237,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-08-26 | `57de52d` | refactor(gcc): 예외 처리 체계를 exception.xml($c.exception)로 분리 |
 | 2026-08-26 | `4e4bbd4` | feat(sbm,win): sbm 오류 경로를 handleError 수집 파이프라인에 합류 + 결함 3건 수정 |
 | 2026-08-26 | `67fc919` | feat(win): __reportError 오류 수집 로직 본구현 — URL 설정 전까지 비활성 |
 | 2026-08-26 | `3bed6e5` | docs(convention)+refactor(sample): 화면 try/catch 오류 처리 규약 신설 및 샘플 적용 — [연관, gcc 무변경] |
