@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- 기능샘플: 주식차트 = 캔들스틱(상단) + 거래량 막대(하단) 2단, x축(날짜) 정렬 -->
+<!-- 기능샘플: 주식차트 = 캔들스틱(상단) + 거래량 막대(하단) 2단, x축(날짜) 정렬
+  - 2026-08-26 SPCHART.md 회신 반영(문의 처리 요약: sbchart/md/SPCHART.md §1) : 코드 컨벤션 정리 + 색상(inColor/deColor)·차트 clear·툴팁 값 포맷 — var→const, fn_xdate→xdate·fn_render→render
+-->
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events"
       xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
 <head meta_screenId="SPCHART_STOCK" meta_screenName="주식차트 (캔들+거래량)" meta_desc="candlestick + volume 2단" meta_author="WRM" meta_date="2026.07.09">
@@ -11,6 +13,18 @@
 // 같은 데이터(CANDLESTICK.json: OHLC + trdvolume)로 두 차트를 상하 렌더
 scwin.URL ="/ui/sample/SBChart/CANDLESTICK/data/CANDLESTICK.json";
 scwin.DATES = [];   // 인덱스→날짜 매핑용 (x축은 인덱스를 주므로 사전 조회한 날짜로 변환)
+
+// ---- 차트 공통 상수 (SPCHART.md 회신 §1 반영) ----
+scwin.CHART_UP_COLOR   = "#E52528";   // 상승 : 빨강
+scwin.CHART_DOWN_COLOR = "#1B64DA";   // 하락 : 파랑
+
+/**
+ * 차트 컨테이너를 정리한다. 재조회 렌더 전 호출 — 이전 차트 잔존 방지 (SPCHART.md §1-5)
+ */
+scwin.clearChart = function (comp) {
+    const el = document.getElementById(comp.getID());
+    if (el) { el.innerHTML = ""; }
+};
 
 // 날짜 MM-DD 로 변환 (인덱스 v → scwin.DATES[v]); 과밀 방지로 3개당 1개만
 scwin.xdate = function (v) {
@@ -29,10 +43,28 @@ scwin.onpageload = async function () {
 };
 
 scwin.render = function (data) {
+    scwin.clearChart(chartTop);   // 재조회 대비 이전 차트 정리 — SPCHART.md §1-5
+    scwin.clearChart(chartVol);
+
     // ── 상단: 캔들스틱 (x축 날짜 MM-DD) ──
     $c.ext.drawChartData("candlestick", data, chartTop, {
         legend: { show: false },                                  // 캔들 범례 숨김
-        tooltip: { width: "200px" },
+        tooltip: {
+            width: "200px",
+            format: {   // 마우스오버 표시값 — OHLC 한글 라벨 + 천단위 콤마 — SPCHART.md §1-7
+                title: function (idx) { return scwin.DATES[idx] || ""; },
+                // values 순서 = keys.value[0] 선언 순서 — [0]시가 [1]종가 [2]저가 [3]고가
+                value: function (values, ratio, id, index) {
+                    const fmt = function (v) { return $c.num.formatNumber(v) + " 원"; };
+                    return {
+                        open:  { key: "시가", value: fmt(values[0]) },
+                        close: { key: "종가", value: fmt(values[1]) },
+                        low:   { key: "저가", value: fmt(values[2]) },
+                        high:  { key: "고가", value: fmt(values[3]) }
+                    };
+                }
+            }
+        },
         axis: {
             y: { min: 78000 },
             x: { tick: { format: scwin.xdate } }               // 인덱스 → 날짜(MM-DD)
@@ -40,6 +72,8 @@ scwin.render = function (data) {
         extend: {
             candlestick: {
                 auto: true,                                       // 상승/하락 자동 색
+                inColor: scwin.CHART_UP_COLOR,                    // 상승 색 명시 — SPCHART.md §1-3
+                deColor: scwin.CHART_DOWN_COLOR,                  // 하락 색 명시
                 marker: { show: true, color: "#c0392b" }          // 고점/저점 값 마커
             }
         },
@@ -51,6 +85,12 @@ scwin.render = function (data) {
     // ── 하단: 거래량 막대 (라벨 숨김, 날짜는 캔들 쪽에 표시) ──
     $c.ext.drawChartData("bar", data, chartVol, {
         legend: { show: false },
+        tooltip: {
+            format: {   // 마우스오버 표시값 — 천단위 콤마 — SPCHART.md §1-7
+                title: function (idx) { return scwin.DATES[idx] || ""; },
+                value: function (v, ratio, id, index) { return $c.num.formatNumber(v) + " 주"; }
+            }
+        },
         axis: {
             y: { tick: { format: function (v) { return Math.round(v / 10000) + "만"; } } },  // 거래량 만 단위
             x: { tick: { format: function () { return ""; } } }   // 하단 라벨 숨김
