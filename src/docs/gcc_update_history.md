@@ -214,6 +214,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
   - 옵션 — `message`(공통 메시지 ID 지원)·`notify`("error"|"alert"|"toast"|"none")·`context`(로그 식별자)·`rethrow`·`callback`
   - `scwin.__reportError` 수집 훅(hidden, 현재 no-op) — 추후 오류 수집 API 신설 시 연동 지점, try/catch 격리로 수집 실패가 화면 흐름을 깨지 않음
   - 빈 예외 가드는 명시적 null 체크 — `$c.util.isEmpty` 가 열거 키 없는 `Error` 인스턴스를 빈 객체로 오판하는 함정 회피, 회귀 테스트 11건 신설(`test/handleError.test.js`)
+- `3bed6e5` (08-26) — [연관] **화면 try/catch 오류 처리 규약 신설 및 샘플 적용**(gcc 무변경): `code-convention.md` 오류 처리 절(진입점 한정 try/catch + `$c.win.handleError` 한 줄 통일·내부 함수 예외 전파·`bizMessage` 업무 예외 표준·빈 catch 금지), `SMPVAL10000` 두 진입점 적용(Stage 2 정답지), `sample_templates.md` 표준 패턴 8번 추가
 
 ---
 
@@ -221,6 +222,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-08-26 | `3bed6e5` | docs(convention)+refactor(sample): 화면 try/catch 오류 처리 규약 신설 및 샘플 적용 — [연관, gcc 무변경] |
 | 2026-08-26 | `a00ab33` | feat(win): 화면 try/catch 공통 오류 처리기 handleError 추가 |
 | 2026-08-26 | `8cc25d0` | feat(data): setCommonCode 캐시 히트 시 서버 재조회 생략 |
 | 2026-08-25 | `cc7c67c` | refactor(data): setCommonCode 바인딩 블록 죽은 코드 정리 |
