@@ -26,7 +26,7 @@ A lint/test toolchain sits on top of the raw XML. All commands run from the repo
 A Python/lxml linter under `tools/wsxml_lint/` that parses the WebSquare `.xml` pages directly (the only tool that actually inspects this project's source).
 
 - **Run:** `npm run lint:xml` — a **split** of two scripts:
-  - `npm run lint:xml:gcc` → `python -m wsxml_lint src/gcc` (strict) → baseline **`11 files, 0 errors, 0 warnings`**.
+  - `npm run lint:xml:gcc` → `python -m wsxml_lint src/gcc` (strict) → baseline **`12 files, 0 errors, 0 warnings`**.
   - `npm run lint:xml:legacy` → `python -m wsxml_lint src/as-is/ins src/as-is/mgt src/as-is/stf src/as-is/fil --ignore WS111,WS112,WS113` → baseline **`227 files, 0 errors, 0 warnings`**.
   - Lint a single file: `python -m wsxml_lint src/gcc/win.xml`.
 - **Why the split:** `WS111`/`WS112`/`WS113` fire on *every* legacy page (missing `<head>` `@meta_*` / `<w2:layoutInfo>` / `<w2:dataCollection>`) — a systematic W-Craft conversion gap, not defects (~424 warnings). They are ignored for `src/as-is/ins|mgt|stf|fil` so real issues aren't buried, while `src/gcc` stays strict. To see the full legacy baseline, run `python -m wsxml_lint src/as-is/ins src/as-is/mgt src/as-is/stf src/as-is/fil` (no `--ignore`).
@@ -73,6 +73,7 @@ The actively maintained core (most recent edits). Each file is one namespace und
 |------|-----------|----------------|
 | `util.xml` | `$c.util` | Component control, type checks (`isEmpty`/`isArray`/`isJSON`), file & Excel up/download, clipboard, timers |
 | `win.xml` | `$c.win` | Business-screen control: auth, popups, alerts/confirm, navigation, i18n/language, history |
+| `exception.xml` | `$c.exception` | Screen try/catch error handling (`handleError`) + error reporting hook (`__reportError`, inactive until `ERROR_REPORT_INFO.URL` is set) |
 | `str.xml` | `$c.str` | String formatting/validation (SSN, phone, email, byte-length, escaping) |
 | `num.xml` | `$c.num` | Number helpers |
 | `date.xml` | `$c.date` | Date helpers |
@@ -95,7 +96,7 @@ This marks code produced by the **W-Craft conversion tool** (migrating an older 
 - Legacy naming: `scwin.fn_com_isur`, `scwin.fn_int2han`, `scwin.fn_DelChar`, `scwin.ins_combo_set`, etc.
 - Often commented-out legacy API calls left as porting hints (`//frame.SetImgAction(...)`).
 - Bare `<head>` with no `@meta_screenId`/`@meta_screenName` (the source of the WS111 warnings) — these are business screens identified by deploy path, not `$c` namespace providers.
-- These modules **consume** common namespaces defined *outside this repo*: `$c.stf.*` (1300+ calls), `$c.frame.*`, `$c.ut.*`, `$c.lce.*`, `$c.info.*`, `$c.rpt.*`, `$c.lcd.*` are called but not defined here (`src/gcc` only provides `$c.util/win/str/num/date/data/validate/sbm/hkey`). This repo is a **partial slice** of the full WebSquare project.
+- These modules **consume** common namespaces defined *outside this repo*: `$c.stf.*` (1300+ calls), `$c.frame.*`, `$c.ut.*`, `$c.lce.*`, `$c.info.*`, `$c.rpt.*`, `$c.lcd.*` are called but not defined here (`src/gcc` only provides `$c.util/win/exception/str/num/date/data/validate/sbm/hkey`). This repo is a **partial slice** of the full WebSquare project.
 
 Same-named files recur across directories (`common.xml`, `PopupCalendar.xml`, `calendar_fil.xml`, `filing_common.xml`, `ShiftCrossBrowser_ver.2.4.min.xml`, …) — these are **per-module copies**, not shared. A fix in one is not automatically reflected in the others; check whether the same edit is needed in sibling directories.
 

@@ -61,7 +61,7 @@ scwin.searchList = async function () {
 - **콜백 스타일 유지 예외**: `submitErrorHandler` 기반 오류 흐름, 의도적 비동기(응답을 기다리지 않는 발사 후 망각),
   기존 변환분(소급 없음)은 콜백 스타일을 유지해도 된다. gridview 스피너·메시지 등 gcc 부가 기능은 훅 기반이라 두 스타일 모두 동작.
 
-## 오류 처리 — 진입점 try/catch + `$c.win.handleError`
+## 오류 처리 — 진입점 try/catch + `$c.exception.handleError`
 
 예외는 **사용자 액션 진입점(3구역 이벤트 핸들러·`onpageload`)에서만** try/catch 로 받고, catch 는 공통 처리기 한 줄로 통일한다.
 내부 업무 함수(4·5구역)는 예외를 삼키지 말고 위로 전파한다 — **자체 try/catch·빈 catch 금지**.
@@ -71,7 +71,7 @@ scwin.btn_save_onclick = async function (e) {
     try {
         await scwin.save();
     } catch (ex) {
-        await $c.win.handleError(ex, { context : "ULDXXX00100.save" });
+        await $c.exception.handleError(ex, { context : "ULDXXX00100.save" });
     }
 };
 ```
@@ -87,7 +87,7 @@ scwin.btn_save_onclick = async function (e) {
   `rethrow`(상위 흐름 중단) · `callback`(알림 닫힘 후 콜백 함수명).
 - **금지**: 빈 catch, catch 에서 원시 `alert()`·`console.log` 만 남기고 종료, 통신 오류 재-alert(sbm 이 이미 알림).
 - 오류 수집: `handleError` 가 내부 훅(`__reportError`)을 호출한다 — 수집 로직(표준 페이로드·중복 억제·화면당 상한·sendBeacon 전송)은 구현돼 있고,
-  `win.xml` 의 `ERROR_REPORT_INFO.URL` 이 비어 있는 동안 비활성이다. 수집 API 신설 시 **URL 한 곳만 지정**하면 전 화면에 적용된다.
+  `exception.xml` 의 `ERROR_REPORT_INFO.URL` 이 비어 있는 동안 비활성이다. 수집 API 신설 시 **URL 한 곳만 지정**하면 전 화면에 적용된다.
 
 ## 이벤트-로직 분리 (Thin Event, 권장)
 

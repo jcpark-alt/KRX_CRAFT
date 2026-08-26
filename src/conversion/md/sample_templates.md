@@ -55,7 +55,7 @@
 5. **페이징** — 조회 후 `$c.sbm.setPagingInfo(... totalCnt ...)` 호출(내림차순 순번 `rowNumVisble desc`, `maxRowNum "all"` 지원).
 6. **날짜·숫자·문자** — `$c.date.*`(getServerDateTime/formatDate/checkCalendarFormat/compareFromToDate), `$c.num.*`, `$c.str.*` 로만 처리(전역 prototype 확장 금지).
 7. **세션·파일** — `$c.session.getUserInfo`, 업로드 `$c.util.onUploadClick`+`checkFileExtension`, 다운로드 `$c.data.downFile`.
-8. **오류 처리** — 사용자 액션 진입점(이벤트 핸들러·`onpageload`)에서만 try/catch, catch 는 `$c.win.handleError(ex, { context : "화면ID.함수명" })` 한 줄로 통일(빈 catch·원시 alert 금지, sbm 통신 오류·중복 제출 skip 은 handleError 가 선별해 이중 알림 없음). 상세: [code-convention.md](../../docs/code-convention/code-convention.md) §오류 처리.
+8. **오류 처리** — 사용자 액션 진입점(이벤트 핸들러·`onpageload`)에서만 try/catch, catch 는 `$c.exception.handleError(ex, { context : "화면ID.함수명" })` 한 줄로 통일(빈 catch·원시 alert 금지, sbm 통신 오류·중복 제출 skip 은 handleError 가 선별해 이중 알림 없음). 상세: [code-convention.md](../../docs/code-convention/code-convention.md) §오류 처리.
 
 ### 모듈 공통 의존 (배포 환경 전제)
 

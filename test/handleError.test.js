@@ -1,7 +1,7 @@
 /**
- * $c.win.handleError 화면 try/catch 공통 오류 처리기 회귀 테스트.
+ * $c.exception.handleError 화면 try/catch 공통 오류 처리기 회귀 테스트.
  *
- * WebSquare 런타임을 mock 으로 대체한 vm 하네스로 win.xml 의 CDATA 를 로드해 실제 구동한다.
+ * WebSquare 런타임을 mock 으로 대체한 vm 하네스로 exception.xml 의 CDATA 를 로드해 실제 구동한다.
  * 분류 규약: sbm 중복 제출 skip(ex.skipped)은 완전 무시, sbm 이 이미 알린 통신 오류(ex.errorType)는
  * 로그·수집만(이중 알림 방지), 업무 예외(ex.bizMessage)는 해당 문구로 alert, 그 외는 error 알림.
  */
@@ -9,7 +9,7 @@ const fs = require("fs");
 const vm = require("vm");
 const path = require("path");
 
-const XML_FILE = "src/gcc/win.xml";
+const XML_FILE = "src/gcc/exception.xml";
 
 const isEmpty = (v) =>
   v === undefined || v === null || v === "" ||
@@ -45,7 +45,12 @@ function loadHarness() {
       sbm: { getContextPath: () => "", MESSAGE_CODE: { STATUS_ERROR: "E" } },
       str: { serialize: (v) => JSON.stringify(v) },
       data: { getParameter: () => "" },
-      win: {}, // 로드 후 scwin 으로 연결
+      // handleError 가 호출하는 $c.win 알림 함수는 기록용 mock (messageBox 는 실제 팝업 런타임 의존)
+      win: {
+        error: (msg, cb) => { calls.error.push({ msg, cb }); return Promise.resolve(); },
+        alert: (msg, cb) => { calls.alert.push({ msg, cb }); return Promise.resolve(); },
+        showToastMessage: (type, msg) => { calls.toast.push({ type, msg }); },
+      },
     },
     $p: {
       id: "scopeA",
@@ -63,19 +68,13 @@ function loadHarness() {
 
   vm.createContext(sandbox);
   vm.runInContext(extractCdata(XML_FILE), sandbox, { filename: path.basename(XML_FILE) + ".cdata.js" });
-  sandbox.$c.win = sandbox.scwin; // $c.win.* 내부 상호 호출 연결
-
-  // 알림 함수는 기록용 mock 으로 대체 (messageBox 는 실제 팝업 런타임 의존)
-  sandbox.scwin.error = (msg, cb) => { calls.error.push({ msg, cb }); return Promise.resolve(); };
-  sandbox.scwin.alert = (msg, cb) => { calls.alert.push({ msg, cb }); return Promise.resolve(); };
-  sandbox.scwin.showToastMessage = (type, msg) => { calls.toast.push({ type, msg }); };
   const origReport = sandbox.scwin.__reportError;
   sandbox.scwin.__reportError = (ex, context) => { calls.report.push({ ex, context }); return origReport(ex, context); };
 
   return { scwin: sandbox.scwin, calls, sandbox };
 }
 
-describe("handleError 공통 오류 처리 (src/gcc/win.xml)", () => {
+describe("handleError 공통 오류 처리 (src/gcc/exception.xml)", () => {
   let h;
   beforeEach(() => { h = loadHarness(); });
 
@@ -163,7 +162,7 @@ describe("handleError 공통 오류 처리 (src/gcc/win.xml)", () => {
   });
 });
 
-describe("__reportError 오류 수집 훅 (src/gcc/win.xml)", () => {
+describe("__reportError 오류 수집 훅 (src/gcc/exception.xml)", () => {
   let h;
   beforeEach(() => { h = loadHarness(); });
 

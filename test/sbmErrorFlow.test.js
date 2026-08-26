@@ -1,5 +1,5 @@
 /**
- * $c.sbm 오류 경로 ↔ $c.win.handleError 부분 통합 회귀 테스트.
+ * $c.sbm 오류 경로 ↔ $c.exception.handleError 부분 통합 회귀 테스트.
  *
  * 알림 주체는 기존 resultMsg 를 유지하고, E 경로(연결 불가·500 서버 오류)에서
  * handleError(notify:"none") 로 로그·수집 파이프라인에만 합류한다.
@@ -32,8 +32,10 @@ function loadHarness() {
       data: { getMessage: (id, arg) => `${id}:${arg}` },
       win: {
         alert: (msg) => { calls.alert.push(msg); return Promise.resolve(); },
-        handleError: (ex, opt) => { calls.handleError.push({ ex, opt }); return Promise.resolve(); },
         __getScope: () => ({ scwin: { $w: {} } }),
+      },
+      exception: {
+        handleError: (ex, opt) => { calls.handleError.push({ ex, opt }); return Promise.resolve(); },
       },
     },
     $p: {},

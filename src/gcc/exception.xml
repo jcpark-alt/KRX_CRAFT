@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ev="http://www.w3.org/2001/xml-events"
+	xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_screenName="공통 예외 처리 함수" meta_screenId="$c.exception" meta_desc="화면 try/catch 공통 오류 처리(handleError)와 오류 수집(__reportError) 함수를 작성한다.">
+		<w2:type>COMMON</w2:type>
+		<w2:buildDate/>
+		<w2:MSA/>
+		<xf:model>
+			<w2:dataCollection baseNode="map"/>
+			<w2:workflowCollection/>
+		</xf:model>
+		<w2:layoutInfo/>
+		<w2:publicInfo method="scwin.handleError"/>
+		<script lazy="false" type="text/javascript"><![CDATA[
+/**
+ * @component
+ * @componentName udc_exception
+ * @pluginName
+ * @company
+ * @developer
+ * @category /cm/gcc
+ * @notSupportBrowser
+ * @version
+ * @htmlRender
+ * @icon
+ * @disableIcon
+ * @description
+ * @width
+ * @height
+ * @license
+ * @imagePath
+ * @homepage
+ */
+// =============================================================================
+/**
+ * 화면 try/catch 공통 오류 처리(handleError)와 오류 수집(__reportError) 함수를 작성한다.
+ *
+ * @author Inswave Systems
+ * @class exception
+ * @namespace $c.exception
+ */
+// =============================================================================
+
+scwin.onpageload = function () {
+
+};
+
+/**
+ * @method
+ * @name handleError
+ * @description 화면 try/catch 공통 오류 처리기. 예외를 분류하여 콘솔 로그·오류 수집 훅(__reportError)·
+ *  사용자 알림을 표준 방식으로 수행한다.
+ *  - sbm 중복 제출 skip(ex.skipped === true)은 정상 흐름이므로 아무 처리 없이 무시한다.
+ *  - sbm 이 이미 사용자에게 알린 통신 오류(ex.errorType 보유)는 이중 알림 없이 로그·수집만 한다.
+ *  - 업무 예외(ex.bizMessage 보유)는 시스템 오류 문구 대신 해당 문구로 alert 알림한다.
+ * @param {Error|Object|String} ex catch 로 전달받은 예외
+ * @param {Object} opt (선택) 처리 옵션
+ *  - {String|Array} message 사용자 안내 문구 또는 공통 메시지 ID (기본 "처리 중 오류가 발생했습니다.")
+ *  - {String} notify 알림 방식 "error"(기본) | "alert" | "toast" | "none" — 명시 시 자동 분류보다 우선
+ *  - {String} context 로그 식별자 (예: "ULDFIS00100.search")
+ *  - {Boolean} rethrow true 면 처리 후 예외를 다시 던져 상위 흐름을 중단한다 (기본 false)
+ *  - {String} callback 알림 창 닫힘 후 실행할 콜백 함수명
+ * @returns {Promise} 알림 창이 닫힐 때 resolve 되는 Promise (callback 지정 시 즉시 resolve)
+ * @hidden N
+ * @exception
+ * @example
+// 이벤트 핸들러 진입점 표준 패턴
+scwin.btn_search_onclick = async function () {
+    try {
+        await $c.sbm.executeDynamic({ id: "sbm_search" });
+        scwin.afterSearch();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context: "ULDXXX00100.search" });
+    }
+};
+
+// 업무 예외 — 지정 문구로 alert 알림
+throw { bizMessage: "재고가 부족합니다." };
+
+// 토스트 알림 + 상위 흐름 중단
+await $c.exception.handleError(ex, { notify: "toast", rethrow: true });
+ */
+scwin.handleError = async function (ex, opt) {
+    opt = (typeof opt === "object" && opt !== null) ? opt : {};
+
+    // 1. 정상 흐름의 reject — 빈 예외, sbm 중복 제출 skip/abort 는 오류가 아니므로 무시한다.
+    // (주의: $c.util.isEmpty 는 열거 키가 없는 Error 인스턴스를 빈 객체로 판정하므로 여기서는 사용하지 않는다)
+    if (ex === undefined || ex === null || ex === "" || ex.skipped === true) {
+        return;
+    }
+
+    const isObj = (typeof ex === "object");
+    const bizMessage = (isObj && !$c.util.isEmpty(ex.bizMessage)) ? ex.bizMessage : null;
+    // sbm 이 이미 resultMsg 로 사용자에게 알린 통신 오류 — 이중 알림 방지
+    const alreadyNotified = (isObj && !$c.util.isEmpty(ex.errorType));
+
+    // 2. 콘솔 로그 — 업무 예외는 warn, 시스템 예외는 error (스택 보존을 위해 예외 객체 그대로 출력)
+    const logArgs = $c.util.isEmpty(opt.context) ? [ex] : ["[" + opt.context + "]", ex];
+    if (bizMessage) {
+        console.warn.apply(console, logArgs);
+    } else {
+        console.error.apply(console, logArgs);
+    }
+
+    // 3. 오류 수집 훅 — 수집 실패가 화면 흐름을 깨지 않도록 격리하고,
+    //    동일 예외 객체는 1회만 수집한다(sbm 등 공통 계층에서 이미 수집한 예외의 재수집 방지).
+    if (!(isObj && ex._errorReported === true)) {
+        try {
+            scwin.__reportError(ex, opt.context);
+        } catch (ignore) {
+            // no-op
+        }
+        if (isObj) {
+            try { ex._errorReported = true; } catch (ignore2) { /* frozen 객체 등 — 무시 */ }
+        }
+    }
+
+    // 4. 사용자 알림
+    const notify = !$c.util.isEmpty(opt.notify) ? opt.notify
+        : (alreadyNotified ? "none" : (bizMessage ? "alert" : "error"));
+    const message = bizMessage || (!$c.util.isEmpty(opt.message) ? opt.message : "처리 중 오류가 발생했습니다.");
+    if (notify === "error" || notify === "alert") {
+        const alertFn = (notify === "error") ? $c.win.error : $c.win.alert;
+        if ($c.util.isEmpty(opt.callback)) {
+            await alertFn(message);
+        } else {
+            alertFn(message, opt.callback);
+        }
+    } else if (notify === "toast") {
+        $c.win.showToastMessage($c.sbm.MESSAGE_CODE.STATUS_ERROR, message);
+    }
+
+    // 5. 상위 흐름 중단 옵션
+    if (opt.rethrow === true) {
+        throw ex;
+    }
+};
+
+// 오류 수집 설정 — URL 이 비어 있는 동안 __reportError 는 아무 것도 전송하지 않는다.
+// 수집 API 신설 시 URL 만 지정하면 handleError 를 쓰는 전 화면에 수집이 활성화된다.
+scwin.ERROR_REPORT_INFO = {
+    URL: "",            // 예: "/api/common/error-report" (현재 수집 API 미구축)
+    MAX_PER_PAGE: 10,   // 화면(프레임)당 최대 전송 건수 — 오류 폭주 시 서버 보호
+    MAX_STACK_LENGTH: 4000 // 스택 문자열 절단 길이
+};
+
+// 화면당 전송 횟수·중복 억제 상태 (동일 context+message 는 1회만 전송)
+scwin.__errorReportState = { sent: 0, keys: {} };
+
+/**
+ * @method
+ * @name __reportError
+ * @description handleError 의 서버 오류 수집 훅. ERROR_REPORT_INFO.URL 이 설정된 경우에만
+ *  표준 페이로드(frameId·context·예외명/메시지/스택·화면 URL·userAgent·발생 시각)를 전송한다.
+ *  - 전송은 navigator.sendBeacon(폴백 fetch keepalive) 로 하며 $c.sbm 을 경유하지 않는다 —
+ *    수집 요청 실패가 sbm 오류 파이프라인(resultMsg 사용자 알림)을 다시 타는 부작용을 차단하기 위함.
+ *  - 동일 context+message 는 화면당 1회, 전체 MAX_PER_PAGE 건까지만 전송한다(폭주 방지).
+ * @param {Error|Object|String} ex 예외 객체
+ * @param {String} context 로그 식별자
+ * @hidden Y
+ * @exception
+ * @example
+ */
+scwin.__reportError = function (ex, context) {
+    const info = scwin.ERROR_REPORT_INFO;
+    if (info == null || $c.util.isEmpty(info.URL)) {
+        return; // 수집 API 미구축 — 비활성
+    }
+
+    const state = scwin.__errorReportState;
+    if (state.sent >= info.MAX_PER_PAGE) {
+        return;
+    }
+
+    const message = String((ex && ex.message) || (ex && ex.bizMessage) || ex);
+    const dupKey = String(context || "") + "|" + message;
+    if (state.keys[dupKey]) {
+        return; // 동일 오류 반복 전송 억제
+    }
+    state.keys[dupKey] = true;
+    state.sent += 1;
+
+    const payload = {
+        frameId: (typeof $p !== "undefined" && $p.getFrameId) ? $p.getFrameId() : "",
+        context: context || "",
+        name: (ex && ex.name) || (typeof ex),
+        message: message,
+        stack: String((ex && ex.stack) || "").substring(0, info.MAX_STACK_LENGTH),
+        pageUrl: (typeof window !== "undefined" && window.location) ? window.location.href : "",
+        userAgent: (typeof navigator !== "undefined") ? navigator.userAgent : "",
+        occurredAt: new Date().toISOString()
+    };
+
+    // 발사 후 망각 전송 — 실패해도 화면 흐름·사용자 알림에 영향을 주지 않는다.
+    const body = JSON.stringify(payload);
+    if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
+        navigator.sendBeacon(info.URL, body);
+    } else if (typeof fetch === "function") {
+        fetch(info.URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: body,
+            keepalive: true
+        }).catch(function () { /* no-op */ });
+    }
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload"/>
+</html>
