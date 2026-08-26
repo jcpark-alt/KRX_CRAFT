@@ -231,6 +231,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
   - CLAUDE.md gcc 모듈 표·lint 기준선(12 files) 현행화, handleError 테스트 하니스를 exception.xml 로드로 전환
   - **배포 주의**: 배포 환경에 `$c.exception` 공통 XML 등록과 함께 반영 필요 — 사용법·등록 구문은 **[exception-handling-guide.md](exception-handling-guide.md)** 참고
 - `febe1e3` (08-26) — [연관] **SBChart 캔들스틱 샘플에 문의 회신 차트 요청 6건 반영**(`src/conversion/sample-front/sbchart`, gcc 무변경): 상승/하락 색 명시(inColor/deColor)·Y축 width 고정·min 0+padding.bottom 0·OHLC 한글 툴팁(제목 날짜 환산)·고점/저점 마커 제거·공시일(gongsi) 캔들 fillColor 강조(`buildChartData`), 데이터 2행 gongsi 플래그 추가, var→const·fn_ 접두 제거
+- `681f4bb` (08-26) — [연관] **sbchart 샘플 전체 코드 컨벤션 정리**(gcc 무변경): 54개 샘플 var→const 전환(node --check 전수 검증), fn_ 접두 제거 5파일, GANTT_SCHEDULE 미정의 `fn_status` 호출 결함 수정. 회신 문서도 표준 Markdown 6절 구조로 정리(`sbchart/md/SPCHART.md`, `82ec860`)
 
 ---
 
@@ -238,6 +239,8 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-08-26 | `82ec860` | docs(sample): SPCHART.md 회신 문서를 표준 Markdown 구조로 정리 — [연관, gcc 무변경] |
+| 2026-08-26 | `681f4bb` | refactor(sample): sbchart 샘플 전체 코드 컨벤션 정리 (var→const, fn_ 접두 제거) — [연관, gcc 무변경] |
 | 2026-08-26 | `febe1e3` | fix(sample): SBChart 캔들스틱 샘플에 문의 회신(md) 차트 요청 6건 반영 — [연관, gcc 무변경] |
 | 2026-08-26 | `57de52d` | refactor(gcc): 예외 처리 체계를 exception.xml($c.exception)로 분리 |
 | 2026-08-26 | `4e4bbd4` | feat(sbm,win): sbm 오류 경로를 handleError 수집 파이프라인에 합류 + 결함 3건 수정 |
