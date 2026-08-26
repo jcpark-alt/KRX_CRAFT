@@ -47,9 +47,10 @@
 <section class="card">
   <h2 style="margin-top:0">1. 개요</h2>
   <p>화면 XML 페이지의 try/catch 오류 처리가 화면마다 제각각(빈 catch, 원시 alert, 미처리 reject로 인한 화면 멈춤)이던 것을,
-  gcc 공통 함수 <code>$c.win.handleError</code> 를 중심으로 한 <strong>단일 표준 체계</strong>로 정비했다.
-  기획 → Phase 1(공통 함수) → Phase 2(규약·샘플) → Phase 3(수집 로직) → sbm 통합의 5단계로 진행했으며,
-  모든 커밋이 main 에 반영되고 CI green 을 유지했다.</p>
+  gcc 공통 함수 <code>$c.exception.handleError</code> 를 중심으로 한 <strong>단일 표준 체계</strong>로 정비했다.
+  기획 → Phase 1(공통 함수) → Phase 2(규약·샘플) → Phase 3(수집 로직) → sbm 통합 → <strong>exception.xml 모듈 분리</strong>의 6단계로 진행했으며,
+  모든 커밋이 main 에 반영됐다.
+  (Phase 1~3 은 win.xml 에 신설했다가 마지막 단계에서 전용 모듈 <code>exception.xml</code>(<code>$c.exception</code>)로 분리 — 본 문서의 함수 위치·호출 표기는 분리 후 기준)</p>
   <p><strong>설계 원칙</strong>: 통신 오류는 기존 <code>$c.sbm</code>(resultMsg)이 이미 사용자에게 알리므로,
   handleError 는 "그 외 스크립트 예외"의 표준 처리와 "이미 처리된 예외의 선별(이중 알림·이중 수집 방지)"을 담당한다.</p>
 </section>
@@ -59,17 +60,18 @@
   <table>
     <thead><tr><th>구분</th><th>커밋</th><th>내용</th><th>CI</th></tr></thead>
     <tbody>
-      <tr><td>Phase 1</td><td class="commit">a00ab33</td><td>공통 오류 처리기 <code>$c.win.handleError</code> + 수집 훅 <code>__reportError</code> 신설 (win.xml, 테스트 11건)</td><td><span class="badge ok">성공</span></td></tr>
+      <tr><td>Phase 1</td><td class="commit">a00ab33</td><td>공통 오류 처리기 <code>handleError</code> + 수집 훅 <code>__reportError</code> 신설 (당시 win.xml, 테스트 11건)</td><td><span class="badge ok">성공</span></td></tr>
       <tr><td>Phase 2</td><td class="commit">3bed6e5</td><td>code-convention.md 오류 처리 절 신설, SMPVAL10000 샘플 적용, sample_templates.md 표준 패턴 8번</td><td><span class="badge ok">성공</span></td></tr>
       <tr><td>Phase 3</td><td class="commit">67fc919</td><td><code>__reportError</code> 수집 로직 본구현 — <code>ERROR_REPORT_INFO.URL</code> 설정 전까지 비활성 (테스트 +6건)</td><td><span class="badge ok">성공</span></td></tr>
       <tr><td>sbm 통합</td><td class="commit">4e4bbd4</td><td>sbm E 경로 수집 합류(notify:none) + <code>_errorReported</code> 1회 수집 + 결함 3건 수정 (테스트 +5건)</td><td><span class="badge ok">성공</span></td></tr>
-      <tr><td>문서</td><td class="commit">eab5705 · bcb9d88 · 63adfb0 · 84f84eb</td><td>gcc 업데이트 이력·overview HTML 동기화 4건</td><td><span class="badge ok">성공</span></td></tr>
+      <tr><td>모듈 분리</td><td class="commit">57de52d</td><td>예외 처리 체계를 <code>exception.xml</code>(<code>$c.exception</code>)로 분리 — gcc 12번째 모듈, 참조 일괄 변경(위임 래퍼 없음), CLAUDE.md·lint 기준선(12 files) 현행화</td><td><span class="badge ok">성공</span></td></tr>
+      <tr><td>문서</td><td class="commit">eab5705 · bcb9d88 · 63adfb0 · 84f84eb · ce703fa</td><td>gcc 업데이트 이력·overview HTML 동기화 5건</td><td><span class="badge ok">성공</span></td></tr>
     </tbody>
   </table>
 </section>
 
 <section class="card">
-  <h2 style="margin-top:0">3. Phase 1 — <code>$c.win.handleError</code> 공통 오류 처리기</h2>
+  <h2 style="margin-top:0">3. Phase 1 — <code>$c.exception.handleError</code> 공통 오류 처리기</h2>
   <h3>예외 분류 규약 (이중 알림 자동 방지)</h3>
   <table>
     <thead><tr><th>예외 형태</th><th>의미</th><th>처리</th></tr></thead>
@@ -108,7 +110,7 @@
     try {
         await scwin.save();
     } catch (ex) {
-        await $c.win.handleError(ex, { context : "ULDXXX00100.save" });
+        await $c.exception.handleError(ex, { context : "ULDXXX00100.save" });
     }
 };
 
@@ -126,7 +128,7 @@ throw { bizMessage : "재고가 부족합니다." };</code></pre>
     <li>전송은 <code>navigator.sendBeacon</code>(폴백 <code>fetch keepalive</code>) — <code>$c.sbm</code> 을 의도적으로 우회.
       수집 요청 실패가 resultMsg 사용자 알림 파이프라인을 재귀적으로 타는 부작용 차단.</li>
   </ul>
-  <div class="note"><strong>수집 API 신설 시 할 일</strong>: <code>win.xml</code> 의 <code>ERROR_REPORT_INFO.URL</code> 한 곳만 지정하면
+  <div class="note"><strong>수집 API 신설 시 할 일</strong>: <code>exception.xml</code> 의 <code>ERROR_REPORT_INFO.URL</code> 한 곳만 지정하면
   handleError 를 쓰는 전 화면(화면 예외 + 통신 오류)에 수집이 활성화된다.</div>
 </section>
 
@@ -136,7 +138,7 @@ throw { bizMessage : "재고가 부족합니다." };</code></pre>
   <strong>알림 주체는 resultMsg 유지 + 수집·로그만 handleError 합류</strong>하는 부분 통합을 적용했다.</p>
   <ul>
     <li>sbm E 경로(연결 불가 <code>__callbackSubmitFunction</code>, 500 <code>__submitErrorHandler</code>)에서
-      <code>$c.win.handleError(resObj, { notify: "none", context: "sbm.&lt;id&gt;" })</code> 호출 — 사용자 알림 UX 무변경</li>
+      <code>$c.exception.handleError(resObj, { notify: "none", context: "sbm.&lt;id&gt;" })</code> 호출 — 사용자 알림 UX 무변경</li>
     <li><code>_errorReported</code> 마킹 — sbm(공통 계층)과 화면 catch 가 같은 예외로 각각 handleError 를 불러도 수집은 1회만 수행</li>
   </ul>
   <h3>함께 수정한 결함</h3>
@@ -151,21 +153,38 @@ throw { bizMessage : "재고가 부족합니다." };</code></pre>
 </section>
 
 <section class="card">
-  <h2 style="margin-top:0">7. 검증 결과</h2>
+  <h2 style="margin-top:0">7. 모듈 분리 — <code>exception.xml</code> (<code>$c.exception</code>)</h2>
+  <p>확산 전 마지막 저비용 시점에 예외 처리 체계를 win.xml 에서 <strong>전용 gcc 모듈로 분리</strong>했다(12번째 모듈, 메서드 총수 285 불변).</p>
+  <ul>
+    <li>이동 단위 — <code>handleError</code>(공개) · <code>__reportError</code>(hidden) · <code>ERROR_REPORT_INFO</code> · <code>__errorReportState</code>
+      (기존 <code>__errorHandler</code> 는 WebSquare 설정의 이름 참조 가능성으로 win.xml 잔류)</li>
+    <li>참조 일괄 변경(위임 래퍼 없음) — sbm.xml 수집 합류 가드 2곳 · SMPVAL10000 샘플 2곳 · code-convention.md · sample_templates.md → <code>$c.exception.handleError</code></li>
+    <li>CLAUDE.md gcc 모듈 표 · lint 기준선(12 files) 현행화, handleError 테스트 하니스를 exception.xml 로드로 전환(더 가벼운 mock)</li>
+  </ul>
+  <div class="note"><strong>배포 환경 필수 설정</strong> — 예외 처리 모듈 로드를 위해 WebSquare <code>config.xml</code> 에 아래 공통 모듈 등록 구문을 추가해야 한다
+  (이 저장소에는 config.xml 이 없음 — 서버 배포 환경 파일). <strong>등록 없이 배포되면 화면에서 <code>$c.exception</code> 이 undefined 가 된다.</strong>
+  <pre><code>&lt;projectCommon&gt;
+    &lt;module name="$c.exception" src="/cm/gcc/exception.xml"/&gt;
+&lt;/projectCommon&gt;</code></pre></div>
+</section>
+
+<section class="card">
+  <h2 style="margin-top:0">8. 검증 결과</h2>
   <table>
     <thead><tr><th>항목</th><th>결과</th></tr></thead>
     <tbody>
       <tr><td>Jest 회귀 테스트</td><td><span class="badge ok">96건 전체 통과</span> — handleError 18건 · sbmErrorFlow 4건 신설 포함 (vm+mock 하니스로 XML CDATA 실구동)</td></tr>
-      <tr><td>wsxml_lint (src/gcc)</td><td><span class="badge ok">11 files, 0 errors, 0 warnings</span></td></tr>
-      <tr><td>API 문서</td><td><span class="badge ok">11 modules / 285 methods</span> — <code>handleError</code> 공개 등록 (npm run docs:gcc 재생성)</td></tr>
-      <tr><td>GitHub Actions CI</td><td><span class="badge ok">전 커밋 SUCCESS</span> (eab5705 · bcb9d88 · 63adfb0 · 84f84eb)</td></tr>
+      <tr><td>wsxml_lint (src/gcc)</td><td><span class="badge ok">12 files, 0 errors, 0 warnings</span> (exception.xml 포함)</td></tr>
+      <tr><td>API 문서</td><td><span class="badge ok">12 modules / 285 methods</span> — <code>handleError</code> 는 $c.exception 소속 공개 (npm run docs:gcc 재생성)</td></tr>
+      <tr><td>GitHub Actions CI</td><td><span class="badge ok">전 커밋 SUCCESS</span> (eab5705 · bcb9d88 · 63adfb0 · 84f84eb · ce703fa)</td></tr>
     </tbody>
   </table>
 </section>
 
 <section class="card">
-  <h2 style="margin-top:0">8. 남은 과제</h2>
+  <h2 style="margin-top:0">9. 남은 과제</h2>
   <ul>
+    <li><span class="badge warn">필수</span> 배포 환경 <code>config.xml</code> 에 <code>$c.exception</code> 공통 모듈 등록 (7절 구문) — 미등록 배포 시 화면 오류</li>
     <li><span class="badge warn">대기</span> 오류 수집 API 신설 시 <code>ERROR_REPORT_INFO.URL</code> 지정 (+ 서버 스펙에 맞춘 페이로드 필드 조정)</li>
     <li><span class="badge warn">보류</span> convert.py Stage 1 이 try/catch 골격을 자동 방출하는 자동화 — 규칙 개정 + pytest + 4개 모듈 재수렴이 필요한 별도 작업으로 의도적 보류 (현재는 규약·샘플 기반 수동 Stage 2 경로로 확산)</li>
     <li>기존 변환분(ui-tobe 336화면)에 대한 표준 패턴 소급 적용 여부 — 신규·대규모 수정 화면부터 적용 권장</li>
