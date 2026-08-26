@@ -219,6 +219,11 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
   - `ERROR_REPORT_INFO` 설정 상수(URL 기본 빈값=비활성·화면당 상한 10건·스택 절단 4000자) — 수집 API 신설 시 URL 한 곳만 지정하면 `handleError` 사용 전 화면에 수집 활성화
   - 표준 페이로드(frameId·context·예외명/메시지/스택·pageUrl·userAgent·occurredAt), 동일 context+message 화면당 1회 중복 억제
   - 전송은 `sendBeacon`(폴백 `fetch keepalive`)로 `$c.sbm` 우회 — 수집 실패가 resultMsg 사용자 알림 파이프라인을 재귀적으로 타는 부작용 차단, 회귀 테스트 +6건(총 17건)
+- `4e4bbd4` (08-26) — `$c.sbm`·`$c.win` **sbm 오류 경로를 handleError 수집 파이프라인에 합류 + 결함 3건 수정**:
+  - sbm E 경로(연결 불가 `__callbackSubmitFunction`·500 `__submitErrorHandler`)에서 resultMsg 알림 유지 + `$c.win.handleError(notify:"none", context:"sbm.<id>")` 호출 — 통신 오류도 콘솔 로그·`__reportError` 수집 합류(사용자 알림 UX 무변경)
+  - `handleError` 가 수집한 예외 객체에 `_errorReported` 마킹 — sbm(공통 계층)·화면 catch 중복 호출 시에도 수집 1회 보장
+  - 결함 수정: ① 연결 불가 시 promise 핸들러 연결 전 조기 return 으로 `executeDynamic` Promise 영구 pending → reject 종결(+`errorType` 표식 보장), ② action 누락 시 문자열 reject 로 화면 handleError 이중 알림 → `{errorType:"invalid-option"}` 객체 reject, ③ 500 응답 본문 비JSON 시 `resBody.errors.code` 접근으로 핸들러 사망·알림 누락 → 안전 접근
+  - 회귀 테스트 `test/sbmErrorFlow.test.js` 4건 신설 + handleError 재수집 방지 1건(총 96건)
 
 ---
 
@@ -226,6 +231,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-08-26 | `4e4bbd4` | feat(sbm,win): sbm 오류 경로를 handleError 수집 파이프라인에 합류 + 결함 3건 수정 |
 | 2026-08-26 | `67fc919` | feat(win): __reportError 오류 수집 로직 본구현 — URL 설정 전까지 비활성 |
 | 2026-08-26 | `3bed6e5` | docs(convention)+refactor(sample): 화면 try/catch 오류 처리 규약 신설 및 샘플 적용 — [연관, gcc 무변경] |
 | 2026-08-26 | `a00ab33` | feat(win): 화면 try/catch 공통 오류 처리기 handleError 추가 |
