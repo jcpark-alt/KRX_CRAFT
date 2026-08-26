@@ -11,7 +11,7 @@
 			<w2:workflowCollection/>
 		</xf:model>
 		<w2:layoutInfo/>
-		<w2:publicInfo method="scwin.getUserAgent,scwin.getParameter,scwin.getObject,scwin.getFunction,scwin.getCallBackFunction,scwin.getJSON,scwin.isJSON,scwin.isArray,scwin.isEmpty,scwin.isEmptyPlainObject,scwin.getObjectType,scwin.isPlainObject,scwin.isMobile,scwin.isXmlDoc,scwin.setGridVisibleRowNum,scwin.setGridViewDelCheckBox,scwin.setTextLengthCounter,scwin.getChildren,scwin.getGridViewDataList,scwin.getComponent,scwin.createComponent,scwin.setInterval,scwin.clearInterval,scwin.setTimeout,scwin.clearTimeout,scwin.copyClipboard,scwin.confirmThen,scwin.isNotEmpty,scwin.isEmptyArray,scwin.duplcRemove,scwin.assignDefined,scwin.encodeBase64,scwin.decodeBase64,scwin.encodeBase64Utf8,scwin.decodeBase64Utf8,scwin.getKeyCode,scwin.isMobileApp,scwin.setClipboard,scwin.getClipboard,scwin.checkDuplicateJsonKey,scwin.setCookie,scwin.getCookie,scwin.removeCookie,scwin.setLocalStorage,scwin.getLocalStorage,scwin.removeLocalStorage,scwin.clearLocalStorage,scwin.setSessionStorage,scwin.getSessionStorage,scwin.removeSessionStorage,scwin.clearSessionStorage,scwin.getUploadFileSize,scwin.checkFileTotalSize,scwin.getUploadFiles,scwin.onUploadClick,scwin.checkFileExtension"/>
+		<w2:publicInfo method="scwin.getUserAgent,scwin.getParameter,scwin.getObject,scwin.getFunction,scwin.getCallBackFunction,scwin.getJSON,scwin.isJSON,scwin.isArray,scwin.isEmpty,scwin.isEmptyPlainObject,scwin.getObjectType,scwin.isPlainObject,scwin.isMobile,scwin.isXmlDoc,scwin.setGridVisibleRowNum,scwin.setButtonState,scwin.registerButtonState,scwin.setGridViewDelCheckBox,scwin.setTextLengthCounter,scwin.getChildren,scwin.getGridViewDataList,scwin.getComponent,scwin.createComponent,scwin.setInterval,scwin.clearInterval,scwin.setTimeout,scwin.clearTimeout,scwin.copyClipboard,scwin.confirmThen,scwin.isNotEmpty,scwin.isEmptyArray,scwin.duplcRemove,scwin.assignDefined,scwin.encodeBase64,scwin.decodeBase64,scwin.encodeBase64Utf8,scwin.decodeBase64Utf8,scwin.getKeyCode,scwin.isMobileApp,scwin.setClipboard,scwin.getClipboard,scwin.checkDuplicateJsonKey,scwin.setCookie,scwin.getCookie,scwin.removeCookie,scwin.setLocalStorage,scwin.getLocalStorage,scwin.removeLocalStorage,scwin.clearLocalStorage,scwin.setSessionStorage,scwin.getSessionStorage,scwin.removeSessionStorage,scwin.clearSessionStorage,scwin.getUploadFileSize,scwin.checkFileTotalSize,scwin.getUploadFiles,scwin.onUploadClick,scwin.checkFileExtension"/>
 		<script lazy="false" type="text/javascript"><![CDATA[// =============================================================================
 /**
  * 웹스퀘어 컴포넌트 제어, 엑셀 파일 업로드/다운로드, 파일 업로드/다운로드, 기타 유틸리티 함수를 작성한다.
@@ -588,6 +588,96 @@ scwin.setGridVisibleRowNum = function (grdObj, rowNum) {
         console.error(ex);
         return false;
     }
+};
+
+// 버튼 상태 정의 — enable 은 활성할 역할 배열 또는 "*"(전체), disable 은 "*" 사용 시 예외 목록.
+// 정의에 없는 역할의 기본값은 "비활성" — 화면에 새 역할(print 등)이 추가되어도 상태 정의 수정 없이 안전하게 동작한다.
+// 프로젝트/화면 전용 상태는 $c.util.registerButtonState 로 등록한다.
+scwin.BTN_STATE_MAP = {
+    insert:      { enable: ["new", "save"] },
+    update:      { enable: "*", disable: ["save"] },   // 전체 활성 + 저장만 예외
+    disabled:    { enable: [] },                       // 전부 비활성
+    enabled:     { enable: "*" },                      // 전부 활성
+    error:       { enable: ["draft"] },
+    insertReady: { enable: ["new"] }
+};
+
+/**
+ * @method
+ * @name setButtonState
+ * @description 그룹 내 버튼들을 업무 상태에 따라 일괄 활성/비활성한다.
+ *  화면은 역할→버튼id 매핑(btnMap)만 선언하고, 상태별 활성 정책은 공통 BTN_STATE_MAP 이 보유한다.
+ *  역할(role)은 화면이 자유롭게 정의·추가할 수 있으며(동적 역할), 상태 정의에 없는 역할은 비활성이 기본이다.
+ *  판정 우선순위: opt.override[role] > state.disable 포함 > state.enable("*"|목록) > 기본 false.
+ *  btnMap 에 없는 그룹 내 버튼은 건드리지 않는다(부작용 방지).
+ * @param {String} groupId 버튼 그룹 요소 id (로그 식별·범위 검증용)
+ * @param {String|Object} status 등록된 상태명(insert|update|disabled|enabled|error|insertReady 또는
+ *  registerButtonState 등록명) 또는 즉석 상태 객체 { enable: [역할..]|"*", disable: [역할..] }
+ * @param {Object} btnMap 역할→버튼id 매핑 (예: { "new": "btn_add", save: "btn_save", print: "btn_print" })
+ * @param {Object} opt (선택) { override: { 역할: true|false } } — 화면별 최종 예외
+ * @returns {Boolean} 적용 수행 여부 (상태 미정의 등 방어 실패 시 false)
+ * @hidden N
+ * @exception
+ * @example
+// 화면 선언부 — 이 화면의 역할→버튼 매핑 (버튼 id 는 화면마다 달라도 됨)
+scwin.BTN_MAP = { "new": "btn_add", save: "btn_save", modify: "btn_edit",
+                  "delete": "btn_remove", guide: "btn_notice", draft: "btn_gian" };
+
+$c.util.setButtonState("grpBtnBox", "insert", scwin.BTN_MAP);
+$c.util.setButtonState("grpBtnBox", "update", scwin.BTN_MAP, { override: { "delete": false } });
+$c.util.setButtonState("grpBtnBox", { enable: ["new", "print"] }, scwin.BTN_MAP);   // 즉석 상태
+ */
+scwin.setButtonState = function (groupId, status, btnMap, opt) {
+    // 1. 상태 해석 — 문자열이면 등록 상태, 객체면 즉석 정의
+    const state = (typeof status === "string") ? scwin.BTN_STATE_MAP[status] : status;
+    if (!state || !("enable" in state)) {
+        console.warn("[$c.util.setButtonState] 알 수 없는 상태입니다. (status: " + status + ", group: " + groupId + ")");
+        return false;
+    }
+    const enableAll = (state.enable === "*");
+    const enableSet = {};
+    (enableAll ? [] : (state.enable || [])).forEach(function (r) { enableSet[r] = true; });
+    const disableSet = {};
+    (state.disable || []).forEach(function (r) { disableSet[r] = true; });
+    const override = (opt && opt.override) || {};
+
+    // 2. 매핑된 역할별 적용 (매핑에 없는 그룹 내 버튼은 건드리지 않는다)
+    Object.keys(btnMap || {}).forEach(function (role) {
+        const comp = $c.util.getComponent(btnMap[role]);
+        if (!comp || typeof comp.setDisabled !== "function") {
+            console.warn("[$c.util.setButtonState] 버튼을 찾을 수 없거나 setDisabled 미지원입니다. (role: " + role + ", id: " + btnMap[role] + ", group: " + groupId + ")");
+            return;
+        }
+        let enable;
+        if (role in override)      { enable = override[role] === true; }   // 1순위: 화면 예외
+        else if (disableSet[role]) { enable = false; }                     // 2순위: 상태 예외 목록
+        else if (enableAll)        { enable = true;  }                     // 3순위: 전체 활성
+        else                       { enable = enableSet[role] === true; }  // 4순위: 활성 목록 (기본 false)
+        comp.setDisabled(!enable);
+    });
+    return true;
+};
+
+/**
+ * @method
+ * @name registerButtonState
+ * @description setButtonState 용 버튼 상태를 등록(또는 재정의)한다 — 프로젝트/화면 전용 상태 확장 지점.
+ * @param {String} name 상태명
+ * @param {Object} stateDef 상태 정의 { enable: [역할..]|"*", disable: [역할..] }
+ * @returns {Boolean} 등록 성공 여부
+ * @hidden N
+ * @exception
+ * @example
+$c.util.registerButtonState("printReady", { enable: ["new", "print"] });
+$c.util.setButtonState("grpBtnBox", "printReady", scwin.BTN_MAP);
+ */
+scwin.registerButtonState = function (name, stateDef) {
+    if ($c.util.isEmpty(name) || !stateDef || !("enable" in stateDef)) {
+        console.warn("[$c.util.registerButtonState] 잘못된 상태 정의입니다. (name: " + name + ")");
+        return false;
+    }
+    scwin.BTN_STATE_MAP[name] = stateDef;
+    return true;
 };
 
 /**
