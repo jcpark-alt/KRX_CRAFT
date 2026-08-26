@@ -224,6 +224,19 @@ scwin.__callbackSubmitFunction = function (resObj, sbmObj) {
         };
 
         $c.sbm.resultMsg(msgObj);
+
+        // 화면 catch 의 handleError 가 이중 알림 없이 거를 수 있도록 errorType 표식을 보장한다.
+        if ($c.util.isEmpty(resObj.errorType)) {
+            resObj.errorType = "error";
+        }
+        // 통신 오류도 공통 오류 처리기의 로그·수집 파이프라인에 합류시킨다. (사용자 알림은 위 resultMsg 담당)
+        if ($c.win && typeof $c.win.handleError === "function") {
+            $c.win.handleError(resObj, { notify: "none", context: "sbm." + ((sbmObj && sbmObj.id) || "") });
+        }
+        // await 중인 화면의 Promise 가 영구 pending 되지 않도록 reject 로 종결한다.
+        if (sbmObj && typeof sbmObj._promise_submitErrorHandler === "function") {
+            sbmObj._promise_submitErrorHandler(resObj);
+        }
         return false;
     }
 
@@ -296,12 +309,17 @@ scwin.__submitErrorHandler = function (resObj) {
 
     const msgObj = {
         statusCode: "E",
-        errorCode: resBody.errors.code ?? "",
+        errorCode: (resBody && resBody.errors && resBody.errors.code) || "",
         message: message ?? "",
-        messageDetail: detailStr ?? ""                                                                                                                                                                                                                                                                         
+        messageDetail: detailStr ?? ""
     };
 
     $c.sbm.resultMsg(msgObj);
+
+    // 서버 오류도 공통 오류 처리기의 로그·수집 파이프라인에 합류시킨다. (사용자 알림은 위 resultMsg 담당)
+    if ($c.win && typeof $c.win.handleError === "function") {
+        $c.win.handleError(resObj, { notify: "none", context: "sbm." + (resObj.id || "") });
+    }
 };
 
 
@@ -415,7 +433,8 @@ scwin.execute = function (sbmObj, requestData, compObj, options) {
         if ($c.util.isEmpty(_sbmObj.action)) {
             const alertMsg = $c.data.getMessage("MSG_CM_00002", "action");
             $c.win.alert(alertMsg);
-            reject(alertMsg);
+            // 알림은 위에서 완료 — errorType 표식으로 화면 catch(handleError)의 이중 알림을 방지한다.
+            reject({ errorType: "invalid-option", message: alertMsg });
             return;
         }
 

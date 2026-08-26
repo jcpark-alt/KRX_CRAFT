@@ -221,6 +221,16 @@ describe("__reportError 오류 수집 훅 (src/gcc/win.xml)", () => {
     expect(JSON.parse(h.calls.fetch[0].opts.body).message).toBe("fb");
   });
 
+  test("동일 예외 객체는 handleError 재호출 시 1회만 수집(_errorReported 마킹)", async () => {
+    h.scwin.ERROR_REPORT_INFO.URL = "/api/err";
+    const ex = { errorType: "error", message: "comm fail" };
+    await h.scwin.handleError(ex, { context: "sbm.sbm_a" });   // sbm 공통 계층의 수집
+    await h.scwin.handleError(ex, { context: "ULDX.search" }); // 화면 catch 의 재호출
+    expect(h.calls.report).toHaveLength(1); // 재수집 없음
+    expect(h.calls.beacon).toHaveLength(1);
+    expect(ex._errorReported).toBe(true);
+  });
+
   test("스택은 MAX_STACK_LENGTH 로 절단", async () => {
     h.scwin.ERROR_REPORT_INFO.URL = "/api/err";
     h.scwin.ERROR_REPORT_INFO.MAX_STACK_LENGTH = 50;
