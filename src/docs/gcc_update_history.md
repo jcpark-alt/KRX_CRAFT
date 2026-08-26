@@ -238,6 +238,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
   - `BTN_STATE_MAP` — 상태를 "활성 역할 목록(enable) 또는 전체(*)+예외(disable)"로 선언, 미정의 역할 기본 비활성이라 **화면별 동적 역할 추가에 안전**. 상태 6종(insert·update·disabled·enabled·error·insertReady)
   - 화면은 역할→버튼id 매핑만 선언(버튼 id 비통일 대응), 판정 우선순위 override > state.disable > enable > 기본 false, 즉석 상태 객체·`registerButtonState` 등록 확장, 매핑 밖 버튼 미접촉·미존재 버튼/미정의 상태 방어
   - 회귀 테스트 9건(`test/setButtonState.test.js`)
+- `ef9628d` (08-26) — [연관] **버튼 상태 제어 가이드 샘플 `SMPBTN10000` 신설**(`src/conversion/sample-front`, gcc 무변경): `setButtonState` 전체 옵션 시연(표준 상태 6종·override·registerButtonState·즉석 상태·동적 역할), 버튼 id 비통일 대응 데모, 샘플 카탈로그 13번째 등록 + 개수 표기 13종 동기화
 - `2c90237` (08-26) — [연관] **SBChart 공시그래프 샘플(SPCHART_NOTICE) 신설**(`sbchart/CANDLESTICK`, gcc 무변경): 캔들+거래량+공시목록 GridView 3단, crosshair 커스텀 동기화(반대편 점선 미러), 공시일 다트형 화살표 SVG 오버레이(scatter combo 는 라이브러리 null 오인 크래시로 미사용), 커스텀 툴팁(상단 OHLC·하단 거래량), `TOOLTIP_TRIGGER`(band/shape) 옵션 — 전 기능 헤드리스(puppeteer) 검증, 미리보기 하네스·데이터·참고 이미지 포함
 
 ---
@@ -246,6 +247,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-08-26 | `ef9628d` | feat(sample): 버튼 상태 제어 가이드 샘플 SMPBTN10000 신설 (setButtonState 전체 옵션) — [연관, gcc 무변경] |
 | 2026-08-26 | `d0f21d9` | feat(util): 버튼 상태 일괄 제어 공통함수 setButtonState/registerButtonState 추가 |
 | 2026-08-26 | `2c90237` | feat(sample): SBChart 공시그래프 샘플(SPCHART_NOTICE) 신설 — 캔들+거래량+공시목록 3단 — [연관, gcc 무변경] |
 | 2026-08-26 | `2708d14` | docs(sample): SBChart 자주 쓰는 속성·기능 정의 문서(SBCHART_OPTIONS.md) 신설 — [연관, gcc 무변경] |
