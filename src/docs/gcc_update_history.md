@@ -215,6 +215,10 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
   - `scwin.__reportError` 수집 훅(hidden, 현재 no-op) — 추후 오류 수집 API 신설 시 연동 지점, try/catch 격리로 수집 실패가 화면 흐름을 깨지 않음
   - 빈 예외 가드는 명시적 null 체크 — `$c.util.isEmpty` 가 열거 키 없는 `Error` 인스턴스를 빈 객체로 오판하는 함정 회피, 회귀 테스트 11건 신설(`test/handleError.test.js`)
 - `3bed6e5` (08-26) — [연관] **화면 try/catch 오류 처리 규약 신설 및 샘플 적용**(gcc 무변경): `code-convention.md` 오류 처리 절(진입점 한정 try/catch + `$c.win.handleError` 한 줄 통일·내부 함수 예외 전파·`bizMessage` 업무 예외 표준·빈 catch 금지), `SMPVAL10000` 두 진입점 적용(Stage 2 정답지), `sample_templates.md` 표준 패턴 8번 추가
+- `67fc919` (08-26) — `$c.win` **`__reportError` 오류 수집 로직 본구현**(URL 설정 전까지 비활성):
+  - `ERROR_REPORT_INFO` 설정 상수(URL 기본 빈값=비활성·화면당 상한 10건·스택 절단 4000자) — 수집 API 신설 시 URL 한 곳만 지정하면 `handleError` 사용 전 화면에 수집 활성화
+  - 표준 페이로드(frameId·context·예외명/메시지/스택·pageUrl·userAgent·occurredAt), 동일 context+message 화면당 1회 중복 억제
+  - 전송은 `sendBeacon`(폴백 `fetch keepalive`)로 `$c.sbm` 우회 — 수집 실패가 resultMsg 사용자 알림 파이프라인을 재귀적으로 타는 부작용 차단, 회귀 테스트 +6건(총 17건)
 
 ---
 
@@ -222,6 +226,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-08-26 | `67fc919` | feat(win): __reportError 오류 수집 로직 본구현 — URL 설정 전까지 비활성 |
 | 2026-08-26 | `3bed6e5` | docs(convention)+refactor(sample): 화면 try/catch 오류 처리 규약 신설 및 샘플 적용 — [연관, gcc 무변경] |
 | 2026-08-26 | `a00ab33` | feat(win): 화면 try/catch 공통 오류 처리기 handleError 추가 |
 | 2026-08-26 | `8cc25d0` | feat(data): setCommonCode 캐시 히트 시 서버 재조회 생략 |
