@@ -229,7 +229,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
   - `handleError`(공개)·`__reportError`(hidden)·`ERROR_REPORT_INFO`·`__errorReportState` 를 win.xml 에서 신설 exception.xml 로 이동(`__errorHandler` 는 WebSquare 설정의 이름 참조 가능성으로 win 잔류)
   - 참조 일괄 변경(위임 래퍼 없음) — sbm.xml 수집 합류 가드 2곳·`SMPVAL10000` 2곳·code-convention.md·sample_templates.md → `$c.exception.handleError`
   - CLAUDE.md gcc 모듈 표·lint 기준선(12 files) 현행화, handleError 테스트 하니스를 exception.xml 로드로 전환
-  - **배포 주의**: 배포 환경에 `$c.exception` 공통 XML 등록과 함께 반영 필요
+  - **배포 주의**: 배포 환경에 `$c.exception` 공통 XML 등록과 함께 반영 필요 — 사용법·등록 구문은 **[exception-handling-guide.md](exception-handling-guide.md)** 참고
 
 ---
 
