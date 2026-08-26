@@ -50,7 +50,7 @@ python src/conversion/tools/convert_all.py --force <프로젝트명>-front
 
 1. 변환 리포트의 **검토·대체 태그** 항목을 [substitution_map.md](substitution_map.md) + gcc API 문서 시그니처 기준으로 보강
 2. 원시 JSP/jQuery 페이지(규칙 19)는 `<w2:*>` 컴포넌트로 재설계
-3. **화면 유형을 [sample_templates.md](sample_templates.md) 최종 샘플 12종에 매칭**해 5단계 구조·async/await 서브미션·검증(`$c.validate.*`)·페이징(`setPagingInfo`) 사용을 샘플 수준으로 정렬
+3. **화면 유형을 [sample_templates.md](sample_templates.md) 최종 샘플 13종에 매칭**해 5단계 구조·async/await 서브미션·검증(`$c.validate.*`)·페이징(`setPagingInfo`) 사용을 샘플 수준으로 정렬
 4. 보류 항목은 `// TODO Stage2:` 주석 + [stage2_todo_worklist.md](stage2_todo_worklist.md) 집계로 추적
 5. 잔존 레거시 호출 grep 점검 → `wsxml_lint` 통과 확인
 

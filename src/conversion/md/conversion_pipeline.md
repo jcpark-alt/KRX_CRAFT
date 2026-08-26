@@ -73,7 +73,7 @@ Python 이 남긴 **"추가 작업 목록"만** Claude Code 로 처리합니다.
 * **목록↔상세 복귀 상태 복원**: 목록→상세 이동(moveUrl/setPageFrameSrc) 화면은 `{isHistory:true, dataInfo}` 스냅샷과 상세의 [목록] 버튼 `{restoreData:true}` 패턴을 적용해 조회조건·목록·페이징을 복원한다(`src/docs/frame-history-guide.md`, `_pagingInfo` 예약 키).
 * **페이징 전체보기/내림차순 순번**: AS-IS 자체 구현(전체보기 토글·역순 순번 계산)은 `$c.sbm.setPagingInfo` 의 `maxRowNum:"all"`·`rowNumVisble:"{grid}|desc"`(+`rowNumColumn`) 옵션으로 대체한다.
 * **모호·충돌**: 같은 이름이 파일마다 다른 의미이거나, 치환 매핑표([substitution_map.md](substitution_map.md))에 없는 커스텀 로직.
-* **샘플 매칭 보강**: 화면 유형(목록+페이징/작성/팝업/탭/엑셀 등)을 [sample_templates.md](sample_templates.md) 매칭 표에서 찾아, 해당 최종 샘플의 5단계 구조·async/await 서브미션·검증·페이징 사용 방식과 일치하도록 정렬한다 — **샘플 12종이 단계 2 의 도달 목표(정답지)**다.
+* **샘플 매칭 보강**: 화면 유형(목록+페이징/작성/팝업/탭/엑셀 등)을 [sample_templates.md](sample_templates.md) 매칭 표에서 찾아, 해당 최종 샘플의 5단계 구조·async/await 서브미션·검증·페이징 사용 방식과 일치하도록 정렬한다 — **샘플 13종이 단계 2 의 도달 목표(정답지)**다.
 * **검증**: 의미 보존 확인, 잔존 레거시 호출/미사용 정의 정리, `npm run lint:xml`(`wsxml_lint`) 통과 확인.
 
 ## 권장 실행 순서
