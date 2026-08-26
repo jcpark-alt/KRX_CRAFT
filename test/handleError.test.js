@@ -25,7 +25,7 @@ function extractCdata(xmlPath) {
 
 // win.xml CDATA 를 mock 런타임 위에 로드하고, 알림/로그 기록 핸들을 반환한다.
 function loadHarness() {
-  const calls = { error: [], alert: [], toast: [], report: [], consoleError: 0, consoleWarn: 0 };
+  const calls = { error: [], alert: [], toast: [], report: [], beacon: [], fetch: [], consoleError: 0, consoleWarn: 0 };
 
   const sandbox = {
     console: {
@@ -56,7 +56,9 @@ function loadHarness() {
       openPopup: () => {},
       main: () => ({}),
     },
-    window: { opener: null, screen: { availWidth: 1920, availHeight: 1080, availTop: 0, availLeft: 0 } },
+    window: { opener: null, screen: { availWidth: 1920, availHeight: 1080, availTop: 0, availLeft: 0 }, location: { href: "http://test/ui/SMP.xml" } },
+    navigator: { userAgent: "jest-harness", sendBeacon: (url, body) => { calls.beacon.push({ url, body }); return true; } },
+    fetch: (url, opts) => { calls.fetch.push({ url, opts }); return Promise.resolve({ ok: true }); },
   };
 
   vm.createContext(sandbox);
@@ -158,5 +160,73 @@ describe("handleError 공통 오류 처리 (src/gcc/win.xml)", () => {
     h.sandbox.scwin.__reportError = () => { throw new Error("report down"); };
     await h.scwin.handleError(new Error("x"));
     expect(h.calls.error).toHaveLength(1); // 수집 실패가 흐름을 깨지 않음
+  });
+});
+
+describe("__reportError 오류 수집 훅 (src/gcc/win.xml)", () => {
+  let h;
+  beforeEach(() => { h = loadHarness(); });
+
+  test("수집 URL 미설정(기본) 시 아무 것도 전송하지 않음", async () => {
+    await h.scwin.handleError(new Error("boom"));
+    expect(h.calls.beacon).toHaveLength(0);
+    expect(h.calls.fetch).toHaveLength(0);
+  });
+
+  test("URL 설정 시 표준 페이로드를 sendBeacon 으로 전송", async () => {
+    h.scwin.ERROR_REPORT_INFO.URL = "/api/common/error-report";
+    await h.scwin.handleError(new Error("boom"), { context: "SMP.save" });
+
+    expect(h.calls.beacon).toHaveLength(1);
+    expect(h.calls.beacon[0].url).toBe("/api/common/error-report");
+    const payload = JSON.parse(h.calls.beacon[0].body);
+    expect(payload.frameId).toBe("mf_frameA");
+    expect(payload.context).toBe("SMP.save");
+    expect(payload.name).toBe("Error");
+    expect(payload.message).toBe("boom");
+    expect(payload.stack).toContain("Error: boom");
+    expect(payload.pageUrl).toBe("http://test/ui/SMP.xml");
+    expect(payload.userAgent).toBe("jest-harness");
+    expect(payload.occurredAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  test("동일 context+message 는 화면당 1회만 전송(중복 억제)", async () => {
+    h.scwin.ERROR_REPORT_INFO.URL = "/api/err";
+    await h.scwin.handleError(new Error("dup"), { context: "A" });
+    await h.scwin.handleError(new Error("dup"), { context: "A" });
+    expect(h.calls.beacon).toHaveLength(1);
+
+    await h.scwin.handleError(new Error("dup"), { context: "B" }); // context 다르면 별건
+    expect(h.calls.beacon).toHaveLength(2);
+  });
+
+  test("MAX_PER_PAGE 초과분은 전송하지 않음(폭주 방지)", async () => {
+    h.scwin.ERROR_REPORT_INFO.URL = "/api/err";
+    h.scwin.ERROR_REPORT_INFO.MAX_PER_PAGE = 2;
+    await h.scwin.handleError(new Error("e1"));
+    await h.scwin.handleError(new Error("e2"));
+    await h.scwin.handleError(new Error("e3"));
+    expect(h.calls.beacon).toHaveLength(2);
+  });
+
+  test("sendBeacon 미지원 환경은 fetch keepalive 로 폴백", async () => {
+    h.scwin.ERROR_REPORT_INFO.URL = "/api/err";
+    delete h.sandbox.navigator.sendBeacon;
+    await h.scwin.handleError(new Error("fb"));
+
+    expect(h.calls.fetch).toHaveLength(1);
+    expect(h.calls.fetch[0].url).toBe("/api/err");
+    expect(h.calls.fetch[0].opts.method).toBe("POST");
+    expect(h.calls.fetch[0].opts.keepalive).toBe(true);
+    expect(JSON.parse(h.calls.fetch[0].opts.body).message).toBe("fb");
+  });
+
+  test("스택은 MAX_STACK_LENGTH 로 절단", async () => {
+    h.scwin.ERROR_REPORT_INFO.URL = "/api/err";
+    h.scwin.ERROR_REPORT_INFO.MAX_STACK_LENGTH = 50;
+    const ex = new Error("long");
+    ex.stack = "x".repeat(500);
+    await h.scwin.handleError(ex);
+    expect(JSON.parse(h.calls.beacon[0].body).stack).toHaveLength(50);
   });
 });

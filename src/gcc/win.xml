@@ -1228,11 +1228,25 @@ scwin.handleError = async function (ex, opt) {
     }
 };
 
+// 오류 수집 설정 — URL 이 비어 있는 동안 __reportError 는 아무 것도 전송하지 않는다.
+// 수집 API 신설 시 URL 만 지정하면 handleError 를 쓰는 전 화면에 수집이 활성화된다.
+scwin.ERROR_REPORT_INFO = {
+    URL: "",            // 예: "/api/common/error-report" (현재 수집 API 미구축)
+    MAX_PER_PAGE: 10,   // 화면(프레임)당 최대 전송 건수 — 오류 폭주 시 서버 보호
+    MAX_STACK_LENGTH: 4000 // 스택 문자열 절단 길이
+};
+
+// 화면당 전송 횟수·중복 억제 상태 (동일 context+message 는 1회만 전송)
+scwin.__errorReportState = { sent: 0, keys: {} };
+
 /**
  * @method
  * @name __reportError
- * @description handleError 의 서버 오류 수집 훅. 현재는 오류 수집 API 가 없어 no-op 이며,
- *  추후 수집 API 신설 시 이 함수에서 화면 ID·컨텍스트·스택 정보를 전송하도록 구현한다.
+ * @description handleError 의 서버 오류 수집 훅. ERROR_REPORT_INFO.URL 이 설정된 경우에만
+ *  표준 페이로드(frameId·context·예외명/메시지/스택·화면 URL·userAgent·발생 시각)를 전송한다.
+ *  - 전송은 navigator.sendBeacon(폴백 fetch keepalive) 로 하며 $c.sbm 을 경유하지 않는다 —
+ *    수집 요청 실패가 sbm 오류 파이프라인(resultMsg 사용자 알림)을 다시 타는 부작용을 차단하기 위함.
+ *  - 동일 context+message 는 화면당 1회, 전체 MAX_PER_PAGE 건까지만 전송한다(폭주 방지).
  * @param {Error|Object|String} ex 예외 객체
  * @param {String} context 로그 식별자
  * @hidden Y
@@ -1240,9 +1254,47 @@ scwin.handleError = async function (ex, opt) {
  * @example
  */
 scwin.__reportError = function (ex, context) {
-    // TODO: 오류 수집 API 신설 시 구현
-    // 예) $c.sbm.executeDynamic({ id: "_sbm_reportError", action: "/api/common/error-report",
-    //      method: "post", requestData: { context: context, message: String(ex && ex.message || ex), stack: ex && ex.stack } });
+    const info = scwin.ERROR_REPORT_INFO;
+    if (info == null || $c.util.isEmpty(info.URL)) {
+        return; // 수집 API 미구축 — 비활성
+    }
+
+    const state = scwin.__errorReportState;
+    if (state.sent >= info.MAX_PER_PAGE) {
+        return;
+    }
+
+    const message = String((ex && ex.message) || (ex && ex.bizMessage) || ex);
+    const dupKey = String(context || "") + "|" + message;
+    if (state.keys[dupKey]) {
+        return; // 동일 오류 반복 전송 억제
+    }
+    state.keys[dupKey] = true;
+    state.sent += 1;
+
+    const payload = {
+        frameId: (typeof $p !== "undefined" && $p.getFrameId) ? $p.getFrameId() : "",
+        context: context || "",
+        name: (ex && ex.name) || (typeof ex),
+        message: message,
+        stack: String((ex && ex.stack) || "").substring(0, info.MAX_STACK_LENGTH),
+        pageUrl: (typeof window !== "undefined" && window.location) ? window.location.href : "",
+        userAgent: (typeof navigator !== "undefined") ? navigator.userAgent : "",
+        occurredAt: new Date().toISOString()
+    };
+
+    // 발사 후 망각 전송 — 실패해도 화면 흐름·사용자 알림에 영향을 주지 않는다.
+    const body = JSON.stringify(payload);
+    if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
+        navigator.sendBeacon(info.URL, body);
+    } else if (typeof fetch === "function") {
+        fetch(info.URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: body,
+            keepalive: true
+        }).catch(function () { /* no-op */ });
+    }
 };
 
 /**

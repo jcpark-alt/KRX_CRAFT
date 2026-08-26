@@ -86,7 +86,8 @@ scwin.btn_save_onclick = async function (e) {
 - 옵션: `message`(문구/메시지 ID) · `notify`("error" 기본 | "alert" | "toast" | "none") · `context`("화면ID.함수명" 권장) ·
   `rethrow`(상위 흐름 중단) · `callback`(알림 닫힘 후 콜백 함수명).
 - **금지**: 빈 catch, catch 에서 원시 `alert()`·`console.log` 만 남기고 종료, 통신 오류 재-alert(sbm 이 이미 알림).
-- 오류 수집: `handleError` 가 내부 훅(`__reportError`)을 호출한다 — 현재는 no-op 이며 수집 API 신설 시 gcc 만 수정하면 전 화면에 적용된다.
+- 오류 수집: `handleError` 가 내부 훅(`__reportError`)을 호출한다 — 수집 로직(표준 페이로드·중복 억제·화면당 상한·sendBeacon 전송)은 구현돼 있고,
+  `win.xml` 의 `ERROR_REPORT_INFO.URL` 이 비어 있는 동안 비활성이다. 수집 API 신설 시 **URL 한 곳만 지정**하면 전 화면에 적용된다.
 
 ## 이벤트-로직 분리 (Thin Event, 권장)
 
