@@ -3,8 +3,10 @@
   SBChart [candlestick] 샘플 (WRM / SPA)
   - 라이브러리는 config.xml <engine><module> 로 전역 로드됨
   - 데이터는 /ui/sample/SBChart/CANDLESTICK/data/CANDLESTICK.json 를 WebSquare.net.ajax 로 조회(GET)하여 결합
-  - 설정(CHART_CONFIG)은 원본 예제의 JS 를 그대로 유지 (포매터/콜백 함수 보존)
   - 컨테이너는 w2:group + getID() (다중 탭 동시표시 안전)
+  - 2026-08-26 SPCHART_CANDLESTICK.md 회신 반영 : 상승/하락 색 명시(inColor/deColor), Y축 width 고정,
+    min 0 + padding.bottom 0, OHLC 한글 툴팁(제목=날짜 환산), 고점/저점 마커 제거,
+    공시 제출일(gongsi) 캔들 fillColor 강조
 -->
 <html xmlns="http://www.w3.org/1999/xhtml"
       xmlns:ev="http://www.w3.org/2001/xml-events"
@@ -27,24 +29,48 @@
 
 // 데이터/옵션 분리: JSON 은 순수 데이터만, 아래 type+옵션은 스크립트가 보유 → 렌더시 조합
 scwin.CHART_TYPE = "candlestick";                    // 차트 타입 (스크립트)
-scwin.CHART_DATA_URL ="/ui/sample/SBChart/CANDLESTICK/data/CANDLESTICK.json";             // 순수 데이터 JSON (type 없음)
+scwin.CHART_DATA_URL ="/src/conversion/sample-front/sbchart/CANDLESTICK/data/CANDLESTICK.json";             // 순수 데이터 JSON (type 없음)
+
+// ---- 차트 공통 상수 (SPCHART_CANDLESTICK.md 회신 STEP 1) ----
+scwin.CHART_Y_WIDTH    = 78;          // ★ Y축 폭 — 가장 긴 라벨이 잘리지 않는 값으로 조정 (복수 차트 시 정렬 공통값)
+scwin.CHART_Y_TOP_PAD  = 5000;        // ★ 위쪽 여백(주가 단위) — 최고가가 상단에 붙으면 키울 것
+scwin.CHART_UP_COLOR   = "#E52528";   // 상승 : 빨강
+scwin.CHART_DOWN_COLOR = "#1B64DA";   // 하락 : 파랑
+scwin.CHART_DSCL_COLOR = "#7B1FA2";   // 공시 제출일 캔들
+
+scwin.DATES = [];                     // 툴팁 제목용 조회 날짜 목록 (x축이 인덱스라 환산에 사용)
+
 scwin.CHART_CONFIG = {
   "tooltip": {   // 툴팁
-    "width": "200px"   // 너비(px 또는 비율)
+    "width": "200px",   // 너비(px 또는 비율)
+    "format": {
+      // 제목 : x값(인덱스)을 조회한 날짜로 환산
+      "title": function (idx) { return scwin.DATES[idx] || ""; },
+      // 값 : OHLC 한글 라벨 + 천단위 콤마. values 순서 = keys.value[0] 선언 순서 — [0]시가 [1]종가 [2]저가 [3]고가
+      "value": function (values, ratio, id, index) {
+        const fmt = function (v) { return $c.num.formatNumber(v) + " 원"; };
+        return {
+          open:  { key: "시가", value: fmt(values[0]) },
+          close: { key: "종가", value: fmt(values[1]) },
+          low:   { key: "저가", value: fmt(values[2]) },
+          high:  { key: "고가", value: fmt(values[3]) }
+        };
+      }
+    }
   },
   "axis": {   // 축 설정
     "y": {
-      "min": 78000   // 최소값
+      "width": scwin.CHART_Y_WIDTH,   // Y축 폭 고정 (라벨 자동 측정 대신 — 복수 차트 정렬 시 동일값 사용)
+      "min": 0,                       // 0 에서 시작 (md [3-4] — 캔들 관례상 최저가*0.98 방식도 가능, 현업 확인 사항)
+      "padding": { "bottom": 0, "top": scwin.CHART_Y_TOP_PAD }   // 하한 고정 + 상단 여백 (domain.min:0 은 무시되므로 금지)
     }
   },
   "extend": {   // 차트별 세부 옵션
     "candlestick": {   // 캔들스틱 전용 옵션
       "auto": true,
-      "marker": {                                              // ★ 고점/저점에 값 마커(삼각형+금액) 표시
-        "show": true,
-        "color": "#c0392b",
-        "min": { "format": function (d) { return "저가 " + d.low.toLocaleString(); } }   // 저점 라벨 포맷
-      }
+      "inColor": scwin.CHART_UP_COLOR,     // 상승 색 명시 (미지정 시 라이브러리 기본색 = 핑크 계열)
+      "deColor": scwin.CHART_DOWN_COLOR,   // 하락 색 명시
+      "marker": { "show": false }          // 고점/저점 마커 제거 — 공시일 캔들 색(fillColor)으로 대체
     }
   },
   "dataOpts": {   // 데이터 레벨 옵션(keys/labels 등)
@@ -62,9 +88,28 @@ scwin.CHART_CONFIG = {
   }
 };               // 옵션(global/axis/extend…) + dataOpts(keys/labels…)
 
+/**
+ * 차트 데이터 가공 : 공시 제출일(gongsi) 캔들에 별도 색을 지정한다.
+ * SBChart 는 행의 fillColor 를 상승/하락 자동색(auto)보다 우선 적용한다. (md [3-6] 방법 A)
+ */
+scwin.buildChartData = function (list) {
+    return list.map(function (r) {
+        const isDscl = (r.gongsi === "true" || r.gongsi === "Y");
+        if (!isDscl) { return r; }
+
+        const row = {};
+        for (const k in r) {
+            if (r.hasOwnProperty(k)) { row[k] = r[k]; }
+        }
+        row.fillColor = scwin.CHART_DSCL_COLOR;
+        return row;
+    });
+};
+
 scwin.onpageload = async function () {
-    var res = await $c.sbm.executeDynamic({ id: "sbm_sbchart", action: scwin.CHART_DATA_URL, method: "get", mediatype: "application/json", mode: "asynchronous", isProcessMsg: false });
-    var data = res.responseJSON;
+    const res = await $c.sbm.executeDynamic({ id: "sbm_sbchart", action: scwin.CHART_DATA_URL, method: "get", mediatype: "application/json", mode: "asynchronous", isProcessMsg: false });
+    const data = scwin.buildChartData(res.responseJSON);
+    scwin.DATES = data.map(function (r) { return r.date; });   // 툴팁 제목용
     $c.ext.drawChartData(scwin.CHART_TYPE, data, chartWrap, scwin.CHART_CONFIG);
 };
 
