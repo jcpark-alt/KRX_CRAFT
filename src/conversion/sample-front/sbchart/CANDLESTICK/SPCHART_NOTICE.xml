@@ -1,0 +1,383 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SBChart [candlestick] 공시그래프 샘플 (WRM / SPA) — 회사정보 확인사항 > 공시그래프 탭 구성 참조
+  - 구조 : 상단 캔들스틱 + 하단 거래량 막대 + 최하단 공시목록 GridView (참고 이미지 data/flow_2026-08-26_15223113.png)
+  - 데이터 : /ui/sample/SBChart/CANDLESTICK/data/chart_data.json — body.chartList(OHLC·거래량·gongsi) + body.disclsList(공시목록)
+  - 기능 : ① 두 차트 crosshair(십자선) 표시 ② 공시일 캔들 하단 초록 ▲ 화살표(렌더 후 SVG 오버레이)
+           ③ 커스텀 툴팁(날짜·시가·종가·고가·저가·거래량) ④ 공시목록 GridView 연동(dlt_disclsList)
+  - 고급 기능 정의: sbchart/md/SBCHART_OPTIONS.md §4(tooltip.custom)·§9(crosshair) / 회신: sbchart/md/SPCHART.md
+  - crosshair 동기화 : 라이브러리 내장 연동(linked) 옵션 없음 — syncCrosshair 커스텀(양방향 대칭).
+    마우스가 있는 차트는 네이티브 crosshair+자기 툴팁(상단=OHLC 커스텀, 하단=거래량), 반대편 차트에는
+    crosshair 동일 스타일 점선을 마우스 연속 추적으로 미러링(getScreenCTM 역변환 — 마진 차이 무관)
+  - 주의 : 공시 마커에 scatter combo(방법 B)를 쓰지 않는다 — 라이브러리가 null 값을 객체로 오인해
+           크래시함(typeof 검사). drawNoticeArrows(post-render SVG) 방식 사용.
+-->
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:ev="http://www.w3.org/2001/xml-events"
+      xmlns:w2="http://www.inswave.com/websquare"
+      xmlns:xf="http://www.w3.org/2002/xforms">
+<head meta_screenId="SPCHART_NOTICE" meta_screenName="공시그래프 (캔들+거래량+공시목록)" meta_desc="candlestick + volume + 공시 GridView 연동 샘플" meta_author="WRM" meta_date="2026.08.26">
+    <w2:type>COMPONENT</w2:type>
+    <w2:buildDate/>
+    <w2:MSA/>
+    <xf:model>
+        <xf:instance>
+            <data xmlns=""/>
+        </xf:instance>
+        <w2:dataCollection baseNode="map">
+            <w2:dataList baseNode="list" repeatNode="map" id="dlt_disclsList">
+                <w2:columnInfo>
+                    <w2:column id="disclsTitle" name="공시제목" dataType="text"></w2:column>
+                    <w2:column id="disclsPublDdtm" name="공시시간" dataType="text"></w2:column>
+                    <w2:column id="formUpclssNm" name="공시유형" dataType="text"></w2:column>
+                    <w2:column id="trdDd" name="거래일(yyyymmdd)" dataType="text"></w2:column>
+                </w2:columnInfo>
+            </w2:dataList>
+        </w2:dataCollection>
+        <w2:workflowCollection/>
+    </xf:model>
+    <w2:layoutInfo/>
+    <w2:publicInfo method=""/>
+    <script lazy="false" type="text/javascript"><![CDATA[
+
+scwin.CHART_DATA_URL = "/ui/sample/SBChart/CANDLESTICK/data/chart_data.json";
+
+// ---- 차트 공통 상수 (SPCHART.md 회신 §1 반영) ----
+scwin.CHART_Y_WIDTH    = 78;          // ★ 두 차트 공통 Y축 폭 — 플롯 영역 정렬 (SPCHART.md §3-2)
+scwin.CHART_UP_COLOR   = "#E52528";   // 상승 : 빨강
+scwin.CHART_DOWN_COLOR = "#1B64DA";   // 하락 : 파랑
+scwin.NOTICE_COLOR     = "#2AC1BC";   // 공시일 마커 : 민트
+scwin.TOOLTIP_TRIGGER  = "shape";      // ★ 툴팁 표시 방식 — "band": 플롯 어디서나 해당 날짜 표시(기본) | "shape": 도형(캔들/막대) 위에서만
+
+scwin.DATES = [];                     // 인덱스→날짜(yyyymmdd) — x축이 인덱스라 tick/툴팁 환산용
+scwin.ROWS  = [];                     // 조회 원본 행 — 커스텀 툴팁에서 거래량 등 참조
+
+/**
+ * 차트 컨테이너를 정리한다. 재조회 렌더 전 호출 — 이전 차트 잔존 방지 (SPCHART.md §1-5)
+ */
+scwin.clearChart = function (comp) {
+    const el = document.getElementById(comp.getID());
+    if (el) { el.innerHTML = ""; }
+};
+
+// "20260120" → "2026-01-20"
+scwin.formatDate = function (d) {
+    return d ? d.slice(0, 4) + "-" + d.slice(4, 6) + "-" + d.slice(6) : "";
+};
+
+/**
+ * 차트 데이터 가공.
+ *  - OHLC 가 모두 0 인 무효 행 제거(원천 데이터 결측 방어 — y domain 왜곡 방지)
+ *  - 문자열 수치를 Number 로 변환
+ *  - 공시일(gongsi true 또는 disclsList 의 trdDd 일치)은 isNotice 플래그만 부여
+ *    ※ scatter combo(SPCHART.md §3-6 방법 B)는 라이브러리가 null 값을 객체로 오인(typeof 검사)해
+ *      크래시하므로 사용하지 않는다 — 렌더 후 drawNoticeArrows(SVG 오버레이)로 ▲ 표시.
+ */
+scwin.buildChartData = function (chartList, disclsList) {
+    const noticeDates = {};
+    (disclsList || []).forEach(function (d) { noticeDates[d.trdDd] = true; });
+
+    return (chartList || []).filter(function (r) {
+        return !(Number(r.open) === 0 && Number(r.high) === 0 && Number(r.low) === 0);
+    }).map(function (r) {
+        return {
+            date:  r.date,
+            open:  Number(r.open),
+            close: Number(r.close),
+            low:   Number(r.low),
+            high:  Number(r.high),
+            admnt: Number(r.admnt),
+            isNotice: (r.gongsi === true || r.gongsi === "true" || r.gongsi === "Y" || noticeDates[r.date] === true)
+        };
+    });
+};
+
+/**
+ * 시리즈 도형 목록 추출 (헤드리스 DOM 실측 기반 — 클래스 셀렉터).
+ *  - 캔들 차트 : 캔들 1개 = <g class="sbchart-bar sbchart-shape sbchart-shape-N"> (wick path + body rect)
+ *  - 막대 차트 : <g class="sbchart-shapes ..."> 하위 rect (막대 1개 = rect 1개)
+ */
+scwin.seriesShapes = function (svg, dataLen) {
+    const candles = svg.querySelectorAll("g.sbchart-shape");
+    const list = candles.length ? candles : svg.querySelectorAll("g.sbchart-shapes > rect");
+    return (list.length === dataLen) ? Array.prototype.slice.call(list) : null;
+};
+
+/**
+ * 공시일 캔들 하단에 초록 ▲ 화살표를 그린다 (렌더 후 SVG 오버레이).
+ * 각 캔들 도형의 getBBox 로 실제 좌표를 얻어 같은 좌표계(부모 그룹)에 path 를 추가한다.
+ */
+scwin.drawNoticeArrows = function (comp, data, tryCnt) {
+    const svg = document.querySelector("#" + comp.getID() + " svg");
+    const candles = svg ? scwin.seriesShapes(svg, data.length) : null;
+    if (!candles) {   // 렌더 지연 방어 — 최대 10회 재시도 (__drawSBChart 의 라이브러리 로드 지연 포함)
+        if ((tryCnt || 0) < 10) { setTimeout(function () { scwin.drawNoticeArrows(comp, data, (tryCnt || 0) + 1); }, 100); }
+        return;
+    }
+    data.forEach(function (r, i) {
+        if (!r.isNotice) { return; }
+        const b = candles[i].getBBox();
+        const cx = b.x + b.width / 2;
+        const top = b.y + b.height + 6;   // 캔들(저가) 바로 아래
+        const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        // 꼭짓점 위 + 하단이 오목한 다트형 화살표 (아래 변을 Q 곡선으로 위로 파냄)
+        p.setAttribute("d", "M " + cx + " " + top
+                          + " L " + (cx + 6) + " " + (top + 11)
+                          + " Q " + cx + " " + (top + 5) + " " + (cx - 6) + " " + (top + 11)
+                          + " Z");
+        p.setAttribute("fill", scwin.NOTICE_COLOR);
+        p.setAttribute("pointer-events", "none");   // 차트 마우스 이벤트 방해 금지
+        candles[i].parentNode.appendChild(p);   // 같은 그룹에 추가해 transform 승계
+    });
+};
+
+// ---- TOOLTIP_TRIGGER="shape" 용 hit-test 상태 (차트별 도형 bbox + 마지막 마우스 플롯 좌표) ----
+scwin.__tooltipHit = {};
+
+scwin.setupShapeHit = function (key, svg, shapes) {
+    const group = shapes[0].parentNode;
+    const st = scwin.__tooltipHit[key] = {
+        boxes: shapes.map(function (s) { const b = s.getBBox(); return { x: b.x, y: b.y, w: b.width, h: b.height }; }),
+        last: null
+    };
+    // capture 단계 등록 — 라이브러리 핸들러(툴팁 갱신)보다 먼저 좌표를 기록
+    svg.addEventListener("mousemove", function (e) {
+        const pt = svg.createSVGPoint();
+        pt.x = e.clientX; pt.y = e.clientY;
+        const loc = pt.matrixTransform(group.getScreenCTM().inverse());
+        st.last = { x: loc.x, y: loc.y };
+    }, true);
+    svg.addEventListener("mouseleave", function () { st.last = null; }, true);
+};
+
+scwin.isOverShape = function (key, i) {
+    const st = scwin.__tooltipHit[key];
+    if (!st || !st.last || !st.boxes[i]) { return false; }
+    const b = st.boxes[i], t = 3;   // 허용 오차(px)
+    return st.last.x >= b.x - t && st.last.x <= b.x + b.w + t
+        && st.last.y >= b.y - t && st.last.y <= b.y + b.h + t;
+};
+
+/**
+ * 커스텀 툴팁 — 날짜·시가·종가·고가·저가·거래량 (참고 이미지의 빨간 테두리 박스 형식)
+ * SBChart tooltip.custom 은 데이터 포인트(배열)를 받는다 — index 로 원본 행을 역참조한다.
+ */
+scwin.noticeTooltip = function (d) {
+    const p = (d && d.length) ? d[0] : d;
+    const i = (p && p.index != null) ? p.index : ((p && p.x != null) ? p.x : -1);
+    if (scwin.TOOLTIP_TRIGGER === "shape" && !scwin.isOverShape("top", i)) { return ""; }   // 도형 밖 — 숨김(:empty 규칙)
+    const row = scwin.ROWS[i];
+    if (!row) { return ""; }
+
+    const fmt = function (v) { return $c.num.formatNumber(v); };
+    return "<div style='background:#fff;border:1px solid #e74c3c;padding:6px 10px;font-size:12px;color:#c0392b;line-height:1.6;'>"
+         + "날짜 : " + scwin.formatDate(row.date) + "<br/>"
+         + "시가 : " + fmt(row.open)  + "<br/>"
+         + "종가 : " + fmt(row.close) + "<br/>"
+         + "고가 : " + fmt(row.high)  + "<br/>"
+         + "저가 : " + fmt(row.low)   + "<br/>"
+         + "거래량 : " + fmt(row.admnt)
+         + "</div>";
+};
+
+/**
+ * 상/하 차트 crosshair 세로선 동기화 (좌표 기반 미러링).
+ * 마우스가 있는 차트에서 가장 가까운 캔들/막대의 중심 x 를 찾아, "반대편 차트"의
+ * 같은 인덱스 위치에 세로선을 직접 그린다 — 라이브러리 내부 이벤트 구조에 의존하지 않아
+ * 확실하게 동작한다(마우스가 있는 차트 자체는 네이티브 crosshair 가 표시).
+ * 좌표는 시리즈 그룹(getScreenCTM 역변환) 기준이라 두 차트의 마진 차이와 무관.
+ */
+scwin.syncCrosshair = function (compA, compB, data, tryCnt) {
+    const seriesInfo = function (comp) {
+        const svg = document.querySelector("#" + comp.getID() + " svg");
+        if (!svg) { return null; }
+        const shapes = scwin.seriesShapes(svg, data.length);
+        if (!shapes) { return null; }
+        const centers = [];
+        let bottom = 0;
+        for (let si = 0; si < shapes.length; si++) {
+            const b = shapes[si].getBBox();
+            centers.push(b.x + b.width / 2);
+            if (b.y + b.height > bottom) { bottom = b.y + b.height; }
+        }
+        return { svg: svg, group: shapes[0].parentNode, shapes: shapes, centers: centers, bottom: bottom };
+    };
+    const A = seriesInfo(compA);
+    const B = seriesInfo(compB);
+    if (!A || !B) {   // 렌더 지연 방어
+        if ((tryCnt || 0) < 10) { setTimeout(function () { scwin.syncCrosshair(compA, compB, data, (tryCnt || 0) + 1); }, 100); }
+        return;
+    }
+    const makeLine = function (info) {
+        const ln = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        ln.setAttribute("y1", 0);
+        ln.setAttribute("y2", info.bottom);
+        ln.setAttribute("stroke", "#C0C0C0");          // 네이티브 crosshair(.sbchart-crosshair-x)와 동일 스타일
+        ln.setAttribute("stroke-dasharray", "3,3");    // 점선 3,3
+        ln.setAttribute("stroke-width", "1");
+        ln.setAttribute("visibility", "hidden");
+        ln.setAttribute("pointer-events", "none");
+        info.group.appendChild(ln);   // 시리즈 그룹에 추가해 transform 승계
+        return ln;
+    };
+    const lineA = makeLine(A);   // 각 차트의 미러 세로선
+    const lineB = makeLine(B);
+
+    // shape 모드 hit-test 준비 + 빈 툴팁 잔상 제거(:empty — width/box-shadow 기본값 때문에 필요)
+    scwin.setupShapeHit("top", A.svg, A.shapes);
+    scwin.setupShapeHit("vol", B.svg, B.shapes);
+    const styleEl = document.createElement("style");
+    styleEl.textContent = "#" + compA.getID() + " .sbchart-tooltip:empty, #" + compB.getID() + " .sbchart-tooltip:empty { display: none !important; }";
+    document.head.appendChild(styleEl);
+
+    const mouseToPlotX = function (src, e) {
+        // 마우스 clientX → 시리즈 그룹 좌표계 x (마진/transform 자동 반영)
+        const pt = src.svg.createSVGPoint();
+        pt.x = e.clientX; pt.y = e.clientY;
+        return pt.matrixTransform(src.group.getScreenCTM().inverse()).x;
+    };
+
+    // 마우스가 있는 차트는 네이티브 crosshair+자기 툴팁, 반대편 차트에는 점선 미러(연속 추적)
+    const wireMirror = function (src, dstLine) {
+        const step = src.centers.length > 1 ? (src.centers[src.centers.length - 1] - src.centers[0]) / (src.centers.length - 1) : 0;
+        const minX = src.centers[0] - step / 2;
+        const maxX = src.centers[src.centers.length - 1] + step / 2;
+        src.svg.addEventListener("mousemove", function (e) {
+            const x = Math.max(minX, Math.min(maxX, mouseToPlotX(src, e)));
+            dstLine.setAttribute("x1", x);
+            dstLine.setAttribute("x2", x);
+            dstLine.setAttribute("visibility", "visible");
+        });
+        src.svg.addEventListener("mouseleave", function () {
+            dstLine.setAttribute("visibility", "hidden");
+        });
+    };
+    wireMirror(A, lineB);   // 상단 hover → 하단에 점선
+    wireMirror(B, lineA);   // 하단 hover → 상단에 점선
+};
+
+/**
+ * 하단 거래량 커스텀 툴팁 — 상단과 동일한 "라벨 : 값" 형식 (날짜/거래량)
+ */
+scwin.volumeTooltip = function (d) {
+    const p = (d && d.length) ? d[0] : d;
+    const i = (p && p.index != null) ? p.index : ((p && p.x != null) ? p.x : -1);
+    if (scwin.TOOLTIP_TRIGGER === "shape" && !scwin.isOverShape("vol", i)) { return ""; }   // 도형 밖 — 숨김(:empty 규칙)
+    const row = scwin.ROWS[i];
+    if (!row) { return ""; }
+    // 네이티브 툴팁(.sbchart-tooltip) 색상 — 배경 rgba(0,0,0,.7)·글자 #fff
+    return "<div style='background:rgba(0,0,0,.7);border-radius:5px;padding:6px 10px;font-size:12px;color:#fff;line-height:1.6;'>"
+         + "날짜 : " + scwin.formatDate(row.date) + "<br/>"
+         + "거래량 : " + $c.num.formatNumber(row.admnt)
+         + "</div>";
+};
+
+scwin.render = function (data) {
+    scwin.clearChart(chartTop);   // 재조회 대비 이전 차트 정리 — SPCHART.md §1-5
+    scwin.clearChart(chartVol);
+
+    // ── 상단: 캔들스틱 + 공시일 scatter 오버레이 ──
+    $c.ext.drawChartData("candlestick", data, chartTop, {
+        legend: { show: false },
+        global: {
+            crosshair: { show: true }          // 십자선 — X/Y 위치 표시 (SBCHART_OPTIONS.md §9)
+        },
+        tooltip: {
+            custom: scwin.noticeTooltip        // 날짜·OHLC·거래량 커스텀 툴팁
+        },
+        axis: {
+            y: { width: scwin.CHART_Y_WIDTH }, // 하단 차트와 플롯 정렬
+            x: { tick: { format: function (v) {
+                const d = scwin.DATES[v];
+                return (d && v % 3 === 0) ? d.slice(4, 6) + "-" + d.slice(6) : "";   // MM-DD, 과밀 방지
+            } } }
+        },
+        extend: {
+            candlestick: {
+                auto: true,
+                inColor: scwin.CHART_UP_COLOR,     // 상승 빨강 (SPCHART.md §3-1)
+                deColor: scwin.CHART_DOWN_COLOR,   // 하락 파랑
+                marker: { show: false }            // 고점/저점 마커 대신 공시일 ▲ 오버레이 사용
+            }
+        },
+        dataOpts: {
+            keys: {
+                x: "date",
+                value: [ { open: "open", close: "close", low: "low", high: "high" } ]
+            }
+        }
+    });
+    scwin.drawNoticeArrows(chartTop, data);   // 공시일 ▲ 오버레이 (렌더 후)
+
+    // ── 하단: 거래량 막대 ──
+    $c.ext.drawChartData("bar", data, chartVol, {
+        legend: { show: false },
+        global: { crosshair: { show: true } },
+        tooltip: {
+            custom: scwin.volumeTooltip   // "라벨 : 값" 형식 (날짜/거래량) — 상단과 통일
+        },
+        axis: {
+            y: {
+                width: scwin.CHART_Y_WIDTH,        // 상단 차트와 플롯 정렬
+                tick: { format: function (v) { return $c.num.formatNumber(v); } }
+            },
+            x: { tick: { format: function () { return ""; } } }   // 날짜는 상단 차트에 표시
+        },
+        extend: { bar: { width: { ratio: 0.5 } } },
+        dataOpts: { keys: { x: "date", value: [ "admnt" ] } }
+    });
+};
+
+scwin.onpageload = async function () {
+    // 진입점 표준 오류 처리 — code-convention §오류 처리
+    try {
+        const res = await $c.sbm.executeDynamic({ id: "sbm_sbchart", action: scwin.CHART_DATA_URL, method: "get", mediatype: "application/json", mode: "asynchronous", isProcessMsg: false });
+        const body = (res.responseJSON && res.responseJSON.body) ? res.responseJSON.body : {};
+
+        // 공시목록 GridView 연동
+        dlt_disclsList.setJSON(body.disclsList || []);
+
+        // 차트 렌더 (공시일 마커는 chartList.gongsi + disclsList.trdDd 매칭으로 판정)
+        const data = scwin.buildChartData(body.chartList, body.disclsList);
+        scwin.ROWS  = data;
+        scwin.DATES = data.map(function (r) { return r.date; });
+        scwin.render(data);
+        scwin.syncCrosshair(chartTop, chartVol, data);   // 상/하 차트 crosshair 세로선 동기화
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "SPCHART_NOTICE.onpageload" });
+    }
+};
+
+    ]]></script>
+</head>
+
+<body ev:onpageload="scwin.onpageload">
+        <!-- SAMPLE_DESC -->
+    <xf:group style="padding:8px 12px;margin-bottom:8px;background:#eef6f3;border-left:4px solid #0a8060;border-radius:4px;">
+        <w2:span label="공시그래프 (candlestick + volume + 공시목록)" style="display:block;font-weight:bold;color:#0a7a52;"/>
+        <w2:span label="상단 캔들·하단 거래량에 십자선과 커스텀 툴팁(날짜/시가/종가/고가/저가/거래량)을 적용하고, 공시일 캔들 하단에 초록 마커를 표시하며, 최하단 GridView 에 공시목록을 연동합니다." style="display:block;font-size:12px;color:#555;margin-top:2px;"/>
+    </xf:group>
+    <w2:group id="chartTop" style="width:100%;height:340px;"/>
+    <w2:group id="chartVol" style="width:100%;height:150px;margin-top:4px;"/>
+    <xf:group class="grdbox" style="margin-top:8px;">
+        <w2:gridView autoFit="allColumn" class="gvw row5" dataList="data:dlt_disclsList" focusMode="row" id="grd_discls"
+            keepDefaultColumnWidth="false" rowNumVisible="false"
+            scrollByColumn="false" setCellInputTypeCustom="true" visibleRowNum="5">
+            <w2:header id="headerDiscls">
+                <w2:row id="rowDisclsHead">
+                    <w2:column displayMode="label" id="hDisclsTitle" inputType="text" value="공시제목" width="420"></w2:column>
+                    <w2:column displayMode="label" id="hDisclsPublDdtm" inputType="text" value="공시시간" width="180"></w2:column>
+                    <w2:column displayMode="label" id="hFormUpclssNm" inputType="text" value="공시유형" width="120"></w2:column>
+                </w2:row>
+            </w2:header>
+            <w2:gBody id="gBodyDiscls">
+                <w2:row id="rowDisclsBody">
+                    <w2:column id="disclsTitle" inputType="text" width="420" textAlign="left"></w2:column>
+                    <w2:column id="disclsPublDdtm" inputType="text" width="180" textAlign="center"></w2:column>
+                    <w2:column id="formUpclssNm" inputType="text" width="120" textAlign="center"></w2:column>
+                </w2:row>
+            </w2:gBody>
+        </w2:gridView>
+    </xf:group>
+</body>
+</html>
