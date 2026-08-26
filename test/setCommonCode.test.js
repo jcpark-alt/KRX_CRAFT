@@ -28,7 +28,7 @@ const isEmpty = (v) =>
 
 // data.xml CDATA 를 mock 런타임 위에 로드하고, 테스트가 조작할 핸들을 반환한다.
 function loadHarness(xmlPath) {
-  const state = { comps: {}, dls: {}, lastServer: null, serverBody: {} };
+  const state = { comps: {}, dls: {}, lastServer: null, serverBody: {}, serverCalls: 0 };
 
   function makeComp(id) {
     const c = {
@@ -61,6 +61,7 @@ function loadHarness(xmlPath) {
       sbm: {
         executeDynamic: async (opts) => {
           state.lastServer = opts;
+          state.serverCalls += 1;
           return { responseJSON: { body: state.serverBody } };
         },
       },
@@ -201,6 +202,41 @@ describe.each(XML_FILES)("setCommonCode 배열 매핑 (%s)", (xmlPath) => {
       code: ["00001", "00005"], compID: ["sbx_A", "sbx_B"],
     }]);
     expect(h.state.lastServer.action).toBe("/api/common/common-codes?cdEngNmList=00001%2C00005");
+  });
+
+  test("동일 code 재호출 시 캐시 히트로 서버 재조회를 생략하고, useLocalCache:false 는 재조회", async () => {
+    h.state.comps = { sbx_S: h.makeComp("sbx_S") };
+    h.state.serverBody = [{ cdVal: "C1", cdValNm: "cache-one" }];
+    await h.scwin.setCommonCode([{ code: "00030", compID: "sbx_S" }]);
+    expect(h.state.serverCalls).toBe(1);
+
+    await h.scwin.setCommonCode([{ code: "00030", compID: "sbx_S" }]);
+    expect(h.state.serverCalls).toBe(1); // 캐시 히트 — 재조회 없음
+    expect(vals(h.state.dls["dlt_commonCode_00030___sbx_S"]._rows, "cdVal")).toContain("C1");
+
+    await h.scwin.setCommonCode([{ code: "00030", compID: "sbx_S", useLocalCache: false }]);
+    expect(h.state.serverCalls).toBe(2); // 캐시 무효화 — 재조회
+  });
+
+  test("배열 code 는 전부 캐시일 때만 생략, 일부 미보유 시 재조회", async () => {
+    h.state.comps = { sbx_A: h.makeComp("sbx_A"), sbx_B: h.makeComp("sbx_B") };
+    h.state.serverBody = {
+      "00001": [{ cdVal: "A1", cdValNm: "A-one" }],
+      "00005": [{ cdVal: "B1", cdValNm: "B-one" }],
+    };
+    await h.scwin.setCommonCode([{ code: ["00001", "00005"], compID: ["sbx_A", "sbx_B"] }]);
+    expect(h.state.serverCalls).toBe(1);
+
+    await h.scwin.setCommonCode([{ code: ["00001", "00005"], compID: ["sbx_A", "sbx_B"] }]);
+    expect(h.state.serverCalls).toBe(1); // 전부 캐시 — 생략
+
+    h.state.serverBody = {
+      "00001": [{ cdVal: "A1", cdValNm: "A-one" }],
+      "00007": [{ cdVal: "D1", cdValNm: "D-one" }],
+    };
+    await h.scwin.setCommonCode([{ code: ["00001", "00007"], compID: ["sbx_A", "sbx_B"] }]);
+    expect(h.state.serverCalls).toBe(2); // 00007 미보유 — 재조회
+    expect(vals(h.state.dls["dlt_commonCode_00007___sbx_B"]._rows, "cdVal")).toContain("D1");
   });
 
   test("단일 code 의 key 래핑 응답은 첫 key 목록으로 언래핑", async () => {
