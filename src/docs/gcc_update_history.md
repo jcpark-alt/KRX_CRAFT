@@ -1,6 +1,6 @@
 # gcc 공통 함수 업데이트 이력
 
-`src/gcc/` 공통 라이브러리(`$c.*`)의 최초 반입(2026-06-08, `92a35bd`) 이후 변경 내역 정리 (최종 갱신 2026-08-25).
+`src/gcc/` 공통 라이브러리(`$c.*`)의 최초 반입(2026-06-08, `92a35bd`) 이후 변경 내역 정리 (최종 갱신 2026-08-26).
 API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-08-25 기준 **11개 모듈 / 284개 공개 메서드**.
 
 > `src/cm/gcc/`는 CM 모듈용 사본으로 일반적 개선만 선별 반영해 왔으나(2026-06-10 병합, 2026-07-22 대규모 동기화로 11파일 체제),
@@ -208,6 +208,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
   - 회귀 테스트 신 계약 재작성(setCommonCode 8건), API 문서 재생성
 - `49efe07` (08-25) — [연관] **sample-front 벤더 JS를 ESLint 대상에서 제외**(`eslint.config.js`, gcc 무변경): SBChart 배포본(sbchart.js 압축본)의 no-undef 에러로 실패하던 Node lint CI 잡 복구
 - `cc7c67c` (08-25) — `$c.data.setCommonCode` **바인딩 블록 죽은 코드 정리**(동작 무변경): 미사용 `mapKey` 선언·낡은 매핑 주석 제거(mappingKey 해석은 `__getCommonCodeData` 로 일원화), 중복 `bodyObj` 조회 제거·`sourceList` 폴백 `[]` 정상화
+- `8cc25d0` (08-26) — `$c.data.setCommonCode` **캐시 히트 시 서버 재조회 생략**: 요청 code 가 모두 `commonCodeList` 캐시에 있으면 `executeDynamic` 호출 생략(배열 code 일부 미보유 시 그룹 재조회, `useLocalCache:false` 는 캐시 삭제 후 재조회) — JSDoc 기술과 실동작 일치화, 캐시 회귀 테스트 2건 신설
 
 ---
 
@@ -215,6 +216,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-08-26 | `8cc25d0` | feat(data): setCommonCode 캐시 히트 시 서버 재조회 생략 |
 | 2026-08-25 | `cc7c67c` | refactor(data): setCommonCode 바인딩 블록 죽은 코드 정리 |
 | 2026-08-25 | `49efe07` | fix(ci): sample-front 벤더 JS를 ESLint 대상에서 제외 — [연관, gcc 무변경] |
 | 2026-08-25 | `b1f9fdf` | feat(gcc): setCommonCode code별 응답 매핑 개편·paramName 제거 + win.reinitialize 추가 |
