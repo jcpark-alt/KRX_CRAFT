@@ -1,7 +1,7 @@
 # gcc 공통 함수 업데이트 이력
 
 `src/gcc/` 공통 라이브러리(`$c.*`)의 최초 반입(2026-06-08, `92a35bd`) 이후 변경 내역 정리 (최종 갱신 2026-08-26).
-API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-08-26 기준 **12개 모듈 / 285개 공개 메서드**.
+API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-08-26 기준 **12개 모듈 / 287개 공개 메서드**.
 
 > `src/cm/gcc/`는 CM 모듈용 사본으로 일반적 개선만 선별 반영해 왔으나(2026-06-10 병합, 2026-07-22 대규모 동기화로 11파일 체제),
 > **2026-08-18 `26af3d5`에서 사용 중단으로 삭제**되어 `src/gcc/`가 유일한 canonical 라이브러리다.
@@ -17,7 +17,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 | `data.xml` (`$c.data`) | 공통코드 로딩(`COMMON_CODE_INFO.ACTION` 연동, `setCommonCode` 배열 매핑 → code별 키잉 응답 매핑(`mappingKey` = 응답 조회 key) 개편·응답 언래핑·기본 컬럼 cdVal/cdValNm·조회 URL 이원화(url/paramName 옵션은 추가 후 제거)), JSON 헬퍼 8종, 프로세스 메시지, 콤보 공통코드 세팅(`comboCbDataSet*`) 계열, 업로드/리포트 헬퍼, 엑셀 다운로드 기본 옵션 개선 |
 | `win.xml` (`$c.win`) | 외부망 홈(`goHomeEx`), 프로그램 열기/내비게이션 단순화, `openFormSubmit`, 인쇄(`mainPrint`/`popupPrint`), `success`/`error` 알림, `openExternalPage`, **browserPopup 부모 화면 접근**(`getOpenerScope`/`callOpener`), 히스토리 기록·복원(`pushState`/`changePageState`) 결함 수정 및 `moveUrl`/`setPageFrameSrc` 이동 복원 확장(`restoreData` [목록] 복귀 포함), 프레임 초기화 `reinitialize` |
 | `exception.xml` (`$c.exception`) | **신설**(2026-08-26, win.xml 에서 분리) — 화면 try/catch 공통 오류 처리기 `handleError`(예외 분류·이중 알림 방지), 오류 수집 훅 `__reportError`(`ERROR_REPORT_INFO.URL` 설정 시 활성화) |
-| `util.xml` (`$c.util`) | 쿠키/웹스토리지 헬퍼 13종, 업로드(`onUploadClick`/`getUploadFiles` 등), `setTextLengthCounter`, `checkFileExtension`, 엑셀 다운로드 파일명 개선, `setGridVisibleRowNum`(gridView "all" 동적 적용) |
+| `util.xml` (`$c.util`) | 쿠키/웹스토리지 헬퍼 13종, 업로드(`onUploadClick`/`getUploadFiles` 등), `setTextLengthCounter`, `checkFileExtension`, 엑셀 다운로드 파일명 개선, `setGridVisibleRowNum`(gridView "all" 동적 적용), 버튼 상태 일괄 제어 `setButtonState`/`registerButtonState` |
 | `date.xml` (`$c.date`) | 날짜 포맷 검증(`checkCalendarFormat`/`compareFromToDate`), `getDateInterval` 단위 버그 수정, commonPrototype 의존 제거 |
 | `str.xml` (`$c.str`) | validate 중복 검증기 통합, 목적격 조사(`attachObjectPostposition`), 바이트/포맷 함수 자체 구현 전환 |
 | `session.xml` (`$c.session`) | **신설**(2026-06-09) — 세션 체크, 로그인/사용자 정보 관리 |
@@ -234,6 +234,10 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 - `681f4bb` (08-26) — [연관] **sbchart 샘플 전체 코드 컨벤션 정리**(gcc 무변경): 54개 샘플 var→const 전환(node --check 전수 검증), fn_ 접두 제거 5파일, GANTT_SCHEDULE 미정의 `fn_status` 호출 결함 수정. 회신 문서도 표준 Markdown 6절 구조로 정리(`sbchart/md/SPCHART.md`, `82ec860`)
 - `c89b556` (08-26) — [연관] **sbchart 샘플에 회신 3항목(색상·clear·툴팁 포맷) 일반화 적용**(gcc 무변경): 색상 팔레트(52)·clearChart 헬퍼 전수·툴팁 천단위 콤마(47)+STOCK OHLC 한글 라벨, range 계열·기존 tooltip 보유 파일은 사유 명시 스킵, 헤더 반영 주석·FEATURE §9 참조 추가
 - `2708d14` (08-26) — [연관] **SBChart 속성·기능 정의 문서 신설**(`sbchart/md/SBCHART_OPTIONS.md`, gcc 무변경): 샘플 55종 사용 빈도 실측 + sbchart.js 근거 — 옵션 그룹별 정의·기능 패턴·함정 8건·FEATURE 검증 고급 기능 9종(§9)
+- `d0f21d9` (08-26) — `$c.util` **버튼 상태 일괄 제어 `setButtonState`/`registerButtonState` 추가** (285→287 메서드):
+  - `BTN_STATE_MAP` — 상태를 "활성 역할 목록(enable) 또는 전체(*)+예외(disable)"로 선언, 미정의 역할 기본 비활성이라 **화면별 동적 역할 추가에 안전**. 상태 6종(insert·update·disabled·enabled·error·insertReady)
+  - 화면은 역할→버튼id 매핑만 선언(버튼 id 비통일 대응), 판정 우선순위 override > state.disable > enable > 기본 false, 즉석 상태 객체·`registerButtonState` 등록 확장, 매핑 밖 버튼 미접촉·미존재 버튼/미정의 상태 방어
+  - 회귀 테스트 9건(`test/setButtonState.test.js`)
 - `2c90237` (08-26) — [연관] **SBChart 공시그래프 샘플(SPCHART_NOTICE) 신설**(`sbchart/CANDLESTICK`, gcc 무변경): 캔들+거래량+공시목록 GridView 3단, crosshair 커스텀 동기화(반대편 점선 미러), 공시일 다트형 화살표 SVG 오버레이(scatter combo 는 라이브러리 null 오인 크래시로 미사용), 커스텀 툴팁(상단 OHLC·하단 거래량), `TOOLTIP_TRIGGER`(band/shape) 옵션 — 전 기능 헤드리스(puppeteer) 검증, 미리보기 하네스·데이터·참고 이미지 포함
 
 ---
@@ -242,6 +246,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-08-26 | `d0f21d9` | feat(util): 버튼 상태 일괄 제어 공통함수 setButtonState/registerButtonState 추가 |
 | 2026-08-26 | `2c90237` | feat(sample): SBChart 공시그래프 샘플(SPCHART_NOTICE) 신설 — 캔들+거래량+공시목록 3단 — [연관, gcc 무변경] |
 | 2026-08-26 | `2708d14` | docs(sample): SBChart 자주 쓰는 속성·기능 정의 문서(SBCHART_OPTIONS.md) 신설 — [연관, gcc 무변경] |
 | 2026-08-26 | `c89b556` | feat(sample): sbchart 샘플에 SPCHART.md 3항목(색상·clear·툴팁 포맷) 일반화 적용 — [연관, gcc 무변경] |
