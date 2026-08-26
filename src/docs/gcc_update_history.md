@@ -1,7 +1,7 @@
 # gcc 공통 함수 업데이트 이력
 
 `src/gcc/` 공통 라이브러리(`$c.*`)의 최초 반입(2026-06-08, `92a35bd`) 이후 변경 내역 정리 (최종 갱신 2026-08-26).
-API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-08-25 기준 **11개 모듈 / 284개 공개 메서드**.
+API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-08-26 기준 **11개 모듈 / 285개 공개 메서드**.
 
 > `src/cm/gcc/`는 CM 모듈용 사본으로 일반적 개선만 선별 반영해 왔으나(2026-06-10 병합, 2026-07-22 대규모 동기화로 11파일 체제),
 > **2026-08-18 `26af3d5`에서 사용 중단으로 삭제**되어 `src/gcc/`가 유일한 canonical 라이브러리다.
@@ -15,7 +15,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 |------|-----------|
 | `sbm.xml` (`$c.sbm`) | 중복 제출 가드, `executeDynamic` 간소화 ref/target 문법·gridview 자동 바인딩·`autoFocus`·다중 gridview 바인딩·스피너 오버레이·message 옵션(opt-in), RESTful URL 활성화, 단건 ref(DataMap)→`requestData` 추출, 페이징(`setPagingInfo`) 개선 — `maxRowNum "all"` 전체 행 표시·`rowNumVisble desc` 내림차순 순번, 그리드 DOM `render` 참조 전환 |
 | `data.xml` (`$c.data`) | 공통코드 로딩(`COMMON_CODE_INFO.ACTION` 연동, `setCommonCode` 배열 매핑 → code별 키잉 응답 매핑(`mappingKey` = 응답 조회 key) 개편·응답 언래핑·기본 컬럼 cdVal/cdValNm·조회 URL 이원화(url/paramName 옵션은 추가 후 제거)), JSON 헬퍼 8종, 프로세스 메시지, 콤보 공통코드 세팅(`comboCbDataSet*`) 계열, 업로드/리포트 헬퍼, 엑셀 다운로드 기본 옵션 개선 |
-| `win.xml` (`$c.win`) | 외부망 홈(`goHomeEx`), 프로그램 열기/내비게이션 단순화, `openFormSubmit`, 인쇄(`mainPrint`/`popupPrint`), `success`/`error` 알림, `openExternalPage`, **browserPopup 부모 화면 접근**(`getOpenerScope`/`callOpener`), 히스토리 기록·복원(`pushState`/`changePageState`) 결함 수정 및 `moveUrl`/`setPageFrameSrc` 이동 복원 확장(`restoreData` [목록] 복귀 포함), 프레임 초기화 `reinitialize` |
+| `win.xml` (`$c.win`) | 외부망 홈(`goHomeEx`), 프로그램 열기/내비게이션 단순화, `openFormSubmit`, 인쇄(`mainPrint`/`popupPrint`), `success`/`error` 알림, `openExternalPage`, **browserPopup 부모 화면 접근**(`getOpenerScope`/`callOpener`), 히스토리 기록·복원(`pushState`/`changePageState`) 결함 수정 및 `moveUrl`/`setPageFrameSrc` 이동 복원 확장(`restoreData` [목록] 복귀 포함), 프레임 초기화 `reinitialize`, try/catch 공통 오류 처리기 `handleError` |
 | `util.xml` (`$c.util`) | 쿠키/웹스토리지 헬퍼 13종, 업로드(`onUploadClick`/`getUploadFiles` 등), `setTextLengthCounter`, `checkFileExtension`, 엑셀 다운로드 파일명 개선, `setGridVisibleRowNum`(gridView "all" 동적 적용) |
 | `date.xml` (`$c.date`) | 날짜 포맷 검증(`checkCalendarFormat`/`compareFromToDate`), `getDateInterval` 단위 버그 수정, commonPrototype 의존 제거 |
 | `str.xml` (`$c.str`) | validate 중복 검증기 통합, 목적격 조사(`attachObjectPostposition`), 바이트/포맷 함수 자체 구현 전환 |
@@ -209,6 +209,11 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 - `49efe07` (08-25) — [연관] **sample-front 벤더 JS를 ESLint 대상에서 제외**(`eslint.config.js`, gcc 무변경): SBChart 배포본(sbchart.js 압축본)의 no-undef 에러로 실패하던 Node lint CI 잡 복구
 - `cc7c67c` (08-25) — `$c.data.setCommonCode` **바인딩 블록 죽은 코드 정리**(동작 무변경): 미사용 `mapKey` 선언·낡은 매핑 주석 제거(mappingKey 해석은 `__getCommonCodeData` 로 일원화), 중복 `bodyObj` 조회 제거·`sourceList` 폴백 `[]` 정상화
 - `8cc25d0` (08-26) — `$c.data.setCommonCode` **캐시 히트 시 서버 재조회 생략**: 요청 code 가 모두 `commonCodeList` 캐시에 있으면 `executeDynamic` 호출 생략(배열 code 일부 미보유 시 그룹 재조회, `useLocalCache:false` 는 캐시 삭제 후 재조회) — JSDoc 기술과 실동작 일치화, 캐시 회귀 테스트 2건 신설
+- `a00ab33` (08-26) — `$c.win` **화면 try/catch 공통 오류 처리기 `handleError` 추가** (284→285 메서드):
+  - 예외 분류 규약 — sbm 중복 제출 skip(`ex.skipped`)은 완전 무시, sbm 이 이미 알린 통신 오류(`ex.errorType`)는 로그·수집만(이중 알림 방지), 업무 예외(`ex.bizMessage`)는 해당 문구로 alert, 그 외 시스템 예외는 기본 문구로 error 알림
+  - 옵션 — `message`(공통 메시지 ID 지원)·`notify`("error"|"alert"|"toast"|"none")·`context`(로그 식별자)·`rethrow`·`callback`
+  - `scwin.__reportError` 수집 훅(hidden, 현재 no-op) — 추후 오류 수집 API 신설 시 연동 지점, try/catch 격리로 수집 실패가 화면 흐름을 깨지 않음
+  - 빈 예외 가드는 명시적 null 체크 — `$c.util.isEmpty` 가 열거 키 없는 `Error` 인스턴스를 빈 객체로 오판하는 함정 회피, 회귀 테스트 11건 신설(`test/handleError.test.js`)
 
 ---
 
@@ -216,6 +221,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-08-26 | `a00ab33` | feat(win): 화면 try/catch 공통 오류 처리기 handleError 추가 |
 | 2026-08-26 | `8cc25d0` | feat(data): setCommonCode 캐시 히트 시 서버 재조회 생략 |
 | 2026-08-25 | `cc7c67c` | refactor(data): setCommonCode 바인딩 블록 죽은 코드 정리 |
 | 2026-08-25 | `49efe07` | fix(ci): sample-front 벤더 JS를 ESLint 대상에서 제외 — [연관, gcc 무변경] |
