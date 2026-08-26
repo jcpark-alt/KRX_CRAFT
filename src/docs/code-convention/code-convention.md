@@ -61,6 +61,33 @@ scwin.searchList = async function () {
 - **콜백 스타일 유지 예외**: `submitErrorHandler` 기반 오류 흐름, 의도적 비동기(응답을 기다리지 않는 발사 후 망각),
   기존 변환분(소급 없음)은 콜백 스타일을 유지해도 된다. gridview 스피너·메시지 등 gcc 부가 기능은 훅 기반이라 두 스타일 모두 동작.
 
+## 오류 처리 — 진입점 try/catch + `$c.win.handleError`
+
+예외는 **사용자 액션 진입점(3구역 이벤트 핸들러·`onpageload`)에서만** try/catch 로 받고, catch 는 공통 처리기 한 줄로 통일한다.
+내부 업무 함수(4·5구역)는 예외를 삼키지 말고 위로 전파한다 — **자체 try/catch·빈 catch 금지**.
+
+```javascript
+scwin.btn_save_onclick = async function (e) {
+    try {
+        await scwin.save();
+    } catch (ex) {
+        await $c.win.handleError(ex, { context : "ULDXXX00100.save" });
+    }
+};
+```
+
+- **handleError 분류 규약** (이미 처리된 예외는 조용히 지나가므로 이중 알림이 없다):
+  - `ex.skipped === true` (sbm 중복 제출 skip/abort) → 완전 무시
+  - `ex.errorType` 보유 (sbm 이 이미 사용자에게 알린 통신 오류) → 콘솔 로그·수집만
+  - `ex.bizMessage` 보유 (업무 예외) → 해당 문구로 alert
+  - 그 외 시스템 예외 → 기본 문구("처리 중 오류가 발생했습니다.")로 error 알림
+- **업무 중단 예외**는 `throw { bizMessage : "재고가 부족합니다." };` 표준 형태로 던진다(문구는 공통 메시지 ID 가능).
+  단순 검증 실패는 예외가 아니라 `return false`/조기 return 으로 처리한다.
+- 옵션: `message`(문구/메시지 ID) · `notify`("error" 기본 | "alert" | "toast" | "none") · `context`("화면ID.함수명" 권장) ·
+  `rethrow`(상위 흐름 중단) · `callback`(알림 닫힘 후 콜백 함수명).
+- **금지**: 빈 catch, catch 에서 원시 `alert()`·`console.log` 만 남기고 종료, 통신 오류 재-alert(sbm 이 이미 알림).
+- 오류 수집: `handleError` 가 내부 훅(`__reportError`)을 호출한다 — 현재는 no-op 이며 수집 API 신설 시 gcc 만 수정하면 전 화면에 적용된다.
+
 ## 이벤트-로직 분리 (Thin Event, 권장)
 
 컴포넌트 이벤트 핸들러(3구역)에는 파라미터 수집과 일반 함수 호출만 두고, 비즈니스 로직은 5구역 함수로 분리한다.
