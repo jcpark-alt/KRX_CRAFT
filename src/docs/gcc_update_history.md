@@ -251,6 +251,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
   - SPCHART_NOTICE 적용: `clearChart` 위임 전환 + `onpageunload` 신설 — 화면 이탈+리사이즈 재현 오류 → 수정 후 무오류(헤드리스 3시나리오)
   - **배포 주의**: 배포 환경 gcc(`ext.xml`) 반영 필요 — 실화면 오류는 배포 반영 후 해소
 - `72b0536` (08-27) — `$c.ext` **var 선언 const/let 전환**: 함수 내 var 14곳 → const(재할당 `inst` 만 let), JSDoc `@example` 2곳 포함. 코드 컨벤션 — 이후 신규/수정 코드는 var 미사용(const 기본·재할당 시 let)
+- `d8c0780` (08-27) — [연관] **SPCHART_NOTICE 미리보기 공시목록 총 건수 표시**(`sbchart/CANDLESTICK`, gcc 무변경): 표 상단 우측 "총 N 건" 카운트 — XML `tbx_discls_cnt` 대응, `renderDisclsTable` 에서 세팅
 
 ---
 
@@ -258,6 +259,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-08-27 | `d8c0780` | feat(sample): SPCHART_NOTICE 미리보기에 공시목록 총 건수 표시 추가 — [연관, gcc 무변경] |
 | 2026-08-27 | `72b0536` | refactor(ext): var 선언을 const/let 으로 전환 |
 | 2026-08-27 | `7e50d0b` | fix(ext): SBChart 고아 resize 리스너 정리 체계 — destroyChart 신설 (287→288) |
 | 2026-08-27 | `7f2ab7b` | feat(sample): SPCHART_NOTICE 실무 골격 마크업·총건수·데이터 보강 + 얇은 막대 hit 보정 — [연관, gcc 무변경] |
