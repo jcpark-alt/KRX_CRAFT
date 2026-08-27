@@ -250,6 +250,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
   - `__drawSBChart` 가 render 중 동기 등록되는 resize 리스너를 캡처해 인스턴스와 함께 보관, 재렌더 시 이전 차트 자동 정리(리스너 직접 제거+destroy). 공개 `$c.ext.destroyChart(container)` 신설 — 차트 화면 `onpageunload` 에서 호출
   - SPCHART_NOTICE 적용: `clearChart` 위임 전환 + `onpageunload` 신설 — 화면 이탈+리사이즈 재현 오류 → 수정 후 무오류(헤드리스 3시나리오)
   - **배포 주의**: 배포 환경 gcc(`ext.xml`) 반영 필요 — 실화면 오류는 배포 반영 후 해소
+- `72b0536` (08-27) — `$c.ext` **var 선언 const/let 전환**: 함수 내 var 14곳 → const(재할당 `inst` 만 let), JSDoc `@example` 2곳 포함. 코드 컨벤션 — 이후 신규/수정 코드는 var 미사용(const 기본·재할당 시 let)
 
 ---
 
@@ -257,6 +258,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-08-27 | `72b0536` | refactor(ext): var 선언을 const/let 으로 전환 |
 | 2026-08-27 | `7e50d0b` | fix(ext): SBChart 고아 resize 리스너 정리 체계 — destroyChart 신설 (287→288) |
 | 2026-08-27 | `7f2ab7b` | feat(sample): SPCHART_NOTICE 실무 골격 마크업·총건수·데이터 보강 + 얇은 막대 hit 보정 — [연관, gcc 무변경] |
 | 2026-08-27 | `e520ee5` | fix(sample): SPCHART_NOTICE 리사이즈 시 crosshair·툴팁 복구 + x축 라벨 간격 2 — [연관, gcc 무변경] |
