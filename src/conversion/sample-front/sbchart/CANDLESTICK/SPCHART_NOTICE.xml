@@ -85,6 +85,7 @@ scwin.DATES = [];                     // 인덱스→날짜(yyyymmdd) — x축�
 scwin.ROWS  = [];                     // 조회 원본 행 — 커스텀 툴팁에서 거래량 등 참조
 scwin.__tooltipHit = {};              // TOOLTIP_TRIGGER="shape" 용 hit-test 상태 (차트별 도형 bbox + 마지막 마우스 플롯 좌표)
 scwin.__resizeTimer = null;           // 리사이즈 재적용 디바운스 타이머
+scwin.__onResize = null;              // 리사이즈 핸들러 참조 — onpageunload 에서 제거용
 
 ///////// 2. 초기화 영역 /////////
 
@@ -130,7 +131,8 @@ scwin.init = async function () {
     // 리사이즈 대응 — 라이브러리가 리사이즈 시 svg 를 재생성해 커스텀 오버레이가 사라지고
     // hit-test 좌표 캐시가 구좌표로 남는다(헤드리스 실측). 재렌더는 라이브러리에 맡기고,
     // 라이브러리 재렌더가 끝난 뒤(디바운스) 오버레이·hit-test·동기화만 재적용한다.
-    window.addEventListener("resize", function () {
+    // (핸들러 참조를 보관 — onpageunload 에서 제거해 화면 이탈 후 고아 리스너를 남기지 않는다)
+    scwin.__onResize = function () {
         clearTimeout(scwin.__resizeTimer);
         scwin.__resizeTimer = setTimeout(function () {
             if (!scwin.ROWS.length) { return; }
@@ -139,7 +141,27 @@ scwin.init = async function () {
             scwin.syncCrosshair(chartTop, chartVol, scwin.ROWS); // 미러선·hit-test 재구축 (새 svg 기준)
             scwin.setupCrosshairXLabel(chartTop, chartVol);      // 날짜 라벨 재부착
         }, 250);
-    });
+    };
+    window.addEventListener("resize", scwin.__onResize);
+};
+
+/**
+ * @method
+ * @name scwin.onpageunload
+ * @author WRM
+ * @date 2026. 08. 27
+ * @description 화면 이탈 — 차트 인스턴스 destroy($c.ext.destroyChart, 라이브러리 전역 resize
+ *   리스너 해제)와 화면 resize 리스너 제거. 정리하지 않으면 화면 전환 후 브라우저 리사이즈 시
+ *   라이브러리 resize 핸들러가 제거된 DOM 에 접근해 null.style 오류가 난다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.onpageunload = function () {
+    clearTimeout(scwin.__resizeTimer);
+    if (scwin.__onResize) { window.removeEventListener("resize", scwin.__onResize); }
+    $c.ext.destroyChart(chartTop);
+    $c.ext.destroyChart(chartVol);
 };
 
 
@@ -191,14 +213,15 @@ scwin.selectChartData = async function () {
  * @name scwin.clearChart
  * @author WRM
  * @date 2026. 08. 26
- * @description 차트 컨테이너 정리. 재조회 렌더 전 호출 — 이전 차트 잔존 방지 (SPCHART.md §1-5)
+ * @description 차트 컨테이너 정리. 재조회 렌더 전 호출 — 이전 차트 잔존 방지 (SPCHART.md §1-5).
+ *   $c.ext.destroyChart 위임 — 인스턴스 destroy 로 라이브러리 전역 resize 리스너까지 해제
+ *   (innerHTML 정리만으로는 리스너가 잔존해 리사이즈 시 null.style 오류)
  * @param {Object} comp 차트 컨테이너 그룹 컴포넌트
  * @returns
  * @hidden N
 */
 scwin.clearChart = function (comp) {
-    const el = document.getElementById(comp.getID());
-    if (el) { el.innerHTML = ""; }
+    $c.ext.destroyChart(comp);
 };
 
 /**
@@ -719,7 +742,7 @@ scwin.render = function (data) {
     ]]></script>
 </head>
 
-<body ev:onpageload="scwin.onpageload">
+<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
 	<xf:group class="sub_contents" id="" meta_componentContainer="true" style="">
     	<w2:pageFrame id="pfmContentHeader" src="/cm/xml/contentHeader.xml" style=""></w2:pageFrame>
         <!-- SAMPLE_DESC -->

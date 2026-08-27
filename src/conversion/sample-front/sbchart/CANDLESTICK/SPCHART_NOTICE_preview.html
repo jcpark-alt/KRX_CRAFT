@@ -83,6 +83,7 @@ let TOOLTIP_TRIGGER  = "shape";   // ★ 툴팁 표시 방식 — "shape": 도�
 let DATES = [];
 let ROWS  = [];
 const HIT = {};   // TOOLTIP_TRIGGER="shape" 용 hit-test 상태 (차트별 도형 bbox + 마지막 마우스 플롯 좌표)
+const CHARTS = {};   // 컨테이너 id → 차트 인스턴스 — 재렌더 시 destroy 로 라이브러리 전역 resize 리스너 해제 (고아 리스너의 null.style 오류 방지)
 
 
 ///////// 2. 초기화 영역 /////////
@@ -309,16 +310,36 @@ function noticeTooltip(d) {
 }
 
 // $c.ext.drawChartData 재현 : dataBlock = {type, json, keys, (dataOpts…)} → config.data 결합 → sb.chart.render
+// 이전 인스턴스는 destroy 후 재렌더 — 전역 resize 리스너 잔존(고아 리스너) 방지 (ext.xml 과 동일)
 function drawChartData(type, rows, elId, config) {
     let dataBlock = { type: type, json: rows };
     const opts = {};
     for (let k in config) { if (config.hasOwnProperty(k) && k !== "keys" && k !== "dataOpts") { opts[k] = config[k]; } }
     if (config.keys) { dataBlock.keys = config.keys; }
     if (config.dataOpts) { for (let dk in config.dataOpts) { if (config.dataOpts.hasOwnProperty(dk)) { dataBlock[dk] = config.dataOpts[dk]; } } }
+    if (CHARTS[elId]) {
+        // 캡처해 둔 resize 리스너 직접 제거 — 라이브러리 destroy() 는 이를 해제하지 않음(실측)
+        (CHARTS[elId].resizeFns || []).forEach(function (fn) { window.removeEventListener("resize", fn); });
+        try { CHARTS[elId].inst.destroy(); } catch (ignore) { /* 이미 제거된 DOM 등 — 무시 */ }
+        delete CHARTS[elId];
+    }
     const el = document.getElementById(elId);
     if (el) { el.innerHTML = ""; }
     opts.data = dataBlock;
-    sb.chart.render("#" + elId, opts);
+    // render 중 등록되는 window resize 리스너 캡처 (동기 등록 실측 확인)
+    const captured = [];
+    const origAdd = window.addEventListener;
+    window.addEventListener = function (type, fn) {
+        if (type === "resize") { captured.push(fn); }
+        return origAdd.apply(window, arguments);
+    };
+    let inst;
+    try {
+        inst = sb.chart.render("#" + elId, opts);
+    } finally {
+        window.addEventListener = origAdd;   // 어떤 경우에도 원복
+    }
+    CHARTS[elId] = { inst: inst, resizeFns: captured };
 }
 
 function render(data) {

@@ -15,7 +15,7 @@ xmlns:xf="http://www.w3.org/2002/xforms">
 		</xf:model>
 		<w2:layoutInfo>
 		</w2:layoutInfo>
-		<w2:publicInfo method="scwin.drawChartData,scwin.drawSBChart"/>
+		<w2:publicInfo method="scwin.drawChartData,scwin.drawSBChart,scwin.destroyChart"/>
 		<script lazy="false" type="text/javascript"><![CDATA[
 scwin.onpageload = function () {
 
@@ -76,8 +76,49 @@ scwin.drawSBChart = function (container, raw, config) {
 
 /**
  * @method
+ * @name destroyChart
+ * @description 컨테이너의 차트 인스턴스를 destroy(전역 resize 리스너 해제)하고 컨테이너를 비운다.
+ *              sb.chart.render 는 window resize 리스너를 등록하므로, innerHTML 정리만으로는 리스너가
+ *              잔존해 화면 이탈/재진입 후 브라우저 리사이즈 시 제거된 DOM 접근 오류(null.style)가 난다.
+ *              차트 화면의 onpageunload 에서 호출할 것. (재렌더 시에는 drawChartData 가 자동 destroy)
+ * @param {Object} container  컨테이너(컴포넌트/엘리먼트/id)
+ * @hidden N
+ * @example
+ * scwin.onpageunload = function () { $c.ext.destroyChart(chartTop); };
+ */
+scwin.destroyChart = function (container) {
+    var id = __sbResolveId(container);
+    scwin.__destroyById(id);
+    var el = id ? document.getElementById(id) : null;
+    if (el) { el.innerHTML = ""; }
+};
+
+/**
+ * @method
+ * @name __destroyById
+ * @description 레지스트리의 차트 정리 — 캡처해 둔 전역(window) resize 리스너를 직접 제거하고
+ *              인스턴스 destroy 호출. 라이브러리의 destroy() 는 자신이 등록한 window resize
+ *              리스너를 해제하지 않는 것을 실측으로 확인 — 캡처/직접 제거가 필수.
+ * @hidden Y
+ */
+scwin.__destroyById = function (id) {
+    var reg = id ? scwin.__charts[id] : null;
+    if (!reg) { return; }
+    (reg.resizeFns || []).forEach(function (fn) { window.removeEventListener("resize", fn); });
+    try { reg.inst.destroy(); } catch (ignore) { /* 이미 제거된 DOM 등 — 무시 */ }
+    delete scwin.__charts[id];
+};
+
+// 컨테이너 id → { inst: 차트 인스턴스, resizeFns: 라이브러리가 등록한 resize 리스너 } 레지스트리
+scwin.__charts = {};
+
+/**
+ * @method
  * @name __drawSBChart
- * @description 조회한 데이터를 설정에 결합하여 sb.chart.render 실행 (라이브러리 전역 로드 지연 방어 포함)
+ * @description 조회한 데이터를 설정에 결합하여 sb.chart.render 실행 (라이브러리 전역 로드 지연 방어 포함).
+ *              이전 차트는 정리(__destroyById) 후 재렌더. render 가 동기 등록하는 window resize
+ *              리스너를 캡처해 함께 보관 — 고아 리스너(화면 이탈/재렌더 후 리사이즈 시 제거된
+ *              DOM 에 null.style 접근 오류) 방지.
  * @hidden Y
  */
 scwin.__drawSBChart = function (comp, config, data) {
@@ -86,10 +127,24 @@ scwin.__drawSBChart = function (comp, config, data) {
         return;
     }
     var id = __sbResolveId(comp);                      // 컴포넌트/엘리먼트/문자열 id 모두 허용
+    scwin.__destroyById(id);                           // 이전 차트 정리 — 리스너 해제
     var el = document.getElementById(id);
     if (el) { el.innerHTML = ""; }                     // 재진입 시 이전 SVG 제거
     config.data = data;                                // 조회 데이터 결합 (type 포함)
-    sb.chart.render("#" + id, config);
+    // render 중 등록되는 window resize 리스너 캡처 (동기 등록 실측 확인)
+    var captured = [];
+    var origAdd = window.addEventListener;
+    window.addEventListener = function (type, fn) {
+        if (type === "resize") { captured.push(fn); }
+        return origAdd.apply(window, arguments);
+    };
+    var inst;
+    try {
+        inst = sb.chart.render("#" + id, config);
+    } finally {
+        window.addEventListener = origAdd;             // 어떤 경우에도 원복
+    }
+    scwin.__charts[id] = { inst: inst, resizeFns: captured };
 };
 
 
