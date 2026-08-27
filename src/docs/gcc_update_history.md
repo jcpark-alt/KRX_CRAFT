@@ -245,6 +245,11 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 - `9995fa6` (08-27) — [연관] **SPCHART_NOTICE init/서브미션 분리 + 미리보기 5단계 영역 정리**(`sbchart/CANDLESTICK`, gcc 무변경): XML 호출 흐름을 `onpageload` → `init`(§2 상태 초기화) → `selectChartData`(§4 — executeDynamic 조회+바인딩+렌더+상호작용 초기화, 재조회 재호출 구조)로 분리(ULDSTF init/list 패턴). 미리보기도 동일 5단계 영역 재배치(`window.onload` §2·`loadData` §4), `TOOLTIP_TRIGGER` 주석 기본값 표기 shape 로 정정 — 로직 무변경, 헤드리스·lint 검증
 - `e520ee5` (08-27) — [연관] **SPCHART_NOTICE 리사이즈 시 crosshair·툴팁 복구 + x축 라벨 간격 2**(`sbchart/CANDLESTICK`, gcc 무변경): 리사이즈 시 라이브러리가 svg 를 재생성해 커스텀 오버레이 소실·hit-test 캐시 구좌표 잔존(헤드리스 실측) — 디바운스(250ms) 후 오버레이·hit-test·동기화 재적용(`init` 리스너 등록) + 그리기 함수 정리 가드 5곳으로 해결. x축 날짜 tick 간격 3→2 — 2회 리사이즈 헤드리스 검증
 - `7f2ab7b` (08-27) — [연관] **SPCHART_NOTICE 실무 골격 마크업·총건수·데이터 보강 + 얇은 막대 hit 보정**(`sbchart/CANDLESTICK`, gcc 무변경): body 를 실무 화면 골격(sub_contents+pageFrame·titbox/chartbox/gvwbox)으로 재구성, 공시목록 "총 N건" 카운트(`tbx_discls_cnt`) 신설. `chart_data.json` 보강(chartList 26행·disclsList 26건 — 참고 이미지 밀도). 보강으로 드러난 결함 수정 — 저거래량 막대(~1px) shape 툴팁 hover 불가 → `setupShapeHit` 최소 hit 높이 10px 보정(밑변 고정·위로 확장) — 헤드리스 검증
+- `7e50d0b` (08-27) — `$c.ext` **SBChart 고아 resize 리스너 정리 체계 — `destroyChart` 신설** (287→288 메서드):
+  - 실화면 보고 결함: 브라우저 리사이즈 시 라이브러리 resize 핸들러가 제거된 차트 DOM 접근 → `null.style` 크래시. 원인은 `sb.chart.render` 가 등록하는 window resize 리스너가 해제 불가 — ① `$c.ext` 인스턴스 미보관 ② **라이브러리 `destroy()` 도 리스너 미해제(실측)**
+  - `__drawSBChart` 가 render 중 동기 등록되는 resize 리스너를 캡처해 인스턴스와 함께 보관, 재렌더 시 이전 차트 자동 정리(리스너 직접 제거+destroy). 공개 `$c.ext.destroyChart(container)` 신설 — 차트 화면 `onpageunload` 에서 호출
+  - SPCHART_NOTICE 적용: `clearChart` 위임 전환 + `onpageunload` 신설 — 화면 이탈+리사이즈 재현 오류 → 수정 후 무오류(헤드리스 3시나리오)
+  - **배포 주의**: 배포 환경 gcc(`ext.xml`) 반영 필요 — 실화면 오류는 배포 반영 후 해소
 
 ---
 
@@ -252,6 +257,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-08-27 | `7e50d0b` | fix(ext): SBChart 고아 resize 리스너 정리 체계 — destroyChart 신설 (287→288) |
 | 2026-08-27 | `7f2ab7b` | feat(sample): SPCHART_NOTICE 실무 골격 마크업·총건수·데이터 보강 + 얇은 막대 hit 보정 — [연관, gcc 무변경] |
 | 2026-08-27 | `e520ee5` | fix(sample): SPCHART_NOTICE 리사이즈 시 crosshair·툴팁 복구 + x축 라벨 간격 2 — [연관, gcc 무변경] |
 | 2026-08-27 | `9995fa6` | refactor(sample): SPCHART_NOTICE init/서브미션 분리 + 미리보기 5단계 영역 정리 — [연관, gcc 무변경] |
