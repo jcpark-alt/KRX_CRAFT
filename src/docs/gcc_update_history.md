@@ -243,6 +243,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 - `0340ce1` (08-27) — [연관] **SPCHART_NOTICE crosshair 날짜 라벨·최고/최저가 마커 추가**(`sbchart/CANDLESTICK`, gcc 무변경): crosshair 세로선 하단 MM-DD 날짜 라벨(HTML 오버레이 — 상단 네이티브 세로선·하단 hover 시 상단 미러선 모두), 상단 미러선 길이를 x축 실좌표(plotBottom) 기준으로 보정, 최고가(수치+▼)·최저가(▲+수치) 회색(`#637381`) 마커를 SVG 루트 오버레이(getCTM 변환)로 표시(최저가 캔들이 공시일이면 민트 화살표 아래로 이동) — 헤드리스 검증·미리보기 하네스 동일 반영
 - `be13515` (08-27) — [연관] **SPCHART_NOTICE 표준 골격 재구성 + formatDate 공통함수 전환**(`sbchart/CANDLESTICK`, gcc 무변경): ULDSTF30700 가이드 골격 적용 — 화면 동작/구성/담긴 패턴 헤더 주석, 5단계 코드 영역 주석, `onpageload` 초기화 영역(최상단) 이동, 전 함수 ULDSTF 형식 JSDoc. 로컬 `formatDate` 삭제 → `$c.date.formatDateTime(value, "yyyy-MM-dd")` 공통함수 사용(미리보기는 동일 시그니처 스텁) — 로직 무변경, 헤드리스·lint 검증
 - `9995fa6` (08-27) — [연관] **SPCHART_NOTICE init/서브미션 분리 + 미리보기 5단계 영역 정리**(`sbchart/CANDLESTICK`, gcc 무변경): XML 호출 흐름을 `onpageload` → `init`(§2 상태 초기화) → `selectChartData`(§4 — executeDynamic 조회+바인딩+렌더+상호작용 초기화, 재조회 재호출 구조)로 분리(ULDSTF init/list 패턴). 미리보기도 동일 5단계 영역 재배치(`window.onload` §2·`loadData` §4), `TOOLTIP_TRIGGER` 주석 기본값 표기 shape 로 정정 — 로직 무변경, 헤드리스·lint 검증
+- `e520ee5` (08-27) — [연관] **SPCHART_NOTICE 리사이즈 시 crosshair·툴팁 복구 + x축 라벨 간격 2**(`sbchart/CANDLESTICK`, gcc 무변경): 리사이즈 시 라이브러리가 svg 를 재생성해 커스텀 오버레이 소실·hit-test 캐시 구좌표 잔존(헤드리스 실측) — 디바운스(250ms) 후 오버레이·hit-test·동기화 재적용(`init` 리스너 등록) + 그리기 함수 정리 가드 5곳으로 해결. x축 날짜 tick 간격 3→2 — 2회 리사이즈 헤드리스 검증
 
 ---
 
@@ -250,6 +251,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-08-27 | `e520ee5` | fix(sample): SPCHART_NOTICE 리사이즈 시 crosshair·툴팁 복구 + x축 라벨 간격 2 — [연관, gcc 무변경] |
 | 2026-08-27 | `9995fa6` | refactor(sample): SPCHART_NOTICE init/서브미션 분리 + 미리보기 5단계 영역 정리 — [연관, gcc 무변경] |
 | 2026-08-27 | `be13515` | refactor(sample): SPCHART_NOTICE 표준 골격 재구성 + formatDate 공통함수 전환 — [연관, gcc 무변경] |
 | 2026-08-27 | `0340ce1` | feat(sample): SPCHART_NOTICE crosshair 날짜 라벨·최고/최저가 마커 추가 — [연관, gcc 무변경] |
