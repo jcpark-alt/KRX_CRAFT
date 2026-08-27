@@ -51,17 +51,10 @@
 </div>
 
 <script>
+///////// 1. 변수 및 선언 영역 /////////
+
 // ---- 데이터 : data/chart_data.json 을 fetch 로 조회 (XML 원본과 동일 소스·형식 { body: { chartList, disclsList } }) ----
 const CHART_DATA_URL = "data/chart_data.json";
-
-function loadData() {
-    return fetch(CHART_DATA_URL).then(function (res) {
-        if (!res.ok) { throw new Error("HTTP " + res.status + " — " + CHART_DATA_URL); }
-        return res.json();
-    }).then(function (json) {
-        return (json && json.body) ? json.body : { chartList: [], disclsList: [] };
-    });
-}
 
 // ---- WebSquare 스텁 ($c.num.formatNumber · $c.date.formatDateTime 만 필요) ----
 const $c = {
@@ -85,10 +78,62 @@ const CHART_UP_COLOR   = "#E52528";
 const CHART_DOWN_COLOR = "#1B64DA";
 const NOTICE_COLOR     = "#2AC1BC";   // 민트
 const HIGHLOW_COLOR    = "#637381";   // 최고/최저가 수치·삼각형 마커 색상 (회색)
-let TOOLTIP_TRIGGER  = "shape";   // ★ 툴팁 표시 방식 — "band": 플롯 어디서나 해당 날짜 표시(현재) | "shape": 도형(캔들/막대) 위에서만
+let TOOLTIP_TRIGGER  = "shape";   // ★ 툴팁 표시 방식 — "shape": 도형(캔들/막대) 위에서만(기본) | "band": 플롯 어디서나 해당 날짜 표시
 
 let DATES = [];
 let ROWS  = [];
+const HIT = {};   // TOOLTIP_TRIGGER="shape" 용 hit-test 상태 (차트별 도형 bbox + 마지막 마우스 플롯 좌표)
+
+
+///////// 2. 초기화 영역 /////////
+
+// 진입점 (XML 의 scwin.onpageload 대응) — 데이터 조회 → 공시목록·차트 렌더 → 상호작용 초기화
+window.onload = function () {
+    if (!(window.sb && sb.chart && typeof sb.chart.render === "function")) {
+        showStatus("sbchart 라이브러리가 로드되지 않았습니다. ../sbchart.js 경로와 의존 스크립트(d3 등) 로드 여부를 확인하세요. "
+                 + "(콘솔 오류 참고 — d3 가 외부 의존이면 sbchart.js 앞에 d3 스크립트를 추가)");
+        return;
+    }
+    loadData().then(function (body) {
+        renderDisclsTable(body.disclsList);
+
+        const data = buildChartData(body.chartList, body.disclsList);
+        ROWS = data;
+        DATES = data.map(function (r) { return r.date; });
+        render(data);
+        syncCrosshair("chartTop", "chartVol", data);   // 상/하 차트 crosshair 세로선 동기화
+        setupCrosshairXLabel("chartTop", "chartVol");  // 상단 세로선(네이티브/미러) 하단 날짜 라벨
+        if (data.length < 10) {
+            showStatus("참고: 현재 chart_data.json 의 chartList 는 유효 행 " + data.length + "건이라 캔들이 성깁니다. "
+                     + "참고 이미지 수준의 밀도를 보려면 chartList 데이터 보강이 필요합니다.");
+        }
+    }).catch(function (ex) {
+        showStatus("데이터 조회/렌더 중 오류: " + (ex && ex.message ? ex.message : ex)
+                 + " — file:// 로 직접 열면 fetch 가 차단되니 로컬 HTTP 서버에서 여세요.");
+        if (window.console) { console.error(ex); }
+    });
+};
+
+
+///////// 3. 컴포넌트 이벤트 영역 /////////
+
+// (해당 없음 — 차트 상호작용은 렌더 후 SVG/DOM 리스너로 등록 : syncCrosshair·setupShapeHit·setupCrosshairXLabel)
+
+
+///////// 4. 서브미션 콜백 영역 /////////
+
+// XML 의 $c.sbm.executeDynamic 대체 — fetch 로 차트 데이터 조회
+function loadData() {
+    return fetch(CHART_DATA_URL).then(function (res) {
+        if (!res.ok) { throw new Error("HTTP " + res.status + " — " + CHART_DATA_URL); }
+        return res.json();
+    }).then(function (json) {
+        return (json && json.body) ? json.body : { chartList: [], disclsList: [] };
+    });
+}
+
+
+///////// 5. 일반/업무 함수 영역 /////////
 
 function buildChartData(chartList, disclsList) {
     const noticeDates = {};
@@ -196,9 +241,6 @@ function drawHighLowMarkers(chartElId, data, tryCnt) {
     put(hiIdx, data[hiIdx].high, true);    // 최고가 : 수치 + 바로 아래 ▼
     put(loIdx, data[loIdx].low,  false);   // 최저가 : ▲ + 바로 아래 수치
 }
-
-// ---- TOOLTIP_TRIGGER="shape" 용 hit-test 상태 (차트별 도형 bbox + 마지막 마우스 플롯 좌표) ----
-const HIT = {};
 
 function setupShapeHit(key, svg, shapes) {
     const group = shapes[0].parentNode;
@@ -472,31 +514,6 @@ function showStatus(msg) {
     s.innerHTML = msg;
 }
 
-window.onload = function () {
-    if (!(window.sb && sb.chart && typeof sb.chart.render === "function")) {
-        showStatus("sbchart 라이브러리가 로드되지 않았습니다. ../sbchart.js 경로와 의존 스크립트(d3 등) 로드 여부를 확인하세요. "
-                 + "(콘솔 오류 참고 — d3 가 외부 의존이면 sbchart.js 앞에 d3 스크립트를 추가)");
-        return;
-    }
-    loadData().then(function (body) {
-        renderDisclsTable(body.disclsList);
-
-        const data = buildChartData(body.chartList, body.disclsList);
-        ROWS = data;
-        DATES = data.map(function (r) { return r.date; });
-        render(data);
-        syncCrosshair("chartTop", "chartVol", data);   // 상/하 차트 crosshair 세로선 동기화
-        setupCrosshairXLabel("chartTop", "chartVol");  // 상단 세로선(네이티브/미러) 하단 날짜 라벨
-        if (data.length < 10) {
-            showStatus("참고: 현재 chart_data.json 의 chartList 는 유효 행 " + data.length + "건이라 캔들이 성깁니다. "
-                     + "참고 이미지 수준의 밀도를 보려면 chartList 데이터 보강이 필요합니다.");
-        }
-    }).catch(function (ex) {
-        showStatus("데이터 조회/렌더 중 오류: " + (ex && ex.message ? ex.message : ex)
-                 + " — file:// 로 직접 열면 fetch 가 차단되니 로컬 HTTP 서버에서 여세요.");
-        if (window.console) { console.error(ex); }
-    });
-};
 </script>
 </body>
 </html>

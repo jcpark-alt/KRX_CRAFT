@@ -78,7 +78,7 @@ scwin.CHART_UP_COLOR   = "#E52528";   // 상승 : 빨강
 scwin.CHART_DOWN_COLOR = "#1B64DA";   // 하락 : 파랑
 scwin.NOTICE_COLOR     = "#2AC1BC";   // 공시일 마커 : 민트
 scwin.HIGHLOW_COLOR    = "#637381";   // 최고/최저가 수치·삼각형 마커 색상 (회색)
-scwin.TOOLTIP_TRIGGER  = "shape";      // ★ 툴팁 표시 방식 — "band": 플롯 어디서나 해당 날짜 표시(기본) | "shape": 도형(캔들/막대) 위에서만
+scwin.TOOLTIP_TRIGGER  = "shape";      // ★ 툴팁 표시 방식 — "shape": 도형(캔들/막대) 위에서만(기본) | "band": 플롯 어디서나 해당 날짜 표시
 
 scwin.DATES = [];                     // 인덱스→날짜(yyyymmdd) — x축이 인덱스라 tick/툴팁 환산용
 scwin.ROWS  = [];                     // 조회 원본 행 — 커스텀 툴팁에서 거래량 등 참조
@@ -91,7 +91,7 @@ scwin.__tooltipHit = {};              // TOOLTIP_TRIGGER="shape" 용 hit-test �
  * @name scwin.onpageload
  * @author WRM
  * @date 2026. 08. 26
- * @description 페이지로드 — 차트 데이터 조회 후 공시목록 바인딩, 2단 차트 렌더, crosshair 동기화·날짜 라벨 초기화
+ * @description 페이지로드 — 초기화(init) 후 차트 데이터 조회·렌더(selectChartData)
  * @param
  * @returns
  * @hidden N
@@ -99,25 +99,31 @@ scwin.__tooltipHit = {};              // TOOLTIP_TRIGGER="shape" 용 hit-test �
 scwin.onpageload = async function () {
     // 진입점 표준 오류 처리 — code-convention §오류 처리
     try {
-        // 차트 데이터 조회
-        const res = await $c.sbm.executeDynamic({ id: "sbm_sbchart", action: scwin.CHART_DATA_URL, method: "get", mediatype: "application/json", mode: "asynchronous", isProcessMsg: false });
-        const body = (res.responseJSON && res.responseJSON.body) ? res.responseJSON.body : {};
+        // 초기화 함수
+        await scwin.init();
 
-        // 공시목록 GridView 연동
-        dlt_disclsList.setJSON(body.disclsList || []);
-
-        // 차트 렌더 (공시일 마커는 chartList.gongsi + disclsList.trdDd 매칭으로 판정)
-        const data = scwin.buildChartData(body.chartList, body.disclsList);
-        scwin.ROWS  = data;
-        scwin.DATES = data.map(function (r) { return r.date; });
-        scwin.render(data);
-
-        // 차트 상호작용 초기화
-        scwin.syncCrosshair(chartTop, chartVol, data);   // 상/하 차트 crosshair 세로선 동기화
-        scwin.setupCrosshairXLabel(chartTop, chartVol);  // 상단 세로선(네이티브/미러) 하단 날짜 라벨
+        // 차트 데이터 조회·렌더
+        await scwin.selectChartData();
     } catch (ex) {
         await $c.exception.handleError(ex, { context : "SPCHART_NOTICE.onpageload" });
     }
+};
+
+/**
+ * @method
+ * @name scwin.init
+ * @author WRM
+ * @date 2026. 08. 27
+ * @description 초기화 — 차트 상태 초기화. 이 화면은 조회조건·공통코드가 없어 초기화 대상은 상태 변수뿐
+ *   (차트 컨테이너 정리는 render 진입 시 clearChart 로 수행 — 재조회 경로에서도 항상 정리되도록)
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.init = async function () {
+    // 차트 상태 초기화 (재진입 대비)
+    scwin.ROWS  = [];
+    scwin.DATES = [];
 };
 
 
@@ -128,7 +134,35 @@ scwin.onpageload = async function () {
 
 ///////// 4. 서브미션 콜백 영역 /////////
 
-// (해당 없음 — 조회는 onpageload 에서 $c.sbm.executeDynamic await 로 직접 처리)
+/**
+ * @method
+ * @name scwin.selectChartData
+ * @author WRM
+ * @date 2026. 08. 27
+ * @description 차트 데이터 조회($c.sbm.executeDynamic) 및 후처리 — 공시목록 GridView 바인딩,
+ *   차트 데이터 가공·2단 차트 렌더, crosshair 동기화·날짜 라벨 등 차트 상호작용 초기화
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.selectChartData = async function () {
+    // 차트 데이터 조회
+    const res = await $c.sbm.executeDynamic({ id: "sbm_sbchart", action: scwin.CHART_DATA_URL, method: "get", mediatype: "application/json", mode: "asynchronous", isProcessMsg: false });
+    const body = (res.responseJSON && res.responseJSON.body) ? res.responseJSON.body : {};
+
+    // 공시목록 GridView 연동
+    dlt_disclsList.setJSON(body.disclsList || []);
+
+    // 차트 렌더 (공시일 마커는 chartList.gongsi + disclsList.trdDd 매칭으로 판정)
+    const data = scwin.buildChartData(body.chartList, body.disclsList);
+    scwin.ROWS  = data;
+    scwin.DATES = data.map(function (r) { return r.date; });
+    scwin.render(data);
+
+    // 차트 상호작용 초기화
+    scwin.syncCrosshair(chartTop, chartVol, data);   // 상/하 차트 crosshair 세로선 동기화
+    scwin.setupCrosshairXLabel(chartTop, chartVol);  // 상단 세로선(네이티브/미러) 하단 날짜 라벨
+};
 
 
 ///////// 5. 일반/업무 함수 영역 /////////
