@@ -241,6 +241,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 - `ef9628d` (08-26) — [연관] **버튼 상태 제어 가이드 샘플 `SMPBTN10000` 신설**(`src/conversion/sample-front`, gcc 무변경): `setButtonState` 전체 옵션 시연(표준 상태 6종·override·registerButtonState·즉석 상태·동적 역할), 버튼 id 비통일 대응 데모, 샘플 카탈로그 13번째 등록 + 개수 표기 13종 동기화
 - `2c90237` (08-26) — [연관] **SBChart 공시그래프 샘플(SPCHART_NOTICE) 신설**(`sbchart/CANDLESTICK`, gcc 무변경): 캔들+거래량+공시목록 GridView 3단, crosshair 커스텀 동기화(반대편 점선 미러), 공시일 다트형 화살표 SVG 오버레이(scatter combo 는 라이브러리 null 오인 크래시로 미사용), 커스텀 툴팁(상단 OHLC·하단 거래량), `TOOLTIP_TRIGGER`(band/shape) 옵션 — 전 기능 헤드리스(puppeteer) 검증, 미리보기 하네스·데이터·참고 이미지 포함
 - `0340ce1` (08-27) — [연관] **SPCHART_NOTICE crosshair 날짜 라벨·최고/최저가 마커 추가**(`sbchart/CANDLESTICK`, gcc 무변경): crosshair 세로선 하단 MM-DD 날짜 라벨(HTML 오버레이 — 상단 네이티브 세로선·하단 hover 시 상단 미러선 모두), 상단 미러선 길이를 x축 실좌표(plotBottom) 기준으로 보정, 최고가(수치+▼)·최저가(▲+수치) 회색(`#637381`) 마커를 SVG 루트 오버레이(getCTM 변환)로 표시(최저가 캔들이 공시일이면 민트 화살표 아래로 이동) — 헤드리스 검증·미리보기 하네스 동일 반영
+- `be13515` (08-27) — [연관] **SPCHART_NOTICE 표준 골격 재구성 + formatDate 공통함수 전환**(`sbchart/CANDLESTICK`, gcc 무변경): ULDSTF30700 가이드 골격 적용 — 화면 동작/구성/담긴 패턴 헤더 주석, 5단계 코드 영역 주석, `onpageload` 초기화 영역(최상단) 이동, 전 함수 ULDSTF 형식 JSDoc. 로컬 `formatDate` 삭제 → `$c.date.formatDateTime(value, "yyyy-MM-dd")` 공통함수 사용(미리보기는 동일 시그니처 스텁) — 로직 무변경, 헤드리스·lint 검증
 
 ---
 
@@ -248,6 +249,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-08-27 | `be13515` | refactor(sample): SPCHART_NOTICE 표준 골격 재구성 + formatDate 공통함수 전환 — [연관, gcc 무변경] |
 | 2026-08-27 | `0340ce1` | feat(sample): SPCHART_NOTICE crosshair 날짜 라벨·최고/최저가 마커 추가 — [연관, gcc 무변경] |
 | 2026-08-26 | `ef9628d` | feat(sample): 버튼 상태 제어 가이드 샘플 SMPBTN10000 신설 (setButtonState 전체 옵션) — [연관, gcc 무변경] |
 | 2026-08-26 | `d0f21d9` | feat(util): 버튼 상태 일괄 제어 공통함수 setButtonState/registerButtonState 추가 |
