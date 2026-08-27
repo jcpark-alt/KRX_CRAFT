@@ -60,6 +60,7 @@
  * - 렌더 후 SVG 오버레이 — 공시 화살표·최고/최저가 마커 (getBBox·getCTM 좌표 변환)
  * - crosshair 커스텀 동기화 — 반대편 점선 미러 (getScreenCTM 역변환) + HTML 오버레이 날짜 라벨
  * - 커스텀 툴팁 (tooltip.custom) + 도형 hit-test 트리거 옵션 (TOOLTIP_TRIGGER)
+ * - 리사이즈 대응 — 라이브러리의 svg 재생성 후 오버레이·hit-test·동기화 디바운스 재적용
  * - 진입점 try/catch 오류 처리 ($c.exception.handleError)
  *
  * 참고 문서
@@ -83,6 +84,7 @@ scwin.TOOLTIP_TRIGGER  = "shape";      // ★ 툴팁 표시 방식 — "shape": 
 scwin.DATES = [];                     // 인덱스→날짜(yyyymmdd) — x축이 인덱스라 tick/툴팁 환산용
 scwin.ROWS  = [];                     // 조회 원본 행 — 커스텀 툴팁에서 거래량 등 참조
 scwin.__tooltipHit = {};              // TOOLTIP_TRIGGER="shape" 용 hit-test 상태 (차트별 도형 bbox + 마지막 마우스 플롯 좌표)
+scwin.__resizeTimer = null;           // 리사이즈 재적용 디바운스 타이머
 
 ///////// 2. 초기화 영역 /////////
 
@@ -114,7 +116,7 @@ scwin.onpageload = async function () {
  * @name scwin.init
  * @author WRM
  * @date 2026. 08. 27
- * @description 초기화 — 차트 상태 초기화. 이 화면은 조회조건·공통코드가 없어 초기화 대상은 상태 변수뿐
+ * @description 초기화 — 차트 상태 초기화 + 리사이즈 대응 리스너 등록
  *   (차트 컨테이너 정리는 render 진입 시 clearChart 로 수행 — 재조회 경로에서도 항상 정리되도록)
  * @param
  * @returns
@@ -124,6 +126,20 @@ scwin.init = async function () {
     // 차트 상태 초기화 (재진입 대비)
     scwin.ROWS  = [];
     scwin.DATES = [];
+
+    // 리사이즈 대응 — 라이브러리가 리사이즈 시 svg 를 재생성해 커스텀 오버레이가 사라지고
+    // hit-test 좌표 캐시가 구좌표로 남는다(헤드리스 실측). 재렌더는 라이브러리에 맡기고,
+    // 라이브러리 재렌더가 끝난 뒤(디바운스) 오버레이·hit-test·동기화만 재적용한다.
+    window.addEventListener("resize", function () {
+        clearTimeout(scwin.__resizeTimer);
+        scwin.__resizeTimer = setTimeout(function () {
+            if (!scwin.ROWS.length) { return; }
+            scwin.drawNoticeArrows(chartTop, scwin.ROWS);        // 공시일 ▲ 재적용
+            scwin.drawHighLowMarkers(chartTop, scwin.ROWS);      // 최고/최저가 마커 재적용
+            scwin.syncCrosshair(chartTop, chartVol, scwin.ROWS); // 미러선·hit-test 재구축 (새 svg 기준)
+            scwin.setupCrosshairXLabel(chartTop, chartVol);      // 날짜 라벨 재부착
+        }, 250);
+    });
 };
 
 
@@ -256,6 +272,7 @@ scwin.drawNoticeArrows = function (comp, data, tryCnt) {
         if ((tryCnt || 0) < 10) { setTimeout(function () { scwin.drawNoticeArrows(comp, data, (tryCnt || 0) + 1); }, 100); }
         return;
     }
+    svg.querySelectorAll("path.notice-arrow").forEach(function (el) { el.remove(); });   // 재적용(리사이즈) 대비 정리
     data.forEach(function (r, i) {
         if (!r.isNotice) { return; }
         const b = candles[i].getBBox();
@@ -267,6 +284,7 @@ scwin.drawNoticeArrows = function (comp, data, tryCnt) {
                           + " L " + (cx + 6) + " " + (top + 11)
                           + " Q " + cx + " " + (top + 5) + " " + (cx - 6) + " " + (top + 11)
                           + " Z");
+        p.setAttribute("class", "notice-arrow");
         p.setAttribute("fill", scwin.NOTICE_COLOR);
         p.setAttribute("pointer-events", "none");   // 차트 마우스 이벤트 방해 금지
         candles[i].parentNode.appendChild(p);   // 같은 그룹에 추가해 transform 승계
@@ -301,6 +319,8 @@ scwin.drawHighLowMarkers = function (comp, data, tryCnt) {
         if (r.high > data[hiIdx].high) { hiIdx = i; }
         if (r.low  < data[loIdx].low)  { loIdx = i; }
     });
+    const oldLayer = svg.querySelector("g.notice-highlow");
+    if (oldLayer) { oldLayer.remove(); }   // 재적용(리사이즈) 대비 정리
     const group = candles[0].parentNode;
     const toRoot = function (x, y) {   // 시리즈 그룹 좌표 → svg 루트 좌표
         const pt = svg.createSVGPoint();
@@ -467,6 +487,8 @@ scwin.syncCrosshair = function (compA, compB, data, tryCnt) {
     };
 
     const makeLine = function (info) {
+        const prev = info.svg.querySelector(".notice-mirror-line");
+        if (prev) { prev.remove(); }   // 재적용(리사이즈) 대비 정리
         const ln = document.createElementNS("http://www.w3.org/2000/svg", "line");
         ln.setAttribute("class", "notice-mirror-line");   // 하단 hover 시 날짜 라벨 기준선으로도 사용
         ln.setAttribute("y1", 0);
@@ -485,9 +507,12 @@ scwin.syncCrosshair = function (compA, compB, data, tryCnt) {
     // shape 모드 hit-test 준비 + 빈 툴팁 잔상 제거(:empty — width/box-shadow 기본값 때문에 필요)
     scwin.setupShapeHit("top", A.svg, A.shapes);
     scwin.setupShapeHit("vol", B.svg, B.shapes);
-    const styleEl = document.createElement("style");
-    styleEl.textContent = "#" + compA.getID() + " .sbchart-tooltip:empty, #" + compB.getID() + " .sbchart-tooltip:empty { display: none !important; }";
-    document.head.appendChild(styleEl);
+    if (!document.getElementById("notice-tooltip-empty-fix")) {   // 재적용(리사이즈) 시 중복 방지
+        const styleEl = document.createElement("style");
+        styleEl.id = "notice-tooltip-empty-fix";
+        styleEl.textContent = "#" + compA.getID() + " .sbchart-tooltip:empty, #" + compB.getID() + " .sbchart-tooltip:empty { display: none !important; }";
+        document.head.appendChild(styleEl);
+    }
 
     const mouseToPlotX = function (src, e) {
         // 마우스 clientX → 시리즈 그룹 좌표계 x (마진/transform 자동 반영)
@@ -564,6 +589,8 @@ scwin.setupCrosshairXLabel = function (comp, compB, tryCnt) {
     }
     if (getComputedStyle(box).position === "static") { box.style.position = "relative"; }   // 오버레이 기준 좌표
 
+    const prevLbl = box.querySelector(".notice-crosshair-xvalue");
+    if (prevLbl) { prevLbl.remove(); }   // 재적용(리사이즈) 대비 정리
     const lbl = document.createElement("div");
     lbl.className = "notice-crosshair-xvalue";
     lbl.style.cssText = "position:absolute;display:none;background:#C0C0C0;color:#fff;font-size:10px;"
@@ -640,7 +667,7 @@ scwin.render = function (data) {
             y: { width: scwin.CHART_Y_WIDTH }, // 하단 차트와 플롯 정렬
             x: { tick: { format: function (v) {
                 const d = scwin.DATES[v];
-                return (d && v % 3 === 0) ? d.slice(4, 6) + "-" + d.slice(6) : "";   // MM-DD, 과밀 방지
+                return (d && v % 2 === 0) ? d.slice(4, 6) + "-" + d.slice(6) : "";   // MM-DD, 과밀 방지
             } } }
         },
         extend: {
