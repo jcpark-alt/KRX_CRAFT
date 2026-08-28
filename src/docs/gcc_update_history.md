@@ -252,6 +252,11 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
   - **배포 주의**: 배포 환경 gcc(`ext.xml`) 반영 필요 — 실화면 오류는 배포 반영 후 해소
 - `72b0536` (08-27) — `$c.ext` **var 선언 const/let 전환**: 함수 내 var 14곳 → const(재할당 `inst` 만 let), JSDoc `@example` 2곳 포함. 코드 컨벤션 — 이후 신규/수정 코드는 var 미사용(const 기본·재할당 시 let)
 - `d8c0780` (08-27) — [연관] **SPCHART_NOTICE 미리보기 공시목록 총 건수 표시**(`sbchart/CANDLESTICK`, gcc 무변경): 표 상단 우측 "총 N 건" 카운트 — XML `tbx_discls_cnt` 대응, `renderDisclsTable` 에서 세팅
+- `ad4228c` (08-28) — `$c.validate` **검증 모듈 명세 v3 반영 — focus/compare/matchValue 등 7항목** (명세 원본 `WebSquare6_Validation_Module_Specification-v3.md` 동봉):
+  - 신규 옵션: 필드 `focus`(실패 시 지정 컴포넌트 포커스 — 분리 입력 대응) · `message`(required 문구 재정의) · `compare`(두 컴포넌트 값 비교 EQUAL/NOT_EQUAL) · `matchValue`(특정 값 확인 — 미입력도 실패) · `maxLengthB` 객체형(`korEng` — "한글 N자 영문 M자" 문구, **한글 3byte 환산**)
+  - byte 계산을 UTF-8 기준(한글 3byte) 자체 헬퍼로 통일(기존 `getByteLength` 는 한글 2byte), required 문구 선택형/입력형 자동 분기, checked "동의 해주세요" 문구, allowChar 조합별 세부 문구 5종
+  - 구조 개선: 폼/그리드 규칙별 중복 보일러플레이트 → 공통 `fail()` 통합(~360줄 축소), 그리드 required 마킹 실패 셀 `setCellClass` 통일
+  - 테스트 115건(신규 7건) · SMPVAL10000 샘플·validate-generator 신규 규칙 동기화
 
 ---
 
@@ -259,6 +264,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-08-28 | `ad4228c` | feat(validate): 검증 모듈 명세 v3 반영 — focus/compare/matchValue 등 7항목 |
 | 2026-08-27 | `d8c0780` | feat(sample): SPCHART_NOTICE 미리보기에 공시목록 총 건수 표시 추가 — [연관, gcc 무변경] |
 | 2026-08-27 | `72b0536` | refactor(ext): var 선언을 const/let 으로 전환 |
 | 2026-08-27 | `7e50d0b` | fix(ext): SBChart 고아 resize 리스너 정리 체계 — destroyChart 신설 (287→288) |
