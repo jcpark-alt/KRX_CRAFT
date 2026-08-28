@@ -52,6 +52,7 @@ th{background:var(--code-bg);color:var(--h-mid);font-size:11px;position:sticky;t
 td input[type=text],td input[type=number],td select{padding:5px 7px;font-size:12px;min-width:64px}
 td .w-name{min-width:110px} td .w-char{min-width:88px}
 .fid{font-family:Consolas,'D2Coding',monospace;color:var(--primary);font-weight:700}
+.fcomp{font-family:Consolas,'D2Coding',monospace;color:var(--muted,#6b7684);white-space:nowrap}
 .adv{display:none}
 table.show-adv .adv{display:table-cell}
 .meta{font-size:11px;color:var(--hint);margin:6px 0 10px}
@@ -156,7 +157,7 @@ fromNum/toNum: 최소/최대 입력 숫자   checked : 체크박스 필수 체�
         <table id="fieldTbl">
           <thead>
             <tr>
-              <th>ID</th><th>name(라벨)</th><th>required</th><th>allowChar</th><th>ignoreChar</th>
+              <th>ID</th><th>컴포넌트 ID</th><th>name(라벨)</th><th>required</th><th>allowChar</th><th>ignoreChar</th>
               <th>minLen</th><th>maxLen</th><th>num</th><th>format</th><th>fromNum</th><th>toNum</th>
               <th class="adv">checked</th><th class="adv">fixLen</th><th class="adv">minLenB</th><th class="adv">maxLenB</th><th class="adv">maxLenF</th>
               <th class="adv">emptyIf</th><th class="adv">requiredIf</th><th class="adv">duplicate</th><th class="adv">dupGroup</th>
@@ -331,7 +332,13 @@ if (typeof module !== "undefined" && module.exports) { module.exports = VG; }
         parsed = VG.parse(xml);
         targets = [];
         parsed.dataMaps.forEach(function (d) {
-            targets.push({ label: "dataMap : " + d.id + " (key " + d.keys.length + "개)", targetId: d.id, fields: d.keys });
+            // 각 key 에 바인딩된 입력 컴포넌트 ID(ref="data:dmaX.key")를 매핑 — 테이블 "컴포넌트 ID" 열 표기용
+            var fields = d.keys.map(function (k) {
+                var comps = parsed.refComps.filter(function (c) { return c.ref === d.id + "." + k.id; })
+                                           .map(function (c) { return c.id; });
+                return { id: k.id, name: k.name, comp: comps.join(", ") };
+            });
+            targets.push({ label: "dataMap : " + d.id + " (key " + d.keys.length + "개)", targetId: d.id, fields: fields });
         });
         parsed.gridViews.forEach(function (g) {
             var dl = null;
@@ -341,8 +348,12 @@ if (typeof module !== "undefined" && module.exports) { module.exports = VG; }
                            targetId: g.id, fields: dl.cols, needId: !g.id });
         });
         if (parsed.refComps.length) {
+            // 이 대상은 필드 key 자체가 컴포넌트 ID — "컴포넌트 ID" 열에는 바인딩 정보(ref)를 표기
+            var refFields = parsed.refComps.map(function (c) {
+                return { id: c.id, name: c.name, comp: c.ref || "" };
+            });
             targets.push({ label: "ref 컴포넌트 그룹 (" + parsed.refComps.length + "개) — 컨테이너 id 직접 입력",
-                           targetId: "", fields: parsed.refComps, custom: true });
+                           targetId: "", fields: refFields, custom: true });
         }
         if (!targets.length) {
             toast("추출된 dataMap/gridView/ref 컴포넌트가 없습니다", true);
@@ -380,6 +391,7 @@ if (typeof module !== "undefined" && module.exports) { module.exports = VG; }
             var tr = document.createElement("tr");
             tr.innerHTML =
                 '<td class="fid">' + f.id + '</td>' +
+                '<td class="fcomp">' + (f.comp || "-") + '</td>' +
                 '<td><input type="text" class="w-name" data-k="name" value="' + (f.name || "").replace(/"/g, "&quot;") + '"></td>' +
                 '<td style="text-align:center"><input type="checkbox" data-k="required"></td>' +
                 '<td><input type="text" class="w-char" data-k="allowChar" list="vgAllow"></td>' +
