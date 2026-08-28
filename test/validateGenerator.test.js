@@ -96,6 +96,15 @@ describe("VG.buildCode — options 코드 생성", () => {
     expect(code).toContain("validateDataCollect(/* TODO: 검증 대상 id */, options)");
   });
 
+  test("includeUnbound true 시 출력 (기본 false 는 미출력)", () => {
+    const on = VG.buildCode({ validateType: "alert", checkType: "single", focus: true, editMode: true, includeUnbound: true },
+      [{ id: "ipt_telNo1", rules: { required: true, name: "대표전화" } }], "grp_content");
+    expect(on).toContain("includeUnbound : true");
+
+    const off = VG.buildCode(common, [{ id: "a", rules: { required: true } }], "grp_form");
+    expect(off).not.toContain("includeUnbound");
+  });
+
   test('식별자가 아닌 필드 키·따옴표 포함 값은 안전하게 인용', () => {
     const code = VG.buildCode(common, [
       { id: "COL-1", rules: { format: "email", name: '별칭"테스트"' } },

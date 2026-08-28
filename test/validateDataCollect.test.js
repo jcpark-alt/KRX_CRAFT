@@ -243,6 +243,42 @@ describe("validateDataCollect (src/gcc/validate.xml)", () => {
     expect(h.state.alerts.join("")).toContain("중복된 값");
   });
 
+  // ==== includeUnbound — DataCollection 미바인딩 컴포넌트 처리 ====
+
+  test("미바인딩 컴포넌트는 기본(includeUnbound 미지정) 건너뜀 — 규칙이 있어도 통과", async () => {
+    const h = loadHarness();
+    const comp = makeComp("ipt_telNo1", "");
+    h.state.comps.ipt_telNo1 = comp;
+    h.scwin.getChildrenComponent = () => [comp];
+    h.scwin.getDataCollection = () => null;   // 미바인딩 — getDataCollection 이 빈 값 반환
+    expect(await h.scwin.validateDataCollect(container, {
+      ...OPTS, fields: { ipt_telNo1: { required: true, name: "대표전화" } },
+    })).toBe(true);   // 하위호환: 조용히 skip (console.info 로만 알림)
+  });
+
+  test("includeUnbound:true — 미바인딩 컴포넌트도 컴포넌트 ID 규칙으로 검증(name 미지정 시 ID 표시)", async () => {
+    const h = loadHarness();
+    const comp = makeComp("ipt_telNo1", "");
+    h.state.comps.ipt_telNo1 = comp;
+    h.scwin.getChildrenComponent = () => [comp];
+    h.scwin.getDataCollection = () => null;
+    expect(await h.scwin.validateDataCollect(container, {
+      ...OPTS, includeUnbound: true,
+      fields: { ipt_telNo1: { required: true, name: "대표전화" } },
+    })).toBe(false);
+    expect(h.state.alerts.join("")).toContain("대표전화은(는) 입력하세요");
+
+    // name 미지정 — 컴포넌트 ID 로 표시명 폴백
+    const h2 = loadHarness();
+    const comp2 = makeComp("ipt_x1", "");
+    h2.scwin.getChildrenComponent = () => [comp2];
+    h2.scwin.getDataCollection = () => null;
+    expect(await h2.scwin.validateDataCollect(container, {
+      ...OPTS, includeUnbound: true, fields: { ipt_x1: { required: true } },
+    })).toBe(false);
+    expect(h2.state.alerts.join("")).toContain("ipt_x1은(는)");
+  });
+
   // ==== 명세 v3 신규 기능 (WebSquare6_Validation_Module_Specification-v3.md) ====
 
   test("§3 required 문구 유형 분기 — 선택형은 '선택하세요', 입력형은 '입력하세요'", async () => {
@@ -322,6 +358,44 @@ describe("validateDataCollect (src/gcc/validate.xml)", () => {
       ...OPTS, fields: { ipb_corpNm: { maxLengthB: { value: 18, msgType: "korEng" }, name: "발행기관명" } },
     })).toBe(false);
     expect(h2.state.alerts.join("")).toContain("한글 6자 영문 18자");
+  });
+
+  test("composition — 프리셋 engNum: 조합 위반 실패, 충족 통과, 빈 값 통과", async () => {
+    const rule = { composition: "engNum", name: "아이디" };
+    const h = loadHarness();
+    mockFormPath(h, [{ comp: makeComp("ipt_id", "abcdef"), columnId: "ID", columnName: "아이디" }]);
+    expect(await h.scwin.validateDataCollect(container, { ...OPTS, fields: { ipt_id: rule } })).toBe(false);
+    expect(h.state.alerts.join("")).toContain("아이디은(는) 영문+숫자 조합으로 입력해주세요");
+
+    const h2 = loadHarness();
+    mockFormPath(h2, [{ comp: makeComp("ipt_id", "abc123"), columnId: "ID", columnName: "아이디" }]);
+    expect(await h2.scwin.validateDataCollect(container, { ...OPTS, fields: { ipt_id: rule } })).toBe(true);
+
+    const h3 = loadHarness();
+    mockFormPath(h3, [{ comp: makeComp("ipt_id", ""), columnId: "ID", columnName: "아이디" }]);
+    expect(await h3.scwin.validateDataCollect(container, { ...OPTS, fields: { ipt_id: rule } })).toBe(true);   // 빈 값 통과(required 소관)
+  });
+
+  test("composition — 객체형 message 재정의·배열형 토큰(special 포함)", async () => {
+    const h = loadHarness();
+    mockFormPath(h, [{ comp: makeComp("ipt_id", "123456"), columnId: "ID", columnName: "아이디" }]);
+    expect(await h.scwin.validateDataCollect(container, {
+      ...OPTS, fields: { ipt_id: { composition: { value: "engNum", message: "아이디는 영문+숫자의 조합이어야 합니다." }, name: "아이디" } },
+    })).toBe(false);
+    expect(h.state.alerts.join("")).toContain("아이디는 영문+숫자의 조합이어야 합니다.");
+
+    const h2 = loadHarness();
+    mockFormPath(h2, [{ comp: makeComp("ipt_pwd", "abc123"), columnId: "PWD", columnName: "비밀번호" }]);
+    expect(await h2.scwin.validateDataCollect(container, {
+      ...OPTS, fields: { ipt_pwd: { composition: ["eng", "num", "special"], name: "비밀번호" } },
+    })).toBe(false);   // 특수문자 미포함
+    expect(h2.state.alerts.join("")).toContain("영문+숫자+특수문자 조합");
+
+    const h3 = loadHarness();
+    mockFormPath(h3, [{ comp: makeComp("ipt_pwd", "abc123!"), columnId: "PWD", columnName: "비밀번호" }]);
+    expect(await h3.scwin.validateDataCollect(container, {
+      ...OPTS, fields: { ipt_pwd: { composition: ["eng", "num", "special"], name: "비밀번호" } },
+    })).toBe(true);
   });
 
   test("§7 allowChar 조합별 세부 문구 — 숫자만/영문+숫자", async () => {

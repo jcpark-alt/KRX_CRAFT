@@ -117,6 +117,7 @@ details pre{background:var(--code-bg);border-radius:8px;padding:10px;font-size:1
           <div class="chk">
             <label><input type="checkbox" id="optFocus" checked>focus (실패 항목 포커스)</label>
             <label><input type="checkbox" id="optEdit" checked>editMode</label>
+            <label><input type="checkbox" id="optUnbound">includeUnbound (미바인딩 컴포넌트 포함)</label>
             <label><input type="checkbox" id="optAdv" checked>고급 규칙 열 표시</label>
           </div>
           <div class="hint">focus/editMode 는 기본값(true)과 다를 때만 코드에 출력됩니다.</div>
@@ -137,8 +138,11 @@ fromNum/toNum: 최소/최대 입력 숫자   checked : 체크박스 필수 체�
 [고급·명세v3] compare : 두 컴포넌트 값 비교 — { compareTarget : "id", compareType : "EQUAL"|"NOT_EQUAL", message : "..." }
 [고급·명세v3] matchValue : 특정 값 확인(미입력도 실패) — { value : "Y", message : "..." } · focus : 실패 시 포커스 이동 컴포넌트 ID
 [고급·명세v3] message : required 실패 문구 재정의 · maxLengthB 객체형 { value : 80, msgType : "korEng" } — "한글 N자 영문 M자" 문구
+[고급] composition : 문자 클래스 조합 필수(각 1자 이상) — "engNum"·"engNumSpecial"·["eng","num",...] · 객체형 {value,message}
+       (allowChar 는 허용 외 문자 금지, composition 은 포함 강제 — 아이디/비밀번호류에 병행 사용)
 ※ required·checked 외 규칙은 빈 값을 통과시킴(필수 항목은 required 병행 지정. matchValue 는 빈 값도 실패)
 ※ byte 길이(min/maxLengthB)는 UTF-8 기준(한글 3byte) 계산 · required 문구는 선택형/입력형 자동 분기
+※ includeUnbound : DataCollection 미바인딩 컴포넌트(분리 입력 칸 등)도 컴포넌트 ID 규칙으로 검증(기본 제외·name 지정 권장)
 ※ gridView 는 입력 허용문자/자릿수 등을 Column 속성으로도 설정 가능 — 본 도구의 options 와 병행 시 중복 주의</pre>
       </details>
     </section>
@@ -161,7 +165,7 @@ fromNum/toNum: 최소/최대 입력 숫자   checked : 체크박스 필수 체�
               <th>minLen</th><th>maxLen</th><th>num</th><th>format</th><th>fromNum</th><th>toNum</th>
               <th class="adv">checked</th><th class="adv">fixLen</th><th class="adv">minLenB</th><th class="adv">maxLenB</th><th class="adv">maxLenF</th>
               <th class="adv">emptyIf</th><th class="adv">requiredIf</th><th class="adv">duplicate</th><th class="adv">dupGroup</th>
-              <th class="adv">compare</th><th class="adv">matchValue</th><th class="adv">focus</th><th class="adv">message</th>
+              <th class="adv">composition</th><th class="adv">compare</th><th class="adv">matchValue</th><th class="adv">focus</th><th class="adv">message</th>
             </tr>
           </thead>
           <tbody id="fieldRows"></tbody>
@@ -249,7 +253,7 @@ var VG = (function () {
     var RULE_ORDER = ["required", "checked", "allowChar", "ignoreChar", "minLength", "maxLength", "num", "format",
                       "fromNum", "toNum", "fixLength", "minLengthB", "maxLengthB", "maxLengthF",
                       "emptyIf", "requiredIf", "duplicate", "duplicateGroup",
-                      "compare", "matchValue", "focus", "message", "name"];
+                      "composition", "compare", "matchValue", "focus", "message", "name"];
     var STR_RULES = { allowChar: 1, ignoreChar: 1, num: 1, format: 1, duplicateGroup: 1, focus: 1, message: 1, name: 1 };
     var BOOL_RULES = { required: 1, checked: 1, duplicate: 1 };            // 체크 시 true 로 출력
     var RAW_RULES = { emptyIf: 1, requiredIf: 1, compare: 1, matchValue: 1 };   // 조건 객체 리터럴 원문 그대로 출력
@@ -260,7 +264,7 @@ var VG = (function () {
         if (BOOL_RULES[key]) { return "true"; }
         if (RAW_RULES[key]) { return String(v).trim(); }
         var sv = String(v).trim();
-        if (!STR_RULES[key] && sv.charAt(0) === "{") { return sv; }   // 객체 리터럴 원문 (maxLengthB korEng 등)
+        if (!STR_RULES[key] && (sv.charAt(0) === "{" || sv.charAt(0) === "[")) { return sv; }   // 객체/배열 리터럴 원문 (maxLengthB korEng·composition 배열 등)
         if (STR_RULES[key]) { return jsStr(v); }
         return NUM_RE.test(sv) ? sv : jsStr(v);
     }
@@ -271,6 +275,7 @@ var VG = (function () {
         lines.push('    checkType : ' + jsStr(common.checkType) + ', // single|multi');
         if (common.focus === false) { lines.push("    focus : false,"); }
         if (common.editMode === false) { lines.push("    editMode : false,"); }
+        if (common.includeUnbound === true) { lines.push("    includeUnbound : true, // DataCollection 미바인딩 컴포넌트 포함"); }
         lines.push("    fields : {");
 
         var frows = fields.map(function (f) {
@@ -415,6 +420,8 @@ if (typeof module !== "undefined" && module.exports) { module.exports = VG; }
                     'placeholder="{ compID : &quot;ipb_chgNm2&quot;, notEmpty : true }"></td>' +
                 '<td class="adv" style="text-align:center"><input type="checkbox" data-k="duplicate"></td>' +
                 '<td class="adv"><input type="text" data-k="duplicateGroup" placeholder="settleMonth"></td>' +
+                '<td class="adv"><input type="text" data-k="composition" style="min-width:120px" ' +
+                    'placeholder="engNum 또는 { value : &quot;engNum&quot;, message : &quot;...&quot; }"></td>' +
                 '<td class="adv"><input type="text" data-k="compare" style="min-width:200px" ' +
                     'placeholder="{ compareTarget : &quot;acntClsMm2&quot;, compareType : &quot;NOT_EQUAL&quot; }"></td>' +
                 '<td class="adv"><input type="text" data-k="matchValue" style="min-width:180px" ' +
@@ -451,7 +458,8 @@ if (typeof module !== "undefined" && module.exports) { module.exports = VG; }
             validateType: document.querySelector('input[name=vType]:checked').value,
             checkType: document.querySelector('input[name=cType]:checked').value,
             focus: $("optFocus").checked,
-            editMode: $("optEdit").checked
+            editMode: $("optEdit").checked,
+            includeUnbound: $("optUnbound").checked
         };
         var targetId = (t.custom || t.needId) ? $("targetCustom").value.trim() : t.targetId;
         var code = VG.buildCode(common, fields, targetId);
