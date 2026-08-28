@@ -12,7 +12,7 @@ xmlns:xf="http://www.w3.org/2002/xforms">
 			<w2:workflowCollection/>
 		</xf:model>
 		<w2:layoutInfo/>
-		<w2:publicInfo method="scwin.__callbackSubmitFunction,scwin.__preSubmitFunction,scwin.__setActionParam,scwin.__submitErrorHandler,scwin.create,scwin.execute,scwin.executeDynamic,scwin.executeWorkflow,scwin.getContextPath,scwin.getMessageCode,scwin.getResultCode,scwin.getServiceURL,scwin.getStatusMessage,scwin.resultMsg,scwin.setAction,scwin.setPagingInfo"/>
+		<w2:publicInfo method="scwin.__callbackSubmitFunction,scwin.__preSubmitFunction,scwin.__setActionParam,scwin.__submitErrorHandler,scwin.__normalizeRefTarget,scwin.__parseGridview,scwin.__eachGridElement,scwin.__setDescRowNum,scwin.__showGridSpinner,scwin.__hideGridSpinner,scwin.create,scwin.execute,scwin.executeDynamic,scwin.executeWorkflow,scwin.getContextPath,scwin.getMessageCode,scwin.getResultCode,scwin.getServiceURL,scwin.getStatusMessage,scwin.resultMsg,scwin.setAction,scwin.setPagingInfo"/>
 		<script lazy="false" type="text/javascript"><![CDATA[
 // 서버 통신 서비스 호출을 위한 Context Path
 scwin.CONTEXT_PATH = WebSquare.core.getConfiguration("/WebSquare/wpack/contextRoot/@value");
@@ -206,7 +206,7 @@ scwin.__setActionParam = function (sbmObj) {
 scwin.__callbackSubmitFunction = function (resObj, sbmObj) {
     // gridview 스피너 오버레이 제거(성공/실패 공통 완료 지점 — abort 경로는 __applyDuplicateGuard에서 별도 제거)
     if (sbmObj && sbmObj._gridview && sbmObj._gridSpinner && (typeof sbmObj.getScopeWindow === "function")) {
-        try { scwin.__hideGridSpinner(sbmObj.getScopeWindow().$p, sbmObj._gridview); } catch (e) { console.error(e); }
+        try { $c.sbm.__hideGridSpinner(sbmObj.getScopeWindow().$p, sbmObj._gridview); } catch (e) { console.error(e); }
     }
 
     // server와 연결을 할 수 없을 경우 responseStatusCode가 0으로 발생.
@@ -248,7 +248,7 @@ scwin.__callbackSubmitFunction = function (resObj, sbmObj) {
     if ($c.util.isEmpty(resObj.errorType) && sbmObj._gridview) {
         const $p = sbmObj.getScopeWindow().$p;
         // gridview를 grid별 { gv, refresh, focus } 디스크립터로 파싱/구성한다.
-        gridViews = scwin.__parseGridview(sbmObj._gridview).map(function (spec) {
+        gridViews = $c.sbm.__parseGridview(sbmObj._gridview).map(function (spec) {
             const gv = (typeof spec.ref === "string") ? $p.getComponentById(spec.ref) : spec.ref;
             if (!gv) { return null; }
             return { gv: gv, refresh: spec.refresh, focus: spec.focus, message: spec.message };
@@ -348,7 +348,7 @@ scwin.__applyDuplicateGuard = function (sbmObj, execOptions) {
             WebSquare.ModelUtil.abort(sbmObj.id, sbmObj.scope_id);
             // abort는 __callbackSubmitFunction을 호출하지 않으므로, 취소된 요청의 gridview 스피너 오버레이를 여기서 제거한다.
             if (sbmObj._gridview && sbmObj._gridSpinner && (typeof sbmObj.getScopeWindow === "function")) {
-                try { scwin.__hideGridSpinner(sbmObj.getScopeWindow().$p, sbmObj._gridview); } catch (e) { console.error(e); }
+                try { $c.sbm.__hideGridSpinner(sbmObj.getScopeWindow().$p, sbmObj._gridview); } catch (e) { console.error(e); }
             }
             // abort는 defaultCallback(__callbackSubmitFunction)을 호출하지 않으므로, 취소된 직전 Promise를 수동으로 reject 처리한다.
             if (typeof sbmObj._promise_submitErrorHandler === "function") {
@@ -478,7 +478,7 @@ scwin.execute = function (sbmObj, requestData, compObj, options) {
 
         // gridview 지정 + gridSpinner 사용 시, 통신 실행 직전 grid 하단에 스피너 오버레이를 표시한다.(완료 시 __callbackSubmitFunction/abort에서 제거)
         if (_sbmObj._gridview && _sbmObj._gridSpinner && (typeof _sbmObj.getScopeWindow === "function")) {
-            try { scwin.__showGridSpinner(_sbmObj.getScopeWindow().$p, _sbmObj._gridview); } catch (e) { console.error(e); }
+            try { $c.sbm.__showGridSpinner(_sbmObj.getScopeWindow().$p, _sbmObj._gridview); } catch (e) { console.error(e); }
         }
 
         $p.executeSubmission(_sbmObj, requestData, compObj);
@@ -609,7 +609,7 @@ scwin.__parseGridview = function (gridviewRef) {
  */
 scwin.__eachGridElement = function (scopeP, gridviewRef, fn) {
     if ($c.util.isEmpty(scopeP) || $c.util.isEmpty(gridviewRef)) { return; }
-    scwin.__parseGridview(gridviewRef).forEach(function (spec) {
+    $c.sbm.__parseGridview(gridviewRef).forEach(function (spec) {
         const gv = (typeof spec.ref === "string") ? scopeP.getComponentById(spec.ref) : spec.ref;
         if ($c.util.isEmpty(gv) || gv.render === undefined) { return; }
         const el = gv.render;
@@ -644,7 +644,7 @@ scwin.__gridSpinnerId = function (el, ref) {
  * @exception
  */
 scwin.__showGridSpinner = function (scopeP, gridviewRef) {
-    scwin.__eachGridElement(scopeP, gridviewRef, function (el, ref) {
+    $c.sbm.__eachGridElement(scopeP, gridviewRef, function (el, ref) {
         const doc = el.ownerDocument;
         const wrapId = scwin.__gridSpinnerId(el, ref);
         if (doc.getElementById(wrapId)) { return; }   // 이미 표시 중이면 재사용(중복 삽입 방지)
@@ -666,7 +666,7 @@ scwin.__showGridSpinner = function (scopeP, gridviewRef) {
  * @exception
  */
 scwin.__hideGridSpinner = function (scopeP, gridviewRef) {
-    scwin.__eachGridElement(scopeP, gridviewRef, function (el, ref) {
+    $c.sbm.__eachGridElement(scopeP, gridviewRef, function (el, ref) {
         const wrap = el.ownerDocument.getElementById(scwin.__gridSpinnerId(el, ref));
         if (wrap && wrap.parentNode) { wrap.parentNode.removeChild(wrap); }
     });
@@ -876,7 +876,7 @@ scwin.executeDynamic = function (options, requestData, obj, execOptions) {
     execOptions = execOptions || {};
 
     // 간소화된 ref/target 문자열을 WebSquare 표준 표현식(data:json,...)으로 변환한다. (create 호출 전에 수행)
-    scwin.__normalizeRefTarget(options);
+    $c.sbm.__normalizeRefTarget(options);   // $c 사용 공개 함수 내부 호출도 $c 경유 — 빌드 $p 주입 규칙
 
     let submissionObj = $c.util.getComponent(options.id);
 
@@ -1392,7 +1392,7 @@ scwin.setPagingInfo = function (pagingInfo, inData, totalCnt) {
 		} else if (rowNumSort.toUpperCase() === "DESC") {
 			// 내림차순 순번은 전체 건수(totalCnt)가 필요하므로 통신 후 호출(totalCnt 전달) 시점에 적용된다.
 			if (!$c.util.isEmpty(totalCnt)) {
-				scwin.__setDescRowNum(gridObj, totalCnt, pagingInfo);
+				$c.sbm.__setDescRowNum(gridObj, totalCnt, pagingInfo);
 			}
 		}
 	}

@@ -15,7 +15,7 @@ xmlns:xf="http://www.w3.org/2002/xforms">
 		</xf:model>
 		<w2:layoutInfo>
 		</w2:layoutInfo>
-		<w2:publicInfo method="scwin.comboCbDataSet,scwin.comboCbDataSetPaging,scwin.comboCbDataSetLimit,scwin.comboCbDataSetDynamic,scwin.comboCbDataSetPeriod,scwin.getValResultMsg,scwin.setDownloadGridViewOption,scwin.loadMessage,scwin.loadCommonMessage,scwin.initChangeCheckedDc,scwin.setChangeCheckedDc,scwin.getChangeCheckedMainFrame,scwin.setCommonCode,scwin.getCommonCodeDataList,scwin.executeCommonCode,scwin.getParameter,scwin.getColumnName,scwin.getDataCollection,scwin.getMessage,scwin.isModified,scwin.downloadMultipleDataList,scwin.downloadMultipleGridView,scwin.downloadGridViewExcel,scwin.downloadGridViewCSV,scwin.uploadGridViewExcel,scwin.uploadGridViewCSV,scwin.openReportPdf,scwin.validateGroup,scwin.validateGridView,scwin.createDataList,scwin.createDataMap,scwin.undoAll,scwin.undoRow,scwin.undoGridView,scwin.deleteRow,scwin.insertRow,scwin.getMatchedJSON,scwin.getDiffJSON,scwin.pickJSON,scwin.omitJSON,scwin.keyByJSON,scwin.groupByJSON,scwin.deepClone,scwin.mergeJSON,scwin.setUserData,scwin.getUserData,scwin.createHolidayDataList,scwin.loadHoliday,scwin.serializeFormToQueryString,scwin.downFile,scwin.getSingleUploadFileInfo,scwin.bindDragDropUpload"/>
+		<w2:publicInfo method="scwin.comboCbDataSet,scwin.comboCbDataSetPaging,scwin.comboCbDataSetLimit,scwin.comboCbDataSetDynamic,scwin.comboCbDataSetPeriod,scwin.getValResultMsg,scwin.setDownloadGridViewOption,scwin.loadMessage,scwin.loadCommonMessage,scwin.initChangeCheckedDc,scwin.setChangeCheckedDc,scwin.getChangeCheckedMainFrame,scwin.setCommonCode,scwin.getCommonCodeDataList,scwin.getCommonCodeData,scwin.applyCommonCodeFilter,scwin.applyCommonCodeSort,scwin.applyCommonCodeFirstRow,scwin.commonCodeEscape,scwin.executeCommonCode,scwin.getParameter,scwin.getColumnName,scwin.getDataCollection,scwin.getMessage,scwin.isModified,scwin.downloadMultipleDataList,scwin.downloadMultipleGridView,scwin.downloadGridViewExcel,scwin.downloadGridViewCSV,scwin.uploadGridViewExcel,scwin.uploadGridViewCSV,scwin.openReportPdf,scwin.validateGroup,scwin.validateGridView,scwin.createDataList,scwin.createDataMap,scwin.undoAll,scwin.undoRow,scwin.undoGridView,scwin.deleteRow,scwin.insertRow,scwin.getMatchedJSON,scwin.getDiffJSON,scwin.pickJSON,scwin.omitJSON,scwin.keyByJSON,scwin.groupByJSON,scwin.deepClone,scwin.mergeJSON,scwin.setUserData,scwin.getUserData,scwin.createHolidayDataList,scwin.loadHoliday,scwin.serializeFormToQueryString,scwin.downFile,scwin.getSingleUploadFileInfo,scwin.bindDragDropUpload"/>
 		<script type="text/javascript" lazy="false"><![CDATA[
 // 공통 코드 저장을 위한 DataList 속성 정보
 scwin.DATA_PREFIX = "dlt_commonCode";
@@ -533,7 +533,7 @@ scwin.setCommonCode = async function (codeOptions, callbackFunc) {
 
     try {
         // 1. 코드 데이터 즉시 취득 (캐시에 없는 그룹은 서버에서 await)
-        const codeData = await scwin.__getCommonCodeData(codeOptions);
+        const codeData = await $c.data.getCommonCodeData(codeOptions);   // 공개 함수 내부 호출도 $c 경유 — 빌드 $p 주입 규칙
 
         // 2. 컴포넌트별 적용
         codeOptions.forEach(function (codeObj) {
@@ -591,14 +591,14 @@ scwin.setCommonCode = async function (codeOptions, callbackFunc) {
 
                     // 원본 클론 → 필터 → 정렬 → 선두항목
                     let jsonData = JSON.parse(JSON.stringify(task.sourceList || []));
-                    jsonData = scwin.__applyCommonCodeFilter(jsonData, codeObj.filter);
-                    scwin.__applyCommonCodeSort(jsonData, codeObj, labelColumn, valueColumn);
-                    scwin.__applyCommonCodeFirstRow(jsonData, codeObj, comp, labelColumn, valueColumn, filedArr);
+                    jsonData = $c.data.applyCommonCodeFilter(jsonData, codeObj.filter);
+                    $c.data.applyCommonCodeSort(jsonData, codeObj, labelColumn, valueColumn);
+                    $c.data.applyCommonCodeFirstRow(jsonData, codeObj, comp, labelColumn, valueColumn, filedArr);
 
                     dataListObj.setJSON(jsonData);
 
                     // escape 처리
-                    scwin.__commonCodeEscape(dataListObj, labelColumn, valueColumn);
+                    $c.data.commonCodeEscape(dataListObj, labelColumn, valueColumn);
 
                     // 바인딩
                     const pluginName = ($c.util.isEmpty(comp.getPluginName)) ? "" : comp.getPluginName();
@@ -629,16 +629,16 @@ scwin.setCommonCode = async function (codeOptions, callbackFunc) {
 
 /**
  * @method
- * @name __getCommonCodeData
+ * @name getCommonCodeData
  * @description setCommonCode 용 공통 코드 데이터를 취득한다. 캐시에 없거나 useLocalCache=false 인
  *  그룹만 공통코드 API(단일 URL·배열 URL_LIST)에서 await 로 받아 캐시에 저장하고, code별 데이터 맵을 반환한다.
  * @param {Array} codeOptions 코드 옵션 배열
  * @returns {Promise:Object} { (DATA_PREFIX+code) : [코드 데이터], ... }
- * @hidden Y
+ * @hidden N
  * @exception
  * @example
  */
-scwin.__getCommonCodeData = async function (codeOptions) {
+scwin.getCommonCodeData = async function (codeOptions) {
 	for (let i = 0; i < codeOptions.length; i++) {
 		const codeObj = codeOptions[i];
         if (codeObj.useLocalCache === false) {
@@ -713,16 +713,16 @@ scwin.__getCommonCodeData = async function (codeOptions) {
 
 /**
  * @method
- * @name __applyCommonCodeFilter
+ * @name applyCommonCodeFilter
  * @description 코드 목록에 filter 조건(==, !=, %%)을 적용한다.
  * @param {Array} jsonData 코드 데이터 배열
  * @param {Array} filter 필터 조건 배열 ["COL==a,b", "COL!=x", "COL%%키워드"]
  * @returns {Array} 필터가 적용된 배열
- * @hidden Y
+ * @hidden N
  * @exception
  * @example
  */
-scwin.__applyCommonCodeFilter = function (jsonData, filter) {
+scwin.applyCommonCodeFilter = function (jsonData, filter) {
     if ($c.util.isEmpty(filter)) {
         return jsonData;
     }
@@ -747,18 +747,18 @@ scwin.__applyCommonCodeFilter = function (jsonData, filter) {
 
 /**
  * @method
- * @name __applyCommonCodeSort
+ * @name applyCommonCodeSort
  * @description 코드 목록에 정렬(sort 템플릿 또는 sortFn)을 적용한다. (in-place)
  * @param {Array} jsonData 코드 데이터 배열
  * @param {Object} codeObj 코드 옵션 (sort, sortFn)
  * @param {String} labelColumn label 컬럼명
  * @param {String} valueColumn value 컬럼명
  * @returns {Array} 정렬된 배열
- * @hidden Y
+ * @hidden N
  * @exception
  * @example
  */
-scwin.__applyCommonCodeSort = function (jsonData, codeObj, labelColumn, valueColumn) {
+scwin.applyCommonCodeSort = function (jsonData, codeObj, labelColumn, valueColumn) {
     const cmp = function (col, desc) {
         return function (a, b) {
             const x = String(a[col]).toUpperCase();
@@ -785,7 +785,7 @@ scwin.__applyCommonCodeSort = function (jsonData, codeObj, labelColumn, valueCol
 
 /**
  * @method
- * @name __applyCommonCodeFirstRow
+ * @name applyCommonCodeFirstRow
  * @description 코드 목록 선두에 firstRow([value, label]) 항목을 추가한다.
  *  firstRow 명시 시에만 추가하며(기본 "선택" 자동 삽입 없음), radio/checkbox 는 추가하지 않는다.
  * @param {Array} jsonData 코드 데이터 배열
@@ -795,11 +795,11 @@ scwin.__applyCommonCodeSort = function (jsonData, codeObj, labelColumn, valueCol
  * @param {String} valueColumn value 컬럼명
  * @param {Array} filedArr (선택) DataList 컬럼 구성(미지정 시 COMMON_CODE_INFO.FILED_ARR)
  * @returns {Array} 선두 항목이 추가된 배열
- * @hidden Y
+ * @hidden N
  * @exception
  * @example
  */
-scwin.__applyCommonCodeFirstRow = function (jsonData, codeObj, comp, labelColumn, valueColumn, filedArr) {
+scwin.applyCommonCodeFirstRow = function (jsonData, codeObj, comp, labelColumn, valueColumn, filedArr) {
     const pluginName = ($c.util.isEmpty(comp.getPluginName)) ? "" : comp.getPluginName();
     if (pluginName === "radio" || pluginName === "checkbox") {
         return jsonData;
@@ -830,17 +830,17 @@ scwin.__applyCommonCodeFirstRow = function (jsonData, codeObj, comp, labelColumn
 
 /**
  * @method
- * @name __commonCodeEscape
+ * @name commonCodeEscape
  * @description DataList 의 label/value 컬럼 값을 escape decode 처리한다.
  * @param {Object} dataListObj 코드 DataList 객체
  * @param {String} labelColumn label 컬럼명
  * @param {String} valueColumn value 컬럼명
  * @returns {void}
- * @hidden Y
+ * @hidden N
  * @exception
  * @example
  */
-scwin.__commonCodeEscape = function (dataListObj, labelColumn, valueColumn) {
+scwin.commonCodeEscape = function (dataListObj, labelColumn, valueColumn) {
     if ($c.util.isEmpty(dataListObj) || dataListObj.initializeType !== "dataList") {
         return;
     }
@@ -1070,7 +1070,7 @@ $c.data.getMessage("MSG_YYY", "성명");    // "성명을 입력해주세요." (
 scwin.getMessage = function (msgId) {
     // 공통 메시지 정의 파일(common_message.json)을 최초 1회 지연 로드한다.
     if (scwin._commonMessageLoaded !== true) {
-        scwin.loadCommonMessage();
+        $c.data.loadCommonMessage();   // 공개 함수 내부 호출도 $c 경유 — 빌드 $p 주입 규칙
     }
 
     let message = ""

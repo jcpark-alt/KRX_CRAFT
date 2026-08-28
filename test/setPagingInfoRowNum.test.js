@@ -78,6 +78,7 @@ function loadHarness() {
   };
   vm.createContext(sandbox);
   vm.runInContext(extractCdata(XML_FILE), sandbox, { filename: path.basename(XML_FILE) + ".cdata.js" });
+  sandbox.$c.sbm = Object.assign(sandbox.scwin, sandbox.$c.sbm);   // 실환경 네임스페이스 배선(기존 mock 유지) — 내부 호출이 $c.sbm.* 경유
   return { scwin: sandbox.scwin, state };
 }
 
