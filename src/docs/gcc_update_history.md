@@ -265,6 +265,10 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 - `360d563` (08-28) — `$c.validate` **빌드 $p 주입 규칙 적용 — $c 사용 함수 공개 전환·$c.validate 호출 통일** (288→292 메서드):
   - **규칙(신규 확립)**: 빌드 시 `$c` 공통함수 호출은 첫 인자에 `$p` 가 주입됨 — **`$c` 를 사용하는 함수는 공개 선언 + `$c.네임스페이스` 호출**(같은 파일 내부라도 scwin 직접 호출 금지). `$c` 미사용 순수 함수만 `__` 내부 유지
   - 공개 전환 4종: `resolveFocusObj`·`getRequiredMessage`·`getExtendedRuleMessage`·`getConditionalRuleMessage`, 내부 호출 11곳 `$c.validate.*` 통일, 테스트 하니스 `$c.validate = scwin` 배선(120건 통과)
+- `ff296d8`·`3ca9bfa` (08-28) — **빌드 $p 주입 규칙 gcc 전체 소급 적용 (1~3단계, 292→314 메서드)**:
+  - 1단계(`ff296d8`) util/exception/date: `setGridViewRowCheckBox`·`deleteGridViewRow`·`reportError`·`checkDateFormat` 공개 전환, `__formatDate`("$p 미전달용" 구 우회 패턴) 를 `formatDate` 에 병합 — 관련 문서 3종(CLAUDE.md 등) 참조 갱신
+  - 2·3단계(`3ca9bfa`) data/sbm/win: data 는 commonCode 헬퍼 5종 개명 공개, **sbm 의 기존 선례(`__` 이름 그대로 publicInfo 등록된 콜백 훅 4종)를 따라 sbm/win 은 개명 없이 "등록+`$c.ns.__X` 호출" 방식** — sbm 6종·win frame state 체인 7종 등록, 내부 호출 26곳 `$c` 화
+  - **보류(빌드 담당 확인 필요)**: 스코프 워킹 래퍼쌍 3쌍(`getParameter`·`getChangeCheckedMainFrame`·`getProgramId` — `const $p = scopeApi` 의도 설계), $p 강의존(`_openPopup`/`_closePopup`/`__applyRestoreData`/`__bindResponseToTargets`), 런타임 콜백(`__errorHandler`·hkey 전체)
 - `7c0c78b` (08-28) — [연관] **ULDINF05000 발행기관등록 가이드 화면 신설**(`sample-front/ui`, gcc 무변경): 코드 컨벤션 전면 적용(5단계·JSDoc·진입점 handleError·camelCase·엄격 비교 43곳) + 결함 4건 수정. **수작업 검증 약 47건 → validateDataCollect 규칙 50건 전환** — 정적 규칙 + 복합 조건(법인/사업자 3중 조건·팩스 all-or-none)은 `options.fields` 동적 구성, `includeUnbound`·`matchValue`·`composition`·korEng 등 신규 옵션 실사용 예. 잔여 수작업은 구조적 이관 불가분(동적 결산월·OR·그리드 안내)만
 
 ---
@@ -273,6 +277,8 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-08-28 | `ff296d8` | refactor(gcc): 빌드 $p 주입 규칙 1단계 — util/exception/date $c 사용 헬퍼 공개화 |
+| 2026-08-28 | `3ca9bfa` | refactor(gcc): 빌드 $p 주입 규칙 2·3단계 — data/sbm/win $c 사용 헬퍼 공개화 |
 | 2026-08-28 | `360d563` | refactor(validate): 빌드 $p 주입 규칙 적용 — $c 사용 함수 공개 전환·$c.validate 호출 통일 |
 | 2026-08-28 | `7c0c78b` | feat(sample): ULDINF05000 발행기관등록 가이드 화면 — 컨벤션 정리 + 공통 검증 전환 — [연관, gcc 무변경] |
 | 2026-08-28 | `0c4b9da` | feat(validate): includeUnbound 옵션·composition 규칙 추가 |
