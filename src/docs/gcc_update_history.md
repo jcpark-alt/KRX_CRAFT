@@ -262,6 +262,9 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
   - `includeUnbound`(기본 false): DataCollection **미바인딩 컴포넌트**(분리 입력 칸 등)도 컴포넌트 ID 규칙으로 검증 — 기본값에서는 기존대로 건너뛰되 규칙 선언 시 `console.info` 로 가시화(조용한 무시 해소). 하위호환 100%
   - `composition`: 문자 클래스 **조합 필수** 규칙(각 1자 이상) — 토큰 eng/num/kor/special/upper/lower, 프리셋 `"engNum"`/`"engNumSpecial"`·배열형·객체형 `{value,message}`, 빈 값 통과. allowChar(문자 제한)와 상호보완(포함 강제) — 아이디/비밀번호류 반복 패턴 공통화
   - generator 동기화(옵션 체크박스·규칙 열)·테스트 +5건(120)
+- `360d563` (08-28) — `$c.validate` **빌드 $p 주입 규칙 적용 — $c 사용 함수 공개 전환·$c.validate 호출 통일** (288→292 메서드):
+  - **규칙(신규 확립)**: 빌드 시 `$c` 공통함수 호출은 첫 인자에 `$p` 가 주입됨 — **`$c` 를 사용하는 함수는 공개 선언 + `$c.네임스페이스` 호출**(같은 파일 내부라도 scwin 직접 호출 금지). `$c` 미사용 순수 함수만 `__` 내부 유지
+  - 공개 전환 4종: `resolveFocusObj`·`getRequiredMessage`·`getExtendedRuleMessage`·`getConditionalRuleMessage`, 내부 호출 11곳 `$c.validate.*` 통일, 테스트 하니스 `$c.validate = scwin` 배선(120건 통과)
 - `7c0c78b` (08-28) — [연관] **ULDINF05000 발행기관등록 가이드 화면 신설**(`sample-front/ui`, gcc 무변경): 코드 컨벤션 전면 적용(5단계·JSDoc·진입점 handleError·camelCase·엄격 비교 43곳) + 결함 4건 수정. **수작업 검증 약 47건 → validateDataCollect 규칙 50건 전환** — 정적 규칙 + 복합 조건(법인/사업자 3중 조건·팩스 all-or-none)은 `options.fields` 동적 구성, `includeUnbound`·`matchValue`·`composition`·korEng 등 신규 옵션 실사용 예. 잔여 수작업은 구조적 이관 불가분(동적 결산월·OR·그리드 안내)만
 
 ---
@@ -270,6 +273,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-08-28 | `360d563` | refactor(validate): 빌드 $p 주입 규칙 적용 — $c 사용 함수 공개 전환·$c.validate 호출 통일 |
 | 2026-08-28 | `7c0c78b` | feat(sample): ULDINF05000 발행기관등록 가이드 화면 — 컨벤션 정리 + 공통 검증 전환 — [연관, gcc 무변경] |
 | 2026-08-28 | `0c4b9da` | feat(validate): includeUnbound 옵션·composition 규칙 추가 |
 | 2026-08-28 | `2208793` | feat(docs): validate-generator 필드 테이블에 컴포넌트 ID 열 추가 — [연관, gcc 무변경] |
