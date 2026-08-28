@@ -133,7 +133,11 @@ fromNum/toNum: 최소/최대 입력 숫자   checked : 체크박스 필수 체�
 [고급] emptyIf/requiredIf : 조건 객체를 원문으로 입력 — { compID : "sbx_nation", notEquals : "410", message : "..." }
        (equals|notEquals|in|notEmpty 로 참조 컴포넌트 값을 판정해 입력 금지/필수 처리)
 [고급] duplicate : (그리드) 컬럼 값 행 간 중복 금지 · duplicateGroup : (폼) 같은 그룹명 필드 간 중복 금지
-※ required·checked 외 규칙은 빈 값을 통과시킴(필수 항목은 required 병행 지정)
+[고급·명세v3] compare : 두 컴포넌트 값 비교 — { compareTarget : "id", compareType : "EQUAL"|"NOT_EQUAL", message : "..." }
+[고급·명세v3] matchValue : 특정 값 확인(미입력도 실패) — { value : "Y", message : "..." } · focus : 실패 시 포커스 이동 컴포넌트 ID
+[고급·명세v3] message : required 실패 문구 재정의 · maxLengthB 객체형 { value : 80, msgType : "korEng" } — "한글 N자 영문 M자" 문구
+※ required·checked 외 규칙은 빈 값을 통과시킴(필수 항목은 required 병행 지정. matchValue 는 빈 값도 실패)
+※ byte 길이(min/maxLengthB)는 UTF-8 기준(한글 3byte) 계산 · required 문구는 선택형/입력형 자동 분기
 ※ gridView 는 입력 허용문자/자릿수 등을 Column 속성으로도 설정 가능 — 본 도구의 options 와 병행 시 중복 주의</pre>
       </details>
     </section>
@@ -156,6 +160,7 @@ fromNum/toNum: 최소/최대 입력 숫자   checked : 체크박스 필수 체�
               <th>minLen</th><th>maxLen</th><th>num</th><th>format</th><th>fromNum</th><th>toNum</th>
               <th class="adv">checked</th><th class="adv">fixLen</th><th class="adv">minLenB</th><th class="adv">maxLenB</th><th class="adv">maxLenF</th>
               <th class="adv">emptyIf</th><th class="adv">requiredIf</th><th class="adv">duplicate</th><th class="adv">dupGroup</th>
+              <th class="adv">compare</th><th class="adv">matchValue</th><th class="adv">focus</th><th class="adv">message</th>
             </tr>
           </thead>
           <tbody id="fieldRows"></tbody>
@@ -242,18 +247,21 @@ var VG = (function () {
     // 출력 순서 — gcc JSDoc 예제 규약(name 은 마지막)
     var RULE_ORDER = ["required", "checked", "allowChar", "ignoreChar", "minLength", "maxLength", "num", "format",
                       "fromNum", "toNum", "fixLength", "minLengthB", "maxLengthB", "maxLengthF",
-                      "emptyIf", "requiredIf", "duplicate", "duplicateGroup", "name"];
-    var STR_RULES = { allowChar: 1, ignoreChar: 1, num: 1, format: 1, duplicateGroup: 1, name: 1 };
-    var BOOL_RULES = { required: 1, checked: 1, duplicate: 1 };   // 체크 시 true 로 출력
-    var RAW_RULES = { emptyIf: 1, requiredIf: 1 };                 // 조건 객체 리터럴 원문 그대로 출력
+                      "emptyIf", "requiredIf", "duplicate", "duplicateGroup",
+                      "compare", "matchValue", "focus", "message", "name"];
+    var STR_RULES = { allowChar: 1, ignoreChar: 1, num: 1, format: 1, duplicateGroup: 1, focus: 1, message: 1, name: 1 };
+    var BOOL_RULES = { required: 1, checked: 1, duplicate: 1 };            // 체크 시 true 로 출력
+    var RAW_RULES = { emptyIf: 1, requiredIf: 1, compare: 1, matchValue: 1 };   // 조건 객체 리터럴 원문 그대로 출력
 
     function jsStr(v) { return '"' + String(v).replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"'; }
 
     function ruleVal(key, v) {
         if (BOOL_RULES[key]) { return "true"; }
         if (RAW_RULES[key]) { return String(v).trim(); }
+        var sv = String(v).trim();
+        if (!STR_RULES[key] && sv.charAt(0) === "{") { return sv; }   // 객체 리터럴 원문 (maxLengthB korEng 등)
         if (STR_RULES[key]) { return jsStr(v); }
-        return NUM_RE.test(String(v).trim()) ? String(v).trim() : jsStr(v);
+        return NUM_RE.test(sv) ? sv : jsStr(v);
     }
 
     function buildCode(common, fields, targetId) {
@@ -387,14 +395,20 @@ if (typeof module !== "undefined" && module.exports) { module.exports = VG; }
                 '<td class="adv" style="text-align:center"><input type="checkbox" data-k="checked"></td>' +
                 '<td class="adv"><input type="number" data-k="fixLength"></td>' +
                 '<td class="adv"><input type="number" data-k="minLengthB"></td>' +
-                '<td class="adv"><input type="number" data-k="maxLengthB"></td>' +
+                '<td class="adv"><input type="text" data-k="maxLengthB" placeholder="80 또는 { value : 80, msgType : &quot;korEng&quot; }"></td>' +
                 '<td class="adv"><input type="text" data-k="maxLengthF" placeholder="10.2"></td>' +
                 '<td class="adv"><input type="text" data-k="emptyIf" style="min-width:200px" ' +
                     'placeholder="{ compID : &quot;sbx_nation&quot;, notEquals : &quot;410&quot; }"></td>' +
                 '<td class="adv"><input type="text" data-k="requiredIf" style="min-width:200px" ' +
                     'placeholder="{ compID : &quot;ipb_chgNm2&quot;, notEmpty : true }"></td>' +
                 '<td class="adv" style="text-align:center"><input type="checkbox" data-k="duplicate"></td>' +
-                '<td class="adv"><input type="text" data-k="duplicateGroup" placeholder="settleMonth"></td>';
+                '<td class="adv"><input type="text" data-k="duplicateGroup" placeholder="settleMonth"></td>' +
+                '<td class="adv"><input type="text" data-k="compare" style="min-width:200px" ' +
+                    'placeholder="{ compareTarget : &quot;acntClsMm2&quot;, compareType : &quot;NOT_EQUAL&quot; }"></td>' +
+                '<td class="adv"><input type="text" data-k="matchValue" style="min-width:180px" ' +
+                    'placeholder="{ value : &quot;Y&quot;, message : &quot;...&quot; }"></td>' +
+                '<td class="adv"><input type="text" data-k="focus" placeholder="ipt_corpRegNo1"></td>' +
+                '<td class="adv"><input type="text" data-k="message" placeholder="required 문구 재정의"></td>';
             tr.dataset.fid = f.id;
             tb.appendChild(tr);
         });

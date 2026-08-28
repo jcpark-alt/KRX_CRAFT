@@ -82,7 +82,17 @@ scwin.onpageload = function() {
             // 그룹 중복·체크박스 규칙
             sbxMonth1  : { duplicateGroup : "settleMonth", name : "결산월1" },           // 같은 그룹명 간 중복 금지
             sbxMonth2  : { duplicateGroup : "settleMonth", name : "결산월2" },
-            chkAgree   : { checked : true, name : "개인정보 처리방침 동의" }             // 미체크("0"·false 포함) 실패
+            chkAgree   : { checked : true, name : "개인정보 처리방침 동의" },            // 미체크("0"·false 포함) 실패
+
+            // 명세 v3 신규 — 필드 focus/message 옵션·비교·특정 값 확인·byte 한/영 문구
+            ipbCorpNo2 : { required : true, format : "corpNum", focus : "ipt_corpRegNo1",
+                           name : "법인등록번호" },                                       // 실패 시 분리 입력 첫 칸으로 포커스 (§1)
+            ipbNewYn   : { matchValue : { value : "Y", message : "아이디 중복확인 여부를 확인하십시오." },
+                           focus : "ipt_integUsrId", name : "중복확인" },                 // 특정 값 확인 — 미입력도 실패 (§5)
+            sbxMonthA  : { compare : { compareTarget : "sbxMonthB", compareType : "NOT_EQUAL",
+                                       message : "동일한 결산월이 존재합니다.\n결산월을 확인해주세요!" },
+                           focus : "sbxMonthB", name : "결산월" },                        // 두 컴포넌트 값 비교 (§4)
+            ipbCorpNm2 : { maxLengthB : { value : 80, msgType : "korEng" }, name : "발행기관명" }  // "한글 26자 영문 80자" 문구 (§2)
         }
     };
 
@@ -131,9 +141,17 @@ scwin.onpageload = function() {
       (예: requiredIf : { compID : "ipb_chgNm2", notEmpty : true, message : "상호변경내역1 변경일을 먼저 입력해주세요." }) <br/>
     - duplicate:true - (그리드) 컬럼 값 행 간 중복 금지 <br/>
     - duplicateGroup:"그룹명" - (폼) 같은 그룹명을 지정한 필드 간 값 중복 금지 (예: 결산월1~n) <br/>
+    - focus:"컴포넌트ID" - 검증 실패 시 포커스 이동 대상 지정(분리 입력 등 — 미지정 시 실패 컴포넌트 자신) <br/>
+    - message:"문구" - required 실패 기본 문구 재정의 <br/>
+    - matchValue:{value|values,message} - 특정 값 일치 확인(미입력도 실패 — 중복확인 여부 등 상태 플래그 점검) <br/>
+    - compare:{compareTarget,compareType:"EQUAL"|"NOT_EQUAL",message} - 두 컴포넌트 값 비교(둘 다 입력 시 판정) <br/>
+    - maxLengthB:{value,msgType:"korEng"} - byte 한도 + "한글 N자 영문 M자" 안내 문구(한글 3byte 환산) <br/>
 
-    ※ ignoreChar·byte 길이·num·범위·format 추가분·emptyIf·duplicate 계열 규칙은
-    빈 값을 통과시킨다(필수 항목은 required 또는 requiredIf 병행 지정). checked 는 빈 값도 실패.
+    ※ byte 길이(minLengthB/maxLengthB)는 UTF-8 기준(한글 3byte)으로 계산한다. <br/>
+    ※ required 기본 문구는 컴포넌트 유형에 따라 자동 분기된다 — 선택형(radio/checkbox/selectbox 등)
+    "…선택하세요.", 입력형 "…입력하세요.". <br/>
+    ※ ignoreChar·byte 길이·num·범위·format 추가분·emptyIf·duplicate·compare 계열 규칙은
+    빈 값을 통과시킨다(필수 항목은 required 또는 requiredIf 병행 지정). checked·matchValue 는 빈 값도 실패.
  */
 scwin.validateDataCollect = async function (validateObj, options) {
     options = Object.assign({ validateType : "alert", checkType : "single", focus : true, editMode : true, fields : {} }, options);
@@ -189,7 +207,8 @@ scwin.validateDataCollect = async function (validateObj, options) {
                 const valInfo = Object.assign({ id : getCompId(valObj), name : undefined }, rules);
 
                 for (const key of Object.keys(valInfo)) {
-                    if (key === "id" || key === "name") continue;
+                    // id/name/focus/message 는 규칙이 아닌 메타 옵션 — 규칙 평가에서 제외 (focus·message: 명세 §1·§5)
+                    if (key === "id" || key === "name" || key === "focus" || key === "message") continue;
                     const validateKey = key.toUpperCase();
                     const val = String(valInfo[key]);
                     if (!val) continue;
@@ -245,7 +264,8 @@ scwin.validateDataCollect = async function (validateObj, options) {
                     const valInfo = Object.assign({ id : columnId, name : undefined }, rules);
 
                     for (const key of Object.keys(valInfo)) {
-                        if (key === "id" || key === "name") continue;
+                        // id/name/focus/message 는 규칙이 아닌 메타 옵션 — 규칙 평가에서 제외 (focus·message: 명세 §1·§5)
+                        if (key === "id" || key === "name" || key === "focus" || key === "message") continue;
                         const validateKey = key.toUpperCase();
                         const val = String(valInfo[key]);
                         if (!val) continue;
@@ -302,290 +322,90 @@ scwin.validateDataCollect = async function (validateObj, options) {
  */
 scwin.validateDataGroup = function (validateKey, val, valInfo, valObj, dataObjInfo, checkType, validateType, options) {
     let validateResult = true;
-    let messageArr = [];
+    const messageArr = [];
     let firstObj = null;
     const valObjValue = valObj.getValue();
+    const name = $c.str.attachPostposition(valInfo.name || dataObjInfo.columnName);
+    const focusObj = scwin.__resolveFocusObj(valInfo, valObj);   // 명세 §1 — 필드 focus 지정 시 해당 컴포넌트로 이동
+
+    // 실패 공통 처리 — 알림(SINGLE 즉시/MULTI 취합)·마킹·포커스 (모든 규칙 공용)
+    const fail = function (msg, alertOpts) {
+        if (validateType === "ALERT" || validateType === "ALL") {
+            (firstObj === null) && (firstObj = focusObj);
+
+            if (checkType === "SINGLE") {
+                $c.win.alert(msg, function () {
+                    if (options.focus) scwin.setFocus(focusObj);
+                }, Object.assign({ disableCloseButton : false }, alertOpts));
+            } else {
+                messageArr.push(msg);
+            }
+        }
+
+        if (validateType === "MARK" || validateType === "ALL") {
+            (firstObj === null) && (firstObj = focusObj);
+            valObj.addClass("req");
+            if (options.focus) scwin.setFocus(focusObj);
+        }
+
+        validateResult = false;
+    };
 
     if (validateKey === "REQUIRED" && val.toUpperCase() === "TRUE") {
         if (valObjValue === "") {
-            if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.columnName)} 필수 입력사항입니다.`;
-                (firstObj === null) && (firstObj = valObj);
-
-                if (checkType === "SINGLE") {
-                    $c.win.alert(msg, function() {
-                        if (options.focus) scwin.setFocus(valObj);
-                    }, { disableCloseButton : false });
-                } else {
-                    messageArr.push(msg);
-                }
-            }
-            
-            if (validateType === "MARK" || validateType === "ALL") {
-                (firstObj === null) && (firstObj = valObj);
-                valObj.addClass("req");
-                if (options.focus) scwin.setFocus(valObj);
-            }
-
-            validateResult = false;
+            // 컴포넌트 유형별 문구 분기(선택/입력 — 명세 §3) + 필드 message 재정의(명세 §5)
+            fail(scwin.__getRequiredMessage(name, valInfo, valObj));
         }
     }
 
     if (validateKey === "ALLOWCHAR") {
         if (valObjValue.length !== ((valObjValue.match(new RegExp("[" + val + "]", "g")) === null) ? 0 : valObjValue.match(new RegExp("[" + val + "]", "g")).length)) {
-            if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.columnName)} 허용된 문자(${val})만 입력해주세요.`;
-                (firstObj === null) && (firstObj = valObj);
-
-                if (checkType === "SINGLE") {
-                    $c.win.alert(msg, function() {
-                        if (options.focus) scwin.setFocus(valObj);
-                    }, { disableCloseButton : false });
-                } else {
-                    messageArr.push(msg);
-                }
-            }
-            
-            if (validateType === "MARK" || validateType === "ALL") {
-                (firstObj === null) && (firstObj = valObj);
-                valObj.addClass("req");
-                if (options.focus) scwin.setFocus(valObj);
-            }
-            
-            validateResult = false;
+            // 조합 인식 시 세부 문구(명세 §7), 인식 불가 조합은 기존 범용 문구
+            fail(scwin.__getAllowCharMessage(name, val) || `${name} 허용된 문자(${val})만 입력해주세요.`);
         }
     }
 
     if (validateKey === "FORMAT") {
         if (val.toUpperCase() === "BIRTH" && !scwin.isBirthDay(valObjValue)) {
-            if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.columnName)} 정확한 생년월일을 입력해주세요.`;
-                (firstObj === null) && (firstObj = valObj);
-
-                if (checkType === "SINGLE") {
-                    $c.win.alert(msg, function() {
-                        if (options.focus) scwin.setFocus(valObj);
-                    }, { disableCloseButton : false });
-                } else {
-                    messageArr.push(msg);
-                }
-            }
-            
-            if (validateType === "MARK" || validateType === "ALL") {
-                (firstObj === null) && (firstObj = valObj);
-                valObj.addClass("req");
-                if (options.focus) scwin.setFocus(valObj);
-            }
-
-            validateResult = false;
+            fail(`${name} 정확한 생년월일을 입력해주세요.`);
         } else if (val.toUpperCase() === "DATE" && !scwin.isValidDate(valObjValue)) {
-            if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.columnName)} 정확한 날짜 형식을 입력해주세요.`;
-                (firstObj === null) && (firstObj = valObj);
-
-                if (checkType === "SINGLE") {
-                    $c.win.alert(msg, function() {
-                        if (options.focus) scwin.setFocus(valObj);
-                    }, { disableCloseButton : false });
-                } else {
-                    messageArr.push(msg);
-                }
-            }
-            
-            if (validateType === "MARK" || validateType === "ALL") {
-                (firstObj === null) && (firstObj = valObj);
-                valObj.addClass("req");
-                if (options.focus) scwin.setFocus(valObj);
-            }
-
-            validateResult = false;
+            fail(`${name} 정확한 날짜 형식을 입력해주세요.`);
         } else if (val.toUpperCase() === "MOBILEPHONE" && !$c.str.isMobilePhone(valObjValue)) {
-            if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.columnName)} 정확한 모바일폰 형식을 입력해주세요.`;
-                (firstObj === null) && (firstObj = valObj);
-
-                if (checkType === "SINGLE") {
-                    $c.win.alert(msg, function() {
-                        if (options.focus) scwin.setFocus(valObj);
-                    }, { disableCloseButton : false, width : 400 });
-                } else {
-                    messageArr.push(msg);
-                }
-            }
-            
-            if (validateType === "MARK" || validateType === "ALL") {
-                (firstObj === null) && (firstObj = valObj);
-                valObj.addClass("req");
-                if (options.focus) scwin.setFocus(valObj);
-            }
-
-            validateResult = false;
+            fail(`${name} 정확한 모바일폰 형식을 입력해주세요.`, { width : 400 });
         } else if (val.toUpperCase() === "PHONE" && !$c.str.isPhone(valObjValue)) {
-            if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.columnName)} 정확한 전화번호 형식을 입력해주세요.`;
-                (firstObj === null) && (firstObj = valObj);
-
-                if (checkType === "SINGLE") {
-                    $c.win.alert(msg, function() {
-                        if (options.focus) scwin.setFocus(valObj);
-                    }, { disableCloseButton : false, width : 400 });
-                } else {
-                    messageArr.push(msg);
-                }
-            }
-            
-            if (validateType === "MARK" || validateType === "ALL") {
-                (firstObj === null) && (firstObj = valObj);
-                valObj.addClass("req");
-                if (options.focus) scwin.setFocus(valObj);
-            }
-
-            validateResult = false;
+            fail(`${name} 정확한 전화번호 형식을 입력해주세요.`, { width : 400 });
         } else if (val.toUpperCase() === "SECURITYNUMBER" && !$c.str.isSSN(valObjValue)) {
-            if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.columnName)} 정확한 주민등록번호 형식을 입력해주세요.`;
-                (firstObj === null) && (firstObj = valObj);
-
-                if (checkType === "SINGLE") {
-                    $c.win.alert(msg, function() {
-                        if (options.focus) scwin.setFocus(valObj);
-                    }, { disableCloseButton : false });
-                } else {
-                    messageArr.push(msg);
-                }
-            }
-            
-            if (validateType === "MARK" || validateType === "ALL") {
-                (firstObj === null) && (firstObj = valObj);
-                valObj.addClass("req");
-                if (options.focus) scwin.setFocus(valObj);
-            }
-
-            validateResult = false;
+            fail(`${name} 정확한 주민등록번호 형식을 입력해주세요.`);
         } else if (val.toUpperCase() === "EMAIL" && !$c.str.isEmail(valObjValue)) {
-            if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.columnName)} 정확한 이메일 형식을 입력해주세요.`;
-                (firstObj === null) && (firstObj = valObj);
-
-                if (checkType === "SINGLE") {
-                    $c.win.alert(msg, function() {
-                        if (options.focus) scwin.setFocus(valObj);
-                    }, { disableCloseButton : false });
-                } else {
-                    messageArr.push(msg);
-                }
-            }
-            
-            if (validateType === "MARK" || validateType === "ALL") {
-                (firstObj === null) && (firstObj = valObj);
-                valObj.addClass("req");
-                if (options.focus) scwin.setFocus(valObj);
-            }
-
-            validateResult = false;
+            fail(`${name} 정확한 이메일 형식을 입력해주세요.`);
         }
     }
 
     if (validateKey === "FIXLENGTH") {
         if (valObjValue.length !== Number.parseInt(val)) {
-            if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.columnName)} 고정길이(${val})로 입력해주세요.`;
-                (firstObj === null) && (firstObj = valObj);
-
-                if (checkType === "SINGLE") {
-                    $c.win.alert(msg, function() {
-                        if (options.focus) scwin.setFocus(valObj);
-                    }, { disableCloseButton : false });
-                } else {
-                    messageArr.push(msg);
-                }
-            }
-            
-            if (validateType === "MARK" || validateType === "ALL") {
-                (firstObj === null) && (firstObj = valObj);
-                valObj.addClass("req");
-                if (options.focus) scwin.setFocus(valObj);
-            }
-
-            validateResult = false;
+            fail(`${name} 고정길이(${val})로 입력해주세요.`);
         }
     }
 
     if (validateKey === "MINLENGTH") {
         if (valObjValue.length < Number.parseInt(val)) {
-            if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.columnName)} 최소길이(${val}) 보다 크게 입력해주세요.`;
-                (firstObj === null) && (firstObj = valObj);
-
-                if (checkType === "SINGLE") {
-                    $c.win.alert(msg, function() {
-                        if (options.focus) scwin.setFocus(valObj);
-                    }, { disableCloseButton : false });
-                } else {
-                    messageArr.push(msg);
-                }
-            }
-            
-            if (validateType === "MARK" || validateType === "ALL") {
-                (firstObj === null) && (firstObj = valObj);
-                valObj.addClass("req");
-                if (options.focus) scwin.setFocus(valObj);
-            }
-
-            validateResult = false;
+            fail(`${name} 최소길이(${val}) 보다 크게 입력해주세요.`);
         }
     }
 
     if (validateKey === "MAXLENGTH") {
         if (valObjValue.length > Number.parseInt(val)) {
-            if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.columnName)} 최대길이(${val}) 보다 작게 입력해주세요.`;
-                (firstObj === null) && (firstObj = valObj);
-
-                if (checkType === "SINGLE") {
-                    $c.win.alert(msg, function() {
-                        if (options.focus) scwin.setFocus(valObj);
-                    }, { disableCloseButton : false });
-                } else {
-                    messageArr.push(msg);
-                }
-            }
-            
-            if (validateType === "MARK" || validateType === "ALL") {
-                (firstObj === null) && (firstObj = valObj);
-                valObj.addClass("req");
-                if (options.focus) scwin.setFocus(valObj);
-            }
-
-            validateResult = false;
+            fail(`${name} 최대길이(${val}) 보다 작게 입력해주세요.`);
         }
     }
 
-    // 확장 규칙(ignoreChar/byte 길이/num/범위/format 추가분) + 조건부·그룹 규칙(checked/emptyIf/requiredIf/duplicateGroup)
-    let extMsg = scwin.__getExtendedRuleMessage(validateKey, val, valObjValue, valInfo.name || dataObjInfo.columnName);
+    // 확장 규칙(ignoreChar/byte 길이/num/범위/format 추가분) + 조건부·그룹 규칙(checked/emptyIf/requiredIf/duplicateGroup/compare/matchValue)
+    let extMsg = scwin.__getExtendedRuleMessage(validateKey, val, valObjValue, valInfo.name || dataObjInfo.columnName, valInfo);
     if (extMsg === null) {
         extMsg = scwin.__getConditionalRuleMessage(validateKey, valInfo, valObjValue, valInfo.name || dataObjInfo.columnName, options, dataObjInfo);
     }
     if (extMsg !== null) {
-        if (validateType === "ALERT" || validateType === "ALL") {
-            (firstObj === null) && (firstObj = valObj);
-
-            if (checkType === "SINGLE") {
-                $c.win.alert(extMsg, function() {
-                    if (options.focus) scwin.setFocus(valObj);
-                }, { disableCloseButton : false });
-            } else {
-                messageArr.push(extMsg);
-            }
-        }
-
-        if (validateType === "MARK" || validateType === "ALL") {
-            (firstObj === null) && (firstObj = valObj);
-            valObj.addClass("req");
-            if (options.focus) scwin.setFocus(valObj);
-        }
-
-        validateResult = false;
+        fail(extMsg);
     }
 
     return { validateResult, messageArr, firstObj };
@@ -612,279 +432,100 @@ scwin.validateDataGroup = function (validateKey, val, valInfo, valObj, dataObjIn
  */
 scwin.validateDataCollection = function (validateKey, val, valInfo, valObj, dataObjInfo, rowIndex, colIndex, checkType, validateType, options) {
     let validateResult = true;
-    let messageArr = [];
+    const messageArr = [];
     let firstObj = null;
     const valObjValue = valObj.getCellData(rowIndex, colIndex);
+    const name = $c.str.attachPostposition(valInfo.name || dataObjInfo.getColumnName(colIndex));
+    const focusObj = scwin.__resolveFocusObj(valInfo, valObj);   // 명세 §1 — 필드 focus 지정 시 해당 컴포넌트로 이동
+
+    // 포커스 공통 처리 — focus 지정 컴포넌트가 있으면 그 컴포넌트로, 없으면 실패 셀로(편집모드 포함)
+    const doFocus = function () {
+        if (!options.focus) { return; }
+        if (focusObj !== valObj) {
+            scwin.setFocus(focusObj);
+        } else {
+            scwin.setFocus(valObj, rowIndex, colIndex, options.editMode);
+        }
+    };
+
+    // 실패 공통 처리 — 알림(SINGLE 즉시/MULTI 취합)·셀 마킹·포커스 (모든 규칙 공용)
+    const fail = function (msg, alertOpts) {
+        if (validateType === "ALERT" || validateType === "ALL") {
+            (firstObj === null) && (firstObj = (focusObj !== valObj) ? focusObj : valObj);
+
+            if (checkType === "SINGLE") {
+                $c.win.alert(msg, function () {
+                    doFocus();
+                }, Object.assign({ disableCloseButton : false }, alertOpts));
+            } else {
+                messageArr.push(msg);
+            }
+        }
+
+        if (validateType === "MARK" || validateType === "ALL") {
+            (firstObj === null) && (firstObj = (focusObj !== valObj) ? focusObj : valObj);
+            valObj.setCellClass(rowIndex, colIndex, "req");
+            doFocus();
+        }
+
+        validateResult = false;
+    };
 
     if (validateKey === "REQUIRED" && val.toUpperCase() === "TRUE") {
         if (valObjValue === "") {
-            if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.getColumnName(colIndex))} 필수 입력사항입니다.`;
-                (firstObj === null) && (firstObj = valObj);
-
-                if (checkType === "SINGLE") {
-                    $c.win.alert(msg, function() {
-                        if (options.focus) scwin.setFocus(valObj, rowIndex, colIndex, options.editMode);
-                    }, { disableCloseButton : false });
-                } else {
-                    messageArr.push(msg);
-                }
-            }
-            
-            if (validateType === "MARK" || validateType === "ALL") {
-                valObj.addClass("req");
-                if (options.focus) scwin.setFocus(valObj, rowIndex, colIndex, options.editMode);
-            }
-
-            validateResult = false;
+            // 컬럼 inputType 별 문구 분기(선택/입력 — 명세 §3) + 필드 message 재정의(명세 §5)
+            fail(scwin.__getRequiredMessage(name, valInfo, valObj, colIndex));
         }
     }
 
     if (validateKey === "ALLOWCHAR") {
         if (valObjValue.length !== ((valObjValue.match(new RegExp("[" + val + "]", "g")) === null) ? 0 : valObjValue.match(new RegExp("[" + val + "]", "g")).length)) {
-            if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.getColumnName(colIndex))} 허용된 문자(${val})만 입력해주세요.`;
-                (firstObj === null) && (firstObj = valObj);
-
-                if (checkType === "SINGLE") {
-                    $c.win.alert(msg, function() {
-                        if (options.focus) scwin.setFocus(valObj, rowIndex, colIndex, options.editMode);
-                    }, { disableCloseButton : false });
-                } else {
-                    messageArr.push(msg);
-                }
-            }
-            
-            if (validateType === "MARK" || validateType === "ALL") {
-                valObj.setCellClass(rowIndex, colIndex, "req");
-                if (options.focus) scwin.setFocus(valObj, rowIndex, colIndex, options.editMode);
-            }
-            
-            validateResult = false;
+            // 조합 인식 시 세부 문구(명세 §7), 인식 불가 조합은 기존 범용 문구
+            fail(scwin.__getAllowCharMessage(name, val) || `${name} 허용된 문자(${val})만 입력해주세요.`);
         }
     }
 
     if (validateKey === "FORMAT") {
         if (val.toUpperCase() === "BIRTH" && !scwin.isBirthDay(valObjValue)) {
-            if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.getColumnName(colIndex))} 정확한 생년월일을 입력해주세요.`;
-                (firstObj === null) && (firstObj = valObj);
-
-                if (checkType === "SINGLE") {
-                    $c.win.alert(msg, function() {
-                        if (options.focus) scwin.setFocus(valObj, rowIndex, colIndex, options.editMode);
-                    }, { disableCloseButton : false });
-                } else {
-                    messageArr.push(msg);
-                }
-            }
-            
-            if (validateType === "MARK" || validateType === "ALL") {
-                valObj.setCellClass(rowIndex, colIndex, "req");
-                if (options.focus) scwin.setFocus(valObj, rowIndex, colIndex, options.editMode);
-            }
-
-            validateResult = false;
+            fail(`${name} 정확한 생년월일을 입력해주세요.`);
         } else if (val.toUpperCase() === "DATE" && !scwin.isValidDate(valObjValue)) {
-            if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.getColumnName(colIndex))} 정확한 날짜 형식을 입력해주세요.`;
-                (firstObj === null) && (firstObj = valObj);
-
-                if (checkType === "SINGLE") {
-                    $c.win.alert(msg, function() {
-                        if (options.focus) scwin.setFocus(valObj, rowIndex, colIndex, options.editMode);
-                    }, { disableCloseButton : false });
-                } else {
-                    messageArr.push(msg);
-                }
-            }
-            
-            if (validateType === "MARK" || validateType === "ALL") {
-                valObj.setCellClass(rowIndex, colIndex, "req");
-                if (options.focus) scwin.setFocus(valObj, rowIndex, colIndex, options.editMode);
-            }
-
-            validateResult = false;
+            fail(`${name} 정확한 날짜 형식을 입력해주세요.`);
         } else if (val.toUpperCase() === "MOBILEPHONE" && !$c.str.isMobilePhone(valObjValue)) {
-            if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.getColumnName(colIndex))} 정확한 모바일폰 형식을 입력해주세요.`;
-                (firstObj === null) && (firstObj = valObj);
-
-                if (checkType === "SINGLE") {
-                    $c.win.alert(msg, function() {
-                        if (options.focus) scwin.setFocus(valObj, rowIndex, colIndex, options.editMode);
-                    }, { disableCloseButton : false, width : 400 });
-                } else {
-                    messageArr.push(msg);
-                }
-            }
-            
-            if (validateType === "MARK" || validateType === "ALL") {
-                valObj.setCellClass(rowIndex, colIndex, "req");
-                if (options.focus) scwin.setFocus(valObj, rowIndex, colIndex, options.editMode);
-            }
-
-            validateResult = false;
+            fail(`${name} 정확한 모바일폰 형식을 입력해주세요.`, { width : 400 });
         } else if (val.toUpperCase() === "SECURITYNUMBER" && !$c.str.isSSN(valObjValue)) {
-            if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.getColumnName(colIndex))} 정확한 형식을 입력해주세요.`;
-                (firstObj === null) && (firstObj = valObj);
-
-                if (checkType === "SINGLE") {
-                    $c.win.alert(msg, function() {
-                        if (options.focus) scwin.setFocus(valObj, rowIndex, colIndex, options.editMode);
-                    }, { disableCloseButton : false });
-                } else {
-                    messageArr.push(msg);
-                }
-            }
-
-            if (validateType === "MARK" || validateType === "ALL") {
-                valObj.setCellClass(rowIndex, colIndex, "req");
-                if (options.focus) scwin.setFocus(valObj, rowIndex, colIndex, options.editMode);
-            }
-
-            validateResult = false;
+            fail(`${name} 정확한 형식을 입력해주세요.`);
         } else if (val.toUpperCase() === "PHONE" && !$c.str.isPhone(valObjValue)) {
-            if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.getColumnName(colIndex))} 정확한 전화번호 형식을 입력해주세요.`;
-                (firstObj === null) && (firstObj = valObj);
-
-                if (checkType === "SINGLE") {
-                    $c.win.alert(msg, function() {
-                        if (options.focus) scwin.setFocus(valObj, rowIndex, colIndex, options.editMode);
-                    }, { disableCloseButton : false, width : 400 });
-                } else {
-                    messageArr.push(msg);
-                }
-            }
-
-            if (validateType === "MARK" || validateType === "ALL") {
-                valObj.setCellClass(rowIndex, colIndex, "req");
-                if (options.focus) scwin.setFocus(valObj, rowIndex, colIndex, options.editMode);
-            }
-
-            validateResult = false;
+            fail(`${name} 정확한 전화번호 형식을 입력해주세요.`, { width : 400 });
         } else if (val.toUpperCase() === "EMAIL" && !$c.str.isEmail(valObjValue)) {
-            if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.getColumnName(colIndex))} 정확한 이메일 형식을 입력해주세요.`;
-                (firstObj === null) && (firstObj = valObj);
-
-                if (checkType === "SINGLE") {
-                    $c.win.alert(msg, function() {
-                        if (options.focus) scwin.setFocus(valObj, rowIndex, colIndex, options.editMode);
-                    }, { disableCloseButton : false });
-                } else {
-                    messageArr.push(msg);
-                }
-            }
-
-            if (validateType === "MARK" || validateType === "ALL") {
-                valObj.setCellClass(rowIndex, colIndex, "req");
-                if (options.focus) scwin.setFocus(valObj, rowIndex, colIndex, options.editMode);
-            }
-
-            validateResult = false;
+            fail(`${name} 정확한 이메일 형식을 입력해주세요.`);
         }
     }
 
     if (validateKey === "FIXLENGTH") {
         if (valObjValue.length !== Number.parseInt(val)) {
-            if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.getColumnName(colIndex))} 고정길이(${val})로 입력해주세요.`;
-                (firstObj === null) && (firstObj = valObj);
-
-                if (checkType === "SINGLE") {
-                    $c.win.alert(msg, function() {
-                        if (options.focus) scwin.setFocus(valObj, rowIndex, colIndex, options.editMode);
-                    }, { disableCloseButton : false });
-                } else {
-                    messageArr.push(msg);
-                }
-            }
-            
-            if (validateType === "MARK" || validateType === "ALL") {
-                valObj.setCellClass(rowIndex, colIndex, "req");
-                if (options.focus) scwin.setFocus(valObj, rowIndex, colIndex, options.editMode);
-            }
-
-            validateResult = false;
+            fail(`${name} 고정길이(${val})로 입력해주세요.`);
         }
     }
 
     if (validateKey === "MINLENGTH") {
         if (valObjValue.length < Number.parseInt(val)) {
-            if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.getColumnName(colIndex))} 최소길이(${val}) 보다 크게 입력해주세요.`;
-                (firstObj === null) && (firstObj = valObj);
-
-                if (checkType === "SINGLE") {
-                    $c.win.alert(msg, function() {
-                        if (options.focus) scwin.setFocus(valObj, rowIndex, colIndex, options.editMode);
-                    }, { disableCloseButton : false });
-                } else {
-                    messageArr.push(msg);
-                }
-            }
-            
-            if (validateType === "MARK" || validateType === "ALL") {
-                valObj.setCellClass(rowIndex, colIndex, "req");
-                if (options.focus) scwin.setFocus(valObj, rowIndex, colIndex, options.editMode);
-            }
-
-            validateResult = false;
+            fail(`${name} 최소길이(${val}) 보다 크게 입력해주세요.`);
         }
     }
 
     if (validateKey === "MAXLENGTH") {
         if (valObjValue.length > Number.parseInt(val)) {
-            if (validateType === "ALERT" || validateType === "ALL") {
-                let msg = `${$c.str.attachPostposition(valInfo.name || dataObjInfo.getColumnName(colIndex))} 최대길이(${val}) 보다 작게 입력해주세요.`;
-                (firstObj === null) && (firstObj = valObj);
-
-                if (checkType === "SINGLE") {
-                    $c.win.alert(msg, function() {
-                        if (options.focus) scwin.setFocus(valObj, rowIndex, colIndex, options.editMode);
-                    }, { disableCloseButton : false });
-                } else {
-                    messageArr.push(msg);
-                }
-            }
-            
-            if (validateType === "MARK" || validateType === "ALL") {
-                valObj.setCellClass(rowIndex, colIndex, "req");
-                if (options.focus) scwin.setFocus(valObj, rowIndex, colIndex, options.editMode);
-            }
-
-            validateResult = false;
+            fail(`${name} 최대길이(${val}) 보다 작게 입력해주세요.`);
         }
     }
 
-    // 확장 규칙(ignoreChar/byte 길이/num/범위/format 추가분) + 조건부·그룹 규칙(checked/emptyIf/requiredIf/duplicate)
-    let extMsg = scwin.__getExtendedRuleMessage(validateKey, val, valObjValue, valInfo.name || dataObjInfo.getColumnName(colIndex));
+    // 확장 규칙(ignoreChar/byte 길이/num/범위/format 추가분) + 조건부·그룹 규칙(checked/emptyIf/requiredIf/duplicate/compare/matchValue)
+    let extMsg = scwin.__getExtendedRuleMessage(validateKey, val, valObjValue, valInfo.name || dataObjInfo.getColumnName(colIndex), valInfo);
     if (extMsg === null) {
         extMsg = scwin.__getConditionalRuleMessage(validateKey, valInfo, valObjValue, valInfo.name || dataObjInfo.getColumnName(colIndex), options, dataObjInfo);
     }
     if (extMsg !== null) {
-        if (validateType === "ALERT" || validateType === "ALL") {
-            (firstObj === null) && (firstObj = valObj);
-
-            if (checkType === "SINGLE") {
-                $c.win.alert(extMsg, function() {
-                    if (options.focus) scwin.setFocus(valObj, rowIndex, colIndex, options.editMode);
-                }, { disableCloseButton : false });
-            } else {
-                messageArr.push(extMsg);
-            }
-        }
-
-        if (validateType === "MARK" || validateType === "ALL") {
-            (firstObj === null) && (firstObj = valObj);
-            valObj.setCellClass(rowIndex, colIndex, "req");
-            if (options.focus) scwin.setFocus(valObj, rowIndex, colIndex, options.editMode);
-        }
-
-        validateResult = false;
+        fail(extMsg);
     }
 
     return { validateResult, messageArr, firstObj };
@@ -892,23 +533,136 @@ scwin.validateDataCollection = function (validateKey, val, valInfo, valObj, data
 
 /**
  * @method
+ * @name __resolveFocusObj
+ * @description 검증 실패 시 포커스 이동 대상을 결정한다 (명세 §1).
+ *  필드 규칙에 focus("컴포넌트ID") 지정 시 해당 컴포넌트, 미지정·미존재 시 검증 컴포넌트 자신.
+ *  (분리 입력 등 실제 입력란이 따로 있는 경우 사용자 입력 위치로 유도)
+ * @param {Object} valInfo 규칙 객체 (focus 옵션 포함 가능)
+ * @param {Object} valObj 검증 대상 컴포넌트
+ * @returns {Object} 포커스 이동 대상 컴포넌트
+ * @hidden Y
+ * @exception
+ * @example
+ * const focusObj = scwin.__resolveFocusObj({ focus : "ipt_corpRegNo1" }, valObj);
+ */
+scwin.__resolveFocusObj = function (valInfo, valObj) {
+    if (valInfo && !$c.util.isEmpty(valInfo.focus)) {
+        const focusObj = $c.util.getComponent(valInfo.focus);
+        if (!$c.util.isEmpty(focusObj)) { return focusObj; }
+    }
+    return valObj;
+};
+
+/**
+ * @method
+ * @name __getRequiredMessage
+ * @description required 실패 기본 메시지를 컴포넌트 유형에 따라 분기한다 (명세 §3).
+ *  선택형(radio/checkbox/selectbox/checkcombobox/autoComplete/searchbox, 그리드 select·checkbox·radio 컬럼)
+ *  → "선택하세요.", 그 외 입력형 → "입력하세요.". 필드 규칙 message 지정 시 그 문구로 재정의(명세 §5).
+ * @param {String} name 조사 부착 항목 표시명
+ * @param {Object} valInfo 규칙 객체 (message 재정의 참조)
+ * @param {Object} valObj 검증 대상 컴포넌트 (그리드면 gridView)
+ * @param {Number} colIndex (그리드) 컬럼 index — 컬럼 inputType 판정용
+ * @returns {String} required 실패 메시지
+ * @hidden Y
+ * @exception
+ * @example
+ * scwin.__getRequiredMessage("결산월은(는)", {}, sbxMonth); // "결산월은(는) 선택하세요."
+ */
+scwin.__getRequiredMessage = function (name, valInfo, valObj, colIndex) {
+    if (valInfo && !$c.util.isEmpty(valInfo.message)) { return valInfo.message; }
+    const SELECT_TYPES = ["RADIO", "CHECKBOX", "SELECTBOX", "CHECKCOMBOBOX", "AUTOCOMPLETE", "SEARCHBOX", "SELECT", "DROPDOWN"];
+    let type = "";
+    if (valObj && typeof valObj.getPluginName === "function") {
+        type = valObj.getPluginName().toUpperCase();
+        if (type === "GRIDVIEW") {
+            type = (typeof valObj.getColumnInputType === "function" && colIndex !== undefined)
+                ? String(valObj.getColumnInputType(colIndex) || "").toUpperCase() : "";
+        }
+    }
+    const verb = SELECT_TYPES.includes(type) ? "선택" : "입력";
+    return `${name} ${verb}하세요.`;
+};
+
+/**
+ * @method
+ * @name __getAllowCharMessage
+ * @description allowChar 허용 패턴을 인식해 조합별 세부 안내 문구를 반환한다 (명세 §7).
+ *  한글/영문/숫자/영문+숫자/영문+숫자+특수문자 조합을 인식하며, 인식 불가 조합은 null 반환
+ *  (호출부에서 기존 범용 문구로 폴백).
+ * @param {String} name 조사 부착 항목 표시명
+ * @param {String} val allowChar 패턴 값 (예: "a-zA-Z0-9")
+ * @returns {String} 세부 안내 문구 (인식 불가 시 null)
+ * @hidden Y
+ * @exception
+ * @example
+ * scwin.__getAllowCharMessage("코드는(는)", "a-zA-Z0-9"); // "코드는(는) 영문+숫자만 입력이 가능합니다."
+ */
+scwin.__getAllowCharMessage = function (name, val) {
+    let rest = String(val);
+    const strip = function (tokens) {
+        let found = false;
+        tokens.forEach(function (t) {
+            if (rest.indexOf(t) !== -1) { found = true; rest = rest.split(t).join(""); }
+        });
+        return found;
+    };
+    const hasKor = strip(["가-힣", "ㄱ-ㅎ", "ㅏ-ㅣ"]);
+    const hasEng = strip(["a-zA-Z", "A-Za-z", "a-z", "A-Z"]);
+    const hasNum = strip(["0-9"]);
+    const hasSpecial = rest.length > 0;   // 알려진 토큰 제거 후 남은 문자는 특수문자 허용 목록으로 간주
+
+    if (hasKor && !hasEng && !hasNum && !hasSpecial) { return `${name} 한글만 입력이 가능합니다.`; }
+    if (hasEng && !hasKor && !hasNum && !hasSpecial) { return `${name} 영문만 입력이 가능합니다.`; }
+    if (hasNum && !hasKor && !hasEng && !hasSpecial) { return `${name} 숫자만 입력이 가능합니다.`; }
+    if (hasEng && hasNum && !hasKor && !hasSpecial) { return `${name} 영문+숫자만 입력이 가능합니다.`; }
+    if (hasEng && hasNum && hasSpecial && !hasKor) { return `${name} 영문+숫자+특수문자만 입력이 가능합니다.`; }
+    return null;
+};
+
+/**
+ * @method
+ * @name __getByteLengthUtf8
+ * @description UTF-8 기준 byte 수를 반환한다 — 한글 3byte (명세 §2 요건 확정값).
+ *  ※ $c.str.getByteLength(WebSquare util)는 한글을 2byte 로 계산하므로 byte 검증 규칙
+ *    (minLengthB/maxLengthB)은 이 함수를 사용한다.
+ * @param {String} str 대상 문자열
+ * @returns {Number} UTF-8 byte 수
+ * @hidden Y
+ * @exception
+ * @example
+ * scwin.__getByteLengthUtf8("1231a한글"); // 11 (5 + 3×2)
+ */
+scwin.__getByteLengthUtf8 = function (str) {
+    let bytes = 0;
+    for (const ch of String(str)) {
+        const cp = ch.codePointAt(0);
+        bytes += (cp <= 0x7F) ? 1 : ((cp <= 0x7FF) ? 2 : ((cp <= 0xFFFF) ? 3 : 4));
+    }
+    return bytes;
+};
+
+/**
+ * @method
  * @name __getExtendedRuleMessage
  * @description 확장 검증 규칙을 평가해 실패 메시지를 반환한다 (validateDataGroup/validateDataCollection 공용).
- *  지원 규칙: ignoreChar(입력 불가 문자) / minLengthB·maxLengthB(byte 길이) / maxLengthF(정수.소수 자리수)
+ *  지원 규칙: ignoreChar(입력 불가 문자) / minLengthB·maxLengthB(byte 길이 — UTF-8 기준·한글 3byte,
+ *  maxLengthB 는 객체형 { value, msgType:"korEng", message } 지원 — 명세 §2) / maxLengthF(정수.소수 자리수)
  *  / num(n:숫자, i:정수, f:실수) / fromNum·toNum(숫자 범위) / format:bizNum(사업자등록번호)
  *  / format:corpNum(법인등록번호) / format:urlNoProtocol(프로토콜 제외 URL).
  *  빈 값은 항상 통과시킨다(필수 여부는 required 규칙 소관).
  * @param {String} validateKey validate key 값 (대문자)
- * @param {String} val 규칙 값
+ * @param {String} val 규칙 값 (문자열화 — 객체형 규칙은 valInfo 에서 원본 참조)
  * @param {String} value 검증 대상 값
  * @param {String} fieldName 항목 표시명
+ * @param {Object} valInfo 규칙 객체 원본 (maxLengthB 객체형 참조용, 생략 가능)
  * @returns {String} 실패 메시지 (통과 시 null)
  * @hidden Y
  * @exception
  * @example
  * const extMsg = scwin.__getExtendedRuleMessage("NUM", "i", "12.5", "나이"); // "나이는 정수 형식으로 입력해주세요."
  */
-scwin.__getExtendedRuleMessage = function (validateKey, val, value, fieldName) {
+scwin.__getExtendedRuleMessage = function (validateKey, val, value, fieldName, valInfo) {
     const s = (value === undefined || value === null) ? "" : String(value);
     if (s === "") {
         return null;
@@ -922,14 +676,21 @@ scwin.__getExtendedRuleMessage = function (validateKey, val, value, fieldName) {
     }
 
     if (validateKey === "MINLENGTHB") {
-        if ($c.str.getByteLength(s) < Number.parseInt(val, 10)) {
+        if (scwin.__getByteLengthUtf8(s) < Number.parseInt(val, 10)) {
             return `${name} 최소 ${val}byte 이상 입력해주세요.`;
         }
     }
 
     if (validateKey === "MAXLENGTHB") {
-        if ($c.str.getByteLength(s) > Number.parseInt(val, 10)) {
-            return `${name} 최대 ${val}byte 이하로 입력해주세요.`;
+        // 객체형 { value, msgType:"korEng", message } 지원 — byte 한도는 동일, 안내 문구만 분기 (명세 §2)
+        const rule = (valInfo && valInfo.maxLengthB !== null && typeof valInfo.maxLengthB === "object") ? valInfo.maxLengthB : null;
+        const limit = Number.parseInt(rule ? rule.value : val, 10);
+        if (scwin.__getByteLengthUtf8(s) > limit) {
+            if (rule && String(rule.msgType || "").toUpperCase() === "KORENG") {
+                const korMax = Math.floor(limit / 3);   // 한글 3byte(UTF-8) 기준 환산 — 요건 확정값
+                return rule.message || `${name} 한글 ${korMax}자 영문 ${limit}자 이내로 입력해주세요.`;
+            }
+            return `${name} 최대 ${limit}byte 이하로 입력해주세요.`;
         }
     }
 
@@ -997,10 +758,14 @@ scwin.__getExtendedRuleMessage = function (validateKey, val, value, fieldName) {
  * @description 타 필드 참조가 필요한 조건부·그룹 규칙을 평가해 실패 메시지를 반환한다
  *  (validateDataGroup/validateDataCollection 공용).
  *  지원 규칙: checked(체크박스 필수 체크) / emptyIf(조건 충족 시 입력 금지) / requiredIf(조건 충족 시 필수)
- *  / duplicateGroup(폼 그룹 필드 간 중복 금지) / duplicate(그리드 컬럼 값 중복 금지).
+ *  / duplicateGroup(폼 그룹 필드 간 중복 금지) / duplicate(그리드 컬럼 값 중복 금지)
+ *  / compare(두 컴포넌트 값 비교 — 명세 §4) / matchValue(특정 값 일치 확인 — 명세 §5, 빈 값도 실패).
  *  emptyIf/requiredIf 조건 객체: { compID, equals | notEquals | in | notEmpty, message } — 참조 컴포넌트 값으로
  *  판정(equals > notEquals > in > notEmpty 순). notEquals 는 참조 값이 빈 경우 조건 불충족으로 처리한다
  *  (예: 국가코드가 대한민국("410")이 아니면 외국국적 — 미선택은 required 소관).
+ *  compare 조건 객체: { compareTarget(비교 대상 컴포넌트 ID — compID 별칭 허용),
+ *  compareType : "EQUAL"(일치해야 함) | "NOT_EQUAL"(달라야 함, 기본), message } — 두 값 모두 입력된 경우만 판정.
+ *  matchValue 조건: { value | values(배열), message } 또는 값/배열 직접 지정 — 값 불일치(미입력 포함) 시 실패.
  * @param {String} validateKey validate key 값 (대문자)
  * @param {Object} valInfo 규칙 객체 (원본 rules + id/name)
  * @param {String} value 검증 대상 값
@@ -1047,7 +812,48 @@ scwin.__getConditionalRuleMessage = function (validateKey, valInfo, value, field
         // 미체크 값(빈 값·falseValue 계열)은 전부 실패 처리 — required 와 달리 "0"/false 도 잡는다
         const FALSE_VALUES = ["", "0", "FALSE", "N", "OFF"];
         if (FALSE_VALUES.includes(s.toUpperCase())) {
-            return `${name} 체크(동의)해주세요.`;
+            return `${name} 동의 해주세요.`;   // 문구 변경 — 명세 §6
+        }
+    }
+
+    if (validateKey === "COMPARE") {
+        // 두 컴포넌트 값 비교 (명세 §4) — 두 값 모두 입력된 경우만 판정(빈 값은 required 소관)
+        const cmp = valInfo.compare;
+        if (!$c.util.isEmpty(cmp) && typeof cmp === "object" && s !== "") {
+            const targetId = cmp.compareTarget || cmp.compID;
+            const targetComp = $c.util.isEmpty(targetId) ? null : $c.util.getComponent(targetId);
+            if (!$c.util.isEmpty(targetComp) && typeof targetComp.getValue === "function") {
+                const targetVal = targetComp.getValue();
+                const t = String(targetVal === undefined || targetVal === null ? "" : targetVal);
+                if (t !== "") {
+                    const cmpType = String(cmp.compareType || "NOT_EQUAL").toUpperCase();
+                    if (cmpType === "EQUAL" && s !== t) {
+                        return cmp.message || `${name} 비교 대상과 값이 일치해야 합니다.`;
+                    }
+                    if (cmpType === "NOT_EQUAL" && s === t) {
+                        return cmp.message || `${name} 동일한 값이 존재합니다.`;
+                    }
+                }
+            }
+        }
+    }
+
+    if (validateKey === "MATCHVALUE") {
+        // 특정 값 일치 확인 (명세 §5) — 미입력도 실패(중복확인 여부 등 상태 플래그 점검용)
+        const mv = valInfo.matchValue;
+        if (!$c.util.isEmpty(mv) || mv === "" || mv === 0 || mv === false) {
+            let expected;
+            let mvMessage;
+            if (mv !== null && typeof mv === "object" && !Array.isArray(mv)) {
+                expected = (mv.values !== undefined) ? mv.values : mv.value;
+                mvMessage = mv.message;
+            } else {
+                expected = mv;
+            }
+            const list = (Array.isArray(expected) ? expected : [expected]).map(String);
+            if (!list.includes(s)) {
+                return mvMessage || `${name} 값을 확인해주세요.`;
+            }
         }
     }
 

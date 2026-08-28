@@ -62,10 +62,14 @@
  * - 조건부 규칙      : emptyIf(notEquals — 외국국적 입력 금지) · requiredIf(notEmpty — 선행 입력)
  * - 그룹·중복 규칙   : duplicateGroup(폼 결산월) · duplicate(그리드 행 간 중복)
  * - 체크박스 규칙    : checked(약관 동의 3종 — 미체크 "0"/false 도 실패)
+ * - 명세 v3 신규     : maxLengthB 객체형(korEng — "한글 N자 영문 M자" 문구, 한글 3byte 환산)
+ *                      · required 문구 자동 분기(선택형 "선택하세요"/입력형 "입력하세요")
+ *                      · 필드 focus/message · compare · matchValue (미사용 옵션은 검증 함수 주석 예시 참조)
  * - 부가 검사        : $c.util.checkFileTotalSize(첨부 총용량 100MB)
  *
  * 참고
  * - required·checked 외 규칙은 빈 값을 통과시킨다. 필수 항목은 required 를 병행 지정한다.
+ * - byte 길이(minLengthB/maxLengthB)는 UTF-8 기준(한글 3byte)으로 계산한다.
  * - 그리드 검증은 행 단위로 돌므로 행이 0건이면 실행되지 않는다.
  *   "최소 1건 필수" 는 저장 함수에서 getRowCount() 로 따로 확인한다.
  */
@@ -319,12 +323,12 @@ scwin.validate = async function () {
 		checkType    : "multi",  // single(첫 실패 즉시 중단) | multi(전건 수집 후 취합 알림)
 		focus        : true,
 		fields : {
-			// [기본] 필수 선택
+			// [기본] 필수 선택 — 선택형 컴포넌트라 "국가코드은(는) 선택하세요." 문구로 자동 분기(명세 §3)
 			sbx_nationCd   : { required : true, name : "국가코드" },
 
-			// [byte] 한/영 혼합 byte 제한 — 한글 40자 = 80byte
+			// [byte] 한/영 혼합 byte 제한 — UTF-8 기준(한글 3byte). 객체형(korEng)은 "한글 N자 영문 M자" 문구(명세 §2)
 			ipt_corpNm     : { required : true, maxLengthB : 80, name : "발행기관명" },
-			ipt_corpAbbrNm : { maxLengthB : 40, name : "발행기관 한글약명" },
+			ipt_corpAbbrNm : { maxLengthB : { value : 40, msgType : "korEng" }, name : "발행기관 한글약명" },   // "한글 13자 영문 40자" 문구
 			ipt_dscnBefCorpNm : { maxLengthB : 100, name : "분할전 법인명" },
 
 			// [문자] 허용 문자 + 최대 길이 (영문 전용 항목은 maxLength 로 글자수 제한)
@@ -362,10 +366,19 @@ scwin.validate = async function () {
 			                                  message : "상호변경내역1 변경일을 먼저 입력해주세요." },
 			                   format : "date", name : "상호변경내역1 변경일" },
 
-			// [약관] checked 는 required 와 달리 미체크 값("0"·false)도 실패로 잡는다
+			// [약관] checked 는 required 와 달리 미체크 값("0"·false)도 실패로 잡는다 — "…동의 해주세요." 문구(명세 §6)
 			chk_agreePrivacy : { checked : true, name : "개인정보 처리방침 동의" },
 			chk_agreeCollect : { checked : true, name : "개인정보 수집·이용 동의" },
 			chk_agreeTerms   : { checked : true, name : "표준코드 서비스 이용약관 동의" }
+
+			// [참고 — 명세 v3 신규 옵션 예시] 이 화면에는 대응 컴포넌트가 없어 주석으로 제공 (validate.xml JSDoc 참조)
+			// 분리 입력 필드 포커스(§1)  : ipt_corpRegNo : { format : "corpNum", focus : "ipt_corpRegNo1", name : "법인등록번호" }
+			// 특정 값 확인(§5)           : ipt_newYn : { matchValue : { value : "Y", message : "아이디 중복확인 여부를 확인하십시오." },
+			//                                            focus : "ipt_integUsrId", name : "중복확인" }   // 미입력도 실패
+			// 두 컴포넌트 값 비교(§4)    : acntClsMm1 : { compare : { compareTarget : "acntClsMm2", compareType : "NOT_EQUAL",
+			//                                            message : "동일한 결산월이 존재합니다.\n결산월을 확인해주세요!" },
+			//                                            focus : "acntClsMm2", name : "결산월" }
+			// required 문구 재정의(§5)   : ipt_newYn : { required : true, message : "아이디 중복확인 여부를 확인하십시오." }
 		}
 	};
 

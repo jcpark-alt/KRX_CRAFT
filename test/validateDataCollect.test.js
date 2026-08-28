@@ -66,13 +66,18 @@ function mockFormPath(h, comps) {
   };
 }
 
-const makeComp = (id, value) => ({
-  getPluginName: () => "input",
-  getOriginalID: () => id,
-  getValue: () => value,
-  addClass: () => {},
-  removeClass: () => {},
-});
+const makeComp = (id, value, plugin = "input") => {
+  const comp = {
+    focused: false,
+    getPluginName: () => plugin,
+    getOriginalID: () => id,
+    getValue: () => value,
+    addClass: () => {},
+    removeClass: () => {},
+  };
+  comp.focus = () => { comp.focused = true; };
+  return comp;
+};
 
 const container = { getPluginName: () => "group" };
 const OPTS = { validateType: "alert", checkType: "multi", focus: false };
@@ -144,7 +149,7 @@ describe("validateDataCollect (src/gcc/validate.xml)", () => {
     expect(await h.scwin.validateDataCollect(container, {
       ...OPTS, fields: { chk_agree: { checked: true, name: "개인정보 처리방침 동의" } },
     })).toBe(false);
-    expect(h.state.alerts.join("")).toContain("체크(동의)");
+    expect(h.state.alerts.join("")).toContain("동의 해주세요");   // 문구 변경 — 명세 §6
 
     const h2 = loadHarness();
     mockFormPath(h2, [{ comp: makeComp("chk_agree", "1"), columnId: "AGREE", columnName: "약관동의" }]);
@@ -236,6 +241,104 @@ describe("validateDataCollect (src/gcc/validate.xml)", () => {
       ...OPTS, fields: { MONTH: { duplicate: true, name: "결산월" } },
     })).toBe(false);
     expect(h.state.alerts.join("")).toContain("중복된 값");
+  });
+
+  // ==== 명세 v3 신규 기능 (WebSquare6_Validation_Module_Specification-v3.md) ====
+
+  test("§3 required 문구 유형 분기 — 선택형은 '선택하세요', 입력형은 '입력하세요'", async () => {
+    const h = loadHarness();
+    mockFormPath(h, [
+      { comp: makeComp("sbx_month", "", "selectbox"), columnId: "M", columnName: "결산월" },
+      { comp: makeComp("ipb_nm", "", "input"), columnId: "NM", columnName: "사원명" },
+    ]);
+    expect(await h.scwin.validateDataCollect(container, {
+      ...OPTS, fields: {
+        sbx_month: { required: true, name: "결산월" },
+        ipb_nm: { required: true, name: "사원명" },
+      },
+    })).toBe(false);
+    const joined = h.state.alerts.join("");
+    expect(joined).toContain("결산월은(는) 선택하세요");
+    expect(joined).toContain("사원명은(는) 입력하세요");
+  });
+
+  test("§5 required message 재정의 + §1 focus 지정 컴포넌트로 포커스 이동", async () => {
+    const h = loadHarness();
+    const focusTarget = makeComp("ipt_corpRegNo1", "");
+    h.state.comps.ipt_corpRegNo1 = focusTarget;
+    mockFormPath(h, [{ comp: makeComp("ipt_corpRegNo", ""), columnId: "CORP", columnName: "법인등록번호" }]);
+    expect(await h.scwin.validateDataCollect(container, {
+      validateType: "all", checkType: "multi", focus: true,   // MARK 경로에서 즉시 setFocus
+      fields: {
+        ipt_corpRegNo: { required: true, message: "법인등록번호를 다시 확인하십시오.", focus: "ipt_corpRegNo1", name: "법인등록번호" },
+      },
+    })).toBe(false);
+    expect(h.state.alerts.join("")).toContain("법인등록번호를 다시 확인하십시오.");
+    expect(focusTarget.focused).toBe(true);   // 실패 컴포넌트가 아닌 focus 지정 컴포넌트로 이동
+  });
+
+  test("§5 matchValue — 미입력/불일치 실패(커스텀 메시지), 일치 통과", async () => {
+    const rule = { matchValue: { value: "Y", message: "아이디 중복확인 여부를 확인하십시오." }, name: "중복확인" };
+    const h = loadHarness();
+    mockFormPath(h, [{ comp: makeComp("ipt_newYn", ""), columnId: "YN", columnName: "중복확인" }]);
+    expect(await h.scwin.validateDataCollect(container, { ...OPTS, fields: { ipt_newYn: rule } })).toBe(false);
+    expect(h.state.alerts.join("")).toContain("아이디 중복확인 여부");
+
+    const h2 = loadHarness();
+    mockFormPath(h2, [{ comp: makeComp("ipt_newYn", "Y"), columnId: "YN", columnName: "중복확인" }]);
+    expect(await h2.scwin.validateDataCollect(container, { ...OPTS, fields: { ipt_newYn: rule } })).toBe(true);
+  });
+
+  test("§4 compare(NOT_EQUAL) — 대상과 동일 값이면 실패, 다르면 통과", async () => {
+    const rule = {
+      compare: { compareTarget: "acntClsMm2", compareType: "NOT_EQUAL", message: "동일한 결산월이 존재합니다." },
+      name: "결산월1",
+    };
+    const h = loadHarness();
+    h.state.comps.acntClsMm2 = makeComp("acntClsMm2", "03");
+    mockFormPath(h, [{ comp: makeComp("acntClsMm1", "03"), columnId: "M1", columnName: "결산월1" }]);
+    expect(await h.scwin.validateDataCollect(container, { ...OPTS, fields: { acntClsMm1: rule } })).toBe(false);
+    expect(h.state.alerts.join("")).toContain("동일한 결산월");
+
+    const h2 = loadHarness();
+    h2.state.comps.acntClsMm2 = makeComp("acntClsMm2", "06");
+    mockFormPath(h2, [{ comp: makeComp("acntClsMm1", "03"), columnId: "M1", columnName: "결산월1" }]);
+    expect(await h2.scwin.validateDataCollect(container, { ...OPTS, fields: { acntClsMm1: rule } })).toBe(true);
+  });
+
+  test("§2 maxLengthB — UTF-8(한글 3byte) 계산 + korEng 옵션 문구", async () => {
+    // 한글 4자 = 12byte > 11 — 한글 2byte 계산(8byte)이면 통과했을 케이스로 3byte 계산을 검증
+    const h = loadHarness();
+    mockFormPath(h, [{ comp: makeComp("ipb_nm", "한글한글"), columnId: "NM", columnName: "이름" }]);
+    expect(await h.scwin.validateDataCollect(container, {
+      ...OPTS, fields: { ipb_nm: { maxLengthB: 11, name: "이름" } },
+    })).toBe(false);
+    expect(h.state.alerts.join("")).toContain("11byte");
+
+    // 객체형 + korEng — 한도 18byte, 한글 7자(21byte) 실패 → "한글 6자 영문 18자" 문구
+    const h2 = loadHarness();
+    mockFormPath(h2, [{ comp: makeComp("ipb_corpNm", "한글한글한글한"), columnId: "CN", columnName: "발행기관명" }]);
+    expect(await h2.scwin.validateDataCollect(container, {
+      ...OPTS, fields: { ipb_corpNm: { maxLengthB: { value: 18, msgType: "korEng" }, name: "발행기관명" } },
+    })).toBe(false);
+    expect(h2.state.alerts.join("")).toContain("한글 6자 영문 18자");
+  });
+
+  test("§7 allowChar 조합별 세부 문구 — 숫자만/영문+숫자", async () => {
+    const h = loadHarness();
+    mockFormPath(h, [
+      { comp: makeComp("ipb_cnt", "12a"), columnId: "CNT", columnName: "수량" },
+      { comp: makeComp("ipb_cd", "AB-1"), columnId: "CD", columnName: "코드" },
+    ]);
+    expect(await h.scwin.validateDataCollect(container, {
+      ...OPTS, fields: {
+        ipb_cnt: { allowChar: "0-9", name: "수량" },
+        ipb_cd: { allowChar: "a-zA-Z0-9", name: "코드" },
+      },
+    })).toBe(false);
+    const joined = h.state.alerts.join("");
+    expect(joined).toContain("수량은(는) 숫자만 입력이 가능합니다");
+    expect(joined).toContain("코드은(는) 영문+숫자만 입력이 가능합니다");
   });
 
   test("그리드 경로 format:email — 잘못된 이메일 셀 실패 (기존 누락 보강)", async () => {

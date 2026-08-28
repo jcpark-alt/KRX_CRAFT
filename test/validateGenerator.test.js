@@ -118,4 +118,22 @@ describe("VG.buildCode — options 코드 생성", () => {
     expect(code).toContain('sbxMonth1 : { duplicateGroup : "settleMonth", name : "결산월1" }');
     expect(code).toContain("MONTH : { fixLength : 2, duplicate : true }");
   });
+
+  test("명세 v3 신규 규칙 — compare/matchValue 원문, focus/message 문자열, maxLengthB 객체형", () => {
+    const code = VG.buildCode(common, [
+      { id: "ipt_newYn", rules: {
+          matchValue: '{ value : "Y", message : "아이디 중복확인 여부를 확인하십시오." }',
+          focus: "ipt_integUsrId", name: "중복확인" } },
+      { id: "ipt_corpNm", rules: { maxLengthB: '{ value : 80, msgType : "korEng" }', name: "발행기관명" } },
+      { id: "acntClsMm1", rules: {
+          compare: '{ compareTarget : "acntClsMm2", compareType : "NOT_EQUAL" }',
+          message: "동일한 결산월이 존재합니다.", name: "결산월1" } },
+    ], "grp_form");
+
+    expect(code).toContain('matchValue : { value : "Y", message : "아이디 중복확인 여부를 확인하십시오." }');
+    expect(code).toContain('focus : "ipt_integUsrId"');
+    expect(code).toContain('maxLengthB : { value : 80, msgType : "korEng" }');   // 객체 리터럴 원문 통과
+    expect(code).toContain('compare : { compareTarget : "acntClsMm2", compareType : "NOT_EQUAL" }');
+    expect(code).toContain('message : "동일한 결산월이 존재합니다."');
+  });
 });
