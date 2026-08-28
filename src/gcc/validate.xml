@@ -11,7 +11,7 @@
 			<w2:workflowCollection/>
 		</xf:model>
 		<w2:layoutInfo/>
-		<w2:publicInfo method="scwin.validateDataCollect,scwin.validateDataGroup,scwin.validateDataCollection,scwin.getGridViewDataList,scwin.getChildrenComponent,scwin.getDataCollection,scwin.setFocus,scwin.isBirthDay,scwin.isValidDate,scwin.validateSiteUrl"/>
+		<w2:publicInfo method="scwin.validateDataCollect,scwin.validateDataGroup,scwin.validateDataCollection,scwin.resolveFocusObj,scwin.getRequiredMessage,scwin.getExtendedRuleMessage,scwin.getConditionalRuleMessage,scwin.getGridViewDataList,scwin.getChildrenComponent,scwin.getDataCollection,scwin.setFocus,scwin.isBirthDay,scwin.isValidDate,scwin.validateSiteUrl"/>
 		<script lazy="false" type="text/javascript"><![CDATA[
 // =============================================================================
 /**
@@ -189,7 +189,7 @@ scwin.validateDataCollect = async function (validateObj, options) {
 
         try {
             // 컴포넌트 수집도 try 내부에서 수행 — 실패 시 catch 로 false 반환
-            objArr = scwin.getChildrenComponent(validateObj, {
+            objArr = $c.validate.getChildrenComponent(validateObj, {
                 includePlugin: "autoComplete checkbox checkcombobox input inputCalendar radio selectbox searchbox secret textarea",
                 recursive: true,
             });
@@ -207,7 +207,7 @@ scwin.validateDataCollect = async function (validateObj, options) {
             objArr.some(valObj => {
 				if (isBreak) return true;
 
-                let dataObjInfo = scwin.getDataCollection(valObj);
+                let dataObjInfo = $c.validate.getDataCollection(valObj);
                 if ($c.util.isEmpty(dataObjInfo)) {
                     // DataCollection 미바인딩 컴포넌트(분리 입력 칸 등) — 기본은 건너뛴다(하위호환).
                     // includeUnbound : true 지정 시 컴포넌트 ID 규칙으로 검증하며, 표시명은 name 미지정 시 컴포넌트 ID.
@@ -234,7 +234,7 @@ scwin.validateDataCollect = async function (validateObj, options) {
                     const val = String(valInfo[key]);
                     if (!val) continue;
 
-                    const result = scwin.validateDataGroup(validateKey, val, valInfo, valObj, dataObjInfo, checkType, validateType, options);
+                    const result = $c.validate.validateDataGroup(validateKey, val, valInfo, valObj, dataObjInfo, checkType, validateType, options);
                     validateResult = (validateResult) ? result.validateResult : false;
                     messageArr.push(...result.messageArr);
                     (firstObj === null) && (firstObj = result.firstObj);
@@ -267,7 +267,7 @@ scwin.validateDataCollect = async function (validateObj, options) {
         return validateResult;
     } else {
         try {
-            const gridViewCollect = await scwin.getGridViewDataList(validateObj);
+            const gridViewCollect = await $c.validate.getGridViewDataList(validateObj);
             const gridViewData = gridViewCollect.getAllJSON();
 
 			let isBreak = false;
@@ -291,7 +291,7 @@ scwin.validateDataCollect = async function (validateObj, options) {
                         const val = String(valInfo[key]);
                         if (!val) continue;
 
-                        const result = scwin.validateDataCollection(validateKey, val, valInfo, validateObj, gridViewCollect, rowIndex, colIndex, checkType, validateType, options);
+                        const result = $c.validate.validateDataCollection(validateKey, val, valInfo, validateObj, gridViewCollect, rowIndex, colIndex, checkType, validateType, options);
                         validateResult = (validateResult) ? result.validateResult : false;
                         messageArr.push(...result.messageArr);
                         (firstObj === null) && (firstObj = result.firstObj);
@@ -347,7 +347,7 @@ scwin.validateDataGroup = function (validateKey, val, valInfo, valObj, dataObjIn
     let firstObj = null;
     const valObjValue = valObj.getValue();
     const name = $c.str.attachPostposition(valInfo.name || dataObjInfo.columnName);
-    const focusObj = scwin.__resolveFocusObj(valInfo, valObj);   // 명세 §1 — 필드 focus 지정 시 해당 컴포넌트로 이동
+    const focusObj = $c.validate.resolveFocusObj(valInfo, valObj);   // 명세 §1 — 필드 focus 지정 시 해당 컴포넌트로 이동
 
     // 실패 공통 처리 — 알림(SINGLE 즉시/MULTI 취합)·마킹·포커스 (모든 규칙 공용)
     const fail = function (msg, alertOpts) {
@@ -375,7 +375,7 @@ scwin.validateDataGroup = function (validateKey, val, valInfo, valObj, dataObjIn
     if (validateKey === "REQUIRED" && val.toUpperCase() === "TRUE") {
         if (valObjValue === "") {
             // 컴포넌트 유형별 문구 분기(선택/입력 — 명세 §3) + 필드 message 재정의(명세 §5)
-            fail(scwin.__getRequiredMessage(name, valInfo, valObj));
+            fail($c.validate.getRequiredMessage(name, valInfo, valObj));
         }
     }
 
@@ -421,9 +421,9 @@ scwin.validateDataGroup = function (validateKey, val, valInfo, valObj, dataObjIn
     }
 
     // 확장 규칙(ignoreChar/byte 길이/num/범위/format 추가분) + 조건부·그룹 규칙(checked/emptyIf/requiredIf/duplicateGroup/compare/matchValue)
-    let extMsg = scwin.__getExtendedRuleMessage(validateKey, val, valObjValue, valInfo.name || dataObjInfo.columnName, valInfo);
+    let extMsg = $c.validate.getExtendedRuleMessage(validateKey, val, valObjValue, valInfo.name || dataObjInfo.columnName, valInfo);
     if (extMsg === null) {
-        extMsg = scwin.__getConditionalRuleMessage(validateKey, valInfo, valObjValue, valInfo.name || dataObjInfo.columnName, options, dataObjInfo);
+        extMsg = $c.validate.getConditionalRuleMessage(validateKey, valInfo, valObjValue, valInfo.name || dataObjInfo.columnName, options, dataObjInfo);
     }
     if (extMsg !== null) {
         fail(extMsg);
@@ -457,7 +457,7 @@ scwin.validateDataCollection = function (validateKey, val, valInfo, valObj, data
     let firstObj = null;
     const valObjValue = valObj.getCellData(rowIndex, colIndex);
     const name = $c.str.attachPostposition(valInfo.name || dataObjInfo.getColumnName(colIndex));
-    const focusObj = scwin.__resolveFocusObj(valInfo, valObj);   // 명세 §1 — 필드 focus 지정 시 해당 컴포넌트로 이동
+    const focusObj = $c.validate.resolveFocusObj(valInfo, valObj);   // 명세 §1 — 필드 focus 지정 시 해당 컴포넌트로 이동
 
     // 포커스 공통 처리 — focus 지정 컴포넌트가 있으면 그 컴포넌트로, 없으면 실패 셀로(편집모드 포함)
     const doFocus = function () {
@@ -495,7 +495,7 @@ scwin.validateDataCollection = function (validateKey, val, valInfo, valObj, data
     if (validateKey === "REQUIRED" && val.toUpperCase() === "TRUE") {
         if (valObjValue === "") {
             // 컬럼 inputType 별 문구 분기(선택/입력 — 명세 §3) + 필드 message 재정의(명세 §5)
-            fail(scwin.__getRequiredMessage(name, valInfo, valObj, colIndex));
+            fail($c.validate.getRequiredMessage(name, valInfo, valObj, colIndex));
         }
     }
 
@@ -541,9 +541,9 @@ scwin.validateDataCollection = function (validateKey, val, valInfo, valObj, data
     }
 
     // 확장 규칙(ignoreChar/byte 길이/num/범위/format 추가분) + 조건부·그룹 규칙(checked/emptyIf/requiredIf/duplicate/compare/matchValue)
-    let extMsg = scwin.__getExtendedRuleMessage(validateKey, val, valObjValue, valInfo.name || dataObjInfo.getColumnName(colIndex), valInfo);
+    let extMsg = $c.validate.getExtendedRuleMessage(validateKey, val, valObjValue, valInfo.name || dataObjInfo.getColumnName(colIndex), valInfo);
     if (extMsg === null) {
-        extMsg = scwin.__getConditionalRuleMessage(validateKey, valInfo, valObjValue, valInfo.name || dataObjInfo.getColumnName(colIndex), options, dataObjInfo);
+        extMsg = $c.validate.getConditionalRuleMessage(validateKey, valInfo, valObjValue, valInfo.name || dataObjInfo.getColumnName(colIndex), options, dataObjInfo);
     }
     if (extMsg !== null) {
         fail(extMsg);
@@ -554,19 +554,19 @@ scwin.validateDataCollection = function (validateKey, val, valInfo, valObj, data
 
 /**
  * @method
- * @name __resolveFocusObj
+ * @name resolveFocusObj
  * @description 검증 실패 시 포커스 이동 대상을 결정한다 (명세 §1).
  *  필드 규칙에 focus("컴포넌트ID") 지정 시 해당 컴포넌트, 미지정·미존재 시 검증 컴포넌트 자신.
  *  (분리 입력 등 실제 입력란이 따로 있는 경우 사용자 입력 위치로 유도)
  * @param {Object} valInfo 규칙 객체 (focus 옵션 포함 가능)
  * @param {Object} valObj 검증 대상 컴포넌트
  * @returns {Object} 포커스 이동 대상 컴포넌트
- * @hidden Y
+ * @hidden N
  * @exception
  * @example
- * const focusObj = scwin.__resolveFocusObj({ focus : "ipt_corpRegNo1" }, valObj);
+ * const focusObj = scwin.resolveFocusObj({ focus : "ipt_corpRegNo1" }, valObj);
  */
-scwin.__resolveFocusObj = function (valInfo, valObj) {
+scwin.resolveFocusObj = function (valInfo, valObj) {
     if (valInfo && !$c.util.isEmpty(valInfo.focus)) {
         const focusObj = $c.util.getComponent(valInfo.focus);
         if (!$c.util.isEmpty(focusObj)) { return focusObj; }
@@ -576,21 +576,22 @@ scwin.__resolveFocusObj = function (valInfo, valObj) {
 
 /**
  * @method
- * @name __getRequiredMessage
+ * @name getRequiredMessage
  * @description required 실패 기본 메시지를 컴포넌트 유형에 따라 분기한다 (명세 §3).
  *  선택형(radio/checkbox/selectbox/checkcombobox/autoComplete/searchbox, 그리드 select·checkbox·radio 컬럼)
  *  → "선택하세요.", 그 외 입력형 → "입력하세요.". 필드 규칙 message 지정 시 그 문구로 재정의(명세 §5).
+ *  ($c 공통함수 사용 함수 — 빌드 $p 주입 규칙에 따라 공개 선언·$c.validate 로 호출)
  * @param {String} name 조사 부착 항목 표시명
  * @param {Object} valInfo 규칙 객체 (message 재정의 참조)
  * @param {Object} valObj 검증 대상 컴포넌트 (그리드면 gridView)
  * @param {Number} colIndex (그리드) 컬럼 index — 컬럼 inputType 판정용
  * @returns {String} required 실패 메시지
- * @hidden Y
+ * @hidden N
  * @exception
  * @example
- * scwin.__getRequiredMessage("결산월은(는)", {}, sbxMonth); // "결산월은(는) 선택하세요."
+ * $c.validate.getRequiredMessage("결산월은(는)", {}, sbxMonth); // "결산월은(는) 선택하세요."
  */
-scwin.__getRequiredMessage = function (name, valInfo, valObj, colIndex) {
+scwin.getRequiredMessage = function (name, valInfo, valObj, colIndex) {
     if (valInfo && !$c.util.isEmpty(valInfo.message)) { return valInfo.message; }
     const SELECT_TYPES = ["RADIO", "CHECKBOX", "SELECTBOX", "CHECKCOMBOBOX", "AUTOCOMPLETE", "SEARCHBOX", "SELECT", "DROPDOWN"];
     let type = "";
@@ -665,8 +666,9 @@ scwin.__getByteLengthUtf8 = function (str) {
 
 /**
  * @method
- * @name __getExtendedRuleMessage
+ * @name getExtendedRuleMessage
  * @description 확장 검증 규칙을 평가해 실패 메시지를 반환한다 (validateDataGroup/validateDataCollection 공용).
+ *  ($c 공통함수 사용 함수 — 빌드 $p 주입 규칙에 따라 공개 선언·$c.validate 로 호출)
  *  지원 규칙: ignoreChar(입력 불가 문자) / minLengthB·maxLengthB(byte 길이 — UTF-8 기준·한글 3byte,
  *  maxLengthB 는 객체형 { value, msgType:"korEng", message } 지원 — 명세 §2) / maxLengthF(정수.소수 자리수)
  *  / num(n:숫자, i:정수, f:실수) / fromNum·toNum(숫자 범위) / format:bizNum(사업자등록번호)
@@ -680,12 +682,12 @@ scwin.__getByteLengthUtf8 = function (str) {
  * @param {String} fieldName 항목 표시명
  * @param {Object} valInfo 규칙 객체 원본 (maxLengthB 객체형 참조용, 생략 가능)
  * @returns {String} 실패 메시지 (통과 시 null)
- * @hidden Y
+ * @hidden N
  * @exception
  * @example
- * const extMsg = scwin.__getExtendedRuleMessage("NUM", "i", "12.5", "나이"); // "나이는 정수 형식으로 입력해주세요."
+ * const extMsg = $c.validate.getExtendedRuleMessage("NUM", "i", "12.5", "나이"); // "나이는 정수 형식으로 입력해주세요."
  */
-scwin.__getExtendedRuleMessage = function (validateKey, val, value, fieldName, valInfo) {
+scwin.getExtendedRuleMessage = function (validateKey, val, value, fieldName, valInfo) {
     const s = (value === undefined || value === null) ? "" : String(value);
     if (s === "") {
         return null;
@@ -800,9 +802,10 @@ scwin.__getExtendedRuleMessage = function (validateKey, val, value, fieldName, v
 
 /**
  * @method
- * @name __getConditionalRuleMessage
+ * @name getConditionalRuleMessage
  * @description 타 필드 참조가 필요한 조건부·그룹 규칙을 평가해 실패 메시지를 반환한다
  *  (validateDataGroup/validateDataCollection 공용).
+ *  ($c 공통함수 사용 함수 — 빌드 $p 주입 규칙에 따라 공개 선언·$c.validate 로 호출)
  *  지원 규칙: checked(체크박스 필수 체크) / emptyIf(조건 충족 시 입력 금지) / requiredIf(조건 충족 시 필수)
  *  / duplicateGroup(폼 그룹 필드 간 중복 금지) / duplicate(그리드 컬럼 값 중복 금지)
  *  / compare(두 컴포넌트 값 비교 — 명세 §4) / matchValue(특정 값 일치 확인 — 명세 §5, 빈 값도 실패).
@@ -819,12 +822,12 @@ scwin.__getExtendedRuleMessage = function (validateKey, val, value, fieldName, v
  * @param {Object} options validateDataCollect options (duplicateGroup 이 fields 목록을 참조)
  * @param {Object} dataObjInfo DataCollection 정보 (그리드 duplicate 가 전체 행을 참조)
  * @returns {String} 실패 메시지 (통과 시 null)
- * @hidden Y
+ * @hidden N
  * @exception
  * @example
- * const condMsg = scwin.__getConditionalRuleMessage("CHECKED", valInfo, "", "약관동의", options, dataObjInfo);
+ * const condMsg = $c.validate.getConditionalRuleMessage("CHECKED", valInfo, "", "약관동의", options, dataObjInfo);
  */
-scwin.__getConditionalRuleMessage = function (validateKey, valInfo, value, fieldName, options, dataObjInfo) {
+scwin.getConditionalRuleMessage = function (validateKey, valInfo, value, fieldName, options, dataObjInfo) {
     const s = (value === undefined || value === null) ? "" : String(value);
     const name = $c.str.attachPostposition(fieldName);
 

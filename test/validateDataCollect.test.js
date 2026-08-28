@@ -53,6 +53,7 @@ function loadHarness() {
   };
   vm.createContext(sandbox);
   vm.runInContext(extractCdata(XML_FILE), sandbox, { filename: "validate.xml.cdata.js" });
+  sandbox.$c.validate = sandbox.scwin;   // 실환경 네임스페이스 배선 — 내부 호출이 $c.validate.* 경유(빌드 $p 주입 규칙)
   return { scwin: sandbox.scwin, state };
 }
 
