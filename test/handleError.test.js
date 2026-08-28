@@ -68,8 +68,9 @@ function loadHarness() {
 
   vm.createContext(sandbox);
   vm.runInContext(extractCdata(XML_FILE), sandbox, { filename: path.basename(XML_FILE) + ".cdata.js" });
-  const origReport = sandbox.scwin.__reportError;
-  sandbox.scwin.__reportError = (ex, context) => { calls.report.push({ ex, context }); return origReport(ex, context); };
+  sandbox.$c.exception = sandbox.scwin;   // 실환경 네임스페이스 배선 — 내부 호출이 $c.exception.* 경유(빌드 $p 주입 규칙)
+  const origReport = sandbox.scwin.reportError;
+  sandbox.scwin.reportError = (ex, context) => { calls.report.push({ ex, context }); return origReport(ex, context); };
 
   return { scwin: sandbox.scwin, calls, sandbox };
 }
@@ -155,14 +156,14 @@ describe("handleError 공통 오류 처리 (src/gcc/exception.xml)", () => {
     expect(h.calls.error[0].cb).toBe("scwin.afterErrorClose");
   });
 
-  test("__reportError 가 예외를 던져도 사용자 알림은 정상 수행", async () => {
-    h.sandbox.scwin.__reportError = () => { throw new Error("report down"); };
+  test("reportError 가 예외를 던져도 사용자 알림은 정상 수행", async () => {
+    h.sandbox.scwin.reportError = () => { throw new Error("report down"); };
     await h.scwin.handleError(new Error("x"));
     expect(h.calls.error).toHaveLength(1); // 수집 실패가 흐름을 깨지 않음
   });
 });
 
-describe("__reportError 오류 수집 훅 (src/gcc/exception.xml)", () => {
+describe("reportError 오류 수집 훅 (src/gcc/exception.xml)", () => {
   let h;
   beforeEach(() => { h = loadHarness(); });
 

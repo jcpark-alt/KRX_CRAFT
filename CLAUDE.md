@@ -73,7 +73,7 @@ The actively maintained core (most recent edits). Each file is one namespace und
 |------|-----------|----------------|
 | `util.xml` | `$c.util` | Component control, type checks (`isEmpty`/`isArray`/`isJSON`), file & Excel up/download, clipboard, timers |
 | `win.xml` | `$c.win` | Business-screen control: auth, popups, alerts/confirm, navigation, i18n/language, history |
-| `exception.xml` | `$c.exception` | Screen try/catch error handling (`handleError`) + error reporting hook (`__reportError`, inactive until `ERROR_REPORT_INFO.URL` is set) |
+| `exception.xml` | `$c.exception` | Screen try/catch error handling (`handleError`) + error reporting hook (`reportError`, inactive until `ERROR_REPORT_INFO.URL` is set) |
 | `str.xml` | `$c.str` | String formatting/validation (SSN, phone, email, byte-length, escaping) |
 | `num.xml` | `$c.num` | Number helpers |
 | `date.xml` | `$c.date` | Date helpers |

@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml"
 	xmlns:ev="http://www.w3.org/2001/xml-events"
 	xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
-	<head meta_screenName="공통 예외 처리 함수" meta_screenId="$c.exception" meta_desc="화면 try/catch 공통 오류 처리(handleError)와 오류 수집(__reportError) 함수를 작성한다.">
+	<head meta_screenName="공통 예외 처리 함수" meta_screenId="$c.exception" meta_desc="화면 try/catch 공통 오류 처리(handleError)와 오류 수집(reportError) 함수를 작성한다.">
 		<w2:type>COMMON</w2:type>
 		<w2:buildDate/>
 		<w2:MSA/>
@@ -11,7 +11,7 @@
 			<w2:workflowCollection/>
 		</xf:model>
 		<w2:layoutInfo/>
-		<w2:publicInfo method="scwin.handleError"/>
+		<w2:publicInfo method="scwin.handleError,scwin.reportError"/>
 		<script lazy="false" type="text/javascript"><![CDATA[
 /**
  * @component
@@ -34,7 +34,7 @@
  */
 // =============================================================================
 /**
- * 화면 try/catch 공통 오류 처리(handleError)와 오류 수집(__reportError) 함수를 작성한다.
+ * 화면 try/catch 공통 오류 처리(handleError)와 오류 수집(reportError) 함수를 작성한다.
  *
  * @author Inswave Systems
  * @class exception
@@ -49,7 +49,7 @@ scwin.onpageload = function () {
 /**
  * @method
  * @name handleError
- * @description 화면 try/catch 공통 오류 처리기. 예외를 분류하여 콘솔 로그·오류 수집 훅(__reportError)·
+ * @description 화면 try/catch 공통 오류 처리기. 예외를 분류하여 콘솔 로그·오류 수집 훅(reportError)·
  *  사용자 알림을 표준 방식으로 수행한다.
  *  - sbm 중복 제출 skip(ex.skipped === true)은 정상 흐름이므로 아무 처리 없이 무시한다.
  *  - sbm 이 이미 사용자에게 알린 통신 오류(ex.errorType 보유)는 이중 알림 없이 로그·수집만 한다.
@@ -107,7 +107,7 @@ scwin.handleError = async function (ex, opt) {
     //    동일 예외 객체는 1회만 수집한다(sbm 등 공통 계층에서 이미 수집한 예외의 재수집 방지).
     if (!(isObj && ex._errorReported === true)) {
         try {
-            scwin.__reportError(ex, opt.context);
+            $c.exception.reportError(ex, opt.context);   // 공개 함수 내부 호출도 $c 경유 — 빌드 $p 주입 규칙
         } catch (ignore) {
             // no-op
         }
@@ -137,7 +137,7 @@ scwin.handleError = async function (ex, opt) {
     }
 };
 
-// 오류 수집 설정 — URL 이 비어 있는 동안 __reportError 는 아무 것도 전송하지 않는다.
+// 오류 수집 설정 — URL 이 비어 있는 동안 reportError 는 아무 것도 전송하지 않는다.
 // 수집 API 신설 시 URL 만 지정하면 handleError 를 쓰는 전 화면에 수집이 활성화된다.
 scwin.ERROR_REPORT_INFO = {
     URL: "",            // 예: "/api/common/error-report" (현재 수집 API 미구축)
@@ -150,7 +150,7 @@ scwin.__errorReportState = { sent: 0, keys: {} };
 
 /**
  * @method
- * @name __reportError
+ * @name reportError
  * @description handleError 의 서버 오류 수집 훅. ERROR_REPORT_INFO.URL 이 설정된 경우에만
  *  표준 페이로드(frameId·context·예외명/메시지/스택·화면 URL·userAgent·발생 시각)를 전송한다.
  *  - 전송은 navigator.sendBeacon(폴백 fetch keepalive) 로 하며 $c.sbm 을 경유하지 않는다 —
@@ -158,11 +158,11 @@ scwin.__errorReportState = { sent: 0, keys: {} };
  *  - 동일 context+message 는 화면당 1회, 전체 MAX_PER_PAGE 건까지만 전송한다(폭주 방지).
  * @param {Error|Object|String} ex 예외 객체
  * @param {String} context 로그 식별자
- * @hidden Y
+ * @hidden N
  * @exception
  * @example
  */
-scwin.__reportError = function (ex, context) {
+scwin.reportError = function (ex, context) {
     const info = scwin.ERROR_REPORT_INFO;
     if (info == null || $c.util.isEmpty(info.URL)) {
         return; // 수집 API 미구축 — 비활성

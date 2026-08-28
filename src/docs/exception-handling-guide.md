@@ -1,7 +1,7 @@
 # 화면 예외 처리 가이드 (`$c.exception.handleError`)
 
 업무 화면 스크립트의 try/catch 오류 처리를 공통 함수 한 줄로 표준화하는 방법을 정리한다. (2026-08-26 도입)
-담당 모듈은 `src/gcc/exception.xml`(`$c.exception`) — 처리기 `handleError`(공개)와 수집 훅 `__reportError`(내부)로 구성된다.
+담당 모듈은 `src/gcc/exception.xml`(`$c.exception`) — 처리기 `handleError`(공개)와 수집 훅 `reportError`(내부)로 구성된다.
 
 도입 전에는 화면마다 처리 방식이 제각각이었다: 빈 catch(오류 은폐), 원시 `alert()`(문구·로그 비표준),
 미처리 reject(await 실패 시 화면이 조용히 멈춤). 이 가이드의 패턴을 따르면 세 문제가 모두 해소된다.
@@ -68,7 +68,7 @@ await $c.exception.handleError(ex, {
 - sbm 은 같은 오류를 `handleError(notify:"none", context:"sbm.<id>")` 로 호출해 **로그·수집에만 합류**시킨다.
 - `await $c.sbm.executeDynamic(...)` 은 통신 실패 시 `errorType` 표식이 있는 응답 객체로 reject 되므로, 진입점 catch 의 handleError 가 조용히 걸러 이중 알림이 없다. 중복 제출로 건너뛴 호출(`skipped`)도 마찬가지다.
 
-## 서버 오류 수집 (`__reportError`)
+## 서버 오류 수집 (`reportError`)
 
 수집 로직(표준 페이로드·중복 억제·화면당 상한)은 구현돼 있고, `exception.xml` 의 설정이 비어 있는 동안 **비활성**이다.
 
