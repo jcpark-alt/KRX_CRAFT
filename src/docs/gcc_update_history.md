@@ -257,6 +257,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
   - byte 계산을 UTF-8 기준(한글 3byte) 자체 헬퍼로 통일(기존 `getByteLength` 는 한글 2byte), required 문구 선택형/입력형 자동 분기, checked "동의 해주세요" 문구, allowChar 조합별 세부 문구 5종
   - 구조 개선: 폼/그리드 규칙별 중복 보일러플레이트 → 공통 `fail()` 통합(~360줄 축소), 그리드 required 마킹 실패 셀 `setCellClass` 통일
   - 테스트 115건(신규 7건) · SMPVAL10000 샘플·validate-generator 신규 규칙 동기화
+- `2208793` (08-28) — [연관] **validate-generator 필드 테이블 "컴포넌트 ID" 열 추가**(`src/docs`, gcc 무변경): ID·name 사이에 표시 전용 열 신설 — dataMap key 별 바인딩 컴포넌트(`ref="data:dmaX.key"`) 매핑(미바인딩 `-`), ref 그룹 대상은 바인딩 정보(dma.key) 표기 — 생성 코드 무영향, 헤드리스 검증
 
 ---
 
@@ -264,6 +265,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-08-28 | `2208793` | feat(docs): validate-generator 필드 테이블에 컴포넌트 ID 열 추가 — [연관, gcc 무변경] |
 | 2026-08-28 | `ad4228c` | feat(validate): 검증 모듈 명세 v3 반영 — focus/compare/matchValue 등 7항목 |
 | 2026-08-27 | `d8c0780` | feat(sample): SPCHART_NOTICE 미리보기에 공시목록 총 건수 표시 추가 — [연관, gcc 무변경] |
 | 2026-08-27 | `72b0536` | refactor(ext): var 선언을 const/let 으로 전환 |
