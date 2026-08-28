@@ -258,6 +258,11 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
   - 구조 개선: 폼/그리드 규칙별 중복 보일러플레이트 → 공통 `fail()` 통합(~360줄 축소), 그리드 required 마킹 실패 셀 `setCellClass` 통일
   - 테스트 115건(신규 7건) · SMPVAL10000 샘플·validate-generator 신규 규칙 동기화
 - `2208793` (08-28) — [연관] **validate-generator 필드 테이블 "컴포넌트 ID" 열 추가**(`src/docs`, gcc 무변경): ID·name 사이에 표시 전용 열 신설 — dataMap key 별 바인딩 컴포넌트(`ref="data:dmaX.key"`) 매핑(미바인딩 `-`), ref 그룹 대상은 바인딩 정보(dma.key) 표기 — 생성 코드 무영향, 헤드리스 검증
+- `0c4b9da` (08-28) — `$c.validate` **includeUnbound 옵션·composition 규칙 추가**:
+  - `includeUnbound`(기본 false): DataCollection **미바인딩 컴포넌트**(분리 입력 칸 등)도 컴포넌트 ID 규칙으로 검증 — 기본값에서는 기존대로 건너뛰되 규칙 선언 시 `console.info` 로 가시화(조용한 무시 해소). 하위호환 100%
+  - `composition`: 문자 클래스 **조합 필수** 규칙(각 1자 이상) — 토큰 eng/num/kor/special/upper/lower, 프리셋 `"engNum"`/`"engNumSpecial"`·배열형·객체형 `{value,message}`, 빈 값 통과. allowChar(문자 제한)와 상호보완(포함 강제) — 아이디/비밀번호류 반복 패턴 공통화
+  - generator 동기화(옵션 체크박스·규칙 열)·테스트 +5건(120)
+- `7c0c78b` (08-28) — [연관] **ULDINF05000 발행기관등록 가이드 화면 신설**(`sample-front/ui`, gcc 무변경): 코드 컨벤션 전면 적용(5단계·JSDoc·진입점 handleError·camelCase·엄격 비교 43곳) + 결함 4건 수정. **수작업 검증 약 47건 → validateDataCollect 규칙 50건 전환** — 정적 규칙 + 복합 조건(법인/사업자 3중 조건·팩스 all-or-none)은 `options.fields` 동적 구성, `includeUnbound`·`matchValue`·`composition`·korEng 등 신규 옵션 실사용 예. 잔여 수작업은 구조적 이관 불가분(동적 결산월·OR·그리드 안내)만
 
 ---
 
@@ -265,6 +270,8 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-08-28 | `7c0c78b` | feat(sample): ULDINF05000 발행기관등록 가이드 화면 — 컨벤션 정리 + 공통 검증 전환 — [연관, gcc 무변경] |
+| 2026-08-28 | `0c4b9da` | feat(validate): includeUnbound 옵션·composition 규칙 추가 |
 | 2026-08-28 | `2208793` | feat(docs): validate-generator 필드 테이블에 컴포넌트 ID 열 추가 — [연관, gcc 무변경] |
 | 2026-08-28 | `ad4228c` | feat(validate): 검증 모듈 명세 v3 반영 — focus/compare/matchValue 등 7항목 |
 | 2026-08-27 | `d8c0780` | feat(sample): SPCHART_NOTICE 미리보기에 공시목록 총 건수 표시 추가 — [연관, gcc 무변경] |
