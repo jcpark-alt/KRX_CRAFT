@@ -43,7 +43,7 @@
 | 탭 구성 + 입력 계산 | `ULDFIL35700` | 탭별 독립 로직, `$c.num.formatNumber/unFormatNumber/round` 합산 계산, `$c.win.mainPrint`/`openReportPdf` 출력 |
 | 조회 팝업(값 반환) | `ULDFIL52110` | 팝업 내 페이징 조회, 선택값 `$c.win.closePopup(param)` 반환 (부모는 callbackFn 수신) |
 | 기능 팝업(부모 조작·발송) | `ULDSTF07404` | `$c.win.getParent` 부모 데이터 수신, `$c.validate.validateDataCollect`(폼)·`validateDataCollection`(그리드 행) 검증, 첨부 발송 |
-| 입력 검증이 많은 작성화면 | `SMPVAL10000` | `validateDataCollect` 전 규칙 한 벌 시연 — 필수/byte(`maxLengthB`)/형식(`corpNum`·`bizNum`·`urlNoProtocol`·`email`·`date`)/조건부(`emptyIf` 외국국적·`requiredIf` 선행조건)/중복(`duplicateGroup`·그리드 `duplicate`)/약관(`checked`) + `$c.util.checkFileTotalSize` 총용량 |
+| 입력 검증이 많은 작성화면 | `SMPVAL10000` | `validateDataCollect` 전 규칙 한 벌 시연 — 필수/byte(`maxLengthB`)/형식(`corpNum`·`bizNum`·`urlNoProtocol`·`email`·`date`)/조건부(`emptyIf` 외국국적·`requiredIf` 선행조건)/중복(`duplicateGroup`·그리드 `duplicate`)/약관(`checked`) + `$c.util.checkFileTotalSize` 총용량 + `validateDataMap` 서버 체크 플래그 검사(alert/confirm 형·중단 code) 데모 |
 | 상태별 버튼 제어가 있는 화면 | `SMPBTN10000` | `$c.util.setButtonState` 상태별 버튼 일괄 활성/비활성 시연 — 역할→버튼 매핑(id 비통일 대응)·표준 상태 6종·동적 역할(출력)·override 예외·`registerButtonState` 전용 상태·즉석 상태 객체 |
 
 ## 3. 샘플에 구현된 표준 패턴 (공통)
