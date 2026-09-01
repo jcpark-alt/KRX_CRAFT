@@ -287,6 +287,9 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
   - ULDBNS15000 `checkModAndRet`(1규칙)·`checkCmData`(4규칙) 전환 적용 — 검사 순서·메시지·중단 코드 동일 보존, 매핑표(§4)·규칙 24 유의사항 반영, Jest 6케이스(126건 통과)
 - `1782df6` (09-01) — [연관] **SMPVAL10000 에 validateDataMap 데모 추가**(`sample-front/ui`, gcc 무변경): 서버 체크 플래그 DataMap(`dma_svrCheck`)+체크박스 토글+「플래그 검사」 버튼 섹션 — alert 형 2건(code 1·3)·confirm 형 1건(code 4, 취소 시에만 중단) 시연, 진입점 handleError 규약 적용, 샘플 카탈로그 항목 동기화
 - `f519466` (09-01) — [연관] **규칙 26 보완 + 샘플 15종 진입점 try/catch 소급 적용**(`src/conversion`, gcc 무변경): 변환 규칙 26(진입점 try/catch + `$c.exception.handleError`)을 2구역 라이프사이클 진입점(onpageload/onpageunload) 한정·들여쓰기 단위(탭/4칸) 감지로 보완하고, sample-front/ui 샘플 15종의 이벤트 핸들러·onpageload **총 123건**을 소급 래핑(기존 수기 적용분 보존, context "화면ID.함수명") — 샘플(정답지) 전 진입점이 오류 처리 규약 준수, 파일별 멱등·lint 0/0
+- `3a76010` (09-01) — `$c.win` **팝업 타입별 데이터 수신 규약 — `openPopup` options.callbackFn 지원**:
+  - **수신 규약(확정)**: `pageFramePopup` 은 `const result = await $c.win.openPopup(...)` **동기 수신** / `browserPopup` 은 **`options.callbackFn` 콜백** 비동기 수신(await 미사용) — `openPopup` 이 options.callbackFn 을 내부 채널(data.callbackFn)로 브리지(기존 data 전달 하위호환·options 우선), JSDoc 예시 2종·Jest 브리지 테스트 3케이스(127건)
+  - 변환 규칙 17 산출 변경(browserPopup: options.callbackFn + await/data 미생성)·가이드 §1b 수신 규약 신설·code-convention 팝업 절 추가, 샘플 정합화 3건(ULDSTF30700/30702 잉여 callbackFn 제거 — 이중 조회 해소, ULDFIL59410 await 수신 전환)
 
 ---
 
@@ -294,6 +297,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-09-01 | `3a76010` | feat(win,conversion): 팝업 타입별 데이터 수신 규약 — options.callbackFn 지원·규칙 17 반영 |
 | 2026-09-01 | `f519466` | feat(conversion): 규칙 26 보완 + 샘플 15종 진입점 try/catch 소급 적용 (123건) — [연관, gcc 무변경] |
 | 2026-09-01 | `1782df6` | feat(sample): SMPVAL10000에 validateDataMap 서버 체크 플래그 검사 데모 추가 — [연관, gcc 무변경] |
 | 2026-09-01 | `bd1d208` | feat(validate): DataMap 값 검사 공통함수 validateDataMap 신설 + ULDBNS15000 적용 (314→315) |
