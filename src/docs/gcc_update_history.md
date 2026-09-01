@@ -290,6 +290,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 - `e83f7b3` (09-01) — `$c.date` **isDate 에 objName 인자·실패 시 공통 메시지 알림 추가**: `isDate(sDate, timeChk, objName)` — objName 전달 시 검증 실패에서 `com_valid_format_0052`("$[0]에 올바른 날짜를 입력하세요.")로 `$c.win.alert`(checkCalendarFormat 동일 규약, 2인자 호출 하위호환). pcc bns_common 의 레거시 날짜 검증(checkDateObj) 전환에 사용
 - `d6baae5` (09-01) — [연관] **pcc stf 업무공통 정비**(`src/pcc`, gcc 무변경): `$c.frame` 의존 제거·gcc 전환(CreateDialogFrame 79건→openPopup 수신 규약, 어댑터 정리), 미사용 함수 20종 삭제(패널 조정 15·PanelToGroupBox 5 등), 규칙 13 개명 90건·박스 주석→@description 91건·argument 라인 79건 정리 — Node 구문검사 10파일 OK·lint 0 errors
 - `8e0f903` (09-01) — [연관] **utils.xml($c.utils) gcc 이관 매핑 stf SOT 신설**(`src/docs`·`src/conversion`, gcc 무변경): 23행(1:1 12·검토 11) 등재·모듈 등록으로 통합본 182→202 매핑, **cGetToday/cGetToday2 매핑 정정**(formatDate→`getServerDateTime` — 현재 일자 취득은 서버 기준, 기존 ins/mgt SOT 동일 오류 정정)
+- `4fe8607` (09-01) — [연관] **pcc frame.xml·utils.xml·stf_old.xml 최종 삭제**(`src/pcc`, gcc 무변경): `$c.frame`/`$c.utils` 사용 중단 방침 — 호출부 gcc 전환 완료 후 정의 파일 삭제(잔존 $c.utils 2건은 `getServerDateTime`/`addDate` 치환), $c.frame 미정의 호출 10건(MDI/WinOpen/PDF 창)은 재설계 대기. pcc/stf 7파일 체제
 - `3a76010` (09-01) — `$c.win` **팝업 타입별 데이터 수신 규약 — `openPopup` options.callbackFn 지원**:
   - **수신 규약(확정)**: `pageFramePopup` 은 `const result = await $c.win.openPopup(...)` **동기 수신** / `browserPopup` 은 **`options.callbackFn` 콜백** 비동기 수신(await 미사용) — `openPopup` 이 options.callbackFn 을 내부 채널(data.callbackFn)로 브리지(기존 data 전달 하위호환·options 우선), JSDoc 예시 2종·Jest 브리지 테스트 3케이스(127건)
   - 변환 규칙 17 산출 변경(browserPopup: options.callbackFn + await/data 미생성)·가이드 §1b 수신 규약 신설·code-convention 팝업 절 추가, 샘플 정합화 3건(ULDSTF30700/30702 잉여 callbackFn 제거 — 이중 조회 해소, ULDFIL59410 await 수신 전환)
@@ -300,6 +301,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-09-01 | `4fe8607` | refactor(pcc): frame.xml·utils.xml·stf_old.xml 최종 삭제 — $c.frame/$c.utils 사용 중단 — [연관, gcc 무변경] |
 | 2026-09-01 | `8e0f903` | feat(conversion): utils.xml($c.utils) gcc 이관 매핑 stf SOT 신설 + cGetToday 매핑 정정 — [연관, gcc 무변경] |
 | 2026-09-01 | `d6baae5` | refactor(pcc): stf 업무공통 정비 — $c.frame 의존 제거·gcc 전환·미사용 삭제·컨벤션 정리 — [연관, gcc 무변경] |
 | 2026-09-01 | `e83f7b3` | feat(date): isDate에 objName 인자·실패 시 공통 메시지 알림 추가 |
