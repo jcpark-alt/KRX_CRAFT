@@ -344,6 +344,8 @@ $c.win.setEnterKeyEvent(tbl_search, scwin.btn_Search_onclick);
   * `await` 호출이므로 함수에 `async` 부여 + **호출부 await 전파** 필수.
   * 형식/길이 규칙은 **빈값을 통과**시킵니다 — 빈값도 막으려면 `required` 를 함께 선언.
   * DataCollection **미바인딩** 컴포넌트는 기본 건너뜁니다 — 검증하려면 `includeUnbound:true` + `name` 지정.
+  * **서버 체크 응답 플래그 나열 검사**("dma 키가 특정 값이면 alert/confirm 후 중단 코드" 패턴 — `fn_CheckCmData` 류)는
+    `await $c.validate.validateDataMap(dmaObj, rules)` 로 통합합니다(rules 선언형 — alert/confirm 형·code 반환, 통신 호출 자체는 화면에 유지).
   * **이관 불가 유형은 남깁니다**: 통신이 필요한 체크(중복 조회 등), 검증과 상태 조작(값 세팅·표시 전환)이 얽힌 로직,
     복합 업무 조건(단, `fields` 를 동적으로 구성해 표현 가능한 경우는 이관). 남긴 코드는 validateDataCollect 호출 **뒤에** 배치합니다.
   * 옵션·규칙 전체 사양과 화면 적용 예는 `SMPVAL10000`(통합 입력 검증 가이드)·`gcc/index.html` 의 `validateDataCollect` 문서를 따릅니다.

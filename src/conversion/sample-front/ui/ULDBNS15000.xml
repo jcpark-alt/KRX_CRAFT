@@ -1306,7 +1306,7 @@ scwin.procBtnStat = function () {
  * @name scwin.checkModAndRet
  * @author Inswave
  * @date 2026. 09. 01
- * @description 접수 후 수정 및 반송 가능 여부를 체크한다
+ * @description 접수 후 수정 및 반송 가능 여부를 체크한다 — 서버 체크 응답 플래그를 공통 검증(validateDataMap)으로 검사
  * @param {String} bndApplId 채권신청ID
  * @returns {Number} 0: 진행, 4: 중단(마감처리 종목)
  * @hidden N
@@ -1314,12 +1314,9 @@ scwin.procBtnStat = function () {
 scwin.checkModAndRet = async function (bndApplId) {
     await scwin.getCheckUrl('', bndApplId, 'N');
 
-    if (dma_rtnGetCheckUrl.get("VALID_BND") === "Y") {
-        $c.win.alert("이미 마감처리가 된 종목입니다. 처리하실수 없습니다.");
-        return 4;
-    }
-
-    return 0;
+    return $c.validate.validateDataMap(dma_rtnGetCheckUrl, [
+        { key: "VALID_BND", equals: "Y", message: "이미 마감처리가 된 종목입니다. 처리하실수 없습니다.", code: 4 }
+    ]);
 };
 
 /**
@@ -1346,7 +1343,7 @@ scwin.endConfirm = async function (hasAttachDoc, procsNm) {
  * @name scwin.checkCmData
  * @author Inswave
  * @date 2026. 09. 01
- * @description 접수·처리완료·수정 시 적용일 관련 체크항목
+ * @description 접수·처리완료·수정 시 적용일 관련 체크항목 — 서버 체크 응답 플래그를 공통 검증(validateDataMap)으로 순서대로 검사
  * @param {String} strtDd 적용일
  * @param {String} bndApplId 채권신청ID
  * @returns {Number} 0: 진행, 1~4: 중단 사유 코드
@@ -1355,26 +1352,13 @@ scwin.endConfirm = async function (hasAttachDoc, procsNm) {
 scwin.checkCmData = async function (strtDd, bndApplId) {
     await scwin.getCheckUrl(strtDd, bndApplId, 'N');
 
-    if (dma_rtnGetCheckUrl.get("VALID_STRT_DD") === "Y") {
-        await $c.win.alert("적용일이 현재일자보다 작습니다. 다시 입력하십시오.");
-        return 1;
-    }
-    if (dma_rtnGetCheckUrl.get("VALID_CALND_DD") === "Y") {
-        await $c.win.alert("적용일이 매매일에 유효하지 않습니다. 다시 입력하십시오.");
-        return 2;
-    }
-    // 적용일 전날이 아니면 확인메시지 보여주기
-    if (dma_rtnGetCheckUrl.get("VALID_BF_DD") === "Y") {
-        if (! await $c.win.confirm("상장일/적용일이 익영업일이 아닙니다. 처리하시겠습니까?")) {
-            return 4;
-        }
-    }
-    if (dma_rtnGetCheckUrl.get("VALID_CLS_DD") === "Y") {
-        await $c.win.alert("입력한 일자는 이미 마감처리가 종료된 일자입니다. 다시 입력하십시오.");
-        return 3;
-    }
-
-    return 0;
+    return $c.validate.validateDataMap(dma_rtnGetCheckUrl, [
+        { key: "VALID_STRT_DD", equals: "Y", message: "적용일이 현재일자보다 작습니다. 다시 입력하십시오.", code: 1 },
+        { key: "VALID_CALND_DD", equals: "Y", message: "적용일이 매매일에 유효하지 않습니다. 다시 입력하십시오.", code: 2 },
+        // 적용일 전날이 아니면 확인메시지 보여주기(확인 시 다음 규칙 계속)
+        { key: "VALID_BF_DD", equals: "Y", type: "confirm", message: "상장일/적용일이 익영업일이 아닙니다. 처리하시겠습니까?", code: 4 },
+        { key: "VALID_CLS_DD", equals: "Y", message: "입력한 일자는 이미 마감처리가 종료된 일자입니다. 다시 입력하십시오.", code: 3 }
+    ]);
 };
 
 /**

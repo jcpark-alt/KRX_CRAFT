@@ -56,6 +56,7 @@
 | --- | --- | --- | --- |
 | `$c.validate.isValidDate` | `fn_checkDate` / `fn_CheckDate` / `fn_CheckDateGn` / `Chk_Date*` / `chkDate2` / `fn_IsValidDateComm` | 일자 유효성 | |
 | `$c.validate.validateDataCollect` | `fn_InputCheck` 류 — "빈값 체크→alert→focus→return" 나열 패턴 | 입력 검증 통합(필수/형식/길이/비교 — 규칙 24, fields 선언형) | 검토 |
+| `$c.validate.validateDataMap` | `fn_CheckCmData` 류 — 서버 체크 응답 dma 플래그 "일치 시 alert/confirm→중단 코드" 나열 패턴 | DataMap 값 검사 통합(rules 선언형 — alert/confirm, code 반환) | 검토 |
 | `$c.validate.setComponentProperty` | `showObj` | 컴포넌트 표시/숨김(속성 제어) | 검토 |
 
 ## 5. `$c.util` — 유틸/컴포넌트

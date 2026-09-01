@@ -11,7 +11,7 @@
 			<w2:workflowCollection/>
 		</xf:model>
 		<w2:layoutInfo/>
-		<w2:publicInfo method="scwin.validateDataCollect,scwin.validateDataGroup,scwin.validateDataCollection,scwin.resolveFocusObj,scwin.getRequiredMessage,scwin.getExtendedRuleMessage,scwin.getConditionalRuleMessage,scwin.getGridViewDataList,scwin.getChildrenComponent,scwin.getDataCollection,scwin.setFocus,scwin.isBirthDay,scwin.isValidDate,scwin.validateSiteUrl"/>
+		<w2:publicInfo method="scwin.validateDataCollect,scwin.validateDataGroup,scwin.validateDataCollection,scwin.resolveFocusObj,scwin.getRequiredMessage,scwin.getExtendedRuleMessage,scwin.getConditionalRuleMessage,scwin.getGridViewDataList,scwin.getChildrenComponent,scwin.getDataCollection,scwin.setFocus,scwin.isBirthDay,scwin.isValidDate,scwin.validateSiteUrl,scwin.validateDataMap"/>
 		<script lazy="false" type="text/javascript"><![CDATA[
 // =============================================================================
 /**
@@ -1267,7 +1267,51 @@ scwin.validateSiteUrl = function(url, options = {}) {
     }
 
     return { valid: true, code: "OK", message: "유효한 주소입니다." };
-}]]></script>
+}
+
+/**
+ * @method
+ * @name validateDataMap
+ * @description DataMap 값 검사 공통함수 — 규칙 배열을 선언 순서대로 검사해 key 값이 equals 와 일치하면 위반으로 처리한다.
+ *              (서버 체크 응답 플래그(dma) 검증 등 "특정 값 일치 시 알림 후 중단" 반복 패턴의 공통화)
+ *              규칙 type "alert"(기본)는 알림 후 즉시 해당 규칙의 code 를 반환하고,
+ *              type "confirm" 은 확인창에서 사용자가 취소한 경우에만 code 를 반환한다(확인 시 다음 규칙 계속).
+ * @param {Object|String} dmaObj 검사할 DataMap 객체 또는 컴포넌트 ID
+ * @param {Array} rules 검사 규칙 배열 [{ key, equals, message, code, type }] — code 미지정 시 (규칙 순번+1) 사용
+ * @returns {Number} 위반된 규칙의 code (모두 통과 시 0)
+ * @hidden N
+ * @exception
+ * @example
+const rtnCode = await $c.validate.validateDataMap(dma_rtnGetCheckUrl, [
+    { key : "VALID_STRT_DD", equals : "Y", message : "적용일이 현재일자보다 작습니다. 다시 입력하십시오.", code : 1 },
+    { key : "VALID_BF_DD", equals : "Y", type : "confirm", message : "상장일/적용일이 익영업일이 아닙니다. 처리하시겠습니까?", code : 4 }
+]);
+if (rtnCode > 0) return;
+ */
+scwin.validateDataMap = async function (dmaObj, rules) {
+    const dma = (typeof dmaObj === "string") ? $p.getComponentById(dmaObj) : dmaObj;
+    if ($c.util.isEmpty(dma) || (typeof dma.get !== "function") || ($c.util.isArray(rules) === false)) {
+        console.error("[$c.validate.validateDataMap] DataMap 또는 규칙 배열이 유효하지 않습니다.");
+        return 0;
+    }
+
+    for (let i = 0; i < rules.length; i++) {
+        const rule = rules[i];
+        if ($c.util.isEmpty(rule) || $c.util.isEmpty(rule.key)) { continue; }
+        if (dma.get(rule.key) !== rule.equals) { continue; }
+
+        const code = $c.util.isEmpty(rule.code) ? (i + 1) : rule.code;
+        if (rule.type === "confirm") {
+            // 확인형 — 사용자가 취소하면 중단 코드 반환, 확인하면 다음 규칙 계속
+            if (await $c.win.confirm(rule.message) === false) { return code; }
+        } else {
+            await $c.win.alert(rule.message);
+            return code;
+        }
+    }
+
+    return 0;
+};]]></script>
 	</head>
 	<body ev:onpageload="scwin.onpageload"/>
 </html>
