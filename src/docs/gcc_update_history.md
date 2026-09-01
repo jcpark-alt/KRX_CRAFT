@@ -292,6 +292,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 - `8e0f903` (09-01) — [연관] **utils.xml($c.utils) gcc 이관 매핑 stf SOT 신설**(`src/docs`·`src/conversion`, gcc 무변경): 23행(1:1 12·검토 11) 등재·모듈 등록으로 통합본 182→202 매핑, **cGetToday/cGetToday2 매핑 정정**(formatDate→`getServerDateTime` — 현재 일자 취득은 서버 기준, 기존 ins/mgt SOT 동일 오류 정정)
 - `4fe8607` (09-01) — [연관] **pcc frame.xml·utils.xml·stf_old.xml 최종 삭제**(`src/pcc`, gcc 무변경): `$c.frame`/`$c.utils` 사용 중단 방침 — 호출부 gcc 전환 완료 후 정의 파일 삭제(잔존 $c.utils 2건은 `getServerDateTime`/`addDate` 치환), $c.frame 미정의 호출 10건(MDI/WinOpen/PDF 창)은 재설계 대기. pcc/stf 7파일 체제
 - `6c95493` (09-01) — [연관] **$c.frame 미정의 호출 10건 정리**(`src/pcc`, gcc 무변경): common MdiHelp·FileDown1/2 삭제·`InfoMenuID`→`$c.win.getProgramId()` 위임, stf 뷰어/목록 4함수 톱 WinOpen→`$c.win.openPopup(browserPopup)` 전환(+`frame.FrameID`→`$p.getFrameId()`), print PDF 창 `window.open` 직접 호출 — pcc 에서 $c.frame/$c.utils 실행 참조 0건 달성
+- `ce3c500` (09-01) — [연관] **common.xml($c.cm) 함수 주석·gcc 치환 정리**(`src/pcc`, gcc 무변경): 박스 주석 22건→@description 이관, 미사용 매핑확정 15개 정의 삭제(85→70 함수)·`fn_Trim` 호출 11건(내부 7·ui-tobe 4) `$c.str.trim` 치환 — 1:1 불가 4종(fn_CheckEmail alert 내장·fn_IsNumber_val 정수 전용·fn_DelChar/3 업무 로직) 유지·검토
 - `3a76010` (09-01) — `$c.win` **팝업 타입별 데이터 수신 규약 — `openPopup` options.callbackFn 지원**:
   - **수신 규약(확정)**: `pageFramePopup` 은 `const result = await $c.win.openPopup(...)` **동기 수신** / `browserPopup` 은 **`options.callbackFn` 콜백** 비동기 수신(await 미사용) — `openPopup` 이 options.callbackFn 을 내부 채널(data.callbackFn)로 브리지(기존 data 전달 하위호환·options 우선), JSDoc 예시 2종·Jest 브리지 테스트 3케이스(127건)
   - 변환 규칙 17 산출 변경(browserPopup: options.callbackFn + await/data 미생성)·가이드 §1b 수신 규약 신설·code-convention 팝업 절 추가, 샘플 정합화 3건(ULDSTF30700/30702 잉여 callbackFn 제거 — 이중 조회 해소, ULDFIL59410 await 수신 전환)
@@ -302,6 +303,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-09-01 | `ce3c500` | refactor(pcc): common.xml 함수 주석·gcc 치환 정리 — [연관, gcc 무변경] |
 | 2026-09-01 | `6c95493` | refactor(pcc): $c.frame 미정의 호출 10건 정리 — gcc 전환·미사용 삭제 — [연관, gcc 무변경] |
 | 2026-09-01 | `4fe8607` | refactor(pcc): frame.xml·utils.xml·stf_old.xml 최종 삭제 — $c.frame/$c.utils 사용 중단 — [연관, gcc 무변경] |
 | 2026-09-01 | `8e0f903` | feat(conversion): utils.xml($c.utils) gcc 이관 매핑 stf SOT 신설 + cGetToday 매핑 정정 — [연관, gcc 무변경] |
