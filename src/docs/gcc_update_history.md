@@ -1,7 +1,7 @@
 # gcc 공통 함수 업데이트 이력
 
 `src/gcc/` 공통 라이브러리(`$c.*`)의 최초 반입(2026-06-08, `92a35bd`) 이후 변경 내역 정리 (최종 갱신 2026-09-01).
-API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-09-01 기준 **12개 모듈 / 314개 공개 메서드**.
+API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-09-01 기준 **12개 모듈 / 315개 공개 메서드**.
 
 > `src/cm/gcc/`는 CM 모듈용 사본으로 일반적 개선만 선별 반영해 왔으나(2026-06-10 병합, 2026-07-22 대규모 동기화로 11파일 체제),
 > **2026-08-18 `26af3d5`에서 사용 중단으로 삭제**되어 `src/gcc/`가 유일한 canonical 라이브러리다.
@@ -282,6 +282,9 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
   - **$p 주입 규칙 적용 조건 확인(사용자 재확인)**: 호출부 첫 인자 `$p` 자동 추가는 해당 XML 의 `<w2:publicInfo>` 에 정의된 함수만 대상 — `arguments` 직접 사용 함수는 `[$p, 선언인자, 추가인자…]` 레이아웃 기준 인덱싱
 - `ba06e21` (09-01) — [연관] **conversion 변환 규칙 확장**(`src/conversion`·`src/docs`, gcc 무변경): convert.py 규칙 5e(`!X === Y` 우선순위 교정)·25(submitDoneHandler 옵션형→async/await 순차 스타일)·26(진입점 try/catch+`$c.exception.handleError`)·27(그리드 자식 중복 id 재부여, WS120)·28(반복문 내 DC 수정 `setBroadcast` 제어) 신설, 규칙 13 bare 참조 동기화·규칙 4 `$c.sbm.executeDynamic` 호출 함수 4구역 분류·라인 주석 `// ` 공백 포맷 추가. 규칙 24(수동 검증 나열→`$c.validate.validateDataCollect` 통합, 단계 2 판단) 문서화. 매핑 갱신 — `fn_CheckDateObj`→`$c.date.checkCalendarFormat`·`fn_CheckDateVal`→`$c.date.isDate` 분리(index_transfer 재생성 182 매핑). 테스트 39건
 - `bae7a2a` (09-01) — [연관] **ULDBNS15000 표면이자율변경 가이드 화면 신설**(`sample-front/ui`, gcc 무변경): 탭+입력 화면 W-Craft 원본의 단계 1+2 전체 변환 — 서브미션 9건 순차 스타일, 진입점 handleError 12곳(타이머·팝업 콜백 자체 처리 포함), 전 함수(45개) 표준 JSDoc, `inputCheck` validateDataCollect 통합(규칙 24 실사용 예), 결함 수정(시그니처 불일치·`!x === 200`·bare `fn_*` 참조·`dts_DtlInfo` 잔재 등) — convert.py 재변환 멱등·lint 0/0
+- `bd1d208` (09-01) — `$c.validate` **DataMap 값 검사 공통함수 `validateDataMap` 신설** (314→315 메서드):
+  - 서버 체크 응답 플래그 등 "dma 키 값이 `equals` 와 일치하면 alert/confirm 후 중단 code 반환" 나열 패턴(`fn_CheckCmData` 류)의 공통화 — rules 선언 순서대로 검사, alert형은 즉시 code 반환, **confirm형은 취소 시만 code**(확인 시 다음 규칙 계속), 모두 통과 시 0(code 미지정 시 규칙 순번+1)
+  - ULDBNS15000 `checkModAndRet`(1규칙)·`checkCmData`(4규칙) 전환 적용 — 검사 순서·메시지·중단 코드 동일 보존, 매핑표(§4)·규칙 24 유의사항 반영, Jest 6케이스(126건 통과)
 
 ---
 
@@ -289,6 +292,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-09-01 | `bd1d208` | feat(validate): DataMap 값 검사 공통함수 validateDataMap 신설 + ULDBNS15000 적용 (314→315) |
 | 2026-09-01 | `bae7a2a` | feat(sample): ULDBNS15000 표면이자율변경 가이드 화면 — 단계1+2 전체 변환 — [연관, gcc 무변경] |
 | 2026-09-01 | `ba06e21` | feat(conversion): 변환 규칙 확장 — 5e·25~28 신설, 13 보강, 규칙24 문서화, 매핑 갱신 — [연관, gcc 무변경] |
 | 2026-09-01 | `53991e1` | feat(gcc): getMessage 배열 인자 지원·checkCalendarFormat 메시지 코드 전환 |
