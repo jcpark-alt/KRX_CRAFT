@@ -1,7 +1,7 @@
 # gcc 공통 함수 업데이트 이력
 
-`src/gcc/` 공통 라이브러리(`$c.*`)의 최초 반입(2026-06-08, `92a35bd`) 이후 변경 내역 정리 (최종 갱신 2026-08-26).
-API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-08-26 기준 **12개 모듈 / 287개 공개 메서드**.
+`src/gcc/` 공통 라이브러리(`$c.*`)의 최초 반입(2026-06-08, `92a35bd`) 이후 변경 내역 정리 (최종 갱신 2026-09-01).
+API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-09-01 기준 **12개 모듈 / 314개 공개 메서드**.
 
 > `src/cm/gcc/`는 CM 모듈용 사본으로 일반적 개선만 선별 반영해 왔으나(2026-06-10 병합, 2026-07-22 대규모 동기화로 11파일 체제),
 > **2026-08-18 `26af3d5`에서 사용 중단으로 삭제**되어 `src/gcc/`가 유일한 canonical 라이브러리다.
@@ -273,10 +273,25 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 ---
 
+## 2026년 9월
+
+### getMessage 개선·conversion 도구 연동 (09-01)
+- `53991e1` (09-01) — `$c.data`/`$c.date` **getMessage 배열 인자 지원·checkCalendarFormat 메시지 코드 전환**:
+  - `getMessage`: 치환 인자 하나를 **배열**로 전달하면 원소를 `$[0]`, `$[1]`… 값으로 사용(인라인 조사 마커 포함) — 배열 전달 시 `isFinalConsonant` 오류 해소, 나열 방식 하위호환 유지. vm 하니스로 빌드 후 런타임 인자 레이아웃(`[$p, msgId, …]`) 재현 검증
+  - `checkCalendarFormat`: 메시지 출력용 `objName` 파라미터 추가, 오류 알림을 공통 메시지 코드(`com_valid_format_0051`/`0052`) 기반으로 전환 (+ `return` 뒤 백틱 오타·들여쓰기 정리)
+  - **$p 주입 규칙 적용 조건 확인(사용자 재확인)**: 호출부 첫 인자 `$p` 자동 추가는 해당 XML 의 `<w2:publicInfo>` 에 정의된 함수만 대상 — `arguments` 직접 사용 함수는 `[$p, 선언인자, 추가인자…]` 레이아웃 기준 인덱싱
+- `ba06e21` (09-01) — [연관] **conversion 변환 규칙 확장**(`src/conversion`·`src/docs`, gcc 무변경): convert.py 규칙 5e(`!X === Y` 우선순위 교정)·25(submitDoneHandler 옵션형→async/await 순차 스타일)·26(진입점 try/catch+`$c.exception.handleError`)·27(그리드 자식 중복 id 재부여, WS120)·28(반복문 내 DC 수정 `setBroadcast` 제어) 신설, 규칙 13 bare 참조 동기화·규칙 4 `$c.sbm.executeDynamic` 호출 함수 4구역 분류·라인 주석 `// ` 공백 포맷 추가. 규칙 24(수동 검증 나열→`$c.validate.validateDataCollect` 통합, 단계 2 판단) 문서화. 매핑 갱신 — `fn_CheckDateObj`→`$c.date.checkCalendarFormat`·`fn_CheckDateVal`→`$c.date.isDate` 분리(index_transfer 재생성 182 매핑). 테스트 39건
+- `bae7a2a` (09-01) — [연관] **ULDBNS15000 표면이자율변경 가이드 화면 신설**(`sample-front/ui`, gcc 무변경): 탭+입력 화면 W-Craft 원본의 단계 1+2 전체 변환 — 서브미션 9건 순차 스타일, 진입점 handleError 12곳(타이머·팝업 콜백 자체 처리 포함), 전 함수(45개) 표준 JSDoc, `inputCheck` validateDataCollect 통합(규칙 24 실사용 예), 결함 수정(시그니처 불일치·`!x === 200`·bare `fn_*` 참조·`dts_DtlInfo` 잔재 등) — convert.py 재변환 멱등·lint 0/0
+
+---
+
 ## 커밋 이력 (src/gcc)
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-09-01 | `bae7a2a` | feat(sample): ULDBNS15000 표면이자율변경 가이드 화면 — 단계1+2 전체 변환 — [연관, gcc 무변경] |
+| 2026-09-01 | `ba06e21` | feat(conversion): 변환 규칙 확장 — 5e·25~28 신설, 13 보강, 규칙24 문서화, 매핑 갱신 — [연관, gcc 무변경] |
+| 2026-09-01 | `53991e1` | feat(gcc): getMessage 배열 인자 지원·checkCalendarFormat 메시지 코드 전환 |
 | 2026-08-28 | `ff296d8` | refactor(gcc): 빌드 $p 주입 규칙 1단계 — util/exception/date $c 사용 헬퍼 공개화 |
 | 2026-08-28 | `3ca9bfa` | refactor(gcc): 빌드 $p 주입 규칙 2·3단계 — data/sbm/win $c 사용 헬퍼 공개화 |
 | 2026-08-28 | `360d563` | refactor(validate): 빌드 $p 주입 규칙 적용 — $c 사용 함수 공개 전환·$c.validate 호출 통일 |
