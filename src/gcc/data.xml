@@ -1051,7 +1051,7 @@ scwin.getDataCollection = function (comObj) {
  * @method
  * @name getMessage
  * @description 공통 메시지 코드에 해당하는 메시지를 반환합니다. 공통 메시지 정의 파일(common_message.json)을 우선 조회하고, 없으면 서버 다국어 메시지(WebSquareLang)로 폴백합니다.(common_message.json은 최초 호출 시 1회 지연 로드)
- * @param {String} msgId 메시지 ID. 두번째 인자부터는 메시지의 자리표시자($[0], $[1] ...)를 순서대로 치환한다.($[n] ← (n+2)번째 인자)
+ * @param {String} msgId 메시지 ID. 두번째 인자부터는 메시지의 자리표시자($[0], $[1] ...)를 순서대로 치환한다.($[n] ← (n+2)번째 인자. 치환 인자 하나를 배열로 넘기면 그 원소들을 순서대로 사용한다.)
  * @description 메시지 본문에 "$[n]{받침조사/무받침조사}" 형태의 인라인 조사 마커를 쓰면, 해당 인자의 받침 유무에 따라 조사를 자동 선택해 "값+조사"로 치환한다.(한국어 화면에서만 동작, 빈 인자면 마커 유지)
  * @hidden N
  * @exception
@@ -1060,6 +1060,7 @@ $c.data.getMessage("MSG_CM_00001");  // "변경된 데이터를 저장하시겠�
 $c.data.getMessage("MSG_CM_00002", $c.str.attachPostposition("전화번호"));  // "전화번호는 필수입력값입니다."
 $c.data.getMessage("MSG_CM_00003", "세션이 종료되어");  // "세션이 종료되어 로그인 화면으로 이동하겠습니다."
 $c.data.getMessage("MSG_CM_00007", "엑셀", "5M");  // 엑셀 파일의 크기가 5M를 초과 했습니다.
+$c.data.getMessage("MSG_CM_00007", ["엑셀", "5M"]);  // 배열 전달도 동일하게 동작한다.
 
 // 인라인 조사 마커 : 메시지 "$[0]{은/는} 필수 입력 사항입니다." 인 경우
 $c.data.getMessage("MSG_XXX", "아이디");  // "아이디는 필수 입력 사항입니다." (받침 없음 → 는)
@@ -1087,17 +1088,18 @@ scwin.getMessage = function (msgId) {
         let tmpMessage = message;
 
         if (arguments.length > 1) {
-            const args = arguments;
+            // 자리표시자 인자 정규화 : 치환 인자 하나가 배열이면 그 원소들을 $[0], $[1] ... 값으로 사용한다.(배열 전달 호출 지원)
+            const args = ((arguments.length === 3) && $c.util.isArray(arguments[2])) ? arguments[2] : Array.prototype.slice.call(arguments, 2);
             // $[n]{A/B} 인라인 조사 마커 : 인자 n(0-based)의 받침 유무로 A(받침)/B(무받침)를 선택해 "값+조사"로 치환한다.
             tmpMessage = tmpMessage.replace(/\$\[(\d+)\]\{([^/}]+)\/([^}]+)\}/g, function (m, idx, a, b) {
-                const val = args[Number(idx) + 2];
+                const val = args[Number(idx)];
                 if ($c.util.isEmpty(val)) { return m; } // 빈 값이면 마커를 보존한다.
                 const josa = ($c.win.getLanguage() === "ko") ? ($c.str.isFinalConsonant(val) ? a : b) : "";
                 return val + josa;
             });
-            for (let i = 2; i < arguments.length; i++) {
-                if ($c.util.isEmpty(arguments[i]) === false) {
-                    tmpMessage = (tmpMessage.indexOf("$[" + (i - 2) + "]") != -1) ? $c.str.replaceAll(tmpMessage, "$[" + (i - 2) + "]", arguments[i]) : tmpMessage;
+            for (let i = 0; i < args.length; i++) {
+                if ($c.util.isEmpty(args[i]) === false) {
+                    tmpMessage = (tmpMessage.indexOf("$[" + i + "]") != -1) ? $c.str.replaceAll(tmpMessage, "$[" + i + "]", args[i]) : tmpMessage;
                 }
             }
             return $c.str.escapeToEnter(tmpMessage);
