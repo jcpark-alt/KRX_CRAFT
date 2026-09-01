@@ -36,7 +36,7 @@
 
 | TO-BE (gcc) | AS-IS 대표 함수 | 설명 | 태그 |
 | --- | --- | --- | --- |
-| `$c.date.formatDate` | `cGetToday` / `cGetToday2` / `getCurrentDate` / `FormatDateEx` / `todate` / `todate_slash` / `dateToyyyyMMdd` / `fn_dte2str` | 오늘/Date → 포맷 문자열 | |
+| `$c.date.formatDate` | `getCurrentDate` / `FormatDateEx` / `todate` / `todate_slash` / `dateToyyyyMMdd` / `fn_dte2str` | Date → 포맷 문자열 | |
 | `$c.date.addDate` | `cGetPlusDate*` / `cGetMinusDate*` / `calcDate` / `fn_setDate*` / `dateAddDel` / `fn_incDte` | 일(日) 가감산 | |
 | `$c.date.addMonth` | `cGetPlusMonth` / `cGetMinusMonth` / `calcMonth` / `addMonth` / `addMonth2` / `fn_incMth` | 월(月) 가감산 | |
 | `$c.date.addYear` | `cGetPlusYear` / `cGetMinusYear` / `calcYear` | 년(年) 가감산 | |
@@ -48,7 +48,7 @@
 | `$c.date.isDate` | `isDate` / `isDate0` / `fn_CheckDateVal` | 날짜 유효성/빈 날짜 판별 | |
 | `$c.date.isLeafYear` | `cIsLeafYear` | 윤년 검사 | |
 | `$c.date.getLastDateOfMonth` | `cGetMaxDay` / `lastDay` | 해당 월 마지막 일수 | |
-| `$c.date.getServerDateTime` | `getSysDate` | 시스템(서버) 현재 일자 — 인자 없으면 기본 `yyyyMMdd` (규칙 18) | |
+| `$c.date.getServerDateTime` | `getSysDate` / `cGetToday` / `cGetToday2` / `fn_get_nowDate` | 시스템(서버) 현재 일자 — 인자 없으면 기본 `yyyyMMdd` (규칙 18). 현재 일자 "취득" 계열은 클라이언트 시계가 아닌 서버 기준으로 전환하며, 레거시 포맷 표기(mm→MM)는 변환 | 검토 |
 
 ## 4. `$c.validate` — 검증
 

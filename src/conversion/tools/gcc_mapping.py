@@ -22,7 +22,7 @@ import sys
 import io
 from pathlib import Path
 
-DEFAULT_MODULES = ("fil", "ins", "mgt")
+DEFAULT_MODULES = ("fil", "ins", "mgt", "stf")
 
 # 순수 JS 식별자(자동 1:1 치환 가능한 함수명) 판정. 와일드카드(*), 범위(~), 주석((mgt)) 등은 제외된다.
 _IDENT_RE = re.compile(r"^[A-Za-z_$][\w$]*$")
