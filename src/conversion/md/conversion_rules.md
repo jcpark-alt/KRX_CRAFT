@@ -192,8 +192,12 @@
     1. `{options.type}` 값이 `"window"` → `type: "browserPopup"`, 값이 없거나 다른 경우 → `type: "pageFramePopup"`.
     2. `{left}`, `{top}` 인자는 사용하지 않습니다(드롭).
     3. `{options.id}` 는 AS-IS 첫 인자를 무시하고 `{url}` 의 **파일명(확장자 제거)** 을 사용합니다. 예: `/lstmgt/ULDSTF40601.gfm` → `"ULDSTF40601"`.
-    4. `"browserPopup"` 이면 `data.callbackFn: "scwin.popupCallback"` + `scwin.popupCallback(result);` 호출 + `scwin.popupCallback` 정의를 파일에 1회 추가합니다.
+    4. `"browserPopup"` 이면 **`options.callbackFn: "scwin.popupCallback"`** 지정 + `scwin.popupCallback` 정의를 파일에 1회 추가합니다(**await/result 미사용** — 콜백으로 비동기 수신).
     5. `CreateDialogFrame` 바로 윗줄이 인자에 `row` 를 넘기는 함수 호출(예: `fn_setId(row);`)이면 삭제합니다.
+* **팝업 타입별 데이터 수신 규약(2026-09-01 확정)**: 리턴 데이터는 `options.type` 별 정의된 방식으로만 수신합니다.
+    * `"pageFramePopup"` → **async/await 동기 수신**: `const result = await $c.win.openPopup(url, options, data);`
+    * `"browserPopup"` → **`options.callbackFn` 콜백 비동기 수신**: `$c.win.openPopup(url, options);` (`callbackFn : "scwin.popupCallback"` 지정, await 미사용)
+    * gcc `openPopup` 이 `options.callbackFn` 을 내부 채널(`data.callbackFn`)로 브리지합니다(기존 data 전달 하위호환, options 우선). `data` 페이로드는 pageFramePopup 전용.
 * **결정적 산출 보조**: `width`/`height` 는 정수 리터럴이면 `"{n}px"`, 표현식·변수면 원형 유지. `title`·`url` 은 원형 유지. `data` 객체는 레거시 호출에 페이로드가 없어 `// TO-DO` 플레이스홀더로 생성(browserPopup 만 `callbackFn` 포함). 같은 블록 다중 호출은 `options`/`data`/`result`, `options2`… 로 명명.
 * **유의사항**: 인자 8개가 아니거나 `url` 이 문자열 리터럴이 아니면(동적 결합) 미변환·리포트. `data` 채움·`result` 처리 업무 로직과 표현식 width/height 정리는 **단계 2(Claude) 검토 보강 대상**입니다. 상세·예시는 [createdialogframe_popup_guide.md](createdialogframe_popup_guide.md) 를 참조하세요. 문자열/주석/정규식 리터럴 내부는 보호합니다(규칙 5 동일 원칙).
 * **browserPopup 자식 화면의 부모 접근**: `"browserPopup"` 은 별도 브라우저 창이라 자식 화면의 부모 접근 코드(`window.opener.*`, 레거시 `Provider("../")` 후 scwin 호출 등)는 `$c.win.getParent()` 로 변환하면 **동작하지 않습니다**. 팝업 타입 무관 공통함수인 `$c.win.getOpenerScope()`(부모 scope)·`$c.win.callOpener(fnName, ...args)`(부모 scwin 함수 호출)로 재작성합니다 — **단계 2 검토 보강 대상**. 상세는 `src/docs/popup-opener-guide.md` 참조.

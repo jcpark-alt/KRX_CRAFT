@@ -302,6 +302,32 @@ scwin.btn_ret_onclick = function () {
     assert "// scwin.fn_GetPar = fn_GetReturn;" in script2
 
 
+def test_rule17_popup_type_reception():
+    # 팝업 타입별 수신 규약 — browserPopup: options.callbackFn + await 미사용 / pageFramePopup: await result
+    script = '''
+scwin.a = function () {
+    $c.frame.CreateDialogFrame("gform", "/lstmgt/ULDSTF40601.gfm", "승인", 200, 100, 603, 398, "window");
+};
+
+scwin.b = function () {
+    $c.frame.CreateDialogFrame("gform", "/common/ULDSTF92017.gfm", "종목선택", 200, 100, 410, 580, "tool");
+};
+'''
+    rep = {"rule17": None, "judgment": []}
+    out = convert.rule17_create_dialog_frame(script, rep)
+    assert "CreateDialogFrame" not in out
+    # browserPopup — options 에 callbackFn, await/result/data 없음, popupCallback 정의 1회 추가
+    bseg = out[out.index("scwin.a"):out.index("scwin.b")]
+    assert '"browserPopup"' in bseg and 'callbackFn: "scwin.popupCallback"' in bseg
+    assert "$c.win.openPopup(\"/lstmgt/ULDSTF40601.gfm\", options);" in bseg
+    assert "await" not in bseg and "const data" not in bseg
+    assert out.count("scwin.popupCallback = function") == 1
+    # pageFramePopup — data + await result 수신
+    pseg = out[out.index("scwin.b"):]
+    assert '"pageFramePopup"' in pseg and "const result = await $c.win.openPopup(" in pseg
+    assert "callbackFn" not in pseg.split("scwin.popupCallback = function")[0]
+
+
 def test_rule28_broadcast_guard():
     # 반복문 내 DataCollection 변경 → 앞뒤 setBroadcast(false)/(true, true) 삽입 + 멱등
     head = '<w2:dataList id="dlt_list" baseNode="list"></w2:dataList>'

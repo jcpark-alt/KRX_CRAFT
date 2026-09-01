@@ -158,3 +158,23 @@ describe("browserPopup 오프너 scope 접근 (src/gcc/win.xml)", () => {
     expect(w.scwin.callOpener("fromPageFrameParent")).toBe("pf-parent");
   });
 });
+
+describe("팝업 타입별 데이터 수신 규약 — options.callbackFn 브리지 (src/gcc/win.xml)", () => {
+  test("openPopup: options.callbackFn 이 내부 data.callbackFn 채널로 전달된다", () => {
+    const w = loadWindow();
+    let captured = null;
+    w.scwin._openPopup = (url, opt, data) => { captured = { url, opt, data }; };
+
+    // browserPopup 수신 규약 — options.callbackFn 지정(3번째 인자 없음)
+    w.scwin.openPopup("/tmp/pop02.xml", { type: "browserPopup", callbackFn: "scwin.popupCallback" });
+    expect(captured.data.callbackFn).toBe("scwin.popupCallback");
+
+    // 기존 data.callbackFn 직접 전달(하위호환) — options 미지정 시 유지
+    w.scwin.openPopup("/tmp/pop03.xml", { type: "pageFramePopup" }, { callbackFn: "scwin.legacyCb" });
+    expect(captured.data.callbackFn).toBe("scwin.legacyCb");
+
+    // 둘 다 지정 시 options 가 우선한다
+    w.scwin.openPopup("/tmp/pop04.xml", { callbackFn: "scwin.optCb" }, { callbackFn: "scwin.dataCb" });
+    expect(captured.data.callbackFn).toBe("scwin.optCb");
+  });
+});

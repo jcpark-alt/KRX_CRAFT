@@ -1799,9 +1799,10 @@ def rule16_trs_submission(script, report):
 #   · left, top 인자는 사용하지 않음(드롭)
 #   · options.id 는 url 의 파일명(확장자 제거)을 사용(AS-IS 첫 인자는 무시)
 #   · width/height : 정수 리터럴은 "{n}px", 그 외(표현식/변수)는 원형 유지
-#   · browserPopup 이면 data.callbackFn + scwin.popupCallback(result) 호출 + scwin.popupCallback 정의 추가
+#   · 팝업 타입별 수신 규약(2026-09-01): pageFramePopup 은 await 로 리턴값 수신(result),
+#     browserPopup 은 options.callbackFn 콜백으로 수신(await 없음) + scwin.popupCallback 정의 추가
 #   · CreateDialogFrame 바로 윗줄이 인자에 row 를 넘기는 함수 호출이면 삭제
-# data 객체는 레거시 호출에 페이로드가 없어 TO-DO 플레이스홀더로 생성한다(검토 보강).
+# data 객체는 pageFramePopup 전용(레거시 호출에 페이로드가 없어 TO-DO 플레이스홀더로 생성, 검토 보강).
 _CDF_RE = re.compile(r'(?:await\s+)?(?:\$c\.)?frame\.CreateDialogFrame\s*\(')
 _ROW_CALL_RE = re.compile(r'^[ \t]*[\w$.]+\s*\([^()]*\brow\b[^()]*\)\s*;[ \t]*$')
 _INT_LIT_RE = re.compile(r'^\d+$')
@@ -1893,23 +1894,25 @@ def rule17_create_dialog_frame(code, report):
             indent + "    title: %s," % title.strip(),
             indent + '    type: "%s",' % popup_type,
             indent + "    width: %s," % _popup_dim(width),
-            indent + "    height: %s" % _popup_dim(height),
-            indent + "};",
-            "",
-            indent + "const %s = {" % dat,
         ]
         if is_browser:
-            blk.append(indent + "    // TO-DO : 팝업으로 전달할 파라미터 설정,")
+            # browserPopup 수신 규약 — options.callbackFn 콜백으로 비동기 수신(await 미사용)
+            blk.append(indent + "    height: %s," % _popup_dim(height))
             blk.append(indent + '    callbackFn: "scwin.popupCallback"')
-        else:
-            blk.append(indent + "    // TO-DO : 팝업으로 전달할 파라미터 설정")
-        blk.append(indent + "};")
-        blk.append("")
-        blk.append(indent + "const %s = await $c.win.openPopup(%s, %s, %s);" % (res, url.strip(), opt, dat))
-        if is_browser:
-            blk.append(indent + "scwin.popupCallback(%s);" % res)
+            blk.append(indent + "};")
+            blk.append("")
+            blk.append(indent + "$c.win.openPopup(%s, %s);" % (url.strip(), opt))
             need_callback[0] = True
         else:
+            # pageFramePopup 수신 규약 — await 로 리턴값(result) 동기 수신
+            blk.append(indent + "    height: %s" % _popup_dim(height))
+            blk.append(indent + "};")
+            blk.append("")
+            blk.append(indent + "const %s = {" % dat)
+            blk.append(indent + "    // TO-DO : 팝업으로 전달할 파라미터 설정")
+            blk.append(indent + "};")
+            blk.append("")
+            blk.append(indent + "const %s = await $c.win.openPopup(%s, %s, %s);" % (res, url.strip(), opt, dat))
             blk.append(indent + "// TO-DO : result 값 확인 후 업무 로직 추가")
         repl = "\n".join(blk) + "\n"
 

@@ -99,6 +99,22 @@ scwin.btn_save_onclick = async function (e) {
   `exception.xml` 의 `ERROR_REPORT_INFO.URL` 이 비어 있는 동안 비활성이다. 수집 API 신설 시 **URL 한 곳만 지정**하면 전 화면에 적용된다.
 - 상세 사용법·sbm 관계·배포 설정(config.xml 등록): [exception-handling-guide.md](../exception-handling-guide.md)
 
+## 팝업 호출 — 타입별 데이터 수신 방식
+
+`$c.win.openPopup` 으로 팝업을 열고 호출원 화면으로 데이터를 리턴받을 때는 **`options.type` 별 수신 방식**을 준수한다. (2026-09-01 확정)
+
+```javascript
+// pageFramePopup — async/await 로 리턴값을 동기 수신
+const resultData = await $c.win.openPopup("/ui/samplePopup.xml", { type : "pageFramePopup", ... }, data);
+
+// browserPopup — options.callbackFn 콜백으로 비동기 수신 (await 미사용)
+$c.win.openPopup("/ui/samplePopup.xml", { type : "browserPopup", callbackFn : "scwin.popupCallback", ... });
+scwin.popupCallback = function (resultData) { /* 리턴 데이터 처리 */ };
+```
+
+- `data`(3번째 인자) 페이로드 전달은 **pageFramePopup 전용** — browserPopup 은 콜백/부모 접근 공통함수(`getOpenerScope`/`callOpener`)로 대체한다.
+- 변환 도구가 자동 적용한다(convert.py **규칙 17** — 팝업 타입별 수신 형태로 산출, [createdialogframe_popup_guide.md](../../conversion/md/createdialogframe_popup_guide.md) §1b).
+
 ## 반복문 내 Map/List 데이터 수정 시 UI 갱신 제어
 
 반복문(for/while/forEach) 안에서 dataMap/dataList 를 반복 변경하면 매 변경마다 UI 갱신이 발생해 성능 저하·화면 깜빡임이 생긴다.
