@@ -364,6 +364,9 @@ $c.win.setEnterKeyEvent(tbl_search, scwin.btn_Search_onclick);
 ### 규칙 26: 진입점 try/catch + `$c.exception.handleError` 자동 래핑
 
 * **대상**: 규칙 4 가 배치한 **2구역(`onpageload`)·3구역(이벤트 핸들러)** 함수 — code-convention §오류 처리 규약의 자동 적용. (2026-09-01 확정)
+    * 2구역은 라이프사이클 진입점(`onpageload`/`onpageunload`)**만** 대상 — 그 밖의 초기화 헬퍼(`init` 등)는 `onpageload` 의 catch 로 수렴하는 내부 함수라 래핑하지 않습니다.
+    * try/catch 들여쓰기 단위(탭/4칸 공백)는 함수 본문에서 감지해 파일 스타일을 유지합니다.
+    * **최종 샘플 15종(sample-front/ui)에 소급 적용 완료**(2026-09-01, 총 123건 래핑) — 샘플(정답지)은 전 진입점이 규약을 따릅니다.
 * **변환 규약**(결정적, convert.py 규칙 26): 함수 본문 전체를 아래 형태로 감쌉니다. async 함수는 catch 호출에 `await` 를 부여합니다.
   ```javascript
   try {

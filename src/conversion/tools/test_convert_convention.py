@@ -250,6 +250,26 @@ scwin.searchList = async function () {
     assert convert.rule26_entry_trycatch(out, {}, "TEST0001") == out
 
 
+def test_rule26_section2_helper_excluded_and_tab_indent():
+    # 2구역은 onpageload/onpageunload 만 래핑(init 등 헬퍼는 제외) + 탭 들여쓰기 단위 감지
+    script = '''///////// 2. 초기화 영역 /////////
+scwin.onpageload = async function () {
+\tawait scwin.init();
+};
+
+scwin.init = async function () {
+\tconsole.log(1);
+};
+'''
+    rep = {}
+    out = convert.rule26_entry_trycatch(script, rep, "T1")
+    assert rep["rule26"] == 1
+    assert 'context : "T1.onpageload"' in out
+    assert 'context : "T1.init"' not in out          # 2구역 내부 헬퍼는 래핑하지 않음
+    assert "\ttry {" in out and "\t\tawait scwin.init();" in out   # 탭 단위 유지(공백 혼입 없음)
+    assert convert.rule26_entry_trycatch(out, {}, "T1") == out
+
+
 def test_rule27_dedup_grid_child_ids():
     body = ('<w2:gridView id="g1"><w2:caption id="caption1"/><w2:header id="header1"></w2:header><w2:gBody id="gBody1"></w2:gBody></w2:gridView>'
             '<w2:gridView id="g2"><w2:caption id="caption1"/><w2:header id="header1"></w2:header><w2:gBody id="gBody1"></w2:gBody></w2:gridView>')

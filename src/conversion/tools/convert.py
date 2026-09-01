@@ -2071,7 +2071,9 @@ def rule25_sequential_submission(script, report):
 def rule26_entry_trycatch(script, report, screen_id):
     """진입점 오류 처리(규칙 26) — 2구역(onpageload)·3구역(이벤트 핸들러) 함수 본문을 try/catch 로 감싸고
     catch 를 `$c.exception.handleError(ex, { context : "{화면ID}.{함수명}" })` 한 줄로 통일한다
-    (code-convention §오류 처리). 본문에 try 가 이미 있거나 실행문이 없으면 건너뛴다. 멱등."""
+    (code-convention §오류 처리). 본문에 try 가 이미 있거나 실행문이 없으면 건너뛴다.
+    2구역은 라이프사이클 진입점(onpageload/onpageunload)만 대상 — 그 밖의 초기화 헬퍼(init 등)는
+    onpageload 가 감싸는 내부 함수이므로 래핑하지 않는다. 들여쓰기 단위(탭/4칸)는 본문에서 감지. 멱등."""
     mask = code_mask(script)
     # 2·3구역 범위 산출 — 규칙 4 가 삽입한 섹션 헤더 기준(헤더가 없으면 미적용)
     heads = [(m.start(), m.group(0)) for m in re.finditer(r'(?m)^/{9} (\d)\. [^\n]*? /{9}[ \t]*$', script)]
@@ -2080,15 +2082,17 @@ def rule26_entry_trycatch(script, report, screen_id):
         num = int(re.search(r'/{9} (\d)\.', txt).group(1))
         if num in (2, 3):
             end = heads[i + 1][0] if i + 1 < len(heads) else len(script)
-            ranges.append((pos, end))
+            ranges.append((num, pos, end))
     if not ranges:
         report["rule26"] = 0
         return script
     fpat = re.compile(r'(?m)^scwin\.([A-Za-z_$][\w$]*)\s*=\s*(async\s+)?function\b[^\n{]*\{')
     edits = []
     cnt = 0
-    for st, en in ranges:
+    for sec, st, en in ranges:
         for mo in fpat.finditer(script, st, en):
+            if sec == 2 and mo.group(1) not in ("onpageload", "onpageunload"):
+                continue   # 2구역 내부 헬퍼(init 등)는 진입점이 아님 — onpageload 의 catch 로 수렴
             bopen = script.index("{", mo.end() - 1)
             bclose = _match_brace(script, mask, bopen)
             if bclose < 0:
@@ -2100,9 +2104,12 @@ def rule26_entry_trycatch(script, report, screen_id):
             if re.search(r'(?<![.\w$])try(?![\w$])', code_txt):
                 continue   # 이미 try 존재 — 수기 적용분 보존(멱등)
             is_async = bool(mo.group(2))
-            inner = "\n".join(("    " + ln if ln.strip() else ln) for ln in body.strip("\n").split("\n"))
+            body_lines = body.strip("\n").split("\n")
+            unit = "\t" if body_lines and body_lines[0].startswith("\t") else "    "   # 파일 들여쓰기 단위 감지
+            inner = "\n".join(((unit + ln) if ln.strip() else ln) for ln in body_lines)
             call = ("await " if is_async else "") + '$c.exception.handleError(ex, { context : "%s.%s" });' % (screen_id, mo.group(1))
-            new_body = "\n    try {\n" + inner + "\n    } catch (ex) {\n        " + call + "\n    }\n"
+            new_body = ("\n" + unit + "try {\n" + inner + "\n" + unit + "} catch (ex) {\n"
+                        + unit + unit + call + "\n" + unit + "}\n")
             edits.append((bopen + 1, bclose, new_body))
             cnt += 1
     for st, en, rep_txt in sorted(edits, reverse=True):

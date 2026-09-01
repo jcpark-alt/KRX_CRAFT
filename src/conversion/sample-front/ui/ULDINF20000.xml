@@ -100,8 +100,12 @@ scwin.totalCount = 0;		// 마지막 조회의 전체 건수. 전체 다운로드
  * @hidden N
 */
 scwin.onpageload = async function () {
-	// 초기화 함수
-	await scwin.init();
+	try {
+		// 초기화 함수
+		await scwin.init();
+	} catch (ex) {
+		await $c.exception.handleError(ex, { context : "ULDINF20000.onpageload" });
+	}
 };
 
 /**
@@ -151,7 +155,11 @@ scwin.init = async function () {
  * @hidden N
 */
 scwin.rd_schTp_onviewchange = function (info) {
-	scwin.setSearchType();
+	try {
+		scwin.setSearchType();
+	} catch (ex) {
+		$c.exception.handleError(ex, { context : "ULDINF20000.rd_schTp_onviewchange" });
+	}
 };
 
 /**
@@ -168,24 +176,28 @@ scwin.rd_schTp_onviewchange = function (info) {
  * @hidden N
 */
 scwin.btn_period_onclick = function (e) {
-	// 예: userData1="M:3" 이면 3개월 전, "Y:1" 이면 1년 전
-	const userData = this.getUserData("userData1") ?? "";
-	const [unit, amount] = userData.split(":");
+	try {
+		// 예: userData1="M:3" 이면 3개월 전, "Y:1" 이면 1년 전
+		const userData = this.getUserData("userData1") ?? "";
+		const [unit, amount] = userData.split(":");
 
-	const endDate = $c.date.getServerDateTime("yyyyMMdd");
-	let startDate = endDate;
+		const endDate = $c.date.getServerDateTime("yyyyMMdd");
+		let startDate = endDate;
 
-	// 날짜 가감은 공통함수를 쓴다. Date 객체로 직접 계산하면 월말·윤년에서 어긋난다.
-	if (unit === "D") {
-		startDate = $c.date.addDate(endDate, -Number(amount));
-	} else if (unit === "M") {
-		startDate = $c.date.addMonth(endDate, -Number(amount));
-	} else if (unit === "Y") {
-		startDate = $c.date.addYear(endDate, -Number(amount));
+		// 날짜 가감은 공통함수를 쓴다. Date 객체로 직접 계산하면 월말·윤년에서 어긋난다.
+		if (unit === "D") {
+			startDate = $c.date.addDate(endDate, -Number(amount));
+		} else if (unit === "M") {
+			startDate = $c.date.addMonth(endDate, -Number(amount));
+		} else if (unit === "Y") {
+			startDate = $c.date.addYear(endDate, -Number(amount));
+		}
+
+		cal_startDate.setValue(startDate);
+		cal_endDate.setValue(endDate);
+	} catch (ex) {
+		$c.exception.handleError(ex, { context : "ULDINF20000.btn_period_onclick" });
 	}
-
-	cal_startDate.setValue(startDate);
-	cal_endDate.setValue(endDate);
 };
 
 /**
@@ -199,7 +211,11 @@ scwin.btn_period_onclick = function (e) {
  * @hidden N
 */
 scwin.btn_search_onclick = async function (e) {
-	await scwin.searchList(1);
+	try {
+		await scwin.searchList(1);
+	} catch (ex) {
+		await $c.exception.handleError(ex, { context : "ULDINF20000.btn_search_onclick" });
+	}
 };
 
 /**
@@ -215,13 +231,17 @@ scwin.btn_search_onclick = async function (e) {
  * @hidden N
 */
 scwin.btn_reset_onclick = async function (e) {
-	dma_search.reset();
-	dlt_main.removeAll();
+	try {
+		dma_search.reset();
+		dlt_main.removeAll();
 
-	txt_totalCnt.setValue(0);
-	pgl_list.setCount(0);
+		txt_totalCnt.setValue(0);
+		pgl_list.setCount(0);
 
-	await scwin.init();
+		await scwin.init();
+	} catch (ex) {
+		await $c.exception.handleError(ex, { context : "ULDINF20000.btn_reset_onclick" });
+	}
 };
 
 /**
@@ -239,12 +259,16 @@ scwin.btn_reset_onclick = async function (e) {
  * @hidden N
 */
 scwin.btn_excel_onclick = function (e) {
-	if (dlt_main.getRowCount() === 0) {
-		$c.win.alert("조회된 내용이 없습니다.");
-		return;
-	}
+	try {
+		if (dlt_main.getRowCount() === 0) {
+			$c.win.alert("조회된 내용이 없습니다.");
+			return;
+		}
 
-	scwin.downloadExcel(`ULDINF20000_표준코드조회_${$c.date.getServerDateTime($p, "yyyyMMddHHmmss")}.xlsx`);
+		scwin.downloadExcel(`ULDINF20000_표준코드조회_${$c.date.getServerDateTime($p, "yyyyMMddHHmmss")}.xlsx`);
+	} catch (ex) {
+		$c.exception.handleError(ex, { context : "ULDINF20000.btn_excel_onclick" });
+	}
 };
 
 /**
@@ -266,33 +290,37 @@ scwin.btn_excel_onclick = function (e) {
  * @hidden N
 */
 scwin.btn_excelAll_onclick = async function (e) {
-	if (dlt_main.getRowCount() === 0) {
-		// "com_search_0011": "조회된 데이터가 없습니다."
-		$c.win.alert($c.data.getMessage("com_search_0011"));
-		return;
+	try {
+		if (dlt_main.getRowCount() === 0) {
+			// "com_search_0011": "조회된 데이터가 없습니다."
+			$c.win.alert($c.data.getMessage("com_search_0011"));
+			return;
+		}
+
+		if (scwin.totalCount > 5000) {
+			// "com_search_0070": "한 번에 내려받을 수 있는 건수는 $[0]건입니다.\n조회 조건을 좁혀 주세요."
+			$c.win.alert($c.data.getMessage("com_search_0070", [$c.num.formatNumber(5000)]));
+			return;
+		}
+
+		// 오래 걸릴 수 있는 작업은 시작 전에 건수를 알려주고 확인을 받는다.
+		// "com_search_0071": "$[0]건을 모두 내려받습니다. 계속하시겠습니까?"
+		if (!await $c.win.confirm($c.data.getMessage("com_search_0071", [$c.num.formatNumber(scwin.totalCount)]))) return;
+
+		const allRows = await scwin.selectAllRows();
+
+		if ($c.util.isEmpty(allRows)) return;
+
+		// 전체를 그리드에 잠시 올린다.
+		dlt_main.setJSON(allRows);
+
+		scwin.downloadExcel(`ULDINF20000_표준코드조회_전체목록_${$c.date.getServerDateTime($p, "yyyyMMddHHmmss")}.xlsx`);
+
+		// 원래 보고 있던 페이지로 되돌린다. 이 줄이 없으면 목록이 전체 상태로 남는다.
+		await scwin.searchList(scwin.pageIndex);
+	} catch (ex) {
+		await $c.exception.handleError(ex, { context : "ULDINF20000.btn_excelAll_onclick" });
 	}
-
-	if (scwin.totalCount > 5000) {
-		// "com_search_0070": "한 번에 내려받을 수 있는 건수는 $[0]건입니다.\n조회 조건을 좁혀 주세요."
-		$c.win.alert($c.data.getMessage("com_search_0070", [$c.num.formatNumber(5000)]));
-		return;
-	}
-
-	// 오래 걸릴 수 있는 작업은 시작 전에 건수를 알려주고 확인을 받는다.
-	// "com_search_0071": "$[0]건을 모두 내려받습니다. 계속하시겠습니까?"
-	if (!await $c.win.confirm($c.data.getMessage("com_search_0071", [$c.num.formatNumber(scwin.totalCount)]))) return;
-
-	const allRows = await scwin.selectAllRows();
-
-	if ($c.util.isEmpty(allRows)) return;
-
-	// 전체를 그리드에 잠시 올린다.
-	dlt_main.setJSON(allRows);
-
-	scwin.downloadExcel(`ULDINF20000_표준코드조회_전체목록_${$c.date.getServerDateTime($p, "yyyyMMddHHmmss")}.xlsx`);
-
-	// 원래 보고 있던 페이지로 되돌린다. 이 줄이 없으면 목록이 전체 상태로 남는다.
-	await scwin.searchList(scwin.pageIndex);
 };
 
 /**
@@ -306,11 +334,15 @@ scwin.btn_excelAll_onclick = async function (e) {
  * @hidden N
 */
 scwin.grd_main_oncellclick = function (rowIndex, columnIndex, columnId) {
-	const rowData = dlt_main.getRowJSON(rowIndex);
+	try {
+		const rowData = dlt_main.getRowJSON(rowIndex);
 
-	// 이동할 화면이 정해지면 아래를 살린다.
-	// $c.win.moveUrl("/ui/업무/상세화면.xml", { stdCd : rowData.stdCd });
-	$c.win.alert("선택한 표준코드 : " + rowData.stdCd);
+		// 이동할 화면이 정해지면 아래를 살린다.
+		// $c.win.moveUrl("/ui/업무/상세화면.xml", { stdCd : rowData.stdCd });
+		$c.win.alert("선택한 표준코드 : " + rowData.stdCd);
+	} catch (ex) {
+		$c.exception.handleError(ex, { context : "ULDINF20000.grd_main_oncellclick" });
+	}
 };
 
 
