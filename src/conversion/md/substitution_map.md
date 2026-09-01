@@ -41,10 +41,11 @@
 | `$c.date.addMonth` | `cGetPlusMonth` / `cGetMinusMonth` / `calcMonth` / `addMonth` / `addMonth2` / `fn_incMth` | 월(月) 가감산 | |
 | `$c.date.addYear` | `cGetPlusYear` / `cGetMinusYear` / `calcYear` | 년(年) 가감산 | |
 | `$c.date.diffDate` | `cGetDifTodayInputday` / `getDayInterval` / `getDuration` / `fn_getPeriod` | 두 날짜 차이(일수/기간) | |
-| `$c.date.dateCompare` | `validateStartDateAndToDate` / `compareFromToDate*` / `fn_checkDay` / `fn_CheckDateObj` | From/To 일자 비교 | |
+| `$c.date.dateCompare` | `validateStartDateAndToDate` / `compareFromToDate*` / `fn_checkDay` | From/To 일자 비교 | |
+| `$c.date.checkCalendarFormat` | `fn_CheckDateObj` | 캘린더 컴포넌트 날짜 포맷/유효성 검증(오류 시 alert) | |
 | `$c.date.dateFormat` | `cal_value2` / `fn_convCalDate` / `chkDate` / `chkDate2` | 8자리 → `YYYY-MM-DD` 마스킹 | |
 | `$c.date.dateUnFormat` | `fn_str2dte` / `cal_offMask*` | 마스킹 제거 / 문자열 → Date — 2026-08 개편으로 시그니처가 `(dateStr)` 1인자(비숫자 전체 제거). 레거시 format 인자는 무시되므로 치환 시 제거 | |
-| `$c.date.isDate` | `isDate` / `isDate0` | 날짜 유효성/빈 날짜 판별 | |
+| `$c.date.isDate` | `isDate` / `isDate0` / `fn_CheckDateVal` | 날짜 유효성/빈 날짜 판별 | |
 | `$c.date.isLeafYear` | `cIsLeafYear` | 윤년 검사 | |
 | `$c.date.getLastDateOfMonth` | `cGetMaxDay` / `lastDay` | 해당 월 마지막 일수 | |
 | `$c.date.getServerDateTime` | `getSysDate` | 시스템(서버) 현재 일자 — 인자 없으면 기본 `yyyyMMdd` (규칙 18) | |
@@ -54,6 +55,7 @@
 | TO-BE (gcc) | AS-IS 대표 함수 | 설명 | 태그 |
 | --- | --- | --- | --- |
 | `$c.validate.isValidDate` | `fn_checkDate` / `fn_CheckDate` / `fn_CheckDateGn` / `Chk_Date*` / `chkDate2` / `fn_IsValidDateComm` | 일자 유효성 | |
+| `$c.validate.validateDataCollect` | `fn_InputCheck` 류 — "빈값 체크→alert→focus→return" 나열 패턴 | 입력 검증 통합(필수/형식/길이/비교 — 규칙 24, fields 선언형) | 검토 |
 | `$c.validate.setComponentProperty` | `showObj` | 컴포넌트 표시/숨김(속성 제어) | 검토 |
 
 ## 5. `$c.util` — 유틸/컴포넌트

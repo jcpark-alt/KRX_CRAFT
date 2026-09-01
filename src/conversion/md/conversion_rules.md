@@ -25,8 +25,10 @@
 2. **초기화 영역** — `scwin.onpageload`, `scwin.onpageunload`
    - `scwin.gform_onload` 함수의 코드를 `scwin.onpageload` 내부로 이동하고, 기존 `scwin.gform_onload` 정의는 삭제.
 3. **컴포넌트 이벤트 영역** — `<body>` 의 `ev:on*` 이 참조하는 핸들러(소문자화 가이드 적용, 규칙 3)
-4. **서브미션 콜백 영역** — 통신 후처리·팝업 콜백 함수. 이름 패턴(`*_submitdone`/`*_submiterror`/`*callback`)
-   **또는** 스크립트 내 `submitHandler`/`submitDoneHandler`/`submitErrorHandler` 옵션이 참조하는 함수를 자동 분류.
+4. **서브미션 콜백 영역** — 통신 실행·후처리·팝업 콜백 함수. 이름 패턴(`*_submitdone`/`*_submiterror`/`*callback`)
+   **또는** 스크립트 내 `submitHandler`/`submitDoneHandler`/`submitErrorHandler` 옵션이 참조하는 함수,
+   **그리고 본문에서 `$c.sbm.executeDynamic` 을 호출하는(통신 실행) 함수**를 자동 분류(2026-09-01 확정).
+   단, `ev:on*` 이 참조하는 이벤트 핸들러는 `executeDynamic` 을 직접 호출하더라도 3구역(컴포넌트 이벤트)을 우선한다.
 5. **일반/업무 함수 영역** — 비즈니스 로직·데이터 가공·검증 함수 (**camelCase** — `fn_` 접두는 규칙 13이 제거)
 
 * 비어 있는 영역의 헤더는 생략합니다. 구(舊) 형식 — 한 줄 경계 주석(`// 전역 변수 선언` 등)과 3줄 블록 헤더(`/**** * n. ****/`) — 은 재변환 시 현행 슬래시 헤더로 자동 마이그레이션됩니다(멱등).
@@ -36,6 +38,7 @@
 * **값 설정 API 변환**: `{컴포넌트명}.value = "";` 형태의 코드를 `{컴포넌트명}.setValue("");` 구조로 전면 치환.
 * **값 설정 API 변환**: `{컴포넌트명}.src = "";` 형태의 코드를 `{컴포넌트명}.setBackgroundImage("");` 구조로 전면 치환.
 * **메서드명 API 변환**: `{dataCollection}.getTotalRow();` 형태의 코드를 `{dataCollection}.getRowCount();` 구조로 치환(수신 객체·인자 보존, 메서드명만 변경).
+* **부정 비교 우선순위 교정(5e, 2026-09-01)**: `!X === Y` 는 `(!X) === Y` 로 평가되는 버그 패턴이므로 `X !== Y` 로 교정합니다(`if (!e.responseStatusCode === 200)` → `if (e.responseStatusCode !== 200)`). X 는 식별자 체인만 대상이며 의도 확인용으로 건별 리포트합니다.
 
 ### 규칙 6: Submission의 동적 함수($c.sbm.executeDynamic) 치환 및 XML 제거
 * `<head>` 내의 `<xf:submission>` 태그 속성을 파싱하여 `sbmOptions` 객체를 생성합니다.
@@ -129,6 +132,7 @@
     * *변환 예:* `fn_setFromToDate` → `setFromToDate`, `fn_OpenRecvDetail` → `openRecvDetail`, `fn_in_charge` → `inCharge`, `fn_code1_sync` → `code1Sync`, `fn_GetByte` → `getByte`
     * camelCase 규칙: `fn_` 제거 후 언더바(`_`)로 분리 → 첫 토큰은 첫 글자 소문자, 이후 토큰은 첫 글자 대문자로 결합.
 * **함께 변경(호출부 동기화)**: 개명된 함수를 참조하는 모든 곳을 동시에 수정합니다 — 스크립트 호출부, `<body>` 의 `ev:on*="scwin.fn_*"`, `<head>` 의 `publicInfo`/`submission` 핸들러.
+    * **bare 참조 포함(2026-09-01 보강)**: `scwin.` 접두 없이 이름만 참조하는 곳(`scwin.fn_GetPar = fn_GetReturn;` 의 대입 RHS 등)도 `scwin.{신이름}` 으로 동기화합니다(레거시 전역 함수 참조 관행의 잔재 — 방치 시 ReferenceError).
 * **치환 시 유의사항**:
     * **같은 파일에 정의된 함수만** 대상입니다(로컬 정의 우선). 정의 없이 호출만 있는 외부 함수(`scwin.fn_GetPar` 등)는 개명 시 호출이 깨지므로 **변경하지 않습니다**.
     * 대상명이 (개명되지 않는) 기존 함수명과 겹치거나, 둘 이상이 같은 이름으로 수렴하는 경우(`fn_search`·`fn_Search` → `search`)는 충돌 방지를 위해 **보류·리포트**합니다.
@@ -305,6 +309,105 @@ $c.win.setEnterKeyEvent(tbl_search, scwin.btn_Search_onclick);
     * 수신 객체는 식별자 체인(`grd_x`, `scwin.grdObj`)만 자동 대상이며, **호출 체인 수신**(`$p.getComponentById("x").setVisibleRowNum("all")`)은 보류·리포트(단계 2)합니다 — 어차피 엔진이 거부하는 죽은 코드이므로 반드시 정리 대상.
 * **연관**: 페이징 화면에서 "전체보기"가 목적이라면 개별 호출 대신 `$c.sbm.setPagingInfo` 의 `maxRowNum : "all"` 옵션(행 수 제한 클래스 자동 제거 포함) 사용을 우선 검토합니다(단계 2). 대량 데이터 그리드에는 "all" 사용을 지양합니다(전 행 DOM 도색).
 * 코드 세그먼트(문자열/주석/정규식 제외)만 치환하며, 결과에 `.setVisibleRowNum("all")` 가 없으므로 **재변환 시 no-op(멱등)** 입니다.
+
+### 규칙 24: 수동 입력 검증 나열 → `$c.validate.validateDataCollect` 통합 (단계 2 · 판단)
+
+레거시 검증 함수(`fn_InputCheck` 류)의 **"빈값 체크 → alert → focus → return false" 나열 패턴**을
+공통 검증 한 건으로 통합합니다. 결정적 치환이 아니라 **단계 2(Claude 판단)** 규칙입니다. (2026-09-01 확정)
+
+* **대상 패턴**: 같은 함수 안에서 아래 형태가 컴포넌트별로 반복되는 경우.
+  ```javascript
+  if (edt_StrtDd.getValue() === '') {
+      $c.win.alert("[적용일]을 입력하십시오.");
+      edt_StrtDd.focus();
+      return false;
+  }
+  if (!$c.date.checkCalendarFormat(edt_StrtDd, "yyyyMMdd", "적용일")) { ... }
+  ```
+* **변환 규약**: 검증 대상 컴포넌트들을 담는 **컨테이너(그룹/그리드)** 를 첫 인자로, 컴포넌트 ID(그리드는 컬럼 ID)별
+  규칙을 `fields` 로 선언해 `await $c.validate.validateDataCollect(container, { fields })` 한 건으로 대체합니다.
+  ```javascript
+  scwin.inputCheck = async function () {
+      return $c.validate.validateDataCollect(pnl_DtlInfo, {
+          fields: {
+              edt_StrtDd: { required: true, format: "date", name: "적용일" },
+              edt_AfchgCpnIntRt: { required: true, name: "변경후 이자율" }
+          }
+      });
+  };
+  ```
+* **개별 체크 → 규칙 매핑**: 빈값 체크→`required` · 날짜 유효성(`fn_CheckDateObj`/`$c.date.checkCalendarFormat`/`isDate` 단독 호출)→`format:"date"` ·
+  이메일/전화/사업자번호→`format:"email"/"phone"/"bizNum"` · 길이→`maxLength`/`minLength`/`fixLength`/`maxLengthB` · 숫자→`num`/`fromNum`/`toNum` ·
+  허용 문자→`allowChar` · 두 컴포넌트 비교→`compare` · 조건부 필수/금지→`requiredIf`/`emptyIf` · 특정 값 확인→`matchValue`.
+  항목 표시명은 `name` 으로 지정(조사·문구는 공통함수가 표준화 — AS-IS 문구와 1:1 동일하지 않아도 무방).
+* **유의사항**:
+  * `await` 호출이므로 함수에 `async` 부여 + **호출부 await 전파** 필수.
+  * 형식/길이 규칙은 **빈값을 통과**시킵니다 — 빈값도 막으려면 `required` 를 함께 선언.
+  * DataCollection **미바인딩** 컴포넌트는 기본 건너뜁니다 — 검증하려면 `includeUnbound:true` + `name` 지정.
+  * **이관 불가 유형은 남깁니다**: 통신이 필요한 체크(중복 조회 등), 검증과 상태 조작(값 세팅·표시 전환)이 얽힌 로직,
+    복합 업무 조건(단, `fields` 를 동적으로 구성해 표현 가능한 경우는 이관). 남긴 코드는 validateDataCollect 호출 **뒤에** 배치합니다.
+  * 옵션·규칙 전체 사양과 화면 적용 예는 `SMPVAL10000`(통합 입력 검증 가이드)·`gcc/index.html` 의 `validateDataCollect` 문서를 따릅니다.
+
+### 규칙 25: `submitDoneHandler` 옵션형 서브미션 → async/await 순차 스타일 정규화
+
+* **대상**: (주로 수기 선변환 코드) 옵션 객체 리터럴에 `submitDoneHandler : scwin.X` 를 담아 `$c.sbm.executeDynamic` 을 호출하는 코드 —
+  핸들러를 옵션으로 넘기면 `executeDynamic` 의 Promise 가 settle 되지 않아 **`await` 가 영구 대기**합니다(code-convention §서브미션). (2026-09-01 확정)
+* **변환 규약**(결정적, convert.py 규칙 25): 옵션에서 `submitDoneHandler` 속성을 제거하고, 단독 호출문을
+  `const sbmRtn = await $c.sbm.executeDynamic(옵션);` + `await scwin.X(sbmRtn);` 순차 스타일로 전환합니다(옵션 변수 접미 명명 규약 유지 — `sbmOptions2`→`sbmRtn2`).
+    * 핸들러가 파일에 **정의돼 있지 않으면** 직접 호출 대신 `// TODO Stage2` 주석을 남깁니다.
+    * `submitErrorHandler` 공존 시 콜백 스타일 유지 규약이므로 **보류·리포트**합니다(규칙 6 예외와 동일).
+    * 대입형 호출(`const r = await $c.sbm.executeDynamic(...)`)은 반환값 사용 중이므로 **핸들러 속성만 제거**(Promise settle 정상화)하고 리포트합니다.
+* 결과 옵션에 `submitDoneHandler` 가 남지 않으므로 **재변환 시 no-op(멱등)** 입니다.
+
+### 규칙 26: 진입점 try/catch + `$c.exception.handleError` 자동 래핑
+
+* **대상**: 규칙 4 가 배치한 **2구역(`onpageload`)·3구역(이벤트 핸들러)** 함수 — code-convention §오류 처리 규약의 자동 적용. (2026-09-01 확정)
+* **변환 규약**(결정적, convert.py 규칙 26): 함수 본문 전체를 아래 형태로 감쌉니다. async 함수는 catch 호출에 `await` 를 부여합니다.
+  ```javascript
+  try {
+      {기존 본문}
+  } catch (ex) {
+      await $c.exception.handleError(ex, { context : "{화면ID}.{함수명}" });
+  }
+  ```
+* **건너뛰는 경우(멱등 보장)**: 본문에 `try` 가 이미 있는 함수(수기 적용분 보존), 실행문이 없는 빈 본문(`onpageunload` 등).
+* 내부(4·5구역) 함수는 래핑하지 않습니다 — 예외는 진입점으로 전파하는 규약(자체 try/catch 금지).
+* **규칙 4 재정렬이 보류된 파일**(섹션 헤더 없음)에는 적용되지 않습니다 — 단계 2에서 재정렬을 해소한 뒤 재변환하면 적용됩니다.
+
+### 규칙 27: 그리드 자식 중복 id 재부여 (wsxml_lint WS120 해소)
+
+* **대상**: BODY 의 `<w2:caption>`/`<w2:header>`/`<w2:gBody>` — W-Craft 변환기가 그리드마다 `caption1`/`header1`/`gBody1` 을
+  복제 생성해 문서 전체에서 id 가 중복됩니다(wsxml_lint **WS120** 오류). (2026-09-01 확정)
+* **변환 규약**(결정적, convert.py 규칙 27): 태그별로 **첫 등장 id 는 유지**하고, 이후 중복은 `{base}{n}` 의 미사용 순번으로
+  재부여합니다(`caption1`→유지, 두 번째 그리드→`caption2`, …). 그리드 내부 표시 전용 id 라 스크립트 참조가 없어 안전합니다.
+* 재부여 후 중복이 없으므로 **재변환 시 no-op(멱등)** 입니다.
+
+### 규칙 28: 반복문 내 Map/List 데이터 수정 시 UI 갱신 제어 (`setBroadcast`)
+
+* **배경**: 반복문(for/while/forEach) 안에서 dataMap/dataList 데이터를 반복 변경하면 매 변경마다 UI 갱신 이벤트가 발생해
+  불필요한 DOM 리드로우/리플로우로 **성능 저하와 화면 깜빡임**이 생깁니다. 반복 전 갱신을 중단하고 반복 후 일괄 반영합니다. (2026-09-01 확정)
+  ```javascript
+  // 1. 반복 시작 전: UI 갱신 중단
+  dlt_list.setBroadcast(false);
+
+  // 2. 데이터 반복 수정
+  for (let i = 0; i < dlt_list.getRowCount(); i++) {
+      dlt_list.setCellData(i, "status", "processed");
+  }
+
+  // 3. 반복 종료 후: UI 갱신 재개 및 누적 변경 즉시 반영
+  dlt_list.setBroadcast(true, true);
+  ```
+* **변환 규약**(결정적, convert.py 규칙 28): 문장 단위의 `for`/`while` 루프 본문이 DataCollection
+  (head 에 선언된 dataMap/dataList id 또는 `dma_`/`dlt_`/`dts_` 접두 식별자)의 뮤테이터
+  (`set`/`setCellData`/`setColumnData`/`insertRow`/`addRow`/`removeRow`/`deleteRow`/`insertJSON`/`appendJSON`)를 호출하면,
+  변경되는 DC 별로 반복 앞에 `setBroadcast(false);`, 반복 뒤에 `setBroadcast(true, true);` 를 삽입합니다.
+  `{DC}.forEach(...)` 문장은 수신 DataCollection 을 제어 대상으로 봅니다(콜백 안 `.set*` 호출 존재 시).
+* **보류(단계 2 검토·리포트)**: 루프 본문에 `return`/`throw` 가 있으면 조기 이탈 시 `setBroadcast(true, true)` 복원이
+  누락되어 화면이 갱신되지 않는 위험이 있어 자동 삽입하지 않습니다(수동으로 try/finally 등 적용 검토).
+  중괄호 없는 단문 루프는 대상 외이며, 감지 루프끼리 중첩되면 바깥 루프만 처리합니다.
+* 직전 줄들에 해당 DC 의 `setBroadcast(false)` 가 이미 있으면 건너뛰므로 **재변환 시 no-op(멱등)** 입니다.
+* **기대 효과**: 렌더링 1회 일괄 갱신으로 대량 데이터 처리 속도 개선, 수정 중 중간 상태 노출·깜빡임 완화.
 
 ---
 

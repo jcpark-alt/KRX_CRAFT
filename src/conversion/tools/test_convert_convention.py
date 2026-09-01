@@ -97,6 +97,267 @@ scwin.doLoad = function () {
     assert "scwin.loadDone" in out[p4:p5]  # 이름 패턴이 아니어도 핸들러 참조로 분류
 
 
+def test_executedynamic_caller_classified_as_callback():
+    # 본문에서 $c.sbm.executeDynamic 을 호출하는(통신 실행) 함수는 4구역으로 분류 (2026-09-01 규칙)
+    script = SCRIPT_BASE + '''
+scwin.loadList = async function () {
+    const sbmOptions = { id : "s2", action : "/api/x" };
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+};
+'''
+    out, rep = _run_rule24(script)
+    p4 = out.find("4. 서브미션 콜백 영역")
+    p5 = out.find("5. 일반/업무 함수 영역")
+    assert "scwin.loadList" in out[p4:p5]
+    assert rep["rule4"]["callback"] == 3
+
+
+def test_executedynamic_in_event_handler_stays_event():
+    # ev:on* 이 참조하는 이벤트 핸들러는 executeDynamic 을 직접 호출해도 3구역 우선
+    script = SCRIPT_BASE + '''
+scwin.btn_load_onclick = async function () {
+    await $c.sbm.executeDynamic({ id : "s3", action : "/api/y" });
+};
+'''
+    body = BODY + '<w2:button id="btn_load" ev:onclick="scwin.btn_load_onclick"/>'
+    out, _ = _run_rule24(script, body=body)
+    p3 = out.find("3. 컴포넌트 이벤트 영역")
+    p4 = out.find("4. 서브미션 콜백 영역")
+    assert "scwin.btn_load_onclick" in out[p3:p4]
+
+
+def test_executedynamic_in_comment_not_classified():
+    # 주석 속 executeDynamic 호출은 분류에 영향 없음(문자열/주석 마스킹)
+    script = SCRIPT_BASE + '''
+scwin.calcFee = function () {
+    // await $c.sbm.executeDynamic(sbmOptions);
+    return 1;
+};
+'''
+    out, _ = _run_rule24(script)
+    p5 = out.find("5. 일반/업무 함수 영역")
+    assert "scwin.calcFee" in out[p5:]
+
+
+def test_first_function_doc_moves_with_function():
+    # 첫 함수의 doc 주석은 preamble 에 남지 않고 섹션 헤더 아래 함수와 함께 배치 (멱등)
+    script = '''
+scwin.vScrenID = "TEST0001";
+
+/**
+ * @method
+ * @name scwin.onpageload
+*/
+scwin.onpageload = function () {
+    scwin.searchList();
+};
+
+scwin.searchList = function () {
+    console.log("s");
+};
+'''
+    out, _ = _run_rule24(script)
+    p2 = out.find("2. 초기화 영역")
+    assert out.find("@name scwin.onpageload") > p2 > -1
+    twice, _ = _run_rule24(out)
+    assert twice == out
+
+
+def test_rule5e_neg_compare():
+    rep = {}
+    out = convert.rule5e_neg_compare("if (!e.responseStatusCode === 200) { }\n// !a === 1 주석\nconst s = '!x === 1';", rep)
+    assert "e.responseStatusCode !== 200" in out
+    assert "// !a === 1" in out and "'!x === 1'" in out   # 주석/문자열 보호
+    assert len(rep["rule5e"]) == 1
+
+
+def test_rule25_sequential_normalization():
+    # submitDoneHandler 옵션형(수기 변환분) → 순차 스타일 정규화 + 멱등
+    script = '''
+scwin.sbm_list_submitdone = async function (e) {
+    console.log(e);
+};
+
+scwin.load = async function () {
+    const sbmOptions = {
+        id: "sbm_list",
+        action: "/api/x",
+        submitDoneHandler: scwin.sbm_list_submitdone, isProcessMsg: false
+    };
+
+    await $c.sbm.executeDynamic(sbmOptions);
+};
+'''
+    rep = {}
+    out = convert.rule25_sequential_submission(script, rep)
+    assert "submitDoneHandler" not in out
+    assert "const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);" in out
+    assert "await scwin.sbm_list_submitdone(sbmRtn);" in out
+    assert "isProcessMsg: false" in out
+    assert convert.rule25_sequential_submission(out, {}) == out
+
+
+def test_rule25_undefined_handler_todo():
+    # 파일에 정의되지 않은 핸들러는 직접 호출 대신 TODO Stage2 주석
+    script = '''
+scwin.load = async function () {
+    const sbmOptions = {
+        id: "s1",
+        submitDoneHandler: scwin.notDefined
+    };
+    await $c.sbm.executeDynamic(sbmOptions);
+};
+'''
+    out = convert.rule25_sequential_submission(script, {})
+    assert not re.search(r'submitDoneHandler\s*:', out)   # 속성은 제거(TODO 주석 문구는 무관)
+    assert "TODO Stage2" in out and "notDefined" in out
+
+
+def test_rule26_entry_trycatch():
+    script = '''///////// 2. 초기화 영역 /////////
+scwin.onpageload = async function () {
+    await scwin.searchList();
+};
+
+scwin.onpageunload = function () {
+};
+
+///////// 3. 컴포넌트 이벤트 영역 /////////
+scwin.btn_x_onclick = function () {
+    scwin.searchList();
+};
+
+scwin.btn_y_onclick = async function () {
+    try {
+        await scwin.searchList();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "T.btn_y" });
+    }
+};
+
+///////// 5. 일반/업무 함수 영역 /////////
+scwin.searchList = async function () {
+    console.log(1);
+};
+'''
+    rep = {}
+    out = convert.rule26_entry_trycatch(script, rep, "TEST0001")
+    assert rep["rule26"] == 2   # onpageload + btn_x (btn_y 는 try 존재, onpageunload 는 빈 본문 → 제외)
+    assert 'await $c.exception.handleError(ex, { context : "TEST0001.onpageload" });' in out
+    assert '$c.exception.handleError(ex, { context : "TEST0001.btn_x_onclick" });' in out
+    assert out.count('context : "T.btn_y"') == 1          # 기존 수기 적용분 보존
+    assert 'context : "TEST0001.searchList"' not in out   # 5구역 일반 함수는 래핑하지 않음
+    assert convert.rule26_entry_trycatch(out, {}, "TEST0001") == out
+
+
+def test_rule27_dedup_grid_child_ids():
+    body = ('<w2:gridView id="g1"><w2:caption id="caption1"/><w2:header id="header1"></w2:header><w2:gBody id="gBody1"></w2:gBody></w2:gridView>'
+            '<w2:gridView id="g2"><w2:caption id="caption1"/><w2:header id="header1"></w2:header><w2:gBody id="gBody1"></w2:gBody></w2:gridView>')
+    rep = {}
+    out = convert.rule27_dedup_grid_child_ids(body, rep)
+    assert len(rep["rule27"]) == 3
+    assert out.count('id="caption1"') == 1 and 'id="caption2"' in out
+    assert out.count('id="header1"') == 1 and 'id="header2"' in out
+    assert out.count('id="gBody1"') == 1 and 'id="gBody2"' in out
+    out2 = convert.rule27_dedup_grid_child_ids(out, {})
+    assert out2 == out
+
+
+def test_rule13_bare_reference_sync():
+    # 규칙 13 보강 — 정의 개명 시 bare 참조(대입 RHS 등)도 scwin.{신이름} 으로 동기화, 주석은 보존
+    script = '''
+scwin.fn_GetReturn = function (arrPar) {
+    return arrPar;
+};
+
+scwin.btn_ret_onclick = function () {
+    scwin.fn_GetPar = fn_GetReturn;
+    // scwin.fn_GetPar = fn_GetReturn; 주석은 보존
+};
+'''
+    rep = {"judgment": []}
+    _, script2, _ = convert.rule13_rename_scwin_fn("", script, "", rep)
+    assert "scwin.getReturn = function" in script2
+    assert "scwin.fn_GetPar = scwin.getReturn;" in script2
+    assert "// scwin.fn_GetPar = fn_GetReturn;" in script2
+
+
+def test_rule28_broadcast_guard():
+    # 반복문 내 DataCollection 변경 → 앞뒤 setBroadcast(false)/(true, true) 삽입 + 멱등
+    head = '<w2:dataList id="dlt_list" baseNode="list"></w2:dataList>'
+    script = '''
+scwin.proc = function () {
+    for (let i = 0; i < dlt_list.getRowCount(); i++) {
+        dlt_list.setCellData(i, "status", "done");
+    }
+};
+'''
+    rep = {}
+    out = convert.rule28_broadcast_guard(script, head, rep)
+    assert "dlt_list.setBroadcast(false);" in out
+    assert "dlt_list.setBroadcast(true, true);" in out
+    assert out.index("setBroadcast(false)") < out.index("for (") < out.index("setBroadcast(true, true)")
+    assert len(rep["rule28"]) == 1
+    assert convert.rule28_broadcast_guard(out, head, {}) == out
+
+
+def test_rule28_foreach_skip_return_and_plain_loop():
+    script = '''
+scwin.a = function () {
+    dlt_rows.forEach(function (item) {
+        item.set("x", 1);
+    });
+};
+
+scwin.b = function () {
+    for (const r of rows) {
+        dma_x.set("k", r);
+        if (r === 0) return;
+    }
+};
+
+scwin.c = function () {
+    for (let i = 0; i < 3; i++) {
+        console.log(i);
+    }
+};
+'''
+    rep = {"judgment": []}
+    out = convert.rule28_broadcast_guard(script, "", rep)
+    assert "dlt_rows.setBroadcast(false);" in out       # DC.forEach — 수신 객체 제어
+    assert "dlt_rows.setBroadcast(true, true);" in out
+    assert "dma_x.setBroadcast" not in out              # 본문 return → 보류(복원 누락 위험)
+    assert any("규칙28" in j for j in rep["judgment"])
+    assert out.count("setBroadcast") == 2               # DC 를 변경하지 않는 일반 루프는 무변환
+
+
+def test_comment_space_formatting():
+    # // 주석 뒤 공백 1개 보장 — 구분선/헤더/W-Craft 마커/문자열 내부는 제외 (code-convention 주석 규칙)
+    src = '''
+scwin.a = 1; //채권시장조치구분코드
+//주석 라인
+// 이미 공백 있음
+///////// 1. 변수 및 선언 영역 /////////
+//----W-Craft WebSquare 변환 확인----//
+////dts_x.DataID = url;
+const u = "http://x/y"; //URL문자열무관
+const s = '//문자열내부는보호';
+'''
+    rep = {}
+    out = convert.format_comment_space(src, rep)
+    assert "// 채권시장조치구분코드" in out
+    assert "// 주석 라인" in out
+    assert "// 이미 공백 있음" in out                     # 변화 없음
+    assert "///////// 1. 변수 및 선언 영역 /////////" in out  # 섹션 헤더 유지
+    assert "//----W-Craft" in out                          # 마커 유지
+    assert "////dts_x.DataID" in out                       # 4중 슬래시 유지
+    assert "// URL문자열무관" in out
+    assert "'//문자열내부는보호'" in out                    # 문자열 내부 보호
+    assert rep["fmt_comment_space"] == 3
+    out2 = convert.format_comment_space(out)
+    assert out2 == out                                     # 멱등
+
+
 def test_rule24_idempotent():
     once, _ = _run_rule24(SCRIPT_BASE)
     twice, _ = _run_rule24(once)

@@ -101,6 +101,21 @@ def segments(code):
     return segs
 
 
+def format_comment_space(script, report=None):
+    """라인 주석 `//` 바로 뒤에 공백 1개를 보장한다(code-convention 주석 규칙, 2026-09-01).
+    섹션 헤더/구분선/마커(`///`, `//-`, `//=`, `//*`, `//#`, `//!` 등)와 문자열 내부는 제외. 멱등."""
+    out = []
+    cnt = 0
+    for txt, is_code in segments(script):
+        if (not is_code) and txt.startswith("//") and len(txt) > 2 and txt[2] not in " \t/*-=#!+~^|":
+            txt = "// " + txt[2:]
+            cnt += 1
+        out.append(txt)
+    if report is not None:
+        report["fmt_comment_space"] = cnt
+    return "".join(out)
+
+
 def code_mask(code):
     mask = bytearray(len(code)); pos = 0
     for txt, is_code in segments(code):
@@ -230,6 +245,24 @@ def rule5a_strict_eq(code, report):
     return "".join(out)
 
 
+def rule5e_neg_compare(code, report):
+    """`!X === Y` 연산자 우선순위 버그를 `X !== Y` 로 교정한다(규칙 5 보강).
+    (!X 가 boolean 으로 평가된 뒤 Y 와 비교되어, 의도한 "불일치 비교"와 다르게 동작하는 실수 패턴)
+    X 는 식별자 체인만 대상(호출·괄호식 제외 — 보수적). 코드 세그먼트만 치환하고 건별 리포트한다."""
+    mask = code_mask(code)
+    pat = re.compile(r'!\s*([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)\s*===(?!=)')
+    res, last = [], 0
+    for mo in pat.finditer(code):
+        if not mask[mo.start()]:
+            continue
+        report.setdefault("rule5e", []).append(mo.group(0).strip() + " → " + mo.group(1) + " !==")
+        res.append(code[last:mo.start()])
+        res.append(mo.group(1) + " !==")
+        last = mo.end()
+    res.append(code[last:])
+    return "".join(res)
+
+
 def rule5b_setvalue(code, report):
     mask = code_mask(code)
     pat = re.compile(r'(\b[\w$]+(?:\.[\w$]+)*)\.value\s*=\s*(?!=)([^;\n]+);')
@@ -344,6 +377,9 @@ def rule13_rename_scwin_fn(head, script, body, report):
         script = _replace_in_code(script, pat, lambda m: m.group(1) + rename[m.group(2)])
         head = pat.sub(lambda m: m.group(1) + rename[m.group(2)], head)
         body = pat.sub(lambda m: m.group(1) + rename[m.group(2)], body)
+        # bare 참조 동기화 — 접두 없는 잔존 참조(`scwin.fn_GetPar = fn_GetReturn;` 의 RHS 등)를 scwin.{신이름} 으로 교정
+        bare = re.compile(r'(?<![.\w$])(' + "|".join(re.escape(o) for o in rename) + r')\b')
+        script = _replace_in_code(script, bare, lambda m: "scwin." + rename[m.group(1)])
         report["rule13"] = ["%s → %s" % (o, n) for o, n in rename.items()]
     if skipped:
         report["judgment"].append("규칙13 scwin.fn_* 정규화 보류(충돌): " + ", ".join(skipped))
@@ -856,6 +892,7 @@ def rule4_structure(script, body, report):
     최상위 함수 정의를 초기화/이벤트/서브미션 콜백/일반 4구역으로 분류·재배치하고
     5단계 정형화 구조 블록 헤더(2~5구역)를 붙인다. (1구역 헤더는 규칙 2 소관)
     - 서브미션 콜백: 이름 패턴(*_submitdone/*_submiterror/*callback) 또는 submitDoneHandler 등 옵션 참조 기반.
+      본문에서 $c.sbm.executeDynamic 을 호출하는(통신 실행) 함수도 콜백 구역으로 분류한다(이벤트 핸들러는 3구역 우선).
     - 함수 사이/뒤에 최상위 실행문이 섞여 있으면 재정렬 보류(리포트).
     - gform_onload 는 onpageload 가 'scwin.gform_onload();' 단일 호출이고 참조가 1건일 때만 병합.
     - doc 주석(경계 주석 제외)은 해당 함수와 함께 이동. 구 한 줄 경계 주석은 블록 헤더로 마이그레이션. 멱등.
@@ -930,7 +967,12 @@ def rule4_structure(script, body, report):
     # 서브미션 옵션(submitHandler/submitDoneHandler/submitErrorHandler)이 참조하는 함수 → 콜백 구역
     handler_refs = set(re.findall(r'submit(?:Done|Error)?Handler\s*:\s*scwin\.([\w$]+)', script))
 
-    def category(name):
+    def _masked_text(f):
+        # 문자열/주석을 공백으로 치운 함수 원문(주석 속 호출 오분류 방지)
+        return "".join(script[k] if mask[k] else " " for k in range(f["start"], f["end"]))
+
+    def category(f):
+        name = f["name"]
         if name in ("onpageload", "onpageunload"):
             return "init"
         if name == "gform_onload":
@@ -939,18 +981,23 @@ def rule4_structure(script, body, report):
             return "callback"
         if name in evon or re.search(r'_[Oo]n[A-Za-z]', name):
             return "event"
+        # $c.sbm.executeDynamic 호출(통신 실행) 함수도 서브미션 콜백 구역으로 분류
+        if re.search(r'\$c\.sbm\.executeDynamic\s*\(', _masked_text(f)):
+            return "callback"
         return "general"
 
     buckets = {"init": [], "event": [], "callback": [], "general": []}
     for i, f in enumerate(funcs):
         if removed[i]:
             continue
-        buckets[category(f["name"])].append(i)
+        buckets[category(f)].append(i)
 
     def emit(cat):
         out = []
         for i in buckets[cat]:
             cl = _clean_lead(leads[i])
+            if i == 0 and first_doc:
+                cl = (cl + "\n" if cl else "") + first_doc
             block = (cl + "\n" if cl else "") + funcs[i]["text"]
             out.append(block)
         return out
@@ -958,6 +1005,13 @@ def rule4_structure(script, body, report):
     # preamble/tail 에서 규칙4 경계 주석(구 한 줄·신 블록 헤더) 제거(재실행 시 중복 방지 → 멱등)
     preamble_clean = _strip_section_headers(preamble).rstrip("\n")
     tail_clean = _strip_section_headers(tail).strip("\n")
+
+    # preamble 끝의 블록 주석(첫 함수의 doc 주석)은 섹션 헤더 아래 첫 함수와 함께 이동
+    first_doc = ""
+    mdoc = re.search(r"(?s)\n?(/\*(?:[^*]|\*(?!/))*\*/)[ \t]*\Z", preamble_clean)
+    if mdoc:
+        first_doc = mdoc.group(1)
+        preamble_clean = preamble_clean[:mdoc.start()].rstrip("\n")
 
     parts = [preamble_clean]
     for cat, header in (("init", _SEC2_INIT), ("event", _SEC3_EVENT),
@@ -1927,6 +1981,267 @@ def collect_judgment(script, head, body, report):
 
 
 # ---------- 파이프라인 ----------
+def _match_brace(code, mask, bpos):
+    """bpos 의 '{' 와 짝이 되는 '}' 인덱스(코드 영역 기준). 못 찾으면 -1."""
+    d, j, n = 0, bpos, len(code)
+    while j < n:
+        if mask[j]:
+            if code[j] == "{":
+                d += 1
+            elif code[j] == "}":
+                d -= 1
+                if d == 0:
+                    return j
+        j += 1
+    return -1
+
+
+def rule25_sequential_submission(script, report):
+    """수기 변환분 정규화(규칙 25) — 옵션 객체 안의 `submitDoneHandler : scwin.X` 를 제거하고
+    순차 스타일(`const sbmRtn = await $c.sbm.executeDynamic(옵션); await scwin.X(sbmRtn);`)로 전환한다.
+    (핸들러를 옵션으로 넘기면 executeDynamic 의 Promise 가 settle 되지 않아 await 이 영구 대기 — code-convention §서브미션)
+    - submitErrorHandler 가 함께 있으면 콜백 스타일 유지 규약이므로 보류·리포트.
+    - 핸들러가 파일에 정의돼 있지 않으면 직접 호출 대신 `// TODO Stage2` 주석을 남긴다.
+    - 호출이 대입형(const r = await ...)이면 핸들러 속성만 제거(기존 반환값 사용 유지)하고 리포트한다.
+    멱등 — 결과 옵션에는 submitDoneHandler 가 남지 않는다."""
+    mask = code_mask(script)
+    defined_fns = set(re.findall(r'scwin\.([A-Za-z_$][\w$]*)\s*=\s*(?:async\s+)?function', script))
+    conv, skip = [], []
+    edits = []  # (start, end, replacement)
+
+    for lit in re.finditer(r'(?:const|let|var)\s+([\w$]+)\s*=\s*\{', script):
+        if not mask[lit.start()]:
+            continue
+        var = lit.group(1)
+        bopen = script.index("{", lit.end() - 1)
+        bclose = _match_brace(script, mask, bopen)
+        if bclose < 0:
+            continue
+        seg = script[bopen:bclose + 1]
+        hm = re.search(r'submitDoneHandler\s*:\s*scwin\.([\w$]+)', seg)
+        if not hm or not mask[bopen + hm.start()]:
+            continue
+        handler = hm.group(1)
+        if re.search(r'submitErrorHandler\s*:', seg):
+            skip.append("%s (submitErrorHandler 공존 — 콜백 유지)" % var)
+            continue
+
+        # 1) 핸들러 속성 제거 — 「속성 + 뒤따르는 콤마」 우선, 마지막 속성이면 「앞 콤마 + 속성」
+        pm = re.search(r'submitDoneHandler\s*:\s*scwin\.' + re.escape(handler) + r'\s*,\s*(?=\S)', seg)
+        if pm:
+            edits.append((bopen + pm.start(), bopen + pm.end(), ""))
+        else:
+            pm = re.search(r',\s*submitDoneHandler\s*:\s*scwin\.' + re.escape(handler), seg)
+            if pm:
+                edits.append((bopen + pm.start(), bopen + pm.end(), ""))
+            else:
+                skip.append("%s (핸들러 속성 형태 인식 실패)" % var)
+                continue
+
+        # 2) 호출부 순차 스타일 전환 — 옵션 리터럴 뒤 첫 executeDynamic({var}) 단독 문장
+        call = re.compile(r'(?m)^([ \t]*)(?:(const|let|var)\s+([\w$]+)\s*=\s*)?(await\s+)?\$c\.sbm\.executeDynamic\(\s*' + re.escape(var) + r'\s*\)\s*;[ \t]*$')
+        cm = call.search(script, bclose)
+        if cm is None or not mask[cm.start(0) + len(cm.group(1))]:
+            skip.append("%s (executeDynamic 호출부 미탐지 — 핸들러 속성만 제거)" % var)
+            continue
+        if cm.group(2):
+            # 대입형 — 반환값 사용 중이므로 핸들러 속성 제거만 수행(Promise settle 정상화)
+            conv.append("%s: 핸들러 속성만 제거(대입형 호출 유지, 핸들러 %s)" % (var, handler))
+            continue
+        indent = cm.group(1)
+        rtn = "sbmRtn" + (var[len("sbmOptions"):] if var.startswith("sbmOptions") else "")
+        line = indent + "const " + rtn + " = await $c.sbm.executeDynamic(" + var + ");\n"
+        if handler in defined_fns:
+            line += indent + "await scwin." + handler + "(" + rtn + ");"
+        else:
+            line += indent + "// TODO Stage2: " + rtn + " 응답 처리 로직 작성 (구 submitDoneHandler scwin." + handler + " 미정의)"
+        edits.append((cm.start(), cm.end(), line))
+        conv.append("%s → 순차 스타일(%s)" % (var, handler))
+
+    for st, en, rep_txt in sorted(edits, reverse=True):
+        script = script[:st] + rep_txt + script[en:]
+    report.setdefault("rule25", {"converted": [], "skipped": []})
+    report["rule25"]["converted"].extend(conv)
+    report["rule25"]["skipped"].extend(skip)
+    if skip:
+        report.setdefault("judgment", []).append("규칙25 순차 전환 보류: " + "; ".join(skip))
+    return script
+
+
+def rule26_entry_trycatch(script, report, screen_id):
+    """진입점 오류 처리(규칙 26) — 2구역(onpageload)·3구역(이벤트 핸들러) 함수 본문을 try/catch 로 감싸고
+    catch 를 `$c.exception.handleError(ex, { context : "{화면ID}.{함수명}" })` 한 줄로 통일한다
+    (code-convention §오류 처리). 본문에 try 가 이미 있거나 실행문이 없으면 건너뛴다. 멱등."""
+    mask = code_mask(script)
+    # 2·3구역 범위 산출 — 규칙 4 가 삽입한 섹션 헤더 기준(헤더가 없으면 미적용)
+    heads = [(m.start(), m.group(0)) for m in re.finditer(r'(?m)^/{9} (\d)\. [^\n]*? /{9}[ \t]*$', script)]
+    ranges = []
+    for i, (pos, txt) in enumerate(heads):
+        num = int(re.search(r'/{9} (\d)\.', txt).group(1))
+        if num in (2, 3):
+            end = heads[i + 1][0] if i + 1 < len(heads) else len(script)
+            ranges.append((pos, end))
+    if not ranges:
+        report["rule26"] = 0
+        return script
+    fpat = re.compile(r'(?m)^scwin\.([A-Za-z_$][\w$]*)\s*=\s*(async\s+)?function\b[^\n{]*\{')
+    edits = []
+    cnt = 0
+    for st, en in ranges:
+        for mo in fpat.finditer(script, st, en):
+            bopen = script.index("{", mo.end() - 1)
+            bclose = _match_brace(script, mask, bopen)
+            if bclose < 0:
+                continue
+            body = script[bopen + 1:bclose]
+            code_txt = "".join(t for t, c in segments(body) if c)
+            if not code_txt.strip():
+                continue   # 실행문 없는 본문(onpageunload 등)
+            if re.search(r'(?<![.\w$])try(?![\w$])', code_txt):
+                continue   # 이미 try 존재 — 수기 적용분 보존(멱등)
+            is_async = bool(mo.group(2))
+            inner = "\n".join(("    " + ln if ln.strip() else ln) for ln in body.strip("\n").split("\n"))
+            call = ("await " if is_async else "") + '$c.exception.handleError(ex, { context : "%s.%s" });' % (screen_id, mo.group(1))
+            new_body = "\n    try {\n" + inner + "\n    } catch (ex) {\n        " + call + "\n    }\n"
+            edits.append((bopen + 1, bclose, new_body))
+            cnt += 1
+    for st, en, rep_txt in sorted(edits, reverse=True):
+        script = script[:st] + rep_txt + script[en:]
+    report["rule26"] = cnt
+    return script
+
+
+_GRID_CHILD_TAGS = ("w2:caption", "w2:header", "w2:gBody")
+
+
+def rule27_dedup_grid_child_ids(body, report):
+    """그리드 표준 자식 요소(caption/header/gBody)의 문서 전체 중복 id 를 순번으로 재부여한다(규칙 27).
+    W-Craft 변환기가 그리드마다 caption1/header1/gBody1 을 복제 생성해 wsxml_lint WS120 이 발생하는 문제 해소.
+    첫 등장은 유지, 이후 중복은 "{base}{n}" 의 미사용 순번으로 개명(표시 전용 id 만 대상). 멱등."""
+    changes = []
+    for tag in _GRID_CHILD_TAGS:
+        base = tag.split(":")[1]
+        pat = re.compile(r'(<' + tag + r'\b[^>]*\bid=")([^"]+)(")')
+        used = set(m.group(2) for m in pat.finditer(body))
+        seen = set()
+
+        def sub(m, base=base, used=used, seen=seen, tag=tag):
+            cur = m.group(2)
+            if cur not in seen:
+                seen.add(cur)
+                return m.group(0)
+            n = 1
+            while base + str(n) in used:
+                n += 1
+            new = base + str(n)
+            used.add(new)
+            changes.append("%s id=%s → %s" % (tag, cur, new))
+            return m.group(1) + new + m.group(3)
+
+        body = pat.sub(sub, body)
+    report["rule27"] = changes
+    return body
+
+
+# 반복문 내 DataCollection 변경으로 판정하는 뮤테이터 메서드(규칙 28)
+_DC_MUTATORS = r'(?:set|setCellData|setColumnData|insertRow|addRow|removeRow|deleteRow|insertJSON|appendJSON)'
+
+
+def rule28_broadcast_guard(script, head, report):
+    """반복문 내 Map/List 데이터 수정 시 UI 갱신 제어(규칙 28) — for/while/forEach 문장의 본문이
+    DataCollection(head 선언 dataMap/dataList id 또는 dma_/dlt_/dts_ 접두 식별자)을 반복 변경하면
+    반복 전 `{dc}.setBroadcast(false);`, 반복 후 `{dc}.setBroadcast(true, true);` 를 삽입한다.
+    - 본문에 return/throw 가 있으면 복원 누락 위험이 있어 보류·리포트(단계 2 검토).
+    - 직전 줄들에 이미 해당 dc 의 setBroadcast(false) 가 있으면 건너뜀 → 멱등.
+    - 다른 감지 루프 내부에 중첩된 루프는 바깥 루프만 처리한다."""
+    mask = code_mask(script)
+    n = len(script)
+    dc_ids = set(re.findall(r'<w2:data(?:Map|List)\b[^>]*\bid="([\w$]+)"', head))
+
+    def is_dc(name):
+        return name in dc_ids or re.match(r'^(?:dma_|dlt_|dts_)', name) is not None
+
+    def match_paren(p):
+        d, j = 0, p
+        while j < n:
+            if mask[j]:
+                if script[j] == "(":
+                    d += 1
+                elif script[j] == ")":
+                    d -= 1
+                    if d == 0:
+                        return j
+            j += 1
+        return -1
+
+    def code_only(text):
+        return "".join(t for t, c in segments(text) if c)
+
+    loops = []
+    # for / while 루프 (문장 시작 위치, 중괄호 본문만)
+    for mo in re.finditer(r'(?m)^([ \t]*)(for|while)\s*\(', script):
+        if not mask[mo.start(2)]:
+            continue
+        p = script.index("(", mo.end(2) - 1)
+        rp = match_paren(p)
+        if rp < 0:
+            continue
+        b = script.find("{", rp)
+        if b < 0 or script[rp + 1:b].strip():
+            continue   # 중괄호 없는 단문 루프는 대상 외
+        bc = _match_brace(script, mask, b)
+        if bc < 0:
+            continue
+        body = code_only(script[b + 1:bc])
+        dcs = sorted(set(m for m in re.findall(r'([\w$]+)\.' + _DC_MUTATORS + r'\s*\(', body) if is_dc(m)))
+        if dcs:
+            loops.append({"indent": mo.group(1), "start": mo.start(), "end": bc + 1, "body": body, "dcs": dcs,
+                          "label": "%s 루프" % mo.group(2)})
+    # {DC}.forEach(...) 문장 — 수신 DataCollection 자체를 순회 변경
+    for mo in re.finditer(r'(?m)^([ \t]*)([\w$]+)\.forEach\s*\(', script):
+        if not mask[mo.start(2)] or not is_dc(mo.group(2)):
+            continue
+        p = script.index("(", mo.end() - 1)
+        rp = match_paren(p)
+        if rp < 0:
+            continue
+        e = rp + 1
+        while e < n and script[e] in " \t":
+            e += 1
+        if e < n and script[e] == ";":
+            e += 1
+        body = code_only(script[p + 1:rp])
+        if not re.search(r'\.' + _DC_MUTATORS + r'\s*\(', body):
+            continue
+        loops.append({"indent": mo.group(1), "start": mo.start(), "end": e, "body": body, "dcs": [mo.group(2)],
+                      "label": "%s.forEach" % mo.group(2)})
+
+    # 감지 루프끼리 중첩되면 바깥 루프만 처리
+    loops = [lp for lp in loops
+             if not any(o is not lp and o["start"] < lp["start"] and lp["end"] <= o["end"] for o in loops)]
+
+    applied, edits = [], []
+    for lp in loops:
+        if re.search(r'(?<![.\w$])(?:return|throw)(?![\w$])', lp["body"]):
+            report.setdefault("judgment", []).append(
+                "규칙28 setBroadcast 보류(%s — 본문 return/throw 로 복원 누락 위험, 수동 적용 검토)" % lp["label"])
+            continue
+        prev = "\n".join(script[:lp["start"]].split("\n")[-6:])   # 직전 줄들에서 기적용 여부 판정(멱등)
+        dcs = [dc for dc in lp["dcs"] if not re.search(re.escape(dc) + r'\.setBroadcast\(\s*false\s*\)', prev)]
+        if not dcs:
+            continue
+        pre = "".join("%s%s.setBroadcast(false);\n" % (lp["indent"], dc) for dc in dcs)
+        post = "".join("\n%s%s.setBroadcast(true, true);" % (lp["indent"], dc) for dc in dcs)
+        edits.append((lp["start"], lp["start"], pre))
+        edits.append((lp["end"], lp["end"], post))
+        applied.append("%s → setBroadcast 제어(%s)" % (lp["label"], ", ".join(dcs)))
+
+    for st, en, rep_txt in sorted(edits, reverse=True):
+        script = script[:st] + rep_txt + script[en:]
+    report["rule28"] = applied
+    return script
+
+
 def convert(raw, filename):
     """단계 1 변환 진입점 — 규칙 파이프라인(_convert_once)을 고정점까지 반복 적용한다.
     개별 규칙은 멱등이지만 재배치·헤더 삽입·공백 정리의 상호작용으로 1회차에 미세 공백이
@@ -1951,6 +2266,7 @@ def _convert_once(raw, filename):
     s = rule1_vscrenid(s, filename, report)
     s = rule2_globals(s, report)
     s = rule5a_strict_eq(s, report)
+    s = rule5e_neg_compare(s, report)   # !X === Y 우선순위 버그 교정(5a 로 === 통일 후)
     s = rule5b_setvalue(s, report)
     s = rule5c_setbgimage(s, report)
     s = rule5d_method_rename(s, report)
@@ -1958,7 +2274,8 @@ def _convert_once(raw, filename):
     s = rule12_dynamic_submission(s, report)
     s = rule16_trs_submission(s, report)
     s = rule17_create_dialog_frame(s, report)
-    s = mark_async_functions(s, report)   # 규칙 6/12/16/17 이 만든 await 의 소속 함수 async 부여
+    s = rule25_sequential_submission(s, report)   # submitDoneHandler 옵션형(수기 변환분) → 순차 스타일 정규화
+    s = mark_async_functions(s, report)   # 규칙 6/12/16/17/25 가 만든 await 의 소속 함수 async 부여
     s = rule9_remove_obsolete(s, report)
     s = rule11_remove_include(s, report)
     s = rule8_var(s, report)
@@ -1975,11 +2292,15 @@ def _convert_once(raw, filename):
     s, reg["body"] = rule3_handlers(s, reg["body"], report)
     s, reg["body"] = rule4_structure(s, reg["body"], report)
     s = mark_async_functions(s, report)   # 규칙4 병합(gform_onload→onpageload)으로 이동한 await 재탐지
+    s = rule26_entry_trycatch(s, report, filename.rsplit(".", 1)[0])   # 진입점 try/catch + handleError(규칙4 섹션 기준)
+    s = rule28_broadcast_guard(s, reg["head"], report)   # 반복문 내 DC 수정 시 setBroadcast 제어
     s = align_wcraft(s, report)   # //----W-Craft 마커 주석 정렬
+    s = format_comment_space(s, report)   # // 주석 뒤 공백 1개(code-convention 주석 규칙)
     s = format_script(s)          # 함수 단위 빈 줄 + 주석 맨앞 정렬
     s = collapse_blank_runs(s)    # 잔존 다중 빈 줄 수렴(멱등성 보장)
     reg["head"] = rule10_remove_events(reg["head"], report)   # <xf:events>/<xf:event> 삭제
     reg["body"] = rule10_remove_events(reg["body"], report)
+    reg["body"] = rule27_dedup_grid_child_ids(reg["body"], report)   # caption/header/gBody 중복 id 재부여(WS120)
     collect_judgment(s, reg["head"], reg["body"], report)
     result = reg["head"] + reg["script_open"] + s + reg["script_close"] + reg["body"]
     return result, report
@@ -2052,6 +2373,19 @@ def print_report(rep, filename):
     for s in rep["rule17"]["converted"]:
         print("   -", s)
     print("async 함수 전환(await 포함 함수) :", len(rep.get("async_marked", [])), "건")
+    print("규칙5e !X === Y 우선순위 교정 :", len(rep.get("rule5e", [])), "건")
+    for s in rep.get("rule5e", []):
+        print("   -", s)
+    r25 = rep.get("rule25", {"converted": [], "skipped": []})
+    print("규칙25 submitDoneHandler 옵션 → 순차 스타일 :", len(r25["converted"]), "건", ("(보류 %d건)" % len(r25["skipped"])) if r25["skipped"] else "")
+    for s in r25["converted"]:
+        print("   -", s)
+    print("규칙26 진입점 try/catch + handleError 래핑 :", rep.get("rule26", 0), "건")
+    print("규칙27 그리드 자식 중복 id 재부여 :", len(rep.get("rule27", [])), "건")
+    print("규칙28 반복문 setBroadcast 제어 :", len(rep.get("rule28", [])), "건")
+    for s in rep.get("rule28", []):
+        print("   -", s)
+    print("포맷 // 주석 뒤 공백 삽입 :", rep.get("fmt_comment_space", 0), "건")
     for s in rep.get("async_marked", []):
         print("   -", s)
     print("규칙13 scwin.fn_* → camelCase 정규화 :", len(rep["rule13"]), "건")
