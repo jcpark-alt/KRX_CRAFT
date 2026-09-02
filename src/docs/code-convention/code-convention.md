@@ -36,11 +36,30 @@
 - 이벤트: `scwin.{컴포넌트ID}_{이벤트명 소문자}` (규칙 3).
 - 서브미션 콜백: `scwin.sbm_{업무명}_submitdone` / `_submiterror`, 팝업 콜백: `scwin.popupCallback` 계열.
 
+## 변수·문법 규칙
+
+- **`var` 를 사용하지 않는다** — `const` 기본, 재할당이 필요할 때만 `let`. (2026-08-27 확정)
+  변환 도구가 자동 적용하며(규칙 8 — 재할당 분석), 기존 코드를 수정할 때는 그 함수의 잔존 `var` 도 함께 정리한다
+  (무관한 함수의 일괄 변환은 하지 않는다).
+- **비교는 엄격 연산자** `===`/`!==` 를 사용한다(규칙 5a). `!X === Y` 는 `!X`(boolean)가 먼저 평가되는
+  우선순위 버그이므로 `X !== Y` 로 쓴다(규칙 5e — 실사례 교정).
+- **원시 브라우저 API 대신 공통함수를 사용한다**:
+  - `alert(...)` → `$c.win.alert(...)` (원시 alert 금지)
+  - `eval(...)` 금지 — 숫자 캐스팅 용도는 `Number(...)` 로
+  - **예외**: `confirm(...)` 은 반환값을 동기 boolean 으로 소비하는 위치(화면 닫기 판정 등)에서는 유지한다 —
+    `$c.win.confirm` 은 Promise 기반 비동기라 1:1 치환이 불가하며, 전환하려면 호출 흐름의 async 재설계가 필요하다(사유 주석 필수).
+- **참고 — 빌드 `$p` 주입**: `$c.*` 공통함수 호출은 빌드 시 호출부 첫 인자에 `$p` 가 자동 주입된다.
+  적용 대상은 **해당 공통 XML 의 `<w2:publicInfo method=>` 에 등재된 함수만**이다. 화면 코드는 `$c.util.isEmpty(x)` 처럼
+  선언 시그니처 그대로 호출하면 된다(공통함수 작성 규칙은 gcc 가이드 소관 — [gcc_xml_guide.md](../gcc_xml_guide.md)).
+
 ## 주석 규칙
 
 - **라인 주석은 `// `(슬래시 2개 + 공백 1개)로 시작**한다 — `//주석`(X) → `// 주석`(O). 주석 처리한 코드도 동일하게 `// scwin.foo();` 형태로 쓴다. (2026-09-01 확정)
 - **예외(형식 그대로 유지)**: 섹션 헤더(`/////////`)·구분선(`//----`, `//====`, `//****` 등)·W-Craft 마커(`//----W-Craft`)처럼 `//` 뒤가 기호로 이어지는 장식/마커 주석.
 - 변환 도구가 자동 적용한다(convert.py 포매팅 단계 `format_comment_space` — 문자열 내부 보호·멱등).
+- **함수 JSDoc 표준**: 모든 함수에 `@method`/`@name`/`@description`/`@param {타입} 이름 설명`/`@returns`/`@hidden N`(`@example` 권장)
+  블록을 작성한다. `@description desc`·빈 `@description` 같은 **placeholder 금지**, 인자 없는 함수의 빈 `@param` 라인은 쓰지 않는다.
+  레거시 박스형(`/**** 함수명 ****/`)·`argument :` 주석은 내용을 `@description`/`@param` 으로 이관하고 삭제한다(단계 2 판단 작업).
 
 ## 서브미션 — async/await 순차 실행 우선
 
@@ -101,6 +120,32 @@ scwin.btn_save_onclick = async function (e) {
   `exception.xml` 의 `ERROR_REPORT_INFO.URL` 이 비어 있는 동안 비활성이다. 수집 API 신설 시 **URL 한 곳만 지정**하면 전 화면에 적용된다.
 - 상세 사용법·sbm 관계·배포 설정(config.xml 등록): [exception-handling-guide.md](../exception-handling-guide.md)
 
+## 검증 — 나열 검증 대신 공통함수 통합
+
+개별 "빈값 체크 → alert → focus → return false" 나열 패턴은 쓰지 않고 **`$c.validate` 공통함수로 통합**한다.
+
+```javascript
+// 폼/그리드 입력 검증 — 규칙 선언형 통합 (규칙 24)
+if (!(await $c.validate.validateDataCollect(grp_form, { fields : { ... } }))) return;
+
+// DataMap 값(서버 체크 플래그 등) 검사 나열 — 규칙 배열로 통합
+const code = await $c.validate.validateDataMap(dma_svrCheck, [ /* rules */ ]);
+if (code !== 0) return;
+```
+
+- **입력 검증**: `validateDataCollect` — required/format/길이(byte)/compare/조건부(`emptyIf`/`requiredIf`)/중복(`duplicate`)/
+  `checked`/`composition` 등 규칙 선언으로 통합(규칙 24 — 단계 2 판단 작업). 복합 조건은 `options.fields` 를 동적 구성한다.
+- **DataMap 플래그 검사**: "키 값이 일치하면 alert/confirm 후 중단 code 반환" 나열은 `validateDataMap` 규칙 배열로 통합
+  (alert 형은 즉시 중단, confirm 형은 취소 시만 중단, 모두 통과 시 0).
+- 단순 검증 실패는 예외가 아니라 조기 `return` 으로 처리한다(오류 처리 절 참조).
+- 규칙 생성 보조 도구: [validate-generator](../validate-generator/README.md) — 화면 XML 분석으로 options 스니펫 생성.
+
+## 버튼 상태 일괄 제어
+
+화면 상태(조회/입력/수정 등)에 따른 버튼 활성/비활성을 개별 `setDisabled` 나열로 흩뿌리지 않고
+**`$c.util.setButtonState(groupId, status, btnMap, opt)` 선언 모델**로 제어한다(표준 상태 6종 + `registerButtonState` 확장).
+사용법: [button-state-guide.md](../button-state-guide.md)
+
 ## 팝업 호출 — 타입별 데이터 수신 방식
 
 `$c.win.openPopup` 으로 팝업을 열고 호출원 화면으로 데이터를 리턴받을 때는 **`options.type` 별 수신 방식**을 준수한다. (2026-09-01 확정)
@@ -153,6 +198,8 @@ scwin.btn_search_onclick = function () {
 | 규칙 1 | `vScrenID` 관련 코드(선언·대입·참조) **삭제** — 미사용 (2026-09-02 변경, 종전 "1구역 이동") |
 | 규칙 2 | 리터럴 전역을 1구역으로 모으고 헤더 삽입 |
 | 규칙 4 | 함수를 2~5구역으로 분류·재배치, 슬래시 섹션 헤더 삽입, 구(舊) 형식(한 줄 주석·3줄 블록 헤더) 마이그레이션 (멱등) |
+| 규칙 5a·5e | `==`/`!=` → `===`/`!==` 엄격화, `!X === Y` → `X !== Y` 우선순위 버그 교정 |
+| 규칙 8 | `var` → `const`/`let` (재할당 분석 — 단일 할당 const, 재할당 let) |
 | 규칙 6·12·16 | 서브미션을 await 순차 스타일로 생성(핸들러 정의 존재 시 직접 호출 연결, 부재 시 `// TODO Stage2`) |
 | async 부여 | await 포함 함수에 `async` 자동 삽입 + 호출부 await 전파 검토 리포트 |
 
