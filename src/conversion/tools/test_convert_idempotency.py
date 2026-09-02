@@ -90,7 +90,8 @@ scwin.btn_search_onclick = function () {
 
 
 def test_rule2_anchor_toplevel_only():
-    """vScrenID 가 함수 내부에서만 설정되는 파일 — 선언 블록이 함수 몸통 안으로 들어가면 안 된다."""
+    """함수 내부의 vScrenID 대입도 삭제(규칙 1)되고, 선언 블록은 스크립트 최상단에 놓여야 한다
+    (함수 몸통 안으로 들어가면 안 된다)."""
     script = '''
 scwin.onpageload = function() {
     scwin.vScrenID = "TEST0001";
@@ -107,6 +108,8 @@ scwin.searchList = function () {
     assert r1 == r2
     m = __import__("re").search(r"<!\[CDATA\[(.*?)\]\]>", r1, __import__("re").S)
     js = m.group(1)
+    # vScrenID 관련 코드는 삭제(규칙 1 — 2026-09-02 변경)
+    assert "vScrenID" not in js
     # 선언 블록(1구역 헤더 + skw)이 onpageload 정의보다 앞(최상위)에 있어야 한다
     assert js.index("scwin.skw") < js.index("scwin.onpageload = ")
     assert "1. 변수 및 선언 영역" in js.split("scwin.onpageload")[0]

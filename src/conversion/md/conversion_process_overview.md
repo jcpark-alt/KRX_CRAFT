@@ -137,7 +137,7 @@ WebSquare XML 은 `head → script(CDATA) → body` 구조이며, 영역마다 �
 
 * **결정적(deterministic)**: 입력이 같으면 출력이 항상 같은 1:1 규칙만 Python 이 처리.
 * **단어경계 매칭**: `\b함수명\s*\(` 로 호출부만 매칭 — 부분 문자열 오치환 방지.
-* **멱등성(idempotent)**: 변환본을 다시 돌려도 결과 동일(예: `scwin.vScrenID` 중복 삽입 금지). `convert_all.py` 가 2-pass 동일성으로 검증.
+* **멱등성(idempotent)**: 변환본을 다시 돌려도 결과 동일(예: 섹션 헤더 중복 삽입 금지, 규칙 1 재실행 시 무변경). `convert_all.py` 가 2-pass 동일성으로 검증.
 * **리터럴 보호**: `==`→`===` 등은 문자열/정규식/주석 내부를 건드리지 않음. body 의 한글 UI 텍스트(`<xf:label>`)는 절대 치환 대상 아님.
 * **산출물 3종**: ① 변환본 XML ② 전/후 diff ③ **미처리 리포트**(단계 2 입력).
 
@@ -149,8 +149,8 @@ WebSquare XML 은 `head → script(CDATA) → body` 구조이며, 영역마다 �
 
 | 규칙 | 영역 | AS-IS → TO-BE |
 | --- | --- | --- |
-| 1 | SCRIPT | 파일명 변수 `scwin.vScrenID = "{파일명}";` 최상단 삽입 |
-| 2 | SCRIPT | 전역 리터럴 변수를 `// 전역 변수 선언` 구역으로 이동 |
+| 1 | SCRIPT | `scwin.vScrenID` 관련 코드 삭제(미사용 — 2026-09-02 변경, 잔존 참조는 파일명 리터럴 치환) |
+| 2 | SCRIPT | 전역 리터럴 변수를 스크립트 최상단 `1. 변수 및 선언 영역` 구역으로 이동 |
 | 3 | BODY+SCRIPT | 이벤트 핸들러명 소문자화 + `ev:on*` ↔ 스크립트 함수 동시 동기화 |
 | 4 | SCRIPT | **5단계 정형화 구조** 재배치(1 선언 → 2 초기화 → 3 이벤트 → 4 서브미션 콜백 → 5 일반) + 블록 헤더, `gform_onload`→`onpageload` 병합 |
 | 5 | SCRIPT | `==`→`===`, `.value=`→`.setValue()`, `.src=`→`.setBackgroundImage()`, `getTotalRow()`→`getRowCount()` |

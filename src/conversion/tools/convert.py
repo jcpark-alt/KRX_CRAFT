@@ -7,7 +7,7 @@ WebSquare XML 변환기 — websquare_conversion_guide.md §4.2 결정적(기계
 substitution_dict() 를 단일 출처로 사용한다.
 
 적용 규칙(결정적):
-  · 규칙 1 : scwin.vScrenID 멱등 삽입
+  · 규칙 1 : scwin.vScrenID 관련 코드 삭제(미사용 — 2026-09-02 변경, 종전 "멱등 삽입")
   · 규칙 3 : ev:on* 바인딩 핸들러명 이벤트부 소문자화 + body/script 동기화
   · 규칙 5a: == / != -> === / !==   (>=,<=,=> 및 기존 ===,!== 제외)
   · 규칙 5b: X.value = RHS; -> X.setValue(RHS);  (단일라인 대입만, 읽기 제외)
@@ -176,20 +176,60 @@ def _strip_section_headers(text, nums="2345", legacy=_LEGACY_SEC[1:]):
 
 # ---------- 규칙별 변환 ----------
 def rule1_vscrenid(code, filename, report):
-    if re.search(r'scwin\.vScrenID\s*=', code):
-        report["rule1"] = "존재 → 생략(멱등)"
-        return code
-    report["rule1"] = '삽입'
-    return '\nscwin.vScrenID = "%s";\n' % filename + code
+    """규칙 1(2026-09-02 변경): scwin.vScrenID 관련 코드를 삭제한다(미사용 — code-convention.md).
+    종전 "파일명 변수 삽입" 규칙을 폐기 — 선언/대입문(var·scwin. 형태, 함수 내부 포함)을 제거하고,
+    잔존 참조는 대입값(문자열 리터럴, 없으면 파일명) 리터럴로 치환해 동작을 보존한다.
+    화면 ID 가 필요한 코드는 $p.getFrameId() 등 런타임 API 로 전환한다(단계 2 검토). 멱등."""
+    mask = code_mask(code)
+    assign = re.compile(r'(?m)^[ \t]*(?:(?:var|let|const)[ \t]+|scwin\.)?vScrenID\s*=\s*([^;\n]*);[ \t]*(?://[^\n]*)?\r?\n?')
+    value, deleted = None, 0
+    res, last = [], 0
+    for mo in assign.finditer(code):
+        if not mask[mo.start()]:   # 주석/문자열 내부 보호
+            continue
+        rhs = mo.group(1).strip()
+        if value is None and re.fullmatch(r'"[^"\n]*"|\'[^\'\n]*\'', rhs):
+            value = rhs
+        res.append(code[last:mo.start()])
+        last = mo.end()
+        deleted += 1
+    res.append(code[last:])
+    code = "".join(res)
+    if value is None:
+        value = '"%s"' % filename
+
+    # 잔존 참조(scwin.vScrenID / 단독 vScrenID)를 리터럴로 치환 — 코드 세그먼트만, 대입 LHS 제외
+    mask = code_mask(code)
+    ref = re.compile(r'(?:scwin\.vScrenID|(?<![.\w$])vScrenID)\b(?![ \t]*=(?!=))')
+    replaced = 0
+    res, last = [], 0
+    for mo in ref.finditer(code):
+        if not mask[mo.start()]:
+            continue
+        res.append(code[last:mo.start()])
+        res.append(value)
+        last = mo.end()
+        replaced += 1
+    res.append(code[last:])
+    code = "".join(res)
+
+    if deleted or replaced:
+        report["rule1"] = "삭제 %d건, 참조 치환 %d건" % (deleted, replaced)
+    else:
+        report["rule1"] = "해당 없음(멱등)"
+    mask = code_mask(code)
+    leftover = sum(1 for mo in re.finditer(r'vScrenID', code) if mask[mo.start()])
+    if leftover:
+        report["rule1"] += " — 잔존 %d건 수동 확인 필요" % leftover
+    return code
 
 
 def rule2_globals(code, report):
     """
-    최상위(depth 0) 전역 변수 선언 `scwin.X = <리터럴>;` 을 vScrenID 하단
-    `// 전역 변수 선언` 구역으로 모은다. 호출/참조 RHS 는 이동하지 않고 리포트로 분리.
+    최상위(depth 0) 전역 변수 선언 `scwin.X = <리터럴>;` 을 스크립트 최상단
+    `1. 변수 및 선언 영역` 블록으로 모은다. 호출/참조 RHS 는 이동하지 않고 리포트로 분리.
+    (2026-09-02 변경: 규칙 1 이 vScrenID 를 삭제하므로 vScrenID 앵커 의존을 제거)
     """
-    if not re.search(r'scwin\.vScrenID\s*=', code):
-        return code  # 규칙1 선행 필요
     depth = depth_array(code)
     decl = re.compile(r'(?m)^[ \t]*scwin\.([A-Za-z_$][\w$]*)\s*=\s*(.+?);[ \t]*(?://[^\n]*)?[ \t]*\r?\n?')
     moved, spans, skipped = [], [], []
@@ -212,24 +252,14 @@ def rule2_globals(code, report):
     res = code
     for s, e in sorted(spans, reverse=True):
         res = res[:s] + res[e:]
-    # 기존 경계 주석/1구역 헤더(현행 슬래시·구 블록 형식) 제거(중복 방지) 후 vScrenID 바로 아래에 재삽입
+    # 기존 경계 주석/1구역 헤더(현행 슬래시·구 블록 형식) 제거(중복 방지) 후 재삽입
     res = re.sub(r'(?m)^[ \t]*//[ \t]*전역 변수 선언[ \t]*\r?\n?', '', res)
     res = re.sub(r'(?m)^[ \t]*/{5,}[ \t]*1\.[^\n]*영역[^\n]*?/{5,}[ \t]*\r?\n?', '', res)
     res = re.sub(r'(?m)^[ \t]*/\*{10,}[ \t]*\n[ \t]*\*[ \t]*1\.[^\n]*영역[^\n]*\n[ \t]*\*{10,}/[ \t]*\r?\n?', '', res)
-    # 앵커는 "최상위" vScrenID 대입만 — 원본이 onpageload 등 함수 내부에서만 설정하는 파일에서
-    # 함수 몸통 안으로 선언 블록이 삽입되던 결함 방지. 최상위 대입이 없으면 스크립트 최상단에 둔다.
-    res_depth = depth_array(res)
-    at = None
-    for a in re.finditer(r'scwin\.vScrenID\s*=\s*[^;\n]*;[ \t]*(?://[^\n]*)?\r?\n?', res):
-        if res_depth[a.start()] == 0:
-            at = a.end()
-            break
+    # 앵커(2026-09-02 변경): 규칙 1 이 vScrenID 를 삭제하므로 1구역 블록은 항상 스크립트 최상단에 둔다.
+    # 선두 공백은 개행 1개로 정규화해 반복 실행 시 개행이 누적되지 않게 한다(멱등).
     block = _SEC1_DECL + "\n" + "\n".join(moved) + "\n"
-    if at is None:
-        lead = re.match(r'\s*', res).group(0)   # 선두 개행 유지
-        res = lead + block + res[len(lead):]
-    else:
-        res = res[:at] + block + res[at:]
+    res = "\n" + block + res.lstrip()
     report["rule2"] = len(moved)
     return res
 

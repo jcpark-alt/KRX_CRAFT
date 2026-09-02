@@ -57,9 +57,39 @@ BODY = '<w2:button id="btn_search" ev:onclick="scwin.btn_search_onclick"/>'
 
 def _run_rule24(script, body=BODY):
     rep = _rep()
-    s = convert.rule2_globals(script, rep)
+    s = convert.rule1_vscrenid(script, "TEST0001.xml", rep)   # vScrenID 삭제(2026-09-02 규칙) 선행
+    s = convert.rule2_globals(s, rep)
     s, _ = convert.rule4_structure(s, body, rep)
     return s, rep
+
+
+def test_rule1_delete_vscrenid_and_replace_refs():
+    # 규칙 1(2026-09-02 변경): 선언·대입 삭제 + 잔존 참조는 대입값 리터럴 치환 + 멱등
+    script = '''
+scwin.vScrenID = "TEST0001.xml";
+
+scwin.doLog = function () {
+    $c.stf.doLogSave(scwin.vScrenID, "05");
+    const url = "/x.do?SCREN_ID=" + vScrenID;
+    // 주석 속 scwin.vScrenID 는 보존
+};
+'''
+    rep = {}
+    out = convert.rule1_vscrenid(script, "TEST0001.xml", rep)
+    assert 'scwin.vScrenID = ' not in out
+    assert '$c.stf.doLogSave("TEST0001.xml", "05");' in out
+    assert '"/x.do?SCREN_ID=" + "TEST0001.xml"' in out
+    assert "// 주석 속 scwin.vScrenID 는 보존" in out
+    assert rep["rule1"].startswith("삭제 1건, 참조 치환 2건")
+    assert convert.rule1_vscrenid(out, "TEST0001.xml", {}) == out   # 멱등
+
+
+def test_rule1_var_form_and_no_value():
+    # var 선언 형태 삭제 + 대입값이 없으면 파일명 리터럴로 참조 치환
+    script = 'var vScrenID = getName();\nconst a = vScrenID;\n'
+    out = convert.rule1_vscrenid(script, "ULDX00100.xml", {})
+    assert "var vScrenID" not in out
+    assert 'const a = "ULDX00100.xml";' in out
 
 
 def test_five_section_headers_and_callback_bucket():

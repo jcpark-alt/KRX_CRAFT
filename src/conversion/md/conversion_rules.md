@@ -4,12 +4,16 @@
 
 ## 세부 변환 규칙 (Rules)
 
-### 규칙 1: 파일명 변수 선언 및 최상단 배치
-* 변환 중인 XML 파일의 파일명(예: `ULDCOM00007.xml`)을 추출합니다.
-* 스크립트 영역의 최상단에 `scwin.vScrenID = "{파일명}";` 형태로 코드를 삽입합니다.
+### 규칙 1: vScrenID 관련 코드 삭제 (2026-09-02 변경 — 종전 "파일명 변수 삽입" 폐기)
+* `scwin.vScrenID` 관련 코드는 **사용하지 않으므로 삭제**합니다([code-convention.md](../../docs/code-convention/code-convention.md) §5단계 구조).
+* 선언/대입문(`scwin.vScrenID = ...;`·`var vScrenID = ...;`, 함수 내부 포함)을 제거합니다.
+* 잔존 참조(`scwin.vScrenID`·단독 `vScrenID`)는 **대입값(문자열 리터럴, 없으면 파일명) 리터럴로 치환**해 동작을 보존합니다
+  (예: `$c.stf.doLogSave(scwin.vScrenID, ...)` → `$c.stf.doLogSave("ULDXXX00100.xml", ...)`).
+* 화면 ID 가 필요한 코드는 `$p.getFrameId()` 등 런타임 API 로 전환합니다(단계 2 검토).
 
 ### 규칙 2: 전역 변수 재정의
-* 기존에 선언되어 있던 전역 변수들은 파일명 선언 바로 하단(`// 전역 변수 선언` 주석 구역)으로 이동시킵니다.
+* 기존에 선언되어 있던 전역 변수들은 **스크립트 최상단 `1. 변수 및 선언 영역` 블록**으로 이동시킵니다
+  (2026-09-02 변경: 규칙 1 이 vScrenID 를 삭제하므로 vScrenID 하단 앵커를 스크립트 최상단으로 대체).
 
 ### 규칙 3: 이벤트 함수명 CamelCase 및 표준화
 * 모든 이벤트 함수는 `scwin.{camelCase}` 구조로 변환하되, 단어 사이의 언더바(`_`) 값은 예외적으로 허용합니다.
@@ -21,7 +25,7 @@
 스크립트 영역의 코드를 **5단계 정형화 구조**([code-convention.md](../../docs/code-convention/code-convention.md))로 분류하고,
 표준 섹션 헤더(`///////// n. {영역명} /////////` 한 줄)를 바운더리로 삼아 순서를 재정렬합니다.
 
-1. **변수 및 선언 영역** — `scwin.vScrenID`(규칙 1) + 리터럴 전역 변수(규칙 2가 이동·헤더 삽입)
+1. **변수 및 선언 영역** — 리터럴 전역 변수(규칙 2가 이동·헤더 삽입. `scwin.vScrenID` 는 규칙 1이 삭제)
 2. **초기화 영역** — `scwin.onpageload`, `scwin.onpageunload`
    - `scwin.gform_onload` 함수의 코드를 `scwin.onpageload` 내부로 이동하고, 기존 `scwin.gform_onload` 정의는 삭제.
 3. **컴포넌트 이벤트 영역** — `<body>` 의 `ev:on*` 이 참조하는 핸들러(소문자화 가이드 적용, 규칙 3)

@@ -28,7 +28,7 @@ WebSquare XML 은 `head(xml) → script(JavaScript, CDATA) → body(xml)` 구조
 
 | 규칙 | 처리 영역 | Python 처리 방식 | 비고 |
 | --- | --- | --- | --- |
-| 규칙 1 파일명 변수 | SCRIPT | 파일명 추출 → `scwin.vScrenID = "{파일명}";` 최상단 삽입(없을 때만) | 멱등 |
+| 규칙 1 vScrenID 삭제 | SCRIPT | `scwin.vScrenID`/`var vScrenID` 선언·대입 삭제(함수 내부 포함) + 잔존 참조는 대입값(없으면 파일명) 리터럴 치환 — 미사용(2026-09-02 변경, 종전 "파일명 변수 삽입" 폐기) | 멱등. 치환 불가 잔존은 리포트(수동 확인) |
 | 규칙 2 전역변수 이동 | SCRIPT | 최상위 `scwin.X = <리터럴>;` 을 **1. 변수 및 선언 영역**(`///////// 1. … /////////` 헤더)으로 이동 | 호출/참조 RHS(예: `$c.x.f()`)는 실행순서 영향으로 이동 보류·리포트 |
 | 규칙 4 영역 재배치 | SCRIPT | 함수 정의를 **5단계 정형화 구조**(2 초기화 / 3 이벤트 / 4 서브미션 콜백 / 5 일반)로 분류·정렬 + 슬래시 섹션 헤더 삽입([code-convention.md](../../docs/code-convention/code-convention.md)). 콜백은 이름 패턴+핸들러 옵션 참조+본문 `$c.sbm.executeDynamic` 호출(통신 실행 함수, 이벤트 핸들러 제외)로 분류. `gform_onload`→`onpageload` 병합은 안전조건에서만 | 함수 사이/뒤 최상위 실행문 있으면 보류·리포트. 구 형식(한 줄 경계 주석·3줄 블록 헤더)은 현행 헤더로 마이그레이션(멱등) |
 | 규칙 5 문법/API | SCRIPT | `==`/`!=` → `===`/`!==`, `X.value = v` → `X.setValue(v)`, `X.src = v` → `X.setBackgroundImage(v)`, `X.getTotalRow()` → `X.getRowCount()`, `!X === Y` → `X !== Y`(5e 우선순위 버그 교정·건별 리포트) | 문자열·정규식·주석 리터럴 보호. 속성 대입은 읽기 제외, 메서드명 치환은 수신 객체·인자 보존 |
@@ -57,7 +57,7 @@ WebSquare XML 은 `head(xml) → script(JavaScript, CDATA) → body(xml)` 구조
 
 **기계 치환 원칙**
 * **단어경계 매칭**: 함수명 치환은 `\b함수명\s*\(` 처럼 호출부만 매칭하여 부분 문자열 오치환을 막습니다. `replaceAll`·`trim` 등 흔한 이름은 특히 주의(원시 String 메서드와 충돌 가능).
-* **멱등성(idempotent)**: 변환본을 다시 돌려도 결과가 동일해야 합니다 — 예: `scwin.vScrenID` 중복 삽입 금지.
+* **멱등성(idempotent)**: 변환본을 다시 돌려도 결과가 동일해야 합니다 — 예: 섹션 헤더 중복 삽입 금지, 규칙 1 재실행 시 무변경.
     * 단, **이미 `$c.*` 로 바뀐 호출이라도 치환 매핑표([substitution_map.md](substitution_map.md))의 TO-BE(gcc) 항목에 해당하는 함수라면 치환(정규화) 대상에 포함**합니다. 즉, "`$c.*` 이면 무조건 건너뛴다"가 아니라 **TO-BE 목록 기준으로 판정**합니다.
     * 이 경우에도 이미 올바른 TO-BE 형태면 동일한 결과로 수렴하므로(재치환 = 같은 함수로의 no-op) 멱등성은 유지됩니다. 비표준/구버전 `$c.*` 호출이 TO-BE 항목에 매핑되어 있다면 표준 형태로 정규화됩니다.
 * **리터럴 보호**: `==`→`===` 같은 치환은 문자열/정규식/주석 내부를 건드리지 않도록 토큰 단위로 처리합니다.
@@ -79,7 +79,7 @@ Python 이 남긴 **"추가 작업 목록"만** Claude Code 로 처리합니다.
 * **모호·충돌**: 같은 이름이 파일마다 다른 의미이거나, 치환 매핑표([substitution_map.md](substitution_map.md))에 없는 커스텀 로직.
 * **수동 검증 나열 통합(규칙 24)**: 레거시 검증 함수의 "빈값 체크→alert→focus→return false" 반복 패턴을 `await $c.validate.validateDataCollect(container, { fields })` 한 건으로 통합한다(required/format/길이/compare 등 규칙 매핑, async 전파, 미바인딩·이관 불가 유형 유의) — [conversion_rules.md](conversion_rules.md) §규칙 24.
 * **표준 JSDoc 주석 생성**: 전 함수에 샘플 표준 형식(`@method`/`@name scwin.함수명`/`@author`/`@date`/`@description`/`@param {타입} 이름 설명`/`@returns`/`@hidden N`)의 주석을 생성하고, 레거시 박스형(`/**** 함수명 ****/`) 주석은 제거한다. 설명·체크 함수의 반환 규약(`0: 진행, 1: 중단` 등) 기재는 판단 작업(단계 2).
-* **불용 코드·미정의 참조 정리**: 어디서도 호출/바인딩되지 않는 함수(구 Gauce 콜백 `trs_*` 등)·핸들러, 존재하지 않는 컴포넌트/DataCollection/전역 함수 참조(`dts_*` 잔재, `popUpCalendar*`, body 의 죽은 `ev:on*` 속성), Gauce 전용 속성 대입(`RightMargin` 등)을 제거한다. 단, 외부 계약(`scwin.fn_GetPar`/`fn_SetPar` — `$c.bns` 팝업이 이름으로 참조)과 규칙 1 의 `vScrenID` 는 미참조라도 유지.
+* **불용 코드·미정의 참조 정리**: 어디서도 호출/바인딩되지 않는 함수(구 Gauce 콜백 `trs_*` 등)·핸들러, 존재하지 않는 컴포넌트/DataCollection/전역 함수 참조(`dts_*` 잔재, `popUpCalendar*`, body 의 죽은 `ev:on*` 속성), Gauce 전용 속성 대입(`RightMargin` 등)을 제거한다. 단, 외부 계약(`scwin.fn_GetPar`/`fn_SetPar` — `$c.bns` 팝업이 이름으로 참조)은 미참조라도 유지. `scwin.vScrenID` 관련 코드는 규칙 1(2026-09-02 변경)이 삭제한다.
 * **샘플 매칭 보강**: 화면 유형(목록+페이징/작성/팝업/탭/엑셀 등)을 [sample_templates.md](sample_templates.md) 매칭 표에서 찾아, 해당 최종 샘플의 5단계 구조·async/await 서브미션·검증·페이징 사용 방식과 일치하도록 정렬한다 — **샘플 13종이 단계 2 의 도달 목표(정답지)**다.
 * **검증**: 의미 보존 확인, 잔존 레거시 호출/미사용 정의 정리, `npm run lint:xml`(`wsxml_lint`) 통과 확인.
 
