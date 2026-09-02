@@ -293,6 +293,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 - `4fe8607` (09-01) — [연관] **pcc frame.xml·utils.xml·stf_old.xml 최종 삭제**(`src/pcc`, gcc 무변경): `$c.frame`/`$c.utils` 사용 중단 방침 — 호출부 gcc 전환 완료 후 정의 파일 삭제(잔존 $c.utils 2건은 `getServerDateTime`/`addDate` 치환), $c.frame 미정의 호출 10건(MDI/WinOpen/PDF 창)은 재설계 대기. pcc/stf 7파일 체제
 - `6c95493` (09-01) — [연관] **$c.frame 미정의 호출 10건 정리**(`src/pcc`, gcc 무변경): common MdiHelp·FileDown1/2 삭제·`InfoMenuID`→`$c.win.getProgramId()` 위임, stf 뷰어/목록 4함수 톱 WinOpen→`$c.win.openPopup(browserPopup)` 전환(+`frame.FrameID`→`$p.getFrameId()`), print PDF 창 `window.open` 직접 호출 — pcc 에서 $c.frame/$c.utils 실행 참조 0건 달성
 - `ce3c500` (09-01) — [연관] **common.xml($c.cm) 함수 주석·gcc 치환 정리**(`src/pcc`, gcc 무변경): 박스 주석 22건→@description 이관, 미사용 매핑확정 15개 정의 삭제(85→70 함수)·`fn_Trim` 호출 11건(내부 7·ui-tobe 4) `$c.str.trim` 치환 — 1:1 불가 4종(fn_CheckEmail alert 내장·fn_IsNumber_val 정수 전용·fn_DelChar/3 업무 로직) 유지·검토
+- `ceacc0a` (09-02) — [연관] **변환 규칙 1을 vScrenID 삭제 규칙으로 전환**(`src/conversion`·`src/docs`, gcc 무변경): scwin.vScrenID 미사용 확정 — code-convention 삭제 규약 명문화, convert.py 규칙 1 재작성(선언·대입 삭제+잔존 참조 대입값/파일명 리터럴 치환·멱등)·규칙 2 앵커를 스크립트 최상단으로 재설계, 테스트 43건 통과·규칙 문서 3종 동기화. 화면 ID 필요 시 `$p.getFrameId()` 사용
 - `191e8f3` (09-02) — [연관] **main.xml 함수 주석 정리**(`src/pcc`, gcc 무변경): JSDoc 정비(빈 @param 제거·@returns 추가·placeholder/오타 정정), initMainLoad 도달 불가 코드 8줄 삭제(no-op 명시), isMobileSize 간소화 — 원시 confirm 은 $c.win 닫기 흐름의 동기 boolean 계약으로 1:1 치환 불가(사유 주석 유지, async 재설계 단계 2)
 - `1a7a9f6` (09-02) — `$c.sbm` **setPagingInfo 페이지 수 계산 0 나눗셈 방지**: recordCountPerPage 0("전체 표시")·미지정·비숫자면 1페이지 처리(`rcpp > 0` 가드) — 기존 `totalCnt / 0 = Infinity` 로 페이지 리스트가 무한 카운트 렌더링되던 버그 수정, 페이지 리스트 미표시 분기(setCount(1)) 정상 동작
 - `59dfba2` (09-02) — [연관] **print.xml($c.print) gcc 치환 정리**(`src/pcc`, gcc 무변경): `dataFormatValue` 날짜 포맷 4종→`$c.date.formatDate` 위임(미지원 3종 사유 주석과 인라인 유지), `$c.util.isEmpty` 중복 빈값 비교 2건 간소화, 헤더 주석 stale $c.frame 의존 기술 삭제, 수정 함수 한정 var 정리 — 반입 시 이미 전면 현대화(JSDoc 완비)라 주석 이관은 불요. Gauce 데이터셋 API·Rexpert 전역 의존은 재설계 보류
@@ -308,6 +309,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-09-02 | `ceacc0a` | feat(conversion): 규칙 1을 vScrenID 삭제 규칙으로 전환 — 미사용 코드 정리 — [연관, gcc 무변경] |
 | 2026-09-02 | `191e8f3` | refactor(pcc): main.xml 함수 주석 정리 — confirm 동기 계약 유지 — [연관, gcc 무변경] |
 | 2026-09-02 | `1a7a9f6` | fix(sbm): setPagingInfo 페이지 수 계산 0 나눗셈 방지 — 전체 표시 1페이지 처리 |
 | 2026-09-02 | `59dfba2` | refactor(pcc): print.xml gcc 치환 정리 — 날짜 포맷 $c.date.formatDate 위임 — [연관, gcc 무변경] |
