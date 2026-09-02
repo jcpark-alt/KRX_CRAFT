@@ -293,6 +293,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 - `4fe8607` (09-01) — [연관] **pcc frame.xml·utils.xml·stf_old.xml 최종 삭제**(`src/pcc`, gcc 무변경): `$c.frame`/`$c.utils` 사용 중단 방침 — 호출부 gcc 전환 완료 후 정의 파일 삭제(잔존 $c.utils 2건은 `getServerDateTime`/`addDate` 치환), $c.frame 미정의 호출 10건(MDI/WinOpen/PDF 창)은 재설계 대기. pcc/stf 7파일 체제
 - `6c95493` (09-01) — [연관] **$c.frame 미정의 호출 10건 정리**(`src/pcc`, gcc 무변경): common MdiHelp·FileDown1/2 삭제·`InfoMenuID`→`$c.win.getProgramId()` 위임, stf 뷰어/목록 4함수 톱 WinOpen→`$c.win.openPopup(browserPopup)` 전환(+`frame.FrameID`→`$p.getFrameId()`), print PDF 창 `window.open` 직접 호출 — pcc 에서 $c.frame/$c.utils 실행 참조 0건 달성
 - `ce3c500` (09-01) — [연관] **common.xml($c.cm) 함수 주석·gcc 치환 정리**(`src/pcc`, gcc 무변경): 박스 주석 22건→@description 이관, 미사용 매핑확정 15개 정의 삭제(85→70 함수)·`fn_Trim` 호출 11건(내부 7·ui-tobe 4) `$c.str.trim` 치환 — 1:1 불가 4종(fn_CheckEmail alert 내장·fn_IsNumber_val 정수 전용·fn_DelChar/3 업무 로직) 유지·검토
+- `59dfba2` (09-02) — [연관] **print.xml($c.print) gcc 치환 정리**(`src/pcc`, gcc 무변경): `dataFormatValue` 날짜 포맷 4종→`$c.date.formatDate` 위임(미지원 3종 사유 주석과 인라인 유지), `$c.util.isEmpty` 중복 빈값 비교 2건 간소화, 헤더 주석 stale $c.frame 의존 기술 삭제, 수정 함수 한정 var 정리 — 반입 시 이미 전면 현대화(JSDoc 완비)라 주석 이관은 불요. Gauce 데이터셋 API·Rexpert 전역 의존은 재설계 보류
 - `2bb6db1` (09-02) — [연관] **stf.xml($c.stf) 함수 주석·gcc 치환 정리**(`src/pcc`, gcc 무변경): 레거시 박스 주석 이관·placeholder JSDoc 8건 해소·@example $c.dis→$c.stf 오기 9건 정정, 원시 alert 3건→`$c.win.alert`·eval 1건 제거, `formatDateEx`→`$c.date.formatDate(str, "-")` 위임+`FormatDateEx` 하위호환 별칭(외부 호출 109건 무중단), 미사용 4함수 삭제(60→56)·publicInfo 오염/고아 항목 교정(list_common `getValue77` 포함) — **pcc 린트 0 errors/0 warnings 달성**. Gauce DataID 4건은 재설계 보류
 - `53f5f24` (09-01) — [연관] **list_common.xml($c.lc) gcc 치환 정리**(`src/pcc`, gcc 무변경): 원시 alert 35건→`$c.win.alert`·eval 숫자 캐스팅 10건→`Number()`·디버그 alert 2건 삭제, 미사용 알림 래퍼 2종(fn_alertMsg·fn_alertNoUpdate) 삭제(호출자 0건)+publicInfo 동기화 — 박스 주석·argument 라인 0건(이관 원천 없음), Gauce 데이터셋 API(DataID 17·NameValue 33·CountRow 17)는 통신 재설계(단계 2) 보류
 - `3a76010` (09-01) — `$c.win` **팝업 타입별 데이터 수신 규약 — `openPopup` options.callbackFn 지원**:
@@ -305,6 +306,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-09-02 | `59dfba2` | refactor(pcc): print.xml gcc 치환 정리 — 날짜 포맷 $c.date.formatDate 위임 — [연관, gcc 무변경] |
 | 2026-09-02 | `2bb6db1` | refactor(pcc): stf.xml 함수 주석·gcc 치환 정리 — pcc 린트 0/0 — [연관, gcc 무변경] |
 | 2026-09-01 | `53f5f24` | refactor(pcc): list_common.xml gcc 치환 정리 — [연관, gcc 무변경] |
 | 2026-09-01 | `ce3c500` | refactor(pcc): common.xml 함수 주석·gcc 치환 정리 — [연관, gcc 무변경] |
