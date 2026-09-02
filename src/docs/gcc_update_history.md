@@ -293,6 +293,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 - `4fe8607` (09-01) — [연관] **pcc frame.xml·utils.xml·stf_old.xml 최종 삭제**(`src/pcc`, gcc 무변경): `$c.frame`/`$c.utils` 사용 중단 방침 — 호출부 gcc 전환 완료 후 정의 파일 삭제(잔존 $c.utils 2건은 `getServerDateTime`/`addDate` 치환), $c.frame 미정의 호출 10건(MDI/WinOpen/PDF 창)은 재설계 대기. pcc/stf 7파일 체제
 - `6c95493` (09-01) — [연관] **$c.frame 미정의 호출 10건 정리**(`src/pcc`, gcc 무변경): common MdiHelp·FileDown1/2 삭제·`InfoMenuID`→`$c.win.getProgramId()` 위임, stf 뷰어/목록 4함수 톱 WinOpen→`$c.win.openPopup(browserPopup)` 전환(+`frame.FrameID`→`$p.getFrameId()`), print PDF 창 `window.open` 직접 호출 — pcc 에서 $c.frame/$c.utils 실행 참조 0건 달성
 - `ce3c500` (09-01) — [연관] **common.xml($c.cm) 함수 주석·gcc 치환 정리**(`src/pcc`, gcc 무변경): 박스 주석 22건→@description 이관, 미사용 매핑확정 15개 정의 삭제(85→70 함수)·`fn_Trim` 호출 11건(내부 7·ui-tobe 4) `$c.str.trim` 치환 — 1:1 불가 4종(fn_CheckEmail alert 내장·fn_IsNumber_val 정수 전용·fn_DelChar/3 업무 로직) 유지·검토
+- `e2cb41d` (09-02) — [연관] **code-convention.md 규약 7건 보강**(`src/docs`, gcc 무변경): 본 이력 검토로 식별된 누락 규약 명문화 — 변수·문법 규칙 절(var 금지·엄격 비교 5a/5e·원시 alert/eval 금지+confirm 동기 계약 예외·빌드 $p 주입 참고), 함수 JSDoc 표준(placeholder 금지), 검증 통합 절(validateDataCollect 규칙 24·validateDataMap), 버튼 상태 setButtonState 절, 도구 연동 표 5a·5e/8 행 추가
 - `1434c25` (09-02) — [연관] **cp.xml($c.cp) 함수 주석·gcc 치환 정리**(`src/pcc`, gcc 무변경): getColumnProp 미정의 변수 버그 수정, getNameValueRow 구현(Gauce IndexOfColumn 호환 1-base), 미사용 4함수 삭제(13→9·publicInfo 12→8), placeholder JSDoc 11건 전부 작성 — pcc 린트 0/0 유지
 - `ceacc0a` (09-02) — [연관] **변환 규칙 1을 vScrenID 삭제 규칙으로 전환**(`src/conversion`·`src/docs`, gcc 무변경): scwin.vScrenID 미사용 확정 — code-convention 삭제 규약 명문화, convert.py 규칙 1 재작성(선언·대입 삭제+잔존 참조 대입값/파일명 리터럴 치환·멱등)·규칙 2 앵커를 스크립트 최상단으로 재설계, 테스트 43건 통과·규칙 문서 3종 동기화. 화면 ID 필요 시 `$p.getFrameId()` 사용
 - `191e8f3` (09-02) — [연관] **main.xml 함수 주석 정리**(`src/pcc`, gcc 무변경): JSDoc 정비(빈 @param 제거·@returns 추가·placeholder/오타 정정), initMainLoad 도달 불가 코드 8줄 삭제(no-op 명시), isMobileSize 간소화 — 원시 confirm 은 $c.win 닫기 흐름의 동기 boolean 계약으로 1:1 치환 불가(사유 주석 유지, async 재설계 단계 2)
@@ -310,6 +311,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-09-02 | `e2cb41d` | docs(convention): 업데이트 이력 검토분 규약 7건 code-convention.md 반영 — [연관, gcc 무변경] |
 | 2026-09-02 | `1434c25` | refactor(pcc): cp.xml 함수 주석·gcc 치환 정리 — 버그 수정·스텁 구현 — [연관, gcc 무변경] |
 | 2026-09-02 | `ceacc0a` | feat(conversion): 규칙 1을 vScrenID 삭제 규칙으로 전환 — 미사용 코드 정리 — [연관, gcc 무변경] |
 | 2026-09-02 | `191e8f3` | refactor(pcc): main.xml 함수 주석 정리 — confirm 동기 계약 유지 — [연관, gcc 무변경] |
