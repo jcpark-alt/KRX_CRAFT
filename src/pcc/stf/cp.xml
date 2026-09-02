@@ -17,7 +17,7 @@ xmlns:xf="http://www.w3.org/2002/xforms">
 		</w2:mfeSubmission>
 		<w2:layoutInfo>
 		</w2:layoutInfo>
-		<w2:publicInfo method="scwin.deleteAll,scwin.getColumnProp,scwin.getNameValueRow,scwin.getValueRow,scwin.isModified,scwin.nameMax,scwin.removeRow,scwin.setBroadCast,scwin.setCBData,scwin.setColumnProp,scwin.setFormat,scwin.valueOfIndex"/>
+		<w2:publicInfo method="scwin.getColumnProp,scwin.getNameValueRow,scwin.isModified,scwin.nameMax,scwin.removeRow,scwin.setBroadCast,scwin.setColumnProp,scwin.valueOfIndex"/>
 		<script type="text/javascript" lazy="false"><![CDATA[
 scwin.onpageload = function() {
 	
@@ -26,13 +26,14 @@ scwin.onpageload = function() {
 /**
  * @method
  * @name removeRow
- * @description
- * @param {Object} dataList dataCollection
- * @param {Number} idx rowIndex
+ * @description DataCollection(dataList)의 지정 행을 삭제한다. (Gauce RemoveRow 호환 래퍼)
+ * @param {Object} dataList 대상 DataList
+ * @param {Number} idx 삭제할 행 인덱스
+ * @returns {void}
  * @hidden N
  * @exception
- * @example
- */ 
+ * @example $c.cp.removeRow(dlt_list, 0);
+ */
 scwin.removeRow = function(dataList,idx) {
     dataList.removeRow(idx);
 };
@@ -40,71 +41,48 @@ scwin.removeRow = function(dataList,idx) {
 /**
  * @method
  * @name isModified
- * @description
+ * @description DataCollection(단건 또는 배열)의 수정 여부를 반환한다. ($c.data.isModified 위임)
  * @param {Object} dcObjArr DataCollection 또는 배열
- * @returns {Boolean} 검사결과
+ * @returns {Boolean} 수정 여부
  * @hidden N
  * @exception
- * @example
- */ 
+ * @example if ($c.cp.isModified([dlt_list, dma_req])) { ... }
+ */
 scwin.isModified = function(dcObjArr) {
     return $c.data.isModified(dcObjArr);
 };
 
 /**
  * @method
- * @name deleteAll
- * @description
- * @param {Object} dataList DataCollection
- * @hidden N
- * @exception
- * @example
- */ 
-scwin.deleteAll = function(dataList) {
-    dataList.removeAll();
-};
-
-/**
- * @method
- * @name getValueRow
- * @description
- * @param {index} rowposition
- * @param {string} value
- * @hidden N
- * @exception
- * @example
- */ 
-scwin.getValueRow = function(dataList,rowIdx,value) {
-    
-};
-
-/**
- * @method
  * @name getNameValueRow
- * @description
- * @param
+ * @description 컬럼 값이 일치하는 첫 행의 1-base 인덱스를 반환한다. (Gauce IndexOfColumn 호환 —
+ * Gauce 행 번호 규약에 맞춰 1-base 로 반환하며, 일치 행이 없으면 0)
+ * @param {Object} dataList 대상 DataList
+ * @param {String} columnId 검색할 컬럼 ID
+ * @param {String} value 찾을 값
+ * @returns {Number} 일치하는 첫 행의 1-base 인덱스 (없으면 0)
  * @hidden N
  * @exception
- * @example
- */ 
-scwin.getNameValueRow = function(dataList,rowIdx,value) {
-
+ * @example const idx = $c.cp.getNameValueRow(dlt_code, "CD_VAL", "01"); // 1-base
+ */
+scwin.getNameValueRow = function(dataList,columnId,value) {
+    const matched = dataList.getMatchedIndex(columnId, value);
+    return (matched.length > 0) ? matched[0] + 1 : 0;
 };
 
 /**
  * @method
  * @name nameMax
- * @description
- * @param {Object} dataList Datacollection
- * @param {String} columnId 컬럼명
- * @param {Number} fromRow 시작Row
- * @param {Number} toRow 종료Row
+ * @description 지정 행 구간에서 컬럼 값의 최대값을 반환한다. (Gauce NameMax 호환)
+ * @param {Object} dataList 대상 DataList
+ * @param {String} columnId 컬럼 ID
+ * @param {Number} fromRow 시작 행
+ * @param {Number} toRow 종료 행
  * @returns {Number} 최대값
  * @hidden N
  * @exception
- * @example
- * dts_listShareRoom.NameMax("col1", 0, dataList.getTotalRow() -1)
- */ 
+ * @example const max = $c.cp.nameMax(dlt_list, "col1", 0, dlt_list.getRowCount() - 1);
+ */
 scwin.nameMax = function(dataList,columnId, fromRow, toRow) {
     const distinctValues = dataList.getColumnDistinctDataArray(columnId, fromRow, toRow);
     return Math.max(...distinctValues);
@@ -113,37 +91,42 @@ scwin.nameMax = function(dataList,columnId, fromRow, toRow) {
 /**
  * @method
  * @name getColumnProp
- * @description
- * @param
+ * @description 그리드 컬럼 속성값을 반환한다. (Gauce 컬럼 속성 getter 호환 — setColumnProp 의 조회 쌍)
+ * Show:표시 여부 / Width:너비(px) / Name:헤더 텍스트 / Edit:읽기전용 여부
+ * @param {Object} grdObj 그리드뷰 컴포넌트
+ * @param {String} columnId 컬럼 ID
+ * @param {String} propertyName 속성명 (Show/Width/Name/Edit)
+ * @returns {Object} 속성값 (지원하지 않는 속성명이면 undefined)
  * @hidden N
  * @exception
- * @example
- */ 
+ * @example const visible = $c.cp.getColumnProp(grd_list, "col1", "Show");
+ */
 scwin.getColumnProp = function(grdObj,columnId,propertyName) {    //'Show'
-    //mask 4, headchkeck 22, data 20, Suppress 11, Multiline 14,
     if (propertyName == "Show") {
-        return grdObj.getColumnVisible(columnId, propertyValue);   //true, false
+        return grdObj.getColumnVisible(columnId);   //true, false
     } else if (propertyName == "Width") {
-        return grdObj.getColumnWidth(columnId, propertyValue); //Number Width Pixel
+        return grdObj.getColumnWidth(columnId); //Number Width Pixel
     } else if (propertyName == "Name") {
-        return grdObj.getHeaderValue(columnId, propertyValue); //header text value
+        return grdObj.getHeaderValue(columnId); //header text value
     } else if (propertyName == "Edit") {
-        return grdObj.getColumnReadOnly(columnId, propertyValue); //any, none
+        return grdObj.getColumnReadOnly(columnId); //any, none
     }
 };
 
 /**
  * @method
  * @name setColumnProp
- * @description
- * @param {string} grdObj desc
- * @param {string} columnId desc
- * @param {string} propertyName desc
- * @param {string} propertyValue desc
+ * @description 그리드 컬럼 속성값을 설정한다. (Gauce 컬럼 속성 setter 호환)
+ * Show:표시 여부 / Width:너비(px) / Name:헤더 텍스트 / Edit:읽기전용 여부
+ * @param {Object} grdObj 그리드뷰 컴포넌트
+ * @param {String} columnId 컬럼 ID
+ * @param {String} propertyName 속성명 (Show/Width/Name/Edit)
+ * @param {Object} propertyValue 설정할 속성값
+ * @returns {void}
  * @hidden N
  * @exception
- * @example
- */ 
+ * @example $c.cp.setColumnProp(grd_list, "col1", "Show", false);
+ */
 scwin.setColumnProp = function(grdObj,columnId,propertyName,propertyValue) {   //'Show',true
     //mask 4, headchkeck 22, data 20, Suppress 11, Multiline 14,
     if (propertyName == "Show") {
@@ -178,53 +161,21 @@ scwin.setBroadCast = function(grdObj,useYn) {
 /**
  * @method
  * @name valueOfIndex
- * @description
- * @param {string} selectboxObj desc
- * @returns {String} 해당 index 값
- * @param {string} value desc
- * @param {string} index desc
+ * @description 셀렉트박스에서 지정 컬럼의 값을 반환한다. (Gauce ValueOfIndex 호환)
+ * 요청 컬럼(value)이 itemset 의 value 컬럼이면 선택된 값(getValue)을, 그 외에는 선택 인덱스를 반환한다.
+ * @param {Object} selectboxObj 셀렉트박스 컴포넌트
+ * @param {String} value 조회할 itemset 컬럼명 (예: "VALUE")
+ * @param {Number} index 조회할 인덱스 (현재 구현은 선택 상태 기준)
+ * @returns {String} 선택된 값 (value 컬럼이 아니면 선택 인덱스)
  * @hidden N
  * @exception
- * @example
- */ 
+ * @example dlt.setCellData(1, "CD", $c.cp.valueOfIndex(cb_gbn, "VALUE", cb_gbn.getSelectedIndex()));
+ */
 scwin.valueOfIndex = function(selectboxObj,value,index) {
-    /*
-    if (index > -1 && selectboxObj.getSelectedIndex() != index) {
-        selectboxObj.setSelectedIndex(index);
-    }
-    */
-
     if (selectboxObj.itemsetObj.value == value) {
         return selectboxObj.getValue();
     }
-    //return selectboxObj.getText();
     return selectboxObj.getSelectedIndex();
-};
-
-/**
- * @method
- * @name setCBData
- * @description
- * @param
- * @hidden N
- * @exception
- * @example
- */ 
-scwin.setCBData = function(selectboxObj,itemsetStr) { //"0^전체,1^미처리,2^처리중,3^처리완료,4^반송"
-
-};
-
-/**
- * @method
- * @name setFormat
- * @description
- * @param
- * @hidden N
- * @exception
- * @example
- */ 
-scwin.setFormat = function(radioObj,itemsetStr) {   //"10^신규,20^처리중"
-
 };]]></script>
 	</head>
 	<body ev:onpageload="scwin.onpageload">
