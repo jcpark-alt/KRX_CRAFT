@@ -65,16 +65,20 @@
 				abortTrigger="">
 			</xf:submission>
 		</xf:model>
-		<script type="text/javascript" lazy="false"><![CDATA[// hpage(신청내역-홈페이지), applRsltNm(신청내역-신청결과명) 리턴 결과 없는 항목
-scwin.gEmpNo = $c.stf.getUserInfo($p, "empNo");
-scwin.vScrenID = "ULDSTF30703.xml";
+		<script type="text/javascript" lazy="false"><![CDATA[
 ///////// 1. 변수 및 선언 영역 /////////
 scwin.gLastJob = "";
 scwin.vCORP_USR_REG_APPL_SEQ = "";
+// hpage(신청내역-홈페이지), applRsltNm(신청내역-신청결과명) 리턴 결과 없는 항목
+scwin.gEmpNo = $c.stf.getUserInfo($p, "empNo");
 
 ///////// 2. 초기화 영역 /////////
 scwin.onpageload = function () {
-    scwin.initPage();
+    try {
+        scwin.initPage();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF30703.onpageload" });
+    }
 };
 
 scwin.onpageunload = function () {
@@ -82,15 +86,27 @@ scwin.onpageunload = function () {
 
 ///////// 3. 컴포넌트 이벤트 영역 /////////
 scwin.btn_Approv_onclick = function (e) {
-    scwin.executeReissuePasswordApproval("Y");
+    try {
+        scwin.executeReissuePasswordApproval("Y");
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF30703.btn_Approv_onclick" });
+    }
 };
 
 scwin.btn_REJECT_onclick = function (e) {
-    scwin.executeReissuePasswordApproval("N");
+    try {
+        scwin.executeReissuePasswordApproval("N");
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF30703.btn_REJECT_onclick" });
+    }
 };
 
 scwin.btn_Close_onclick = function (e) {
-    $c.win.closePopup();
+    try {
+        $c.win.closePopup();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF30703.btn_Close_onclick" });
+    }
 };
 
 ///////// 4. 서브미션 콜백 영역 /////////
@@ -103,6 +119,35 @@ scwin.sbm_Save_submitdone = async function (e) {
     await $c.win.alert(msg);
     $p.parent().scwin.fn_listReissuePassword();
     $c.win.closePopup();
+};
+
+scwin.executeReissuePasswordApproval = async function (APPL_FLAG) {
+    if (APPL_FLAG === "Y") {
+        scwin.gLastJob = "승인";
+    }
+    else if (APPL_FLAG === "N") {
+        if ($c.stf.checkMaxLength(txa_reject_rsn, 200, '거부사유') === false) {
+            return;
+        }
+
+        scwin.gLastJob = "거부";
+    }
+
+    ibx_APPL_RSLT_CD.setValue(APPL_FLAG);
+
+    let msg = $c.stf.getMessageParam("MSG-A006", scwin.gLastJob);
+    let res = await $c.win.confirm(msg);
+    if (res) {
+        const sbmOptions = {
+            id : "sbm_Save",
+            action : "/api/discls/issueinfo/update-reissue-password-approval",
+            ref : "dma_Master",
+            isProcessMsg : false
+        };
+
+        const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+        scwin.sbm_Save_submitdone(sbmRtn);
+    }
 };
 
 ///////// 5. 일반/업무 함수 영역 /////////
@@ -138,35 +183,6 @@ scwin.readReissuePassword = async function () {
 
     if (ret.responseJSON.success) {
         dma_Master.setJSON(ret.responseJSON.body);
-    }
-};
-
-scwin.executeReissuePasswordApproval = async function (APPL_FLAG) {
-    if (APPL_FLAG === "Y") {
-        scwin.gLastJob = "승인";
-    }
-    else if (APPL_FLAG === "N") {
-        if ($c.stf.checkMaxLength(txa_reject_rsn, 200, '거부사유') === false) {
-            return;
-        }
-
-        scwin.gLastJob = "거부";
-    }
-
-    ibx_APPL_RSLT_CD.setValue(APPL_FLAG);
-
-    let msg = $c.stf.getMessageParam("MSG-A006", scwin.gLastJob);
-    let res = await $c.win.confirm(msg);
-    if (res) {
-        const sbmOptions = {
-            id : "sbm_Save",
-            action : "/api/discls/issueinfo/update-reissue-password-approval",
-            ref : "dma_Master",
-            isProcessMsg : false
-        };
-
-        const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
-        scwin.sbm_Save_submitdone(sbmRtn);
     }
 };
 ]]></script>

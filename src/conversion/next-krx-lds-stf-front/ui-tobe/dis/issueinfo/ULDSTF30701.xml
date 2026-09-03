@@ -83,16 +83,20 @@
 				abortTrigger="">
 			</xf:submission>
 		</xf:model>
-		<script type="text/javascript" lazy="false"><![CDATA[// hpage(신청내역-홈페이지), applRsltNm(신청내역-신청결과명) 리턴 결과 없는 항목
-scwin.gEmpNo = $c.stf.getUserInfo($p, "empNo");
-scwin.vScrenID = "ULDSTF30701.xml";
+		<script type="text/javascript" lazy="false"><![CDATA[
 ///////// 1. 변수 및 선언 영역 /////////
 scwin.gLastJob = "";
 scwin.vCORP_USR_REG_APPL_SEQ = "";
+// hpage(신청내역-홈페이지), applRsltNm(신청내역-신청결과명) 리턴 결과 없는 항목
+scwin.gEmpNo = $c.stf.getUserInfo($p, "empNo");
 
 ///////// 2. 초기화 영역 /////////
 scwin.onpageload = function () {
-    scwin.initPage();
+    try {
+        scwin.initPage();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF30701.onpageload" });
+    }
 };
 
 scwin.onpageunload = function () {
@@ -100,15 +104,27 @@ scwin.onpageunload = function () {
 
 ///////// 3. 컴포넌트 이벤트 영역 /////////
 scwin.btn_Approv_onclick = function (e) {
-    scwin.executeNewPasswordApproval("Y");
+    try {
+        scwin.executeNewPasswordApproval("Y");
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF30701.btn_Approv_onclick" });
+    }
 };
 
 scwin.btn_REJECT_onclick = function (e) {
-    scwin.executeNewPasswordApproval("N");
+    try {
+        scwin.executeNewPasswordApproval("N");
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF30701.btn_REJECT_onclick" });
+    }
 };
 
 scwin.btn_Close_onclick = function (e) {
-    $c.win.closePopup();
+    try {
+        $c.win.closePopup();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF30701.btn_Close_onclick" });
+    }
 };
 
 ///////// 4. 서브미션 콜백 영역 /////////
@@ -121,6 +137,39 @@ scwin.sbm_Save_submitdone = async function (e) {
     await $c.win.alert(msg);
     $p.parent().scwin.fn_listNewPassword();
     $c.win.closePopup();
+};
+
+scwin.executeNewPasswordApproval = async function (APPL_FLAG) {
+    let canGoNext = true;
+    let usrTpCd = dma_MASTER.get("corpUsrTpCd");
+
+    if (APPL_FLAG === "Y") {
+        scwin.gLastJob = "승인";
+        if (usrTpCd === '32') {
+            if (!await scwin.check4MM()) {
+                canGoNext = false;
+            }
+        }
+    } else if (APPL_FLAG === "N") {
+        scwin.gLastJob = "거부";
+    }
+
+    if (canGoNext) {
+        ibx_APPL_RSLT_CD.setValue(APPL_FLAG);        
+        let msg = $c.stf.getMessageParam("MSG-A006", scwin.gLastJob);
+        let res = await $c.win.confirm(msg);
+        if (res) {
+            const sbmOptions = {
+                id : "sbm_Save",
+                action : "/api/discls/issueinfo/update-new-password-approval",
+                ref : "dma_MASTER",
+                isProcessMsg : false
+            };
+
+            const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+            scwin.sbm_Save_submitdone(sbmRtn);
+        }
+    }
 };
 
 ///////// 5. 일반/업무 함수 영역 /////////
@@ -157,51 +206,18 @@ scwin.check4MM = async function () {
     const mm_a = ibx_MM_A.getValue();
     const mm_b = ibx_MM_B.getValue();
 
-    //시장조성자 번호는 필수임.
+    // 시장조성자 번호는 필수임.
     if (mm_a === '') {
         await $c.win.alert('시장조성자 번호가 없습니다. 시스템담당자에게 문의 하십시오.');
         return false;
     } else {
-        //발행기관에 시장조성자 번호가 있는경우,  승인시 신청한 시장조성자 번호로 업데이트 하지 않음.(시장조성자 번호가 발행기관에 없는 경우에만 처기하기 위하여)
+        // 발행기관에 시장조성자 번호가 있는경우,  승인시 신청한 시장조성자 번호로 업데이트 하지 않음.(시장조성자 번호가 발행기관에 없는 경우에만 처기하기 위하여)
         if (mm_b !== '') {
             let res = await $c.win.confirm('발행기관 테이블에 시장조성자 번호가 있는경우,<br>시장조성자 번호는 업데이트 하지 않습니다.<br>계속 진행하시겠습니까?');
             if (res) {
                 return true;
             } else return false;
         } else return true;
-    }
-};
-
-scwin.executeNewPasswordApproval = async function (APPL_FLAG) {
-    let canGoNext = true;
-    let usrTpCd = dma_MASTER.get("corpUsrTpCd");
-
-    if (APPL_FLAG === "Y") {
-        scwin.gLastJob = "승인";
-        if (usrTpCd === '32') {
-            if (!await scwin.check4MM()) {
-                canGoNext = false;
-            }
-        }
-    } else if (APPL_FLAG === "N") {
-        scwin.gLastJob = "거부";
-    }
-
-    if (canGoNext) {
-        ibx_APPL_RSLT_CD.setValue(APPL_FLAG);        
-        let msg = $c.stf.getMessageParam("MSG-A006", scwin.gLastJob);
-        let res = await $c.win.confirm(msg);
-        if (res) {
-            const sbmOptions = {
-                id : "sbm_Save",
-                action : "/api/discls/issueinfo/update-new-password-approval",
-                ref : "dma_MASTER",
-                isProcessMsg : false
-            };
-
-            const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
-            scwin.sbm_Save_submitdone(sbmRtn);
-        }
     }
 };
 
