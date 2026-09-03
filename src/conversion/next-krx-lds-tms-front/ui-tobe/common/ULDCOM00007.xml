@@ -11,145 +11,85 @@
 						<w2:column id="SPOT_ISU_TRD_MKT_TP_CD" name="name1" dataType="text"></w2:column>
 						<w2:column id="LIST_STAT_CD" name="name2" dataType="text"></w2:column>
 						<w2:column id="COM_ABBRV" name="회사명" dataType="text"></w2:column>
+						<w2:column id="OLD_COM_ABBRV" name="이전상호약명" dataType="text"></w2:column>
 						<w2:column id="ISUR_CD" name="회사코드" dataType="text"></w2:column>
 					</w2:columnInfo>
 				</w2:dataList>
+				<w2:dataList baseNode="list" repeatNode="map" id="MxDataSet_code1">
+					<w2:columnInfo>
+						<w2:column id="CD_VAL" name="공통코드" dataType="text"></w2:column>
+						<w2:column id="CD_VAL_NM" name="공통코드명" dataType="text"></w2:column>
+					</w2:columnInfo>
+				</w2:dataList>
 			</w2:dataCollection>
-			<xf:submission id="sbm_dts_jongmok" userData2=" onfilter:dts_jongmok_OnFilter;" mode="asynchronous" method="get" encoding="UTF-8" mediatype="application/json" ev:submitdone="scwin.dts_jongmok_OnLoadCompleted" target="data:json,dlt_commonCodecomIsur"/>
-			<xf:submission id="sbm_MxDataSet_code1" userData2=" onfilter:MxDataSet_code1_OnFilter;" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json" ev:submitdone="scwin.MxDataSet_code1_OnLoadCompleted"/>
-			<xf:submission id="sbm_MxDataSet_code2" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json"/>
 		</xf:model>
 		<script type="text/javascript" lazy="false"><![CDATA[
 ///////// 1. 변수 및 선언 영역 /////////
-scwin.gJongcode = ""; // 업종코드
-scwin.gUpjongJongmok = ""; // 업종에 따른 종목
-scwin.gFilterType = ""; // "S":종목검색버튼,"O"
-scwin.gJongName = ""; // 종목명
-scwin.ssMarket = "N"; // 종목콤보확인
-scwin.stat = "";
-scwin.gListStatCd = "";
-scwin.skw = "";
-/* ★Wcraft guide★    
-스크립트 수작업 유의사항
-*/
-
-debugger;
-// scwin.tpcd = $c.frame.path("../").js_com_market;
-// scwin.tpcd = frame.Provider("../").js_com_market; //세션의 시장구분
-scwin.tpcd = $c.session.info("js_market");  // 임시
+scwin.ssMarket = "N"; // 시장 콤보 초기 세팅 완료 여부(초기 setValue 시 onchange 재조회 방지)
+scwin.skw = ""; // 회사명 필터 키워드
+scwin.stat = ""; // 상장구분 코드
+scwin.gListStatCd = ""; // 부모 화면이 지정한 상장구분(지정 시 콤보 고정)
+scwin.tpcd = ""; // 세션의 시장구분 (onpageload 에서 취득)
 
 ///////// 2. 초기화 영역 /////////
-scwin.onpageload = async function() {
-    try {
-    debugger;
-        scwin.stat = $c.frame.path("../").js_listStatCd; // 상장상태여부
+/* ★Wcraft guide★
+스크립트 수작업 유의사항
 
-        if (scwin.stat === undefined) {
-            scwin.stat = "";
-        } else {
+*/
+scwin.onpageload = async function () {
+    try {
+        // TODO Stage2: 세션 시장구분 취득 API 확정($c.session.getUserInfo) 반영
+        scwin.tpcd = $c.session.getUserInfo("js_market") ?? "";
+
+        // 구 $c.frame.path("../") — 부모 화면의 상장구분 지정값(규칙 21: getParent)
+        scwin.stat = $c.win.getParent()?.js_listStatCd ?? "";
+        if (scwin.stat !== "") {
             scwin.gListStatCd = scwin.stat;
             if (scwin.gListStatCd === "Y") {
-                combo_stat.bindColVal = 'Y';
+                combo_stat.setValue("Y");
                 combo_stat.setDisabled(true);
             }
         }
-        ////$c.cm.PanelToGroupBox_01(panel_1);  //라운드CSS 삭제
-        ////$c.cm.PanelToGroupBox_02(panel_2);  //라운드CSS 삭제
-        const sbmOptions = {
-            id : "sbm_dts_jongmok",
-            action : "/gauceSystemierAdaptor.do",
-            ref : "",
-            target : "dts_jongmok=body.content",
-            isProcessMsg : false
-        };
 
-        const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
-        // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
-
-        const sbmOptions2 = {
-            id : "sbm_MxDataSet_code1",
-            action : "/gauceSystemierAdaptor.do",
-            ref : "",
-            target : "MxDataSet_code1=body.content",
-            isProcessMsg : false
-        };
-
-        const sbmRtn2 = await $c.sbm.executeDynamic(sbmOptions2);
-        // TODO Stage2: sbmRtn2 응답 처리 로직 작성 (구 submitDoneHandler 자리)
-
-        const sbmOptions3 = {
-            id : "sbm_MxDataSet_code2",
-            action : "/gauceSystemierAdaptor.do",
-            ref : "",
-            target : "MxDataSet_code2=body.content",
-            isProcessMsg : false
-        };
-
-        const sbmRtn3 = await $c.sbm.executeDynamic(sbmOptions3);
-        // TODO Stage2: sbmRtn3 응답 처리 로직 작성 (구 submitDoneHandler 자리)
-
-        scwin.code1Sync();
-        scwin.listSync();
+        await scwin.code1Sync();
     } catch (ex) {
         await $c.exception.handleError(ex, { context : "ULDCOM00007.onpageload" });
     }
 };
 
-scwin.onpageunload = function() {
+scwin.onpageunload = function () {
 };
 
 ///////// 3. 컴포넌트 이벤트 영역 /////////
-scwin.dts_jongmok_OnLoadCompleted = function(e) {
-};
-
-scwin.MxDataSet_code1_OnLoadCompleted = function(e) {
+scwin.grd_jongmok_onkeydown = async function (e) {
     try {
-        scwin.marketSetCombo();
-    } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDCOM00007.MxDataSet_code1_OnLoadCompleted" });
-    }
-};
-
-scwin.MxDataSet_code1_OnFilter = function(row) {
-    try {
-        if (dts_jongmok.NameValue(row, "SPOT_ISU_TRD_MKT_TP_CD") === scwin.gJongcode) return true;
-
-        else return false;
-    } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDCOM00007.MxDataSet_code1_OnFilter" });
-    }
-};
-
-scwin.grd_jongmok_OnKeyPress = function(kcode) {
-    try {
-        if (kcode === '13') {
-            scwin.Confirm();
+        if (Number(e.keyCode) === 13) {
+            await scwin.Confirm();
         }
     } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDCOM00007.grd_jongmok_OnKeyPress" });
+        await $c.exception.handleError(ex, { context : "ULDCOM00007.grd_jongmok_onkeydown" });
     }
 };
 
-scwin.grd_jongmok_OnDblClick = function(row, colid) {
+scwin.grd_jongmok_oncelldblclick = async function (rowIndex, columnIndex, columnId) {
     try {
-        scwin.Confirm();
+        await scwin.Confirm();
     } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDCOM00007.grd_jongmok_OnDblClick" });
+        await $c.exception.handleError(ex, { context : "ULDCOM00007.grd_jongmok_oncelldblclick" });
     }
 };
 
-scwin.img_search_onclick = function(e) {
+scwin.img_search_onclick = function (e) {
     try {
-        scwin.JongmokName(txb_jongmokName.value);
+        scwin.JongmokSearch();
     } catch (ex) {
         $c.exception.handleError(ex, { context : "ULDCOM00007.img_search_onclick" });
     }
 };
 
-scwin.txb_jongmokName_onkeydown = function(e) {
+scwin.txb_jongmokName_onkeydown = function (e) {
     try {
-        if (window.event.keyCode === "13") {
-            // JongmokName(window.event.keyCode);
+        if (Number(e.keyCode) === 13) {
             scwin.JongmokSearch();
         }
     } catch (ex) {
@@ -157,55 +97,35 @@ scwin.txb_jongmokName_onkeydown = function(e) {
     }
 };
 
-scwin.combo_market_onselchange = function(info) {
+scwin.combo_market_onselchange = async function (info) {
     try {
         if (scwin.ssMarket === "Y") {
             txb_jongmokName.setValue("");
             scwin.skw = "";
-            scwin.tpcd = MxDataSet_code1.NameValue(combo_market.Index + 1, "CD_VAL");
-            scwin.listSync();
+            scwin.tpcd = combo_market.getValue();
+            await scwin.listSync();
         }
     } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDCOM00007.combo_market_onselchange" });
+        await $c.exception.handleError(ex, { context : "ULDCOM00007.combo_market_onselchange" });
     }
 };
 
-scwin.combo_stat_onselchange = function(info) {
+scwin.combo_stat_onselchange = async function (info) {
     try {
         txb_jongmokName.setValue("");
         scwin.skw = "";
 
-        scwin.stat = combo_stat.ValueOfIndex("Column2", combo_stat.Index);
-        if (scwin.stat === '0') {
+        scwin.stat = combo_stat.getValue();
+        if (scwin.stat === "0") {
             scwin.stat = "";
         }
-        scwin.listSync();
+        await scwin.listSync();
     } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDCOM00007.combo_stat_onselchange" });
+        await $c.exception.handleError(ex, { context : "ULDCOM00007.combo_stat_onselchange" });
     }
 };
 
-scwin.dts_jongmok_OnFilter = function(row) {
-    try {
-        if (scwin.skw !== "") {
-            f1 = (dts_jongmok.NameString(row, "COM_ABBRV")).toUpperCase();
-            f2 = (dts_jongmok.NameString(row, "OLD_COM_ABBRV")).toUpperCase();
-            if (f1.indexOf(scwin.skw) !== -1) {
-                return true;
-            } else if (f2.indexOf(scwin.skw) !== -1) {
-                return true;
-            } else {
-                return false;
-            }
-        } else {
-            return true;
-        }
-    } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDCOM00007.dts_jongmok_OnFilter" });
-    }
-};
-
-scwin.btn_ga_onclick = function(e) {
+scwin.btn_ga_onclick = function (e) {
     try {
         scwin.Jongmok('가', '나');
     } catch (ex) {
@@ -213,7 +133,7 @@ scwin.btn_ga_onclick = function(e) {
     }
 };
 
-scwin.btn_na_onclick = function(e) {
+scwin.btn_na_onclick = function (e) {
     try {
         scwin.Jongmok('나', '다');
     } catch (ex) {
@@ -221,7 +141,7 @@ scwin.btn_na_onclick = function(e) {
     }
 };
 
-scwin.btn_da_onclick = function(e) {
+scwin.btn_da_onclick = function (e) {
     try {
         scwin.Jongmok('다', '라');
     } catch (ex) {
@@ -229,7 +149,7 @@ scwin.btn_da_onclick = function(e) {
     }
 };
 
-scwin.btn_la_onclick = function(e) {
+scwin.btn_la_onclick = function (e) {
     try {
         scwin.Jongmok('라', '마');
     } catch (ex) {
@@ -237,7 +157,7 @@ scwin.btn_la_onclick = function(e) {
     }
 };
 
-scwin.btn_ma_onclick = function(e) {
+scwin.btn_ma_onclick = function (e) {
     try {
         scwin.Jongmok('마', '바');
     } catch (ex) {
@@ -245,7 +165,7 @@ scwin.btn_ma_onclick = function(e) {
     }
 };
 
-scwin.btn_ba_onclick = function(e) {
+scwin.btn_ba_onclick = function (e) {
     try {
         scwin.Jongmok('바', '사');
     } catch (ex) {
@@ -253,7 +173,7 @@ scwin.btn_ba_onclick = function(e) {
     }
 };
 
-scwin.btn_sa_onclick = function(e) {
+scwin.btn_sa_onclick = function (e) {
     try {
         scwin.Jongmok('사', '아');
     } catch (ex) {
@@ -261,7 +181,7 @@ scwin.btn_sa_onclick = function(e) {
     }
 };
 
-scwin.btn_a_onclick = function(e) {
+scwin.btn_a_onclick = function (e) {
     try {
         scwin.Jongmok('아', '자');
     } catch (ex) {
@@ -269,7 +189,7 @@ scwin.btn_a_onclick = function(e) {
     }
 };
 
-scwin.btn_ja_onclick = function(e) {
+scwin.btn_ja_onclick = function (e) {
     try {
         scwin.Jongmok('자', '차');
     } catch (ex) {
@@ -277,7 +197,7 @@ scwin.btn_ja_onclick = function(e) {
     }
 };
 
-scwin.btn_ca_onclick = function(e) {
+scwin.btn_ca_onclick = function (e) {
     try {
         scwin.Jongmok('차', '카');
     } catch (ex) {
@@ -285,7 +205,7 @@ scwin.btn_ca_onclick = function(e) {
     }
 };
 
-scwin.btn_ka_onclick = function(e) {
+scwin.btn_ka_onclick = function (e) {
     try {
         scwin.Jongmok('카', '타');
     } catch (ex) {
@@ -293,7 +213,7 @@ scwin.btn_ka_onclick = function(e) {
     }
 };
 
-scwin.btn_ta_onclick = function(e) {
+scwin.btn_ta_onclick = function (e) {
     try {
         scwin.Jongmok('타', '파');
     } catch (ex) {
@@ -301,7 +221,7 @@ scwin.btn_ta_onclick = function(e) {
     }
 };
 
-scwin.btn_fa_onclick = function(e) {
+scwin.btn_fa_onclick = function (e) {
     try {
         scwin.Jongmok('파', '하');
     } catch (ex) {
@@ -309,15 +229,15 @@ scwin.btn_fa_onclick = function(e) {
     }
 };
 
-scwin.btn_ha_onclick = function(e) {
+scwin.btn_ha_onclick = function (e) {
     try {
-        scwin.Jongmok('하', '豈');
+        scwin.Jongmok('하', '豈');
     } catch (ex) {
         $c.exception.handleError(ex, { context : "ULDCOM00007.btn_ha_onclick" });
     }
 };
 
-scwin.btn_young_onclick = function(e) {
+scwin.btn_young_onclick = function (e) {
     try {
         scwin.Jongmok('A', 'Z');
     } catch (ex) {
@@ -325,7 +245,7 @@ scwin.btn_young_onclick = function(e) {
     }
 };
 
-scwin.btn_num_onclick = function(e) {
+scwin.btn_num_onclick = function (e) {
     try {
         scwin.Jongmok('0', '9');
     } catch (ex) {
@@ -333,283 +253,41 @@ scwin.btn_num_onclick = function(e) {
     }
 };
 
-scwin.btn_ga_onmouseover = function() {
+// 회사명·이전상호약명 키워드 필터 — 구 Gauce UseFilter/Filter()/OnFilter 대체
+scwin.dlt_commonCodecomIsur_OnFilter = function () {
     try {
-        btn_ga.setBackgroundImage("../img/stock/btn_stockga.gif");
-    } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDCOM00007.btn_ga_onmouseover" });
-    }
-};
+        dlt_commonCodecomIsur.removeColumnFilterAll();
 
-scwin.btn_na_onmouseover = function() {
-    try {
-        btn_na.setBackgroundImage("../img/stock/btn_stockna.gif");
+        if (scwin.skw !== "") {
+            dlt_commonCodecomIsur.setColumnFilter({ type : "row", colIndex : "COM_ABBRV", key : scwin.skw, condition : "and", exactMatch : false });
+            dlt_commonCodecomIsur.setColumnFilter({ type : "row", colIndex : "OLD_COM_ABBRV", key : scwin.skw, condition : "or", exactMatch : false });
+        }
     } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDCOM00007.btn_na_onmouseover" });
-    }
-};
-
-scwin.btn_da_onmouseover = function() {
-    try {
-        btn_da.setBackgroundImage("../img/stock/btn_stockda.gif");
-    } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDCOM00007.btn_da_onmouseover" });
-    }
-};
-
-scwin.btn_la_onmouseover = function() {
-    try {
-        btn_la.setBackgroundImage("../img/stock/btn_stockla.gif");
-    } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDCOM00007.btn_la_onmouseover" });
-    }
-};
-
-scwin.btn_ma_onmouseover = function() {
-    try {
-        btn_ma.setBackgroundImage("../img/stock/btn_stockma.gif");
-    } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDCOM00007.btn_ma_onmouseover" });
-    }
-};
-
-scwin.btn_ba_onmouseover = function() {
-    try {
-        btn_ba.setBackgroundImage("../img/stock/btn_stockba.gif");
-    } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDCOM00007.btn_ba_onmouseover" });
-    }
-};
-
-scwin.btn_sa_onmouseover = function() {
-    try {
-        btn_sa.setBackgroundImage("../img/stock/btn_stocksa.gif");
-    } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDCOM00007.btn_sa_onmouseover" });
-    }
-};
-
-scwin.btn_a_onmouseover = function() {
-    try {
-        btn_a.setBackgroundImage("../img/stock/btn_stocka.gif");
-    } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDCOM00007.btn_a_onmouseover" });
-    }
-};
-
-scwin.btn_ja_onmouseover = function() {
-    try {
-        btn_ja.setBackgroundImage("../img/stock/btn_stockja.gif");
-    } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDCOM00007.btn_ja_onmouseover" });
-    }
-};
-
-scwin.btn_ca_onmouseover = function() {
-    try {
-        btn_ca.setBackgroundImage("../img/stock/btn_stockca.gif");
-    } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDCOM00007.btn_ca_onmouseover" });
-    }
-};
-
-scwin.btn_ka_onmouseover = function() {
-    try {
-        btn_ka.setBackgroundImage("../img/stock/btn_stockka.gif");
-    } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDCOM00007.btn_ka_onmouseover" });
-    }
-};
-
-scwin.btn_ta_onmouseover = function() {
-    try {
-        btn_ta.setBackgroundImage("../img/stock/btn_stockta.gif");
-    } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDCOM00007.btn_ta_onmouseover" });
-    }
-};
-
-scwin.btn_fa_onmouseover = function() {
-    try {
-        btn_fa.setBackgroundImage("../img/stock/btn_stockfa.gif");
-    } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDCOM00007.btn_fa_onmouseover" });
-    }
-};
-
-scwin.btn_ha_onmouseover = function() {
-    try {
-        btn_ha.setBackgroundImage("../img/stock/btn_stockha.gif");
-    } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDCOM00007.btn_ha_onmouseover" });
-    }
-};
-
-scwin.btn_young_onmouseover = function() {
-    try {
-        btn_young.setBackgroundImage("../img/stock/btn_stockyoung.gif");
-    } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDCOM00007.btn_young_onmouseover" });
-    }
-};
-
-scwin.btn_num_onmouseover = function() {
-    try {
-        btn_num.setBackgroundImage("../img/stock/btn_stocknum.gif");
-    } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDCOM00007.btn_num_onmouseover" });
-    }
-};
-
-scwin.btn_ga_onmouseout = function() {
-    try {
-        btn_ga.setBackgroundImage("../img/stock/btn_stockga_d.gif");
-    } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDCOM00007.btn_ga_onmouseout" });
-    }
-};
-
-scwin.btn_na_onmouseout = function() {
-    try {
-        btn_na.setBackgroundImage("../img/stock/btn_stockna_d.gif");
-    } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDCOM00007.btn_na_onmouseout" });
-    }
-};
-
-scwin.btn_da_onmouseout = function() {
-    try {
-        btn_da.setBackgroundImage("../img/stock/btn_stockda_d.gif");
-    } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDCOM00007.btn_da_onmouseout" });
-    }
-};
-
-scwin.btn_la_onmouseout = function() {
-    try {
-        btn_la.setBackgroundImage("../img/stock/btn_stockla_d.gif");
-    } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDCOM00007.btn_la_onmouseout" });
-    }
-};
-
-scwin.btn_ma_onmouseout = function() {
-    try {
-        btn_ma.setBackgroundImage("../img/stock/btn_stockma_d.gif");
-    } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDCOM00007.btn_ma_onmouseout" });
-    }
-};
-
-scwin.btn_ba_onmouseout = function() {
-    try {
-        btn_ba.setBackgroundImage("../img/stock/btn_stockba_d.gif");
-    } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDCOM00007.btn_ba_onmouseout" });
-    }
-};
-
-scwin.btn_sa_onmouseout = function() {
-    try {
-        btn_sa.setBackgroundImage("../img/stock/btn_stocksa_d.gif");
-    } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDCOM00007.btn_sa_onmouseout" });
-    }
-};
-
-scwin.btn_a_onmouseout = function() {
-    try {
-        btn_a.setBackgroundImage("../img/stock/btn_stocka_d.gif");
-    } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDCOM00007.btn_a_onmouseout" });
-    }
-};
-
-scwin.btn_ja_onmouseout = function() {
-    try {
-        btn_ja.setBackgroundImage("../img/stock/btn_stockja_d.gif");
-    } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDCOM00007.btn_ja_onmouseout" });
-    }
-};
-
-scwin.btn_ca_onmouseout = function() {
-    try {
-        btn_ca.setBackgroundImage("../img/stock/btn_stockca_d.gif");
-    } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDCOM00007.btn_ca_onmouseout" });
-    }
-};
-
-scwin.btn_ka_onmouseout = function() {
-    try {
-        btn_ka.setBackgroundImage("../img/stock/btn_stockka_d.gif");
-    } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDCOM00007.btn_ka_onmouseout" });
-    }
-};
-
-scwin.btn_ta_onmouseout = function() {
-    try {
-        btn_ta.setBackgroundImage("../img/stock/btn_stockta_d.gif");
-    } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDCOM00007.btn_ta_onmouseout" });
-    }
-};
-
-scwin.btn_fa_onmouseout = function() {
-    try {
-        btn_fa.setBackgroundImage("../img/stock/btn_stockfa_d.gif");
-    } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDCOM00007.btn_fa_onmouseout" });
-    }
-};
-
-scwin.btn_ha_onmouseout = function() {
-    try {
-        btn_ha.setBackgroundImage("../img/stock/btn_stockha_d.gif");
-    } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDCOM00007.btn_ha_onmouseout" });
-    }
-};
-
-scwin.btn_young_onmouseout = function() {
-    try {
-        btn_young.setBackgroundImage("../img/stock/btn_stockyoung_d.gif");
-    } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDCOM00007.btn_young_onmouseout" });
-    }
-};
-
-scwin.btn_num_onmouseout = function() {
-    try {
-        btn_num.setBackgroundImage("../img/stock/btn_stocknum_d.gif");
-    } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDCOM00007.btn_num_onmouseout" });
+        $c.exception.handleError(ex, { context : "ULDCOM00007.dlt_commonCodecomIsur_OnFilter" });
     }
 };
 
 ///////// 4. 서브미션 콜백 영역 /////////
- // 세션의 시장구분
-scwin.listSync = async function() {
-    ////var url = "/isurcd.do?method=searchIsurCd&inputMessageId=isurcd&outputMessageId=isurcd" + "&LIST_STAT_CD=" + scwin.stat + "&SPOT_ISU_TRD_MKT_TP_CD=" + scwin.tpcd + "&SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01;
+// 발행회사 목록 조회 — 조회 후 정렬·필터 반영(구 dts_jongmok_OnLoadCompleted 대체)
+scwin.listSync = async function () {
     const sbmOptions = {
-        id : "sbm_dts_jongmok",
+        id : "sbm_dlt_commonCodecomIsur",
         action : "/ui/dsclsrch/data/isurCode.jsp",
         ref : "",
-        target : "dts_jongmok=body.content",
+        target : "dlt_commonCodecomIsur=body.content",
         isProcessMsg : false
     };
 
     const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
-    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+    // TODO Stage2: 조회 파라미터(LIST_STAT_CD=scwin.stat·SPOT_ISU_TRD_MKT_TP_CD=scwin.tpcd) API 확정 시 반영
 
-    let smbObj = $p.getComponentById("sbm_dts_jongmok");
-    smbObj.action = url;
-    $c.sbm.execute(sbm_dts_jongmok)
+    dlt_commonCodecomIsur.sort("COM_ABBRV", 0);
+    scwin.dlt_commonCodecomIsur_OnFilter();
+    grd_jongmok.setFocusedCell(0, 0);
 };
 
-scwin.code1Sync = async function() {
+// 시장구분 공통코드 조회 — 조회 후 콤보 세팅·목록 조회(구 MxDataSet_code1_OnLoadCompleted 대체)
+scwin.code1Sync = async function () {
     const sbmOptions = {
         id : "sbm_MxDataSet_code1",
         action : "/tbmccdval.do",
@@ -621,112 +299,79 @@ scwin.code1Sync = async function() {
     const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
     // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
 
-    const sbmOptions2 = {
-        id : "sbm_MxDataSet_code2",
-        action : "/tbmccdval.do",
-        ref : "",
-        target : "MxDataSet_code2=body.content",
-        isProcessMsg : false
-    };
-
-    const sbmRtn2 = await $c.sbm.executeDynamic(sbmOptions2);
-    // TODO Stage2: sbmRtn2 응답 처리 로직 작성 (구 submitDoneHandler 자리)
-
+    scwin.marketSetCombo();
+    if (MxDataSet_code1.getRowCount() > 0) {
+        await scwin.listSync();
+    }
 };
 
 ///////// 5. 일반/업무 함수 영역 /////////
-/********************************************** 
- * 함수명   : Jongmok()
- * 설명       : 가나다라..검색
- ***********************************************/
-scwin.Jongmok = function(prevval, nextval) {
+// 가나다라.. 검색 — 구 countrow/NameValue/Rowposition(Gauce) 대체
+scwin.Jongmok = function (prevval, nextval) {
     txb_jongmokName.setValue("");
     scwin.skw = "";
+    scwin.dlt_commonCodecomIsur_OnFilter();
+    dlt_commonCodecomIsur.sort("COM_ABBRV", 0);
 
-    dts_jongmok.UseFilter = "true";
-
-    dts_jongmok.Filter();
-    grd_jongmok.Redraw = "false";
-    dts_jongmok.SortExpr = "+COM_ABBRV";
-    dts_jongmok.Sort();
     let cnt = 0;
-    for (i = 1; i <= dts_jongmok.countrow; i++) {
-        let name = dts_jongmok.NameValue(i, "COM_ABBRV").substring(0, 1);
+    for (let i = 0; i < dlt_commonCodecomIsur.getRowCount(); i++) {
+        const name = String(dlt_commonCodecomIsur.getCellData(i, "COM_ABBRV")).substring(0, 1);
         if (name >= prevval && name < nextval) {
             cnt = i;
             break;
         }
     }
-    grd_jongmok.Redraw = "true";
-    dts_jongmok.Rowposition = cnt + 11;
-    dts_jongmok.Rowposition = cnt;
 
-    grd_jongmok.focus();
+    // 구 Rowposition = cnt+11 → cnt (스크롤 확보) 트릭 대체
+    grd_jongmok.setFocusedCell(Math.min(cnt + 11, Math.max(dlt_commonCodecomIsur.getRowCount() - 1, 0)), 0);
+    grd_jongmok.setFocusedCell(cnt, 0);
+    grd_jongmok.setFocus();
 };
 
-/********************************************** 
- * 함수명   : JongmokName()
- * 설명       : 종목명검색
- ***********************************************/
-scwin.JongmokName = function(keyCode) {
-    // if(keyCode==13) on_close();
-    grd_jongmok.Redraw = "false";
-    dts_jongmok.SortExpr = "+COM_ABBRV";
-    dts_jongmok.Sort();
+// 회사명 접두 위치 탐색
+scwin.JongmokName = function () {
+    dlt_commonCodecomIsur.sort("COM_ABBRV", 0);
+
     let cnt = 0;
-    const len = txb_jongmokName.getValue().length;
     const txtVal = txb_jongmokName.getValue().toUpperCase();
-    for (i = 1; i <= dts_jongmok.countrow; i++) {
-        let name = dts_jongmok.NameValue(i, "COM_ABBRV").substring(0, len).toUpperCase();
+    const len = txtVal.length;
+    for (let i = 0; i < dlt_commonCodecomIsur.getRowCount(); i++) {
+        const name = String(dlt_commonCodecomIsur.getCellData(i, "COM_ABBRV")).substring(0, len).toUpperCase();
         if (txtVal <= name) {
             cnt = i;
             break;
         }
     }
-    grd_jongmok.Redraw = "true";
-    dts_jongmok.Rowposition = cnt + 11;
-    dts_jongmok.Rowposition = cnt;
+
+    grd_jongmok.setFocusedCell(Math.min(cnt + 11, Math.max(dlt_commonCodecomIsur.getRowCount() - 1, 0)), 0);
+    grd_jongmok.setFocusedCell(cnt, 0);
 };
 
-/********************************************** 
- * 함수명   : JongmokSearch()
- * 설명       : 종목명검색
- ***********************************************/
-scwin.JongmokSearch = function() {
-    scwin.skw = (txb_jongmokName.getValue()).toUpperCase();
-
-    ////dts_jongmok.UseFilter = "true";
-
-    ////dts_jongmok.Filter();
-    ////dts_jongmok.Rowposition = 1;
+// 키워드 필터 검색
+scwin.JongmokSearch = function () {
+    scwin.skw = txb_jongmokName.getValue().toUpperCase();
+    scwin.dlt_commonCodecomIsur_OnFilter();
+    grd_jongmok.setFocusedCell(0, 0);
 };
 
-/********************************************** 
- * 함수명   : Confirm()
- * 설명       : 부모창으로 종목코드 전달
- ***********************************************/
-scwin.Confirm = async function() {
-    // frame.Provider("../").종목코드id
-    const pJongCode = dts_jongmok.NameValue(dts_jongmok.RowPosition, "ISUR_CD");
-    const pJongNm = dts_jongmok.NameValue(dts_jongmok.RowPosition, "COM_ABBRV");
-    const ld_mkt_tp_cd = dts_jongmok.NameValue(dts_jongmok.RowPosition, "SPOT_ISU_TRD_MKT_TP_CD");
-    $c.frame.path("../").isurSearch_Rtn(pJongCode, pJongNm, ld_mkt_tp_cd);
+// 부모창으로 발행회사 정보 전달 — 구 RowPosition/NameValue(Gauce)·frame.Provider 대체
+scwin.Confirm = async function () {
+    const row = dlt_commonCodecomIsur.getRowPosition();
+    if (row < 0) {
+        return;
+    }
+    const pJongCode = dlt_commonCodecomIsur.getCellData(row, "ISUR_CD");
+    const pJongNm = dlt_commonCodecomIsur.getCellData(row, "COM_ABBRV");
+    const ldMktTpCd = dlt_commonCodecomIsur.getCellData(row, "SPOT_ISU_TRD_MKT_TP_CD");
+    $c.win.getParent()?.isurSearch_Rtn(pJongCode, pJongNm, ldMktTpCd);
 
     await $c.win.closePopup();
 };
 
-scwin.marketSetCombo = function() {
-    let cIndex;
-    let name;
+// 시장 콤보 초기 세팅 — 구 countrow/NameValue/Index(Gauce) 대체
+scwin.marketSetCombo = function () {
     if (scwin.tpcd !== "") {
-        for (i = 1; i <= MxDataSet_code1.countrow; i++) {
-            name = MxDataSet_code1.NameValue(i, "CD_VAL");
-            if (name === scwin.tpcd) {
-                cIndex = i - 1;
-                break;
-            }
-        }
-        combo_market.Index = cIndex;
+        combo_market.setValue(scwin.tpcd);
     }
     if (scwin.tpcd === "1" || scwin.tpcd === "2") {
         combo_market.setDisabled(true);
@@ -771,7 +416,13 @@ scwin.marketSetCombo = function() {
 					</xf:group>
 					<xf:group tagname="td" class="w2tb_td">
 						<w2:attributes></w2:attributes>
-						<xf:select1 selectedData="true" ref="data:MxDataSet_code1" appearance="minimal" ev:onchange="scwin.combo_market_onselchange" disabledClass="w2selectbox_disabled" hierarchy="combo_market" style="" userData2=" class:TopCondition_01; disablebackcolor:#FFFFFF; listcount:10; listexprformat:CD_VAL_NM^0^90;" id="combo_market" displayMode="label" orgid="combo_market">
+						<xf:select1 selectedData="true" ref="" appearance="minimal" ev:onchange="scwin.combo_market_onselchange" disabledClass="w2selectbox_disabled" hierarchy="combo_market" style="" userData2=" class:TopCondition_01; disablebackcolor:#FFFFFF; listcount:10; listexprformat:CD_VAL_NM^0^90;" id="combo_market" displayMode="label" orgid="combo_market">
+							<xf:choices>
+								<xf:itemset nodeset="data:MxDataSet_code1">
+									<xf:label ref="CD_VAL_NM"></xf:label>
+									<xf:value ref="CD_VAL"></xf:value>
+								</xf:itemset>
+							</xf:choices>
 						</xf:select1>
 					</xf:group>
 					<xf:group tagname="th" class="w2tb_th"><w2:attributes>
@@ -783,16 +434,16 @@ scwin.marketSetCombo = function() {
 						<xf:select1 selectedData="true" item="전체^0,상장^Y,상장폐지^D" appearance="minimal" ev:onchange="scwin.combo_stat_onselchange" disabledClass="w2selectbox_disabled" hierarchy="combo_stat" style="" userData2=" class:TopCondition_01; bindcolumn:Column2; index:0; listcount:10; listexprformat:Column1^0^70;" id="combo_stat" displayMode="label" orgid="combo_stat">
 							<xf:choices>
 								<xf:item>
-									<xf:label><![CDATA[0]]></xf:label>
-									<xf:value><![CDATA[전체]]></xf:value>
+									<xf:label><![CDATA[전체]]></xf:label>
+									<xf:value><![CDATA[0]]></xf:value>
 								</xf:item>
 								<xf:item>
-									<xf:label><![CDATA[Y]]></xf:label>
-									<xf:value><![CDATA[상장]]></xf:value>
+									<xf:label><![CDATA[상장]]></xf:label>
+									<xf:value><![CDATA[Y]]></xf:value>
 								</xf:item>
 								<xf:item>
-									<xf:label><![CDATA[D]]></xf:label>
-									<xf:value><![CDATA[상장폐지]]></xf:value>
+									<xf:label><![CDATA[상장폐지]]></xf:label>
+									<xf:value><![CDATA[D]]></xf:value>
 								</xf:item>
 							</xf:choices>
 						</xf:select1>
@@ -804,56 +455,56 @@ scwin.marketSetCombo = function() {
 				</xf:trigger>
 			</xf:group>
 		</xf:group><xf:group style="" userData2=" class:Description_01;" id="panel_2" class="titbox">
-			<xf:trigger style="" id="btn_ga" type="button" class="btn_cm">
+			<xf:trigger ev:onclick="scwin.btn_ga_onclick" style="" id="btn_ga" type="button" class="btn_cm">
 				<xf:label><![CDATA[가]]></xf:label>
 			</xf:trigger>
-			<xf:trigger style="" id="btn_na" type="button" class="btn_cm">
+			<xf:trigger ev:onclick="scwin.btn_na_onclick" style="" id="btn_na" type="button" class="btn_cm">
 				<xf:label><![CDATA[나]]></xf:label>
 			</xf:trigger>
-			<xf:trigger style="" id="btn_da" type="button" class="btn_cm">
+			<xf:trigger ev:onclick="scwin.btn_da_onclick" style="" id="btn_da" type="button" class="btn_cm">
 				<xf:label><![CDATA[다]]></xf:label>
 			</xf:trigger>
-			<xf:trigger style="" id="btn_la" type="button" class="btn_cm">
+			<xf:trigger ev:onclick="scwin.btn_la_onclick" style="" id="btn_la" type="button" class="btn_cm">
 				<xf:label><![CDATA[라]]></xf:label>
 			</xf:trigger>
-			<xf:trigger style="" id="btn_ma" type="button" class="btn_cm">
+			<xf:trigger ev:onclick="scwin.btn_ma_onclick" style="" id="btn_ma" type="button" class="btn_cm">
 				<xf:label><![CDATA[마]]></xf:label>
 			</xf:trigger>
-			<xf:trigger style="" id="btn_ba" type="button" class="btn_cm">
+			<xf:trigger ev:onclick="scwin.btn_ba_onclick" style="" id="btn_ba" type="button" class="btn_cm">
 				<xf:label><![CDATA[바]]></xf:label>
 			</xf:trigger>
-			<xf:trigger style="" id="btn_sa" type="button" class="btn_cm">
+			<xf:trigger ev:onclick="scwin.btn_sa_onclick" style="" id="btn_sa" type="button" class="btn_cm">
 				<xf:label><![CDATA[사]]></xf:label>
 			</xf:trigger>
-			<xf:trigger style="" id="btn_a" type="button" class="btn_cm">
+			<xf:trigger ev:onclick="scwin.btn_a_onclick" style="" id="btn_a" type="button" class="btn_cm">
 				<xf:label><![CDATA[아]]></xf:label>
 			</xf:trigger>
-			<xf:trigger style="" id="btn_ja" type="button" class="btn_cm">
+			<xf:trigger ev:onclick="scwin.btn_ja_onclick" style="" id="btn_ja" type="button" class="btn_cm">
 				<xf:label><![CDATA[자]]></xf:label>
 			</xf:trigger>
-			<xf:trigger style="" id="btn_ca" type="button" class="btn_cm">
+			<xf:trigger ev:onclick="scwin.btn_ca_onclick" style="" id="btn_ca" type="button" class="btn_cm">
 				<xf:label><![CDATA[차]]></xf:label>
 			</xf:trigger>
-			<xf:trigger style="" id="btn_ka" type="button" class="btn_cm">
+			<xf:trigger ev:onclick="scwin.btn_ka_onclick" style="" id="btn_ka" type="button" class="btn_cm">
 				<xf:label><![CDATA[카]]></xf:label>
 			</xf:trigger>
-			<xf:trigger style="" id="btn_ta" type="button" class="btn_cm">
+			<xf:trigger ev:onclick="scwin.btn_ta_onclick" style="" id="btn_ta" type="button" class="btn_cm">
 				<xf:label><![CDATA[타]]></xf:label>
 			</xf:trigger>
-			<xf:trigger style="" id="btn_fa" type="button" class="btn_cm">
+			<xf:trigger ev:onclick="scwin.btn_fa_onclick" style="" id="btn_fa" type="button" class="btn_cm">
 				<xf:label><![CDATA[파]]></xf:label>
 			</xf:trigger>
-			<xf:trigger style="" id="btn_ha" type="button" class="btn_cm">
+			<xf:trigger ev:onclick="scwin.btn_ha_onclick" style="" id="btn_ha" type="button" class="btn_cm">
 				<xf:label><![CDATA[하]]></xf:label>
 			</xf:trigger>
-			<xf:trigger style="" id="btn_young" type="button" class="btn_cm">
+			<xf:trigger ev:onclick="scwin.btn_young_onclick" style="" id="btn_young" type="button" class="btn_cm">
 				<xf:label><![CDATA[영]]></xf:label>
 			</xf:trigger>
-			<xf:trigger style="" id="btn_num" type="button" class="btn_cm">
+			<xf:trigger ev:onclick="scwin.btn_num_onclick" style="" id="btn_num" type="button" class="btn_cm">
 				<xf:label><![CDATA[숫]]></xf:label>
 			</xf:trigger>
 		</xf:group><xf:group id="" class="gvwbox">
-			<w2:gridView dataList="data:dlt_commonCodecomIsur" hierarchy="grd_jongmok" userData2=" class:Grid_01; onkeypress:grd_jongmok_OnKeyPress; gtitleheight:0; sortview:left; usingoneclick:1; xtitleheight:0; ondblclick:grd_jongmok_OnDblClick;" style="height:353px;" id="grd_jongmok" autoFit="allColumn" class="gvw" orgid="grd_jongmok">
+			<w2:gridView dataList="data:dlt_commonCodecomIsur" ev:onkeydown="scwin.grd_jongmok_onkeydown" ev:oncelldblclick="scwin.grd_jongmok_oncelldblclick" hierarchy="grd_jongmok" userData2=" class:Grid_01; onkeypress:grd_jongmok_OnKeyPress; gtitleheight:0; sortview:left; usingoneclick:1; xtitleheight:0; ondblclick:grd_jongmok_OnDblClick;" style="height:353px;" id="grd_jongmok" autoFit="allColumn" class="gvw" orgid="grd_jongmok">
 				<w2:caption style="" id="caption1" value="this is a grid caption."></w2:caption>
 				<w2:header style="" id="header1">
 					<w2:row>
