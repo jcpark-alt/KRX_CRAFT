@@ -897,9 +897,27 @@ def rule7_gcc_substitute(code, report):
 
 
 def _only_comment_blank(text):
+    """주석/빈 줄만으로 구성됐는지 판정 — 블록 주석(`/* */`) 상태를 추적해
+    `*` 접두 없는 블록 주석 내용 줄을 실행문으로 오판하지 않는다(2026-09-03 보강)."""
+    in_block = False
     for ln in text.splitlines():
         s = ln.strip()
-        if s == "" or s.startswith(("//", "/*", "*", "*/")):
+        if in_block:
+            if "*/" in s:
+                in_block = False
+                rest = s.split("*/", 1)[1].strip()
+                if rest and not rest.startswith("//"):
+                    return False
+            continue
+        if s == "" or s.startswith(("//", "*")):
+            continue
+        if s.startswith("/*"):
+            if "*/" in s[2:]:
+                rest = s[2:].split("*/", 1)[1].strip()
+                if rest and not rest.startswith("//"):
+                    return False
+            else:
+                in_block = True
             continue
         return False
     return True
@@ -953,6 +971,13 @@ def rule4_structure(script, body, report):
 
     if len(funcs) < 2:
         return script, body
+
+    # 함수 범위 겹침 가드(2026-09-03): 마스크/중괄호 해석 실패로 extent 가 다음 함수를 침범하면
+    # 재조립 시 코드가 복제되므로 재정렬을 보류한다(원시 jQuery/JSP 혼재 파일 등 — 규칙 19 대상).
+    for _a, _b in zip(funcs, funcs[1:]):
+        if _a["end"] > _b["start"]:
+            report["judgment"].append("규칙4 재정렬 보류: 함수 경계 해석 실패(중괄호/마스크 불일치 — 수동 검토)")
+            return script, body
 
     preamble = script[:funcs[0]["start"]]
     tail = script[funcs[-1]["end"]:]
