@@ -92,6 +92,15 @@ def test_rule1_var_form_and_no_value():
     assert 'const a = "ULDX00100.xml";' in out
 
 
+def test_rule1_foreign_scope_ref_untouched():
+    # 타 스코프 접근(X.scwin.vScrenID / X.vScrenID)은 다른 화면의 값 — 치환 금지·잔존 리포트
+    script = 'scwin.vScrenID = "A.xml";\nif ($p.parent().scwin.vScrenID == "B.gfm") { }\n'
+    rep = {}
+    out = convert.rule1_vscrenid(script, "A.xml", rep)
+    assert '$p.parent().scwin.vScrenID == "B.gfm"' in out   # 구문 파손 금지
+    assert "잔존" in rep["rule1"]
+
+
 def test_five_section_headers_and_callback_bucket():
     out, rep = _run_rule24(SCRIPT_BASE)
     p1 = out.find("1. 변수 및 선언 영역")
@@ -405,6 +414,39 @@ scwin.c = function () {
     assert "dma_x.setBroadcast" not in out              # 본문 return → 보류(복원 누락 위험)
     assert any("규칙28" in j for j in rep["judgment"])
     assert out.count("setBroadcast") == 2               # DC 를 변경하지 않는 일반 루프는 무변환
+
+
+def test_remove_wcraft_markers_and_block_include():
+    # 2026-09-03 규칙: W-Craft 변환 확인 마커 라인 삭제(블록 주석 내부 포함) + 규칙 11 이
+    # 블록 주석으로 감싼 include 도 삭제 → 빈 껍데기 블록 주석 제거 (ULDSTF30304 사례)
+    src = '''
+/* ★Wcraft guide★
+스크립트 수작업 유의사항
+*/
+/*
+	//----W-Craft WebSquare 변환 확인: include----//
+include("../js/PopupCalendar.js");
+
+	//----W-Craft WebSquare 변환 확인: include----//
+include("../js/utils.js");
+
+*/
+scwin.a = function () {
+    //----W-Craft WebSquare 변환 확인: popUpCalendar2----//
+    console.log(1);
+};
+'''
+    rep = {}
+    out = convert.rule11_remove_include(src, rep)
+    assert rep["rule11"] == 2
+    out = convert.remove_wcraft_markers(out, rep)
+    assert "W-Craft" not in out.replace("★Wcraft guide★", "")   # 확인 마커 전부 삭제
+    assert "include(" not in out
+    assert "★Wcraft guide★" in out                               # 파일 헤더 가이드 블록은 유지
+    assert out.count("/*") == 1                                   # 빈 껍데기 블록 주석 제거
+    assert rep["wcraft"] == 3
+    again = convert.remove_wcraft_markers(convert.rule11_remove_include(out, {}), {})
+    assert again == out                                           # 멱등
 
 
 def test_comment_space_formatting():

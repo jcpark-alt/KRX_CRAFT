@@ -198,9 +198,10 @@ def rule1_vscrenid(code, filename, report):
     if value is None:
         value = '"%s"' % filename
 
-    # 잔존 참조(scwin.vScrenID / 단독 vScrenID)를 리터럴로 치환 — 코드 세그먼트만, 대입 LHS 제외
+    # 잔존 참조(scwin.vScrenID / 단독 vScrenID)를 리터럴로 치환 — 코드 세그먼트만, 대입 LHS 제외.
+    # 타 스코프 접근(`X.scwin.vScrenID`·`X.vScrenID`)은 다른 화면의 값이므로 치환하지 않는다(잔존 리포트).
     mask = code_mask(code)
-    ref = re.compile(r'(?:scwin\.vScrenID|(?<![.\w$])vScrenID)\b(?![ \t]*=(?!=))')
+    ref = re.compile(r'(?<![.\w$])(?:scwin\.)?vScrenID\b(?![ \t]*=(?!=))')
     replaced = 0
     res, last = [], 0
     for mo in ref.finditer(code):
@@ -548,19 +549,11 @@ def _defined_function_names(code):
 
 
 def rule11_remove_include(code, report):
-    """스크립트 영역에서 `include(...)` 로 시작하는 라인을 삭제(활성 + 주석 처리 모두). 문자열 내부 보호."""
-    mask = code_mask(code)
+    """스크립트 영역에서 `include(...)` 로 시작하는 라인을 삭제한다 — 활성·`//` 주석 처리·**블록 주석(`/* */`) 내부** 모두
+    (2026-09-03 보강: 블록 주석으로 감싼 include 묶음이 잔존하던 사례 대응 — ULDSTF30304).
+    라인 선두 앵커 매칭이라 문자열 내부 오탐은 사실상 없다(레거시 소스에 개행 포함 템플릿 리터럴 없음)."""
     pat = re.compile(r'(?m)^[ \t]*(/+[ \t]*)?include\b\s*\([^\n]*\r?\n?')
-    spans, removed = [], 0
-    for mo in pat.finditer(code):
-        commented = bool(mo.group(1))
-        cpos = mo.start() + mo.group(0).index("include")
-        if not commented and not mask[cpos]:
-            continue   # 문자열/비코드 내부
-        spans.append((mo.start(), mo.end()))
-        removed += 1
-    for s, e in sorted(spans, reverse=True):
-        code = code[:s] + code[e:]
+    code, removed = pat.subn('', code)
     report["rule11"] = removed
     return code
 
@@ -1061,43 +1054,19 @@ def rule4_structure(script, body, report):
     return result, body
 
 
-def align_wcraft(script, report=None):
-    """`//----W-Craft ...` 마커 주석을 **바로 아래 코드 라인의 들여쓰기**에 맞춰 정렬. 문자열 내부는 보호. 멱등."""
-    mask = code_mask(script)
+def remove_wcraft_markers(script, report=None):
+    """`//----W-Craft ...----//` 변환 확인 마커 주석 라인을 **삭제**한다(2026-09-03 변경 — 종전 "들여쓰기 정렬 유지" 폐기).
+    블록 주석 내부의 마커 라인도 삭제하며, 삭제로 내용이 비게 된 블록 주석(`/* */`)은 함께 제거한다. 멱등."""
     lines = script.split("\n")
-    offs, p = [], 0
-    for ln in lines:
-        offs.append(p); p += len(ln) + 1
-    marker_re = re.compile(r'^([ \t]*)(//-+\s*W-Craft.*)$')
-
-    def indent_of(s):
-        return s[:len(s) - len(s.lstrip())]
-
-    cnt = 0
-    for i, ln in enumerate(lines):
-        m = marker_re.match(ln)
-        if not m:
-            continue
-        st = offs[i]
-        if st - 1 >= 0 and st - 1 < len(mask) and not mask[st - 1]:
-            continue   # 직전 개행이 비코드(문자열 내부) → 스킵
-        # 바로 아래의 비공백·비마커 코드 라인 들여쓰기를 따른다
-        target = None
-        for k in range(i + 1, len(lines)):
-            s = lines[k]
-            if s.strip() == "" or marker_re.match(s):
-                continue
-            target = indent_of(s)
-            break
-        if target is None:
-            continue
-        new = target + m.group(2)
-        if new != ln:
-            lines[i] = new
-            cnt += 1
+    marker_re = re.compile(r'^[ \t]*//-+\s*W-Craft[^\n]*$')
+    kept = [ln for ln in lines if not marker_re.match(ln)]
+    cnt = len(lines) - len(kept)
+    script = "\n".join(kept)
+    # 마커/include 삭제로 빈 껍데기만 남은 블록 주석 제거
+    script = re.sub(r'(?m)^[ \t]*/\*[ \t]*\n(?:[ \t]*\n)*[ \t]*\*/[ \t]*\r?\n?', '', script)
     if report is not None:
         report["wcraft"] = cnt
-    return "\n".join(lines)
+    return script
 
 
 def collapse_blank_runs(script):
@@ -2334,7 +2303,7 @@ def _convert_once(raw, filename):
     s = mark_async_functions(s, report)   # 규칙4 병합(gform_onload→onpageload)으로 이동한 await 재탐지
     s = rule26_entry_trycatch(s, report, filename.rsplit(".", 1)[0])   # 진입점 try/catch + handleError(규칙4 섹션 기준)
     s = rule28_broadcast_guard(s, reg["head"], report)   # 반복문 내 DC 수정 시 setBroadcast 제어
-    s = align_wcraft(s, report)   # //----W-Craft 마커 주석 정렬
+    s = remove_wcraft_markers(s, report)   # //----W-Craft 변환 확인 마커 주석 삭제(2026-09-03 변경)
     s = format_comment_space(s, report)   # // 주석 뒤 공백 1개(code-convention 주석 규칙)
     s = format_script(s)          # 함수 단위 빈 줄 + 주석 맨앞 정렬
     s = collapse_blank_runs(s)    # 잔존 다중 빈 줄 수렴(멱등성 보장)

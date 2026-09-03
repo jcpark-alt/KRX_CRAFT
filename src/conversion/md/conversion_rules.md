@@ -127,7 +127,9 @@
 
 * 스크립트 영역에서 **`include(...)` 로 시작하는 라인을 삭제**합니다. (예: `include("../js/common.js");`)
 * 외부 JS 파일 로딩 구문으로, gcc 공통 라이브러리는 `$c.*` 네임스페이스로 제공되어 별도 include 가 필요 없습니다.
-* **삭제 범위**: 활성 코드뿐 아니라 주석 처리된 형태(`//include(...)`, `////include(...)`)도 제거합니다.
+* **삭제 범위**: 활성 코드뿐 아니라 주석 처리된 형태(`//include(...)`, `////include(...)`)와
+  **블록 주석(`/* */`)으로 감싼 include 묶음**도 제거합니다(2026-09-03 보강 — `ULDSTF30304` 잔존 사례 대응).
+  삭제로 내용이 비게 된 블록 주석 껍데기는 규칙 30이 함께 제거합니다.
 * 문자열/비코드 내부는 보호합니다.
 
 ### 규칙 13: `scwin.fn_*` 정의 함수명 정규화 (`fn_` 제거 + camelCase)
@@ -421,6 +423,46 @@ $c.win.setEnterKeyEvent(tbl_search, scwin.btn_Search_onclick);
   중괄호 없는 단문 루프는 대상 외이며, 감지 루프끼리 중첩되면 바깥 루프만 처리합니다.
 * 직전 줄들에 해당 DC 의 `setBroadcast(false)` 가 이미 있으면 건너뛰므로 **재변환 시 no-op(멱등)** 입니다.
 * **기대 효과**: 렌더링 1회 일괄 갱신으로 대량 데이터 처리 속도 개선, 수정 중 중간 상태 노출·깜빡임 완화.
+
+### 규칙 29: Gauce 데이터셋/그리드 API → WebSquare DataList·gridView 표준 API 전환 (단계 2 판단)
+
+W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면은 **WebSquare 런타임에서 동작하지 않으므로**
+아래 매핑으로 재설계합니다(자동 치환이 아닌 **단계 2 판단 작업** — 1-base→0-base 전환·데이터 선언·이벤트 재배선이 얽혀 있음).
+(2026-09-03 확정 — 정답지: `mgt ui-tobe/common/ULDCOM00008.xml`, `stf ui-tobe/common/ULDCOM00007_KOSDAQ_IR.xml`)
+
+* **선행 — DataCollection 선언**: `<xf:model>` 에 `w2:dataCollection` 이 없는 화면은 gridView `dataList="data:{id}"`·
+  서브미션 `target "{id}=body.content"` 가 참조하는 **DataList 를 컬럼 정의와 함께 선언**한다(컬럼은 gridView 컬럼 id·
+  통신 응답·필터/정렬 대상 컬럼에서 도출). 헤더 초기화용 `/gauceSystemierAdaptor.do` 더미 로드는 선언으로 대체되므로 **삭제**한다.
+* **API 매핑표** (Gauce → WebSquare):
+
+  | Gauce | WebSquare 표준 | 유의 |
+  |---|---|---|
+  | `{ds}.countrow` | `{dlt}.getRowCount()` | 루프를 **1-base → 0-base** 로 함께 전환 |
+  | `{ds}.NameValue(row, col)` / `NameString(row, col)` | `{dlt}.getCellData(row, col)` | row 인덱스 0-base 보정 |
+  | `{ds}.RowPosition` (읽기) | `{dlt}.getRowPosition()` 또는 `{grid}.getFocusedRowIndex()` | 미선택 `-1` 가드 |
+  | `{ds}.Rowposition = n` (쓰기) | `{grid}.setFocusedCell(n, 0)` | 구 `n+11 → n` 재대입은 스크롤 확보 트릭 — `setFocusedCell` 2회 호출로 대체 |
+  | `{ds}.UseFilter`/`Filter()` + `OnFilter` 콜백 | `{dlt}.removeColumnFilterAll()` + `{dlt}.setColumnFilter({type:"row", colIndex, key, condition:"and"/"or", exactMatch:false})` | OnFilter 의 행 판정 로직을 컬럼 필터 선언으로 이관 |
+  | `{ds}.SortExpr = "+COL"`/`Sort()` | `{dlt}.sort("COL", 0)` | 0=오름차순 |
+  | `{grid}.Redraw = "false"/"true"` | `{dlt}.setBroadcast(false)` / `(true, true)` | 규칙 28 규약과 동일 |
+  | `{ds}_OnLoadCompleted(rowcount)` | (삭제) 순차 스타일 `await executeDynamic` **직후 후처리로 이관** | rowcount 는 `getRowCount()` 로 대체 |
+  | `{grid}.focus()` | `{grid}.setFocus()` | |
+
+* **이벤트 재배선**: `userData2` 문자열(`onkeypress:...`/`ondblclick:...`)로만 남은 그리드 이벤트는 실제
+  `ev:onkeydown`/`ev:oncelldblclick` 속성으로 재배선하고, 핸들러는 규칙 3 명명(`{id}_onkeydown` 등)으로 정규화한다.
+  keyCode 비교는 `Number(e.keyCode) === 13` 형태로 통일(문자 `"13"` 비교·`window.event` 금지).
+  콤보의 Gauce 잔재 바인딩(`ref="data:{dlt}"` + `listexprformat`)은 `<xf:choices><xf:itemset nodeset="data:{dlt}">` 로 전환한다.
+* **동반 정정 유형**: 미정의 `$c` 네임스페이스에 함수를 정의하는 오기(`$c.xxx.fn = function` — 로드 시점 TypeError)는
+  `scwin.` 으로 교정, 미정의 공통 호출(`PanelToGroupBox` 류)은 삭제, 최상위 즉시 실행문은 `onpageload` 로 이동(규칙 4 보류 해소).
+
+### 규칙 30: W-Craft 변환 확인 마커 주석 삭제
+
+* `//----W-Craft WebSquare 변환 확인: {항목}----//` 형태의 **변환 확인 마커 주석 라인을 전부 삭제**합니다.
+  (2026-09-03 확정 — 종전 "들여쓰기 정렬 후 유지" 정책 폐기. 마커는 변환 검수용 임시 표식으로, 규칙 정비가 끝난 산출물에는 남기지 않는다)
+* **삭제 범위**: 블록 주석(`/* */`) 내부의 마커 라인 포함. 마커·include(규칙 11) 삭제로 내용이 비게 된
+  블록 주석 껍데기(`/*` ~ `*/` 사이가 공백뿐)도 함께 제거합니다.
+* **유지 대상**: 파일 헤더의 `★Wcraft guide★` 안내 블록은 마커가 아니므로 유지합니다.
+* convert.py 포매팅 단계(`remove_wcraft_markers`)가 자동 적용하며 멱등입니다. 규칙 7m/12/20 이 개별 치환 시
+  직전 마커를 함께 지우는 동작은 그대로 유지됩니다(본 규칙이 최종 일괄 정리).
 
 ---
 
