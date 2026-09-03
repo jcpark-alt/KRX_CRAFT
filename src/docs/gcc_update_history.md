@@ -293,6 +293,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 - `4fe8607` (09-01) — [연관] **pcc frame.xml·utils.xml·stf_old.xml 최종 삭제**(`src/pcc`, gcc 무변경): `$c.frame`/`$c.utils` 사용 중단 방침 — 호출부 gcc 전환 완료 후 정의 파일 삭제(잔존 $c.utils 2건은 `getServerDateTime`/`addDate` 치환), $c.frame 미정의 호출 10건(MDI/WinOpen/PDF 창)은 재설계 대기. pcc/stf 7파일 체제
 - `6c95493` (09-01) — [연관] **$c.frame 미정의 호출 10건 정리**(`src/pcc`, gcc 무변경): common MdiHelp·FileDown1/2 삭제·`InfoMenuID`→`$c.win.getProgramId()` 위임, stf 뷰어/목록 4함수 톱 WinOpen→`$c.win.openPopup(browserPopup)` 전환(+`frame.FrameID`→`$p.getFrameId()`), print PDF 창 `window.open` 직접 호출 — pcc 에서 $c.frame/$c.utils 실행 참조 0건 달성
 - `ce3c500` (09-01) — [연관] **common.xml($c.cm) 함수 주석·gcc 치환 정리**(`src/pcc`, gcc 무변경): 박스 주석 22건→@description 이관, 미사용 매핑확정 15개 정의 삭제(85→70 함수)·`fn_Trim` 호출 11건(내부 7·ui-tobe 4) `$c.str.trim` 치환 — 1:1 불가 4종(fn_CheckEmail alert 내장·fn_IsNumber_val 정수 전용·fn_DelChar/3 업무 로직) 유지·검토
+- `b2284e8`·`7430abd` (09-03) — [연관] **변환 규칙 29·30 신설 + 4개 모듈 336화면 일괄 재적용**(`src/conversion`, gcc 무변경): 규칙 29(Gauce 데이터셋/그리드 API→WebSquare 표준 매핑표, 단계 2)·규칙 30(W-Craft 확인 마커 삭제 — 종전 정렬 유지 폐기)·규칙 11 블록 주석 include 보강·규칙 1 타 스코프 보정(pytest 45건). fil·mgt·stf·tms ui-tobe 제자리 멱등 재변환(vScrenID 삭제·진입점 try/catch·4구역·마커/include 소급 전량 삭제), ULDCOM00008 규칙 29 재설계(DataList 선언·이벤트 바인딩 복원·로드 오류 3건 정정)·calMM 파스 오류 2파일 교정 — 고정점 무변경·JS/XML 0오류·규칙별 잔존 0 전수 감사
 - `b7324fe` (09-03) — [연관] **bns_common.xml($c.bns) 함수 주석·gcc 치환 정리 + 팝업 return 수신 전환**(`src/pcc`, gcc 무변경): @param placeholder 232건 전량 작성(사전 198+본문 확인 34, 객체 타입 교정)·eval 5건 제거, `await $c.win.openPopup` 66건 → `return await` 전환(호출 화면이 팝업 리턴 데이터 수신) — bare 호출 의심 11건 주석 내 무해 확인, vScrenID 72건은 함수 파라미터 설계로 유지, pcc 린트 0/0
 - `e2cb41d` (09-02) — [연관] **code-convention.md 규약 7건 보강**(`src/docs`, gcc 무변경): 본 이력 검토로 식별된 누락 규약 명문화 — 변수·문법 규칙 절(var 금지·엄격 비교 5a/5e·원시 alert/eval 금지+confirm 동기 계약 예외·빌드 $p 주입 참고), 함수 JSDoc 표준(placeholder 금지), 검증 통합 절(validateDataCollect 규칙 24·validateDataMap), 버튼 상태 setButtonState 절, 도구 연동 표 5a·5e/8 행 추가
 - `1434c25` (09-02) — [연관] **cp.xml($c.cp) 함수 주석·gcc 치환 정리**(`src/pcc`, gcc 무변경): getColumnProp 미정의 변수 버그 수정, getNameValueRow 구현(Gauce IndexOfColumn 호환 1-base), 미사용 4함수 삭제(13→9·publicInfo 12→8), placeholder JSDoc 11건 전부 작성 — pcc 린트 0/0 유지
@@ -312,6 +313,8 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-09-03 | `7430abd` | refactor(conversion): 4개 모듈 ui-tobe 336화면 신규 규칙 일괄 재적용 — [연관, gcc 무변경] |
+| 2026-09-03 | `b2284e8` | feat(conversion): 규칙 29·30 신설 + 규칙 1 보정·11 보강 — [연관, gcc 무변경] |
 | 2026-09-03 | `b7324fe` | refactor(pcc): bns_common.xml 함수 주석·gcc 치환 정리 + 팝업 return 수신 전환 — [연관, gcc 무변경] |
 | 2026-09-02 | `e2cb41d` | docs(convention): 업데이트 이력 검토분 규약 7건 code-convention.md 반영 — [연관, gcc 무변경] |
 | 2026-09-02 | `1434c25` | refactor(pcc): cp.xml 함수 주석·gcc 치환 정리 — 버그 수정·스텁 구현 — [연관, gcc 무변경] |
