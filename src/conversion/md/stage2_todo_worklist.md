@@ -9,10 +9,10 @@
 | 모듈 | 항목 수 |
 | --- | ---: |
 | fil | 4 |
-| mgt | 40 |
-| stf | 28 |
+| mgt | 23 |
+| stf | 26 |
 | tms | 3 |
-| **합계** | **75** |
+| **합계** | **56** |
 
 | 유형 | 항목 수 | 해결 방법 |
 | --- | ---: | --- |
@@ -21,7 +21,7 @@
 | 그리드 포커스 전환(구 Rowposition) | 8 | 구 `ds.Rowposition = v` 쓰기 — 대상 그리드 특정 후 `setFocusedCell(row, col)` 로 재작성(유일 바인딩은 자동 전환 완료). |
 | 필터 재설계(setColumnFilter) | 5 | Gauce `Filter()`/onfilter 콜백 로직을 `setColumnFilter({type:"row",...})`/`removeColumnFilterAll()` 로 재구현. |
 | 조회 파라미터/세션 API 확정 | 6 | 조회 파라미터·세션 사용자 정보 취득 API 확정 시 반영. |
-| 팝업 파라미터/결과 처리 보강 | 23 | openPopup 전환 화면의 data 파라미터 채움·result/arg 수신 후 업무 로직 작성. |
+| 팝업 파라미터/결과 처리 보강 | 4 | openPopup 전환 화면의 data 파라미터 채움·result/arg 수신 후 업무 로직 작성. |
 | 기타(개발필요) | 3 | 개별 확인 필요(원본 미구현 스텁 등). |
 
 ### 추가 점검 유형 (코드에 `// TODO Stage2:` 주석을 남기면 다음 집계에 포함)
@@ -70,9 +70,9 @@ trs `KeyValue`/`Post`/`SetDataHeader` 잔존 — 서버 API 확정 후 `executeD
 
 | 파일 | 라인 |
 | --- | --- |
-| `[mgt] mgt/ULDMGT10108.xml` | 226, 227 |
-| `[mgt] mgt/ULDMGT10110.xml` | 197, 198 |
-| `[mgt] mgt/ULDMGT10201.xml` | 163, 164 |
+| `[mgt] mgt/ULDMGT10108.xml` | 227, 228 |
+| `[mgt] mgt/ULDMGT10110.xml` | 199, 200 |
+| `[mgt] mgt/ULDMGT10201.xml` | 165, 166 |
 | `[mgt] mgt/ULDMGT40008.xml` | 645, 646 |
 
 ## 필터 재설계(setColumnFilter)  (5)
@@ -97,21 +97,12 @@ Gauce `Filter()`/onfilter 콜백 로직을 `setColumnFilter({type:"row",...})`/`
 | `[tms] common/ULDCOM00007.xml` | 41, 282 |
 | `[tms] common/ULDCOM00008.xml` | 256 |
 
-## 팝업 파라미터/결과 처리 보강  (23)
+## 팝업 파라미터/결과 처리 보강  (4)
 
 openPopup 전환 화면의 data 파라미터 채움·result/arg 수신 후 업무 로직 작성.
 
 | 파일 | 라인 |
 | --- | --- |
-| `[mgt] mgt/ULDMGT10108.xml` | 145, 149 |
-| `[mgt] mgt/ULDMGT10110.xml` | 116, 120 |
-| `[mgt] mgt/ULDMGT10201.xml` | 82, 86 |
-| `[mgt] mgt/ULDMGT40002.xml` | 194, 198 |
-| `[mgt] mgt/ULDMGT40220.xml` | 194, 198 |
-| `[mgt] mgt/ULDMGT42030.xml` | 286, 363 |
-| `[mgt] mgt/ULDMGT42040.xml` | 47, 84, 114 |
-| `[mgt] mgt/ULDMGT95030.xml` | 401, 405 |
-| `[stf] dis/bizspt/ULDSTF30304.xml` | 101, 319 |
 | `[stf] lst/fis/ULDFIS00500.xml` | 294, 582 |
 | `[stf] lstproc/ULDSTF05234.xml` | 179, 294 |
 
