@@ -9,14 +9,13 @@
 | 모듈 | 항목 수 |
 | --- | ---: |
 | fil | 4 |
-| mgt | 55 |
-| stf | 37 |
+| mgt | 40 |
+| stf | 28 |
 | tms | 3 |
-| **합계** | **99** |
+| **합계** | **75** |
 
 | 유형 | 항목 수 | 해결 방법 |
 | --- | ---: | --- |
-| 0-based 인덱스 검토 | 24 | Gauce 1-based → WebSquare 0-based. 비정형 루프는 토큰만 치환된 상태 — 화면 실행으로 행 접근 어긋남 확인 후 `-1`/`+1` 조정. |
 | $c.frame 프레임 재설계(형제/절대) | 21 | `../frame_head`·`/top` 등 형제/절대 프레임 접근은 대응 공통함수 없음. 프레임 구조 확정 후 재설계(부모는 `$c.win.getParent()` 전환 완료). |
 | Gauce 통신 재설계(DataID/KeyValue/Post) | 9 | trs `KeyValue`/`Post`/`SetDataHeader` 잔존 — 서버 API 확정 후 `executeDynamic` 으로 재설계(규칙 12/16). |
 | 그리드 포커스 전환(구 Rowposition) | 8 | 구 `ds.Rowposition = v` 쓰기 — 대상 그리드 특정 후 `setFocusedCell(row, col)` 로 재작성(유일 바인딩은 자동 전환 완료). |
@@ -33,26 +32,6 @@
 | 목록↔상세 복귀 상태 복원 | 목록→상세 moveUrl/setPageFrameSrc 화면에 `{isHistory:true, dataInfo}` 스냅샷 + 상세 [목록] 버튼 `{restoreData:true}` 적용, 목록 onpageload 에 `_isHistoryRestore` 자동조회 skip 관례 적용. 가이드: `src/docs/frame-history-guide.md` |
 | 페이징 전체보기/역순 순번 대체 | AS-IS 자체 구현(전체보기 토글·내림차순 순번 계산)을 `$c.sbm.setPagingInfo` 옵션(`maxRowNum:"all"`, `rowNumVisble:"{grid}|desc"`, `rowNumColumn`)으로 대체 |
 
-## 0-based 인덱스 검토  (24)
-
-Gauce 1-based → WebSquare 0-based. 비정형 루프는 토큰만 치환된 상태 — 화면 실행으로 행 접근 어긋남 확인 후 `-1`/`+1` 조정.
-
-| 파일 | 라인 |
-| --- | --- |
-| `[mgt] mgt/ULDMGT10200.xml` | 107 |
-| `[mgt] mgt/ULDMGT30309.xml` | 112, 228, 249, 317 |
-| `[mgt] mgt/ULDMGT40002.xml` | 449 |
-| `[mgt] mgt/ULDMGT40008.xml` | 460, 505 |
-| `[mgt] mgt/ULDMGT40220.xml` | 449 |
-| `[mgt] mgt/ULDMGT42030.xml` | 372 |
-| `[mgt] mgt/ULDMGT80220.xml` | 53, 135, 172 |
-| `[mgt] mgt/ULDMGT95030.xml` | 446, 457 |
-| `[stf] common/ULDINS91200.xml` | 492 |
-| `[stf] dis/dsclsrch/ULDSTF15000.xml` | 323, 911, 1383 |
-| `[stf] etc/ULDINS20000.xml` | 436, 520, 589 |
-| `[stf] etc/ULDINS21340.xml` | 217 |
-| `[stf] listingcommon/ULDSTF92009.xml` | 73 |
-
 ## $c.frame 프레임 재설계(형제/절대)  (21)
 
 `../frame_head`·`/top` 등 형제/절대 프레임 접근은 대응 공통함수 없음. 프레임 구조 확정 후 재설계(부모는 `$c.win.getParent()` 전환 완료).
@@ -63,7 +42,7 @@ Gauce 1-based → WebSquare 0-based. 비정형 루프는 토큰만 치환된 상
 | `[mgt] mgt/ULDMGT95030.xml` | 31 |
 | `[stf] dis/bizspt/ULDSTF30341.xml` | 74 |
 | `[stf] dis/dsclinfo/ULDSTF30402.xml` | 175 |
-| `[stf] dis/dsclsrch/ULDSTF15000.xml` | 612, 627, 639 |
+| `[stf] dis/dsclsrch/ULDSTF15000.xml` | 611, 626, 638 |
 | `[stf] dis/issueinfo/ULDSTF30700.xml` | 287, 303 |
 | `[stf] dis/issueinfo/ULDSTF30702.xml` | 248 |
 | `[stf] listingcommon/ULDSTF92009.xml` | 27 |
@@ -79,7 +58,7 @@ trs `KeyValue`/`Post`/`SetDataHeader` 잔존 — 서버 API 확정 후 `executeD
 
 | 파일 | 라인 |
 | --- | --- |
-| `[mgt] mgt/ULDMGT30309.xml` | 211 |
+| `[mgt] mgt/ULDMGT30309.xml` | 210 |
 | `[mgt] mgt/ULDMGT42045.xml` | 326, 329, 356, 361 |
 | `[mgt] mgt/ULDMGT80300.xml` | 85 |
 | `[mgt] mgt/ULDMGT80700.xml` | 85 |
@@ -94,7 +73,7 @@ trs `KeyValue`/`Post`/`SetDataHeader` 잔존 — 서버 API 확정 후 `executeD
 | `[mgt] mgt/ULDMGT10108.xml` | 226, 227 |
 | `[mgt] mgt/ULDMGT10110.xml` | 197, 198 |
 | `[mgt] mgt/ULDMGT10201.xml` | 163, 164 |
-| `[mgt] mgt/ULDMGT40008.xml` | 647, 648 |
+| `[mgt] mgt/ULDMGT40008.xml` | 645, 646 |
 
 ## 필터 재설계(setColumnFilter)  (5)
 
@@ -103,7 +82,7 @@ Gauce `Filter()`/onfilter 콜백 로직을 `setColumnFilter({type:"row",...})`/`
 | 파일 | 라인 |
 | --- | --- |
 | `[mgt] mgt/ULDMGT10200.xml` | 97 |
-| `[mgt] mgt/ULDMGT40008.xml` | 557, 588, 617 |
+| `[mgt] mgt/ULDMGT40008.xml` | 555, 586, 615 |
 | `[mgt] mgt/ULDMGT42045.xml` | 422 |
 
 ## 조회 파라미터/세션 API 확정  (6)
