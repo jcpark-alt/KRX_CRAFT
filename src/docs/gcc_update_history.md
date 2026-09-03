@@ -293,6 +293,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 - `4fe8607` (09-01) — [연관] **pcc frame.xml·utils.xml·stf_old.xml 최종 삭제**(`src/pcc`, gcc 무변경): `$c.frame`/`$c.utils` 사용 중단 방침 — 호출부 gcc 전환 완료 후 정의 파일 삭제(잔존 $c.utils 2건은 `getServerDateTime`/`addDate` 치환), $c.frame 미정의 호출 10건(MDI/WinOpen/PDF 창)은 재설계 대기. pcc/stf 7파일 체제
 - `6c95493` (09-01) — [연관] **$c.frame 미정의 호출 10건 정리**(`src/pcc`, gcc 무변경): common MdiHelp·FileDown1/2 삭제·`InfoMenuID`→`$c.win.getProgramId()` 위임, stf 뷰어/목록 4함수 톱 WinOpen→`$c.win.openPopup(browserPopup)` 전환(+`frame.FrameID`→`$p.getFrameId()`), print PDF 창 `window.open` 직접 호출 — pcc 에서 $c.frame/$c.utils 실행 참조 0건 달성
 - `ce3c500` (09-01) — [연관] **common.xml($c.cm) 함수 주석·gcc 치환 정리**(`src/pcc`, gcc 무변경): 박스 주석 22건→@description 이관, 미사용 매핑확정 15개 정의 삭제(85→70 함수)·`fn_Trim` 호출 11건(내부 7·ui-tobe 4) `$c.str.trim` 치환 — 1:1 불가 4종(fn_CheckEmail alert 내장·fn_IsNumber_val 정수 전용·fn_DelChar/3 업무 로직) 유지·검토
+- `442f3d7` (09-03) — [연관] **stf ULDCOM00007_KOSDAQ_IR 경미 잔재 정리**(`src/conversion`, gcc 무변경): 미사용 전역 4종 삭제·keyCode 문자 비교 2건·window.event/파라미터 누락 교정 — 멱등·활성 잔재 0 (ULDCOM00007 계열 4사본 전체 정비 완료)
 - `d73537c` (09-03) — [연관] **mgt·stf ULDCOM00007 경미 잔재 정리**(`src/conversion`, gcc 무변경): mgt 콜백 명명 규약 정합(`sbm_select_list_submitdone`)+Gauce userData2 사어 토큰 제거, stf 활성 `$c.frame`→`getParent` 전환·debugger 삭제·암묵 전역 교정 — 두 파일 멱등·잔재 0
 - `b51580b` (09-03) — [연관] **tms ULDCOM00007 규칙 29 재설계**(`src/conversion`, gcc 무변경): 미선언 데이터셋 참조를 선언 DataList 로 정합(정적 submission·더미 로드 삭제), Gauce API 9종 표준 전환, `$c.frame`→`getParent`·`session.info`→`getUserInfo`·combo_stat label/value 반전 등 결함 6건 정정, 버튼 16종·그리드·콤보 이벤트 배선 복원 — 876→527줄, 멱등·Gauce 잔존 0 (mgt·stf 사본은 경미 잔재만)
 - `05f54d8` (09-03) — [연관] **ULDINF20000 규칙 19 재설계**(`src/conversion`, gcc 무변경): JSP/jQuery 사어 블록 8개(~250줄)·미사용 전역 24종·미사용 함수 2개 삭제, `$c.date.getServerDateTime`·`$c.win.alert`·`setFocus` 표준 전환, 미정의 바인딩 제거 — 규칙 4 경계 해석 실패 해소로 5단계 구조·규칙 26 적용, **규칙 4 보류 파일 0건 달성**(잔존 레거시 0·멱등)
@@ -317,6 +318,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-09-03 | `442f3d7` | refactor(conversion): stf ULDCOM00007_KOSDAQ_IR 경미 잔재 정리 — [연관, gcc 무변경] |
 | 2026-09-03 | `d73537c` | refactor(conversion): mgt·stf ULDCOM00007 경미 잔재 정리 — [연관, gcc 무변경] |
 | 2026-09-03 | `b51580b` | refactor(conversion): tms ULDCOM00007 규칙 29 재설계 — Gauce API 전면 전환 — [연관, gcc 무변경] |
 | 2026-09-03 | `05f54d8` | refactor(conversion): ULDINF20000 규칙 19 재설계 — 보류 파일 0건 달성 — [연관, gcc 무변경] |
