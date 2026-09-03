@@ -293,6 +293,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 - `4fe8607` (09-01) — [연관] **pcc frame.xml·utils.xml·stf_old.xml 최종 삭제**(`src/pcc`, gcc 무변경): `$c.frame`/`$c.utils` 사용 중단 방침 — 호출부 gcc 전환 완료 후 정의 파일 삭제(잔존 $c.utils 2건은 `getServerDateTime`/`addDate` 치환), $c.frame 미정의 호출 10건(MDI/WinOpen/PDF 창)은 재설계 대기. pcc/stf 7파일 체제
 - `6c95493` (09-01) — [연관] **$c.frame 미정의 호출 10건 정리**(`src/pcc`, gcc 무변경): common MdiHelp·FileDown1/2 삭제·`InfoMenuID`→`$c.win.getProgramId()` 위임, stf 뷰어/목록 4함수 톱 WinOpen→`$c.win.openPopup(browserPopup)` 전환(+`frame.FrameID`→`$p.getFrameId()`), print PDF 창 `window.open` 직접 호출 — pcc 에서 $c.frame/$c.utils 실행 참조 0건 달성
 - `ce3c500` (09-01) — [연관] **common.xml($c.cm) 함수 주석·gcc 치환 정리**(`src/pcc`, gcc 무변경): 박스 주석 22건→@description 이관, 미사용 매핑확정 15개 정의 삭제(85→70 함수)·`fn_Trim` 호출 11건(내부 7·ui-tobe 4) `$c.str.trim` 치환 — 1:1 불가 4종(fn_CheckEmail alert 내장·fn_IsNumber_val 정수 전용·fn_DelChar/3 업무 로직) 유지·검토
+- `4b2cd18` (09-03) — [연관] **팝업 파라미터/결과 처리 TODO 23건 일괄 처리**(`src/conversion`, gcc 무변경): ULDCOM00007 리턴("코드^명")→isurSearch_Rtn 연결 8건, 무반환 팝업(42035·42045·30305·40221) 콜백/데이터 제거 11건(+사어 popupCallback 호출·스텁 정리), 미변환 대상 4건 표준 TODO 정규화 — 이스케이프 손상 3파일 수리·저장 게이트 node 구문검사 추가, 워크리스트 75→56건
 - `3d1a779` (09-03) — [연관] **0-based 인덱스 검토 TODO 24건 일괄 해소**(`src/conversion`, gcc 무변경): 1-base 오름 루프 18곳 0-base 전환·초과 순회 3곳·이벤트 row 경계 1곳·파생 버그 2건(grp[i-1]·insertRow 후 인덱스) 교정 — 13파일, 워크리스트 99→75건("0-based" 유형 소거)
 - `f8fd191` (09-03) — [연관] **응답 처리 TODO 331건 일괄 마감**(`src/conversion`, gcc 무변경): 후처리 원천 없는 172건 제거(target 자동 바인딩 충분)·미배선 구 핸들러 159건 시그니처별 연결(rowcount→getRowCount/응답형→sbmRtn/async→await) — 83파일, 워크리스트 430→99건("응답 처리" 유형 소거), 구문·멱등 검증
 - `8b3bc90` (09-03) — [연관] **Stage 2 TODO 워크리스트 자동 집계기 신설**(`src/conversion`, gcc 무변경): `gen_stage2_worklist.py` — TODO Stage2/TO-DO 주석 스캔·유형 9종 분류로 stage2_todo_worklist.md 재생성("자동 생성" 명세 실체화). 최신 기준선 430건(fil 최초 포함 — 응답 처리 331·0-based 24·$c.frame 21 등), 일반 TODO 과포집 패턴 교정
@@ -322,6 +323,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-09-03 | `4b2cd18` | refactor(conversion): 팝업 파라미터/결과 처리 TODO 23건 일괄 처리 — 워크리스트 75→56건 — [연관, gcc 무변경] |
 | 2026-09-03 | `3d1a779` | refactor(conversion): 0-based 인덱스 검토 TODO 24건 일괄 해소 — 워크리스트 99→75건 — [연관, gcc 무변경] |
 | 2026-09-03 | `f8fd191` | refactor(conversion): 응답 처리 TODO 331건 일괄 마감 — 워크리스트 430→99건 — [연관, gcc 무변경] |
 | 2026-09-03 | `8b3bc90` | feat(conversion): Stage 2 TODO 워크리스트 자동 집계기 신설 + 재집계(430건) — [연관, gcc 무변경] |
