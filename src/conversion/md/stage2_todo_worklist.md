@@ -9,16 +9,15 @@
 | 모듈 | 항목 수 |
 | --- | ---: |
 | fil | 4 |
-| mgt | 23 |
+| mgt | 15 |
 | stf | 26 |
 | tms | 3 |
-| **합계** | **56** |
+| **합계** | **48** |
 
 | 유형 | 항목 수 | 해결 방법 |
 | --- | ---: | --- |
 | $c.frame 프레임 재설계(형제/절대) | 21 | `../frame_head`·`/top` 등 형제/절대 프레임 접근은 대응 공통함수 없음. 프레임 구조 확정 후 재설계(부모는 `$c.win.getParent()` 전환 완료). |
 | Gauce 통신 재설계(DataID/KeyValue/Post) | 9 | trs `KeyValue`/`Post`/`SetDataHeader` 잔존 — 서버 API 확정 후 `executeDynamic` 으로 재설계(규칙 12/16). |
-| 그리드 포커스 전환(구 Rowposition) | 8 | 구 `ds.Rowposition = v` 쓰기 — 대상 그리드 특정 후 `setFocusedCell(row, col)` 로 재작성(유일 바인딩은 자동 전환 완료). |
 | 필터 재설계(setColumnFilter) | 5 | Gauce `Filter()`/onfilter 콜백 로직을 `setColumnFilter({type:"row",...})`/`removeColumnFilterAll()` 로 재구현. |
 | 조회 파라미터/세션 API 확정 | 6 | 조회 파라미터·세션 사용자 정보 취득 API 확정 시 반영. |
 | 팝업 파라미터/결과 처리 보강 | 4 | openPopup 전환 화면의 data 파라미터 채움·result/arg 수신 후 업무 로직 작성. |
@@ -63,17 +62,6 @@ trs `KeyValue`/`Post`/`SetDataHeader` 잔존 — 서버 API 확정 후 `executeD
 | `[mgt] mgt/ULDMGT80300.xml` | 85 |
 | `[mgt] mgt/ULDMGT80700.xml` | 85 |
 | `[stf] lst/lstinvstg/ULDSTF07404.xml` | 75, 173 |
-
-## 그리드 포커스 전환(구 Rowposition)  (8)
-
-구 `ds.Rowposition = v` 쓰기 — 대상 그리드 특정 후 `setFocusedCell(row, col)` 로 재작성(유일 바인딩은 자동 전환 완료).
-
-| 파일 | 라인 |
-| --- | --- |
-| `[mgt] mgt/ULDMGT10108.xml` | 227, 228 |
-| `[mgt] mgt/ULDMGT10110.xml` | 199, 200 |
-| `[mgt] mgt/ULDMGT10201.xml` | 165, 166 |
-| `[mgt] mgt/ULDMGT40008.xml` | 645, 646 |
 
 ## 필터 재설계(setColumnFilter)  (5)
 
