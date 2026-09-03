@@ -8,18 +8,17 @@
 
 | 모듈 | 항목 수 |
 | --- | ---: |
-| fil | 4 |
-| mgt | 15 |
-| stf | 26 |
-| tms | 3 |
-| **합계** | **48** |
+| fil | 3 |
+| mgt | 14 |
+| stf | 25 |
+| tms | 0 |
+| **합계** | **42** |
 
 | 유형 | 항목 수 | 해결 방법 |
 | --- | ---: | --- |
 | $c.frame 프레임 재설계(형제/절대) | 21 | `../frame_head`·`/top` 등 형제/절대 프레임 접근은 대응 공통함수 없음. 프레임 구조 확정 후 재설계(부모는 `$c.win.getParent()` 전환 완료). |
 | Gauce 통신 재설계(DataID/KeyValue/Post) | 9 | trs `KeyValue`/`Post`/`SetDataHeader` 잔존 — 서버 API 확정 후 `executeDynamic` 으로 재설계(규칙 12/16). |
 | 필터 재설계(setColumnFilter) | 5 | Gauce `Filter()`/onfilter 콜백 로직을 `setColumnFilter({type:"row",...})`/`removeColumnFilterAll()` 로 재구현. |
-| 조회 파라미터/세션 API 확정 | 6 | 조회 파라미터·세션 사용자 정보 취득 API 확정 시 반영. |
 | 팝업 파라미터/결과 처리 보강 | 4 | openPopup 전환 화면의 data 파라미터 채움·result/arg 수신 후 업무 로직 작성. |
 | 기타(개발필요) | 3 | 개별 확인 필요(원본 미구현 스텁 등). |
 
@@ -72,18 +71,6 @@ Gauce `Filter()`/onfilter 콜백 로직을 `setColumnFilter({type:"row",...})`/`
 | `[mgt] mgt/ULDMGT10200.xml` | 97 |
 | `[mgt] mgt/ULDMGT40008.xml` | 555, 586, 615 |
 | `[mgt] mgt/ULDMGT42045.xml` | 422 |
-
-## 조회 파라미터/세션 API 확정  (6)
-
-조회 파라미터·세션 사용자 정보 취득 API 확정 시 반영.
-
-| 파일 | 라인 |
-| --- | --- |
-| `[fil] inf/srch/ULDINF20000.xml` | 66 |
-| `[mgt] common/ULDCOM00008.xml` | 256 |
-| `[stf] common/ULDCOM00008.xml` | 256 |
-| `[tms] common/ULDCOM00007.xml` | 41, 282 |
-| `[tms] common/ULDCOM00008.xml` | 256 |
 
 ## 팝업 파라미터/결과 처리 보강  (4)
 
