@@ -74,11 +74,13 @@ scwin.btnSearch_onclick = async function (e) {
  */
 scwin.btnExcel_onclick = function (e) {
     try {
-        if (grdFis.getRowCount() <= 0) {
+        // setGridStyle 재생성 이후 로드 시점 전역 바인딩은 구 인스턴스일 수 있어 호출 시점 재조회
+        const grd = $c.util.getComponent("grdFis");
+        if (grd.getRowCount() <= 0) {
             $c.win.alert("조회된 데이터가 없습니다.");
             return;
         }
-        grdFis.downloadExcel({ fileName: "재무_동적그리드" });
+        grd.downloadExcel({ fileName: "재무_동적그리드" });
     } catch (ex) {
         $c.exception.handleError(ex, { context: "ULDFIS00600.btnExcel_onclick" });
     }
@@ -110,7 +112,9 @@ scwin.loadFisData = async function () {
 /**
  * @method
  * @name buildDynamicGrid
- * @description 메타(연도/지표)로 gridView 컬럼을 setColumns 로 재구성하고 데이터를 적재한다.
+ * @description 메타(연도/지표)로 gridView 를 setGridStyle 로 재구성(2단 그룹 헤더)하고 데이터를 적재한다.
+ *  엔진 setColumns 는 헤더를 단일 행으로 강제(colSpan/rowSpan=1, group 미지원)하므로
+ *  멀티로우 헤더는 전체 XML 재생성 API 인 setGridStyle 을 사용한다.
  * @param {Object} json 로컬 데이터(JSON) — { meta:{fixed,years,metrics}, body:[...] }
  * @returns {void}
  * @hidden N
@@ -127,9 +131,108 @@ scwin.buildDynamicGrid = function (json) {
         meta = { fixed: [], years: [], metrics: [] };
     }
     scwin.fisMeta = meta;
-    // 컬럼을 데이터에 맞춰 통째 재구성(그리드 재생성 없음) — 연도 그룹 × 지표 동적.
-    grdFis.setColumns(scwin.buildColumnDefs(meta));
+    const cols = scwin.buildColumnDefs(meta);
+    // dataList 컬럼 동기화(신규 insert·잔존 remove) 후 그리드 전체 재생성 — 연도 그룹 × 지표 동적.
+    scwin.syncDataListColumns(cols);
+    $c.util.getComponent("grdFis").setGridStyle(scwin.buildGridStyleXml(cols));
     dltFisList.setJSON(body.length ? scwin.buildRows(body, meta) : []);
+};
+
+/**
+ * @method
+ * @name syncDataListColumns
+ * @description colDef 목록에 맞춰 dltFisList 컬럼을 동기화한다 — 신규 컬럼 insertColumn(기존 id 는 엔진이 skip·멱등),
+ *  목록에 없는 잔존 컬럼 removeColumn(연도/지표 축소 재조회 대응).
+ * @param {Array} cols colDef[] — { id, header, width, align[, group] }
+ * @returns {void}
+ * @hidden N
+ */
+scwin.syncDataListColumns = function (cols) {
+    const keep = {};
+    for (let i = 0; i < cols.length; i++) {
+        keep[cols[i].id] = true;
+        dltFisList.insertColumn(cols[i].id, { name: cols[i].header });
+    }
+    const stale = [];
+    for (let c = dltFisList.getTotalCol() - 1; c >= 0; c--) {
+        const colId = dltFisList.getColumnID(c);
+        if (!keep[colId]) {
+            stale.push(colId);
+        }
+    }
+    for (let s = 0; s < stale.length; s++) {
+        dltFisList.removeColumn(stale[s]);
+    }
+};
+
+/**
+ * @method
+ * @name buildGridStyleXml
+ * @description colDef 목록으로 setGridStyle 용 gridView 전체 XML 문자열을 생성한다.
+ *  group 이 있으면 2단 헤더 — 상단 행: group 없는 컬럼 rowSpan="2" + 연속 동일 group colSpan 병합, 하단 행: group 컬럼의 지표 헤더.
+ * @param {Array} cols colDef[] — { id, header, width, align[, group] }
+ * @returns {String} <w2:gridView> XML 문자열
+ * @hidden N
+ */
+scwin.buildGridStyleXml = function (cols) {
+    const esc = scwin.escapeXml;
+    const headCell = function (id, value, width, extra) {
+        return '<w2:column id="' + esc(id) + '" value="' + esc(value) + '" width="' + width
+            + '" displayMode="label" inputType="text" textAlign="center"' + (extra || "") + '></w2:column>';
+    };
+    const hasGroup = cols.some(function (c) { return !!c.group; });
+    const head = [];
+    head.push("<w2:row>");
+    let g = 0;
+    let i = 0;
+    while (i < cols.length) {
+        const col = cols[i];
+        if (!col.group) {
+            head.push(headCell("hd_" + col.id, col.header, col.width, hasGroup ? ' rowSpan="2"' : ""));
+            i++;
+        } else {
+            let span = 1;
+            while (i + span < cols.length && cols[i + span].group === col.group) {
+                span++;
+            }
+            g++;
+            head.push(headCell("hdg_" + g, col.group, col.width, ' colSpan="' + span + '"'));
+            i += span;
+        }
+    }
+    head.push("</w2:row>");
+    if (hasGroup) {
+        head.push("<w2:row>");
+        for (let j = 0; j < cols.length; j++) {
+            if (cols[j].group) {
+                head.push(headCell("hd_" + cols[j].id, cols[j].header, cols[j].width, ""));
+            }
+        }
+        head.push("</w2:row>");
+    }
+    const bodyCells = [];
+    for (let k = 0; k < cols.length; k++) {
+        bodyCells.push('<w2:column id="' + esc(cols[k].id) + '" width="' + cols[k].width
+            + '" textAlign="' + (cols[k].align || "left") + '" displayMode="label" inputType="text"></w2:column>');
+    }
+    return '<w2:gridView xmlns:w2="http://www.inswave.com/websquare" id="grdFis" class="gvw"'
+        + ' dataList="data:dltFisList" autoFit="allColumn" focusMode="row" readOnly="true" style="height: 420px;">'
+        + '<w2:caption id="captionFis" value="연도별 재무지표 동적 그리드"></w2:caption>'
+        + '<w2:header id="headerFis">' + head.join("") + "</w2:header>"
+        + '<w2:gBody id="gBodyFis"><w2:row>' + bodyCells.join("") + "</w2:row></w2:gBody>"
+        + "</w2:gridView>";
+};
+
+/**
+ * @method
+ * @name escapeXml
+ * @description XML 속성값용 특수문자 이스케이프(& < > ").
+ * @param {String} s 원본 문자열
+ * @returns {String} 이스케이프된 문자열
+ * @hidden N
+ */
+scwin.escapeXml = function (s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 };
 
 /**
@@ -162,7 +265,7 @@ scwin.extractMeta = function (rec) {
 /**
  * @method
  * @name buildColumnDefs
- * @description 메타로부터 setColumns 용 컬럼 정의(colDef) 배열을 생성한다. 연도는 group 으로 2단 병합.
+ * @description 메타로부터 컬럼 정의(colDef) 배열을 생성한다. 연도는 group 으로 2단 병합(buildGridStyleXml 이 헤더 행으로 전개).
  * @param {Object} meta extractMeta/JSON 메타
  * @returns {Array} colDef[] — { id, header, width, align[, group] }
  * @hidden N
