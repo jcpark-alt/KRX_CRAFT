@@ -293,6 +293,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 - `4fe8607` (09-01) — [연관] **pcc frame.xml·utils.xml·stf_old.xml 최종 삭제**(`src/pcc`, gcc 무변경): `$c.frame`/`$c.utils` 사용 중단 방침 — 호출부 gcc 전환 완료 후 정의 파일 삭제(잔존 $c.utils 2건은 `getServerDateTime`/`addDate` 치환), $c.frame 미정의 호출 10건(MDI/WinOpen/PDF 창)은 재설계 대기. pcc/stf 7파일 체제
 - `6c95493` (09-01) — [연관] **$c.frame 미정의 호출 10건 정리**(`src/pcc`, gcc 무변경): common MdiHelp·FileDown1/2 삭제·`InfoMenuID`→`$c.win.getProgramId()` 위임, stf 뷰어/목록 4함수 톱 WinOpen→`$c.win.openPopup(browserPopup)` 전환(+`frame.FrameID`→`$p.getFrameId()`), print PDF 창 `window.open` 직접 호출 — pcc 에서 $c.frame/$c.utils 실행 참조 0건 달성
 - `ce3c500` (09-01) — [연관] **common.xml($c.cm) 함수 주석·gcc 치환 정리**(`src/pcc`, gcc 무변경): 박스 주석 22건→@description 이관, 미사용 매핑확정 15개 정의 삭제(85→70 함수)·`fn_Trim` 호출 11건(내부 7·ui-tobe 4) `$c.str.trim` 치환 — 1:1 불가 4종(fn_CheckEmail alert 내장·fn_IsNumber_val 정수 전용·fn_DelChar/3 업무 로직) 유지·검토
+- `d59962e`·`6b32da3` (09-04) — [연관] **code-convention 초기화·명명·변수 규약 추가 + jsp-front 2화면 변환**(`src/docs`·`src/conversion`, gcc 무변경): 규약 신설(IIFE·onpageload 오버라이딩 금지·init_* 순차·onpageload 2구역 최상단·미사용 scwin 전역 삭제·5구역 camelCase), jsp-front `jldfil25900`·`jldfil25910` 을 규약 준수 변환(IIFE→명명함수·오류처리 통일·엄격비교·미참조 캐싱 전역 44+96 삭제·JSDoc 11+39)+화면별 수정 가이드 md 동봉
 - `7bf7c83` (09-04) — [연관] **필터 재설계 TODO 5건 처리**(`src/conversion`, gcc 무변경): ULDMGT10200 발송결과 필터·42045 퀵메뉴 검색 필터를 `setColumnFilter` 재설계+호출 배선(allCnt→getRowCount·사어 onfilter 토큰 제거), 40008 주석 블록 내 죽은 필터 3건 TODO 제거 — 워크리스트 42→37건
 - `51dabaa` (09-03) — [연관] **조회 파라미터/세션 API TODO 6건 처리**(`src/conversion`, gcc 무변경): 원본 ui/ 소스로 파라미터명 확정 후 실배선 — ULDCOM00008 ×3 `DISCLS_SUBMITPRN_TP_CD`, tms ULDCOM00007 `LIST_STAT_CD`·`SPOT_ISU_TRD_MKT_TP_CD`(4건)·세션 TODO 강등($c.session.getUserInfo 확정)·stale 제거(ULDINF20000) — 워크리스트 48→42건
 - `b1f9ee3` (09-03) — [연관] **그리드 포커스 전환 TODO 8건 처리**(`src/conversion`, gcc 무변경): 대상 그리드(Grd_com_isur) 마크업 소실 확정 6건 결론 주석 정리(팝업 대체 완료)·사어 usrName 삭제 2건 — 워크리스트 56→48건. 후속 후보: 미정의 Grd_com_isur 참조 14곳·$c.stockSearch 오기
@@ -326,6 +327,8 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-09-04 | `6b32da3` | feat(conversion): jsp-front jldfil25900·25910 code-convention 변환 + 가이드 — [연관, gcc 무변경] |
+| 2026-09-04 | `d59962e` | docs(convention): 초기화·명명·변수 규약 추가 — [연관, gcc 무변경] |
 | 2026-09-04 | `7bf7c83` | refactor(conversion): 필터 재설계 TODO 5건 처리 — 워크리스트 42→37건 — [연관, gcc 무변경] |
 | 2026-09-03 | `51dabaa` | refactor(conversion): 조회 파라미터/세션 API TODO 6건 처리 — 워크리스트 48→42건 — [연관, gcc 무변경] |
 | 2026-09-03 | `b1f9ee3` | refactor(conversion): 그리드 포커스 전환 TODO 8건 처리 — 워크리스트 56→48건 — [연관, gcc 무변경] |
