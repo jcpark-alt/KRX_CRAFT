@@ -33,6 +33,12 @@
 
 - **일반/업무 함수는 camelCase** — `scwin.searchList`, `scwin.calcFee`. `fn_` 접두는 **사용하지 않는다**
   (변환 규칙 13이 레거시 `scwin.fn_*`를 camelCase 로 정규화하며, gcc 라이브러리·기존 변환 302파일과 일관).
+- **5구역(일반/업무 함수 영역)으로 분리되는 함수는 `scwin.${camelCase}` 로 명명**한다. 이벤트·서브미션 콜백이 아닌
+  비즈니스 로직·데이터 가공·검증 함수가 대상이며, 레거시 명명(`fn_dupleChek`·`tx_fn_getList`·`fnCom_isur` 등
+  `fn_`/`tx_`/스네이크·언더바 혼용)은 접두·구분자를 제거하고 camelCase 로 변환한다
+  (예: `fn_dupleChek` → `dupleCheck`, `tx_fn_getList` → `getList`, `set_bns_combo` → `setBnsCombo`).
+  정의부와 **모든 호출부(스크립트·body `ev:on*`·`publicInfo`)를 함께 개명**한다(규칙 13). 같은 파일 정의 함수만 대상이며,
+  외부 계약 함수·이름 충돌은 보류·리포트한다.
 - 이벤트: `scwin.{컴포넌트ID}_{이벤트명 소문자}` (규칙 3).
 - 서브미션 콜백: `scwin.sbm_{업무명}_submitdone` / `_submiterror`, 팝업 콜백: `scwin.popupCallback` 계열.
 
@@ -41,6 +47,14 @@
 - **`var` 를 사용하지 않는다** — `const` 기본, 재할당이 필요할 때만 `let`. (2026-08-27 확정)
   변환 도구가 자동 적용하며(규칙 8 — 재할당 분석), 기존 코드를 수정할 때는 그 함수의 잔존 `var` 도 함께 정리한다
   (무관한 함수의 일괄 변환은 하지 않는다).
+- **사용하지 않는 `scwin` 전역 변수는 삭제한다** — 선언(`scwin.X = …;`)만 있고 파일 내·외에서 읽거나 쓰지 않는
+  전역 상태값은 코드를 제거한다. (2026-09-04 확정)
+  - **판별**: 선언 외에 활성 코드(주석·문자열 제외)에서 참조(`scwin.X`/바디 `ref="…X"`/`ev:on*`)가 0건이면 미사용.
+    W-Craft 변환 잔재(`scwin.result`·`scwin.modifiyDate` 등 스켈레톤이 남긴 선언)가 대표 대상이다.
+  - **유지 예외**: 외부 파일이 이름으로 참조하는 계약(`scwin.fn_GetPar` 류), 값이 채워져 다른 함수가 소비하는 상태값,
+    `<w2:publicInfo method=>` 등재 항목은 미참조로 보여도 유지한다.
+  - 컴포넌트 캐싱 전역(`scwin.grd_x = $c.util.getComponent(...)`)은 해당 컴포넌트가 body 에 존재하면 유지,
+    body 에서 사라진 컴포넌트를 가리키면 함께 삭제한다.
 - **비교는 엄격 연산자** `===`/`!==` 를 사용한다(규칙 5a). `!X === Y` 는 `!X`(boolean)가 먼저 평가되는
   우선순위 버그이므로 `X !== Y` 로 쓴다(규칙 5e — 실사례 교정).
 - **원시 브라우저 API 대신 공통함수를 사용한다**:
@@ -60,6 +74,39 @@
 - **함수 JSDoc 표준**: 모든 함수에 `@method`/`@name`/`@description`/`@param {타입} 이름 설명`/`@returns`/`@hidden N`(`@example` 권장)
   블록을 작성한다. `@description desc`·빈 `@description` 같은 **placeholder 금지**, 인자 없는 함수의 빈 `@param` 라인은 쓰지 않는다.
   레거시 박스형(`/**** 함수명 ****/`)·`argument :` 주석은 내용을 `@description`/`@param` 으로 이관하고 삭제한다(단계 2 판단 작업).
+
+## 초기화 — IIFE·onpageload 오버라이딩 금지, `init_*` 순차 호출
+
+로딩 시점 로직은 **즉시실행함수(IIFE)로 자동 실행하거나 `scwin.onpageload` 를 래핑(오버라이딩)하지 않는다.**
+각 초기화 단위를 명명 함수(`scwin.init_*`)로 분리하고, **`scwin.onpageload` 단일 정의 안에서 데이터 의존성 순서대로 호출**한다. (2026-09-04 확정)
+
+```javascript
+// (X) 금지 — IIFE 자동 실행 + onpageload 오버라이딩 래핑
+(function () { /* 로딩 시 자동 실행 */ })();
+(function () {
+    var __prev = scwin.onpageload;                 // 기존 onpageload 래핑
+    scwin.onpageload = function () { scwin.init_conds(); if (__prev) __prev(); };
+})();
+
+// (O) 권장 — onpageload 를 2구역 최상단에 정의, init_* 는 그 아래
+scwin.onpageload = function () {
+    try {
+        scwin.init_recvParam();   // 1) 파라미터 수신
+        scwin.init_conds();       // 2) 수신값 기반 조건 평가
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "화면ID.onpageload" });
+    }
+};
+
+scwin.init_recvParam = function () { $c.data.recvParamData("dma_pageContext"); };
+scwin.init_conds     = function () { $c.util.evalConds(binds); };
+```
+
+- **`scwin.onpageload` 는 `///////// 2. 초기화 영역 /////////` 단락의 최상단에 정의**한다. 진입점을 즉시 식별할 수 있도록 `init_*`·`onpageunload` 등 다른 초기화 함수보다 앞에 둔다(함수 대입은 로딩 시 모두 완료되므로, `onpageload` 가 뒤에 정의된 `init_*` 를 호출해도 실행 시점엔 이미 정의돼 있어 문제없다).
+- **IIFE 금지**: `(function(){…})()` / `(async function(){…})()` 로 로딩 시점에 자동 실행하지 않는다. 정의만 하고 `onpageload` 에서 호출한다.
+- **오버라이딩 금지**: `var __prev = scwin.onpageload;` 형태의 래핑을 만들지 않는다. `scwin.onpageload` 는 파일당 1회만 정의한다.
+- **순차 호출 순서는 데이터 의존성**을 따른다(파라미터 수신 → 파생값 충전 → 화면 렌더/조건 평가). 렌더가 데이터를 기다리려 `setTimeout` 다중 예약에 의존하지 말고 **선행 함수 완료 후 호출**로 순서를 보장한다. 비동기 초기화면 `onpageload`/`init_*` 를 `async`/`await` 로 전환해 순차 배치한다.
+- 진입점이므로 `onpageload` 를 단일 try/catch + `$c.exception.handleError` 로 감싼다(오류 처리 절·규칙 26 정합). 정답지: `src/conversion/jsp-front/jldfil25900.xml`.
 
 ## 서브미션 — async/await 순차 실행 우선
 
