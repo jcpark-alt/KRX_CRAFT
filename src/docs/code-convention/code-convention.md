@@ -112,7 +112,10 @@ scwin.init_conds     = function () { $c.util.evalConds(binds); };
 ```
 
 - **`scwin.onpageload` 는 `///////// 2. 초기화 영역 /////////` 단락의 최상단에 정의**한다. 진입점을 즉시 식별할 수 있도록 `init_*`·`onpageunload` 등 다른 초기화 함수보다 앞에 둔다(함수 대입은 로딩 시 모두 완료되므로, `onpageload` 가 뒤에 정의된 `init_*` 를 호출해도 실행 시점엔 이미 정의돼 있어 문제없다).
-- **IIFE 금지**: `(function(){…})()` / `(async function(){…})()` 로 로딩 시점에 자동 실행하지 않는다. 정의만 하고 `onpageload` 에서 호출한다.
+- **IIFE 금지(화면 페이지 전면)**: 화면 개발 페이지에서는 즉시실행함수 `(function(){…})()` / `(async function(){…})()` / `(()=>{…})()` 를 **일절 사용하지 않는다** — 로딩 시점 자동 실행뿐 아니라 **값 계산·값 쓰기용 인라인 IIFE** 도 금지. (2026-09-04 확정)
+  - 반복되는 값 추출/쓰기 로직은 명명 헬퍼 함수(`scwin.getDmaValue`·`scwin.setComponentText` 등)로 분리해 호출한다.
+  - **예외**: 공통 라이브러리(`src/gcc/*`·`src/pcc/*`)는 네임스페이스 캡슐화를 위한 모듈 패턴 IIFE 를 허용한다(화면 페이지가 아닌 라이브러리 한정).
+- 초기화 IIFE 는 정의만 하고 `onpageload` 에서 호출한다(위 초기화 절 참조).
 - **오버라이딩 금지**: `var __prev = scwin.onpageload;` 형태의 래핑을 만들지 않는다. `scwin.onpageload` 는 파일당 1회만 정의한다.
 - **순차 호출 순서는 데이터 의존성**을 따른다(파라미터 수신 → 파생값 충전 → 화면 렌더/조건 평가). 렌더가 데이터를 기다리려 `setTimeout` 다중 예약에 의존하지 말고 **선행 함수 완료 후 호출**로 순서를 보장한다. 비동기 초기화면 `onpageload`/`init_*` 를 `async`/`await` 로 전환해 순차 배치한다.
 - 진입점이므로 `onpageload` 를 단일 try/catch + `$c.exception.handleError` 로 감싼다(오류 처리 절·규칙 26 정합). 정답지: `src/conversion/jsp-front/jldfil25900.xml`.

@@ -88,14 +88,22 @@ scwin.init_radio     = function () { scwin.basDRadio(); /* divBasDdYn change 바
 - 함수는 `$c.util.getComponent(...)` 직접 조회 방식이라 무영향. **실사용 캐싱만 유지**: `ex`(onMover/onMout 의 `scwin.ex.setStyle`)·`filebox`(fn_fileDel 의 `scwin.filebox.setStyle`).
 - 상태값(`result`·`modifiyDate`·`delck`·`screenId`)·특수 초기화(`upd_attachFile` = `__krxFileControl`)는 유지.
 
-### 4.5 주석 (전 구역)
+### 4.5 인라인 IIFE 전면 제거 → 명명 헬퍼 전환 (8건, 2026-09-04)
+- code-convention **「IIFE 금지(화면 페이지 전면)」** 규칙 확정에 따라, 화면 페이지에서는 값 계산·값 쓰기용 인라인 IIFE 도 사용하지 않는다. 반복 로직을 5구역 명명 헬퍼로 분리해 호출한다.
+- 제거 대상 8건:
+  - **값 추출 6건**: `btn_FileDown_onclick`·`btn_FileDown_2_onclick`(각 `bzProcsNo`·`attachFileNm` 2건)·`basDRadio` 관련(`divBasDdYn` 2건) 의 `(function(){ … dma_dividendDate.get/getCellData … })()` → `scwin.getDmaValue("dma_dividendDate", "키")`.
+  - **값 쓰기 1건**: `fn_setLength` 의 `(function(__c,__v){ setValue/setText })(…)` → `scwin.setComponentText(comp, val, tdName)`.
+  - **파일 컨트롤 폴백 1건**: `scwin.upd_attachFile` 초기화의 `(function(){ getFrame().render … })().querySelector(…)` → `scwin.resolveFileControlRoot().querySelector(…)`.
+- 신규 헬퍼 3종을 5구역 말미에 정의: `scwin.getDmaValue(dmaId, key)`·`scwin.setComponentText(comp, val, label)`·`scwin.resolveFileControlRoot()`.
+- 결과: 화면 값계산/자동실행 IIFE **잔존 0**(이벤트 콜백 `.change(function(){…})` 는 IIFE 아님·유지).
+
+### 4.6 주석 (전 구역)
 - 함수 39개에 표준 JSDoc(`@method`/`@name`/`@description`/`@param`/`@returns`/`@hidden`) 부여, placeholder 0.
 
 ---
 
 ## 5. 유지(변환 제외) 항목
 
-- **인라인 IIFE 4건**: `btn_FileDown_onclick`·`btn_FileDown_2_onclick` 의 `dma_dividendDate` 값 추출용 `(function(){…})()` 은 **로딩 시점 자동 실행이 아니라 호출 시점 값 계산**이므로 초기화 IIFE 금지 규약 대상이 아니다(유지).
 - **`== null`/`!= null`**: null·undefined 동시 판별 관용구라 엄격화하지 않는다.
 - **jQuery DOM 조작**(`$("input[name=…]").val(…)`·form action 설정): 규칙 19(원시 jQuery→컴포넌트) 재설계 대상으로, code-convention 직접 규약 밖이라 이번 범위에서 제외. body 에 `dma_*Req` 바인딩 hidden input 이 있어 후속 전환 가능.
 - **`fn_*`/`tx_fn_*` 명명**: 호출자 정합용 as-is 별칭(`fn_modifiyDate`·`tx_fn_*`)이라 개명 보류. 신규 5구역 함수는 camelCase.
@@ -104,7 +112,7 @@ scwin.init_radio     = function () { scwin.basDRadio(); /* divBasDdYn change 바
 
 ## 6. 검토 체크리스트
 
-- [x] 자동 실행 IIFE(`)()`) 0건 (인라인 값 추출 IIFE 제외)
+- [x] 화면 IIFE(값 계산·값 쓰기·자동 실행 모두) 0건 — 헬퍼 3종(`getDmaValue`·`setComponentText`·`resolveFileControlRoot`) 전환
 - [x] `__prev` / `var __prev = scwin.onpageload` 0건
 - [x] `setTimeout(` 예약 호출 0건
 - [x] `scwin.onpageload` 정의 1건, **2구역 최상단 배치**, `body ev:onpageload` 바인딩 유지
