@@ -30,16 +30,20 @@
 | dataList `insertColumn(id, opts)` / `removeColumn(id)` | dataList 컬럼 추가(기존 id skip·멱등)/제거 | (데이터 축) |
 
 ### 구현 흐름 (colDef 는 내부 모델로 유지)
+> **2026-09-07**: `syncDataListColumns`·`buildGridStyleXml` 을 **gcc 공통함수 `$c.util.*` 로 승격**(범용화 — dataList/그리드 옵션 인자화, `__escapeXmlAttr` 내부 헬퍼). 화면은 호출만 남김. Jest `test/dynamicGridColumns.test.js` 회귀 테스트·API 문서 등재.
+
 colDef `{ id, header, width, align[, group] }` 배열을 내부 모델로 만들고(`buildColumnDefs`), 이를 두 갈래로 전개한다:
-1. **`syncDataListColumns(cols)`** — dltFisList 에 `insertColumn`(신규)·`removeColumn`(잔존) 으로 컬럼 동기화. setColumns 가 내부에서 하던 dataList 연동을 직접 수행.
-2. **`buildGridStyleXml(cols)`** — `<w2:gridView>` 전체 XML 문자열 생성 후 `grdFis.setGridStyle(xml)`:
+1. **`$c.util.syncDataListColumns(dataList, cols)`** — dataList 에 `insertColumn`(신규·기존 id 는 엔진 skip 멱등)·`removeColumn`(잔존) 으로 컬럼 동기화, `{inserted, removed}` 반환. setColumns 가 내부에서 하던 dataList 연동을 직접 수행.
+2. **`$c.util.buildGridStyleXml(gridOptions, cols)`** — `{ id, dataList(필수), caption, className, autoFit, focusMode, readOnly, style }` 옵션으로 `<w2:gridView>` 전체 XML 문자열 생성 후 `setGridStyle(xml)`:
    - 상단 헤더 행: `group` 없는 고정 컬럼 `rowSpan="2"` + 연속 동일 `group` 을 `colSpan=지표수` 로 병합("YYYY년").
    - 하단 헤더 행: `group` 컬럼의 지표 헤더 셀.
    - `group` 이 하나도 없으면(빈 메타) 단일 헤더 행.
    - gBody 행: 컬럼 id·`textAlign`(colDef `align`) 바인딩. 라벨은 `escapeXml` 로 이스케이프.
 ```js
-scwin.syncDataListColumns(cols);
-$c.util.getComponent("grdFis").setGridStyle(scwin.buildGridStyleXml(cols));
+$c.util.syncDataListColumns(dltFisList, cols);
+$c.util.getComponent("grdFis").setGridStyle($c.util.buildGridStyleXml({
+    id: "grdFis", dataList: "dltFisList", caption: "연도별 재무지표 동적 그리드", style: "height: 420px;"
+}, cols));
 dltFisList.setJSON(rows);
 ```
 → **연도 그룹 슬롯도, 연도당 지표 슬롯도 사전 정의 없이 데이터에서 도출한 목록 그대로 생성**된다(슬롯/hidden 토글 불필요).
@@ -56,7 +60,7 @@ dltFisList.setJSON(rows);
 1. **2구역** `onpageload`(async) → `await loadFisData()` — 진입점 try/catch + `await $c.exception.handleError`, 내부 함수는 예외 전파.
 2. **4구역(서브미션 콜백)** `loadFisData`(async): `const rtn = await $c.sbm.executeDynamic({ id, action, isProcessMsg })` 로 서버 동적 조회. **`submitDoneHandler` 를 넘기지 않아야** sbm 이 `_promise_submitDoneHandler → resolve(rtn)`(성공)·`reject`(실패)로 Promise 를 settle 하므로 `await` 로 응답을 수신(에러는 진입점으로 전파). 이후 `buildDynamicGrid(rtn.responseJSON)`.
 3. `buildDynamicGrid`: 메타는 응답 `json.meta`(years/metrics) 우선, 없으면 `extractMeta(body[0])` 폴백, 빈 body 면 빈 메타.
-   - `buildColumnDefs(meta)` → `syncDataListColumns(cols)`(dataList 동기화) → `$c.util.getComponent("grdFis").setGridStyle(buildGridStyleXml(cols))`(2단 헤더 재생성) → `dltFisList.setJSON(buildRows(body, meta))`.
+   - `buildColumnDefs(meta)` → `$c.util.syncDataListColumns(dltFisList, cols)`(dataList 동기화) → `$c.util.getComponent("grdFis").setGridStyle($c.util.buildGridStyleXml(옵션, cols))`(2단 헤더 재생성) → `dltFisList.setJSON(buildRows(body, meta))`.
 4. `extractMeta(rec)`(폴백): 키를 `/^(20\d\d)_(.+)$/` 로 분해 → `{fixed, years, metrics}`(연도 오름차순). 괄호 지표명(`(당좌자산대손충당금(계))`)도 정상.
 5. `buildColumnDefs(meta)`: 고정 4(`isurCd`/`comNm`/`lstDt`/`spacYn`, header 는 `meta.fixed` 라벨) + **연도(`group="YYYY년"`) × 지표(`header=지표명`)** colDef 배열 생성 — 연도·지표 개수 모두 데이터 기반.
 6. `buildRows(body, meta)`: 각 레코드를 컬럼 id(고정 + `y{연}m{지표}`) 스키마로 매핑.

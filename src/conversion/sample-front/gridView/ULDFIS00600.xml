@@ -132,107 +132,15 @@ scwin.buildDynamicGrid = function (json) {
     }
     scwin.fisMeta = meta;
     const cols = scwin.buildColumnDefs(meta);
-    // dataList 컬럼 동기화(신규 insert·잔존 remove) 후 그리드 전체 재생성 — 연도 그룹 × 지표 동적.
-    scwin.syncDataListColumns(cols);
-    $c.util.getComponent("grdFis").setGridStyle(scwin.buildGridStyleXml(cols));
+    // dataList 컬럼 동기화(신규 insert·잔존 remove) 후 그리드 전체 재생성 — 연도 그룹 × 지표 동적($c.util 공통함수).
+    $c.util.syncDataListColumns(dltFisList, cols);
+    $c.util.getComponent("grdFis").setGridStyle($c.util.buildGridStyleXml({
+        id: "grdFis",
+        dataList: "dltFisList",
+        caption: "연도별 재무지표 동적 그리드",
+        style: "height: 420px;"
+    }, cols));
     dltFisList.setJSON(body.length ? scwin.buildRows(body, meta) : []);
-};
-
-/**
- * @method
- * @name syncDataListColumns
- * @description colDef 목록에 맞춰 dltFisList 컬럼을 동기화한다 — 신규 컬럼 insertColumn(기존 id 는 엔진이 skip·멱등),
- *  목록에 없는 잔존 컬럼 removeColumn(연도/지표 축소 재조회 대응).
- * @param {Array} cols colDef[] — { id, header, width, align[, group] }
- * @returns {void}
- * @hidden N
- */
-scwin.syncDataListColumns = function (cols) {
-    const keep = {};
-    for (let i = 0; i < cols.length; i++) {
-        keep[cols[i].id] = true;
-        dltFisList.insertColumn(cols[i].id, { name: cols[i].header });
-    }
-    const stale = [];
-    for (let c = dltFisList.getTotalCol() - 1; c >= 0; c--) {
-        const colId = dltFisList.getColumnID(c);
-        if (!keep[colId]) {
-            stale.push(colId);
-        }
-    }
-    for (let s = 0; s < stale.length; s++) {
-        dltFisList.removeColumn(stale[s]);
-    }
-};
-
-/**
- * @method
- * @name buildGridStyleXml
- * @description colDef 목록으로 setGridStyle 용 gridView 전체 XML 문자열을 생성한다.
- *  group 이 있으면 2단 헤더 — 상단 행: group 없는 컬럼 rowSpan="2" + 연속 동일 group colSpan 병합, 하단 행: group 컬럼의 지표 헤더.
- * @param {Array} cols colDef[] — { id, header, width, align[, group] }
- * @returns {String} <w2:gridView> XML 문자열
- * @hidden N
- */
-scwin.buildGridStyleXml = function (cols) {
-    const esc = scwin.escapeXml;
-    const headCell = function (id, value, width, extra) {
-        return '<w2:column id="' + esc(id) + '" value="' + esc(value) + '" width="' + width
-            + '" displayMode="label" inputType="text" textAlign="center"' + (extra || "") + '></w2:column>';
-    };
-    const hasGroup = cols.some(function (c) { return !!c.group; });
-    const head = [];
-    head.push("<w2:row>");
-    let g = 0;
-    let i = 0;
-    while (i < cols.length) {
-        const col = cols[i];
-        if (!col.group) {
-            head.push(headCell("hd_" + col.id, col.header, col.width, hasGroup ? ' rowSpan="2"' : ""));
-            i++;
-        } else {
-            let span = 1;
-            while (i + span < cols.length && cols[i + span].group === col.group) {
-                span++;
-            }
-            g++;
-            head.push(headCell("hdg_" + g, col.group, col.width, ' colSpan="' + span + '"'));
-            i += span;
-        }
-    }
-    head.push("</w2:row>");
-    if (hasGroup) {
-        head.push("<w2:row>");
-        for (let j = 0; j < cols.length; j++) {
-            if (cols[j].group) {
-                head.push(headCell("hd_" + cols[j].id, cols[j].header, cols[j].width, ""));
-            }
-        }
-        head.push("</w2:row>");
-    }
-    const bodyCells = [];
-    for (let k = 0; k < cols.length; k++) {
-        bodyCells.push('<w2:column id="' + esc(cols[k].id) + '" width="' + cols[k].width
-            + '" textAlign="' + (cols[k].align || "left") + '" displayMode="label" inputType="text"></w2:column>');
-    }
-    return '<w2:gridView xmlns:w2="http://www.inswave.com/websquare" id="grdFis" class="gvw"'
-        + ' dataList="data:dltFisList" autoFit="allColumn" focusMode="row" readOnly="true" style="height: 420px;">'
-        + '<w2:caption id="captionFis" value="연도별 재무지표 동적 그리드"></w2:caption>'
-        + '<w2:header id="headerFis">' + head.join("") + "</w2:header>"
-        + '<w2:gBody id="gBodyFis"><w2:row>' + bodyCells.join("") + "</w2:row></w2:gBody>"
-        + "</w2:gridView>";
-};
-
-/**
- * @method
- * @name escapeXml
- * @description XML 속성값용 특수문자 이스케이프(& < > ").
- * @param {String} s 원본 문자열
- * @returns {String} 이스케이프된 문자열
- * @hidden N
- */
-scwin.escapeXml = function (s) {
-    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 };
 
 /**

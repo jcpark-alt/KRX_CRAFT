@@ -11,7 +11,7 @@
 			<w2:workflowCollection/>
 		</xf:model>
 		<w2:layoutInfo/>
-		<w2:publicInfo method="scwin.getUserAgent,scwin.getParameter,scwin.getObject,scwin.getFunction,scwin.getCallBackFunction,scwin.getJSON,scwin.isJSON,scwin.isArray,scwin.isEmpty,scwin.isEmptyPlainObject,scwin.getObjectType,scwin.isPlainObject,scwin.isMobile,scwin.isXmlDoc,scwin.setGridVisibleRowNum,scwin.setButtonState,scwin.registerButtonState,scwin.setGridViewDelCheckBox,scwin.setGridViewRowCheckBox,scwin.deleteGridViewRow,scwin.setTextLengthCounter,scwin.getChildren,scwin.getGridViewDataList,scwin.getComponent,scwin.createComponent,scwin.setInterval,scwin.clearInterval,scwin.setTimeout,scwin.clearTimeout,scwin.copyClipboard,scwin.confirmThen,scwin.isNotEmpty,scwin.isEmptyArray,scwin.duplcRemove,scwin.assignDefined,scwin.encodeBase64,scwin.decodeBase64,scwin.encodeBase64Utf8,scwin.decodeBase64Utf8,scwin.getKeyCode,scwin.isMobileApp,scwin.setClipboard,scwin.getClipboard,scwin.checkDuplicateJsonKey,scwin.setCookie,scwin.getCookie,scwin.removeCookie,scwin.setLocalStorage,scwin.getLocalStorage,scwin.removeLocalStorage,scwin.clearLocalStorage,scwin.setSessionStorage,scwin.getSessionStorage,scwin.removeSessionStorage,scwin.clearSessionStorage,scwin.getUploadFileSize,scwin.checkFileTotalSize,scwin.getUploadFiles,scwin.onUploadClick,scwin.checkFileExtension"/>
+		<w2:publicInfo method="scwin.getUserAgent,scwin.getParameter,scwin.getObject,scwin.getFunction,scwin.getCallBackFunction,scwin.getJSON,scwin.isJSON,scwin.isArray,scwin.isEmpty,scwin.isEmptyPlainObject,scwin.getObjectType,scwin.isPlainObject,scwin.isMobile,scwin.isXmlDoc,scwin.setGridVisibleRowNum,scwin.setButtonState,scwin.registerButtonState,scwin.setGridViewDelCheckBox,scwin.setGridViewRowCheckBox,scwin.deleteGridViewRow,scwin.setTextLengthCounter,scwin.getChildren,scwin.getGridViewDataList,scwin.getComponent,scwin.createComponent,scwin.syncDataListColumns,scwin.buildGridStyleXml,scwin.setInterval,scwin.clearInterval,scwin.setTimeout,scwin.clearTimeout,scwin.copyClipboard,scwin.confirmThen,scwin.isNotEmpty,scwin.isEmptyArray,scwin.duplcRemove,scwin.assignDefined,scwin.encodeBase64,scwin.decodeBase64,scwin.encodeBase64Utf8,scwin.decodeBase64Utf8,scwin.getKeyCode,scwin.isMobileApp,scwin.setClipboard,scwin.getClipboard,scwin.checkDuplicateJsonKey,scwin.setCookie,scwin.getCookie,scwin.removeCookie,scwin.setLocalStorage,scwin.getLocalStorage,scwin.removeLocalStorage,scwin.clearLocalStorage,scwin.setSessionStorage,scwin.getSessionStorage,scwin.removeSessionStorage,scwin.clearSessionStorage,scwin.getUploadFileSize,scwin.checkFileTotalSize,scwin.getUploadFiles,scwin.onUploadClick,scwin.checkFileExtension"/>
 		<script lazy="false" type="text/javascript"><![CDATA[// =============================================================================
 /**
  * 웹스퀘어 컴포넌트 제어, 엑셀 파일 업로드/다운로드, 파일 업로드/다운로드, 기타 유틸리티 함수를 작성한다.
@@ -999,7 +999,168 @@ scwin.getGridViewDataList = function (gridViewObj) {
 };
 
 /**
- * @method 
+ * @method
+ * @name syncDataListColumns
+ * @description colDef 목록에 맞춰 DataList 컬럼을 동기화한다. 목록의 신규 컬럼은 insertColumn 으로 추가하고
+ *  (기존 id 는 엔진이 skip 하므로 멱등), 목록에 없는 잔존 컬럼은 removeColumn 으로 제거한다.
+ *  buildGridStyleXml 로 그리드를 동적 재구성하기 전에 데이터 축을 맞추는 용도이다.
+ * @param {Object|String} dataList DataList 객체 또는 아이디
+ * @param {Array} cols colDef 배열 — { id[, header, width, align, group] } (header 는 컬럼 name 으로 사용)
+ * @returns {Object} { inserted: 추가 수, removed: 제거 수 } (인자 오류 시 null)
+ * @hidden N
+ * @exception
+ * @example
+const cols = [ { id: "comNm", header: "회사명" }, { id: "y1m1", header: "자산총계", group: "2009년" } ];
+const result = $c.util.syncDataListColumns(dlt_list, cols); // { inserted: 2, removed: 0 }
+ */
+scwin.syncDataListColumns = function (dataList, cols) {
+    const dlt = (typeof dataList === "string") ? $p.getComponentById(dataList) : dataList;
+    if ((dlt === null) || (typeof dlt === "undefined") || (typeof dlt.insertColumn !== "function")) {
+        console.warn("[$c.util.syncDataListColumns] DataList 를 찾을 수 없습니다. : " + dataList);
+        return null;
+    }
+    if (!scwin.isArray(cols) || (cols.length === 0)) {
+        console.warn("[$c.util.syncDataListColumns] cols 는 비어 있지 않은 colDef 배열이어야 합니다.");
+        return null;
+    }
+
+    const keep = {};
+    const before = dlt.getTotalCol();
+    for (let i = 0; i < cols.length; i++) {
+        const colId = cols[i].id || cols[i].dataColumn;
+        if (!colId) {
+            continue;
+        }
+        keep[colId] = true;
+        dlt.insertColumn(colId, { name: (typeof cols[i].header === "string") ? cols[i].header : colId });
+    }
+    const inserted = dlt.getTotalCol() - before;
+
+    const stale = [];
+    for (let c = dlt.getTotalCol() - 1; c >= 0; c--) {
+        const colId = dlt.getColumnID(c);
+        if (!keep[colId]) {
+            stale.push(colId);
+        }
+    }
+    for (let s = 0; s < stale.length; s++) {
+        dlt.removeColumn(stale[s]);
+    }
+
+    return { inserted: inserted, removed: stale.length };
+};
+
+/**
+ * @method
+ * @name buildGridStyleXml
+ * @description colDef 목록으로 gridView.setGridStyle 용 전체 XML 문자열을 생성한다.
+ *  colDef 에 group 이 있으면 2단 헤더로 전개한다 — 상단 행: group 없는 컬럼 rowSpan="2" + 연속 동일 group 을
+ *  colSpan 병합, 하단 행: group 컬럼의 개별 헤더. group 이 없으면 단일 헤더 행.
+ *  엔진 setColumns 는 헤더를 단일 행으로 강제(group 미지원)하므로 멀티로우 헤더는 이 함수 + setGridStyle 로 구성한다.
+ *  setGridStyle 은 그리드를 재생성하므로 이후 그리드 참조는 호출 시점 $c.util.getComponent 로 재조회해야 한다.
+ * @param {Object} gridOptions 그리드 옵션 — { id: 그리드 아이디(필수), dataList: 바인딩 DataList 아이디(필수),
+ *  caption: 캡션 문구, className: class 속성(기본 "gvw"), autoFit(기본 "allColumn"), focusMode(기본 "row"),
+ *  readOnly(기본 true), style: 스타일 문자열 }
+ * @param {Array} cols colDef 배열 — { id(필수), header(기본 id), width(기본 100), align(기본 "left")[, group] }
+ * @returns {String} <w2:gridView> XML 문자열 (인자 오류 시 null)
+ * @hidden N
+ * @exception
+ * @example
+const cols = [
+    { id: "comNm", header: "회사명", width: 160, align: "left" },
+    { id: "y1m1", header: "자산총계", width: 110, align: "right", group: "2009년" },
+    { id: "y1m2", header: "유동자산(계)", width: 110, align: "right", group: "2009년" }
+];
+const xml = $c.util.buildGridStyleXml({ id: "grd_list", dataList: "dlt_list", caption: "연도별 재무지표", style: "height: 420px;" }, cols);
+$c.util.getComponent("grd_list").setGridStyle(xml);
+ */
+scwin.buildGridStyleXml = function (gridOptions, cols) {
+    const opt = gridOptions || {};
+    if (!opt.id || !opt.dataList) {
+        console.warn("[$c.util.buildGridStyleXml] gridOptions.id / gridOptions.dataList 는 필수입니다.");
+        return null;
+    }
+    if (!scwin.isArray(cols) || (cols.length === 0)) {
+        console.warn("[$c.util.buildGridStyleXml] cols 는 비어 있지 않은 colDef 배열이어야 합니다.");
+        return null;
+    }
+
+    const esc = scwin.__escapeXmlAttr;
+    const headCell = function (id, value, width, extra) {
+        return '<w2:column id="' + esc(id) + '" value="' + esc(value) + '" width="' + width
+            + '" displayMode="label" inputType="text" textAlign="center"' + (extra || "") + '></w2:column>';
+    };
+
+    const hasGroup = cols.some(function (c) { return !!c.group; });
+    const head = [];
+    head.push("<w2:row>");
+    let g = 0;
+    let i = 0;
+    while (i < cols.length) {
+        const col = cols[i];
+        const width = (col.width !== null && typeof col.width !== "undefined") ? col.width : 100;
+        const header = (typeof col.header === "string") ? col.header : col.id;
+        if (!col.group) {
+            head.push(headCell("hd_" + col.id, header, width, hasGroup ? ' rowSpan="2"' : ""));
+            i++;
+        } else {
+            let span = 1;
+            while ((i + span < cols.length) && (cols[i + span].group === col.group)) {
+                span++;
+            }
+            g++;
+            head.push(headCell("hdg_" + opt.id + "_" + g, col.group, width, ' colSpan="' + span + '"'));
+            i += span;
+        }
+    }
+    head.push("</w2:row>");
+    if (hasGroup) {
+        head.push("<w2:row>");
+        for (let j = 0; j < cols.length; j++) {
+            if (cols[j].group) {
+                head.push(headCell("hd_" + cols[j].id, (typeof cols[j].header === "string") ? cols[j].header : cols[j].id,
+                    (cols[j].width !== null && typeof cols[j].width !== "undefined") ? cols[j].width : 100, ""));
+            }
+        }
+        head.push("</w2:row>");
+    }
+
+    const bodyCells = [];
+    for (let k = 0; k < cols.length; k++) {
+        bodyCells.push('<w2:column id="' + esc(cols[k].id) + '" width="'
+            + ((cols[k].width !== null && typeof cols[k].width !== "undefined") ? cols[k].width : 100)
+            + '" textAlign="' + esc(cols[k].align || "left") + '" displayMode="label" inputType="text"></w2:column>');
+    }
+
+    return '<w2:gridView xmlns:w2="http://www.inswave.com/websquare" id="' + esc(opt.id) + '"'
+        + ' class="' + esc(opt.className || "gvw") + '"'
+        + ' dataList="data:' + esc(opt.dataList) + '"'
+        + ' autoFit="' + esc(opt.autoFit || "allColumn") + '"'
+        + ' focusMode="' + esc(opt.focusMode || "row") + '"'
+        + ' readOnly="' + ((opt.readOnly === false) ? "false" : "true") + '"'
+        + (opt.style ? ' style="' + esc(opt.style) + '"' : "") + ">"
+        + (opt.caption ? '<w2:caption id="' + esc(opt.id) + '_caption" value="' + esc(opt.caption) + '"></w2:caption>' : "")
+        + '<w2:header id="' + esc(opt.id) + '_header">' + head.join("") + "</w2:header>"
+        + '<w2:gBody id="' + esc(opt.id) + '_gBody"><w2:row>' + bodyCells.join("") + "</w2:row></w2:gBody>"
+        + "</w2:gridView>";
+};
+
+/**
+ * @method
+ * @name __escapeXmlAttr
+ * @description XML 속성값용 특수문자를 이스케이프한다(& < > ").
+ * @param {String} s 원본 문자열
+ * @returns {String} 이스케이프된 문자열
+ * @hidden Y
+ * @exception
+ * @example
+ */
+scwin.__escapeXmlAttr = function (s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+};
+
+/**
+ * @method
  * @name getComponent
  * @description 주어진 아이디에 해당하는 웹스퀘어 컴포넌트를 찾아 반환한다.
  * @param {String} compId 컴포넌트 아이디
