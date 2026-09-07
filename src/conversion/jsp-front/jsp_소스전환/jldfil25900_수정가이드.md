@@ -165,3 +165,42 @@ scwin.init_conds = function () {
 - [ ] 미참조 `scwin.X = getComponent('X')` 캐싱 전역 0건(실사용·상태값·screenId 제외)
 - [ ] Node 구문검사 + `wsxml_lint` 통과
 ```
+
+---
+
+## 규칙 19 — jQuery 컴포넌트 전환 (2026-09-07)
+
+jQuery 원시 DOM 조작 **7건 중 5건 전환·2건 보류**. body 실측으로 셀렉터 name → 컴포넌트 id 를 확인해 값 쓰기를 컴포넌트 API 로 교체했다(WebSquare setValue 는 렌더된 DOM input 값에 반영되므로 이후 form 제출 동작 유지).
+
+### body 실측 (셀렉터 → 컴포넌트)
+
+| 셀렉터 name | 컴포넌트 id | 바인딩 |
+|---|---|---|
+| `input[name='method']` | `ipt_method` | `data:dma_goWriteReq.method` |
+| `input[name='status']` | `ipt_status` | `data:dma_goWriteReq.status` |
+| `input[name='bzProcsNo']` | `ipt_bzProcsNo` | `data:dma_goWriteReq.bzProcsNo` |
+
+### 전환 (5건)
+
+| 함수 | 변경 전 | 변경 후 |
+|---|---|---|
+| `goWrite` | `$("input[name='method']").val("dividendDateModifiy")` | `$c.util.getComponent("ipt_method").setValue("dividendDateModifiy")` |
+| `goWrite` | `$("input[name='status']").val("R")` | `$c.util.getComponent("ipt_status").setValue("R")` |
+| `goView` | `$("input[name='method']").val("dividendDateModifiy")` | `$c.util.getComponent("ipt_method").setValue("dividendDateModifiy")` |
+| `goView` | `$("input[name='status']").val(await scwin.fn_modifiyDate())` | `$c.util.getComponent("ipt_status").setValue(await scwin.fn_modifiyDate())` (인자 원형 유지 — 동작 변경 금지) |
+| `goView` | `$("input[name='bzProcsNo']").val(ipt_bzProcsNo)` | `$c.util.getComponent("ipt_bzProcsNo").setValue(ipt_bzProcsNo)` |
+
+body 히든 인풋 3개의 유지 주석도 "DOM 참조" → "컴포넌트 API 참조(규칙 19 전환)" 로 갱신.
+
+### 보류 (2건) — form 제출 기계부
+
+| 함수 | 코드 | 사유 |
+|---|---|---|
+| `goWrite` | `$("form[name='dividendDateForm']").attr("action", "dividendBaseDate.do")` | JSP form 제출 재설계(별도 과제)와 결합 — `// TODO 규칙19-보류` 표기 |
+| `goView` | `$("form[name='dividendDateForm']").attr("action", "dividendBaseDate.do")` | 상동 |
+
+### 검증
+
+- [x] script CDATA 추출 → `node --check` OK
+- [x] jQuery 잔존 2건 = 보류 2건 일치 (전환 대상 잔존 0)
+- [x] `wsxml_lint --min-severity error` → 0 errors (ev 이관 없음 — publicInfo 변경 없음)

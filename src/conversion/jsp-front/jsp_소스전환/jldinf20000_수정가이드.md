@@ -41,3 +41,23 @@
 ## 5. 후속 정정 (wsxml_lint 전수 검사)
 
 - WS120 중복 컬럼 id 재부여(규칙 27): dataTb 내 `column5`(중복) → `column5_2` — 스크립트 참조 0건 확인, 원본 유래 결함
+
+## 규칙 19 — jQuery 컴포넌트 전환 (2026-09-07)
+
+기존 보류(3절 "jQuery `$("...")` 코드 21건")를 재설계했다. 호출식 24건 중 18건 전환, 6건 보류(페이징 DOM 재구성 2블록). body 실측: 조건 행 `tr[name=trSearch]` = `xf:group`(`id_isur`/`id_com`/`id_type`/`id_date`), 상품선택 라디오 = 개별 `xf:select1 ipt_searchRadio1~18`(단일 item, 값=id 접미), `input[name=pageIndex]` = hidden `xf:input ipt_pageIndex`(ref: dma_DownloadReq.pageIndex), `.paging` 테이블은 전환 마크업에 **부재**(`w2:pageList krxpage_pagenavigator_263` 대체).
+
+| # | 위치 | as-is | to-be | 방식 |
+|---|------|-------|-------|------|
+| 1 | init_pageBody | `$('input[name=ipt_isurNm1]').keypress(Enter→fn_search('1'))` | `ipt_isurNm1` 에 `ev:onkeydown="scwin.ipt_isurNm1_onkeydown"` 신설(규칙 3 명명, publicInfo 등재) | 이벤트 속성 이관 |
+| 2 | init_pageBody | `$('input[name=searchRadio]').bind("click", …)` (`$(this).val()` 포함) | 신설 `scwin.searchRadioClickCommon(value)` 를 18개 `ipt_searchRadioN_onclick` 말미(cgSearch 다음)에서 호출 — as-is 실행 순서(인라인 onclick → bind 콜백) 보존, `$(this).val()` 은 각 핸들러의 리터럴 값 전달 | 이벤트 이관(기존 ev:onclick 통합) |
+| 3 | cgSearch | `$('tr[name=trSearch]').attr("style","display:none;")` | `["id_isur","id_com","id_type","id_date"].forEach(… getComponent(id).hide())` | hide() |
+| 4 | cgSearch ×4 · searchData ×1 · fn_search ×2 | `$('input[name=searchRadio][value=N]').attr("checked", true)` | 신설 `scwin.setSearchRadioChecked(value)` → `getComponent('ipt_searchRadio'+value).setValue(String(value))`, 컴포넌트 부재 시 as-is(매칭 0건 no-op)처럼 경고만 | setValue |
+| 5 | cgSearch | `$('input[name=searchDateRadio][value=1]').attr("checked", true)` | `getComponent('ipt_searchDateRadio1').setValue('1')` | setValue |
+| 6 | fn_Download ×3 | `$('#ipt_searchRadio10/11/16').is(":checked")` | `getComponent('ipt_searchRadioN').getValue() === 'N'` 비교 (도달 불가 보존 코드 내) | getValue 비교 |
+| 7 | searchData ×2 | `$('#ipt_isurCd1').length`·`$('#ipt_isurNm1').length` | `$c.util.getComponent(id) != null` (gcc getComponent 는 부재 시 undefined 반환 가능 → `!= null` 관용구) | 존재 확인 |
+| 8 | fn_search | `$('input[name=pageIndex]').val("1")` | `getComponent('ipt_pageIndex').setValue("1")` (jldinf20000p 선례 동일) — 마크업 주석도 컴포넌트 참조로 갱신 | setValue |
+
+- **보류 6건 (2블록)**: ① init_pageBody 페이징 현재 페이지 강조(`$('.paging td:contains')`·`$(obj).text/html/attr` 4건) ② searchRadioClickCommon 내 페이징 초기화(`$('.paging').empty()/append` 2건, bind 콜백에서 원형 이동). 사유: `.paging` 테이블이 전환 마크업에 없어(`w2:pageList` 대체) 현재 매칭 0건 no-op 이며, pageList API 로의 대응은 페이징 컴포넌트 재설계 대상 — 원형 유지 + `[규칙 19 보류]` 주석 표기.
+- **신설 함수**: `scwin.ipt_isurNm1_onkeydown`(publicInfo 등재), `scwin.setSearchRadioChecked`·`scwin.searchRadioClickCommon`(비이벤트 헬퍼 — 기존 cgSearch 등과 동일하게 publicInfo 미등재). 18개 라디오 핸들러 JSDoc @description 에 공통 호출 반영.
+- **주의(의미 드리프트 기록)**: as-is 라디오 checked 는 브라우저 name 공유로 상호 배타였으나, 전환 후 각 select1 컴포넌트 값은 개별 관리된다(#6 getValue 비교는 도달 불가 코드라 실동작 영향 없음).
+- **검증**: script CDATA 추출 → `node --check` 통과, jQuery 잔존 6건(보류 6건과 일치, 주석 제외), `wsxml_lint --min-severity error` 0 errors(신설 핸들러 publicInfo 등재로 WS201 없음).

@@ -46,3 +46,17 @@
 
 - **js-beautify(indent 4) 재포맷**을 script CDATA 전체에 적용 (jldfil25900·25910·35700c 선례 동일).
 - 검증: 비공백 문자 빈도 완전 일치(로직 보존), node --check 통과, wsxml_lint 0 errors, 들여쓰기 4배수 위반 0.
+
+## 규칙 19 — jQuery 컴포넌트 전환 (2026-09-07)
+
+기존 보류 3건(3절 "jQuery 3건")을 전량 전환했다. jQuery 잔존 0건.
+
+| # | 위치 | as-is | to-be | 방식 |
+|---|------|-------|-------|------|
+| 1 | init_pageBody | `$(".form_search").on("focusout", fn)` | `document.querySelectorAll(".form_search")` + `addEventListener("focusout", …)` | 표준 DOM API (아래 참고) |
+| 2 | init_pageBody | `$(".chkNumber").on("keyup", fn)` | `document.querySelectorAll(".chkNumber")` + `addEventListener("keyup", …)` | 표준 DOM API (아래 참고) |
+| 3 | fn_chkUploadFile | `$('[type=file]')` | `document.querySelectorAll('input[type="file"]')` | 표준 DOM API — file input 은 파일 컨트롤(`__krxFileControl`) 내부·동적 렌더(delAttachFile innerHTML) DOM 이라 대응 컴포넌트 없음 |
+
+- **#1·#2 ev 속성 이관 불가 사유**: body 마크업 실측 결과 `form_search`/`chkNumber` 클래스를 가진 컴포넌트 **0건**(해당 토큰은 script 내부에만 존재) — `ev:onblur`/`ev:onkeyup` 이관 대상 컴포넌트가 없다. 원본 JSP 잔재 클래스가 배포 DOM(파일 컨트롤 등)에 존재할 가능성에 대비해 jQuery 를 제거하고 동등한 표준 DOM 바인딩으로 대체했다(jQuery `return false` 는 `e.preventDefault()`+`e.stopPropagation()` 으로 등가 치환, `this`=바인딩 요소 유지). publicInfo 변경 없음.
+- **보류**: 0건.
+- **검증**: script CDATA 추출 → `node --check` 통과, jQuery 잔존 0건(보류 0건과 일치), `wsxml_lint --min-severity error` 0 errors.

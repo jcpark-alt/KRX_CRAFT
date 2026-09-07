@@ -106,7 +106,7 @@ scwin.init_radio     = function () { scwin.basDRadio(); /* divBasDdYn change 바
 ## 5. 유지(변환 제외) 항목
 
 - **`== null`/`!= null`**: null·undefined 동시 판별 관용구라 엄격화하지 않는다.
-- **jQuery DOM 조작**(`$("input[name=…]").val(…)`·form action 설정): 규칙 19(원시 jQuery→컴포넌트) 재설계 대상으로, code-convention 직접 규약 밖이라 이번 범위에서 제외. body 에 `dma_*Req` 바인딩 hidden input 이 있어 후속 전환 가능.
+- **jQuery DOM 조작**(`$("input[name=…]").val(…)`·form action 설정): 규칙 19(원시 jQuery→컴포넌트) 재설계 대상으로, code-convention 직접 규약 밖이라 이번 범위에서 제외. body 에 `dma_*Req` 바인딩 hidden input 이 있어 후속 전환 가능. → **2026-09-07 「규칙 19 — jQuery 컴포넌트 전환」 절에서 수행(전환 2·보류 12)**.
 - **`fn_*`/`tx_fn_*` 명명**: 호출자 정합용 as-is 별칭(`fn_modifiyDate`·`tx_fn_*`)이라 개명 보류. 신규 5구역 함수는 camelCase.
 
 ---
@@ -124,3 +124,39 @@ scwin.init_radio     = function () { scwin.basDRadio(); /* divBasDdYn change 바
 - [x] 전 함수 JSDoc 완비(42개 — 헬퍼 3종 포함, placeholder 0)
 - [x] XML well-formed + JS 구문 OK
 ```
+
+---
+
+## 규칙 19 — jQuery 컴포넌트 전환 (2026-09-07)
+
+jQuery 원시 DOM 조작 **14건 중 2건 전환·12건 보류**(§5 의 "규칙 19 후속 전환 가능" 항목의 실행). 값 읽기/쓰기·이벤트 바인딩 계열만 전환하고, JSP form 제출 기계부·외부 위젯 결합 건은 원형 유지 + TODO 표기.
+
+### 전환 (2건)
+
+| 위치 | 변경 전 | 변경 후 |
+|---|---|---|
+| `init_radio` | `$("input[name='divBasDdYn']").change(function(){...})` (런타임 바인딩) | `rd_divBasDdYn` 에 `ev:onchange="scwin.rd_divBasDdYn_onchange"` 선언 바인딩 이관 + 3구역에 `scwin.rd_divBasDdYn_onchange` 신설(규칙 3 명명, try/catch+handleError, **publicInfo 등재**). 값은 `this.value` → `$c.util.getComponent("rd_divBasDdYn").getValue()` |
+| `fn_fileValidation` | `$("input[type='file']")` + `.attr("value")` ×3 | `scwin.resolveFileControlRoot().querySelectorAll('input[type="file"]')[0]` + `.value` 1회 추출(`fileVal`). 파일 컨트롤 내부 DOM 은 컴포넌트 API 부재 — 기존 헬퍼 경유 원시 접근으로 jQuery 만 제거(사유 주석 부기) |
+
+- `rd_divBasDdYn2`(읽기전용, 동일 name=divBasDdYn)는 `onclick` 이 false 를 반환해 변경이 차단되므로(구 change 바인딩도 사실상 사문) onchange 이관 대상에서 제외 — 동작 동일.
+- `.attr("value")` → `.value` 프로퍼티: 구(舊) jQuery(attr=prop 시절) 의도(선택 파일 경로 읽기) 보존. 빈 매치 시 `undefined` 반환하던 것은 `null` 로 대체 — 후속 `!= null` 관용구 판별 동일.
+
+### 보류 (12건) — form 제출 기계부·외부 위젯
+
+각 위치에 `// TODO 규칙19-보류: ...` 한 줄 주석 표기(연속 블록은 블록 선두 1회).
+
+| 함수 | 코드 | 사유 |
+|---|---|---|
+| `rd_divBasDdYn_onchange` (구 init_radio) | `$(".ui-datepicker-trigger").click()` | jQuery UI datepicker 위젯 트리거 — 외부 위젯 재설계(별도 과제) |
+| `fn_list` | `$('#dividendDateForm').append('<input type="hidden" name="method" .../>')` | JSP form 제출 기계부 (dividendDateForm 은 `xf:group` tagname 렌더 — 폼 컴포넌트 아님) |
+| `fn_list` | `$('#dividendDateForm').attr("action", ...)` / `.attr("onsubmit", "")` (2건) | 상동 |
+| `fn_register` | `$('#dividendDateForm').append(...)` / `.attr("action", ...)` / `.attr("onsubmit", "")` (3건) | 상동 |
+| `fn_fileDel` | `$("#attachFileList").remove()` | 폼 내 동적 첨부 목록 정리 — form 제출 재설계와 결합 |
+| `fn_FileDown` | `$('#dividendDateAttachForm').append(...)` / `.attr("action", ...)` / `.attr("onsubmit", "")` (3건) | 상동 (dividendDateAttachForm 도 `xf:group` 렌더) |
+| `fn_FileDown` | `$("#method").remove()` | 동적 히든 정리 — form 제출 재설계와 결합 |
+
+### 검증
+
+- [x] script CDATA 추출 → `node --check` OK
+- [x] jQuery 잔존 12건 = 보류 12건 일치 (전환 대상 잔존 0)
+- [x] `wsxml_lint --min-severity error` → 0 errors, `publicInfo="scwin.rd_divBasDdYn_onchange"` 정의 존재(WS201 없음)

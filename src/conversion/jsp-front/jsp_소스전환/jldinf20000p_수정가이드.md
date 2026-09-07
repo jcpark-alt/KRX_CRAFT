@@ -41,3 +41,17 @@
 ## 5. 후속 정정 (wsxml_lint 전수 검사)
 
 - WS120 중복 컬럼 id 재부여(규칙 27): dataTb 내 `column3`(중복) → `column3_2` — 스크립트 참조 0건 확인, 원본 유래 결함
+
+## 규칙 19 — jQuery 컴포넌트 전환 (2026-09-07)
+
+기존 보류(3절 "jQuery `$("input[name=…]")` 수집·설정 코드")를 전량 전환했다. jQuery 잔존 0건.
+
+| # | 위치 | as-is | to-be | 방식 |
+|---|------|-------|-------|------|
+| 1 | fn_search | `$('input[name=ipt_searchRadio]:checked').val()` | `$c.util.getComponent('ipt_searchRadio').getValue()` | 컴포넌트 API — 원본 라디오 그룹은 전환 시 hidden `<xf:input id="ipt_searchRadio">`(ref: dma_onPopupCodeReq.searchRadio)로 대체됨 |
+| 2 | fn_search | `$('input[name=list_cd3]:checked')` 수집 + `$(ckArr[i]).val()` | `document.querySelectorAll('input[name="list_cd3"]:checked')` + `ckArr[i].value` | 표준 DOM API — body 실측 결과 name=list_cd3 체크박스 컴포넌트 **0건**(원본 JSP 상장구분 체크 목록이 전환 마크업에 부재)이라 컴포넌트 API 대응 불가. 수집 결과(`'v1','v2'` 콤마 문자열, 미체크 시 빈 문자열) 동일 |
+| 3 | fn_search | `$('input[name=pageIndex]').val("1")` | `$c.util.getComponent('ipt_pageIndex').setValue("1")` | 컴포넌트 API — hidden `ipt_pageIndex`(name="pageIndex", ref: dma_onPopupCodeReq.pageIndex) |
+
+- **ev 속성 이관**: 해당 없음(이벤트 바인딩 아님). publicInfo·body 마크업 변경 없음.
+- **보류**: 0건.
+- **검증**: script CDATA 추출 → `node --check` 통과, jQuery 잔존 0건(보류 0건과 일치), `wsxml_lint --min-severity error` 0 errors.

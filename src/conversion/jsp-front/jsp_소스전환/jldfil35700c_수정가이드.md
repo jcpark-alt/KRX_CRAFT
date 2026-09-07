@@ -35,7 +35,7 @@
 
 ## 3. 보류(유지) 항목
 
-- **jQuery `$("...")` 46건 유지** — `fn_reset`·`changeType`·`fnCheckGubun`·`layer_popup` 등의 DOM 직접 제어. 규칙 19(WebSquare API 재설계) 대상으로 이관 보류.
+- **jQuery `$("...")` 46건 유지** — `fn_reset`·`changeType`·`fnCheckGubun`·`layer_popup` 등의 DOM 직접 제어. 규칙 19(WebSquare API 재설계) 대상으로 이관 보류. → **2026-09-07 §6에서 `changeType` 36건·`fn_reset` 10건 전환 완료**, 잔존은 `layer_popup` 내부 3건(§6 보류 목록).
 - **`fn_*`/`tx_fn_*` 함수명 13개 유지** — `fn_taxCalc(_trust)`·`fn_checkValue(Mkt)`·`fn_reset`·`fn_rules`·`fn_print(_trust)`·`fn_goTab1/2`·`fn_kosdaqNewListChk`·`fn_multInputChk`·`tx_fn_goTab1`. 호출자 정합용 as-is 계약.
 - **`== null`/`!= null` 관용구 유지** — null/undefined 동시 판별(`gubun1Checked` 판정식 등).
 - **`ev:ondataload`** — 이 화면에는 해당 바인딩 없음(해당 없음).
@@ -58,3 +58,50 @@
 - 초기 정비(스크립트 일괄 변환)에서 빠졌던 **js-beautify(indent 4) 재포맷**을 script CDATA 전체에 적용 (jldfil25900·25910 선례 5a75a16 동일).
 - 결과: 다문장 한 줄 320→2, 120자 초과 라인 207→21(정규식·긴 문자열 등 단일 식 잔존), 코드 라인 2,188→3,691 전개.
 - 검증: 비공백 문자 빈도 완전 일치(로직 보존), node --check 통과, wsxml_lint 0 errors.
+
+## 6. 규칙 19 — jQuery 컴포넌트 전환 (2026-09-07)
+
+`changeType`(36건)·`fn_reset`(10건)의 jQuery 원시 DOM 조작 46건을 WebSquare 컴포넌트 API로 전환. body 마크업은 이미 WebSquare 컴포넌트라 셀렉터의 `name` 속성 → 컴포넌트 `id` 매핑만 실측해 치환했다(로직·분기·호출 순서 동일).
+
+### name→id 매핑 (body 실측)
+
+행 반복 규칙: **1행 = 기본 id, n행(n≥2) = 기본 id + `_r{n-1}`** (예: `n_stock_count1`→`ipt_nStockCount`, `n_stock_count10`→`ipt_nStockCount_r9`). 이 규칙을 신설 헬퍼 **`scwin.fn_rowInput(baseId, row)`** 로 캡슐화(publicInfo 159→160건).
+
+| jQuery name 접두 | 컴포넌트 기본 id | 행 범위(사용처) |
+|------|------|------|
+| `stock_count{i}` | `ipt_stockCount` | 1~10 |
+| `parval_{i}` | `ipt_parval` | 1~10 |
+| `list_amt{i}` | `ipt_listAmt` | 1~10 |
+| `n_stock_count{i}` | `ipt_nStockCount` | 1~10 |
+| `n_parval_{i}` | `ipt_nParval` | 1~10 |
+| `n_list_amt{i}` | `ipt_nListAmt` | 1~10 |
+| `trust_count{i}` | `ipt_trustCount` | 1~10 |
+| `commission_{i}` | `ipt_commission` | 1~10 |
+| `issueCode{i}` | `ipt_issueCode` | 1~10 |
+| (id) `#stock_type1`/`#stock_type2` | `stock_type` / `stock_type_r1` (`w2:textbox`) | 1·2행 |
+| (checkbox) `checkGubun1` | `ipt_checkGubun1` (`xf:select` checkboxgroup) | — |
+
+### 전환 표 (규칙 19 매핑)
+
+| 원형 | 전환 |
+|------|------|
+| `$('input[name=…i]').val('')` | `scwin.fn_rowInput('ipt_…', i).setValue('')` |
+| `$('input[name=…i]').attr('readonly', b)` | `.setReadOnly(b)` |
+| `$('input[name=…i]').css('backgroundColor', v)` | `.setStyle('background-color', v)` (케밥 표기) |
+| `$("#stock_type1").html(v)` / `#stock_type2` | `$c.util.getComponent('stock_type').setValue(v)` / `'stock_type_r1'` (`w2:textbox`) |
+| `$('input:checkbox[name="checkGubun1"]').attr('checked', false)` | `$c.util.getComponent('ipt_checkGubun1').setValue('')` (checkboxgroup 전체 해제) |
+
+- 루프 내 같은 행 컴포넌트 2회 조회(readonly+css)는 파일 선례(`cpCheckGubun1` 등)에 맞춰 `const cpNStockCount = scwin.fn_rowInput(...)` 캐싱 — set 호출 순서는 원형과 동일.
+- `changeType`·`fn_reset` JSDoc @description 을 실동작(주권유형 라벨 전환·체크박스 해제 포함)에 맞게 갱신.
+
+### 보류 목록
+
+| 위치 | 잔존 | 사유 |
+|------|------|------|
+| `layer_popup` | `$(el)`·`$(document)` 3건 (+체이닝 `fadeIn`/`outerWidth`/`css`/`find().click`) | 인자 `el` 이 임의 셀렉터라 대응 컴포넌트를 body 에서 특정 불가 + fade 효과·문서 크기 측정은 jQuery 전용 동작 — 규칙 19 보류 기준에 따라 원형 유지 (이번 46건 범위 밖) |
+
+### 검증 결과
+
+- script CDATA 추출 → `node --check` 통과.
+- 전환 후 `$(` 잔존 3건 = 보류 목록(`layer_popup`)과 일치, `changeType`·`fn_reset` 내 jQuery 0건.
+- XML well-formed(lxml parse OK), `wsxml_lint --min-severity error` → 1 files, 0 errors, 0 warnings.
