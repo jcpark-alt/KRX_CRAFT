@@ -16,7 +16,7 @@
 |------|------|
 | 구현 범위 | **순수 동적그리드 샘플로 재구성** (축 pivot·서버 통신 잔재 제거) |
 | 헤더 형태 | **연도 2단 그룹 헤더** (상위=연도, 하위=지표 + 고정 4컬럼 rowSpan) |
-| 데이터 로딩 | **`$c.sbm.executeDynamic` 서버 동적 조회** (async/await 수신) |
+| 데이터 로딩 | **로컬 JSON(`ULDFIS00600.json`)을 `$c.sbm.executeDynamic(GET)` 으로 조회** (async/await 수신 — 09-07 대상만 서버 서비스→정적 JSON 전환, gcc 표준 통신 유지) |
 
 ## 3. 동적 구현 방식 — `setGridStyle` 전체 재생성 (2단 헤더) + dataList `insertColumn` 동기화
 
@@ -58,18 +58,18 @@ dltFisList.setJSON(rows);
 
 ### 4.2 동적 로직 (스크립트 구역, code-convention 준수)
 1. **2구역** `onpageload`(async) → `await loadFisData()` — 진입점 try/catch + `await $c.exception.handleError`, 내부 함수는 예외 전파.
-2. **4구역(서브미션 콜백)** `loadFisData`(async): `const rtn = await $c.sbm.executeDynamic({ id, action, isProcessMsg })` 로 서버 동적 조회. **`submitDoneHandler` 를 넘기지 않아야** sbm 이 `_promise_submitDoneHandler → resolve(rtn)`(성공)·`reject`(실패)로 Promise 를 settle 하므로 `await` 로 응답을 수신(에러는 진입점으로 전파). 이후 `buildDynamicGrid(rtn.responseJSON)`.
-3. `buildDynamicGrid`: 메타는 응답 `json.meta`(years/metrics) 우선, 없으면 `extractMeta(body[0])` 폴백, 빈 body 면 빈 메타.
+2. **4구역(서브미션 콜백)** `loadFisData`(async): `const rtn = await $c.sbm.executeDynamic({ id, method: "GET", action: scwin.DATA_URL, isProcessMsg })` 로 **로컬 JSON 을 GET 조회**(`DATA_URL = "/conversion/sample-front/gridView/ULDFIS00600.json"` — 웹루트 기준, 배포 경로에 맞게 조정·`CONTEXT_PATH` 는 sbm `__preSubmitFunction` 이 자동 접두). **`submitDoneHandler` 를 넘기지 않아야** Promise 가 settle 되어 `await` 로 응답 수신(실패는 reject → 진입점 handleError 전파), 이후 `buildDynamicGrid(rtn.responseJSON)`. (09-07 사용자 확정: 통신은 gcc 표준 executeDynamic 유지, 대상만 서버 서비스 → 정적 JSON)
+3. `buildDynamicGrid`: 메타는 **전 레코드 키 스캔(`extractMeta(body)`)으로 직접 생성**(09-07 — JSON `meta` 필드 삭제·화면 도출로 일원화), 빈 body 면 빈 메타.
    - `buildColumnDefs(meta)` → `$c.util.syncDataListColumns(dltFisList, cols)`(dataList 동기화) → `$c.util.getComponent("grdFis").setGridStyle($c.util.buildGridStyleXml(옵션, cols))`(2단 헤더 재생성) → `dltFisList.setJSON(buildRows(body, meta))`.
-4. `extractMeta(rec)`(폴백): 키를 `/^(20\d\d)_(.+)$/` 로 분해 → `{fixed, years, metrics}`(연도 오름차순). 괄호 지표명(`(당좌자산대손충당금(계))`)도 정상.
+4. `extractMeta(records)`: 전 레코드 키를 `/^(20\d\d)_(.+)$/` 로 분해 → `{fixed, years, metrics}`(연도 오름차순, 최초 등장 순서·합집합 스캔이라 일부 레코드 키 결측에도 안전). 괄호 지표명(`(당좌자산대손충당금(계))`)도 정상.
 5. `buildColumnDefs(meta)`: 고정 4(`isurCd`/`comNm`/`lstDt`/`spacYn`, header 는 `meta.fixed` 라벨) + **연도(`group="YYYY년"`) × 지표(`header=지표명`)** colDef 배열 생성 — 연도·지표 개수 모두 데이터 기반.
 6. `buildRows(body, meta)`: 각 레코드를 컬럼 id(고정 + `y{연}m{지표}`) 스키마로 매핑.
 7. 값 결측(`"-"`)·콤마 천단위 문자열은 원본 그대로 표시(`pick` 으로 undefined/null → `""`).
 
 ### 4.3 리뷰 반영 (websquare-code-reviewer)
 초기 슬롯 버전 리뷰 지적을 반영한 뒤 setColumns 방식으로 전환:
-- **통신 방식**: `fetch` → gcc 표준 `$c.sbm.executeDynamic`(**async/await**) — `submitDoneHandler` 를 넘기지 않아 Promise 가 settle 되므로 `await` 로 응답 수신, 실패는 reject → 진입점 try/catch 로 전파.
-- **첫 행 결측 의존 해소**: `json.meta` 우선 사용.
+- **통신 방식**: `fetch` → gcc 표준 `$c.sbm.executeDynamic`(**async/await**) — `submitDoneHandler` 를 넘기지 않아 Promise 가 settle 되므로 `await` 로 응답 수신, 실패는 reject → 진입점 try/catch 로 전파. *(09-07 확정: executeDynamic 유지, 대상만 정적 JSON — §4.2·§5 참조)*
+- **첫 행 결측 의존 해소**: `json.meta` 우선 사용. *(09-07 JSON meta 삭제 — extractMeta 전 레코드 합집합 스캔으로 해소 방식 변경)*
 - **빈 body**: 빈 메타 → 고정 4컬럼·단일 헤더 행의 `setGridStyle` + `setJSON([])`(잔존 없음, dataList 잔존 컬럼은 `syncDataListColumns` 가 제거).
 - **`<w2:publicInfo>` 등록**: 배선 4함수.
 - (유지) `grdFis`/`dltFisList` bare 전역 참조 — WebSquare id 전역 등록 관용.
@@ -80,14 +80,14 @@ dltFisList.setJSON(rows);
 - 총 컬럼 = 고정 4 + 4×5 = **24** (슬롯·hidden 없이 정확히 데이터 수만큼). 연도/지표 수가 바뀌면 `setGridStyle` 재생성 결과가 그대로 반영(vm 하니스 실측: 헤더 2행 — 상단 rowSpan="2" ×4 + colSpan="5" ×4, 하단 20셀, 바디 24셀; 빈 메타 시 단일 헤더 행).
 
 ## 5. 데이터/응답 규약
-- 서버 응답(`rtn.responseJSON`)은 `{ meta:{fixed,years,metrics}, body:[...] }` 구조로 가정(원본 `ULDFIS00600.json` 과 동일 형태 — 응답 모킹/참고 데이터로 유지).
-- `action`(`scwin.SERVICE_ACTION = "/uld/fis/ULDFIS00600/selectFisList.do"`)·`id`(`sbmFisList`)는 샘플 경로. 실제 서비스/queryId 로 교체 필요.
-- 조회 조건이 필요하면 요청 파라미터 DataMap 을 `options.ref` 로 지정한다(현재는 무조건 전체 조회라 생략).
+- 데이터는 `ULDFIS00600.json` 을 `$c.sbm.executeDynamic(GET)` 으로 로드(`scwin.DATA_URL` 웹루트 기준 경로) — `{ body:[...] }` 구조(상장사 49건, 한글 키 보존, **meta 필드 없음** — 09-07 삭제, 화면 `extractMeta` 가 레코드 키에서 생성). 정적 .json 응답은 `application/json` 이므로 `rtn.responseJSON` 으로 수신.
+- `DATA_URL` 은 배포 웹루트 구조에 맞게 조정(`"./"` 상대 경로는 `CONTEXT_PATH` 자동 접두와 충돌 위험이 있어 루트 기준 절대 경로 사용).
+- 실서비스 전환 시: `action` 만 서비스 URL 로 교체(`method` 는 서비스 규약에 맞춤)하고, 조회 조건은 요청 파라미터 DataMap 을 `options.ref` 로 지정.
 
 ## 6. 유지/제외 항목
 - 축(기준/가로/세로) 팝업·조건 저장·`queryId`/`tableName` 분기 등 **원본 서버·프레임 의존 로직 전면 제거**(순수 샘플 목적).
 - 페이지리스트(`pageList`)·조건 입력 테이블 등 원본 UI 잔재 제거.
-- 통신은 gcc 표준 `$c.sbm.executeDynamic`(비동기, **async/await**)로 표준화 — 서버 미배포 시 그리드는 빈 상태.
+- 데이터 로딩은 **`$c.sbm.executeDynamic(GET)` + 정적 JSON**(09-07 확정) — 서버 로직 미배포 환경에서도 화면 확인 가능, 통신 규약은 gcc 표준 유지. 실서비스 전환은 `action` 교체만(§5).
 
 ## 7. 검토 체크리스트
 - [x] XML well-formed · JS 구문 OK
