@@ -99,6 +99,7 @@ scwin.init_radio     = function () { scwin.basDRadio(); /* divBasDdYn change 바
 
 ### 4.6 주석 (전 구역)
 - 함수 39개에 표준 JSDoc(`@method`/`@name`/`@description`/`@param`/`@returns`/`@hidden`) 부여, placeholder 0.
+- (2026-09-07 규약 재감사) §4.5 헬퍼 3종에 누락됐던 JSDoc 보완 → **총 42개 완비**.
 
 ---
 
@@ -120,6 +121,6 @@ scwin.init_radio     = function () { scwin.basDRadio(); /* divBasDdYn change 바
 - [x] 비엄격 `==`/`!=` (코드) 0건(관용구 `== null`/`!= null` 제외)
 - [x] 자기 대입 0건, 미선언 루프변수 0건
 - [x] 미참조 `scwin.X = getComponent('X')` 캐싱 전역 삭제(96개, 실사용 `ex`·`filebox`·상태값 유지)
-- [x] 전 함수 JSDoc 완비(39개, placeholder 0)
+- [x] 전 함수 JSDoc 완비(42개 — 헬퍼 3종 포함, placeholder 0)
 - [x] XML well-formed + JS 구문 OK
 ```

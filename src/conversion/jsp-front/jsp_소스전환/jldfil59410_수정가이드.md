@@ -41,3 +41,8 @@
 - [x] 로직 동등(동작 변경 없음) — 문자열 리터럴·$c 호출 대사(캐싱 축약분만 감소), 단락 평가 순서 보존
 - [x] node --check 통과, XML well-formed, wsxml_lint(WS111·112·113 제외) 0 오류·0 경고
 - [x] `@author`/`@date` 0건, publicInfo·body 마크업 무변경
+
+## 5. 후속 정정 — 코드 뷰티파이 적용 (2026-09-07)
+
+- **js-beautify(indent 4) 재포맷**을 script CDATA 전체에 적용 (jldfil25900·25910·35700c 선례 동일).
+- 검증: 비공백 문자 빈도 완전 일치(로직 보존), node --check 통과, wsxml_lint 0 errors, 들여쓰기 4배수 위반 0.
