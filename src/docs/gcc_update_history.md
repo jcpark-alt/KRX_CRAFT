@@ -1,7 +1,7 @@
 # gcc 공통 함수 업데이트 이력
 
-`src/gcc/` 공통 라이브러리(`$c.*`)의 최초 반입(2026-06-08, `92a35bd`) 이후 변경 내역 정리 (최종 갱신 2026-09-01).
-API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-09-01 기준 **12개 모듈 / 315개 공개 메서드**.
+`src/gcc/` 공통 라이브러리(`$c.*`)의 최초 반입(2026-06-08, `92a35bd`) 이후 변경 내역 정리 (최종 갱신 2026-09-07).
+API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-09-07 기준 **12개 모듈 / 317개 공개 메서드**.
 
 > `src/cm/gcc/`는 CM 모듈용 사본으로 일반적 개선만 선별 반영해 왔으나(2026-06-10 병합, 2026-07-22 대규모 동기화로 11파일 체제),
 > **2026-08-18 `26af3d5`에서 사용 중단으로 삭제**되어 `src/gcc/`가 유일한 canonical 라이브러리다.
@@ -17,7 +17,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 | `data.xml` (`$c.data`) | 공통코드 로딩(`COMMON_CODE_INFO.ACTION` 연동, `setCommonCode` 배열 매핑 → code별 키잉 응답 매핑(`mappingKey` = 응답 조회 key) 개편·응답 언래핑·기본 컬럼 cdVal/cdValNm·조회 URL 이원화(url/paramName 옵션은 추가 후 제거)), JSON 헬퍼 8종, 프로세스 메시지, 콤보 공통코드 세팅(`comboCbDataSet*`) 계열, 업로드/리포트 헬퍼, 엑셀 다운로드 기본 옵션 개선 |
 | `win.xml` (`$c.win`) | 외부망 홈(`goHomeEx`), 프로그램 열기/내비게이션 단순화, `openFormSubmit`, 인쇄(`mainPrint`/`popupPrint`), `success`/`error` 알림, `openExternalPage`, **browserPopup 부모 화면 접근**(`getOpenerScope`/`callOpener`), 히스토리 기록·복원(`pushState`/`changePageState`) 결함 수정 및 `moveUrl`/`setPageFrameSrc` 이동 복원 확장(`restoreData` [목록] 복귀 포함), 프레임 초기화 `reinitialize` |
 | `exception.xml` (`$c.exception`) | **신설**(2026-08-26, win.xml 에서 분리) — 화면 try/catch 공통 오류 처리기 `handleError`(예외 분류·이중 알림 방지), 오류 수집 훅 `__reportError`(`ERROR_REPORT_INFO.URL` 설정 시 활성화) |
-| `util.xml` (`$c.util`) | 쿠키/웹스토리지 헬퍼 13종, 업로드(`onUploadClick`/`getUploadFiles` 등), `setTextLengthCounter`, `checkFileExtension`, 엑셀 다운로드 파일명 개선, `setGridVisibleRowNum`(gridView "all" 동적 적용), 버튼 상태 일괄 제어 `setButtonState`/`registerButtonState` |
+| `util.xml` (`$c.util`) | 쿠키/웹스토리지 헬퍼 13종, 업로드(`onUploadClick`/`getUploadFiles` 등), `setTextLengthCounter`, `checkFileExtension`, 엑셀 다운로드 파일명 개선, `setGridVisibleRowNum`(gridView "all" 동적 적용), 버튼 상태 일괄 제어 `setButtonState`/`registerButtonState`, 동적 컬럼 그리드 `syncDataListColumns`/`buildGridStyleXml`(setGridStyle 2단 그룹 헤더) |
 | `date.xml` (`$c.date`) | 날짜 포맷 검증(`checkCalendarFormat`/`compareFromToDate`), `getDateInterval` 단위 버그 수정, commonPrototype 의존 제거 |
 | `str.xml` (`$c.str`) | validate 중복 검증기 통합, 목적격 조사(`attachObjectPostposition`), 바이트/포맷 함수 자체 구현 전환 |
 | `session.xml` (`$c.session`) | **신설**(2026-06-09) — 세션 체크, 로그인/사용자 정보 관리 |
@@ -293,6 +293,12 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 - `4fe8607` (09-01) — [연관] **pcc frame.xml·utils.xml·stf_old.xml 최종 삭제**(`src/pcc`, gcc 무변경): `$c.frame`/`$c.utils` 사용 중단 방침 — 호출부 gcc 전환 완료 후 정의 파일 삭제(잔존 $c.utils 2건은 `getServerDateTime`/`addDate` 치환), $c.frame 미정의 호출 10건(MDI/WinOpen/PDF 창)은 재설계 대기. pcc/stf 7파일 체제
 - `6c95493` (09-01) — [연관] **$c.frame 미정의 호출 10건 정리**(`src/pcc`, gcc 무변경): common MdiHelp·FileDown1/2 삭제·`InfoMenuID`→`$c.win.getProgramId()` 위임, stf 뷰어/목록 4함수 톱 WinOpen→`$c.win.openPopup(browserPopup)` 전환(+`frame.FrameID`→`$p.getFrameId()`), print PDF 창 `window.open` 직접 호출 — pcc 에서 $c.frame/$c.utils 실행 참조 0건 달성
 - `ce3c500` (09-01) — [연관] **common.xml($c.cm) 함수 주석·gcc 치환 정리**(`src/pcc`, gcc 무변경): 박스 주석 22건→@description 이관, 미사용 매핑확정 15개 정의 삭제(85→70 함수)·`fn_Trim` 호출 11건(내부 7·ui-tobe 4) `$c.str.trim` 치환 — 1:1 불가 4종(fn_CheckEmail alert 내장·fn_IsNumber_val 정수 전용·fn_DelChar/3 업무 로직) 유지·검토
+- `6232c44` (09-07) — `$c.util` **동적 컬럼 그리드 공통함수 `syncDataListColumns`·`buildGridStyleXml` 신설** (315→317 메서드):
+  - ULDFIS00600 에서 검증(런타임 화면 확인 09-07)된 로직의 승격 — `syncDataListColumns(dataList, cols)`: DataList 객체/id 수용, `insertColumn`(기존 id 엔진 skip·멱등)/잔존 `removeColumn` 동기화, `{inserted, removed}` 반환. `buildGridStyleXml(gridOptions, cols)`: `setGridStyle` 용 gridView 전체 XML 생성 — colDef `group` 연속 구간 colSpan 병합 + 고정 컬럼 rowSpan=2 의 **2단 그룹 헤더**(엔진 `setColumns` 는 단일 헤더 강제·group 미지원이라 setGridStyle 재생성이 표준), 옵션 `{id, dataList}` 필수·caption·기본값(gvw/allColumn/row/readOnly), `__escapeXmlAttr` 내부 헬퍼
+  - ULDFIS00600 화면은 로컬 구현 제거 후 호출만 위임(정답지 유지), Jest `dynamicGridColumns.test.js` 9케이스(총 136건)·lint 0/0
+- `2a987d1` (09-07) — [연관] **validate-generator 전체 폭 레이아웃 전환**(`src/docs`, gcc 무변경): `.wrap` 고정폭(1500px)·가운데 정렬 제거 → `width:100%`
+- `963ceb0`·`78a29d9` (09-04) — [연관] **엔진 스냅샷 최신화 + ULDFIS00600 멀티로우 헤더 수정**(`src/engine`·`src/conversion`, gcc 무변경): 운영 최신 엔진(10.2MB, setColumns/setGridStyle 포함) 교체·beautified 재생성(js-beautify, 12.4MB). 엔진 실측으로 `setColumns` 는 colDef `{id,header,width,inputType,defaultValue}` 만 읽고 헤더 단일 행 강제(**group·align 미지원**) 확인 — b0ddf06 의 가정 스펙 정정, 2단 그룹 헤더를 `setGridStyle`(전체 XML 재생성) 전환으로 구현(vm 하니스·lxml 검증, 09-07 실화면 표시 확인)
+- `0c2230c` (09-04) — [연관] **jsp-front 변환작업 보고서 HTML 신설**(`src/conversion`, gcc 무변경): jldfil25900·25910 변환 내용(공통 패턴·화면별 건수·커밋 4건)+사용 파일 목록(규약 SOT·가이드·gcc 공통 6파일·검증 도구) — DESIGN.md 토큰 준수 무의존 단일 HTML
 - `b0ddf06` (09-04) — [연관] **sample-front gridView 동적 컬럼 샘플(ULDFIS00600) 신설**(`src/conversion`, gcc 무변경): 재무 조건검색 W-Craft 잔재를 JSON 데이터 기준 동적 컬럼 gridView 샘플로 재구성(축 pivot·서버통신·프레임 의존 전면 제거). 컬럼은 gridView 표준 `setColumns` API 로 데이터 도출 colDef(연도 `group` 병합 × 지표) 통째 재구성 — **연도 그룹·연도당 지표 슬롯 모두 데이터 기반**(사전정의·hidden 토글 없음, colDef `{id,header,width,align,group}` 스키마 확정). 통신은 `$c.sbm.executeDynamic` **async/await**(submitDoneHandler 미지정→Promise settle, `loadFisData` 4.서브미션 콜백 영역 배치), 데이터는 `ULDFIS00600.json` 유효 JSON 정규화(`meta{fixed,years,metrics}`+body, 한글키 보존). code-convention 준수(진입점 handleError·엄격비교·IIFE 0·4스페이스·publicInfo)+수정가이드 동봉, websquare-code-reviewer 교차검증. 엔진 근거: `setHeaderValue`(L39639)·`setColumnVisible`(L27502)·`setColumns`(운영 보강 API, 리포 스냅샷 미포함)
 - `fc3b94f`·`5a75a16`·`7ec2732` (09-04) — [연관] **code-convention 들여쓰기·화면 IIFE 전면 금지 규약 + jsp-front 후속 정비**(`src/docs`·`src/conversion`, gcc 무변경): 규약 신설 — 스크립트 CDATA 4-스페이스 들여쓰기(탭·2-스페이스 혼용 금지·body XML 제외)·**화면 페이지 IIFE 전면 금지**(값 계산·값 쓰기용 인라인 IIFE 포함, `src/gcc`·`src/pcc` 모듈 패턴 IIFE 만 예외). `jldfil25900`·`25910` 들여쓰기 4-스페이스 통일+js-beautify 재포맷, `jldfil25910` 화면 인라인 IIFE 8건(값 추출 6·값 쓰기 1·파일컨트롤 폴백 1)→ 명명 헬퍼 3종(`getDmaValue`·`setComponentText`·`resolveFileControlRoot`) 전환·수정 가이드 §4.5 반영(`jldfil25900` 은 IIFE 0 재확인) — 화면 IIFE 잔존 0·XML WF·JS 구문 OK·CI green
 - `d59962e`·`6b32da3` (09-04) — [연관] **code-convention 초기화·명명·변수 규약 추가 + jsp-front 2화면 변환**(`src/docs`·`src/conversion`, gcc 무변경): 규약 신설(IIFE·onpageload 오버라이딩 금지·init_* 순차·onpageload 2구역 최상단·미사용 scwin 전역 삭제·5구역 camelCase), jsp-front `jldfil25900`·`jldfil25910` 을 규약 준수 변환(IIFE→명명함수·오류처리 통일·엄격비교·미참조 캐싱 전역 44+96 삭제·JSDoc 11+39)+화면별 수정 가이드 md 동봉
@@ -329,6 +335,11 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-09-07 | `2a987d1` | style(docs): validate-generator 전체 폭 레이아웃 전환 — [연관, gcc 무변경] |
+| 2026-09-07 | `6232c44` | feat(gcc): 동적 컬럼 그리드 공통함수 syncDataListColumns·buildGridStyleXml 신설 (315→317 메서드) |
+| 2026-09-04 | `78a29d9` | fix(conversion): ULDFIS00600 멀티로우 헤더 미적용 — setColumns→setGridStyle 전환 — [연관, gcc 무변경] |
+| 2026-09-04 | `963ceb0` | chore(engine): WebSquare 엔진 스냅샷 최신화 + beautified 재생성 — [연관, gcc 무변경] |
+| 2026-09-04 | `0c2230c` | docs(conversion): jsp-front 변환작업 보고서 HTML 신설 — [연관, gcc 무변경] |
 | 2026-09-04 | `b0ddf06` | feat(conversion): sample-front gridView 동적 컬럼 샘플(ULDFIS00600) 신설 — setColumns·executeDynamic async/await — [연관, gcc 무변경] |
 | 2026-09-04 | `7ec2732` | refactor(conversion): jldfil25910 화면 인라인 IIFE 전면 제거 + code-convention 규칙 — [연관, gcc 무변경] |
 | 2026-09-04 | `5a75a16` | style(conversion): jsp-front jldfil25900·25910 script 코드 뷰티파이 — [연관, gcc 무변경] |
