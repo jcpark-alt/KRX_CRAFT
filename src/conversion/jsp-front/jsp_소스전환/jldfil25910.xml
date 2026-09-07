@@ -724,17 +724,6 @@ scwin.tx_fn_register = async function() {
 
 /**
  * @method
- * @name tx_fn_FileDown
- * @description 첨부파일 다운로드 요청을 전송한다($c.data.downFile).
- * @returns {void}
- * @hidden N
- */
-scwin.tx_fn_FileDown = async function() {
-    return await $c.data.downFile("filedown.do", "", ($c.util.getComponent("dma_FileDownReq") ? $c.util.getComponent("dma_FileDownReq").getJSON() : {}));
-};
-
-/**
- * @method
  * @name tx_fn_modifiyDate
  * @description 배당기준일 수정 가능 여부를 서버에 조회한다. 응답 실패 시 메시지를 알린다.
  * @returns {void}
@@ -762,24 +751,34 @@ scwin.tx_fn_modifiyDate = async function() {
 /**
  * @method
  * @name fn_list
- * @description 목록 화면(jldfil25900)으로 이동한다.
+ * @description 목록 화면 전환 제출 — dividendDateForm 전송 필드를 params 로 수집해
+ *  dividendBaseDate.do(method=dividendDateList)로 동적 폼 POST 제출한다(JSP 페이지 전환 의미 보존).
  * @returns {void}
  * @hidden N
  */
 scwin.fn_list = function() {
-    // TODO 규칙19-보류: form 제출 재설계와 함께 전환
-    $('#dividendDateForm').append('<input type="hidden" name="method" id="method" />');
     $c.util.getComponent("dma_listReq").set("method", "dividendDateList");
-    // TODO 규칙19-보류: form 제출 재설계와 함께 전환
-    $('#dividendDateForm').attr("action", "dividendBaseDate.do");
-    $('#dividendDateForm').attr("onsubmit", "");
-    $c.win.moveUrl("/jldfil25900/jldfil25900.xml");
+    // dividendDateForm 전송 필드 실측(bzProcsNo/isurCd/basYy/divBasDdYn/divBasDd/주주명부·이익배당) + method
+    // → params 수집 후 동적 폼 제출. 파일 컨트롤 upd_attachFile(name=attachFile)은 목록 전환에 불필요하여 제외.
+    const params = {
+        "method": $c.util.getComponent("dma_listReq").get("method"),
+        "bzProcsNo": $c.util.getComponent("ipt_bzProcsNo").getValue(),
+        "isurCd": $c.util.getComponent("ipt_isurCd").getValue(),
+        "basYy": $c.util.getComponent("ipt_basYy").getValue(),
+        "divBasDdYn": $c.util.getComponent("rd_divBasDdYn").getValue(),
+        "divBasDd": $c.util.getComponent("cal_divBasDd").getValue(),
+        "shrhdNmlistClsBasddContn": $c.util.getComponent("txa_shrhdNmlistClsBasddContn").getValue(),
+        "proftDivRemk": $c.util.getComponent("txa_proftDivRemk").getValue()
+    };
+    $c.win.openFormSubmit("dividendBaseDate.do", params);
 };
 
 /**
  * @method
  * @name fn_register
- * @description 수정 가능 여부 확인·검증 후 등록을 실행한다.
+ * @description 수정 가능 여부 확인·검증 후 등록을 실행한다. 저장 제출은 dividendDateForm 이
+ *  파일 컨트롤(upd_attachFile, name=attachFile)을 폼으로 전송하는 multipart 제출이라 openFormSubmit
+ *  전환 대상에서 제외(원형 유지)한다.
  * @returns {void}
  * @hidden N
  */
@@ -789,10 +788,10 @@ scwin.fn_register = async function() {
         if (!await $c.win.confirm("저장하시겠습니까")) {
             return;
         }
-        // TODO 규칙19-보류: form 제출 재설계와 함께 전환
+        // TODO form-재설계-보류: multipart 파일 전송 — 파일 업로드 API 재설계 필요
+        // (dividendDateForm 은 upd_attachFile[name=attachFile] 파일을 폼으로 전송 — openFormSubmit 으로 파일 이관 불가)
         $('#dividendDateForm').append('<input type="hidden" name="method" id="method" />');
         $c.util.getComponent("dma_listReq").set("method", "dividendDateRegister");
-        // TODO 규칙19-보류: form 제출 재설계와 함께 전환
         $('#dividendDateForm').attr("action", "dividendBaseDate.do");
         $('#dividendDateForm').attr("onsubmit", "");
         await scwin.tx_fn_register();
@@ -912,13 +911,17 @@ scwin.fn_validation = async function() {
  * @hidden N
  */
 scwin.fn_fileDel = async function(ipt_attachFileNm) {
-    let msg = ipt_attachFileNm + " 첨부파일을 삭제하시겠습니까?\n삭제된 파일은 복구가 불가능합니다.";
+    const msg = ipt_attachFileNm + " 첨부파일을 삭제하시겠습니까?\n삭제된 파일은 복구가 불가능합니다.";
     if (!await $c.win.confirm(msg)) {
         return;
     }
     scwin.filebox.setStyle("display", "");
-    // TODO 규칙19-보류: form 제출 재설계와 함께 전환 (폼 내 동적 첨부 목록 정리)
-    $("#attachFileList").remove();
+    // 폼 제출 재설계로 DOM 폼 정리 목적은 소멸(attachFileList 는 전송 필드 없는 표시 영역) —
+    // 삭제된 첨부 링크 숨김(UI)만 컴포넌트 API 로 유지한다(구 jQuery #attachFileList remove 대체).
+    const attachList = $c.util.getComponent("attachFileList");
+    if (attachList && attachList.setStyle) {
+        attachList.setStyle("display", "none");
+    }
     $c.util.getComponent('upd_attachFile').setValue("");
     scwin.delck = "Y";
 };
@@ -986,27 +989,24 @@ scwin.fn_calBytes = function(str) {
 /**
  * @method
  * @name fn_FileDown
- * @description 첨부파일 다운로드 폼을 구성해 전송한다.
- * @param {Object} ipt_contnId
- * @param {Object} ipt_attachFileNm
+ * @description 첨부파일 다운로드 제출 — dividendDateAttachForm 전송 필드(method/contnId/attachFileNm)를
+ *  params 로 수집해 dividendDateFiledown.do 로 동적 폼 POST 제출한다(Content-Disposition 파일 다운로드 의미 보존).
+ * @param {Object} ipt_contnId 콘텐츠 아이디(업무처리번호)
+ * @param {Object} ipt_attachFileNm 첨부파일명
  * @returns {void}
  * @hidden N
  */
-scwin.fn_FileDown = async function(ipt_contnId, ipt_attachFileNm) {
-    let frm = (document.DividendDateAttachForm || {
-        elements: []
-    });
-    // TODO 규칙19-보류: form 제출 재설계와 함께 전환
-    $('#dividendDateAttachForm').append('<input type="hidden" name="method" id="method" />');
-    $('#dividendDateAttachForm').attr("action", "dividendDateFiledown.do");
+scwin.fn_FileDown = function(ipt_contnId, ipt_attachFileNm) {
     $c.util.getComponent("dma_listReq").set("method", "dividendDateAttachFile");
-    // TODO 규칙19-보류: form 제출 재설계와 함께 전환
-    $('#dividendDateAttachForm').attr("onsubmit", "");
     $c.util.getComponent('ipt_contnId').setValue(ipt_contnId);
     $c.util.getComponent('ipt_attachFileNm').setValue(ipt_attachFileNm);
-    await scwin.tx_fn_FileDown();
-    // TODO 규칙19-보류: form 제출 재설계와 함께 전환 (동적 히든 정리)
-    $("#method").remove();
+    // dividendDateAttachForm 전송 필드 실측(contnId/attachFileNm) + method → params 수집 후 동적 폼 제출
+    const params = {
+        "method": $c.util.getComponent("dma_listReq").get("method"),
+        "contnId": $c.util.getComponent("ipt_contnId").getValue(),
+        "attachFileNm": $c.util.getComponent("ipt_attachFileNm").getValue()
+    };
+    $c.win.openFormSubmit("dividendDateFiledown.do", params);
 };
 
 /**

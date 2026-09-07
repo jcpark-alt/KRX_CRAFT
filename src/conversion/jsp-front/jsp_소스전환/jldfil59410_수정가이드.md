@@ -60,3 +60,34 @@
 - **#1·#2 ev 속성 이관 불가 사유**: body 마크업 실측 결과 `form_search`/`chkNumber` 클래스를 가진 컴포넌트 **0건**(해당 토큰은 script 내부에만 존재) — `ev:onblur`/`ev:onkeyup` 이관 대상 컴포넌트가 없다. 원본 JSP 잔재 클래스가 배포 DOM(파일 컨트롤 등)에 존재할 가능성에 대비해 jQuery 를 제거하고 동등한 표준 DOM 바인딩으로 대체했다(jQuery `return false` 는 `e.preventDefault()`+`e.stopPropagation()` 으로 등가 치환, `this`=바인딩 요소 유지). publicInfo 변경 없음.
 - **보류**: 0건.
 - **검증**: script CDATA 추출 → `node --check` 통과, jQuery 잔존 0건(보류 0건과 일치), `wsxml_lint --min-severity error` 0 errors.
+
+## form 제출 재설계 — $c.win.openFormSubmit 전환 (2026-09-07)
+
+as-is JSP 의 insertForm/downloadForm 제출 기계부를 gcc 공통함수 `$c.win.openFormSubmit(url, params)` 기반으로 재설계했다. 중간 산출물이던 executeDynamic 서브미션(tx_fn_Delete·tx_fn_RetrRequest·tx_fn_DownloadFile, AJAX 재해석)은 페이지 전환·파일 다운로드 의미와 어긋나 제거하고, 각 제출 지점이 openFormSubmit 을 직접 호출한다(POST 기본 = as-is form POST). 파일을 multipart 전송하는 fn_Register 는 보류.
+
+### 제출 지점별 전환표
+
+| 제출 지점 | 구 흐름 | URL | params 근거 |
+|-----------|---------|-----|-------------|
+| `fn_Delete()` | `scwin.form.action` 설정 + dma_RegisterReq.set(method=`delete`) + confirm + tx_fn_Delete(executeDynamic, ref dma_DeleteReq) | `/listInvstg/specyValuAppl.do` | `dma_RegisterReq.getJSON()` — as-is 는 insertForm 전체 필드 제출. body 실측 결과 모든 입력이 `data:dma_RegisterReq.*` 바인딩이라 이를 params 원천으로 확정(구 ref 였던 dma_DeleteReq 는 바인딩 0건·항상 빈 전문 — Stage-2 산출 결함) |
+| `fn_RetrRequest()` | `scwin.form.action` 설정 + dma_RegisterReq.set(method=`retrReqSubmit`) + confirm + tx_fn_RetrRequest(executeDynamic, ref dma_RetrRequestReq) | `/listInvstg/specyValuAppl.do` | `dma_RegisterReq.getJSON()` — 위와 동일(dma_RetrRequestReq 미사용). bzProcsNo 인자 미사용은 as-is 로직 그대로 보존 |
+| `fn_DownloadFile(fileTpCd, fileSeq)` | `document.downloadForm.action` 설정 + dma_RegisterReq.set(method=`downloadFile`·fileTpCd·fileSeq) + tx_fn_DownloadFile(executeDynamic, ref dma_DownloadFileReq) | `/listInvstg/specyValuAppl.do` | 직접 구성 객체 `{ method: "downloadFile", fileTpCd, fileSeq }` — body 실측: downloadForm(form_466)의 필드는 hidden 3종(method·fileTpCd·fileSeq)뿐. as-is 에서 별도 폼이던 값을 dma_RegisterReq(신청서 전문)에 set 하던 오염(이후 등록 제출에 method=`downloadFile` 잔류 위험)도 함께 제거. 내부 await 소멸로 동기 함수화(호출부 await 무해) |
+
+- method 파라미터: 3지점 모두 `options.method` 미지정 = **POST**(as-is form POST 제출과 동일; 다운로드도 POST 회신으로 의미 보존), target `_self`.
+
+### 보류
+
+- **`fn_Register('write'/'edit')`** — insertForm 은 파일 컨트롤 7종(`fileTpCd01[0]`·`fileTpCd02[0~2]`·`fileTpCd13[0~2]`, `__krxFileControl` 로드 초기화)과 delAttachFile 이 재주입하는 `input[type=file]` 을 함께 전송하는 **multipart 폼**이라 hidden input 전용인 openFormSubmit 로 전환 불가 → 원형 유지 + `// TODO form-재설계-보류: multipart 파일 전송` 표기(JSDoc 에도 명기). `frm = (document.insertForm || { elements: [] })` 폴백·`frm.action`/`frm.skilBzTpCd[n].checked` 참조 일체 보존.
+- **`scwin.form` 전역(1구역 선언 + init_pageBody 의 `document.insertForm` 확보)** — 제출 용도 참조는 0건이 되었으나, setData 의 외부 공통 호출 4건(`$c.cm.fn_SetPhoneValue` ×3·`fn_SetEmaileValue` ×1)이 계약상 form 객체(`frm[name]` 접근)를 요구해 유지(선언부·확보부에 사유 주석).
+
+### 함께 정리한 항목
+
+- tx_fn_Delete·tx_fn_RetrRequest·tx_fn_DownloadFile 함수 3종 삭제(publicInfo 비등재라 XML 무변경). 4구역 헤더는 사유 주석으로 대체.
+- `slc_setEmail_onchange` 의 `document.insertForm.apctEmail2` → `$c.util.getComponent('ipt_apctEmail2')` 전환 — body 실측: `ipt_apctEmail2`(ref `data:dma_RegisterReq.apctEmail2`) 컴포넌트 존재. `$c.cm.fn_SelEmail` 계약 실측(as-is fil common 동일 함수: `_targetObj.setValue()`/`.focus()`)상 setValue 를 가진 **컴포넌트**가 적합(DOM input 은 setValue 부재로 오히려 계약 위반).
+- dataCollection 의 `dma_DeleteReq`·`dma_RetrRequestReq`·`dma_DownloadFileReq` 는 스크립트 참조 0건의 고아가 되었으나 body/dataCollection 무변경 원칙에 따라 XML 은 유지(후속 정리 후보).
+
+### 검증
+
+- script CDATA 추출 → `node --check` 통과.
+- `python -m wsxml_lint jldfil59410.xml --min-severity error` → 0 errors.
+- `document.폼`·`scwin.form` 잔존 = fn_Register(document.insertForm, multipart 보류)·setData 계약용 scwin.form 뿐 — 보류 목록과 일치. `.submit()`·`tx_fn_*` 잔존 0건.

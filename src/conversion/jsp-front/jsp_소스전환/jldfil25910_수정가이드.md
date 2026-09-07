@@ -160,3 +160,45 @@ jQuery 원시 DOM 조작 **14건 중 2건 전환·12건 보류**(§5 의 "규칙
 - [x] script CDATA 추출 → `node --check` OK
 - [x] jQuery 잔존 12건 = 보류 12건 일치 (전환 대상 잔존 0)
 - [x] `wsxml_lint --min-severity error` → 0 errors, `publicInfo="scwin.rd_divBasDdYn_onchange"` 정의 존재(WS201 없음)
+
+---
+
+## form 제출 재설계 — $c.win.openFormSubmit 전환 (2026-09-07)
+
+JSP form 제출 기계부를 gcc 공통함수 `$c.win.openFormSubmit(url, params)` (동적 hidden 폼 생성 후 POST 제출 — JSP 페이지 전환·Content-Disposition 다운로드 의미 보존, src/gcc/win.xml) 기반으로 재설계. 규칙 19 form 계열 보류 11건 중 **8건 삭제·3건 multipart 보류 전환**(외부 위젯 datepicker 1건은 범위 외 유지).
+
+### 제출 지점별 전환 (2건)
+
+| 함수 | 구 흐름 | URL | params 구성 | 근거 |
+|---|---|---|---|---|
+| `fn_list` | dividendDateForm 에 method hidden append + `dma_listReq.set("method","dividendDateList")` + action="dividendBaseDate.do"·onsubmit 해제(보류 jQuery 3건) → `moveUrl("/jldfil25900/...")` 근사 전환 | `dividendBaseDate.do` (POST) | `method`(dma_listReq 값) + `bzProcsNo`·`isurCd`·`basYy`(히든 인풋 getValue) + `divBasDdYn`(rd_divBasDdYn)·`divBasDd`(cal_divBasDd)·`shrhdNmlistClsBasddContn`·`proftDivRemk`(textarea getValue) | body dividendDateForm(xf:group) 내 name 보유 폼 컴포넌트 실측 전량. `upd_attachFile`(name=attachFile)은 파일이라 params 이관 불가 — 목록 전환 제출에 불필요하여 제외(주석 부기). `rd_divBasDdYn2`(동일 name, 비바인딩 읽기전용 영역)·`divBasDd_2` 등 div 는 전송 필드 아님 |
+| `fn_FileDown` | dividendDateAttachForm 에 method hidden append + action="dividendDateFiledown.do" + onsubmit 해제(보류 jQuery 3건) → `tx_fn_FileDown()`(`$c.data.downFile("filedown.do", …)` 근사·URL 상이) → `$("#method").remove()` 정리 | `dividendDateFiledown.do` (POST) | `method`(=dividendDateAttachFile, dma_listReq 값) + `contnId`·`attachFileNm`(setValue 후 getValue 실측) | body dividendDateAttachForm 내 바인딩 히든 인풋 2개(`ipt_contnId`[name=contnId]·`ipt_attachFileNm`[name=attachFileNm]) = 전송 필드 전량. 다운로드 제출은 페이지 전환 없이 Content-Disposition 저장 — openFormSubmit POST 로 원형 URL 복원 |
+
+- `fn_FileDown` 부속 정리: 미사용 잔재 `let frm = (document.DividendDateAttachForm || …)` 삭제, 근사 구현 `scwin.tx_fn_FileDown`(downFile "filedown.do" — 원 action 과 URL 상이) 은 미참조 사장 코드가 되어 함수째 삭제(publicInfo 미등재 — WS201 무관), await 소멸로 `fn_FileDown` 은 일반 함수화(호출부 `await` 는 유효).
+- `fn_list` 의 `moveUrl` 근사 전환 삭제 — 페이지 전환은 openFormSubmit 이 JSP 원형 그대로 수행.
+
+### 보류 (multipart 예외 1지점 + 범위 외 1건)
+
+| 함수 | 코드 | 사유 |
+|---|---|---|
+| `fn_register` | `$('#dividendDateForm').append('<input … name="method" …/>')` / `.attr("action", …)` / `.attr("onsubmit", "")` (3건, 원형 유지) | **multipart 파일 전송** — dividendDateForm 은 파일 컨트롤 `upd_attachFile`(name=attachFile)의 파일을 폼으로 전송하는 저장 제출이라 openFormSubmit 으로 파일 이관 불가. `// TODO form-재설계-보류: multipart 파일 전송 — 파일 업로드 API 재설계 필요` 로 TODO 갱신 |
+| `rd_divBasDdYn_onchange` | `$(".ui-datepicker-trigger").click()` | 외부 위젯(jQuery UI datepicker) — 이번 form 재설계 범위 아님(규칙19-보류 유지) |
+
+### fn_fileDel — `$("#attachFileList").remove()` 판단
+
+- attachFileList 는 전송 필드가 없는 표시 영역(xf:group 내 다운로드 앵커·파일명 textbox)이라 **폼 정리 목적은 재설계로 소멸**, 삭제된 첨부 링크 숨김(UI)은 여전히 필요 → `$c.util.getComponent("attachFileList").setStyle("display", "none")` 컴포넌트 API 로 전환(기존 `scwin.filebox.setStyle` 선례와 동일 계열 — querySelector 불요). 부수: `let msg` → `const msg`.
+
+### 삭제된 규칙19-보류 항목 (8건)
+
+| 함수 | 삭제된 코드 |
+|---|---|
+| `fn_list` | `$('#dividendDateForm').append('<input … name="method" …/>')` / `.attr("action", "dividendBaseDate.do")` / `.attr("onsubmit", "")` (3건) |
+| `fn_FileDown` | `$('#dividendDateAttachForm').append('<input … name="method" …/>')` / `.attr("action", "dividendDateFiledown.do")` / `.attr("onsubmit", "")` (3건) |
+| `fn_FileDown` | `$("#method").remove()` (동적 히든 정리 — openFormSubmit 이 자체 폼을 생성·제거하므로 불필요) |
+| `fn_fileDel` | `$("#attachFileList").remove()` (컴포넌트 API 숨김으로 전환) |
+
+### 검증
+
+- [x] script CDATA 추출 → `node --check` OK
+- [x] `wsxml_lint --min-severity error` → 0 errors (publicInfo 변경 없음 — 삭제된 tx_fn_FileDown 은 미등재)
+- [x] jQuery 잔존 4건 = 보류 4건(fn_register 3 + datepicker 1) 일치, `document.폼` 잔존 0건, `moveUrl` 잔존 0건, `openFormSubmit` 호출 2건(fn_list·fn_FileDown)

@@ -39,3 +39,19 @@
 - [x] __ 접두 지역변수 0
 - [x] 로직 동등(동작 변경 없음)
 - [x] node --check 통과
+
+## form 제출 재설계 — $c.win.openFormSubmit 전환 (2026-09-07)
+
+`document.XXXForm` + hidden 세팅 + `frm.action`/`frm.submit()` 기계부를 gcc 공통함수 `$c.win.openFormSubmit`(동적 hidden 폼 생성·POST 제출) 기준으로 재설계했다. body 실측: `listFeeReceiptForm`(form_8) 내 명명 필드는 startDate·endDate·period·pageSize·checkType(행 반복) 5종으로 전부 `dma_goPrintReq` ref 바인딩이며, 코드 관리 필드(method·pageIndex)도 같은 dataMap 이 보유 — 동일 키 집합의 dma_goTab2Req 전문이 이미 listFee.do 전송 전문으로 쓰인다(tx_fn_goTab2). `newReportForm` 은 빈 컨테이너 그룹(전송 필드·target 부재 실측).
+
+| 제출 지점 | 구 흐름 | 재설계 | URL·params 근거 |
+|-----------|---------|--------|------------------|
+| fn_searchList | `document.listFeeReceiptForm` → method 세팅 → `frm.submit()` | `$c.win.openFormSubmit('listFee.do', printReq.getJSON())` (POST·_self — JSP 페이지 전환 의미 보존) | URL: 같은 폼의 fn_goTab1/fn_goTab2 `frm.action='listFee.do'` + tx_fn_goTab2 action 동일. params: dma_goPrintReq 전문(method=searchListFeeReceipt 세팅 후) — 폼 명명 필드 전부 이 dataMap ref |
+| fn_printReceipt | `const frm = (document.listFeeReceiptForm ‖ …)` (미사용) | 폴백 선언 제거 | 제출 없음 — 체크 집계 후 fn_goPrint 위임뿐 |
+| fn_goPrint(success) | `const form = (document.newReportForm ‖ …)` (미사용) | 폴백 선언 제거 + 재설계 주석 | newReportForm 제출(→ /common/newPrint.do)은 tx_fn_goPrint 의 `$c.data.downFile` 로 파일 다운로드 의미 기보존. 새 창 target 실측: 부재(빈 그룹, window.open 연계 없음) |
+| fn_goTab1 | `frm.action='listFee.do'` 대입(제출 없음) | 무효 기계부 제거 — `$c.win.moveUrl` 화면 전환 유지 | as-is 탭 이동 제출은 이미 moveUrl(paramData method=searchListFeeCalc) 재설계 |
+| fn_goTab2 | `frm.action='listFee.do'` 대입(제출 없음) | 무효 기계부 제거 — tx_fn_goTab2(executeDynamic listFee.do, dma_goTab2Req) 유지 | as-is 초기 조회 제출은 이미 executeDynamic 재설계 |
+
+- **전환 1건**(fn_searchList — 유일한 실제 `.submit()`), **기계부 제거 4건**, **보류 0건**(multipart 파일 전송 폼 없음).
+- JSDoc 갱신: fn_searchList(openFormSubmit 제출 명시)·fn_goTab1·fn_goTab2(재설계 경위 명시).
+- **검증**: script CDATA 추출 → `node --check` 통과, `document.폼`·`.submit()` 잔존 0건(보류 0건과 일치, 주석 제외), `wsxml_lint --min-severity error` 0 errors(publicInfo 변경 없음).

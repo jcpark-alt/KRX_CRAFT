@@ -171,6 +171,7 @@ scwin.screenId = "jldfil52100";
 ///////// 1. 변수 및 선언 영역 /////////
 
 // as-is 흐름 보존 — 활성 폼 캐시(각 업무 함수 진입 시 prtDepoForm 으로 재설정)
+// TODO form-재설계-보류: multipart 파일 전송 — prtDepoForm 은 업로드(upd_attachFiles*, name="attachFiles[n]") 파일을 전송하므로 $c.win.openFormSubmit 전환 불가(원형 유지)
 scwin.form = null;
 
 
@@ -666,24 +667,6 @@ scwin.btn_updatePrtDepoWithd_2_onclick = async function (e) {
 
 /**
  * @method
- * @name tx_fn_FileDown
- * @description 첨부 파일을 다운로드한다(공용 $c.data.downFile, dma_FileDownReq 전문 사용). 실패 시 오류를 무통지 수집하고 null 을 반환한다.
- * @returns {Object} 다운로드 결과 객체(실패 시 null)
- * @hidden N
- * @example await scwin.tx_fn_FileDown();
- */
-scwin.tx_fn_FileDown = async function () {
-    try {
-        const fileDownReq = $c.util.getComponent("dma_FileDownReq");
-        return await $c.data.downFile("/listInvstg/lplAttach.do", "", (fileDownReq ? fileDownReq.getJSON() : {}));
-    } catch (_e) {
-        await $c.exception.handleError(_e, { notify: 'none', context: '다운로드' });
-        return null;
-    }
-};
-
-/**
- * @method
  * @name tx_insertPrtDepoWithd
  * @description 처분신청 신규 저장을 서버에 요청한다(/listInvstg/prtDepo.do, dma_insertPrtDepoWithdReq 전문). 응답 실패 시 서버 메시지를 알린다.
  * @returns {Object} executeDynamic 응답 객체(resObj, 통신 오류 시 null)
@@ -784,7 +767,7 @@ scwin.tx_sendPrtDepoWithd = async function () {
 /**
  * @method
  * @name fn_FileDown
- * @description 첨부파일 다운로드 전문(dma_FileDownReq)에 의무보유ID·신청 일련번호·파일 일련번호와 method(downloadPrtdepoFile)를 설정한 뒤 다운로드(tx_fn_FileDown)를 호출한다.
+ * @description 첨부파일 다운로드 — 의무보유ID·신청 일련번호·파일 일련번호와 method(downloadPrtdepoFile)를 전송 파라미터로 구성해 $c.win.openFormSubmit 으로 다운로드 폼을 제출한다(POST, as-is fileDownForm submit 의 파일 다운로드 의미 보존).
  * @param {String} prtDepoId 의무보유 ID
  * @param {String} prtDepoIdSeq 처분신청 일련번호
  * @param {String} attachFileSeq 첨부파일 일련번호
@@ -793,14 +776,14 @@ scwin.tx_sendPrtDepoWithd = async function () {
  * @example await scwin.fn_FileDown(prtDepoId, prtDepoIdSeq, attachFileSeq);
  */
 scwin.fn_FileDown = async function (prtDepoId, prtDepoIdSeq, attachFileSeq) {
-    const downForm = (document.fileDownForm || { elements: [] });
-    const fileDownReq = $c.util.getComponent('dma_FileDownReq');
-    fileDownReq.set('prtDepoId', prtDepoId);
-    fileDownReq.set('prtDepoIdSeq', prtDepoIdSeq);
-    fileDownReq.set('fileSeq', attachFileSeq);
-    downForm.action = '/listInvstg/lplAttach.do';
-    fileDownReq.set('method', 'downloadPrtdepoFile');
-    await scwin.tx_fn_FileDown();
+    // as-is: fileDownForm(action='/listInvstg/lplAttach.do') hidden 세팅 + submit — 폼 필드 실측: form_1 그룹은 빈 그룹, 전송 필드는 이 흐름이 세팅하던 4키
+    const params = {
+        method: 'downloadPrtdepoFile',
+        prtDepoId: prtDepoId,
+        prtDepoIdSeq: prtDepoIdSeq,
+        fileSeq: attachFileSeq
+    };
+    $c.win.openFormSubmit('/listInvstg/lplAttach.do', params);
 };
 
 
@@ -970,6 +953,7 @@ scwin.checkValue = async function () {
  * @example await scwin.insertPrtDepoWithd();
  */
 scwin.insertPrtDepoWithd = async function () {
+    // TODO form-재설계-보류: multipart 파일 전송(upd_attachFiles·upd_attachFiles_3) — openFormSubmit 전환 불가, 원형 유지
     scwin.form = (document.prtDepoForm || { elements: [] });
     scwin.form.action = '/listInvstg/prtDepo.do';
     $c.util.getComponent('dma_FileDownReq').set('method', 'write');
@@ -1015,6 +999,7 @@ scwin.insertPrtDepoWithd = async function () {
  * @example await scwin.updatePrtDepoWithd(2);
  */
 scwin.updatePrtDepoWithd = async function (updateType) {
+    // TODO form-재설계-보류: multipart 파일 전송(upd_attachFiles_2·upd_attachFiles_4) — openFormSubmit 전환 불가, 원형 유지
     scwin.form = (document.prtDepoForm || { elements: [] });
     const fileDownReq = $c.util.getComponent('dma_FileDownReq');
     fileDownReq.set('searchType', updateType);
@@ -1053,6 +1038,7 @@ scwin.updatePrtDepoWithd = async function (updateType) {
  * @example await scwin.sendPrtDepoWithd(prtDepoNo, updateType);
  */
 scwin.sendPrtDepoWithd = async function (prtDepoNo, updateType) {
+    // TODO form-재설계-보류: multipart 파일 전송(prtDepoForm 은 업로드 컴포넌트를 포함한 multipart 폼) — openFormSubmit 전환 불가, 원형 유지
     scwin.form = (document.prtDepoForm || { elements: [] });
     const rse = await $c.win.confirm("제출 하시겠습니까? ");
     if (rse) {

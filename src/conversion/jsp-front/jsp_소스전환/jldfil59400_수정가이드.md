@@ -41,3 +41,34 @@
 ## 5. 후속 정정 (wsxml_lint 전수 검사)
 
 - WS120 중복 컬럼 id 재부여(규칙 27): grd_pageList 내 `column1`→`column1_2`, `column5`→`column5_2` — 스크립트 참조 0건 확인, 원본 유래 결함
+
+## form 제출 재설계 — $c.win.openFormSubmit 전환 (2026-09-07)
+
+as-is JSP 의 searchForm 제출 기계부(`scwin.form = document.searchForm` + `form.action` 설정 + submit)를 gcc 공통함수 `$c.win.openFormSubmit(url, params)` 기반으로 재설계했다. 중간 산출물이던 executeDynamic 서브미션(tx_viewDetail·tx_fn_Search·tx_fn_EditStatus, AJAX 재해석)은 JSP 페이지 전환 의미와 어긋나 제거하고, 각 제출 지점이 openFormSubmit 을 직접 호출한다(POST 기본 = as-is form POST).
+
+### 제출 지점별 전환표
+
+| 제출 지점 | 구 흐름 | URL | params 근거 |
+|-----------|---------|-----|-------------|
+| `viewDetail(bzProcsNo, strLoadTp)` | `scwin.form.action` 설정 + dma_viewDetailReq set(bzProcsNo·method=`editForm`·loadTp) + tx_viewDetail(executeDynamic) | `/listInvstg/specyValuAppl.do` | `dma_viewDetailReq.getJSON()` — set 3건 반영 후 전문 전체(beginIndex·bzProcsNo·isurCd·ldMktTpCd·loadTp·method·pageIndex·pageSize·regId = as-is searchForm hidden 필드 집합) |
+| `fn_Search()` | `scwin.form.action` 설정 + tx_fn_Search(executeDynamic, ref dma_SearchReq) | `/listInvstg/specyValuAppl.do` | `dma_viewDetailReq.getJSON()` — as-is 는 method 재설정 없이 searchForm 현재 값 그대로 제출. 화면 바인딩(slc_pageSize ref·pageIndex set)이 전부 dma_viewDetailReq 라 이를 params 원천으로 확정(구 ref 였던 dma_SearchReq 는 바인딩 0건·항상 빈 전문 — Stage-2 산출 결함) |
+| `fn_EditStatus(bzProcsNo, strMethod, strMsg)` | `scwin.form.action` 설정 + dma_viewDetailReq set(method·bzProcsNo) + confirm + tx_fn_EditStatus(executeDynamic, ref dma_EditStatusReq) | `/listInvstg/specyValuAppl.do` | `dma_viewDetailReq.getJSON()` — set 2건(method=`applSubmit` 등) 반영 후 전문 전체(dma_EditStatusReq 도 바인딩 0건이라 미사용) |
+
+- method 파라미터: 3지점 모두 `options.method` 미지정 = **POST** (as-is searchForm POST 제출과 동일), target `_self`(페이지 전환).
+- `viewDetail`·`fn_Search` 는 내부 await 소멸로 동기 함수화(호출부 `await` 는 무해하여 유지).
+
+### 정리(제거) 항목
+
+- `scwin.form = null`(1구역)·`scwin.form = (document.searchForm || { elements: [] })`(init_pageBody) 전역·폴백 제거 — 전환 후 참조 전수 0건 확인. init_pageBody JSDoc·onpageload 순번 주석 동반 갱신.
+- tx_viewDetail·tx_fn_Search·tx_fn_EditStatus 함수 3종 삭제(publicInfo 비등재라 XML 무변경). 4구역 헤더는 사유 주석으로 대체.
+- dataCollection 의 `dma_SearchReq`·`dma_EditStatusReq` 는 스크립트 참조 0건의 고아가 되었으나 body/dataCollection 무변경 원칙에 따라 XML 은 유지(후속 정리 후보).
+
+### 보류
+
+- 없음 (이 화면은 파일 전송 폼 없음).
+
+### 검증
+
+- script CDATA 추출 → `node --check` 통과.
+- `python -m wsxml_lint jldfil59400.xml --min-severity error` → 0 errors.
+- `document.searchForm`·`.submit()`·`scwin.form`·`tx_*` 잔존 0건 = 보류 목록(0건)과 일치.

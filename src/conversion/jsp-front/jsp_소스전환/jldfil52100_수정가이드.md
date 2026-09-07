@@ -39,3 +39,36 @@
 - [x] __ 접두 지역변수 0
 - [x] 로직 동등(동작 변경 없음)
 - [x] node --check 통과
+
+## form 제출 재설계 — $c.win.openFormSubmit 전환 (2026-09-07)
+
+JSP form 제출 기계부를 gcc `$c.win.openFormSubmit(url, params)` 기반으로 재설계. 이 화면의 폼은 2벌 — `fileDownForm`(form_1, **빈 그룹**: named 입력 0건, 다운로드 요청 전용)과 `prtDepoForm`(form_10, `w2:upload` 4개 — `upd_attachFiles`/`_2`/`_3`/`_4`, `name="attachFiles[0]/[1]"` — 를 포함한 **multipart 폼**). multipart 예외 규칙에 따라 prtDepoForm 계열 제출은 전량 보류.
+
+### 제출 지점별 전환 (전환 1건 · 보류 3건)
+
+| 제출 지점 | 구 흐름 | 처리 | URL·params 근거 |
+|---|---|---|---|
+| fn_FileDown | `document.fileDownForm` 참조 + `downForm.action='/listInvstg/lplAttach.do'`(미사용 대입) + dma_FileDownReq 세팅 → tx_fn_FileDown($c.data.downFile) | **전환** | `$c.win.openFormSubmit('/listInvstg/lplAttach.do', params)` POST — params = { method:'downloadPrtdepoFile', prtDepoId, prtDepoIdSeq, fileSeq } (form_1 빈 그룹 실측 + 이 흐름이 세팅하던 4키 = as-is fileDownForm hidden 필드 집합; 파일 다운로드 의미 보존) |
+| insertPrtDepoWithd | `scwin.form=(document.prtDepoForm‖…)` + `action='/listInvstg/prtDepo.do'` + tx_insertPrtDepoWithd | **보류** | multipart 파일 전송(upd_attachFiles·upd_attachFiles_3 필수 선택 검사 후 제출) — 원형 유지 + `// TODO form-재설계-보류` 표기 |
+| updatePrtDepoWithd | `scwin.form=(document.prtDepoForm‖…)` + `action='/listInvstg/prtDepo.do'` + tx_updatePrtDepoWithd | **보류** | multipart 파일 전송(searchType 2/3 재업로드 upd_attachFiles_2·upd_attachFiles_4) — 원형 유지 + TODO 표기 |
+| sendPrtDepoWithd | `scwin.form=(document.prtDepoForm‖…)` + `action='/listInvstg/prtDepoList.do'` + tx_sendPrtDepoWithd | **보류** | prtDepoForm 자체가 업로드 컴포넌트를 포함한 multipart 폼 — 원형 유지 + TODO 표기 |
+
+부수 정리:
+
+- fn_FileDown 전환에 따라 tx_fn_FileDown 삭제(호출 잔존 0건), 미사용 `downForm.action` 대입 흐름(§3 보류 항목이던 것)과 dma_FileDownReq 임시 세팅 4건(prtDepoId·prtDepoIdSeq·fileSeq·method — 다른 소비처 0건 확인) 제거 — 전송 파라미터 객체 직접 구성으로 대체.
+- 1구역 `scwin.form` 전역과 그 캐시 재설정(init_pageBody·checkValue) — prtDepoForm 보류 계열이 계속 사용하므로 **유지**(1구역 선언부에 보류 사유 TODO 주석 부기).
+- `filePrtDepoWithd()` 미정의 전역 호출(§3 원본 유래 결함) — 지시대로 무변경.
+
+### 보류 잔존 목록 (`document.폼` 참조 = 아래 5곳, `.submit()` 잔존 0건)
+
+1. 1구역 다음의 init_pageBody `scwin.form = (document.prtDepoForm || { elements: [] })` — 활성 폼 캐시(as-is body onload 대응)
+2. checkValue 동일 캐시 재설정 — 보류 제출 함수들의 선행 검증 경로
+3. insertPrtDepoWithd — multipart 보류(TODO 표기)
+4. updatePrtDepoWithd — multipart 보류(TODO 표기)
+5. sendPrtDepoWithd — multipart 보류(TODO 표기)
+
+### 검증 결과
+
+- script CDATA 추출 → `node --check` OK
+- `python -m wsxml_lint jldfil52100.xml --min-severity error` → 1 files, 0 errors, 0 warnings
+- `document.폼` 잔존 5곳 = 위 보류 목록과 일치, tx_fn_FileDown/downFile/downForm 참조 잔존 0건

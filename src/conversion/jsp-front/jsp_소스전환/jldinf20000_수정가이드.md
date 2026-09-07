@@ -61,3 +61,15 @@
 - **신설 함수**: `scwin.ipt_isurNm1_onkeydown`(publicInfo 등재), `scwin.setSearchRadioChecked`·`scwin.searchRadioClickCommon`(비이벤트 헬퍼 — 기존 cgSearch 등과 동일하게 publicInfo 미등재). 18개 라디오 핸들러 JSDoc @description 에 공통 호출 반영.
 - **주의(의미 드리프트 기록)**: as-is 라디오 checked 는 브라우저 name 공유로 상호 배타였으나, 전환 후 각 select1 컴포넌트 값은 개별 관리된다(#6 getValue 비교는 도달 불가 코드라 실동작 영향 없음).
 - **검증**: script CDATA 추출 → `node --check` 통과, jQuery 잔존 6건(보류 6건과 일치, 주석 제외), `wsxml_lint --min-severity error` 0 errors(신설 핸들러 publicInfo 등재로 WS201 없음).
+
+## form 제출 재설계 — $c.win.openFormSubmit 전환 (2026-09-07)
+
+`popup_form`(onPopupCode) 제출 기계부 실측·재설계. body 실측: `popup_form` 은 빈 컨테이너 그룹(`<xf:group id="popup_form" name="popupForm"/>`, 전송 필드 0건)이고 함수 내 `.submit()` 호출은 부재 — as-is 의 `window.open('', 'winPop')` + `popup_form[target=winPop]` → `/srch/srch.do?method=srchPopup{type}` 제출은 Stage-1 에서 이미 `$c.win.openPopup("/jldinf20000p/jldinf20000p.xml", …, dma_onPopupCodeReq.getJSON())`(pageFramePopup + paramData 전달) + 팝업 화면 자체 조회로 재설계된 상태였다.
+
+| 제출 지점 | 구 흐름 | 재설계 | 판단 근거 |
+|-----------|---------|--------|-----------|
+| onPopupCode | `const fm = (document.popup_form ‖ …)` + `fm.action = "/srch/srch.do?method=srchPopup"+type` (제출 없음) | 무효 기계부 제거(폴백 선언·action 대입) + 재설계 경위 주석 | 잔존 action 대입은 xf:group div 프로퍼티 대입으로 무효. `openFormSubmit(url, params, { target: 'winPop' })` 전환은 부적합 — WebSquare pageFramePopup(iframe) 과 별개로 네이티브 winPop 창을 새로 열어 원 JSP 응답을 띄우게 되어 to-be 팝업 흐름과 충돌한다. type 정보는 dma_hiddenStore.ipt_stdcdType 로 보존 |
+
+- **전환 0건·기계부 제거 1건·보류 0건**(popup_form 은 제출·값 참조 모두 아님 → 컴포넌트 전환도 불요). `tx_onPopupCode`(srchPopup executeDynamic 스텁, 미호출)는 원형 유지.
+- **범위 외 잔존** (`document.폼` 3건 — 이번 과제 대상 아님, 후속 form 재설계 대상): fn_Download(`document.JLDINF20000` — action 분기 대입 후 tx_fn_Download, 도달 불가 보존 코드 내), open_corp_cd(`document.JLDINF20000` — as-is 전역 `fn_popupCorpSearch2` 가 폼 객체를 인자로 받는 계약), fn_search(`document.JLDINF20000` — action/target 대입만, 조회는 tx_fn_search 기재설계).
+- **검증**: script CDATA 추출(두 번째 CDATA, `<script lazy` 앵커) → `node --check` 통과, `.submit()` 잔존 0건·`document.폼` 잔존 3건 = 범위 외 목록과 일치, `wsxml_lint --min-severity error` 0 errors(publicInfo 변경 없음).

@@ -55,3 +55,15 @@
 - **ev 속성 이관**: 해당 없음(이벤트 바인딩 아님). publicInfo·body 마크업 변경 없음.
 - **보류**: 0건.
 - **검증**: script CDATA 추출 → `node --check` 통과, jQuery 잔존 0건(보류 0건과 일치), `wsxml_lint --min-severity error` 0 errors.
+
+## form 제출 재설계 — $c.win.openFormSubmit 전환 (2026-09-07)
+
+`popup_form`(onPopupCode) 제출 기계부 실측·재설계 — 부모 화면(jldinf20000)과 동일 패턴. body 실측: `popup_form` 은 빈 컨테이너 그룹(전송 필드 0건), 함수 내 `.submit()` 부재. as-is 의 `popup_form[target=winPop]` → `/srch/srch.do?method=srchPopup{type}` 제출은 이미 `$c.win.openPopup("/jldinf20000p/jldinf20000p.xml", …, dma_onPopupCodeReq.getJSON())` + 팝업 화면 자체 조회로 재설계된 상태였다.
+
+| 제출 지점 | 구 흐름 | 재설계 | 판단 근거 |
+|-----------|---------|--------|-----------|
+| onPopupCode | `const fm = (document.popup_form ‖ …)` + `fm.action = "/srch/srch.do?method=srchPopup"+type` (제출 없음) | 무효 기계부 제거(폴백 선언·action 대입) + 재설계 경위 주석 | 잔존 action 대입은 무효(div 프로퍼티). `openFormSubmit(target:'winPop')` 전환은 pageFramePopup 흐름과 충돌(별개 네이티브 창 생성)이라 부적합. type 정보는 dma_hiddenStore.ipt_stdcdType 로 보존(122→12 정규화 포함) |
+
+- **전환 0건·기계부 제거 1건·보류 0건**. `tx_onPopupCode`(srchPopup executeDynamic 스텁, 미호출)는 원형 유지.
+- **범위 외 잔존** (`document.` 3건 — 이번 과제 대상 아님): open_corp_cd(`document.JLDINF20000p` — as-is 전역 `fn_popupCorpSearch2` 폼 객체 인자 계약), fn_search(`document.JLDINF20000p` — action/target 대입만, 조회는 tx_fn_search 기재설계), fn_search 의 `document.querySelectorAll('input[name="list_cd3"]:checked')`(규칙 19 표준 DOM 조회 — 폼 제출 아님).
+- **검증**: script CDATA 추출(두 번째 CDATA, `<script lazy` 앵커) → `node --check` 통과, `.submit()` 잔존 0건·`document.폼` 잔존 2건 = 범위 외 목록과 일치, `wsxml_lint --min-severity error` 0 errors(publicInfo 변경 없음).

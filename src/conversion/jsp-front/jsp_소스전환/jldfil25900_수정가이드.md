@@ -204,3 +204,36 @@ body 히든 인풋 3개의 유지 주석도 "DOM 참조" → "컴포넌트 API �
 - [x] script CDATA 추출 → `node --check` OK
 - [x] jQuery 잔존 2건 = 보류 2건 일치 (전환 대상 잔존 0)
 - [x] `wsxml_lint --min-severity error` → 0 errors (ev 이관 없음 — publicInfo 변경 없음)
+
+---
+
+## form 제출 재설계 — $c.win.openFormSubmit 전환 (2026-09-07)
+
+JSP form 제출 기계부를 gcc 공통함수 `$c.win.openFormSubmit(url, params)` (동적 hidden 폼 생성 후 POST 제출 — JSP 페이지 전환 의미 보존, src/gcc/win.xml) 기반으로 재설계. **body 실측 결과 dividendDateForm(xf:group)에 파일 컨트롤이 없어 multipart 예외 없음 → 제출 2건 전면 전환**, 규칙 19 보류 2건 전량 해소.
+
+### 제출 지점별 전환 (2건)
+
+| 함수 | 구 흐름 | URL | params 구성 | 근거 |
+|---|---|---|---|---|
+| `goWrite` | ipt_method="dividendDateModifiy"·ipt_status="R" setValue → form action="dividendBaseDate.do" 설정(보류 jQuery) → `moveUrl("/jldfil25910/...")` 근사 전환 | `dividendBaseDate.do` (POST) | `method`·`status`·`bzProcsNo` — setValue 후 각 컴포넌트 `getValue()` 실측값 | body dividendDateForm 내 바인딩 히든 인풋 3개(`ipt_method`[name=method]·`ipt_status`[name=status]·`ipt_bzProcsNo`[name=bzProcsNo]) = 폼이 전송하던 필드 전량 |
+| `goView` | 동일 + ipt_status=`await fn_modifiyDate()` 값·ipt_bzProcsNo=선택 행 → form action 설정 → moveUrl 근사 전환 | `dividendBaseDate.do` (POST) | 상동 (`status` 는 `setValue(await scwin.fn_modifiyDate())` 인자 원형 유지 — 동작 변경 금지) | 상동 |
+
+- **setValue → getValue 왕복 수집**: 폼이 실제 전송하던 name=value 를 컴포넌트 실측값 그대로 params 에 담고, `dma_goWriteReq` 바인딩 상태 갱신도 기존과 동일하게 유지.
+- `$c.win.moveUrl` 2건 삭제 — 페이지 전환은 `openFormSubmit` POST(target `_self`)가 JSP 원형 그대로 수행(전환 이중화 제거).
+
+### 삭제된 규칙19-보류 항목 (2건)
+
+| 함수 | 삭제된 코드 |
+|---|---|
+| `goWrite` | `$("form[name='dividendDateForm']").attr("action", "dividendBaseDate.do")` (+ TODO 주석) |
+| `goView` | 상동 |
+
+### 보류 (0건)
+
+- dividendDateForm 에 input[type=file]/파일 컨트롤 없음 → multipart 예외 해당 없음.
+
+### 검증
+
+- [x] script CDATA 추출 → `node --check` OK
+- [x] `wsxml_lint --min-severity error` → 0 errors (publicInfo 변경 없음)
+- [x] jQuery 잔존 0건 = 보류 0건 일치, `document.폼`·`moveUrl` 잔존 0건, `openFormSubmit` 호출 2건
