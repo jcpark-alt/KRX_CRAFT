@@ -118,7 +118,7 @@ scwin.init_conds     = function () { $c.util.evalConds(binds); };
 - 초기화 IIFE 는 정의만 하고 `onpageload` 에서 호출한다(위 초기화 절 참조).
 - **오버라이딩 금지**: `var __prev = scwin.onpageload;` 형태의 래핑을 만들지 않는다. `scwin.onpageload` 는 파일당 1회만 정의한다.
 - **순차 호출 순서는 데이터 의존성**을 따른다(파라미터 수신 → 파생값 충전 → 화면 렌더/조건 평가). 렌더가 데이터를 기다리려 `setTimeout` 다중 예약에 의존하지 말고 **선행 함수 완료 후 호출**로 순서를 보장한다. 비동기 초기화면 `onpageload`/`init_*` 를 `async`/`await` 로 전환해 순차 배치한다.
-- 진입점이므로 `onpageload` 를 단일 try/catch + `$c.exception.handleError` 로 감싼다(오류 처리 절·규칙 26 정합). 정답지: `src/conversion/jsp-front/jldfil25900.xml`.
+- 진입점이므로 `onpageload` 를 단일 try/catch + `$c.exception.handleError` 로 감싼다(오류 처리 절·규칙 26 정합). 정답지: `src/conversion/jsp-front/jsp_소스전환/jldfil25900.xml`.
 
 ## 서브미션 — async/await 순차 실행 우선
 
