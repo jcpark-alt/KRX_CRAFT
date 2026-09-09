@@ -64,281 +64,440 @@
         	</xf:submission>
         </xf:model>
         <w2:layoutInfo/>
-        <w2:publicInfo method=""/>
-        <script lazy="false" type="text/javascript"><![CDATA[
-///////// 1. 변수 및 선언 영역 /////////
+        <w2:publicInfo method="scwin.sbm_code_submitdone,scwin.sbm_rsnclss_submitdone,scwin.sbm_detail_submitdone,scwin.sbm_save_submitdone,scwin.onpageload,scwin.ibx_formEngNm_onkeyup,scwin.sbx_ldMktTpCd_onviewchange,scwin.sbx_wrtrptMaindocTpCd_onviewchange,scwin.sbx_formUpclssCd_onviewchange,scwin.sbx_rsnClssCd_onviewchange,scwin.sbx_inqdisclsTpCd_onviewchange,scwin.btn_cancel_onclick,scwin.btn_update_onclick"></w2:publicInfo><script lazy="false" type="text/javascript"><![CDATA[///////// 1. 변수 및 선언 영역 /////////
 scwin.rsnClssCd = "";
 
 // 최초에 값셋팅용으로 사용하는 변수
 
 ///////// 2. 초기화 영역 /////////
-            scwin.onpageload = async function () {
 
-                dma_search.set("formCd", $c.data.getParameter("formCd"));
-                dma_search.set("formVer", $c.data.getParameter("formVer"));
+/**
+ * @method
+ * @name onpageload
+ * @description 화면 진입점 — 파라미터(formCd·formVer)를 조회 조건에 설정하고, 서식분류 정보(sbm_upclss)와 코드 정보(sbm_code)를 조회한다.
+ * @returns {Promise<void>}
+ * @hidden N
+ * @example (body ev:onpageload 바인딩으로 자동 호출)
+ */
+scwin.onpageload = async function() {
 
-                // 상장고시 시장구분코드, 서식관리 기관 구분코드, 보고서 본문 구분코드, 조회공시구분코드, 조회공시 내용 구분코드, 
-                // 조회공시 답변 구분코드, 서식작성방식 구분코드, 서식별 사용자 구분코드
-                const list = ["LD_MKT_TP_CD", "FORM_ADM_INST_TP_CD", "WRTRPT_MAINDOC_TP_CD", "INQDISCLS_TP_CD", 
-                              "INQDISCLS_CONTN_TP_CD", "INQDISCLS_ANS_TP_CD", "FORM_WRT_METHD_TP_CD", "BYFORM_USR_TP_CD"];
-                const params = {"cdEngNmList":list};
+    dma_search.set("formCd", $c.data.getParameter("formCd"));
+    dma_search.set("formVer", $c.data.getParameter("formVer"));
 
-                // 서식분류 정보 조회
-                const sbmOptions = {
-                    id : "sbm_upclss",
-                    action : "/api/code/form-upclss",
-                    method : "get",
-                    processMsg : "공통코드 조회중..."
-                };
+    // 상장고시 시장구분코드, 서식관리 기관 구분코드, 보고서 본문 구분코드, 조회공시구분코드, 조회공시 내용 구분코드, 
+    // 조회공시 답변 구분코드, 서식작성방식 구분코드, 서식별 사용자 구분코드
+    const list = ["LD_MKT_TP_CD", "FORM_ADM_INST_TP_CD", "WRTRPT_MAINDOC_TP_CD", "INQDISCLS_TP_CD",
+        "INQDISCLS_CONTN_TP_CD", "INQDISCLS_ANS_TP_CD", "FORM_WRT_METHD_TP_CD", "BYFORM_USR_TP_CD"
+    ];
+    const params = {
+        "cdEngNmList": list
+    };
 
-                const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
-                scwin.sbm_upclss_submitdone(sbmRtn);
+    // 서식분류 정보 조회
+    const sbmOptions = {
+        id: "sbm_upclss",
+        action: "/api/code/form-upclss",
+        method: "get",
+        processMsg: "공통코드 조회중..."
+    };
 
-                // 코드 정보 조회
-                $c.sbm.execute(sbm_code, params);                                
-            };
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    scwin.sbm_upclss_submitdone(sbmRtn);
+
+    // 코드 정보 조회
+    $c.sbm.execute(sbm_code, params);
+};
 
 ///////// 3. 컴포넌트 이벤트 영역 /////////
-            // 저장                    
-            scwin.btn_update_onclick = async function (e) {
-                
-                // validation 체크
-                if (!$c.tms.validateGroupTms("grp_input")) return;
 
-                if (await $c.win.confirm("변경 사항을 저장 하시겠습니까?")) {
-                    // 영문명 없으며 "N/A"로 변경 처리
-                    if ($c.util.isEmpty(dma_save.get("formEngNm"))) {
-                        dma_save.set("formEngNm", "N/A");
-                    }
+/**
+ * @method
+ * @name btn_update_onclick
+ * @description 저장 — [변경] 버튼 클릭 시 입력 검증·확인 후 구분값 정리(영문명 N/A 충전, 구분코드 초기화)를 거쳐 기본문서정보를 저장한다.
+ * @param {Object} e 이벤트 객체
+ * @returns {Promise<void>}
+ * @hidden N
+ * @example await scwin.btn_update_onclick(e);
+ */
+scwin.btn_update_onclick = async function(e) {
 
-                    if (dma_save.get("wrtrptMaindocTpCd") !== "1") {
-                        dma_save.set("formUpclssCd", "");
-                        dma_save.set("rsnClssCd", "");                    
-                    }
+    // validation 체크
+    if (!$c.tms.validateGroupTms("grp_input")) return;
 
-                    const formUpclssCd = dma_save.get("formUpclssCd");
-                    const rsnClssCd = dma_save.get("rsnClssCd");
+    if (await $c.win.confirm("변경 사항을 저장 하시겠습니까?")) {
+        // 영문명 없으며 "N/A"로 변경 처리
+        if ($c.util.isEmpty(dma_save.get("formEngNm"))) {
+            dma_save.set("formEngNm", "N/A");
+        }
 
-                    if ((formUpclssCd === "01" && rsnClssCd === "040") ||
-                        (formUpclssCd === "01" && rsnClssCd === "041") ||
-                        (formUpclssCd === "09" && rsnClssCd === "006") ||
-                        (formUpclssCd === "09" && rsnClssCd === "009")) {
-                        if (dma_save.get("inqdisclsTpCd") !== "A") {
-                            dma_save.set("inqdisclsAnsTpCd", "");
-                        }
-                    } else {
-                        dma_save.set("inqdisclsTpCd", "");
-                        dma_save.set("inqdisclsContnTpCd", "");
-                        dma_save.set("inqdisclsAnsTpCd", "");
-                    }
-                    dma_save.set("mode", "U");
-                    $c.sbm.execute(sbm_save, dma_save.getJSON());
-                }                
-            };
+        if (dma_save.get("wrtrptMaindocTpCd") !== "1") {
+            dma_save.set("formUpclssCd", "");
+            dma_save.set("rsnClssCd", "");
+        }
 
-            scwin.btn_cancel_onclick = function (e) {
+        const formUpclssCd = dma_save.get("formUpclssCd");
+        const rsnClssCd = dma_save.get("rsnClssCd");
 
-                $c.win.closePopup();
-            };
+        if ((formUpclssCd === "01" && rsnClssCd === "040") ||
+            (formUpclssCd === "01" && rsnClssCd === "041") ||
+            (formUpclssCd === "09" && rsnClssCd === "006") ||
+            (formUpclssCd === "09" && rsnClssCd === "009")) {
+            if (dma_save.get("inqdisclsTpCd") !== "A") {
+                dma_save.set("inqdisclsAnsTpCd", "");
+            }
+        } else {
+            dma_save.set("inqdisclsTpCd", "");
+            dma_save.set("inqdisclsContnTpCd", "");
+            dma_save.set("inqdisclsAnsTpCd", "");
+        }
+        dma_save.set("mode", "U");
+        $c.sbm.execute(sbm_save, dma_save.getJSON());
+    }
+};
 
-            scwin.ibx_formEngNm_onkeyup = function (e) {
-                
-                $c.tms.disableBlockKor(ibx_formEngNm);
-            };
+/**
+ * @method
+ * @name btn_cancel_onclick
+ * @description [취소] 버튼 클릭 — 팝업을 닫는다.
+ * @param {Object} e 이벤트 객체
+ * @returns {void}
+ * @hidden N
+ * @example scwin.btn_cancel_onclick(e);
+ */
+scwin.btn_cancel_onclick = function(e) {
 
-            scwin.sbx_ldMktTpCd_onviewchange = function (info) {
+    $c.win.closePopup();
+};
 
-                scwin.changeRsnTpInfo();
-            };
+/**
+ * @method
+ * @name ibx_formEngNm_onkeyup
+ * @description 영문 서식명 입력란 키업 — 한글 입력을 차단한다($c.tms.disableBlockKor).
+ * @param {Object} e 이벤트 객체
+ * @returns {void}
+ * @hidden N
+ * @example scwin.ibx_formEngNm_onkeyup(e);
+ */
+scwin.ibx_formEngNm_onkeyup = function(e) {
 
-            scwin.sbx_formUpclssCd_onviewchange = function (info) {
+    $c.tms.disableBlockKor(ibx_formEngNm);
+};
 
-                scwin.changeRsnTpInfo();
-            };
+/**
+ * @method
+ * @name sbx_ldMktTpCd_onviewchange
+ * @description 시장구분 셀렉트박스 변경 — 사유/유형정보를 재조회한다.
+ * @param {Object} info 변경 정보 객체
+ * @returns {void}
+ * @hidden N
+ * @example scwin.sbx_ldMktTpCd_onviewchange(info);
+ */
+scwin.sbx_ldMktTpCd_onviewchange = function(info) {
 
-            scwin.sbx_inqdisclsTpCd_onviewchange = function (info) {
+    scwin.changeRsnTpInfo();
+};
 
-                scwin.chageInqdisclsInfo2();
-            };
+/**
+ * @method
+ * @name sbx_formUpclssCd_onviewchange
+ * @description 서식 대분류 셀렉트박스 변경 — 사유/유형정보를 재조회한다.
+ * @param {Object} info 변경 정보 객체
+ * @returns {void}
+ * @hidden N
+ * @example scwin.sbx_formUpclssCd_onviewchange(info);
+ */
+scwin.sbx_formUpclssCd_onviewchange = function(info) {
 
-            scwin.sbx_wrtrptMaindocTpCd_onviewchange = function (info) {
-                
-                scwin.chageWrtrptMainDocInfo();
-            };
+    scwin.changeRsnTpInfo();
+};
 
-            scwin.sbx_rsnClssCd_onviewchange = function (info) {
+/**
+ * @method
+ * @name sbx_inqdisclsTpCd_onviewchange
+ * @description 조회공시구분 셀렉트박스 변경 — 조회공시 관련 표시 정보를 갱신한다.
+ * @param {Object} info 변경 정보 객체
+ * @returns {void}
+ * @hidden N
+ * @example scwin.sbx_inqdisclsTpCd_onviewchange(info);
+ */
+scwin.sbx_inqdisclsTpCd_onviewchange = function(info) {
 
-                scwin.chageInqdisclsInfo1();
-            };
+    scwin.chageInqdisclsInfo2();
+};
+
+/**
+ * @method
+ * @name sbx_wrtrptMaindocTpCd_onviewchange
+ * @description 보고서 본문 구분 셀렉트박스 변경 — 서식첨부구분 관련 표시 정보를 갱신한다.
+ * @param {Object} info 변경 정보 객체
+ * @returns {void}
+ * @hidden N
+ * @example scwin.sbx_wrtrptMaindocTpCd_onviewchange(info);
+ */
+scwin.sbx_wrtrptMaindocTpCd_onviewchange = function(info) {
+
+    scwin.chageWrtrptMainDocInfo();
+};
+
+/**
+ * @method
+ * @name sbx_rsnClssCd_onviewchange
+ * @description 사유분류 셀렉트박스 변경 — 조회공시 표시 정보를 갱신한다.
+ * @param {Object} info 변경 정보 객체
+ * @returns {void}
+ * @hidden N
+ * @example scwin.sbx_rsnClssCd_onviewchange(info);
+ */
+scwin.sbx_rsnClssCd_onviewchange = function(info) {
+
+    scwin.chageInqdisclsInfo1();
+};
 
 ///////// 4. 서브미션 콜백 영역 /////////
-            scwin.sbm_upclss_submitdone = function (e) {
 
-                // 조회 성공인 경우
-                const result = e.responseJSON;
-                if (result.success) {
-                    // select box 자동 생성
-                    $c.tms.setSelectData(result.body, sbx_formUpclssCd, "formUpclssNm", "formUpclssCd");
-                } else {
-                    $c.win.alert(result.message);
-                }
-            };
+/**
+ * @method
+ * @name sbm_upclss_submitdone
+ * @description 서식분류 정보 조회(sbm_upclss) 완료 콜백 — 성공 시 서식 대분류 셀렉트박스를 자동 생성한다.
+ * @param {Object} e 서브미션 응답 객체(responseJSON 등)
+ * @returns {void}
+ * @hidden N
+ * @example scwin.sbm_upclss_submitdone(sbmRtn);
+ */
+scwin.sbm_upclss_submitdone = function(e) {
 
-            scwin.sbm_code_submitdone = function (e) {
+    // 조회 성공인 경우
+    const result = e.responseJSON;
+    if (result.success) {
+        // select box 자동 생성
+        $c.tms.setSelectData(result.body, sbx_formUpclssCd, "formUpclssNm", "formUpclssCd");
+    } else {
+        $c.win.alert(result.message);
+    }
+};
 
-                // 조회 성공인 경우
-                const result = e.responseJSON;
-                if (result.success) {
-                    // select box 자동 생성
-                    // 서식관리 기관 구분코드
-                    $c.tms.setSelectData(result.body, sbx_formAdmInstTpCd, "cdValNm", "cdVal", "FORM_ADM_INST_TP_CD", "cdEngNm");
-                    // 상장고시 시장구분코드                                        
-                    $c.tms.setSelectData(result.body, sbx_ldMktTpCd, "cdValNm", "cdVal", "LD_MKT_TP_CD", "cdEngNm");
-                    // 보고서 본문 구분코드
-                    $c.tms.setSelectData(result.body, sbx_wrtrptMaindocTpCd, "cdValNm", "cdVal", "WRTRPT_MAINDOC_TP_CD", "cdEngNm");                                        
-                    // 조회공시구분코드
-                    $c.tms.setSelectData(result.body, sbx_inqdisclsTpCd, "cdValNm", "cdVal", "INQDISCLS_TP_CD", "cdEngNm");
-                    // 조회공시 내용 구분코드
-                    $c.tms.setSelectData(result.body, sbx_inqdisclsContnTpCd, "cdValNm", "cdVal", "INQDISCLS_CONTN_TP_CD", "cdEngNm");
-                    // 조회공시 답변 구분코드
-                    $c.tms.setSelectData(result.body, sbx_inqdisclsAnsTpCd, "cdValNm", "cdVal", "INQDISCLS_ANS_TP_CD", "cdEngNm");
-                    // 서식작성방식 구분코드
-                    $c.tms.setSelectData(result.body, sbx_formWrtMethdTpCd, "cdValNm", "cdVal", "FORM_WRT_METHD_TP_CD", "cdEngNm");                    
-                    // 서식별 사용자 구분코드
-                    $c.tms.setSelectData(result.body, sbx_byformUsrTpCd, "cdValNm", "cdVal", "BYFORM_USR_TP_CD", "cdEngNm");                    
-                }                
-                // 상세 조회 처리 
-                $c.sbm.execute(sbm_detail, dma_search.getJSON());
-            };
+/**
+ * @method
+ * @name sbm_code_submitdone
+ * @description 코드 정보 조회(sbm_code) 완료 콜백 — 성공 시 구분코드별 셀렉트박스를 자동 생성하고, 이어서 상세를 조회한다.
+ * @param {Object} e 서브미션 응답 객체(responseJSON 등)
+ * @returns {void}
+ * @hidden N
+ * @example (sbm_code ev:submitdone 바인딩으로 자동 호출)
+ */
+scwin.sbm_code_submitdone = function(e) {
 
-            scwin.sbm_detail_submitdone = function (e) {
-                // 조회 성공인 경우
-                const result = e.responseJSON;
-                if (result.success) {
-                    if (dma_save.get("engFormYn") === "N") {
-                        ibx_formEngNm.setReadOnly(true);
-                    }
-                    // 최초 1회만 사용(DataSet에서 직접 꺼내도 값이 사라지기 때문에 직접셋팅)    
-                    scwin.rsnClssCd = result.body.dma_result.rsnClssCd;
-                    scwin.changeRsnTpInfo();                    
-                } else {
-                    $c.win.alert(result.message);
-                }
-            };
+    // 조회 성공인 경우
+    const result = e.responseJSON;
+    if (result.success) {
+        // select box 자동 생성
+        // 서식관리 기관 구분코드
+        $c.tms.setSelectData(result.body, sbx_formAdmInstTpCd, "cdValNm", "cdVal", "FORM_ADM_INST_TP_CD", "cdEngNm");
+        // 상장고시 시장구분코드                                        
+        $c.tms.setSelectData(result.body, sbx_ldMktTpCd, "cdValNm", "cdVal", "LD_MKT_TP_CD", "cdEngNm");
+        // 보고서 본문 구분코드
+        $c.tms.setSelectData(result.body, sbx_wrtrptMaindocTpCd, "cdValNm", "cdVal", "WRTRPT_MAINDOC_TP_CD", "cdEngNm");
+        // 조회공시구분코드
+        $c.tms.setSelectData(result.body, sbx_inqdisclsTpCd, "cdValNm", "cdVal", "INQDISCLS_TP_CD", "cdEngNm");
+        // 조회공시 내용 구분코드
+        $c.tms.setSelectData(result.body, sbx_inqdisclsContnTpCd, "cdValNm", "cdVal", "INQDISCLS_CONTN_TP_CD", "cdEngNm");
+        // 조회공시 답변 구분코드
+        $c.tms.setSelectData(result.body, sbx_inqdisclsAnsTpCd, "cdValNm", "cdVal", "INQDISCLS_ANS_TP_CD", "cdEngNm");
+        // 서식작성방식 구분코드
+        $c.tms.setSelectData(result.body, sbx_formWrtMethdTpCd, "cdValNm", "cdVal", "FORM_WRT_METHD_TP_CD", "cdEngNm");
+        // 서식별 사용자 구분코드
+        $c.tms.setSelectData(result.body, sbx_byformUsrTpCd, "cdValNm", "cdVal", "BYFORM_USR_TP_CD", "cdEngNm");
+    }
+    // 상세 조회 처리 
+    $c.sbm.execute(sbm_detail, dma_search.getJSON());
+};
 
-            scwin.sbm_save_submitdone = async function (e) {
-                
-                const result = e.responseJSON;
-                if (result.success) {
-                    await $c.win.alert("저장 되었습니다.");
+/**
+ * @method
+ * @name sbm_detail_submitdone
+ * @description 상세 조회(sbm_detail) 완료 콜백 — 영문명 편집 가능 여부를 반영하고 최초 사유분류값을 보관한 뒤 사유/유형정보를 갱신한다.
+ * @param {Object} e 서브미션 응답 객체(responseJSON 등)
+ * @returns {void}
+ * @hidden N
+ * @example (sbm_detail ev:submitdone 바인딩으로 자동 호출)
+ */
+scwin.sbm_detail_submitdone = function(e) {
+    // 조회 성공인 경우
+    const result = e.responseJSON;
+    if (result.success) {
+        if (dma_save.get("engFormYn") === "N") {
+            ibx_formEngNm.setReadOnly(true);
+        }
+        // 최초 1회만 사용(DataSet에서 직접 꺼내도 값이 사라지기 때문에 직접셋팅)    
+        scwin.rsnClssCd = result.body.dma_result.rsnClssCd;
+        scwin.changeRsnTpInfo();
+    } else {
+        $c.win.alert(result.message);
+    }
+};
 
-                    let params = {};
-                    params.refreshYn = "Y";
-                    $c.win.closePopup(params);
-                } else {
-                    $c.win.alert(result.message);
-                }
-            };
+/**
+ * @method
+ * @name sbm_save_submitdone
+ * @description 저장(sbm_save) 완료 콜백 — 성공 시 저장 완료를 알리고 refreshYn=Y 로 팝업을 닫는다.
+ * @param {Object} e 서브미션 응답 객체(responseJSON 등)
+ * @returns {Promise<void>}
+ * @hidden N
+ * @example (sbm_save ev:submitdone 바인딩으로 자동 호출)
+ */
+scwin.sbm_save_submitdone = async function(e) {
 
-            scwin.sbm_rsnclss_submitdone = function (e) {
-                                
-                // 조회 성공인 경우
-                const result = e.responseJSON;
-                if (result.success) {
-                    // 초기화
-                    sbx_rsnClssCd.removeAll();
-                    // select box 자동 생성
-                    $c.tms.setSelectData(result.body.content, sbx_rsnClssCd, "disclsRsnClssNm", "rsnClssCd");
-                    scwin.chageInqdisclsInfo1();
-                    // 선택 버튼 추가 (공백이라도 값이 있어야 setValue나 setSelectedIndex가 정상 작동)
-                    sbx_rsnClssCd.addItem(" ", "선택", "0");
+    const result = e.responseJSON;
+    if (result.success) {
+        await $c.win.alert("저장 되었습니다.");
 
-                    if (!$c.util.isEmpty(scwin.rsnClssCd)) {
-                        sbx_rsnClssCd.setValue(scwin.rsnClssCd);
-                        scwin.rsnClssCd = "";
-                    } else {                        
-                        sbx_rsnClssCd.setValue(" ");
-                    }                   
-                } else {
-                    $c.win.alert(result.message);
-                }
-            };
+        const params = {};
+        params.refreshYn = "Y";
+        $c.win.closePopup(params);
+    } else {
+        $c.win.alert(result.message);
+    }
+};
+
+/**
+ * @method
+ * @name sbm_rsnclss_submitdone
+ * @description 사유 분류 정보 조회(sbm_rsnclss) 완료 콜백 — 사유분류 셀렉트박스를 재구성하고 보관된 최초 사유분류값(rsnClssCd)이 있으면 선택한다.
+ * @param {Object} e 서브미션 응답 객체(responseJSON 등)
+ * @returns {void}
+ * @hidden N
+ * @example (sbm_rsnclss ev:submitdone 바인딩으로 자동 호출)
+ */
+scwin.sbm_rsnclss_submitdone = function(e) {
+
+    // 조회 성공인 경우
+    const result = e.responseJSON;
+    if (result.success) {
+        // 초기화
+        sbx_rsnClssCd.removeAll();
+        // select box 자동 생성
+        $c.tms.setSelectData(result.body.content, sbx_rsnClssCd, "disclsRsnClssNm", "rsnClssCd");
+        scwin.chageInqdisclsInfo1();
+        // 선택 버튼 추가 (공백이라도 값이 있어야 setValue나 setSelectedIndex가 정상 작동)
+        sbx_rsnClssCd.addItem(" ", "선택", "0");
+
+        if (!$c.util.isEmpty(scwin.rsnClssCd)) {
+            sbx_rsnClssCd.setValue(scwin.rsnClssCd);
+            scwin.rsnClssCd = "";
+        } else {
+            sbx_rsnClssCd.setValue(" ");
+        }
+    } else {
+        $c.win.alert(result.message);
+    }
+};
 
 ///////// 5. 일반/업무 함수 영역 /////////
-            // 대분류, 시장구분 변경에 따른 사유, 유형정보 변경
-            scwin.changeRsnTpInfo = function () {
-                
-                // WebSquere Map에 적용되는 갭이 존재하여
-                // ref에 연결된 객체가 아닌 직접 컴퍼넌트에서 가져와 처리
-                const params = {};
-                params.formUpclssCd = sbx_formUpclssCd.getValue();
-                params.ldMktTpCd = sbx_ldMktTpCd.getValue();
-                // 기존에 목록을 사용해서 조회 하기 때문에 페이지 정보 추가
-                params.page = "1";
-                params.size = "100";
 
-                // 사유 분류 정보 조회
-                $c.sbm.execute(sbm_rsnclss, params);
-            }
+/**
+ * @method
+ * @name changeRsnTpInfo
+ * @description 대분류, 시장구분 변경에 따른 사유, 유형정보 변경 — 컴포넌트 값으로 파라미터를 구성해 사유 분류 정보를 조회한다(sbm_rsnclss).
+ * @returns {void}
+ * @hidden N
+ * @example scwin.changeRsnTpInfo();
+ */
+scwin.changeRsnTpInfo = function() {
 
-// 사유분류 변경에 따른 조회 공시 정보 변경
-            scwin.chageInqdisclsInfo1 = function (e) {
+    // WebSquere Map에 적용되는 갭이 존재하여
+    // ref에 연결된 객체가 아닌 직접 컴퍼넌트에서 가져와 처리
+    const params = {};
+    params.formUpclssCd = sbx_formUpclssCd.getValue();
+    params.ldMktTpCd = sbx_ldMktTpCd.getValue();
+    // 기존에 목록을 사용해서 조회 하기 때문에 페이지 정보 추가
+    params.page = "1";
+    params.size = "100";
 
-                const formUpclssCd = sbx_formUpclssCd.getValue();
-                const rsnClssCd = sbx_rsnClssCd.getValue();
+    // 사유 분류 정보 조회
+    $c.sbm.execute(sbm_rsnclss, params);
+}
 
-                if ((formUpclssCd === "01" && rsnClssCd === "040") ||
-                    (formUpclssCd === "01" && rsnClssCd === "041") ||
-                    (formUpclssCd === "09" && rsnClssCd === "006") ||
-                    (formUpclssCd === "09" && rsnClssCd === "009")) {
-                   grp_info2.setStyle("display", "table-row");
-                   scwin.chageInqdisclsInfo2();
-                } else {
-                   grp_info2.setStyle("display", "none");
-                   grp_info3.setStyle("display", "none");
-                }                               
-            };
+/**
+ * @method
+ * @name chageInqdisclsInfo1
+ * @description 사유분류 변경에 따른 조회 공시 정보 변경 — 대분류·사유분류 조합에 따라 조회공시 영역 표시를 제어한다.
+ * @param {Object} e 이벤트 객체(직접 호출 시 생략)
+ * @returns {void}
+ * @hidden N
+ * @example scwin.chageInqdisclsInfo1();
+ */
+scwin.chageInqdisclsInfo1 = function(e) {
 
-// 서식첨부구분
-            scwin.chageWrtrptMainDocInfo = function () {
-                                
-                let selectedIndex = sbx_listFormYn.getSelectedIndex();
-                if (sbx_wrtrptMaindocTpCd.getValue() === "1") {                                                                   
-                    grp_info1.setStyle("display", "table-row");
-                    grp_info4.setStyle("display", "table-row");
+    const formUpclssCd = sbx_formUpclssCd.getValue();
+    const rsnClssCd = sbx_rsnClssCd.getValue();
 
-                    sbx_formUpclssCd.setMandatory(true);
-                    sbx_listFormYn.deleteItem(0, true);
-                    sbx_listFormYn.addItem("Y", "상장", 0, true);
-                    ibx_title.setValue("상장신청서구분");                                        
-                } else {                    
-                    grp_info1.setStyle("display", "none");
-                    grp_info4.setStyle("display", "none");
+    if ((formUpclssCd === "01" && rsnClssCd === "040") ||
+        (formUpclssCd === "01" && rsnClssCd === "041") ||
+        (formUpclssCd === "09" && rsnClssCd === "006") ||
+        (formUpclssCd === "09" && rsnClssCd === "009")) {
+        grp_info2.setStyle("display", "table-row");
+        scwin.chageInqdisclsInfo2();
+    } else {
+        grp_info2.setStyle("display", "none");
+        grp_info3.setStyle("display", "none");
+    }
+};
 
-                    sbx_formUpclssCd.setMandatory(false);
-                    sbx_listFormYn.deleteItem(0, true);
-                    sbx_listFormYn.addItem("Y", "비공시", 0, true);                    
-                    ibx_title.setValue("공시비공시구분");                                    
-                }                
-                                                
-                // 첫번째 item을 선택하고 있을때 처리
-                if (selectedIndex === 0) {
-                    sbx_listFormYn.setSelectedIndex(1);
-                    sbx_listFormYn.setSelectedIndex(selectedIndex);
-                }
-                // 이쪽에서 다시 한번 조회 공시구분등 체크
-                scwin.chageInqdisclsInfo1();                                
-            };
+/**
+ * @method
+ * @name chageWrtrptMainDocInfo
+ * @description 서식첨부구분 — 보고서 본문 구분(1 여부)에 따라 상장/공시 구분 항목·필수 여부·타이틀을 전환하고 조회공시 정보를 재점검한다.
+ * @returns {void}
+ * @hidden N
+ * @example scwin.chageWrtrptMainDocInfo();
+ */
+scwin.chageWrtrptMainDocInfo = function() {
 
-// 조회 공시 구분에 따른 정보 변경
-            scwin.chageInqdisclsInfo2 = function (e) {
-                
-                if (sbx_inqdisclsTpCd.getValue() === "A") {
-                   grp_info3.setStyle("display", "table-row");
-                } else {
-                   grp_info3.setStyle("display", "none");
-                }
-            };
+    const selectedIndex = sbx_listFormYn.getSelectedIndex();
+    if (sbx_wrtrptMaindocTpCd.getValue() === "1") {
+        grp_info1.setStyle("display", "table-row");
+        grp_info4.setStyle("display", "table-row");
+
+        sbx_formUpclssCd.setMandatory(true);
+        sbx_listFormYn.deleteItem(0, true);
+        sbx_listFormYn.addItem("Y", "상장", 0, true);
+        ibx_title.setValue("상장신청서구분");
+    } else {
+        grp_info1.setStyle("display", "none");
+        grp_info4.setStyle("display", "none");
+
+        sbx_formUpclssCd.setMandatory(false);
+        sbx_listFormYn.deleteItem(0, true);
+        sbx_listFormYn.addItem("Y", "비공시", 0, true);
+        ibx_title.setValue("공시비공시구분");
+    }
+
+    // 첫번째 item을 선택하고 있을때 처리
+    if (selectedIndex === 0) {
+        sbx_listFormYn.setSelectedIndex(1);
+        sbx_listFormYn.setSelectedIndex(selectedIndex);
+    }
+    // 이쪽에서 다시 한번 조회 공시구분등 체크
+    scwin.chageInqdisclsInfo1();
+};
+
+/**
+ * @method
+ * @name chageInqdisclsInfo2
+ * @description 조회 공시 구분에 따른 정보 변경 — 조회공시구분이 A 이면 답변 구분 영역을 표시한다.
+ * @param {Object} e 이벤트 객체(직접 호출 시 생략)
+ * @returns {void}
+ * @hidden N
+ * @example scwin.chageInqdisclsInfo2();
+ */
+scwin.chageInqdisclsInfo2 = function(e) {
+
+    if (sbx_inqdisclsTpCd.getValue() === "A") {
+        grp_info3.setStyle("display", "table-row");
+    } else {
+        grp_info3.setStyle("display", "none");
+    }
+};
 ]]></script>
     </head>
     <body ev:onpageload="scwin.onpageload">
