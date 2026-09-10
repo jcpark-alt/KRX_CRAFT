@@ -466,7 +466,7 @@ scwin.save = async function (opts) {
 // ═══════════════════════════════════════════════════════════════
 // dataMap 기반 (flat 폼 — 여러 테이블에 필드 분산)
 // FormData 규칙: 텍스트는 {dataMapId} JSON Blob 파트,
-//               파일은 files 다중 append + "{fieldKey}_file_index"(files 내 인덱스)로 매칭
+//               파일은 files 다중 append + dmaFileIndex 파트({fieldKey: files 내 인덱스} JSON)로 매칭
 // ═══════════════════════════════════════════════════════════════
 
 /**
@@ -537,7 +537,7 @@ scwin.loadMapForm = async function (opts) {
  *   - dataMap  별 파트: dataMap JSON Blob ("{파트명}.json", application/json)
  *   - dataList 별 파트: opts.dataList 지정 시 { "{파트명}": rows } JSON Blob (전체 로우)
  *   - files 파트: fileMap 의 파일들을 다중 append
- *   - "{fieldKey}_file_index" 파트: 해당 필드 파일의 files 내 인덱스 (서버 매칭용)
+ *   - dmaFileIndex 파트: 동적 생성한 dataMap(dmaFileIndex)의 JSON Blob — { "{fieldKey}": files 내 인덱스 } (서버 매칭용, 파일이 있을 때만 추가)
  * 파트 이름: dataMapId/dataListId(단일 문자열 또는 병렬 배열) 우선, 미지정 시 data, data2… / rows, rows2…
  * @param {Object|Array} opts.dataMap    단일 dataMap 또는 배열(멀티)
  * @hidden N
@@ -551,7 +551,7 @@ scwin.loadMapForm = async function (opts) {
  * @param opts.onError
  * @example
 // 1) 단일 dataMap 폼 — 파일은 attachFileToMap("photo", dma_form) 으로 첨부해 둔 것 자동 동봉
-//    → FormData 파트: data, photo_file_index, files
+//    → FormData 파트: data, dmaFileIndex({ photo: 0 }), files
 udc_saver.getScope().saveMapForm({
     dataMap : dma_form,
     saveUrl : "/api/x/save-form",
@@ -560,7 +560,7 @@ udc_saver.getScope().saveMapForm({
 });
 
 // 2) 멀티 dataMap + dataList 동봉 — onValidate 에는 JSON "배열"([기본정보, 부가정보])이 전달됨
-//    → 파트: basic, data2, rows, {fieldKey}_file_index, files
+//    → 파트: basic, data2, rows, dmaFileIndex, files
 udc_saver.getScope().saveMapForm({
     dataMap : [dma_basic, dma_extra],
     dataMapId : ["basic"],                // 두 번째는 자동 "data2"
@@ -601,19 +601,24 @@ scwin.saveMapForm = async function (opts) {
 		formData.append(dataMapId, new Blob([JSON.stringify(dataJsons[mi])], { type: "application/json;charset=UTF-8" }), `${dataMapId}.json`);
 	}
 
-	const keys = Object.keys(scwin.fileMap);
+	// 파일 — files 다중 append. files 내 인덱스는 개별 파트 대신 dmaFileIndex dataMap 하나로 모아 전달(서버 매칭용)
+	const fileIndexJson = {};
+	let fileIdx = 0;
+	for (const f in scwin.fileMap) {
+		if (!scwin.fileMap.hasOwnProperty(f)) continue;
+		const file = scwin.fileMap[f];
+		if (!file) continue;
 
-	// 파일 — files 다중 append + "{fieldKey}_file_index" 로 files 내 인덱스 전달(서버 매칭용)
-	for (let f in scwin.fileMap) {
-		let file = null;
-		if (scwin.fileMap.hasOwnProperty(f)) {
-			file = scwin.fileMap[f];
-		}
+		fileIndexJson[f] = fileIdx++;
+		formData.append("files", file, file.name);
+	}
 
-		if (file) {
-			formData.append(`${f}_file_index`, keys.indexOf(f));
-			formData.append("files", file, file.name);
-		}
+	// dmaFileIndex dataMap 동적 생성 — key: fieldKey, value: files 내 인덱스 (파일이 하나도 없으면 파트 생략)
+	const fileIndexKeys = Object.keys(fileIndexJson);
+	if (fileIndexKeys.length > 0) {
+		const dmaFileIndex = $c.data.createDataMap("dmaFileIndex", fileIndexKeys, fileIndexKeys.map(function () { return "number"; }));
+		dmaFileIndex.setJSON(fileIndexJson);
+		formData.append("dmaFileIndex", new Blob([JSON.stringify(dmaFileIndex.getJSON())], { type: "application/json;charset=UTF-8" }), "dmaFileIndex.json");
 	}
 
 	try {
