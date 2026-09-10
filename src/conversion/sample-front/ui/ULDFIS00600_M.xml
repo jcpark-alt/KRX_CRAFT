@@ -1,0 +1,287 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDFIS00600.gfm" meta_screenName="[가이드] 동적 그리드 샘플 : 멀티헤더(setGridStyle) - (원본 ULDFIS00600 연도별 재무지표)">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<xf:model>
+			<w2:workflowCollection/>
+			<w2:dataCollection baseNode="map">
+				<w2:dataList baseNode="list" repeatNode="map" id="dltFisList">
+					<w2:columnInfo></w2:columnInfo>
+				</w2:dataList>
+			</w2:dataCollection>
+		</xf:model>
+		<w2:publicInfo method="scwin.onpageload,scwin.onpageunload,scwin.btnSearch_onclick,scwin.btnExcel_onclick"/>
+		<script type="text/javascript" lazy="false"><![CDATA[///////// 1. 변수 및 선언 영역 /////////
+
+// 재무 동적 그리드 샘플 상수
+scwin.fisMeta = null;                     // 로드된 메타(고정/연도/지표)
+
+///////// 2. 초기화 영역 /////////
+
+/**
+ * @method
+ * @name onpageload
+ * @description 화면 로드 — 로컬 JSON 을 읽어 동적 그리드를 구성한다.
+ * @returns {void}
+ * @hidden N
+ */
+scwin.onpageload = async function () {
+    try {
+        await scwin.loadFisData();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context: "ULDFIS00600.onpageload" });
+    }
+};
+
+/**
+ * @method
+ * @name onpageunload
+ * @description 화면 종료 처리(없음).
+ * @returns {void}
+ * @hidden N
+ */
+scwin.onpageunload = function () {};
+
+///////// 3. 컴포넌트 이벤트 영역 /////////
+
+/**
+ * @method
+ * @name btnSearch_onclick
+ * @description 조회 버튼 — 로컬 데이터를 다시 읽어 그리드를 재구성한다.
+ * @param {Object} e 이벤트 객체
+ * @returns {void}
+ * @hidden N
+ */
+scwin.btnSearch_onclick = async function (e) {
+    try {
+        await scwin.loadFisData();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context: "ULDFIS00600.btnSearch_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name btnExcel_onclick
+ * @description 엑셀 다운로드 — 표시 중인 그리드를 엑셀로 내려받는다.
+ * @param {Object} e 이벤트 객체
+ * @returns {void}
+ * @hidden N
+ */
+scwin.btnExcel_onclick = function (e) {
+    try {
+        // setGridStyle 재생성 이후 로드 시점 전역 바인딩은 구 인스턴스일 수 있어 호출 시점 재조회
+        const grd = $c.util.getComponent("grdFis");
+        if (grd.getRowCount() <= 0) {
+            $c.win.alert("조회된 데이터가 없습니다.");
+            return;
+        }
+        grd.downloadExcel({ fileName: "재무_동적그리드" });
+    } catch (ex) {
+        $c.exception.handleError(ex, { context: "ULDFIS00600.btnExcel_onclick" });
+    }
+};
+
+///////// 4. 서브미션 콜백 영역 /////////
+
+/**
+ * @method
+ * @name loadFisData
+ * @description 재무 목록 로컬 JSON(ULDFIS00600.json)을 $c.sbm.executeDynamic(GET)으로 조회해 그리드를 구성한다(서버 로직 미의존 샘플).
+ *  submitDoneHandler 를 넘기지 않아야 executeDynamic 의 Promise 가 settle 되어 await 로 응답을 수신하며,
+ *  로드 실패는 reject 로 진입점에 전파되어 $c.exception.handleError 가 처리한다.
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.loadFisData = async function () {
+    const sbmOptions = {
+        id: "sbmFisList",
+        method: "GET",
+        action: "/ui/sample/JsonData/ULDFIS00600.json",
+        isProcessMsg: false
+    };
+    const rtn = await $c.sbm.executeDynamic(sbmOptions);
+    const json = (rtn && rtn.responseJSON) ? rtn.responseJSON : {};
+    scwin.buildDynamicGrid(json);
+};
+
+///////// 5. 일반/업무 함수 영역 /////////
+
+/**
+ * @method
+ * @name buildDynamicGrid
+ * @description 레코드 키에서 메타(고정/연도/지표)를 생성(extractMeta)해 gridView 를 setGridStyle 로 재구성(2단 그룹 헤더)하고 데이터를 적재한다.
+ *  엔진 setColumns 는 헤더를 단일 행으로 강제(colSpan/rowSpan=1, group 미지원)하므로
+ *  멀티로우 헤더는 전체 XML 재생성 API 인 setGridStyle 을 사용한다.
+ * @param {Object} json 로컬 데이터(JSON) — { body:[...] } (메타는 데이터에서 직접 도출)
+ * @returns {void}
+ * @hidden N
+ */
+scwin.buildDynamicGrid = function (json) {
+    const body = (json && json.body) ? json.body : [];
+    // 메타는 전 레코드 키 스캔으로 직접 생성 — JSON meta 필드 미사용(09-07 삭제).
+    const meta = body.length ? scwin.extractMeta(body) : { fixed: [], years: [], metrics: [] };
+    scwin.fisMeta = meta;
+    const cols = scwin.buildColumnDefs(meta);
+    // dataList 컬럼 동기화(신규 insert·잔존 remove) 후 그리드 전체 재생성 — 연도 그룹 × 지표 동적($c.util 공통함수).
+    $c.util.syncDataListColumns(dltFisList, cols);
+    $c.util.getComponent("grdFis").setGridStyle($c.util.buildGridStyleXml({
+        id: "grdFis",
+        dataList: "dltFisList",
+        caption: "연도별 재무지표 동적 그리드",
+        style: "height: 420px;"
+    }, cols));
+    dltFisList.setJSON(body.length ? scwin.buildRows(body, meta) : []);
+};
+
+/**
+ * @method
+ * @name extractMeta
+ * @description 전 레코드의 키를 스캔해 메타를 생성한다 — "연도(YYYY)_지표" 패턴 키는 연도/지표로,
+ *  그 외 키는 고정 컬럼으로 분해(최초 등장 순서 유지·전 레코드 합집합이라 일부 레코드 키 결측에도 안전).
+ * @param {Array} records 레코드 배열
+ * @returns {Object} { fixed:string[], years:string[](오름차순), metrics:string[] }
+ * @hidden N
+ */
+scwin.extractMeta = function (records) {
+    const yearRe = /^(20\d\d)_(.+)$/;
+    const fixed = [];
+    const years = [];
+    const metrics = [];
+    for (let r = 0; r < records.length; r++) {
+        const keys = Object.keys(records[r]);
+        for (let i = 0; i < keys.length; i++) {
+            const mo = keys[i].match(yearRe);
+            if (mo) {
+                if (years.indexOf(mo[1]) === -1) { years.push(mo[1]); }
+                if (metrics.indexOf(mo[2]) === -1) { metrics.push(mo[2]); }
+            } else if (fixed.indexOf(keys[i]) === -1) {
+                fixed.push(keys[i]);
+            }
+        }
+    }
+    years.sort();
+    return { fixed: fixed, years: years, metrics: metrics };
+};
+
+/**
+ * @method
+ * @name buildColumnDefs
+ * @description 메타로부터 컬럼 정의(colDef) 배열을 생성한다. 연도는 group 으로 2단 병합(buildGridStyleXml 이 헤더 행으로 전개).
+ * @param {Object} meta extractMeta/JSON 메타
+ * @returns {Array} colDef[] — { id, header, width, align[, group] }
+ * @hidden N
+ */
+scwin.buildColumnDefs = function (meta) {
+    const fixLabels = (meta.fixed && meta.fixed.length) ? meta.fixed : ["발행기관코드", "회사명", "상장일", "스팩합병 상장여부"];
+    const cols = [
+        { id: "isurCd", header: fixLabels[0], width: 90, align: "center" },
+        { id: "comNm", header: fixLabels[1], width: 160, align: "left" },
+        { id: "lstDt", header: fixLabels[2], width: 90, align: "center" },
+        { id: "spacYn", header: fixLabels[3], width: 90, align: "center" }
+    ];
+    for (let y = 0; y < meta.years.length; y++) {
+        for (let m = 0; m < meta.metrics.length; m++) {
+            cols.push({
+                id: "y" + (y + 1) + "m" + (m + 1),
+                header: meta.metrics[m],
+                width: 110,
+                align: "right",
+                group: meta.years[y] + "년"
+            });
+        }
+    }
+    return cols;
+};
+
+/**
+ * @method
+ * @name buildRows
+ * @description 각 레코드를 컬럼 id(고정 + y{연}m{지표}) 스키마로 매핑한다.
+ * @param {Array} body 레코드 배열
+ * @param {Object} meta 메타
+ * @returns {Array} setJSON 용 행 배열
+ * @hidden N
+ */
+scwin.buildRows = function (body, meta) {
+    const rows = [];
+    for (let i = 0; i < body.length; i++) {
+        const rec = body[i];
+        const row = {
+            isurCd: scwin.pick(rec, meta.fixed[0]),
+            comNm: scwin.pick(rec, meta.fixed[1]),
+            lstDt: scwin.pick(rec, meta.fixed[2]),
+            spacYn: scwin.pick(rec, meta.fixed[3])
+        };
+        for (let y = 0; y < meta.years.length; y++) {
+            for (let m = 0; m < meta.metrics.length; m++) {
+                row["y" + (y + 1) + "m" + (m + 1)] = scwin.pick(rec, meta.years[y] + "_" + meta.metrics[m]);
+            }
+        }
+        rows.push(row);
+    }
+    return rows;
+};
+
+/**
+ * @method
+ * @name pick
+ * @description 레코드에서 키 값을 안전하게 취득한다(없으면 빈 문자열).
+ * @param {Object} rec 레코드
+ * @param {String} key 키
+ * @returns {String} 값(undefined/null 은 "")
+ * @hidden N
+ */
+scwin.pick = function (rec, key) {
+    const v = (key && rec) ? rec[key] : "";
+    return (v === undefined || v === null) ? "" : v;
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+		<xf:group class="sub_contents" id="">
+			<xf:group class="pgtbox" id="">
+				<w2:textbox class="pgt_tit" id="" label="재무 동적 그리드 샘플 - 연도별 재무지표" style="" tagname=""></w2:textbox>
+				<xf:group class="breadcrumb" id="">
+					<xf:group id="" tagname="ul">
+						<xf:group class="home" id="" tagname="li">
+							<w2:anchor id="" outerDiv="false"><xf:label><![CDATA[Home]]></xf:label></w2:anchor>
+						</xf:group>
+						<xf:group id="" tagname="li">
+							<w2:span id="" label="재무 조건검색"></w2:span>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<xf:group class="titbox" id="">
+				<xf:group class="rt" id="">
+					<xf:trigger class="btn_cm search" ev:onclick="scwin.btnSearch_onclick" id="btnSearch" type="button">
+						<xf:label><![CDATA[조회]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm download" ev:onclick="scwin.btnExcel_onclick" id="btnExcel" type="button">
+						<xf:label><![CDATA[엑셀다운로드]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+			<xf:group class="lybox" id="">
+				<xf:group id="">
+					<xf:group class="titbox" id="">
+						<w2:textbox class="" id="" label="연도별 재무지표 (연도×지표 setGridStyle 동적 컬럼)" style="" tagname="h3"></w2:textbox>
+					</xf:group>
+					<xf:group class="gvwbox" id="">
+						<w2:gridView autoFit="allColumn" class="gvw" dataList="data:dltFisList" focusMode="row" id="grdFis" orgid="grdFis" readOnly="true" style="height: 420px;">
+							<w2:caption id="captionFis" style="" value="연도별 재무지표 동적 그리드"></w2:caption>
+							<w2:header id="headerFis" style="">
+								<w2:row id="" style=""></w2:row>
+							</w2:header>
+							<w2:gBody id="gBodyFis" style="">
+								<w2:row id="" style=""></w2:row>
+							</w2:gBody>
+						</w2:gridView>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+		</xf:group>
+	</body>
+</html>

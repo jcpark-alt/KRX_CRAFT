@@ -1,0 +1,670 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:ev="http://www.w3.org/2001/xml-events"
+    xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+    <head meta_screenName="[가이드] DataList 데이터 변경 성능 개선 (setBroadcast / setJSON)" meta_screenId="SMPDLT10000" meta_screenDesc="DataList 대량 변경 시 setBroadcast(false/true,true) 로 컴포넌트 전파를 묶고, setJSON 을 한 번만 호출하는 권장 패턴을 건별 처리와 소요시간으로 비교하는 가이드." meta_author="Inswave" meta_type="가이드">
+        <w2:type>COMPONENT</w2:type>
+        <w2:buildDate/>
+        <w2:MSA/>
+        <xf:model>
+            <w2:dataCollection baseNode="map">
+            	<w2:dataMap id="dma_cond" baseNode="map">
+            		<w2:keyInfo>
+            			<w2:key id="rowCount" name="처리 건수" dataType="text"></w2:key>
+            		</w2:keyInfo>
+            	</w2:dataMap>
+            	<w2:dataMap id="dma_basic" baseNode="map">
+            		<w2:keyInfo>
+            			<w2:key id="name" name="이름" dataType="text"></w2:key>
+            			<w2:key id="address" name="주소" dataType="text"></w2:key>
+            			<w2:key id="telephone" name="전화번호" dataType="text"></w2:key>
+            		</w2:keyInfo>
+            	</w2:dataMap>
+            	<w2:dataList baseNode="list" repeatNode="map" id="dlt_member">
+            		<w2:columnInfo>
+            			<w2:column id="EMP_NM" name="사원명" dataType="text"></w2:column>
+            			<w2:column id="GENDER_CD" name="성별코드" dataType="text"></w2:column>
+            			<w2:column id="ROLE_CD" name="역할코드" dataType="text"></w2:column>
+            			<w2:column id="JOIN_DATE" name="입사일" dataType="text"></w2:column>
+            		</w2:columnInfo>
+            	</w2:dataList>
+            	<w2:dataList baseNode="list" repeatNode="map" id="dlt_dept">
+            		<w2:columnInfo>
+            			<w2:column id="DEPT_CD" name="부서코드" dataType="text"></w2:column>
+            			<w2:column id="DEPT_NM" name="부서명" dataType="text"></w2:column>
+            			<w2:column id="EMP_CNT" name="인원수" dataType="text"></w2:column>
+            		</w2:columnInfo>
+            	</w2:dataList>
+            	<w2:dataList baseNode="list" repeatNode="map" id="dlt_link">
+            		<w2:columnInfo>
+            			<w2:column id="link_nm" name="링크명" dataType="text"></w2:column>
+            			<w2:column id="link_url" name="링크 URL" dataType="text"></w2:column>
+            			<w2:column id="add_gubun" name="추가구분" dataType="text"></w2:column>
+            		</w2:columnInfo>
+            	</w2:dataList>
+            	<w2:dataList baseNode="list" repeatNode="map" id="dlt_log">
+            		<w2:columnInfo>
+            			<w2:column id="seq" name="순번" dataType="text"></w2:column>
+            			<w2:column id="caseNm" name="처리 방식" dataType="text"></w2:column>
+            			<w2:column id="apiNm" name="사용 API" dataType="text"></w2:column>
+            			<w2:column id="rowCnt" name="건수" dataType="text"></w2:column>
+            			<w2:column id="elapsed" name="소요시간(ms)" dataType="text"></w2:column>
+            			<w2:column id="note" name="비고" dataType="text"></w2:column>
+            		</w2:columnInfo>
+            	</w2:dataList>
+            </w2:dataCollection>
+            <w2:workflowCollection/>
+        </xf:model>
+        <w2:layoutInfo/>
+        <w2:publicInfo method=""/>
+        <script lazy="false" type="text/javascript"><![CDATA[// 가이드 : DataList 데이터 변경 성능 개선 샘플 (setBroadcast / setJSON)
+
+/*
+ * 화면 동작
+ * 1. 처리 건수를 입력하고 7.1 「setBroadcast」 영역의 버튼으로 같은 건수를 세 가지 방식으로 입력해 소요시간을 비교한다
+ *    - 건별 반영(비권장)     : broadcast 기본값(true) 그대로 insertRow/setCellData 를 반복 → 건마다 그리드가 갱신된다
+ *    - setBroadcast 묶음(권장): dlt.setBroadcast(false) → 반복 변경 → dlt.setBroadcast(true, true) → 마지막에 한 번만 갱신
+ *    - 전역 setBroadcast     : $p.data.setBroadcast(false/true) 로 화면의 모든 DataCollection 전파를 한꺼번에 제어(두 DataList 동시 입력)
+ * 2. 7.2 「setJSON」 영역의 버튼으로 setJSON 호출 횟수에 따른 차이를 비교한다
+ *    - 건별 setJSON(비권장)  : 행마다 setJSON(row, true) 를 반복 호출
+ *    - 한 번에 setJSON(권장)  : 배열로 모아 setJSON(list) 를 1회 호출
+ *    - DataMap setJSON       : 객체 리터럴로 만들어 한 번에 설정(권장 표기)
+ *    - 링크 목록 추가        : setJSON(jsonArray, true) 로 기존 데이터 뒤에 append
+ * 3. 각 실행 결과는 하단 「실행 로그」 그리드에 (처리 방식·API·건수·소요시간) 으로 누적된다
+ *
+ * 담긴 패턴
+ * - dataList.setBroadcast(false) / setBroadcast(true, true)   : 대량 변경 전 전파 중지, 변경 후 전파 재개 + 바인딩 컴포넌트 즉시 갱신
+ * - $p.data.setBroadcast(false) / setBroadcast(true)          : 화면 단위 일괄 제어(여러 DataCollection 을 함께 변경할 때)
+ * - dataList.setJSON(jsonArray)                               : 데이터를 한 번에 설정(기존 데이터 대체, 행 상태 R)
+ * - dataList.setJSON(jsonArray, true)                         : 기존 데이터에 append
+ * - dataMap.setJSON(jsonObject)                               : 객체 리터럴로 한 번에 설정
+ *
+ * 참고
+ * - setBroadcast(true) 만 호출하면 전파는 재개되지만 이미 변경된 내용으로 컴포넌트가 다시 그려지지는 않는다.
+ *   묶음 변경 뒤에는 반드시 setBroadcast(true, true) 로 refresh 까지 요청한다.
+ * - 반복문 안에서 return/throw 로 빠져나가면 setBroadcast(true, true) 가 누락될 수 있으므로 try/finally 로 복원한다.
+ * - 소요시간은 브라우저·데이터량에 따라 달라지며, 절대값보다 방식 간 상대 비교가 목적이다.
+ */
+
+
+///////// 1. 변수 및 선언 영역 /////////
+
+scwin.screenId = "SMPDLT10000";
+
+scwin.DEFAULT_ROW_COUNT = 2000;    // 기본 처리 건수
+scwin.MAX_ROW_COUNT = 50000;       // 브라우저 보호를 위한 상한
+
+scwin.GENDER_CDS = ["M", "F"];
+scwin.ROLE_CDS = ["01", "02", "03"];
+
+// 7.2.2 setJSON append 샘플 데이터 — 정부 서비스 링크 목록
+scwin.LINK_DATA = [
+	{ link_nm : "주민등록증 진위확인/잠김해제", link_url : "http://www.egov.go.kr/main?a=AA090UserJuminIsCertApp", add_gubun : "1" },
+	{ link_nm : "운전면허증 진위여부 조회",    link_url : "http://dls.koroad.or.kr/jsp//OL_LcnsTruthYnRtvV.jsp",   add_gubun : "1" },
+	{ link_nm : "사업자등록상태 조회",        link_url : "https://www.hometax.go.kr",                             add_gubun : "2" }
+];
+
+
+///////// 2. 초기화 영역 /////////
+
+/**
+ * @method
+ * @name scwin.onpageload
+ * @author Inswave
+ * @date 2026. 09. 10
+ * @description 페이지 로드. 기본 처리 건수를 설정한다.
+ * @hidden N
+*/
+scwin.onpageload = function () {
+	try {
+		dma_cond.set("rowCount", String(scwin.DEFAULT_ROW_COUNT));
+	} catch (ex) {
+		$c.exception.handleError(ex, { context : "SMPDLT10000.onpageload" });
+	}
+};
+
+
+///////// 3. 컴포넌트 이벤트 영역 /////////
+
+// ── 7.1 setBroadcast ──
+
+/**
+ * @event
+ * @name scwin.btn_insertEach_onclick
+ * @description [건별 반영(비권장)] broadcast 기본값(true) 상태에서 insertRow/setCellData 를 반복한다.
+ *              건마다 바인딩된 그리드가 갱신되어 건수가 커질수록 느려진다.
+ * @hidden N
+*/
+scwin.btn_insertEach_onclick = function () {
+	try {
+		const totCount = scwin.getTotCount();
+		if (!totCount) { return; }
+
+		dlt_member.removeAll();
+		const startTime = performance.now();
+
+		scwin.fillMemberByCell(totCount);    // broadcast true — 건마다 그리드 갱신
+
+		scwin.printLog("건별 반영(비권장)", "insertRow + setCellData", totCount, startTime, "broadcast 기본값(true) 유지");
+	} catch (ex) {
+		$c.exception.handleError(ex, { context : "SMPDLT10000.btn_insertEach_onclick" });
+	}
+};
+
+/**
+ * @event
+ * @name scwin.btn_insertBroadcast_onclick
+ * @description [setBroadcast 묶음(권장)] 변경 전 setBroadcast(false) 로 전파를 멈추고,
+ *              변경 후 setBroadcast(true, true) 로 전파 재개 + 바인딩 컴포넌트를 한 번만 갱신한다.
+ * @hidden N
+*/
+scwin.btn_insertBroadcast_onclick = function () {
+	try {
+		const totCount = scwin.getTotCount();
+		if (!totCount) { return; }
+
+		dlt_member.removeAll();
+		const startTime = performance.now();
+
+		dlt_member.setBroadcast(false);    // 모든 data 변경 전 비활성화
+		try {
+			scwin.fillMemberByCell(totCount);
+		} finally {
+			dlt_member.setBroadcast(true, true);    // 모든 data 변경 후 활성화 + refresh (예외 시에도 복원)
+		}
+
+		scwin.printLog("setBroadcast 묶음(권장)", "setBroadcast(false) → 변경 → setBroadcast(true, true)", totCount, startTime, "마지막에 한 번만 갱신");
+	} catch (ex) {
+		$c.exception.handleError(ex, { context : "SMPDLT10000.btn_insertBroadcast_onclick" });
+	}
+};
+
+/**
+ * @event
+ * @name scwin.btn_insertGlobal_onclick
+ * @description [전역 setBroadcast] $p.data.setBroadcast(false) 로 화면의 모든 DataCollection 전파를 멈추고
+ *              두 DataList(사원·부서)를 함께 변경한 뒤 $p.data.setBroadcast(true) 로 재개한다.
+ * @hidden N
+*/
+scwin.btn_insertGlobal_onclick = function () {
+	try {
+		const totCount = scwin.getTotCount();
+		if (!totCount) { return; }
+
+		dlt_member.removeAll();
+		dlt_dept.removeAll();
+		const startTime = performance.now();
+
+		$p.data.setBroadcast(false);    // 화면의 모든 DataCollection 전파 중지
+		try {
+			scwin.fillMemberByCell(totCount);
+			scwin.fillDeptByCell(totCount);
+		} finally {
+			$p.data.setBroadcast(true);    // 최종 데이터로 연동 컴포넌트 일괄 갱신
+		}
+
+		scwin.printLog("전역 setBroadcast", "$p.data.setBroadcast(false) → 변경 → $p.data.setBroadcast(true)", totCount * 2, startTime, "사원 + 부서 두 DataList 동시 변경");
+	} catch (ex) {
+		$c.exception.handleError(ex, { context : "SMPDLT10000.btn_insertGlobal_onclick" });
+	}
+};
+
+// ── 7.2 setJSON ──
+
+/**
+ * @event
+ * @name scwin.btn_setJsonEach_onclick
+ * @description [건별 setJSON(비권장)] 행마다 setJSON(row, true) 를 반복 호출한다.
+ *              호출마다 데이터 반영 + 컴포넌트 갱신이 일어나 느리다.
+ * @hidden N
+*/
+scwin.btn_setJsonEach_onclick = function () {
+	try {
+		const totCount = scwin.getTotCount();
+		if (!totCount) { return; }
+
+		dlt_member.removeAll();
+		const startTime = performance.now();
+
+		const today = $c.date.getServerDateTime("yyyyMMdd");
+		for (let i = 1; i <= totCount; i++) {
+			dlt_member.setJSON([scwin.makeMemberRow(i, today)], true);    // 건마다 append 호출 — 비권장
+		}
+
+		scwin.printLog("건별 setJSON(비권장)", "setJSON(row, true) × N", totCount, startTime, "호출마다 반영·갱신");
+	} catch (ex) {
+		$c.exception.handleError(ex, { context : "SMPDLT10000.btn_setJsonEach_onclick" });
+	}
+};
+
+/**
+ * @event
+ * @name scwin.btn_setJsonOnce_onclick
+ * @description [한 번에 setJSON(권장)] 최종 결과를 배열로 모아 setJSON(list) 를 1회만 호출한다.
+ * @hidden N
+*/
+scwin.btn_setJsonOnce_onclick = function () {
+	try {
+		const totCount = scwin.getTotCount();
+		if (!totCount) { return; }
+
+		dlt_member.removeAll();
+		const startTime = performance.now();
+
+		const memberList = scwin.makeMemberList(totCount);    // 먼저 배열로 모은다
+		dlt_member.setJSON(memberList);                        // 한 번만 호출
+
+		scwin.printLog("한 번에 setJSON(권장)", "setJSON(list) × 1", totCount, startTime, "배열로 모아 1회 호출");
+	} catch (ex) {
+		$c.exception.handleError(ex, { context : "SMPDLT10000.btn_setJsonOnce_onclick" });
+	}
+};
+
+/**
+ * @event
+ * @name scwin.btn_setJsonBasic_onclick
+ * @description [DataMap setJSON] 키를 하나씩 대입하지 않고 객체 리터럴로 만들어 setJSON 한 번으로 설정한다(권장 표기).
+ * @hidden N
+*/
+scwin.btn_setJsonBasic_onclick = function () {
+	try {
+		const startTime = performance.now();
+
+		// 권장 : 객체 리터럴로 한 번에 구성 → setJSON 1회
+		const basicData = {
+			name      : "WebSquare",
+			address   : "서울시 구로구",
+			telephone : "01011112222"
+		};
+		dma_basic.setJSON(basicData);
+
+		scwin.printLog("DataMap setJSON", "dataMap.setJSON(object)", 1, startTime, "객체 리터럴로 한 번에 설정");
+	} catch (ex) {
+		$c.exception.handleError(ex, { context : "SMPDLT10000.btn_setJsonBasic_onclick" });
+	}
+};
+
+/**
+ * @event
+ * @name scwin.btn_addLink_onclick
+ * @description [setJSON append] 링크 목록 배열을 기존 DataList 데이터 뒤에 추가한다(append = true).
+ * @hidden N
+*/
+scwin.btn_addLink_onclick = function () {
+	try {
+		const startTime = performance.now();
+
+		scwin.addBodyLink(dlt_link);
+
+		scwin.printLog("setJSON append", "setJSON(jsonArray, true)", scwin.LINK_DATA.length, startTime, "기존 데이터 뒤에 추가 (누적 " + dlt_link.getRowCount() + "건)");
+	} catch (ex) {
+		$c.exception.handleError(ex, { context : "SMPDLT10000.btn_addLink_onclick" });
+	}
+};
+
+// ── 공통 ──
+
+/**
+ * @event
+ * @name scwin.btn_clearData_onclick
+ * @description 샘플 데이터(사원·부서·링크·기본정보)를 모두 비운다.
+ * @hidden N
+*/
+scwin.btn_clearData_onclick = function () {
+	try {
+		dlt_member.removeAll();
+		dlt_dept.removeAll();
+		dlt_link.removeAll();
+		dma_basic.reset();
+	} catch (ex) {
+		$c.exception.handleError(ex, { context : "SMPDLT10000.btn_clearData_onclick" });
+	}
+};
+
+/**
+ * @event
+ * @name scwin.btn_clearLog_onclick
+ * @description 실행 로그를 비운다.
+ * @hidden N
+*/
+scwin.btn_clearLog_onclick = function () {
+	try {
+		dlt_log.removeAll();
+	} catch (ex) {
+		$c.exception.handleError(ex, { context : "SMPDLT10000.btn_clearLog_onclick" });
+	}
+};
+
+
+///////// 4. 서브미션 콜백 영역 /////////
+
+
+///////// 5. 일반/업무 함수 영역 /////////
+
+/**
+ * @method
+ * @name scwin.getTotCount
+ * @description 처리 건수 입력값을 검증해 숫자로 돌려준다. 잘못된 값이면 안내 후 0 을 반환한다.
+ * @returns {Number} 처리 건수 (검증 실패 시 0)
+ * @hidden N
+*/
+scwin.getTotCount = function () {
+	const totCount = Number(dma_cond.get("rowCount"));
+
+	if (!Number.isInteger(totCount) || totCount < 1) {
+		$c.win.alert("처리 건수는 1 이상의 정수로 입력하세요.");
+		ipt_rowCount.focus();
+		return 0;
+	}
+	if (totCount > scwin.MAX_ROW_COUNT) {
+		$c.win.alert("처리 건수는 최대 " + $c.num.formatNumber(scwin.MAX_ROW_COUNT) + "건까지 입력할 수 있습니다.");
+		ipt_rowCount.focus();
+		return 0;
+	}
+	return totCount;
+};
+
+/**
+ * @method
+ * @name scwin.makeMemberRow
+ * @description 사원 샘플 1행을 만든다.
+ * @param {Number} i 순번(1부터)
+ * @param {String} today 입사일로 쓸 오늘 날짜(yyyyMMdd)
+ * @returns {Object} 사원 행 객체
+ * @hidden N
+*/
+scwin.makeMemberRow = function (i, today) {
+	return {
+		EMP_NM    : "insertRow" + i,
+		GENDER_CD : scwin.GENDER_CDS[i % scwin.GENDER_CDS.length],
+		ROLE_CD   : scwin.ROLE_CDS[i % scwin.ROLE_CDS.length],
+		JOIN_DATE : today
+	};
+};
+
+/**
+ * @method
+ * @name scwin.makeMemberList
+ * @description 사원 샘플 n행을 배열로 만든다(setJSON 1회 호출용).
+ * @param {Number} totCount 생성 건수
+ * @returns {Array} 사원 행 배열
+ * @hidden N
+*/
+scwin.makeMemberList = function (totCount) {
+	const today = $c.date.getServerDateTime("yyyyMMdd");
+	const list = [];
+	for (let i = 1; i <= totCount; i++) {
+		list.push(scwin.makeMemberRow(i, today));
+	}
+	return list;
+};
+
+/**
+ * @method
+ * @name scwin.fillMemberByCell
+ * @description 사원 DataList 에 insertRow + setCellData 로 n행을 건별 입력한다.
+ *              broadcast 제어는 호출자가 담당한다(7.1 세 방식이 같은 본문을 공유).
+ * @param {Number} totCount 입력 건수
+ * @hidden N
+*/
+scwin.fillMemberByCell = function (totCount) {
+	const today = $c.date.getServerDateTime("yyyyMMdd");
+	for (let i = 1; i <= totCount; i++) {
+		const idx = dlt_member.insertRow();
+		dlt_member.setCellData(idx, "EMP_NM", "insertRow" + i);
+		dlt_member.setCellData(idx, "GENDER_CD", scwin.GENDER_CDS[i % scwin.GENDER_CDS.length]);
+		dlt_member.setCellData(idx, "ROLE_CD", scwin.ROLE_CDS[i % scwin.ROLE_CDS.length]);
+		dlt_member.setCellData(idx, "JOIN_DATE", today);
+	}
+};
+
+/**
+ * @method
+ * @name scwin.fillDeptByCell
+ * @description 부서 DataList 에 insertRow + setCellData 로 n행을 건별 입력한다(전역 setBroadcast 시연용 두 번째 DataList).
+ * @param {Number} totCount 입력 건수
+ * @hidden N
+*/
+scwin.fillDeptByCell = function (totCount) {
+	for (let i = 1; i <= totCount; i++) {
+		const idx = dlt_dept.insertRow();
+		dlt_dept.setCellData(idx, "DEPT_CD", "D" + String(i).padStart(5, "0"));
+		dlt_dept.setCellData(idx, "DEPT_NM", "부서" + i);
+		dlt_dept.setCellData(idx, "EMP_CNT", String(i % 50));
+	}
+};
+
+/**
+ * @method
+ * @name scwin.addBodyLink
+ * @description 링크 목록을 대상 DataList 의 기존 데이터 뒤에 추가한다(7.2.2 setJSON append 샘플).
+ * @param {Object} dsObj 대상 DataList
+ * @hidden N
+*/
+scwin.addBodyLink = function (dsObj) {
+	dsObj.setJSON(scwin.LINK_DATA, true);    // append = true : 기존 데이터 유지 + 추가
+};
+
+/**
+ * @method
+ * @name scwin.printLog
+ * @description 실행 결과(처리 방식·API·건수·소요시간)를 로그 DataList 에 1행 추가한다.
+ * @param {String} caseNm 처리 방식
+ * @param {String} apiNm 사용 API
+ * @param {Number} rowCnt 처리 건수
+ * @param {Number} startTime 시작 시각(performance.now())
+ * @param {String} note 비고
+ * @hidden N
+*/
+scwin.printLog = function (caseNm, apiNm, rowCnt, startTime, note) {
+	const elapsed = Math.round(performance.now() - startTime);
+	const logRow = {
+		seq     : String(dlt_log.getRowCount() + 1),
+		caseNm  : caseNm,
+		apiNm   : apiNm,
+		rowCnt  : $c.num.formatNumber(rowCnt),
+		elapsed : $c.num.formatNumber(elapsed),
+		note    : note || ""
+	};
+	dlt_log.setJSON([logRow], true);
+};]]></script>
+    </head>
+    <body ev:onpageload="scwin.onpageload">
+    	<xf:group class="sub_contents" id="" meta_componentContainer="true" style="">
+    		<w2:pageFrame id="pfmContentHeader" src="/cm/xml/contentHeader.xml" style=""></w2:pageFrame>
+    		<w2:textbox class="txt_info blue bold" id="" label="본 화면은 DataList 대량 변경 시 setBroadcast 로 컴포넌트 전파를 묶고, setJSON 을 한 번만 호출하는 권장 패턴을 건별 처리와 소요시간으로 비교하는 가이드입니다." style="" tagname=""></w2:textbox>
+    		<w2:textbox class="txt_info red" id="" label="같은 건수를 여러 방식으로 실행한 뒤 하단 실행 로그의 소요시간을 비교하세요. 건별 반영 방식은 건수가 크면 화면이 잠시 멈출 수 있습니다." style="" tagname=""></w2:textbox>
+
+    		<xf:group class="tblbox" id="" style="">
+    			<xf:group adaptive="layout" adaptiveThreshold="768" class="w2tb tbl" id="grp_cond" style="" tagname="table">
+    				<w2:attributes>
+    					<w2:summary></w2:summary>
+    				</w2:attributes>
+    				<xf:group tagname="colgroup">
+    					<xf:group style="width:170px;" tagname="col"></xf:group>
+    					<xf:group style="" tagname="col"></xf:group>
+    				</xf:group>
+    				<xf:group tagname="tr">
+    					<xf:group class="w2tb_th" tagname="th">
+    						<w2:textbox class="req" id="" label="처리 건수" style=""></w2:textbox>
+    					</xf:group>
+    					<xf:group class="w2tb_td" tagname="td">
+    						<xf:input id="ipt_rowCount" ref="data:dma_cond.rowCount" style="width:120px;text-align:right;" class="req" title="처리 건수" placeholder="1 ~ 50,000"></xf:input>
+    						<w2:textbox class="txt_info" id="" label="※ 7.1 setBroadcast 와 7.2 setJSON 비교 버튼에 공통으로 적용되는 건수입니다. (최대 50,000건)" style=""></w2:textbox>
+    					</xf:group>
+    				</xf:group>
+    			</xf:group>
+    		</xf:group>
+
+    		<xf:group class="titbox" id="" style="">
+    			<w2:textbox class="tit" id="" label="7.1 setBroadcast — 대량 변경 시 컴포넌트 전파 제어" style=""></w2:textbox>
+    			<xf:group class="rt" id="">
+    				<xf:trigger class="btn_cm" id="btn_insertEach" type="button" ev:onclick="scwin.btn_insertEach_onclick">
+    					<xf:label><![CDATA[건별 반영(비권장)]]></xf:label>
+    				</xf:trigger>
+    				<xf:trigger class="btn_cm pt" id="btn_insertBroadcast" type="button" ev:onclick="scwin.btn_insertBroadcast_onclick">
+    					<xf:label><![CDATA[setBroadcast 묶음(권장)]]></xf:label>
+    				</xf:trigger>
+    				<xf:trigger class="btn_cm" id="btn_insertGlobal" type="button" ev:onclick="scwin.btn_insertGlobal_onclick">
+    					<xf:label><![CDATA[전역 $p.data.setBroadcast]]></xf:label>
+    				</xf:trigger>
+    			</xf:group>
+    		</xf:group>
+    		<w2:textbox class="txt_info" id="" label="건별 반영은 broadcast 기본값(true) 그대로 insertRow/setCellData 를 반복합니다. 묶음 방식은 setBroadcast(false) → 변경 → setBroadcast(true, true) 로 마지막에 한 번만 그리드를 갱신하고, 전역 방식은 $p.data.setBroadcast 로 사원·부서 두 DataList 를 함께 제어합니다." style="" tagname=""></w2:textbox>
+    		<xf:group class="grdbox" id="" style="">
+    			<w2:gridView autoFit="allColumn" class="gvw row5" dataList="data:dlt_member" focusMode="row" id="grd_member"
+    				keepDefaultColumnWidth="false" rowNumHeaderValue="번호" rowNumVisible="true" rowNumWidth="60"
+    				scrollByColumn="false" style="" visibleRowNum="5">
+    				<w2:header id="headerMember" style="">
+    					<w2:row id="rowMemberHead" style="">
+    						<w2:column displayMode="label" id="hEmpNm" inputType="text" value="사원명" width="200"></w2:column>
+    						<w2:column displayMode="label" id="hGenderCd" inputType="text" value="성별코드" width="100"></w2:column>
+    						<w2:column displayMode="label" id="hRoleCd" inputType="text" value="역할코드" width="100"></w2:column>
+    						<w2:column displayMode="label" id="hJoinDate" inputType="text" value="입사일" width="140"></w2:column>
+    					</w2:row>
+    				</w2:header>
+    				<w2:gBody id="gBodyMember" style="">
+    					<w2:row id="rowMemberBody" style="">
+    						<w2:column id="EMP_NM" inputType="text" width="200" textAlign="left"></w2:column>
+    						<w2:column id="GENDER_CD" inputType="text" width="100" textAlign="center"></w2:column>
+    						<w2:column id="ROLE_CD" inputType="text" width="100" textAlign="center"></w2:column>
+    						<w2:column id="JOIN_DATE" inputType="text" width="140" textAlign="center"></w2:column>
+    					</w2:row>
+    				</w2:gBody>
+    			</w2:gridView>
+    		</xf:group>
+    		<xf:group class="grdbox" id="" style="">
+    			<w2:gridView autoFit="allColumn" class="gvw row5" dataList="data:dlt_dept" focusMode="row" id="grd_dept"
+    				keepDefaultColumnWidth="false" rowNumHeaderValue="번호" rowNumVisible="true" rowNumWidth="60"
+    				scrollByColumn="false" style="" visibleRowNum="3">
+    				<w2:header id="headerDept" style="">
+    					<w2:row id="rowDeptHead" style="">
+    						<w2:column displayMode="label" id="hDeptCd" inputType="text" value="부서코드" width="140"></w2:column>
+    						<w2:column displayMode="label" id="hDeptNm" inputType="text" value="부서명" width="200"></w2:column>
+    						<w2:column displayMode="label" id="hEmpCnt" inputType="text" value="인원수" width="100"></w2:column>
+    					</w2:row>
+    				</w2:header>
+    				<w2:gBody id="gBodyDept" style="">
+    					<w2:row id="rowDeptBody" style="">
+    						<w2:column id="DEPT_CD" inputType="text" width="140" textAlign="center"></w2:column>
+    						<w2:column id="DEPT_NM" inputType="text" width="200" textAlign="left"></w2:column>
+    						<w2:column id="EMP_CNT" inputType="text" width="100" textAlign="right"></w2:column>
+    					</w2:row>
+    				</w2:gBody>
+    			</w2:gridView>
+    		</xf:group>
+
+    		<xf:group class="titbox" id="" style="">
+    			<w2:textbox class="tit" id="" label="7.2 setJSON — 호출 횟수 최소화" style=""></w2:textbox>
+    			<xf:group class="rt" id="">
+    				<xf:trigger class="btn_cm" id="btn_setJsonEach" type="button" ev:onclick="scwin.btn_setJsonEach_onclick">
+    					<xf:label><![CDATA[건별 setJSON(비권장)]]></xf:label>
+    				</xf:trigger>
+    				<xf:trigger class="btn_cm pt" id="btn_setJsonOnce" type="button" ev:onclick="scwin.btn_setJsonOnce_onclick">
+    					<xf:label><![CDATA[한 번에 setJSON(권장)]]></xf:label>
+    				</xf:trigger>
+    				<xf:trigger class="btn_cm" id="btn_setJsonBasic" type="button" ev:onclick="scwin.btn_setJsonBasic_onclick">
+    					<xf:label><![CDATA[DataMap setJSON]]></xf:label>
+    				</xf:trigger>
+    				<xf:trigger class="btn_cm" id="btn_addLink" type="button" ev:onclick="scwin.btn_addLink_onclick">
+    					<xf:label><![CDATA[링크 목록 추가(append)]]></xf:label>
+    				</xf:trigger>
+    			</xf:group>
+    		</xf:group>
+    		<w2:textbox class="txt_info" id="" label="건별 setJSON 은 행마다 setJSON(row, true) 를 호출하고, 권장 방식은 최종 결과를 배열로 모아 setJSON(list) 를 1회만 호출해 위 사원 그리드에 반영합니다. DataMap setJSON 은 객체 리터럴로 한 번에 설정하며, 링크 목록 추가는 setJSON(jsonArray, true) 로 기존 데이터 뒤에 append 합니다." style="" tagname=""></w2:textbox>
+    		<xf:group class="tblbox" id="" style="">
+    			<xf:group adaptive="layout" adaptiveThreshold="768" class="w2tb tbl" id="grp_basic" style="" tagname="table">
+    				<w2:attributes>
+    					<w2:summary></w2:summary>
+    				</w2:attributes>
+    				<xf:group tagname="colgroup">
+    					<xf:group style="width:170px;" tagname="col"></xf:group>
+    					<xf:group style="" tagname="col"></xf:group>
+    					<xf:group style="width:170px;" tagname="col"></xf:group>
+    					<xf:group style="" tagname="col"></xf:group>
+    					<xf:group style="width:170px;" tagname="col"></xf:group>
+    					<xf:group style="" tagname="col"></xf:group>
+    				</xf:group>
+    				<xf:group tagname="tr">
+    					<xf:group class="w2tb_th" tagname="th">
+    						<w2:textbox class="" id="" label="이름" style=""></w2:textbox>
+    					</xf:group>
+    					<xf:group class="w2tb_td" tagname="td">
+    						<xf:input id="ipt_name" ref="data:dma_basic.name" style="width:100%;" readOnly="true" title="이름"></xf:input>
+    					</xf:group>
+    					<xf:group class="w2tb_th" tagname="th">
+    						<w2:textbox class="" id="" label="주소" style=""></w2:textbox>
+    					</xf:group>
+    					<xf:group class="w2tb_td" tagname="td">
+    						<xf:input id="ipt_address" ref="data:dma_basic.address" style="width:100%;" readOnly="true" title="주소"></xf:input>
+    					</xf:group>
+    					<xf:group class="w2tb_th" tagname="th">
+    						<w2:textbox class="" id="" label="전화번호" style=""></w2:textbox>
+    					</xf:group>
+    					<xf:group class="w2tb_td" tagname="td">
+    						<xf:input id="ipt_telephone" ref="data:dma_basic.telephone" style="width:100%;" readOnly="true" title="전화번호"></xf:input>
+    					</xf:group>
+    				</xf:group>
+    			</xf:group>
+    		</xf:group>
+    		<xf:group class="grdbox" id="" style="">
+    			<w2:gridView autoFit="allColumn" class="gvw row5" dataList="data:dlt_link" focusMode="row" id="grd_link"
+    				keepDefaultColumnWidth="false" rowNumHeaderValue="번호" rowNumVisible="true" rowNumWidth="60"
+    				scrollByColumn="false" style="" visibleRowNum="3">
+    				<w2:header id="headerLink" style="">
+    					<w2:row id="rowLinkHead" style="">
+    						<w2:column displayMode="label" id="hLinkNm" inputType="text" value="링크명" width="240"></w2:column>
+    						<w2:column displayMode="label" id="hLinkUrl" inputType="text" value="링크 URL" width="400"></w2:column>
+    						<w2:column displayMode="label" id="hAddGubun" inputType="text" value="추가구분" width="100"></w2:column>
+    					</w2:row>
+    				</w2:header>
+    				<w2:gBody id="gBodyLink" style="">
+    					<w2:row id="rowLinkBody" style="">
+    						<w2:column id="link_nm" inputType="text" width="240" textAlign="left"></w2:column>
+    						<w2:column id="link_url" inputType="text" width="400" textAlign="left"></w2:column>
+    						<w2:column id="add_gubun" inputType="text" width="100" textAlign="center"></w2:column>
+    					</w2:row>
+    				</w2:gBody>
+    			</w2:gridView>
+    		</xf:group>
+
+    		<xf:group class="titbox" id="" style="">
+    			<w2:textbox class="tit" id="" label="실행 로그" style=""></w2:textbox>
+    			<xf:group class="rt" id="">
+    				<xf:trigger class="btn_cm" id="btn_clearData" type="button" ev:onclick="scwin.btn_clearData_onclick">
+    					<xf:label><![CDATA[데이터 비우기]]></xf:label>
+    				</xf:trigger>
+    				<xf:trigger class="btn_cm" id="btn_clearLog" type="button" ev:onclick="scwin.btn_clearLog_onclick">
+    					<xf:label><![CDATA[로그 비우기]]></xf:label>
+    				</xf:trigger>
+    			</xf:group>
+    		</xf:group>
+    		<xf:group class="grdbox" id="" style="">
+    			<w2:gridView autoFit="allColumn" class="gvw row10" dataList="data:dlt_log" focusMode="row" id="grd_log"
+    				keepDefaultColumnWidth="false" rowNumVisible="false"
+    				scrollByColumn="false" style="" visibleRowNum="8">
+    				<w2:header id="headerLog" style="">
+    					<w2:row id="rowLogHead" style="">
+    						<w2:column displayMode="label" id="hSeq" inputType="text" value="순번" width="60"></w2:column>
+    						<w2:column displayMode="label" id="hCaseNm" inputType="text" value="처리 방식" width="180"></w2:column>
+    						<w2:column displayMode="label" id="hApiNm" inputType="text" value="사용 API" width="360"></w2:column>
+    						<w2:column displayMode="label" id="hRowCnt" inputType="text" value="건수" width="90"></w2:column>
+    						<w2:column displayMode="label" id="hElapsed" inputType="text" value="소요시간(ms)" width="110"></w2:column>
+    						<w2:column displayMode="label" id="hNote" inputType="text" value="비고" width="260"></w2:column>
+    					</w2:row>
+    				</w2:header>
+    				<w2:gBody id="gBodyLog" style="">
+    					<w2:row id="rowLogBody" style="">
+    						<w2:column id="seq" inputType="text" width="60" textAlign="center"></w2:column>
+    						<w2:column id="caseNm" inputType="text" width="180" textAlign="left"></w2:column>
+    						<w2:column id="apiNm" inputType="text" width="360" textAlign="left"></w2:column>
+    						<w2:column id="rowCnt" inputType="text" width="90" textAlign="right"></w2:column>
+    						<w2:column id="elapsed" inputType="text" width="110" textAlign="right"></w2:column>
+    						<w2:column id="note" inputType="text" width="260" textAlign="left"></w2:column>
+    					</w2:row>
+    				</w2:gBody>
+    			</w2:gridView>
+    		</xf:group>
+    	</xf:group>
+    </body>
+</html>
