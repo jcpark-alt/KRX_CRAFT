@@ -1,7 +1,7 @@
 # gcc 공통 함수 업데이트 이력
 
-`src/gcc/` 공통 라이브러리(`$c.*`)의 최초 반입(2026-06-08, `92a35bd`) 이후 변경 내역 정리 (최종 갱신 2026-09-07).
-API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-09-07 기준 **12개 모듈 / 317개 공개 메서드**.
+`src/gcc/` 공통 라이브러리(`$c.*`)의 최초 반입(2026-06-08, `92a35bd`) 이후 변경 내역 정리 (최종 갱신 2026-09-10).
+API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-09-10 기준 **12개 모듈 / 319개 공개 메서드**.
 
 > `src/cm/gcc/`는 CM 모듈용 사본으로 일반적 개선만 선별 반영해 왔으나(2026-06-10 병합, 2026-07-22 대규모 동기화로 11파일 체제),
 > **2026-08-18 `26af3d5`에서 사용 중단으로 삭제**되어 `src/gcc/`가 유일한 canonical 라이브러리다.
@@ -14,7 +14,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 | 모듈 | 주요 변화 |
 |------|-----------|
 | `sbm.xml` (`$c.sbm`) | 중복 제출 가드, `executeDynamic` 간소화 ref/target 문법·gridview 자동 바인딩·`autoFocus`·다중 gridview 바인딩·스피너 오버레이·message 옵션(opt-in), RESTful URL 활성화, 단건 ref(DataMap)→`requestData` 추출, 페이징(`setPagingInfo`) 개선 — `maxRowNum "all"` 전체 행 표시·`rowNumVisble desc` 내림차순 순번, 그리드 DOM `render` 참조 전환 |
-| `data.xml` (`$c.data`) | 공통코드 로딩(`COMMON_CODE_INFO.ACTION` 연동, `setCommonCode` 배열 매핑 → code별 키잉 응답 매핑(`mappingKey` = 응답 조회 key) 개편·응답 언래핑·기본 컬럼 cdVal/cdValNm·조회 URL 이원화(url/paramName 옵션은 추가 후 제거)), JSON 헬퍼 8종, 프로세스 메시지, 콤보 공통코드 세팅(`comboCbDataSet*`) 계열, 업로드/리포트 헬퍼, 엑셀 다운로드 기본 옵션 개선 |
+| `data.xml` (`$c.data`) | 공통코드 로딩(`COMMON_CODE_INFO.ACTION` 연동, `setCommonCode` 배열 매핑 → code별 키잉 응답 매핑(`mappingKey` = 응답 조회 key) 개편·응답 언래핑·기본 컬럼 cdVal/cdValNm·조회 URL 이원화(url/paramName 옵션은 추가 후 제거)), JSON 헬퍼 8종, 프로세스 메시지, 콤보 공통코드 세팅(`comboCbDataSet*`) 계열(이메일 도메인 `comboCbDataSetEmail` 포함), 업로드/리포트 헬퍼, 엑셀 다운로드 기본 옵션 개선, 화면/DC 단위 전파 제어 `setBroadcast` |
 | `win.xml` (`$c.win`) | 외부망 홈(`goHomeEx`), 프로그램 열기/내비게이션 단순화, `openFormSubmit`, 인쇄(`mainPrint`/`popupPrint`), `success`/`error` 알림, `openExternalPage`, **browserPopup 부모 화면 접근**(`getOpenerScope`/`callOpener`), 히스토리 기록·복원(`pushState`/`changePageState`) 결함 수정 및 `moveUrl`/`setPageFrameSrc` 이동 복원 확장(`restoreData` [목록] 복귀 포함), 프레임 초기화 `reinitialize` |
 | `exception.xml` (`$c.exception`) | **신설**(2026-08-26, win.xml 에서 분리) — 화면 try/catch 공통 오류 처리기 `handleError`(예외 분류·이중 알림 방지), 오류 수집 훅 `__reportError`(`ERROR_REPORT_INFO.URL` 설정 시 활성화) |
 | `util.xml` (`$c.util`) | 쿠키/웹스토리지 헬퍼 13종, 업로드(`onUploadClick`/`getUploadFiles` 등), `setTextLengthCounter`, `checkFileExtension`, 엑셀 다운로드 파일명 개선, `setGridVisibleRowNum`(gridView "all" 동적 적용), 버튼 상태 일괄 제어 `setButtonState`/`registerButtonState`, 동적 컬럼 그리드 `syncDataListColumns`/`buildGridStyleXml`(setGridStyle 2단 그룹 헤더) |
@@ -293,6 +293,12 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 - `4fe8607` (09-01) — [연관] **pcc frame.xml·utils.xml·stf_old.xml 최종 삭제**(`src/pcc`, gcc 무변경): `$c.frame`/`$c.utils` 사용 중단 방침 — 호출부 gcc 전환 완료 후 정의 파일 삭제(잔존 $c.utils 2건은 `getServerDateTime`/`addDate` 치환), $c.frame 미정의 호출 10건(MDI/WinOpen/PDF 창)은 재설계 대기. pcc/stf 7파일 체제
 - `6c95493` (09-01) — [연관] **$c.frame 미정의 호출 10건 정리**(`src/pcc`, gcc 무변경): common MdiHelp·FileDown1/2 삭제·`InfoMenuID`→`$c.win.getProgramId()` 위임, stf 뷰어/목록 4함수 톱 WinOpen→`$c.win.openPopup(browserPopup)` 전환(+`frame.FrameID`→`$p.getFrameId()`), print PDF 창 `window.open` 직접 호출 — pcc 에서 $c.frame/$c.utils 실행 참조 0건 달성
 - `ce3c500` (09-01) — [연관] **common.xml($c.cm) 함수 주석·gcc 치환 정리**(`src/pcc`, gcc 무변경): 박스 주석 22건→@description 이관, 미사용 매핑확정 15개 정의 삭제(85→70 함수)·`fn_Trim` 호출 11건(내부 7·ui-tobe 4) `$c.str.trim` 치환 — 1:1 불가 4종(fn_CheckEmail alert 내장·fn_IsNumber_val 정수 전용·fn_DelChar/3 업무 로직) 유지·검토
+- `9b9a5ef` (09-10) — `$c.data` **DataCollection 전파 제어 공통함수 `setBroadcast` 신설** (318→319 메서드):
+  - `setBroadcast(flag, dcList)`: 대상 미지정 시 `$p.data.setBroadcast(flag)` 로 화면의 모든 DataCollection 전파를 일괄 제어(빌드 $p 주입 규칙으로 호출 화면 스코프에 적용), 대상(객체·id·배열) 지정 시 해당 DC 만 `setBroadcast(false)` / 재개 시 `setBroadcast(true, true)`(refresh 포함 — 규칙 28 규약과 동일). 미해결 id 는 warn 후 건너뛰고 전역 상태는 건드리지 않음. 반복문 조기 이탈 대비 try/finally 호출을 JSDoc 예제로 명시
+  - SMPDLT10000(DataList 성능 가이드)의 「전역 setBroadcast」 버튼이 `$p.data.setBroadcast` 직접 호출 대신 본 함수를 사용하도록 교체(주석·로그 라벨·버튼 캡션 동기화), vm 하니스로 4경로 검증
+- `be4ecc3` (09-10) — [연관] **bulkFileSaver UDC `saveMapForm` 파일 인덱스 전달 방식 변경**(`src/udc`, gcc 무변경): 파일별 `{fieldKey}_file_index` 개별 FormData 파트 → `$c.data.createDataMap` 으로 `dmaFileIndex` dataMap 을 동적 생성해 `{ fieldKey: files 내 인덱스 }` JSON Blob 파트 하나로 전송(파일이 없으면 생략), 인덱스는 실제 files append 순서 기준. 서버 핸들러도 동일 규약으로 맞춰야 함
+- `064a753` (09-10) — `$c.sbm`/`$c.validate`/`$c.session` **결함 수정 3건**: `executeDynamic` 에서 submission 객체의 options 가 비어 있으면 빈 객체로 초기화(엔진 오류 방지) · `validateDataGroup`/`validateDataCollection` 의 항목명 조사를 **REQUIRED 규칙일 때 `attachObjectPostposition`(을/를)** 로 분기("~을/를 입력하세요") · session onpageload·getUserInfo 디버그 console.log 제거. (Jest `validateDataCollect` 하니스는 `attachObjectPostposition` mock 미비로 3건 실패 → 후속 커밋에서 mock·기대 문구 보정)
+- `7cefc92` (09-09) — `$c.data` **이메일 도메인 콤보 세팅 `comboCbDataSetEmail` 신설** (317→318 메서드): 직접 입력/naver.com/hanmail.net/daum.net/gmail.com/icloud.com itemArr 구성 + index(기본 0) 선택 — `comboCbDataSet*` 계열 확장, publicInfo 등재·표준 JSDoc
 - `6232c44` (09-07) — `$c.util` **동적 컬럼 그리드 공통함수 `syncDataListColumns`·`buildGridStyleXml` 신설** (315→317 메서드):
   - ULDFIS00600 에서 검증(런타임 화면 확인 09-07)된 로직의 승격 — `syncDataListColumns(dataList, cols)`: DataList 객체/id 수용, `insertColumn`(기존 id 엔진 skip·멱등)/잔존 `removeColumn` 동기화, `{inserted, removed}` 반환. `buildGridStyleXml(gridOptions, cols)`: `setGridStyle` 용 gridView 전체 XML 생성 — colDef `group` 연속 구간 colSpan 병합 + 고정 컬럼 rowSpan=2 의 **2단 그룹 헤더**(엔진 `setColumns` 는 단일 헤더 강제·group 미지원이라 setGridStyle 재생성이 표준), 옵션 `{id, dataList}` 필수·caption·기본값(gvw/allColumn/row/readOnly), `__escapeXmlAttr` 내부 헬퍼
   - ULDFIS00600 화면은 로컬 구현 제거 후 호출만 위임(정답지 유지), Jest `dynamicGridColumns.test.js` 9케이스(총 136건)·lint 0/0
@@ -335,6 +341,10 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-09-10 | `9b9a5ef` | feat(gcc): $c.data.setBroadcast 공통함수 신설 + SMPDLT10000 전역 setBroadcast 호출 교체 (318→319 메서드) |
+| 2026-09-10 | `be4ecc3` | refactor(udc): bulkFileSaver saveMapForm 파일 인덱스를 dmaFileIndex dataMap 단일 파트로 전달 — [연관, gcc 무변경] |
+| 2026-09-10 | `064a753` | fix(gcc): sbm options 방어 초기화·validate REQUIRED 목적격 조사·session 디버그 로그 제거 |
+| 2026-09-09 | `7cefc92` | feat(gcc): data.xml comboCbDataSetEmail 이메일 도메인 콤보 세팅 함수 추가 (317→318 메서드) |
 | 2026-09-07 | `2a987d1` | style(docs): validate-generator 전체 폭 레이아웃 전환 — [연관, gcc 무변경] |
 | 2026-09-07 | `6232c44` | feat(gcc): 동적 컬럼 그리드 공통함수 syncDataListColumns·buildGridStyleXml 신설 (315→317 메서드) |
 | 2026-09-04 | `78a29d9` | fix(conversion): ULDFIS00600 멀티로우 헤더 미적용 — setColumns→setGridStyle 전환 — [연관, gcc 무변경] |

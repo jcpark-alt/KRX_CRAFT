@@ -38,6 +38,7 @@ function loadHarness() {
       util: { isEmpty, getComponent: (id) => state.comps[id] },
       str: {
         attachPostposition: (s) => s + "은(는)",
+        attachObjectPostposition: (s) => s + "을(를)",   // REQUIRED 규칙은 목적격 조사(064a753)
         getByteLength: byteLen,
         isEmail: (s) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s),
         isBizID: (s) => /^\d{10}$/.test(s),
@@ -267,7 +268,7 @@ describe("validateDataCollect (src/gcc/validate.xml)", () => {
       ...OPTS, includeUnbound: true,
       fields: { ipt_telNo1: { required: true, name: "대표전화" } },
     })).toBe(false);
-    expect(h.state.alerts.join("")).toContain("대표전화은(는) 입력하세요");
+    expect(h.state.alerts.join("")).toContain("대표전화을(를) 입력하세요");
 
     // name 미지정 — 컴포넌트 ID 로 표시명 폴백
     const h2 = loadHarness();
@@ -277,7 +278,7 @@ describe("validateDataCollect (src/gcc/validate.xml)", () => {
     expect(await h2.scwin.validateDataCollect(container, {
       ...OPTS, includeUnbound: true, fields: { ipt_x1: { required: true } },
     })).toBe(false);
-    expect(h2.state.alerts.join("")).toContain("ipt_x1은(는)");
+    expect(h2.state.alerts.join("")).toContain("ipt_x1을(를)");
   });
 
   // ==== 명세 v3 신규 기능 (WebSquare6_Validation_Module_Specification-v3.md) ====
@@ -295,8 +296,8 @@ describe("validateDataCollect (src/gcc/validate.xml)", () => {
       },
     })).toBe(false);
     const joined = h.state.alerts.join("");
-    expect(joined).toContain("결산월은(는) 선택하세요");
-    expect(joined).toContain("사원명은(는) 입력하세요");
+    expect(joined).toContain("결산월을(를) 선택하세요");
+    expect(joined).toContain("사원명을(를) 입력하세요");
   });
 
   test("§5 required message 재정의 + §1 focus 지정 컴포넌트로 포커스 이동", async () => {
