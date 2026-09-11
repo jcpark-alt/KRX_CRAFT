@@ -20,6 +20,7 @@
 | `ULDFIL59410.xml` | 대형 작성화면 | ULDFIL59410 코스닥 전문평가신청 작성화면 | `/ui/sample/template/ULDFIL59410.xml` |
 | `ULDINF20000.xml` | 조회조건 + 기간검색 + 엑셀다운로드 | ULDINF20000 표준코드 조회 | `/ui/sample/template/ULDINF20000.xml` |
 | `ULDSTF07404.xml` | 메일 발송 팝업 | ULDSTF07404 전문평가 메일발송 | `/ui/sample/template/ULDSTF07404.xml` |
+| `ULDSTF05403.xml` | 신규·수정 겸용 입력 팝업 + 상태별 버튼 제어 | ULDSTF05403 (팝업)수익증권 신규상장관리 | `/ui/sample/template/ULDSTF05403.xml` |
 | `ULDSTF30700.xml` | 조회조건 + 페이징 + 엑셀 | ULDSTF30700 비밀번호 신규 | `/ui/sample/template/ULDSTF30700.xml` |
 | `ULDSTF30702.xml` | 조회조건 + 페이징 + 엑셀 | ULDSTF30702 비밀번호 재발급 | `/ui/sample/template/ULDSTF30710.xml` |
 | `SMPVAL10000.xml` | 통합 입력 검증 (validateDataCollect 전체 옵션) | (합성 가이드 — 원본 없음) | `/ui/sample/template/SMPVAL10000.xml` |
@@ -43,6 +44,7 @@
 | 탭 구성 + 입력 계산 | `ULDFIL35700` | 탭별 독립 로직, `$c.num.formatNumber/unFormatNumber/round` 합산 계산, `$c.win.mainPrint`/`openReportPdf` 출력 |
 | 조회 팝업(값 반환) | `ULDFIL52110` | 팝업 내 페이징 조회, 선택값 `$c.win.closePopup(param)` 반환 (부모는 callbackFn 수신) |
 | 기능 팝업(부모 조작·발송) | `ULDSTF07404` | `$c.win.getParent` 부모 데이터 수신, `$c.validate.validateDataCollect`(폼)·`validateDataCollection`(그리드 행) 검증, 첨부 발송 |
+| 입력 팝업(신규·수정 겸용) + 상태별 버튼 | `ULDSTF05403` | 부모 파라미터(`$c.data.getParameter`) 유무로 신규/수정 분기, 선택 팝업 3종 `$c.win.openPopup` await 수신(취소 = 빈 결과), 조회 결과별 `$c.util.setButtonState`(insert/update/error) 를 `setFormState` 한 곳에 집중, `validateDataCollect`(readOnly 항목 `focus` 옵션·`maxLengthB`) + 통신 필요 중복확인·날짜 선후 비교는 뒤에 별도 배치, 신규/수정 공용 저장(action 분기) 후 부모 재조회, `$c.stf`/`$c.lc` 업무공통 의존 |
 | 입력 검증이 많은 작성화면 | `SMPVAL10000` | `validateDataCollect` 전 규칙 한 벌 시연 — 필수/byte(`maxLengthB`)/형식(`corpNum`·`bizNum`·`urlNoProtocol`·`email`·`date`)/조건부(`emptyIf` 외국국적·`requiredIf` 선행조건)/중복(`duplicateGroup`·그리드 `duplicate`)/약관(`checked`) + `$c.util.checkFileTotalSize` 총용량 + `validateDataMap` 서버 체크 플래그 검사(alert/confirm 형·중단 code) 데모 |
 | 상태별 버튼 제어가 있는 화면 | `SMPBTN10000` | `$c.util.setButtonState` 상태별 버튼 일괄 활성/비활성 시연 — 역할→버튼 매핑(id 비통일 대응)·표준 상태 6종·동적 역할(출력)·override 예외·`registerButtonState` 전용 상태·즉석 상태 객체 |
 
