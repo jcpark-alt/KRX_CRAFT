@@ -276,6 +276,12 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 ## 2026년 9월
 
 ### 내부 헬퍼 비공개화 규칙 전환 (09-15)
+- (미커밋) (09-15) — **scope 인자를 받는 함수의 `$p` 재선언·재대입 제거** (data/win/util, 메서드 수 무변경):
+  - **규칙**: 호출자의 `$p` 를 인자(`scopeApi` 등)로 받는 함수는 본문에서 `$p` 변수를 쓰지 않는다 — `const $p = scopeApi` 재선언(빌드 `$p` 주입 시 중복 선언)·`$p = scopeApi` 재대입 금지, 받은 인자를 직접 사용
+  - data `_getChangeCheckedMainFrame`(`$c.util.getObject("scwin", scopeApi)` 로 scope 명시 전달·재귀도 내부 헬퍼 직접 호출)·`_getParameter`(`scope` 지역 변수로 분기), win `_getProgramId`(`scopeApi` 직접 사용)·`getActiveWindowInfo`(`$p = scopeApi` 재대입 → `const scope` 분기, 내부 `getProgramId(scope)` 명시 전달)
+  - util `getObject` 2번째 인자에 **scope(`$p`) 객체 직접 전달 지원** 추가(문자열 scope ID 와 병행) — 특정 scope 의 `scwin` 등을 전역 `$p` 에 의존하지 않고 조회
+  - session `sessionCheck` 의 `$p = $w` 재대입도 같은 패턴이라 `const scope = $p || $w` 분기로 정리
+  - 미대상: 공개 래퍼(`getParameter`/`getProgramId`/`getChangeCheckedMainFrame`/`getFrame`)의 "scope 미전달 시 호출 화면 `$p` 폴백" 은 인자 부재 시 대체 경로라 유지, sbm 의 `const $p = sbmObj.getScopeWindow().$p` 3곳은 인자로 받는 경우가 아니라 유지
 - (미커밋) (09-15) — **08-28 공개 전환 함수 13종 `_X` 내부 복귀** (301→288 메서드): 구 "빌드 $p 주입 규칙" 때문에 `__X`→공개로 바뀌었던 헬퍼를 개정 규칙에 맞춰 다시 비공개 `_X` 로 — validate `_resolveFocusObj`·`_getRequiredMessage`·`_getExtendedRuleMessage`·`_getConditionalRuleMessage`, date `_checkDateFormat`, exception `_reportError`, util `_setGridViewRowCheckBox`·`_deleteGridViewRow`, data `_getCommonCodeData`·`_applyCommonCodeFilter`·`_applyCommonCodeSort`·`_applyCommonCodeFirstRow`·`_commonCodeEscape`. publicInfo 해제·`@hidden Y`·내부 `$c.ns.X` 참조 23곳 `scwin._X` 전환, 리포 내 외부 호출 0건(handleError 테스트 훅 참조만 갱신), 예외 처리 가이드·code-convention 명칭 동기화. `formatDate` 는 병합 결과 공개 함수라 유지
 - `08458c3` (09-15) — gcc 전체 **내부 헬퍼 명명·노출 규칙 개정** (314→301 메서드, 08-28 확립 "빌드 $p 주입 규칙" 폐기):
   - **규칙**: `_`/`__` 접두 함수는 **publicInfo 에 절대 등재하지 않음**(외부 비노출, `@hidden Y`). 본문에서 `$p`/`$c` 를 사용하는 내부 헬퍼는 **`scwin._X`**, 순수 헬퍼(둘 다 미사용)는 **`scwin.__X`**. 파일 내부 호출은 `scwin._X()`(`$c.<ns>._X` 금지). 공개 함수는 그대로

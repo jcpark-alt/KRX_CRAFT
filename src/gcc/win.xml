@@ -130,11 +130,9 @@ scwin._getScope = function (comObj) {
  * @example
  */
 scwin.getActiveWindowInfo = function (scopeApi) {
-
-    // $p를 직접 넣은 경우.
-    if (typeof (scopeApi) == 'object') {
-        $p = scopeApi;
-    };
+    // scope 객체를 직접 전달받은 경우 그 scope 를 사용하고, 미전달 시 호출 화면 scope 를 사용한다.
+    // ($p 를 재대입하지 않고 지역 변수로 분기한다)
+    const scope = (typeof scopeApi === "object" && scopeApi !== null) ? scopeApi : $p;
 
     const activeInfo = {
         "type": "", // T:Tabcontrol, W:windowContainer, P:popup
@@ -142,13 +140,13 @@ scwin.getActiveWindowInfo = function (scopeApi) {
         "programCd": "" // 프로그램 코드 (팝업인경우는 예외)
     };
 
-    const popupList = $p.getPopupWindowList();
+    const popupList = scope.getPopupWindowList();
     let popupWindow = null;
 
     if (popupList.length > 0) {
         for (let i = popupList.length - 1; i > -1; i--) {
             if (document.activeElement.id + "_pageFrame" === popupList[i].$p.getFrameId()) {
-                popupWindow = $p.getPopupWindow(document.activeElement.id);
+                popupWindow = scope.getPopupWindow(document.activeElement.id);
             }
         }
     }
@@ -160,34 +158,34 @@ scwin.getActiveWindowInfo = function (scopeApi) {
         activeInfo["type"] = "P";
         activeInfo["programCd"] = $c.win.getProgramId(popupWindow.$p);
         activeInfo["window"] = popupWindow;
-    } else if ($p.main().pfm_main?.scope.main && typeof $p.main().pfm_main?.scope.main.getLayoutId === "function") {
+    } else if (scope.main().pfm_main?.scope.main && typeof scope.main().pfm_main?.scope.main.getLayoutId === "function") {
         // TabControl 또는 WindowContainer를 통해서 오픈된 업무 화면
-        activeInfo["type"] = $p.main().pfm_main?.scope.main.getLayoutId();
+        activeInfo["type"] = scope.main().pfm_main?.scope.main.getLayoutId();
         if (activeInfo["type"] == "T") {
-            const selectedTabId = $p.main().tac_layout.getSelectedTabID();
+            const selectedTabId = scope.main().tac_layout.getSelectedTabID();
             findProgramList = $c.data.menuComp.getMatchedJSON("MENU_CD", selectedTabId, true);
             if (findProgramList.length > 0) {
                 activeInfo["programCd"] = findProgramList[0].PROGRAM_CD;
             }
-            activeInfo["window"] = $p.main().tac_layout.getWindow(selectedTabId);
+            activeInfo["window"] = scope.main().tac_layout.getWindow(selectedTabId);
         } else if (activeInfo["type"] == "M") {
-            const selectedWindowId = $p.main().wdc_main.getSelectedWindowId();
+            const selectedWindowId = scope.main().wdc_main.getSelectedWindowId();
             findProgramList = $c.data.menuComp.getMatchedJSON("MENU_CD", selectedWindowId, true);
             if (findProgramList.length > 0) {
                 activeInfo["programCd"] = findProgramList[0].PROGRAM_CD;
             }
-            activeInfo["window"] = $p.main().wdc_main.getWindow(selectedWindowId);
+            activeInfo["window"] = scope.main().wdc_main.getWindow(selectedWindowId);
         } else if (activeInfo["type"] == "S") {
-            if (!$c.util.isEmpty($c.data.getParameter($p.main().pfm_main?.scope.pfm_layout.getWindow().$p, "menuInfo"))) {
-                activeInfo["programCd"] = $c.data.getParameter($p.main().pfm_main?.scope.pfm_layout.getWindow().$p, "menuInfo").programCd;
+            if (!$c.util.isEmpty($c.data.getParameter(scope.main().pfm_main?.scope.pfm_layout.getWindow().$p, "menuInfo"))) {
+                activeInfo["programCd"] = $c.data.getParameter(scope.main().pfm_main?.scope.pfm_layout.getWindow().$p, "menuInfo").programCd;
             }
-            activeInfo["window"] = $p.main().pfm_main?.scope.pfm_layout.getWindow();
+            activeInfo["window"] = scope.main().pfm_main?.scope.pfm_layout.getWindow();
         }
     } else {
         // Window Popup 방식으로 오픈된 팝업 화면
         activeInfo["type"] = "P";
-        activeInfo["programCd"] = $c.win.getProgramId();
-        activeInfo["window"] = $p.getFrame();
+        activeInfo["programCd"] = $c.win.getProgramId(scope);
+        activeInfo["window"] = scope.getFrame();
     }
 
     return activeInfo;
@@ -1205,28 +1203,28 @@ scwin.getProgramId = function (scopeApi) {
  * @exception 
  */
 scwin._getProgramId = function (scopeApi) {
-    const $p = scopeApi;
+    // 인자로 받은 scope 만 사용한다 — 파일 전역 $p 를 참조하거나 $p 로 재선언하지 않는다.
     let programId = "";
 
-    if ($c.util.isEmpty($p.getMetaValue("meta_screenId"))) {
+    if ($c.util.isEmpty(scopeApi.getMetaValue("meta_screenId"))) {
         // 웹스퀘어 파일명을 프로그램 아이디와 동일하게 작성한 경우에만 정상 동작한다.
         let src = "";
 
-        if (!$c.util.isEmpty($p.getFrame())) {
-            src = $p.getFrame().getSrc();
+        if (!$c.util.isEmpty(scopeApi.getFrame())) {
+            src = scopeApi.getFrame().getSrc();
         } else {
-            src = $p.getParameter("w2xPath");
+            src = scopeApi.getParameter("w2xPath");
         }
 
         if (src.indexOf("/ui/") >= 0) {
             programId = src.substring(src.lastIndexOf("/") + 1, src.lastIndexOf("."));
         }
     } else {
-        programId = $p.getMetaValue("meta_screenId");
+        programId = scopeApi.getMetaValue("meta_screenId");
     }
 
     return programId;
-}
+};
 
 /**
  * @method 
