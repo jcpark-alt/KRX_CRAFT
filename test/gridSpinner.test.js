@@ -116,13 +116,13 @@ describe.each(XML_FILES)("executeDynamic gridview spinner (%s)", (xmlPath) => {
     expect(() => h.scwin._showGridSpinner(h.scopeP, "grd_none")).not.toThrow();
   });
 
-  test.each(["성공", "실패"])("_callbackSubmitFunction(%s) 완료 시 스피너 자동 제거", (kind) => {
+  test.each(["성공", "실패"])("__callbackSubmitFunction(%s) 완료 시 스피너 자동 제거", (kind) => {
     h.scwin._showGridSpinner(h.scopeP, "grd_main");
     const sbmObj = { _gridview: "grd_main", _gridSpinner: true, getScopeWindow: () => ({ $p: h.scopeP }) };
     const resObj = (kind === "성공")
       ? { responseStatusCode: 200, errorType: "", responseJSON: null }
       : { responseStatusCode: 200, errorType: "E", responseJSON: null };
-    try { h.scwin._callbackSubmitFunction(resObj, sbmObj); } catch { /* 후속 로직 무관 */ }
+    try { h.scwin.__callbackSubmitFunction(resObj, sbmObj); } catch { /* 후속 로직 무관 */ }
     expect(spinnerOf(h.doc, h.grids.grd_main)).toBeNull();
   });
 

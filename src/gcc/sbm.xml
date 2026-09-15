@@ -12,7 +12,7 @@ xmlns:xf="http://www.w3.org/2002/xforms">
 			<w2:workflowCollection/>
 		</xf:model>
 		<w2:layoutInfo/>
-		<w2:publicInfo method="scwin.create,scwin.execute,scwin.executeDynamic,scwin.executeWorkflow,scwin.getContextPath,scwin.getMessageCode,scwin.getResultCode,scwin.getServiceURL,scwin.getStatusMessage,scwin.resultMsg,scwin.setAction,scwin.setPagingInfo"/>
+		<w2:publicInfo method="scwin.getContextPath,scwin.__preSubmitFunction,scwin.__callbackSubmitFunction,scwin.__submitErrorHandler,scwin.execute,scwin.executeDynamic,scwin.executeWorkflow,scwin.create,scwin.getResultCode,scwin.getStatusMessage,scwin.resultMsg,scwin.setAction,scwin.getServiceURL,scwin.getMessageCode,scwin.setPagingInfo"/>
 		<script lazy="false" type="text/javascript"><![CDATA[// =============================================================================
 /**
  * 통신 함수(submission 또는 ajax 통신)를 작성한다.
@@ -65,17 +65,17 @@ scwin.getContextPath = function () {
 
 /**
  * @method
- * @name _preSubmitFunction
+ * @name __preSubmitFunction
  * @description submission의 공통 설정에서 사용.
  * submisison 통신 직전 호출.
  * return true일 경우 통신 수행, return false일 경우 통신 중단
  * 
  * @param {Object} sbmObj 서브미션 객체
  * @returns {Boolean} 통신수행여부
- * @hidden Y
+ * @hidden N
  * @exception 
  */
-scwin._preSubmitFunction = function (sbmObj) {
+scwin.__preSubmitFunction = function (sbmObj) {
     if (($c.util.isEmpty(scwin.CONTEXT_PATH) === false) && (sbmObj.action.indexOf(scwin.CONTEXT_PATH) !== 0)) {
         sbmObj.action = scwin.CONTEXT_PATH + sbmObj.action;
     }
@@ -205,14 +205,14 @@ scwin._setActionParam = function (sbmObj) {
 
 /**
  * @method
- * @name _callbackSubmitFunction
+ * @name __callbackSubmitFunction
  * @description 모든 submission의 defaultCallback - $c.sbm.submitErrorHandler 보다 먼저 수행됨. (400 Error) config.xml에 설정
  * @param {Object} resObj responseData 객체
  * @param {Object} sbmObj Submission 객체
- * @hidden Y
+ * @hidden N
  * @exception 
  */
-scwin._callbackSubmitFunction = function (resObj, sbmObj) {
+scwin.__callbackSubmitFunction = function (resObj, sbmObj) {
     // gridview 스피너 오버레이 제거(성공/실패 공통 완료 지점 — abort 경로는 __applyDuplicateGuard에서 별도 제거)
     if (sbmObj && sbmObj._gridview && sbmObj._gridSpinner && (typeof sbmObj.getScopeWindow === "function")) {
         try { scwin._hideGridSpinner(sbmObj.getScopeWindow().$p, sbmObj._gridview); } catch (e) { console.error(e); }
@@ -255,10 +255,10 @@ scwin._callbackSubmitFunction = function (resObj, sbmObj) {
     // grid.refresh()는 target DataCollection의 setJSON 시(ondataload) 호출되도록 __bindResponseToTargets에서 바인딩한다.
     let gridViews = [];
     if ($c.util.isEmpty(resObj.errorType) && sbmObj._gridview) {
-        const $p = sbmObj.getScopeWindow().$p;
+        const scopeP = sbmObj.getScopeWindow().$p;
         // gridview를 grid별 { gv, refresh, focus } 디스크립터로 파싱/구성한다.
         gridViews = scwin._parseGridview(sbmObj._gridview).map(function (spec) {
-            const gv = (typeof spec.ref === "string") ? $p.getComponentById(spec.ref) : spec.ref;
+            const gv = (typeof spec.ref === "string") ? scopeP.getComponentById(spec.ref) : spec.ref;
             if (!gv) { return null; }
             return { gv: gv, refresh: spec.refresh, focus: spec.focus, message: spec.message };
         }).filter(Boolean);
@@ -290,14 +290,13 @@ scwin._callbackSubmitFunction = function (resObj, sbmObj) {
 
 /**
  * @method
- * @name _submitErrorHandler
+ * @name __submitErrorHandler
  * @description submission중 에러가 발생한 경우 호출되는 함수 - 서버 오류(500 error)
  * @param {Object} resObj responseData 객체
- * @hidden Y
+ * @hidden N
  * @exception 
  */
-scwin._submitErrorHandler = function (resObj) {
-    const $p = $c.win.getScope(resObj.id).scwin.$w;
+scwin.__submitErrorHandler = function (resObj) {
 	let resBody;
 	let resMsg ="";
 	try {
@@ -359,7 +358,7 @@ scwin._applyDuplicateGuard = function (sbmObj, execOptions) {
             if (sbmObj._gridview && sbmObj._gridSpinner && (typeof sbmObj.getScopeWindow === "function")) {
                 try { scwin._hideGridSpinner(sbmObj.getScopeWindow().$p, sbmObj._gridview); } catch (e) { console.error(e); }
             }
-            // abort는 defaultCallback(_callbackSubmitFunction)을 호출하지 않으므로, 취소된 직전 Promise를 수동으로 reject 처리한다.
+            // abort는 defaultCallback(__callbackSubmitFunction)을 호출하지 않으므로, 취소된 직전 Promise를 수동으로 reject 처리한다.
             if (typeof sbmObj._promise_submitErrorHandler === "function") {
                 sbmObj._promise_submitErrorHandler({ aborted: true, reason: "duplicate-abort", id: sbmObj.id });
             }
@@ -485,7 +484,7 @@ scwin.execute = function (sbmObj, requestData, compObj, options) {
             }
         }
 
-        // gridview 지정 + gridSpinner 사용 시, 통신 실행 직전 grid 하단에 스피너 오버레이를 표시한다.(완료 시 _callbackSubmitFunction/abort에서 제거)
+        // gridview 지정 + gridSpinner 사용 시, 통신 실행 직전 grid 하단에 스피너 오버레이를 표시한다.(완료 시 __callbackSubmitFunction/abort에서 제거)
         if (_sbmObj._gridview && _sbmObj._gridSpinner && (typeof _sbmObj.getScopeWindow === "function")) {
             try { scwin._showGridSpinner(_sbmObj.getScopeWindow().$p, _sbmObj._gridview); } catch (e) { console.error(e); }
         }
@@ -699,12 +698,12 @@ scwin._hideGridSpinner = function (scopeP, gridviewRef) {
  * @exception
  */
 scwin._bindResponseToTargets = function (sbmObj, rtn, targets, gridViews) {
-    const $p = sbmObj.getScopeWindow().$p;
-
     if ($c.util.isEmpty(targets) || $c.util.isEmpty(rtn) || $c.util.isEmpty(rtn.responseJSON)) {
         return;
     }
 
+    // submission 이 속한 화면 scope — 바인딩 대상이 있을 때만 취득한다.
+    const scopeP = sbmObj.getScopeWindow().$p;
     const responseJSON = rtn.responseJSON;
 
     // 대상 DataCollection에 데이터를 적재하는 내부 헬퍼 (data가 undefined면 적재하지 않음)
@@ -712,7 +711,7 @@ scwin._bindResponseToTargets = function (sbmObj, rtn, targets, gridViews) {
         if (typeof data === "undefined") {
             return;
         }
-        const dc = $p.getComponentById(id);
+        const dc = scopeP.getComponentById(id);
         if (!dc || typeof dc.setJSON !== "function") {
             return;
         }
@@ -918,7 +917,7 @@ scwin.executeDynamic = function (options, requestData, obj, execOptions) {
 	}
 
     // 간소화 target으로 분리된 바인딩 디스크립터를 submission 객체에 부착한다.
-    // 통신 성공 시 공통 콜백(scwin._callbackSubmitFunction)에서 응답 본문을 대상 DataCollection에 적재한다.
+    // 통신 성공 시 공통 콜백(scwin.__callbackSubmitFunction)에서 응답 본문을 대상 DataCollection에 적재한다.
     if (($c.util.isEmpty(options.__bindTargets) === false) && (submissionObj !== null)) {
         submissionObj._autoBindTargets = options.__bindTargets;
     }
@@ -1110,6 +1109,14 @@ scwin.resultMsg = function (resultData) {
 					break;
 				}
             } else if (resultData.errorCode === "UNAUTHENTICATED") {
+                // 로그인했던 사용자의 인증 실패(401)는 세션 만료와 동일하게 안내 후 로그인 화면으로 이동한다.
+                // (미로그인 상태의 401 은 종전대로 조용히 무시 — 로그인 화면 자체의 호출 등)
+                if (!$c.util.isEmpty($c.session.getUserInfo("usrId"))) {
+                    const alertMsg = $c.data.getMessage("com_complete_0056"); // "세션이 종료되었습니다. 다시 로그인해 주세요."
+                    $c.win.alert(alertMsg, function () {
+                        $c.session.goLogin();
+                    });
+                }
 				break;
 			} else if ($c.util.isEmpty(message) === false) {
                 $c.win.alert(message);

@@ -20,6 +20,7 @@
 | `meta_screenId` | `$c.<id>` 형식 (예: `$c.util`, `$c.session`, `$c.mgt`) — 파일/도메인과 일치 |
 | 호출 | 같은 파일 내부: `scwin.함수명()` · 다른 모듈: `$c.<id>.함수명()` |
 | 내부(비공개) 헬퍼 | 이름 앞 `_` 또는 `__` — `@hidden Y`, **publicInfo 에 넣지 않음**(외부 비노출). 본문에서 `$p`/`$c` 를 사용하면 `scwin._함수명`, 순수 함수(`$p`/`$c` 미사용)면 `scwin.__함수명` |
+| 엔진 훅(예외) | WebSquare 설정(`src/websquare/config.js`·`config.xml`)에서 **이름으로 참조하는 `$c` 공통함수는 위 비공개 규칙의 예외** — 접두어(`_`/`__`)를 유지한 채 publicInfo 에 등재(`@hidden N`)한다. 엔진은 `$c.<id>` 에 publicInfo 메서드만 노출하므로 등재하지 않으면 훅이 조용히 사라진다. 현재 4종: `$c.sbm.__preSubmitFunction`·`__callbackSubmitFunction`·`__submitErrorHandler`(submission), `$c.win._errorHandler`(errorPage). 이름 변경 시 config.js/config.xml 도 함께 바꾼다 |
 
 ---
 
@@ -178,7 +179,7 @@ scwin.isEmpty = function (value) {
 - [ ] head 골격(`w2:type`/`xf:model`+`dataCollection`/`layoutInfo`/`publicInfo`) 완비.
 - [ ] 모든 공개 함수에 JSDoc(`@method`~`@example`) 작성, 한국어 설명.
 - [ ] 공개 함수 ↔ `publicInfo` 일치(추가/삭제 동기화).
-- [ ] 내부 헬퍼는 `_`(`$p`/`$c` 사용) 또는 `__`(순수) + `@hidden Y` + publicInfo 제외. `_`/`__` 함수는 publicInfo 에 절대 등재하지 않는다.
+- [ ] 내부 헬퍼는 `_`(`$p`/`$c` 사용) 또는 `__`(순수) + `@hidden Y` + publicInfo 제외. `_`/`__` 함수는 publicInfo 에 등재하지 않는다 — **단, `config.js`/`config.xml` 이 이름으로 참조하는 `$c` 공통함수(엔진 훅, §2 표)는 예외로 등재**.
 - [ ] 기존 `$c.*` 함수 재사용(중복 구현·`eval` 없음, `const/let`).
 - [ ] `python -m wsxml_lint <파일>` → **0 errors, 0 warnings**.
 - [ ] (함수 추가 시) `npm run docs:gcc` 로 문서 현행화.
