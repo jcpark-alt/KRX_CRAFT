@@ -1,7 +1,7 @@
 # gcc 공통 함수 업데이트 이력
 
-`src/gcc/` 공통 라이브러리(`$c.*`)의 최초 반입(2026-06-08, `92a35bd`) 이후 변경 내역 정리 (최종 갱신 2026-09-10).
-API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-09-10 기준 **12개 모듈 / 319개 공개 메서드**.
+`src/gcc/` 공통 라이브러리(`$c.*`)의 최초 반입(2026-06-08, `92a35bd`) 이후 변경 내역 정리 (최종 갱신 2026-09-15).
+API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-09-15 기준 **12개 모듈 / 301개 공개 메서드**.
 
 > `src/cm/gcc/`는 CM 모듈용 사본으로 일반적 개선만 선별 반영해 왔으나(2026-06-10 병합, 2026-07-22 대규모 동기화로 11파일 체제),
 > **2026-08-18 `26af3d5`에서 사용 중단으로 삭제**되어 `src/gcc/`가 유일한 canonical 라이브러리다.
@@ -274,6 +274,14 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 ---
 
 ## 2026년 9월
+
+### 내부 헬퍼 비공개화 규칙 전환 (09-15)
+- (미커밋) (09-15) — gcc 전체 **내부 헬퍼 명명·노출 규칙 개정** (314→301 메서드, 08-28 확립 "빌드 $p 주입 규칙" 폐기):
+  - **규칙**: `_`/`__` 접두 함수는 **publicInfo 에 절대 등재하지 않음**(외부 비노출, `@hidden Y`). 본문에서 `$p`/`$c` 를 사용하는 내부 헬퍼는 **`scwin._X`**, 순수 헬퍼(둘 다 미사용)는 **`scwin.__X`**. 파일 내부 호출은 `scwin._X()`(`$c.<ns>._X` 금지). 공개 함수는 그대로
+  - 적용: publicInfo 등재 해제 13건(sbm 10 — `__callbackSubmitFunction`·`__preSubmitFunction`·`__setActionParam`·`__submitErrorHandler`·`__normalizeRefTarget`·`__parseGridview`·`__eachGridElement`·`__setDescRowNum`·`__showGridSpinner`·`__hideGridSpinner` / win 3 — `__getScope`·`__setOnBeforeUnload`·`__errorHandler`), `__X`→`_X` 개명 28건(data 2·hkey 3·sbm 12·win 11 — frame state 체인·`_getScope`·`_getProgramId`·`_applyRestoreData` 등), 순수 `__` 유지 7건(`__setOnBeforeUnload`·`__getPlainJSON` 등), 파일 내부 `$c.ns.__X` 호출 26곳 `scwin._X` 전환. sbm 의 win 호출은 공개 래퍼 `$c.win.getScope` 경유
+  - win: `showProcessMessage`/`hideProcessMessage` 신설(`$p.showProcessMessage(".")`/`hideProcessMessage` 래퍼, 프로세스 창 표시·숨김)
+  - 테스트 5종 참조 갱신(136건 통과)·`gcc_xml_guide.md` §2/§4.1/§7·CLAUDE.md 명명 규약·sbm-generator README 갱신, `npm run docs:gcc` 재생성(12 modules/301 methods)·lint gcc 0/0
+  - **확인 필요**: 리포 밖(배포 환경·main 화면)에서 `$c.win.__errorHandler` 등 해제된 이름을 직접 참조하고 있었다면 갱신 필요
 
 ### getMessage 개선·conversion 도구 연동 (09-01)
 - `53991e1` (09-01) — `$c.data`/`$c.date` **getMessage 배열 인자 지원·checkCalendarFormat 메시지 코드 전환**:

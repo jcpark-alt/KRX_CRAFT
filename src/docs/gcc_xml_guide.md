@@ -19,7 +19,7 @@
 | 위치 | 표준 공통: `src/gcc/<name>.xml` · 모듈 업무공통: `src/<module>/gcc/<name>.xml` |
 | `meta_screenId` | `$c.<id>` 형식 (예: `$c.util`, `$c.session`, `$c.mgt`) — 파일/도메인과 일치 |
 | 호출 | 같은 파일 내부: `scwin.함수명()` · 다른 모듈: `$c.<id>.함수명()` |
-| 내부(비공개) 헬퍼 | `scwin.__함수명` (이름 앞 `__`) — `@hidden Y`, **publicInfo 에 넣지 않음** |
+| 내부(비공개) 헬퍼 | 이름 앞 `_` 또는 `__` — `@hidden Y`, **publicInfo 에 넣지 않음**(외부 비노출). 본문에서 `$p`/`$c` 를 사용하면 `scwin._함수명`, 순수 함수(`$p`/`$c` 미사용)면 `scwin.__함수명` |
 
 ---
 
@@ -101,7 +101,7 @@ scwin.isEmpty = function (value) {
 };
 ```
 
-- `@hidden N` = 공개(publicInfo 등재), `@hidden Y` = 내부(`__` 접두어, publicInfo 제외).
+- `@hidden N` = 공개(publicInfo 등재), `@hidden Y` = 내부(`_`/`__` 접두어, publicInfo 제외). 내부 헬퍼는 `$p`/`$c` 사용 여부로 접두어를 나눈다: 사용 → `_함수명`, 미사용(순수) → `__함수명`.
 - `@param {Type} 이름 설명` / `@returns {Type} 설명` 형식. 타입은 `{Object}`, `{String}`, `{Boolean}`, `{Number}`, `{void}`, `{Promise<Object>}` 등.
 - `@example` 아래 줄에 실제 호출 예시 코드를 둔다(주석 `*` 없이).
 - 설명·예시는 **한국어** 로 작성(프로젝트 일관성).
@@ -178,7 +178,7 @@ scwin.isEmpty = function (value) {
 - [ ] head 골격(`w2:type`/`xf:model`+`dataCollection`/`layoutInfo`/`publicInfo`) 완비.
 - [ ] 모든 공개 함수에 JSDoc(`@method`~`@example`) 작성, 한국어 설명.
 - [ ] 공개 함수 ↔ `publicInfo` 일치(추가/삭제 동기화).
-- [ ] 내부 헬퍼는 `__` + `@hidden Y` + publicInfo 제외.
+- [ ] 내부 헬퍼는 `_`(`$p`/`$c` 사용) 또는 `__`(순수) + `@hidden Y` + publicInfo 제외. `_`/`__` 함수는 publicInfo 에 절대 등재하지 않는다.
 - [ ] 기존 `$c.*` 함수 재사용(중복 구현·`eval` 없음, `const/let`).
 - [ ] `python -m wsxml_lint <파일>` → **0 errors, 0 warnings**.
 - [ ] (함수 추가 시) `npm run docs:gcc` 로 문서 현행화.

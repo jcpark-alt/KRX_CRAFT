@@ -80,7 +80,7 @@ describe.each(XML_FILES)("executeDynamic gridview spinner (%s)", (xmlPath) => {
   beforeEach(() => { h = loadHarness(xmlPath); });
 
   test("show: gridView 하단에 spinner_wrap>spinner_cont>grid_spinner 삽입", () => {
-    h.scwin.__showGridSpinner(h.scopeP, "grd_main");
+    h.scwin._showGridSpinner(h.scopeP, "grd_main");
     const wrap = spinnerOf(h.doc, h.grids.grd_main);
     expect(wrap).toBeTruthy();
     expect(wrap.className).toBe("spinner_wrap");
@@ -91,38 +91,38 @@ describe.each(XML_FILES)("executeDynamic gridview spinner (%s)", (xmlPath) => {
   });
 
   test("show 재호출 시 중복 삽입 없음(멱등)", () => {
-    h.scwin.__showGridSpinner(h.scopeP, "grd_main");
-    h.scwin.__showGridSpinner(h.scopeP, "grd_main");
+    h.scwin._showGridSpinner(h.scopeP, "grd_main");
+    h.scwin._showGridSpinner(h.scopeP, "grd_main");
     const wraps = h.grids.grd_main._el.children.filter((c) => c.className === "spinner_wrap");
     expect(wraps).toHaveLength(1);
   });
 
   test("hide: 스피너 제거", () => {
-    h.scwin.__showGridSpinner(h.scopeP, "grd_main");
-    h.scwin.__hideGridSpinner(h.scopeP, "grd_main");
+    h.scwin._showGridSpinner(h.scopeP, "grd_main");
+    h.scwin._hideGridSpinner(h.scopeP, "grd_main");
     expect(spinnerOf(h.doc, h.grids.grd_main)).toBeNull();
   });
 
   test("다중 grid 각각 삽입/제거", () => {
-    h.scwin.__showGridSpinner(h.scopeP, "grd_main,grd_sub");
+    h.scwin._showGridSpinner(h.scopeP, "grd_main,grd_sub");
     expect(spinnerOf(h.doc, h.grids.grd_main)).toBeTruthy();
     expect(spinnerOf(h.doc, h.grids.grd_sub)).toBeTruthy();
-    h.scwin.__hideGridSpinner(h.scopeP, "grd_main,grd_sub");
+    h.scwin._hideGridSpinner(h.scopeP, "grd_main,grd_sub");
     expect(spinnerOf(h.doc, h.grids.grd_main)).toBeNull();
     expect(spinnerOf(h.doc, h.grids.grd_sub)).toBeNull();
   });
 
   test("미존재 grid 는 무시(예외 없음)", () => {
-    expect(() => h.scwin.__showGridSpinner(h.scopeP, "grd_none")).not.toThrow();
+    expect(() => h.scwin._showGridSpinner(h.scopeP, "grd_none")).not.toThrow();
   });
 
-  test.each(["성공", "실패"])("__callbackSubmitFunction(%s) 완료 시 스피너 자동 제거", (kind) => {
-    h.scwin.__showGridSpinner(h.scopeP, "grd_main");
+  test.each(["성공", "실패"])("_callbackSubmitFunction(%s) 완료 시 스피너 자동 제거", (kind) => {
+    h.scwin._showGridSpinner(h.scopeP, "grd_main");
     const sbmObj = { _gridview: "grd_main", _gridSpinner: true, getScopeWindow: () => ({ $p: h.scopeP }) };
     const resObj = (kind === "성공")
       ? { responseStatusCode: 200, errorType: "", responseJSON: null }
       : { responseStatusCode: 200, errorType: "E", responseJSON: null };
-    try { h.scwin.__callbackSubmitFunction(resObj, sbmObj); } catch { /* 후속 로직 무관 */ }
+    try { h.scwin._callbackSubmitFunction(resObj, sbmObj); } catch { /* 후속 로직 무관 */ }
     expect(spinnerOf(h.doc, h.grids.grd_main)).toBeNull();
   });
 

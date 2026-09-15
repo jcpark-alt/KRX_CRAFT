@@ -32,7 +32,7 @@ function loadHarness() {
       data: { getMessage: (id, arg) => `${id}:${arg}` },
       win: {
         alert: (msg) => { calls.alert.push(msg); return Promise.resolve(); },
-        __getScope: () => ({ scwin: { $w: {} } }),
+        getScope: () => ({ scwin: { $w: {} } }),
       },
       exception: {
         handleError: (ex, opt) => { calls.handleError.push({ ex, opt }); return Promise.resolve(); },
@@ -55,7 +55,7 @@ describe("sbm 오류 경로의 handleError 합류 (src/gcc/sbm.xml)", () => {
     let rejectedWith = null;
     const sbmObj = { id: "sbm_test", _promise_submitErrorHandler: (rtn) => { rejectedWith = rtn; } };
 
-    h.scwin.__callbackSubmitFunction(resObj, sbmObj);
+    h.scwin._callbackSubmitFunction(resObj, sbmObj);
 
     // 사용자 알림은 기존 resultMsg 경로 그대로
     expect(h.calls.resultMsg).toHaveLength(1);
@@ -71,7 +71,7 @@ describe("sbm 오류 경로의 handleError 합류 (src/gcc/sbm.xml)", () => {
     expect(resObj.errorType).toBe("error");
   });
 
-  test("500 서버 오류(__submitErrorHandler): 서버 메시지 alert + handleError 수집 합류", () => {
+  test("500 서버 오류(_submitErrorHandler): 서버 메시지 alert + handleError 수집 합류", () => {
     const resObj = {
       id: "sbm_save",
       responseStatusCode: 500,
@@ -79,7 +79,7 @@ describe("sbm 오류 경로의 handleError 합류 (src/gcc/sbm.xml)", () => {
       resourceUri: "/api/save",
       responseBody: JSON.stringify({ message: "저장 중 서버 오류", errors: { code: "E500" } }),
     };
-    h.scwin.__submitErrorHandler(resObj);
+    h.scwin._submitErrorHandler(resObj);
 
     expect(h.calls.resultMsg).toHaveLength(1);
     expect(h.calls.resultMsg[0].message).toBe("저장 중 서버 오류");
@@ -90,7 +90,7 @@ describe("sbm 오류 경로의 handleError 합류 (src/gcc/sbm.xml)", () => {
 
   test("500 응답 본문이 JSON 이 아니어도 기본 문구로 알림·수집 수행(경화)", () => {
     const resObj = { id: "sbm_x", responseStatusCode: 500, responseReasonPhrase: "ISE", resourceUri: "/api/x", responseBody: "<html>oops</html>" };
-    h.scwin.__submitErrorHandler(resObj);
+    h.scwin._submitErrorHandler(resObj);
 
     expect(h.calls.resultMsg).toHaveLength(1);
     expect(h.calls.resultMsg[0].message).toBe("서버 오류입니다. 자세한 내용은 관리자에게 문의하시기 바랍니다.");

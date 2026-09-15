@@ -59,7 +59,7 @@ Each file is `<w2:type>COMMON</w2:type>`. A fully-formed `<head>` (all `src/gcc/
 ### Naming & visibility conventions (follow these)
 - Functions are defined as `scwin.functionName = function () { ... }`.
 - Within a file, a public `scwin.foo` is registered under that file's namespace and called from elsewhere as `$c.<ns>.foo()` (e.g. `$c.util.isEmpty`, `$c.str.getByteLength`). The `$c` object is the cross-file common-library accessor; `scwin` is the current screen's scope.
-- A leading double underscore (`scwin.__foo`) marks an **internal helper**: it is `@hidden Y` in JSDoc and omitted from `publicInfo`. Public wrappers (`scwin.foo`, `@hidden N`, listed in `publicInfo`) typically delegate to a `__foo` implementation.
+- A leading underscore marks an **internal helper**: `@hidden Y` in JSDoc and **never listed in `publicInfo`** (not exposed outside the file). Two prefixes: `scwin._foo` for helpers whose body uses `$p` or `$c`, `scwin.__foo` for pure helpers that use neither. Public wrappers (`scwin.foo`, `@hidden N`, listed in `publicInfo`) typically delegate to a `_foo`/`__foo` implementation, called as `scwin._foo()` within the file (never `$c.<ns>._foo`).
 - Every function carries a JSDoc block with `@method`, `@name`, `@description`, `@param`, `@returns`, `@hidden Y|N`, `@example`. Keep this format when adding functions, and **keep `publicInfo` in sync** when you add/remove a public function.
 
 ## Architecture: two generations of code

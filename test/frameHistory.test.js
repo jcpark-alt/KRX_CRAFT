@@ -2,7 +2,7 @@
  * moveUrl/setPageFrameSrc 히스토리 기록·복원(frameInfo) 회귀 테스트.
  *
  * isHistory 옵션 지정 시: 떠나는 화면 entry 에 replaceState 로 frameInfo+dataInfo 를 병합하고,
- * setSrc 완료 후 새 화면 entry 를 push 한다. popstate(__changePageState) 시 frameInfo entry 는
+ * setSrc 완료 후 새 화면 entry 를 push 한다. popstate(_changePageState) 시 frameInfo entry 는
  * 해당 프레임을 기록된 화면으로 setSrc 복원하고 dataInfo 를 DataCollection 에 자동 적용한다.
  * WebSquare 런타임을 mock 으로 대체한 vm 하네스로 검증한다.
  */
@@ -144,7 +144,7 @@ describe("moveUrl/setPageFrameSrc 히스토리 기록·복원 (src/gcc/win.xml)"
     expect(h.state.pushed[0].stateObj.data.frameInfo).toEqual({ frameId: "pfm_body", src: "/y.xml" });
   });
 
-  test("__changePageState(frameInfo entry): 프레임을 기록된 화면으로 setSrc 복원 + dataInfo 자동 적용", async () => {
+  test("_changePageState(frameInfo entry): 프레임을 기록된 화면으로 setSrc 복원 + dataInfo 자동 적용", async () => {
     const h = loadHarness();
     const dma = makeDc(); const dlt = makeDc();
     const pfm = makeFrame("pfm_body", "/detail.xml", { dma_search: dma, dlt_list: dlt });
@@ -157,7 +157,7 @@ describe("moveUrl/setPageFrameSrc 히스토리 기록·복원 (src/gcc/win.xml)"
       },
     };
 
-    h.scwin.__changePageState();
+    h.scwin._changePageState();
     await flush();
 
     expect(pfm.setSrcCalls).toHaveLength(1);
@@ -169,7 +169,7 @@ describe("moveUrl/setPageFrameSrc 히스토리 기록·복원 (src/gcc/win.xml)"
     expect(dlt.applied).toEqual([[{ r: 1 }]]);
   });
 
-  test("__changePageState: 프레임 미발견 시 menuInfo 로 openMenu 폴백", async () => {
+  test("_changePageState: 프레임 미발견 시 menuInfo 로 openMenu 폴백", async () => {
     const h = loadHarness();
     const calls = [];
     h.scwin.openMenu = (menuNm, url, menuCode, paramObj, option) => { calls.push({ menuCode, option }); };
@@ -180,7 +180,7 @@ describe("moveUrl/setPageFrameSrc 히스토리 기록·복원 (src/gcc/win.xml)"
       },
     };
 
-    h.scwin.__changePageState();
+    h.scwin._changePageState();
     await flush();
 
     expect(calls).toHaveLength(1);
@@ -245,7 +245,7 @@ describe("moveUrl/setPageFrameSrc 히스토리 기록·복원 (src/gcc/win.xml)"
       data: { frameInfo: { frameId: "pfm_body", src: "/l.xml" }, dataInfo: { dma_none: { k: 1 } } },
     };
 
-    expect(() => h.scwin.__changePageState()).not.toThrow();
+    expect(() => h.scwin._changePageState()).not.toThrow();
     await flush();
     expect(pfm.setSrcCalls).toHaveLength(1); // 화면 복원 자체는 수행
   });

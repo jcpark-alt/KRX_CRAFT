@@ -1,7 +1,7 @@
 /**
  * executeDynamic gridview 접미사 옵션 "message" (opt-in) 회귀 테스트.
  *
- * sbm.xml 의 __parseGridview 는 gridview 문자열을 grid별 디스크립터로 파싱한다.
+ * sbm.xml 의 _parseGridview 는 gridview 문자열을 grid별 디스크립터로 파싱한다.
  * 빈 결과 메시지("조회된 데이터가 없습니다.")는 "|message" 접미사가 있을 때만 출력되며
  * (opt-in), 기본은 미출력이다. WebSquare 런타임을 mock 으로 대체한 vm 하네스로 검증한다.
  */
@@ -40,7 +40,7 @@ function loadScwin(xmlPath) {
 
 describe.each(XML_FILES)("executeDynamic gridview message opt-in (%s)", (xmlPath) => {
   let parse;
-  beforeAll(() => { parse = loadScwin(xmlPath).__parseGridview; });
+  beforeAll(() => { parse = loadScwin(xmlPath)._parseGridview; });
 
   test("기본(옵션 없음)은 message=false — 빈 결과 메시지 미출력", () => {
     expect(parse("grd_main")[0].message).toBe(false);

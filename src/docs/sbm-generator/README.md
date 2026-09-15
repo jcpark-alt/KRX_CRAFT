@@ -11,7 +11,7 @@ WebSquare IDE 에서 작성된 `<xf:submission>` XML 을 붙여넣으면, `$c.sb
 ## 1. 개요 및 목적
 
 - **목적**: submission XML 의 `ref` / `target` 은 보통 `data:json,{"id":...,"key":...}` 같은 **WebSquare 표준 표현식**으로 작성된다. 이를 `$c.sbm.executeDynamic` 의 **간소화 문법**(`id[=key][|append]`)으로 손으로 옮기는 번거로움을 줄인다.
-- **근거**: 변환 규칙은 `src/gcc/sbm.xml` 의 `scwin.__normalizeRefTarget` / `scwin.__bindResponseToTargets` / `scwin.executeDynamic` JSDoc 주석을 그대로 반영한다.
+- **근거**: 변환 규칙은 `src/gcc/sbm.xml` 의 `scwin._normalizeRefTarget` / `scwin._bindResponseToTargets` / `scwin.executeDynamic` JSDoc 주석을 그대로 반영한다.
 
 ---
 
@@ -161,6 +161,6 @@ $c.sbm.executeDynamic(sbmOptions);
 
 ## 7. 참고
 
-- 변환 규칙 원본: `src/gcc/sbm.xml` — `scwin.executeDynamic`, `scwin.__normalizeRefTarget`, `scwin.__bindResponseToTargets`.
+- 변환 규칙 원본: `src/gcc/sbm.xml` — `scwin.executeDynamic`, `scwin._normalizeRefTarget`, `scwin._bindResponseToTargets`.
 - 디자인 가이드: `src/docs/DESIGN.md`.
 - 자매 도구: `src/docs/data-generator/` (DataCollection XML 생성기).
