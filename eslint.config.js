@@ -14,7 +14,8 @@ const globals = require("globals");
 module.exports = [
   {
     // src/conversion/sample-front: 샘플 갤러리에 동봉된 벤더 배포본(sbchart.js 압축본 등) — lint 대상 아님
-    ignores: ["node_modules/**", "coverage/**", "tools/wsxml_lint/**", "src/engine/**", "src/conversion/sample-front/**"],
+    // src/websquare: 배포 환경 WebSquare 설정 참조본(config.js 는 ES 모듈) — 훅 이름 SOT 용도, lint 대상 아님
+    ignores: ["node_modules/**", "coverage/**", "tools/wsxml_lint/**", "src/engine/**", "src/conversion/sample-front/**", "src/websquare/**"],
   },
   {
     files: ["**/*.js"],

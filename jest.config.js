@@ -9,7 +9,8 @@ module.exports = {
   // extracted into .js under the business-module trees.
   // src/engine 은 대용량 WebSquare 엔진 번들 — 계측 시 워커가 죽으므로 커버리지 대상에서 제외
   // (eslint 도 src/engine/** 를 ignore 한다).
-  collectCoverageFrom: ["src/**/*.js", "!src/engine/**"],
+  // src/websquare 는 배포 WebSquare 설정 참조본(config.js 는 ES 모듈) — 실행 코드가 아니므로 계측 제외
+  collectCoverageFrom: ["src/**/*.js", "!src/engine/**", "!src/websquare/**"],
   coverageReporters: ["text", "lcov"],
   // NOTE: the source repo enforced a global 80% threshold. It is omitted here
   // because no .js sources exist yet (the JS is in XML). Re-add a
