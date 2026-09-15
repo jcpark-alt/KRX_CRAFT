@@ -178,3 +178,19 @@ describe("팝업 타입별 데이터 수신 규약 — options.callbackFn 브리
     expect(captured.data.callbackFn).toBe("scwin.optCb");
   });
 });
+
+describe("openPopup options.disableCloseButton (src/gcc/win.xml)", () => {
+  test("true 지정 시 엔진 $p.openPopup 옵션에 disableCloseButton:true 로 전달", () => {
+    const w = loadWindow();
+    w.scwin._openPopup("/tmp/pop02.xml", { type: "pageFramePopup", disableCloseButton: true }, {}, () => true);
+    expect(w.state.openedPopup.options.disableCloseButton).toBe(true);
+  });
+
+  test("미지정·false·비불리언 값은 false 로 정규화(기본 닫기 버튼 사용)", () => {
+    const w = loadWindow();
+    w.scwin._openPopup("/tmp/pop03.xml", { type: "pageFramePopup" }, {}, () => true);
+    expect(w.state.openedPopup.options.disableCloseButton).toBe(false);
+    w.scwin._openPopup("/tmp/pop04.xml", { type: "pageFramePopup", disableCloseButton: "true" }, {}, () => true);
+    expect(w.state.openedPopup.options.disableCloseButton).toBe(false);
+  });
+});
