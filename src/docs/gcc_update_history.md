@@ -1,7 +1,7 @@
 # gcc 공통 함수 업데이트 이력
 
 `src/gcc/` 공통 라이브러리(`$c.*`)의 최초 반입(2026-06-08, `92a35bd`) 이후 변경 내역 정리 (최종 갱신 2026-09-15).
-API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-09-15 기준 **12개 모듈 / 301개 공개 메서드**.
+API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-09-15 기준 **12개 모듈 / 288개 공개 메서드**.
 
 > `src/cm/gcc/`는 CM 모듈용 사본으로 일반적 개선만 선별 반영해 왔으나(2026-06-10 병합, 2026-07-22 대규모 동기화로 11파일 체제),
 > **2026-08-18 `26af3d5`에서 사용 중단으로 삭제**되어 `src/gcc/`가 유일한 canonical 라이브러리다.
@@ -16,7 +16,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 | `sbm.xml` (`$c.sbm`) | 중복 제출 가드, `executeDynamic` 간소화 ref/target 문법·gridview 자동 바인딩·`autoFocus`·다중 gridview 바인딩·스피너 오버레이·message 옵션(opt-in), RESTful URL 활성화, 단건 ref(DataMap)→`requestData` 추출, 페이징(`setPagingInfo`) 개선 — `maxRowNum "all"` 전체 행 표시·`rowNumVisble desc` 내림차순 순번, 그리드 DOM `render` 참조 전환 |
 | `data.xml` (`$c.data`) | 공통코드 로딩(`COMMON_CODE_INFO.ACTION` 연동, `setCommonCode` 배열 매핑 → code별 키잉 응답 매핑(`mappingKey` = 응답 조회 key) 개편·응답 언래핑·기본 컬럼 cdVal/cdValNm·조회 URL 이원화(url/paramName 옵션은 추가 후 제거)), JSON 헬퍼 8종, 프로세스 메시지, 콤보 공통코드 세팅(`comboCbDataSet*`) 계열(이메일 도메인 `comboCbDataSetEmail` 포함), 업로드/리포트 헬퍼, 엑셀 다운로드 기본 옵션 개선, 화면/DC 단위 전파 제어 `setBroadcast` |
 | `win.xml` (`$c.win`) | 외부망 홈(`goHomeEx`), 프로그램 열기/내비게이션 단순화, `openFormSubmit`, 인쇄(`mainPrint`/`popupPrint`), `success`/`error` 알림, `openExternalPage`, **browserPopup 부모 화면 접근**(`getOpenerScope`/`callOpener`), 히스토리 기록·복원(`pushState`/`changePageState`) 결함 수정 및 `moveUrl`/`setPageFrameSrc` 이동 복원 확장(`restoreData` [목록] 복귀 포함), 프레임 초기화 `reinitialize` |
-| `exception.xml` (`$c.exception`) | **신설**(2026-08-26, win.xml 에서 분리) — 화면 try/catch 공통 오류 처리기 `handleError`(예외 분류·이중 알림 방지), 오류 수집 훅 `__reportError`(`ERROR_REPORT_INFO.URL` 설정 시 활성화) |
+| `exception.xml` (`$c.exception`) | **신설**(2026-08-26, win.xml 에서 분리) — 화면 try/catch 공통 오류 처리기 `handleError`(예외 분류·이중 알림 방지), 오류 수집 훅 `_reportError`(`ERROR_REPORT_INFO.URL` 설정 시 활성화) |
 | `util.xml` (`$c.util`) | 쿠키/웹스토리지 헬퍼 13종, 업로드(`onUploadClick`/`getUploadFiles` 등), `setTextLengthCounter`, `checkFileExtension`, 엑셀 다운로드 파일명 개선, `setGridVisibleRowNum`(gridView "all" 동적 적용), 버튼 상태 일괄 제어 `setButtonState`/`registerButtonState`, 동적 컬럼 그리드 `syncDataListColumns`/`buildGridStyleXml`(setGridStyle 2단 그룹 헤더) |
 | `date.xml` (`$c.date`) | 날짜 포맷 검증(`checkCalendarFormat`/`compareFromToDate`), `getDateInterval` 단위 버그 수정, commonPrototype 의존 제거 |
 | `str.xml` (`$c.str`) | validate 중복 검증기 통합, 목적격 조사(`attachObjectPostposition`), 바이트/포맷 함수 자체 구현 전환 |
@@ -276,7 +276,8 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 ## 2026년 9월
 
 ### 내부 헬퍼 비공개화 규칙 전환 (09-15)
-- (미커밋) (09-15) — gcc 전체 **내부 헬퍼 명명·노출 규칙 개정** (314→301 메서드, 08-28 확립 "빌드 $p 주입 규칙" 폐기):
+- (미커밋) (09-15) — **08-28 공개 전환 함수 13종 `_X` 내부 복귀** (301→288 메서드): 구 "빌드 $p 주입 규칙" 때문에 `__X`→공개로 바뀌었던 헬퍼를 개정 규칙에 맞춰 다시 비공개 `_X` 로 — validate `_resolveFocusObj`·`_getRequiredMessage`·`_getExtendedRuleMessage`·`_getConditionalRuleMessage`, date `_checkDateFormat`, exception `_reportError`, util `_setGridViewRowCheckBox`·`_deleteGridViewRow`, data `_getCommonCodeData`·`_applyCommonCodeFilter`·`_applyCommonCodeSort`·`_applyCommonCodeFirstRow`·`_commonCodeEscape`. publicInfo 해제·`@hidden Y`·내부 `$c.ns.X` 참조 23곳 `scwin._X` 전환, 리포 내 외부 호출 0건(handleError 테스트 훅 참조만 갱신), 예외 처리 가이드·code-convention 명칭 동기화. `formatDate` 는 병합 결과 공개 함수라 유지
+- `08458c3` (09-15) — gcc 전체 **내부 헬퍼 명명·노출 규칙 개정** (314→301 메서드, 08-28 확립 "빌드 $p 주입 규칙" 폐기):
   - **규칙**: `_`/`__` 접두 함수는 **publicInfo 에 절대 등재하지 않음**(외부 비노출, `@hidden Y`). 본문에서 `$p`/`$c` 를 사용하는 내부 헬퍼는 **`scwin._X`**, 순수 헬퍼(둘 다 미사용)는 **`scwin.__X`**. 파일 내부 호출은 `scwin._X()`(`$c.<ns>._X` 금지). 공개 함수는 그대로
   - 적용: publicInfo 등재 해제 13건(sbm 10 — `__callbackSubmitFunction`·`__preSubmitFunction`·`__setActionParam`·`__submitErrorHandler`·`__normalizeRefTarget`·`__parseGridview`·`__eachGridElement`·`__setDescRowNum`·`__showGridSpinner`·`__hideGridSpinner` / win 3 — `__getScope`·`__setOnBeforeUnload`·`__errorHandler`), `__X`→`_X` 개명 28건(data 2·hkey 3·sbm 12·win 11 — frame state 체인·`_getScope`·`_getProgramId`·`_applyRestoreData` 등), 순수 `__` 유지 7건(`__setOnBeforeUnload`·`__getPlainJSON` 등), 파일 내부 `$c.ns.__X` 호출 26곳 `scwin._X` 전환. sbm 의 win 호출은 공개 래퍼 `$c.win.getScope` 경유
   - win: `showProcessMessage`/`hideProcessMessage` 신설(`$p.showProcessMessage(".")`/`hideProcessMessage` 래퍼, 프로세스 창 표시·숨김)

@@ -175,7 +175,7 @@ scwin.btn_save_onclick = async function (e) {
   `rethrow`(상위 흐름 중단) · `callback`(알림 닫힘 후 콜백 함수명).
 - **금지**: 빈 catch, catch 에서 원시 `alert()`·`console.log` 만 남기고 종료, 통신 오류 재-alert(sbm 이 이미 알림).
 - 변환 도구가 자동 적용한다(convert.py **규칙 26** — 규칙 4 섹션 기준 2·3구역 진입점 래핑, 본문에 `try` 가 이미 있으면 보존·멱등).
-- 오류 수집: `handleError` 가 내부 훅(`reportError`)을 호출한다 — 수집 로직(표준 페이로드·중복 억제·화면당 상한·sendBeacon 전송)은 구현돼 있고,
+- 오류 수집: `handleError` 가 내부 훅(`_reportError`)을 호출한다 — 수집 로직(표준 페이로드·중복 억제·화면당 상한·sendBeacon 전송)은 구현돼 있고,
   `exception.xml` 의 `ERROR_REPORT_INFO.URL` 이 비어 있는 동안 비활성이다. 수집 API 신설 시 **URL 한 곳만 지정**하면 전 화면에 적용된다.
 - 상세 사용법·sbm 관계·배포 설정(config.xml 등록): [exception-handling-guide.md](../exception-handling-guide.md)
 
