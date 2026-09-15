@@ -20,7 +20,7 @@
 | `meta_screenId` | `$c.<id>` 형식 (예: `$c.util`, `$c.session`, `$c.mgt`) — 파일/도메인과 일치 |
 | 호출 | 같은 파일 내부: `scwin.함수명()` · 다른 모듈: `$c.<id>.함수명()` |
 | 내부(비공개) 헬퍼 | 이름 앞 `_` 또는 `__` — `@hidden Y`, **publicInfo 에 넣지 않음**(외부 비노출). 본문에서 `$p`/`$c` 를 사용하면 `scwin._함수명`, 순수 함수(`$p`/`$c` 미사용)면 `scwin.__함수명` |
-| 엔진 훅(예외) | WebSquare 설정(`src/websquare/config.js`·`config.xml`)에서 **이름으로 참조하는 `$c` 공통함수는 위 비공개 규칙의 예외** — 접두어(`_`/`__`)를 유지한 채 publicInfo 에 등재(`@hidden N`)한다. 엔진은 `$c.<id>` 에 publicInfo 메서드만 노출하므로 등재하지 않으면 훅이 조용히 사라진다. 현재 4종: `$c.sbm.__preSubmitFunction`·`__callbackSubmitFunction`·`__submitErrorHandler`(submission), `$c.win._errorHandler`(errorPage). 이름 변경 시 config.js/config.xml 도 함께 바꾼다 |
+| 엔진 훅(예외) | WebSquare 설정(`src/websquare/config.js`·`config.xml`)에서 **이름으로 참조하는 `$c` 공통함수는 위 비공개 규칙의 예외** — 접두어(`_`/`__`)를 유지한 채 publicInfo 에 등재(`@hidden N`)한다. 엔진은 `$c.<id>` 에 publicInfo 메서드만 노출하므로 등재하지 않으면 훅이 조용히 사라진다. 현재 4종: `$c.sbm.__preSubmitFunction`·`__callbackSubmitFunction`·`__submitErrorHandler`(submission), `$c.win._errorHandler`(errorPage). 이름 변경 시 config.js/config.xml 도 함께 바꾼다. 본문에서 호출 화면의 `$p` 가 필요한 함수는 `_` 헬퍼로 두지 말고 **공개 함수 하나로 합쳐** 주입을 받게 한다(`$c.data.getParameter` 선례 — 래퍼/`_getParameter` 분리 폐지). 호출부에서 `$p` 를 명시적으로 넘기지 않는다 |
 
 ---
 

@@ -276,6 +276,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 ## 2026년 9월
 
 ### 내부 헬퍼 비공개화 규칙 전환 (09-15)
+- (미커밋) (09-15) — `$c.data` **`getParameter` 단일 함수화 — 래퍼/`_getParameter` 분리 폐지** (메서드 수 292 유지): 빌드가 첫 인자에 호출 화면 `$p` 를 주입하므로 `getParameter(paramKey, scopeObj)` 하나로 합쳐 주입을 직접 받고(`scopeObj` 지정 시 그 scope, 미지정 시 `$p`), 종전 `scwin._getParameter($p, …)` 의 명시 `$p` 전달(주입과 겹쳐 인자 밀림)·미사용 `scopeApi` 인자·**scope 우선 호출 `getParameter(scope, key)` 분기 폐지**(win `getActiveWindowInfo` 의 호출 2곳을 `("menuInfo", scope)` 순서로 정정). 가이드 §2·CLAUDE.md: "`$p` 가 필요한 함수는 `_` 헬퍼로 두지 말고 공개 함수 하나로"
 - `0a1c3d3` (09-15) — **엔진 훅 4종 publicInfo 복원 — 401 시 Promise 영구 pending 결함 수정** (288→292 메서드):
   - **원인**: `08458c3` 의 비공개화로 WebSquare `config.xml` 이 이름으로 참조하는 `$c.sbm.__preSubmitFunction`/`__callbackSubmitFunction`/`__submitErrorHandler`(submission)·`$c.win._errorHandler`(errorPage) 가 `$c.<ns>` 에서 사라짐 — 엔진은 publicInfo 메서드만 노출(`_isPublicInfoVariable`)하고 `getGlobalFunction` 실패를 조용히 건너뛰므로, 2xx 외 응답(401 등)에서 `setSubmissionEnd` 가 부르는 기본 콜백이 실행되지 않아 execute/executeDynamic 의 Promise 가 settle 되지 않음(성공은 submitDoneHandler 이벤트로 진행돼 오류 시에만 증상). vm 재현·엔진 코드(7805/7482/19007/11825행)로 확인
   - **조치**: 훅 4종(sbm `__preSubmitFunction`·`__callbackSubmitFunction`·`__submitErrorHandler`, win `_errorHandler`)을 `@hidden N` 으로 publicInfo 등재하고, 배포 설정 `src/websquare/config.js`·`config.xml` 을 리포에 반입해 참조를 같은 이름으로 갱신(훅 이름 정답지 SOT, config 의 `$c.*` 참조 15건 전수 대조). **규칙 예외 확정**: config.js/config.xml 이 이름으로 참조하는 `$c` 공통함수는 `_`/`__` 비공개 규칙의 예외로 publicInfo 에 등재한다 — 가이드 §2/§7·CLAUDE.md 에 명시
