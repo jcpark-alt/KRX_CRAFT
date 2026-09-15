@@ -1,7 +1,7 @@
 /**
- * $c.win.pushState / changePageState(_changePageState) 회귀 테스트.
+ * $c.win.pushState / changePageState(__changePageState) 회귀 테스트.
  *
- * pushState 는 메뉴 데이터를 history 에 기록하고, _changePageState 는 popstate 시
+ * pushState 는 메뉴 데이터를 history 에 기록하고, __changePageState 는 popstate 시
  * history.state 의 메뉴 정보로 openMenu 를 재호출한다(isHistory:false, 파라미터 보존).
  * WebSquare 런타임을 mock 으로 대체한 vm 하네스로 검증한다.
  */
@@ -48,7 +48,7 @@ function loadHarness() {
   return { scwin: sandbox.scwin, state, sandbox };
 }
 
-describe("$c.win.pushState / _changePageState (src/gcc/win.xml)", () => {
+describe("$c.win.pushState / __changePageState (src/gcc/win.xml)", () => {
   test("pushState: {data} state 와 contextPath(끝 슬래시 제거) URL 로 기록", () => {
     const h = loadHarness();
     const data = { menuInfo: { menuNm: "인사조회", menuCode: "010001", src: "/tmp/t.xml" }, srchKey: "A" };
@@ -60,7 +60,7 @@ describe("$c.win.pushState / _changePageState (src/gcc/win.xml)", () => {
     expect(h.state.pushed[0].url).toBe("/ctx");
   });
 
-  test("_changePageState: state 의 메뉴 정보로 openMenu 재호출 — data 자체를 paramObj 로 전달(파라미터 보존), isHistory:false", () => {
+  test("__changePageState: state 의 메뉴 정보로 openMenu 재호출 — data 자체를 paramObj 로 전달(파라미터 보존), isHistory:false", () => {
     const h = loadHarness();
     const data = { menuInfo: { menuNm: "인사조회", menuCode: "010001", src: "/tmp/t.xml" }, srchKey: "A" };
     h.sandbox.history.state = { data };
@@ -69,7 +69,7 @@ describe("$c.win.pushState / _changePageState (src/gcc/win.xml)", () => {
       calls.push({ menuNm, url, menuCode, paramObj, option });
     };
 
-    h.scwin._changePageState();
+    h.scwin.__changePageState();
 
     expect(calls).toHaveLength(1);
     expect(calls[0].menuNm).toBe("인사조회");
@@ -79,20 +79,20 @@ describe("$c.win.pushState / _changePageState (src/gcc/win.xml)", () => {
     expect(calls[0].option).toEqual({ isHistory: false });
   });
 
-  test("_changePageState: state 가 없거나 menuInfo 가 없으면 아무것도 하지 않음", () => {
+  test("__changePageState: state 가 없거나 menuInfo 가 없으면 아무것도 하지 않음", () => {
     const h = loadHarness();
     const calls = [];
     h.scwin.openMenu = () => { calls.push(1); };
 
     h.sandbox.history.state = null;
-    h.scwin._changePageState();
+    h.scwin.__changePageState();
     h.sandbox.history.state = { data: { srchKey: "A" } }; // menuInfo 없음
-    h.scwin._changePageState();
+    h.scwin.__changePageState();
 
     expect(calls).toHaveLength(0);
   });
 
-  test("changePageState: _changePageState 로 위임", () => {
+  test("changePageState: __changePageState 로 위임", () => {
     const h = loadHarness();
     const data = { menuInfo: { menuNm: "m", menuCode: "c", src: "/s.xml" } };
     h.sandbox.history.state = { data };

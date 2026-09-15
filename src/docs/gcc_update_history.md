@@ -276,6 +276,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 ## 2026년 9월
 
 ### 내부 헬퍼 비공개화 규칙 전환 (09-15)
+- (미커밋) (09-15) — `$c.win` **openMenu 창 개수 초과 알림·pushState 위치 조정, `__changePageState` 명명 복원**: M 레이아웃에서 `wdc_main.windows.length === 15` 이면 `com_deny_0010` 알림(엔진 `windowMaxNum` 제한·`onwindowmaxnumexceeded` 이벤트와 중복 — 후속 정리 후보), history `pushState` 는 창이 실제 생성된 경우(`winScope` 존재)에만 기록, closeAction 들여쓰기 정리. popstate 핸들러는 `_changePageState`→`__changePageState` 로 명명 복원(사용자 결정, 테스트 2종 참조 동기화)
 - `e47d8e3` (09-15) — `$c.win` **`openPopup` 옵션 `disableCloseButton` 추가**: true 면 팝업 타이틀 닫기(X) 버튼을 비활성화해 화면 버튼 등 명시 흐름으로만 닫히게 한다 — `_openPopup` 이 엔진 `$p.openPopup` 옵션(w2window `disableCloseButton`, 클릭 무시·`w2window_close_disabled` 클래스)으로 그대로 전달, 불리언 true 외는 false 정규화. pageFramePopup 전용(browserPopup 은 브라우저가 닫기 제어). JSDoc·예제 추가, Jest 2케이스(`popupOpenerScope`), docs:gcc 재생성
 - `c736071` (09-15) — `$c.data` **`getParameter` 단일 함수화 — 래퍼/`_getParameter` 분리 폐지** (메서드 수 292 유지): 빌드가 첫 인자에 호출 화면 `$p` 를 주입하므로 `getParameter(paramKey, scopeObj)` 하나로 합쳐 주입을 직접 받고(`scopeObj` 지정 시 그 scope, 미지정 시 `$p`), 종전 `scwin._getParameter($p, …)` 의 명시 `$p` 전달(주입과 겹쳐 인자 밀림)·미사용 `scopeApi` 인자·**scope 우선 호출 `getParameter(scope, key)` 분기 폐지**(win `getActiveWindowInfo` 의 호출 2곳을 `("menuInfo", scope)` 순서로 정정). 가이드 §2·CLAUDE.md: "`$p` 가 필요한 함수는 `_` 헬퍼로 두지 말고 공개 함수 하나로"
 - `0a1c3d3` (09-15) — **엔진 훅 4종 publicInfo 복원 — 401 시 Promise 영구 pending 결함 수정** (288→292 메서드):
