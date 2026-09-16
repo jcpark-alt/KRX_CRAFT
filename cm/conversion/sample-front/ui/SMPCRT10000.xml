@@ -122,16 +122,23 @@ scwin.onpageload = async function () {
 scwin.init = async function () {
     scwin.clearResult();
 
+    // 저장된 가상키보드 사용 여부 복원 — 벤더 의존이 없으므로 모듈 준비 실패와 무관하게 먼저 복원한다.
+    // 프로그램적 setValue 는 onchange 를 발생시키지 않아 이 시점에 이니텍 설정(cwui_conf)에는 반영되지 않지만,
+    // $c.cert.auth 가 팝업 직전에 useTranskey 옵션으로 다시 반영하므로 동작에는 문제없다.
+    chk_useTranskey.setValue(scwin.loadTranskeyPref() ? "Y" : "");
+
     // 벤더 스크립트 확인(셸이 정적 로드) → 키패드 z-index 보정 → 공동인증서 모듈 초기화 (PC 만)
+    // onStatus(message, done): 진행 중에는 안내를 보이고, 초기화가 끝나면(done) 잠시 뒤 숨긴다.
     await $c.cert.loadModule({
-        onStatus : function (message) {
+        onStatus : function (message, done) {
             txb_moduleStatus.setValue(message);
             txb_moduleStatus.show();
+
+            if (done) {
+                $c.util.setTimeout(function () { txb_moduleStatus.hide(); }, { delay : 1500, key : "certModuleStatusHide" });
+            }
         }
     });
-
-    // 저장된 가상키보드 사용 여부 복원
-    chk_useTranskey.setValue(scwin.loadTranskeyPref() ? "Y" : "");
 };
 
 
@@ -152,9 +159,11 @@ scwin.init = async function () {
 scwin.btn_certAuth_onclick = async function () {
     try {
         scwin.clearResult();
-        scwin.beforeCertPopup();
 
         await $c.cert.auth(scwin.API_URL.auth, scwin.certAuthCallback, { useTranskey : scwin.useTranskey() });
+
+        // 팝업이 실제로 열린 뒤에만 기록한다 (auth 가 예외를 던지면 새로고침 안내 조건이 되지 않게)
+        scwin.beforeCertPopup();
     } catch (ex) {
         await $c.exception.handleError(ex, { context : "SMPCRT10000.btn_certAuth_onclick" });
     }
@@ -173,9 +182,10 @@ scwin.btn_certAuth_onclick = async function () {
 scwin.btn_certVerify_onclick = async function () {
     try {
         scwin.clearResult();
-        scwin.beforeCertPopup();
 
         await $c.cert.auth(scwin.API_URL.verify, scwin.certVerifyCallback, { useTranskey : scwin.useTranskey() });
+
+        scwin.beforeCertPopup();
     } catch (ex) {
         await $c.exception.handleError(ex, { context : "SMPCRT10000.btn_certVerify_onclick" });
     }
@@ -195,16 +205,17 @@ scwin.btn_certVerify_onclick = async function () {
 */
 scwin.btn_certRegister_onclick = async function () {
     try {
-        if (!await scwin.validateRegister()) return;
-
         scwin.clearResult();
-        scwin.beforeCertPopup();
+
+        if (!await scwin.validateRegister()) return;
 
         // dataMap 키 이름이 곧 서버 파라미터명이다 (PKCS7SignedData 와 같은 FormData 에 담긴다)
         await $c.cert.auth(scwin.API_URL.register, scwin.certRegisterCallback, {
             params      : dma_chrgInfo.getJSON(),
             useTranskey : scwin.useTranskey()
         });
+
+        scwin.beforeCertPopup();
     } catch (ex) {
         await $c.exception.handleError(ex, { context : "SMPCRT10000.btn_certRegister_onclick" });
     }
@@ -268,6 +279,8 @@ scwin.btn_reload_onclick = function () {
 */
 scwin.certAuthCallback = function (res) {
     try {
+        res = res || {};   // 204 No Content 등 본문 없는 성공 응답 보호
+
         scwin.setResult(true, "로그인 성공 — 인증 토큰(accessToken 쿠키) 발급"
             + ($c.util.isEmpty(res.message) ? "" : " : " + res.message));
     } catch (ex) {
@@ -289,6 +302,8 @@ scwin.certAuthCallback = function (res) {
 */
 scwin.certVerifyCallback = async function (res) {
     try {
+        res = res || {};   // 204 No Content 등 본문 없는 성공 응답 보호
+
         const cert = res.body || {};
         const message = $c.util.isEmpty(res.message) ? "인증서 상태를 확인할 수 없습니다." : res.message;
 
@@ -317,6 +332,8 @@ scwin.certVerifyCallback = async function (res) {
 */
 scwin.certRegisterCallback = async function (res) {
     try {
+        res = res || {};   // 204 No Content 등 본문 없는 성공 응답 보호
+
         const data = res.body || {};
 
         await $c.win.alert("인증서 등록 요청이 정상 처리되었습니다.\n\n일련번호 : " + (data.serialNumber || "-"));
@@ -354,7 +371,8 @@ scwin.useTranskey = function () {
  * @name scwin.beforeCertPopup
  * @author Inswave
  * @date 2026. 09. 15
- * @description 인증서 팝업을 열기 직전 처리. 새로고침 안내 조건이 되는 "팝업을 연 적 있음" 상태만 기록한다.
+ * @description 인증서 팝업을 연 직후 처리. 새로고침 안내 조건이 되는 "팝업을 연 적 있음" 상태만 기록한다.
+ * $c.cert.auth 가 정상 반환(팝업 실행)한 뒤에 호출해, 벤더 미로드 등으로 auth 가 실패한 경우에는 기록하지 않는다.
  * (키패드 설정 반영은 $c.cert.auth 의 useTranskey 옵션이 팝업 직전에 수행한다)
  * @param
  * @returns
