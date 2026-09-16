@@ -1,7 +1,6 @@
 /**
  * WebSquare 셸에서 이니텍(INISAFE Sign, crosswebex6)·라온(TransKey) 벤더 스크립트를 config.xml <engine><module> 로
  * 정적 로드할 때 필요한 보정 두 가지를 한 파일에 모았다. **벤더 그룹 맨 앞(transkey_config.js 보다 먼저)에 1회 로드한다.**
- * (이전의 promise-guard.js + initech-docwrite-capture.js + initech-docwrite-replay.js 3파일을 병합, 2026-09-16)
  *
  * 1. 전역 Promise 보호
  *    crosswebex6.js 가 비동기로 끌어오는 bluebird-3.5.0 브라우저 번들은 window.Promise 를 자기 구현으로 덮어쓴다.

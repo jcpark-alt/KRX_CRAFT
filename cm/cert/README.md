@@ -79,6 +79,34 @@ await $c.cert.auth(url, callback, { params : dma_chrgInfo.getJSON(), useTranskey
 - 통신은 벤더의 `$.ajax`(FormData) 라 `$c.sbm` 을 타지 않는다. API 경로의 프리픽스(`app.api.prefix`)를 바꾸면 벤더 스크립트의 하드코딩 경로도 함께 고친다.
 - 가상키보드 사용 여부는 `auth` 의 `useTranskey` 옵션이 팝업 직전에 `cwui_conf` 에 반영한다. 첫 팝업의 키패드 선택은 이니텍 UI 가 캐시하므로 팝업을 연 뒤 바꾸면 새로고침이 필요하다.
 
+## 6a. 로컬 에이전트 포트 탐색 — `securePortScan`
+
+개발자 도구 Network 탭에 `127.0.0.1:4441~4445` 로 가는 요청이 여러 건 보이고 일부가 `ERR_CONNECTION_REFUSED` 로 찍히는 것은
+이니텍 CrossWeb EX 가 **PC 에 설치된 로컬 에이전트(데몬)를 찾는 정상 동작**이다. 서버 API 가 아니라 브라우저에서 사용자 PC 로 직접
+보내는 요청이므로 WebtoB·백엔드 라우팅과 무관하고, `/cm/cert/**` 경로 변경의 영향도 받지 않는다.
+코드: `vendor/SW/initech/extension/common/js/exproto_ext_daemon.js` 의 `dmPortCheckStart`(472~479행 부근).
+
+| 채널 | URL | 비고 |
+|---|---|---|
+| HTTPS | `https://127.0.0.1:{포트}?securePortScan{타임스탬프}={lic_domain}` | 기본. 쿼리 키 뒤에 현재 시각을 붙여 캐시를 피하고, 값으로 라이선스 도메인 토큰을 보낸다 |
+| WebSocket | `wss://127.0.0.1:{포트}/securePortScan` | `localhost` 설정이 `wss://` 로 시작할 때. 연결이 열리면 `securePortScan={lic_domain}` 을 메시지로 다시 보낸다 |
+
+- **호스트**: `common/exinterface.js` 가 데몬 모드일 때 `https://127.0.0.1`(Mac 은 `https://localhost`)로 설정.
+- **포트**: `exEdgeInfo.edgeStartPort`(4441)부터 `portChkCnt`(5)개 — 4441~4445 를 100ms 간격으로 차례로 시도.
+- **lic_domain**: `exinterface.js` 의 라이선스 도메인 암호문. `crosswebexInit.js` 가 정책(`crosswebexPolicy.lic_domain`)이 있으면 덮어쓴다. 에이전트는 이 값으로 현재 사이트가 라이선스된 도메인인지 확인한다.
+
+동작 흐름:
+1. `sessionStorage` 의 `crosswebex_wsport` 에 이미 찾아 둔 포트가 있으면 탐색을 건너뛰고 바로 통신한다.
+2. 없으면 포트마다 위 URL 로 요청한다. 응답 코드 200 이면 그 포트를 `crosswebex_wsport` 에 저장하고 곧바로 `GetVersion` 요청(`sendWS`)으로 에이전트 버전을 확인한다.
+3. 응답 코드 400 이면 라이선스 도메인 불일치로 판단해 경고창(`C_W_033`)을 한 번 띄운다.
+4. 5개 포트가 모두 실패하면 `setDaemonStatus(…, false, true)` 로 "에이전트 미설치" 상태가 되어 설치 안내 흐름으로 넘어간다.
+
+점검 포인트:
+- 탐색 요청이 **아예 보이지 않으면** `exproto_ext_daemon.js` 가 로드되지 않은 것이다. 이 파일은 데몬 모드일 때 `exinterface.js` 가 `document.write` 로 끌어오므로 `initech-shell-guard.js` 의 재생(§4.3)이 먼저 동작해야 한다 — `window.__initechDocWrite.loaded` 에 포함됐는지 확인.
+- 다섯 포트가 **전부 실패**하면 에이전트 미설치·미실행이거나 방화벽/보안 프로그램이 로컬 포트를 막는 경우다.
+- **400 경고**가 뜨면 라이선스 도메인과 접속 도메인이 다른 것이다(개발용 호스트명 등). `lic_domain` 정책을 확인한다.
+- 포트를 바꾼 뒤 탐색이 계속 옛 포트로 가면 `sessionStorage` 의 `crosswebex_wsport` 를 지운다.
+
 ## 7. 배포 체크리스트
 
 1. 백엔드가 `cm/cert` 폴더를 **`/cm/cert/**`** 로 서비스하도록 정적 매핑을 바꾼다(옛 `/resources/**` 그대로면 404).
