@@ -1,5 +1,5 @@
 /**
- * $c.validate.validateDataCollect 회귀 테스트 (src/gcc/validate.xml).
+ * $c.validate.validateDataCollect 회귀 테스트 (cm/gcc/validate.xml).
  *
  * 2026-08-25 수정 3건의 재발 방지:
  * 1. finally 의 return 이 catch 의 return false 를 덮어쓰던 결함 — 예외 시 항상 false 반환
@@ -13,7 +13,7 @@ const fs = require("fs");
 const vm = require("vm");
 const path = require("path");
 
-const XML_FILE = "src/gcc/validate.xml";
+const XML_FILE = "cm/gcc/validate.xml";
 
 function extractCdata(xmlPath) {
   const xml = fs.readFileSync(xmlPath, "utf8");
@@ -84,7 +84,7 @@ const makeComp = (id, value, plugin = "input") => {
 const container = { getPluginName: () => "group" };
 const OPTS = { validateType: "alert", checkType: "multi", focus: false };
 
-describe("validateDataCollect (src/gcc/validate.xml)", () => {
+describe("validateDataCollect (cm/gcc/validate.xml)", () => {
   test("내부 예외 발생 시 false 반환 (finally 가 catch 반환을 덮어쓰지 않음)", async () => {
     const h = loadHarness();
     h.scwin.getChildrenComponent = () => { throw new Error("boom"); };

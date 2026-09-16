@@ -10,7 +10,7 @@ const fs = require("fs");
 const vm = require("vm");
 const path = require("path");
 
-const XML_FILE = "src/gcc/util.xml";
+const XML_FILE = "cm/gcc/util.xml";
 
 const isEmpty = (v) =>
   v === undefined || v === null || v === "" ||
@@ -65,7 +65,7 @@ function enabledOf(h) {
   return out;
 }
 
-describe("$c.util.setButtonState (src/gcc/util.xml)", () => {
+describe("$c.util.setButtonState (cm/gcc/util.xml)", () => {
   let h;
   beforeEach(() => {
     h = loadHarness();

@@ -10,7 +10,7 @@ const fs = require("fs");
 const vm = require("vm");
 const path = require("path");
 
-const XML_FILE = "src/gcc/sbm.xml";
+const XML_FILE = "cm/gcc/sbm.xml";
 
 const isEmpty = (v) =>
   v === undefined || v === null || v === "" ||
@@ -82,7 +82,7 @@ function loadHarness() {
   return { scwin: sandbox.scwin, state };
 }
 
-describe("$c.sbm.setPagingInfo maxRowNum 'all' (src/gcc/sbm.xml)", () => {
+describe("$c.sbm.setPagingInfo maxRowNum 'all' (cm/gcc/sbm.xml)", () => {
   test('maxRowNum "all": 그리드를 즉시 전체 행 표시로 전환 (이미 "all" 이면 재적용 생략)', () => {
     const h = loadHarness();
     const grid = makeGrid("grd_main");

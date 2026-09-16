@@ -1,8 +1,8 @@
 """명령행 인터페이스: WebSquare XML 의 JSDoc 으로 API 문서(HTML)를 생성한다.
 
 사용 예:
-    python -m wsxml_lint.docgen src/gcc -o src/docs/api/gcc
-    wsxml-doc src/gcc -o out --title "gcc API"
+    python -m wsxml_lint.docgen cm/gcc -o cm/docs/api/gcc
+    wsxml-doc cm/gcc -o out --title "gcc API"
 """
 
 from __future__ import annotations

@@ -9,7 +9,7 @@ const fs = require("fs");
 const vm = require("vm");
 const path = require("path");
 
-const XML_FILES = ["src/gcc/sbm.xml"];
+const XML_FILES = ["cm/gcc/sbm.xml"];
 
 function extractCdata(xmlPath) {
   const xml = fs.readFileSync(xmlPath, "utf8");

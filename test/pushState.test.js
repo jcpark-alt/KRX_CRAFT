@@ -9,7 +9,7 @@ const fs = require("fs");
 const vm = require("vm");
 const path = require("path");
 
-const XML_FILE = "src/gcc/win.xml";
+const XML_FILE = "cm/gcc/win.xml";
 
 const isEmpty = (v) =>
   v === undefined || v === null || v === "" ||
@@ -48,7 +48,7 @@ function loadHarness() {
   return { scwin: sandbox.scwin, state, sandbox };
 }
 
-describe("$c.win.pushState / __changePageState (src/gcc/win.xml)", () => {
+describe("$c.win.pushState / __changePageState (cm/gcc/win.xml)", () => {
   test("pushState: {data} state 와 contextPath(끝 슬래시 제거) URL 로 기록", () => {
     const h = loadHarness();
     const data = { menuInfo: { menuNm: "인사조회", menuCode: "010001", src: "/tmp/t.xml" }, srchKey: "A" };

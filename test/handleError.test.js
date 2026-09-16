@@ -9,7 +9,7 @@ const fs = require("fs");
 const vm = require("vm");
 const path = require("path");
 
-const XML_FILE = "src/gcc/exception.xml";
+const XML_FILE = "cm/gcc/exception.xml";
 
 const isEmpty = (v) =>
   v === undefined || v === null || v === "" ||
@@ -75,7 +75,7 @@ function loadHarness() {
   return { scwin: sandbox.scwin, calls, sandbox };
 }
 
-describe("handleError 공통 오류 처리 (src/gcc/exception.xml)", () => {
+describe("handleError 공통 오류 처리 (cm/gcc/exception.xml)", () => {
   let h;
   beforeEach(() => { h = loadHarness(); });
 
@@ -163,7 +163,7 @@ describe("handleError 공통 오류 처리 (src/gcc/exception.xml)", () => {
   });
 });
 
-describe("reportError 오류 수집 훅 (src/gcc/exception.xml)", () => {
+describe("reportError 오류 수집 훅 (cm/gcc/exception.xml)", () => {
   let h;
   beforeEach(() => { h = loadHarness(); });
 

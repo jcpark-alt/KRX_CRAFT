@@ -10,7 +10,7 @@ const fs = require("fs");
 const vm = require("vm");
 const path = require("path");
 
-const XML_FILE = "src/gcc/win.xml";
+const XML_FILE = "cm/gcc/win.xml";
 
 const isEmpty = (v) =>
   v === undefined || v === null || v === "" ||
@@ -76,7 +76,7 @@ function loadHarness(contextPath = "") {
 
 const flush = () => new Promise((r) => setImmediate(r));
 
-describe("moveUrl/setPageFrameSrc 히스토리 기록·복원 (src/gcc/win.xml)", () => {
+describe("moveUrl/setPageFrameSrc 히스토리 기록·복원 (cm/gcc/win.xml)", () => {
   test("moveUrl 기본(옵션 없음): setSrc 만 수행, 히스토리 기록 없음 — 기존 동작 유지", async () => {
     const h = loadHarness();
     h.state.frames.pfm_current = makeFrame("pfm_current", "/list.xml");

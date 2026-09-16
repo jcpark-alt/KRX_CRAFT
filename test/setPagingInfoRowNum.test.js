@@ -10,7 +10,7 @@ const fs = require("fs");
 const vm = require("vm");
 const path = require("path");
 
-const XML_FILE = "src/gcc/sbm.xml";
+const XML_FILE = "cm/gcc/sbm.xml";
 
 const isEmpty = (v) =>
   v === undefined || v === null || v === "" ||
@@ -82,7 +82,7 @@ function loadHarness() {
   return { scwin: sandbox.scwin, state };
 }
 
-describe("$c.sbm.setPagingInfo rowNumVisble asc/desc (src/gcc/sbm.xml)", () => {
+describe("$c.sbm.setPagingInfo rowNumVisble asc/desc (cm/gcc/sbm.xml)", () => {
   test("desc + totalCnt: DataList rowNum 컬럼에 페이지별 내림차순 순번 설정 (전체 100건·10건/2페이지 → 90,89,88)", () => {
     const h = loadHarness();
     const dlt = makeDlt(3);

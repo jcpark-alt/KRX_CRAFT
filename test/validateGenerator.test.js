@@ -8,8 +8,8 @@ const fs = require("fs");
 const vm = require("vm");
 const path = require("path");
 
-const HTML = path.join(__dirname, "..", "src", "docs", "validate-generator", "validate-generator.html");
-const REAL_XML = path.join(__dirname, "..", "src", "conversion",
+const HTML = path.join(__dirname, "..", "cm", "docs", "validate-generator", "validate-generator.html");
+const REAL_XML = path.join(__dirname, "..", "cm", "conversion",
   "next-krx-lds-fil-front", "ui-tobe", "dis", "account", "JLDFIL00356.xml");
 
 function loadVG() {

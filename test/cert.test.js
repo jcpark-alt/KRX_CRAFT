@@ -7,10 +7,9 @@
  */
 const fs = require("fs");
 const vm = require("vm");
-const path = require("path");
 
-const CERT_XML = "src/gcc/cert.xml";
-const UTIL_XML = "src/gcc/util.xml";
+const CERT_XML = "cm/gcc/cert.xml";
+const UTIL_XML = "cm/gcc/util.xml";
 
 const isEmpty = (v) =>
   v === undefined || v === null || v === "" ||
@@ -99,7 +98,7 @@ function loadHarness(opts) {
   return { cert: certScope, util: sandbox.$c.util, calls, document, window, vendor };
 }
 
-describe("$c.util DOM 로더 (src/gcc/util.xml)", () => {
+describe("$c.util DOM 로더 (cm/gcc/util.xml)", () => {
   test("loadScript 는 script 태그를 head 에 붙이고 onload 에 resolve, 같은 src 는 재삽입하지 않는다", async () => {
     const h = loadHarness();
     await h.util.loadScript("/a.js");
@@ -133,7 +132,7 @@ describe("$c.util DOM 로더 (src/gcc/util.xml)", () => {
   });
 });
 
-describe("$c.cert 공동인증서 연동 (src/gcc/cert.xml)", () => {
+describe("$c.cert 공동인증서 연동 (cm/gcc/cert.xml)", () => {
   test("isReady 는 벤더 함수 유무를 반환한다", () => {
     const h = loadHarness();
     expect(h.cert.isReady()).toBe(false);

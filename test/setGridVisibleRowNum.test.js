@@ -9,7 +9,7 @@ const fs = require("fs");
 const vm = require("vm");
 const path = require("path");
 
-const XML_FILE = "src/gcc/util.xml";
+const XML_FILE = "cm/gcc/util.xml";
 
 const isEmpty = (v) =>
   v === undefined || v === null || v === "" ||
@@ -71,7 +71,7 @@ function loadHarness() {
   return { scwin };
 }
 
-describe("$c.util.setGridVisibleRowNum (src/gcc/util.xml)", () => {
+describe("$c.util.setGridVisibleRowNum (cm/gcc/util.xml)", () => {
   test("숫자: 엔진 setVisibleRowNum 에 위임", () => {
     const h = loadHarness();
     const grid = makeGrid("grd_main");

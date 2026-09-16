@@ -9,8 +9,8 @@ JavaScript lives inside `<script><![CDATA[ ... ]]>` blocks in `.xml` screen page
 
 | Path | What |
 |------|------|
-| `src/gcc/` | Modern common library — one `$c.*` namespace per file (`$c.util`, `$c.win`, `$c.str`, …) |
-| `src/as-is/ins/`, `src/as-is/mgt/`, `src/as-is/stf/`, `src/as-is/fil/` | W-Craft-converted business modules (legacy style) |
+| `cm/gcc/` | Modern common library — one `$c.*` namespace per file (`$c.util`, `$c.win`, `$c.str`, …) |
+| `cm/as-is/ins/`, `cm/as-is/mgt/`, `cm/as-is/stf/`, `cm/as-is/fil/` | W-Craft-converted business modules (legacy style) |
 | `tools/wsxml_lint/` | Python/lxml linter for the WebSquare XML pages |
 | `.claude/agents/` | Project subagents for WebSquare review / dev / analysis / docs |
 
@@ -29,6 +29,6 @@ npm run ci            # full local mirror of CI: lint → jest → wsxml tests �
 
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on push, PR, and manual
 dispatch — a **Node** job (ESLint + Jest) and a **WebSquare XML lint** job
-(`wsxml_lint` unit tests + strict `src/gcc` lint + de-noised legacy lint).
+(`wsxml_lint` unit tests + strict `cm/gcc` lint + de-noised legacy lint).
 
 See [CLAUDE.md](CLAUDE.md) for architecture, conventions, and toolchain details.

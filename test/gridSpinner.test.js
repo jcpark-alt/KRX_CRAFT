@@ -9,7 +9,7 @@ const fs = require("fs");
 const vm = require("vm");
 const path = require("path");
 
-const XML_FILES = ["src/gcc/sbm.xml"];
+const XML_FILES = ["cm/gcc/sbm.xml"];
 
 const isEmpty = (v) =>
   v === undefined || v === null || v === "" ||

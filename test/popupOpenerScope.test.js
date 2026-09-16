@@ -10,7 +10,7 @@ const fs = require("fs");
 const vm = require("vm");
 const path = require("path");
 
-const XML_FILE = "src/gcc/win.xml";
+const XML_FILE = "cm/gcc/win.xml";
 
 const isEmpty = (v) =>
   v === undefined || v === null || v === "" ||
@@ -66,7 +66,7 @@ function loadWindow(overrides = {}) {
   return { scwin: sandbox.scwin, $c: sandbox.$c, state, frameScope, sandbox };
 }
 
-describe("browserPopup 오프너 scope 접근 (src/gcc/win.xml)", () => {
+describe("browserPopup 오프너 scope 접근 (cm/gcc/win.xml)", () => {
   test("_openPopup(browserPopup): 호출 scope 를 popupId 로 등록하고 id 미지정 시 자동 생성", () => {
     const parent = loadWindow();
     parent.scwin._openPopup("/tmp/pop01.xml", { type: "browserPopup" }, {}, () => true);
@@ -159,7 +159,7 @@ describe("browserPopup 오프너 scope 접근 (src/gcc/win.xml)", () => {
   });
 });
 
-describe("팝업 타입별 데이터 수신 규약 — options.callbackFn 브리지 (src/gcc/win.xml)", () => {
+describe("팝업 타입별 데이터 수신 규약 — options.callbackFn 브리지 (cm/gcc/win.xml)", () => {
   test("openPopup: options.callbackFn 이 내부 data.callbackFn 채널로 전달된다", () => {
     const w = loadWindow();
     let captured = null;
@@ -179,7 +179,7 @@ describe("팝업 타입별 데이터 수신 규약 — options.callbackFn 브리
   });
 });
 
-describe("openPopup options.disableCloseButton (src/gcc/win.xml)", () => {
+describe("openPopup options.disableCloseButton (cm/gcc/win.xml)", () => {
   test("true 지정 시 엔진 $p.openPopup 옵션에 disableCloseButton:true 로 전달", () => {
     const w = loadWindow();
     w.scwin._openPopup("/tmp/pop02.xml", { type: "pageFramePopup", disableCloseButton: true }, {}, () => true);

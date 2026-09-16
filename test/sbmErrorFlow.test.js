@@ -10,7 +10,7 @@ const fs = require("fs");
 const vm = require("vm");
 const path = require("path");
 
-const XML_FILE = "src/gcc/sbm.xml";
+const XML_FILE = "cm/gcc/sbm.xml";
 
 const isEmpty = (v) =>
   v === undefined || v === null || v === "" ||
@@ -47,7 +47,7 @@ function loadHarness() {
   return { scwin: sandbox.scwin, calls };
 }
 
-describe("sbm 오류 경로의 handleError 합류 (src/gcc/sbm.xml)", () => {
+describe("sbm 오류 경로의 handleError 합류 (cm/gcc/sbm.xml)", () => {
   let h;
   beforeEach(() => { h = loadHarness(); });
 
@@ -106,7 +106,7 @@ describe("sbm 오류 경로의 handleError 합류 (src/gcc/sbm.xml)", () => {
   });
 });
 
-describe("resultMsg 인증 오류 코드 처리 (src/gcc/sbm.xml)", () => {
+describe("resultMsg 인증 오류 코드 처리 (cm/gcc/sbm.xml)", () => {
   let h;
   beforeEach(() => { h = loadHarness(); });
 

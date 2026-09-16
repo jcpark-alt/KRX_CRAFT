@@ -1,5 +1,5 @@
 /**
- * $c.validate.validateDataMap 회귀 테스트 (src/gcc/validate.xml).
+ * $c.validate.validateDataMap 회귀 테스트 (cm/gcc/validate.xml).
  *
  * DataMap 값 검사 공통함수 — 규칙 배열을 선언 순서대로 검사해 key 값이 equals 와 일치하면 위반:
  * - type "alert"(기본): 알림 후 즉시 해당 규칙의 code 반환 (code 미지정 시 규칙 순번+1)
@@ -11,7 +11,7 @@
 const fs = require("fs");
 const vm = require("vm");
 
-const XML_FILE = "src/gcc/validate.xml";
+const XML_FILE = "cm/gcc/validate.xml";
 
 function extractCdata(xmlPath) {
   const xml = fs.readFileSync(xmlPath, "utf8");
@@ -49,7 +49,7 @@ function loadHarness({ confirmResult = true } = {}) {
 
 const makeDataMap = (data) => ({ get: (key) => data[key] });
 
-describe("validateDataMap (src/gcc/validate.xml)", () => {
+describe("validateDataMap (cm/gcc/validate.xml)", () => {
   test("모든 규칙 통과(플래그 불일치) 시 0 반환, 알림 없음", async () => {
     const h = loadHarness();
     const rtn = await h.scwin.validateDataMap(makeDataMap({ VALID_BND: "N" }), [

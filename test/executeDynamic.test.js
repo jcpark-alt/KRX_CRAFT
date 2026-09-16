@@ -1,5 +1,5 @@
 /**
- * $c.sbm.executeDynamic 회귀 테스트 (src/gcc/sbm.xml).
+ * $c.sbm.executeDynamic 회귀 테스트 (cm/gcc/sbm.xml).
  *
  * executeDynamic 의 전체 흐름 — 간소화 ref/target 정규화 → 중복 실행 가드 → submission 생성/재생성
  * → gridview/자동 바인딩 디스크립터 부착 → execute(Promise) → 공통 콜백(__callbackSubmitFunction)에서
@@ -10,7 +10,7 @@ const fs = require("fs");
 const vm = require("vm");
 const path = require("path");
 
-const XML_FILE = "src/gcc/sbm.xml";
+const XML_FILE = "cm/gcc/sbm.xml";
 
 const isEmpty = (v) =>
   v === undefined || v === null || v === "" ||
@@ -88,7 +88,7 @@ function loadHarness() {
 const baseOptions = () => ({ id: "sbm_search", action: "/api/search", ref: "dma_search", target: "dlt_a,dlt_b|append", isProcessMsg: false });
 const okRes = (json) => ({ responseStatusCode: 200, errorType: "", responseJSON: json });
 
-describe("$c.sbm.executeDynamic (src/gcc/sbm.xml)", () => {
+describe("$c.sbm.executeDynamic (cm/gcc/sbm.xml)", () => {
   let h;
   beforeEach(() => {
     h = loadHarness();

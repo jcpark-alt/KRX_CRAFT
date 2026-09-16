@@ -10,7 +10,7 @@ const fs = require("fs");
 const vm = require("vm");
 const path = require("path");
 
-const XML_FILE = "src/gcc/util.xml";
+const XML_FILE = "cm/gcc/util.xml";
 
 function extractCdata(xmlPath) {
   const xml = fs.readFileSync(xmlPath, "utf8");
@@ -61,7 +61,7 @@ const COLS = [
   { id: "y2m1", header: "자산총계", width: 110, align: "right", group: "2010년" },
 ];
 
-describe("$c.util.syncDataListColumns (src/gcc/util.xml)", () => {
+describe("$c.util.syncDataListColumns (cm/gcc/util.xml)", () => {
   test("신규 컬럼 insert + 잔존 컬럼 remove", () => {
     const h = loadHarness();
     const dlt = makeDataList(["comNm", "oldCol"]);
@@ -102,7 +102,7 @@ describe("$c.util.syncDataListColumns (src/gcc/util.xml)", () => {
   });
 });
 
-describe("$c.util.buildGridStyleXml (src/gcc/util.xml)", () => {
+describe("$c.util.buildGridStyleXml (cm/gcc/util.xml)", () => {
   test("group 컬럼 → 2단 헤더(고정 rowSpan=2 + 그룹 colSpan 병합 + 하단 지표 행)", () => {
     const h = loadHarness();
     const xml = h.scwin.buildGridStyleXml({ id: "grdFis", dataList: "dltFisList" }, COLS);

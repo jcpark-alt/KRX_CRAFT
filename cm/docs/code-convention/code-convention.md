@@ -1,0 +1,265 @@
+# WebSquare 업무 화면 코드 컨벤션 — 5단계 정형화 구조
+
+업무 화면 스크립트의 가독성·유지보수성을 위한 표준 구조 규약이다. **변환(conversion) 산출물과 신규 작성 화면**에 적용하며,
+변환 파이프라인(convert.py 규칙 2·4)이 구조 재배치와 헤더 삽입을 자동 수행한다. (2026-08-21 확정)
+
+- **적용 범위**: 업무 화면(`ui-tobe` 신규 변환분·신규 작성 화면). `cm/gcc` 공통 라이브러리는 대상이 아니다(별도 구조).
+- **기존 변환분(302파일) 소급 없음** — 재변환 시 자동 마이그레이션되도록 도구가 구(舊) 한 줄 경계 주석을 블록 헤더로 교체한다.
+
+---
+
+## 5단계 구조
+
+스크립트는 아래 5개 영역을 **이 순서대로** 배치하고, 각 영역은 표준 블록 헤더로 구분한다.
+
+```javascript
+///////// 1. 변수 및 선언 영역 /////////
+```
+
+| # | 영역 | 역할 | 배치 대상 |
+|---|------|------|-----------|
+| 1 | **변수 및 선언 영역** | 페이지 전역 변수·상태값·전달 파라미터 | `scwin.param = {};`, `scwin.pageNum = 1;` 등 리터럴 전역(규칙 2가 자동 이동) |
+| 2 | **초기화 영역** | 페이지 라이프사이클·초기 세팅 | `scwin.onpageload`, `scwin.onpageunload` |
+| 3 | **컴포넌트 이벤트 영역** | 사용자 액션 이벤트 핸들러 | `scwin.{컴포넌트ID}_{이벤트명소문자}` (예: `scwin.btn_search_onclick` — 규칙 3) |
+| 4 | **서브미션 콜백 영역** | 통신 실행·후처리·팝업 콜백 함수 | `$c.sbm.executeDynamic` 을 호출하는 통신 실행 함수(`scwin.searchList` 등 — 2026-09-01 확정), `scwin.sbm_{업무명}_submitdone`, `scwin.*_submiterror`, `scwin.popupCallback` — 이름 패턴·`submitDoneHandler` 옵션 참조·본문 `executeDynamic` 호출로 자동 분류 |
+| 5 | **일반/업무 함수 영역** | 비즈니스 로직·데이터 가공·유효성 검사 | `scwin.validateInput`, `scwin.calcFee` 등 (통신하지 않는 함수) |
+
+- 비어 있는 영역의 헤더는 생략한다(도구 동작 동일).
+- 헤더 텍스트(번호·명칭)는 도구의 멱등 판정 기준이므로 임의 변형하지 않는다.
+- **`scwin.vScrenID` 관련 코드는 사용하지 않으므로 삭제한다**(선언·대입·참조 모두 제거 — 규칙 1, 2026-09-02 확정).
+  화면 ID 가 필요한 곳은 `$p.getFrameId()` 등 런타임 API 를 사용한다.
+
+## 명명 규칙
+
+- **일반/업무 함수는 camelCase** — `scwin.searchList`, `scwin.calcFee`. `fn_` 접두는 **사용하지 않는다**
+  (변환 규칙 13이 레거시 `scwin.fn_*`를 camelCase 로 정규화하며, gcc 라이브러리·기존 변환 302파일과 일관).
+- **5구역(일반/업무 함수 영역)으로 분리되는 함수는 `scwin.${camelCase}` 로 명명**한다. 이벤트·서브미션 콜백이 아닌
+  비즈니스 로직·데이터 가공·검증 함수가 대상이며, 레거시 명명(`fn_dupleChek`·`tx_fn_getList`·`fnCom_isur` 등
+  `fn_`/`tx_`/스네이크·언더바 혼용)은 접두·구분자를 제거하고 camelCase 로 변환한다
+  (예: `fn_dupleChek` → `dupleCheck`, `tx_fn_getList` → `getList`, `set_bns_combo` → `setBnsCombo`).
+  정의부와 **모든 호출부(스크립트·body `ev:on*`·`publicInfo`)를 함께 개명**한다(규칙 13). 같은 파일 정의 함수만 대상이며,
+  외부 계약 함수·이름 충돌은 보류·리포트한다.
+- 이벤트: `scwin.{컴포넌트ID}_{이벤트명 소문자}` (규칙 3).
+- 서브미션 콜백: `scwin.sbm_{업무명}_submitdone` / `_submiterror`, 팝업 콜백: `scwin.popupCallback` 계열.
+
+## 들여쓰기 규칙
+
+- **스크립트(`<script>` CDATA) 내 JavaScript 는 4-스페이스(soft tab)로 들여쓴다.** 탭 문자·2-스페이스 혼용을 금지한다. (2026-09-04 확정)
+  - 한 단계 = 스페이스 4칸. 함수 정의는 최상위(0칸), 함수 본문은 4칸, 그 안 블록(`try`/`if`/객체·배열 리터럴)은 8칸… 식으로 depth × 4.
+  - JSDoc 블록은 ` * ` 정렬(`/**` 은 함수와 같은 열, 본문은 한 칸 들여쓴 ` *`)을 유지한다.
+  - 여러 줄 연결식(`+`·삼항 등)·다중행 문자열 리터럴 내부의 정렬은 임의로 바꾸지 않는다.
+  - gcc 예시·기존 변환 산출물(`ui-tobe`)의 스크립트가 이미 4-스페이스이며, 이와 일관되게 맞춘다.
+- **body XML 마크업 들여쓰기**는 편집기/변환기 기본(탭)을 따르며 본 규칙 대상이 아니다.
+
+## 변수·문법 규칙
+
+- **`var` 를 사용하지 않는다** — `const` 기본, 재할당이 필요할 때만 `let`. (2026-08-27 확정)
+  변환 도구가 자동 적용하며(규칙 8 — 재할당 분석), 기존 코드를 수정할 때는 그 함수의 잔존 `var` 도 함께 정리한다
+  (무관한 함수의 일괄 변환은 하지 않는다).
+- **사용하지 않는 `scwin` 전역 변수는 삭제한다** — 선언(`scwin.X = …;`)만 있고 파일 내·외에서 읽거나 쓰지 않는
+  전역 상태값은 코드를 제거한다. (2026-09-04 확정)
+  - **판별**: 선언 외에 활성 코드(주석·문자열 제외)에서 참조(`scwin.X`/바디 `ref="…X"`/`ev:on*`)가 0건이면 미사용.
+    W-Craft 변환 잔재(`scwin.result`·`scwin.modifiyDate` 등 스켈레톤이 남긴 선언)가 대표 대상이다.
+  - **유지 예외**: 외부 파일이 이름으로 참조하는 계약(`scwin.fn_GetPar` 류), 값이 채워져 다른 함수가 소비하는 상태값,
+    `<w2:publicInfo method=>` 등재 항목은 미참조로 보여도 유지한다.
+  - 컴포넌트 캐싱 전역(`scwin.grd_x = $c.util.getComponent(...)`)은 해당 컴포넌트가 body 에 존재하면 유지,
+    body 에서 사라진 컴포넌트를 가리키면 함께 삭제한다.
+- **비교는 엄격 연산자** `===`/`!==` 를 사용한다(규칙 5a). `!X === Y` 는 `!X`(boolean)가 먼저 평가되는
+  우선순위 버그이므로 `X !== Y` 로 쓴다(규칙 5e — 실사례 교정).
+- **원시 브라우저 API 대신 공통함수를 사용한다**:
+  - `alert(...)` → `$c.win.alert(...)` (원시 alert 금지)
+  - `eval(...)` 금지 — 숫자 캐스팅 용도는 `Number(...)` 로
+  - **예외**: `confirm(...)` 은 반환값을 동기 boolean 으로 소비하는 위치(화면 닫기 판정 등)에서는 유지한다 —
+    `$c.win.confirm` 은 Promise 기반 비동기라 1:1 치환이 불가하며, 전환하려면 호출 흐름의 async 재설계가 필요하다(사유 주석 필수).
+- **참고 — 빌드 `$p` 주입**: `$c.*` 공통함수 호출은 빌드 시 호출부 첫 인자에 `$p` 가 자동 주입된다.
+  적용 대상은 **해당 공통 XML 의 `<w2:publicInfo method=>` 에 등재된 함수만**이다. 화면 코드는 `$c.util.isEmpty(x)` 처럼
+  선언 시그니처 그대로 호출하면 된다(공통함수 작성 규칙은 gcc 가이드 소관 — [gcc_xml_guide.md](../gcc_xml_guide.md)).
+
+## 주석 규칙
+
+- **라인 주석은 `// `(슬래시 2개 + 공백 1개)로 시작**한다 — `//주석`(X) → `// 주석`(O). 주석 처리한 코드도 동일하게 `// scwin.foo();` 형태로 쓴다. (2026-09-01 확정)
+- **예외(형식 그대로 유지)**: 섹션 헤더(`/////////`)·구분선(`//----`, `//====`, `//****` 등)·W-Craft 마커(`//----W-Craft`)처럼 `//` 뒤가 기호로 이어지는 장식/마커 주석.
+- 변환 도구가 자동 적용한다(convert.py 포매팅 단계 `format_comment_space` — 문자열 내부 보호·멱등).
+- **함수 JSDoc 표준**: 모든 함수에 `@method`/`@name`/`@description`/`@param {타입} 이름 설명`/`@returns`/`@hidden N`(`@example` 권장)
+  블록을 작성한다. `@description desc`·빈 `@description` 같은 **placeholder 금지**, 인자 없는 함수의 빈 `@param` 라인은 쓰지 않는다.
+  레거시 박스형(`/**** 함수명 ****/`)·`argument :` 주석은 내용을 `@description`/`@param` 으로 이관하고 삭제한다(단계 2 판단 작업).
+
+## 초기화 — IIFE·onpageload 오버라이딩 금지, `init_*` 순차 호출
+
+로딩 시점 로직은 **즉시실행함수(IIFE)로 자동 실행하거나 `scwin.onpageload` 를 래핑(오버라이딩)하지 않는다.**
+각 초기화 단위를 명명 함수(`scwin.init_*`)로 분리하고, **`scwin.onpageload` 단일 정의 안에서 데이터 의존성 순서대로 호출**한다. (2026-09-04 확정)
+
+```javascript
+// (X) 금지 — IIFE 자동 실행 + onpageload 오버라이딩 래핑
+(function () { /* 로딩 시 자동 실행 */ })();
+(function () {
+    var __prev = scwin.onpageload;                 // 기존 onpageload 래핑
+    scwin.onpageload = function () { scwin.init_conds(); if (__prev) __prev(); };
+})();
+
+// (O) 권장 — onpageload 를 2구역 최상단에 정의, init_* 는 그 아래
+scwin.onpageload = function () {
+    try {
+        scwin.init_recvParam();   // 1) 파라미터 수신
+        scwin.init_conds();       // 2) 수신값 기반 조건 평가
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "화면ID.onpageload" });
+    }
+};
+
+scwin.init_recvParam = function () { $c.data.recvParamData("dma_pageContext"); };
+scwin.init_conds     = function () { $c.util.evalConds(binds); };
+```
+
+- **`scwin.onpageload` 는 `///////// 2. 초기화 영역 /////////` 단락의 최상단에 정의**한다. 진입점을 즉시 식별할 수 있도록 `init_*`·`onpageunload` 등 다른 초기화 함수보다 앞에 둔다(함수 대입은 로딩 시 모두 완료되므로, `onpageload` 가 뒤에 정의된 `init_*` 를 호출해도 실행 시점엔 이미 정의돼 있어 문제없다).
+- **IIFE 금지(화면 페이지 전면)**: 화면 개발 페이지에서는 즉시실행함수 `(function(){…})()` / `(async function(){…})()` / `(()=>{…})()` 를 **일절 사용하지 않는다** — 로딩 시점 자동 실행뿐 아니라 **값 계산·값 쓰기용 인라인 IIFE** 도 금지. (2026-09-04 확정)
+  - 반복되는 값 추출/쓰기 로직은 명명 헬퍼 함수(`scwin.getDmaValue`·`scwin.setComponentText` 등)로 분리해 호출한다.
+  - **예외**: 공통 라이브러리(`cm/gcc/*`·`cm/pcc/*`)는 네임스페이스 캡슐화를 위한 모듈 패턴 IIFE 를 허용한다(화면 페이지가 아닌 라이브러리 한정).
+- 초기화 IIFE 는 정의만 하고 `onpageload` 에서 호출한다(위 초기화 절 참조).
+- **오버라이딩 금지**: `var __prev = scwin.onpageload;` 형태의 래핑을 만들지 않는다. `scwin.onpageload` 는 파일당 1회만 정의한다.
+- **순차 호출 순서는 데이터 의존성**을 따른다(파라미터 수신 → 파생값 충전 → 화면 렌더/조건 평가). 렌더가 데이터를 기다리려 `setTimeout` 다중 예약에 의존하지 말고 **선행 함수 완료 후 호출**로 순서를 보장한다. 비동기 초기화면 `onpageload`/`init_*` 를 `async`/`await` 로 전환해 순차 배치한다.
+- 진입점이므로 `onpageload` 를 단일 try/catch + `$c.exception.handleError` 로 감싼다(오류 처리 절·규칙 26 정합). 정답지: `cm/conversion/jsp-front/jsp_소스전환/jldfil25900.xml`.
+
+## 서브미션 — async/await 순차 실행 우선
+
+통신 코드는 **콜백(submitDoneHandler) 대신 async/await 순차 스타일을 우선**한다.
+
+```javascript
+scwin.searchList = async function () {
+    const sbmOptions = {
+        id : "sbm_selectList",
+        action : "/api/x/select-list",
+        ref : "dma_req",
+        target : "dlt_list=body",
+        isProcessMsg : false
+        // submitDoneHandler 는 넣지 않는다 — 넘기면 executeDynamic 의 Promise 가 settle 되지 않음
+    };
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // 응답 후처리 (sbmRtn = 응답 resObj — responseJSON 등)
+    scwin.sbm_selectList_submitdone(sbmRtn); // 후처리가 크면 4구역 콜백 함수로 분리해 호출
+};
+```
+
+- **배치**: `$c.sbm.executeDynamic` 을 호출하는 통신 실행 함수는 **4구역(서브미션 콜백 영역)** 에 배치한다(2026-09-01 확정).
+  `ev:on*` 에 연결된 이벤트 핸들러가 직접 호출하는 경우는 예외 — 3구역을 우선한다.
+- **원리**: `$c.sbm.executeDynamic` 은 `submitDoneHandler` 가 **비어 있을 때만** Promise 가 응답(resObj)으로 resolve 된다
+  (오류 시 reject — 필요하면 try-catch). 옵션에 핸들러를 넘기면 Promise 는 pending 으로 남는 콜백 전용 모드다.
+- `await` 를 쓰는 함수는 `async function` 으로 선언한다(변환 도구가 자동 부여). **async 로 바뀐 함수를 호출하는 쪽**에서
+  순차 보장이 필요하면 `await` 를 전파한다(단계 2 검토 항목).
+- **콜백 스타일 유지 예외**: `submitErrorHandler` 기반 오류 흐름, 의도적 비동기(응답을 기다리지 않는 발사 후 망각),
+  기존 변환분(소급 없음)은 콜백 스타일을 유지해도 된다. gridview 스피너·메시지 등 gcc 부가 기능은 훅 기반이라 두 스타일 모두 동작.
+
+## 오류 처리 — 진입점 try/catch + `$c.exception.handleError`
+
+예외는 **사용자 액션 진입점(3구역 이벤트 핸들러·`onpageload`)에서만** try/catch 로 받고, catch 는 공통 처리기 한 줄로 통일한다.
+내부 업무 함수(4·5구역)는 예외를 삼키지 말고 위로 전파한다 — **자체 try/catch·빈 catch 금지**.
+
+```javascript
+scwin.btn_save_onclick = async function (e) {
+    try {
+        await scwin.save();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDXXX00100.save" });
+    }
+};
+```
+
+- **handleError 분류 규약** (이미 처리된 예외는 조용히 지나가므로 이중 알림이 없다):
+  - `ex.skipped === true` (sbm 중복 제출 skip/abort) → 완전 무시
+  - `ex.errorType` 보유 (sbm 이 이미 사용자에게 알린 통신 오류) → 콘솔 로그·수집만
+  - `ex.bizMessage` 보유 (업무 예외) → 해당 문구로 alert
+  - 그 외 시스템 예외 → 기본 문구("처리 중 오류가 발생했습니다.")로 error 알림
+- **업무 중단 예외**는 `throw { bizMessage : "재고가 부족합니다." };` 표준 형태로 던진다(문구는 공통 메시지 ID 가능).
+  단순 검증 실패는 예외가 아니라 `return false`/조기 return 으로 처리한다.
+- 옵션: `message`(문구/메시지 ID) · `notify`("error" 기본 | "alert" | "toast" | "none") · `context`("화면ID.함수명" 권장) ·
+  `rethrow`(상위 흐름 중단) · `callback`(알림 닫힘 후 콜백 함수명).
+- **금지**: 빈 catch, catch 에서 원시 `alert()`·`console.log` 만 남기고 종료, 통신 오류 재-alert(sbm 이 이미 알림).
+- 변환 도구가 자동 적용한다(convert.py **규칙 26** — 규칙 4 섹션 기준 2·3구역 진입점 래핑, 본문에 `try` 가 이미 있으면 보존·멱등).
+- 오류 수집: `handleError` 가 내부 훅(`_reportError`)을 호출한다 — 수집 로직(표준 페이로드·중복 억제·화면당 상한·sendBeacon 전송)은 구현돼 있고,
+  `exception.xml` 의 `ERROR_REPORT_INFO.URL` 이 비어 있는 동안 비활성이다. 수집 API 신설 시 **URL 한 곳만 지정**하면 전 화면에 적용된다.
+- 상세 사용법·sbm 관계·배포 설정(config.xml 등록): [exception-handling-guide.md](../exception-handling-guide.md)
+
+## 검증 — 나열 검증 대신 공통함수 통합
+
+개별 "빈값 체크 → alert → focus → return false" 나열 패턴은 쓰지 않고 **`$c.validate` 공통함수로 통합**한다.
+
+```javascript
+// 폼/그리드 입력 검증 — 규칙 선언형 통합 (규칙 24)
+if (!(await $c.validate.validateDataCollect(grp_form, { fields : { ... } }))) return;
+
+// DataMap 값(서버 체크 플래그 등) 검사 나열 — 규칙 배열로 통합
+const code = await $c.validate.validateDataMap(dma_svrCheck, [ /* rules */ ]);
+if (code !== 0) return;
+```
+
+- **입력 검증**: `validateDataCollect` — required/format/길이(byte)/compare/조건부(`emptyIf`/`requiredIf`)/중복(`duplicate`)/
+  `checked`/`composition` 등 규칙 선언으로 통합(규칙 24 — 단계 2 판단 작업). 복합 조건은 `options.fields` 를 동적 구성한다.
+- **DataMap 플래그 검사**: "키 값이 일치하면 alert/confirm 후 중단 code 반환" 나열은 `validateDataMap` 규칙 배열로 통합
+  (alert 형은 즉시 중단, confirm 형은 취소 시만 중단, 모두 통과 시 0).
+- 단순 검증 실패는 예외가 아니라 조기 `return` 으로 처리한다(오류 처리 절 참조).
+- 규칙 생성 보조 도구: [validate-generator](../validate-generator/README.md) — 화면 XML 분석으로 options 스니펫 생성.
+
+## 버튼 상태 일괄 제어
+
+화면 상태(조회/입력/수정 등)에 따른 버튼 활성/비활성을 개별 `setDisabled` 나열로 흩뿌리지 않고
+**`$c.util.setButtonState(groupId, status, btnMap, opt)` 선언 모델**로 제어한다(표준 상태 6종 + `registerButtonState` 확장).
+사용법: [button-state-guide.md](../button-state-guide.md)
+
+## 팝업 호출 — 타입별 데이터 수신 방식
+
+`$c.win.openPopup` 으로 팝업을 열고 호출원 화면으로 데이터를 리턴받을 때는 **`options.type` 별 수신 방식**을 준수한다. (2026-09-01 확정)
+
+```javascript
+// pageFramePopup — async/await 로 리턴값을 동기 수신
+const resultData = await $c.win.openPopup("/ui/samplePopup.xml", { type : "pageFramePopup", ... }, data);
+
+// browserPopup — options.callbackFn 콜백으로 비동기 수신 (await 미사용)
+$c.win.openPopup("/ui/samplePopup.xml", { type : "browserPopup", callbackFn : "scwin.popupCallback", ... });
+scwin.popupCallback = function (resultData) { /* 리턴 데이터 처리 */ };
+```
+
+- `data`(3번째 인자) 페이로드 전달은 **pageFramePopup 전용** — browserPopup 은 콜백/부모 접근 공통함수(`getOpenerScope`/`callOpener`)로 대체한다.
+- 변환 도구가 자동 적용한다(convert.py **규칙 17** — 팝업 타입별 수신 형태로 산출, [createdialogframe_popup_guide.md](../../conversion/md/createdialogframe_popup_guide.md) §1b).
+
+## 반복문 내 Map/List 데이터 수정 시 UI 갱신 제어
+
+반복문(for/while/forEach) 안에서 dataMap/dataList 를 반복 변경하면 매 변경마다 UI 갱신이 발생해 성능 저하·화면 깜빡임이 생긴다.
+**반복 시작 전 `{DC}.setBroadcast(false);` 로 갱신을 중단하고, 종료 후 `{DC}.setBroadcast(true, true);` 로 누적 변경을 일괄 반영**한다. (2026-09-01 확정)
+
+```javascript
+dlt_list.setBroadcast(false);                 // 1. 반복 시작 전: UI 갱신 중단
+dlt_list.forEach(function (item) {
+    item.set("status", "processed");          // 2. 데이터 반복 수정
+});
+dlt_list.setBroadcast(true, true);            // 3. 반복 종료 후: 일괄 갱신 반영
+```
+
+- 루프 본문에서 조기 이탈(`return`/`throw`)할 수 있으면 복원 누락으로 화면이 갱신되지 않으므로 try/finally 등으로 복원을 보장한다.
+- 변환 도구가 자동 적용한다(convert.py **규칙 28** — 본문 `return`/`throw` 시 보류·리포트, 멱등).
+
+## 이벤트-로직 분리 (Thin Event, 권장)
+
+컴포넌트 이벤트 핸들러(3구역)에는 파라미터 수집과 일반 함수 호출만 두고, 비즈니스 로직은 5구역 함수로 분리한다.
+
+```javascript
+scwin.btn_search_onclick = function () {
+    scwin.searchList(dma_req.getJSON());
+};
+```
+
+- 자동 변환(결정적 치환) 대상이 아니다 — **신규 작성·대규모 수정 화면에 적용**하고, 기존 핸들러의 로직 추출은
+  동작 변경 위험이 있어 리뷰 판단으로만 수행한다.
+
+## 도구 연동 (convert.py)
+
+| 규칙 | 담당 |
+|------|------|
+| 규칙 1 | `vScrenID` 관련 코드(선언·대입·참조) **삭제** — 미사용 (2026-09-02 변경, 종전 "1구역 이동") |
+| 규칙 2 | 리터럴 전역을 1구역으로 모으고 헤더 삽입 |
+| 규칙 4 | 함수를 2~5구역으로 분류·재배치, 슬래시 섹션 헤더 삽입, 구(舊) 형식(한 줄 주석·3줄 블록 헤더) 마이그레이션 (멱등) |
+| 규칙 5a·5e | `==`/`!=` → `===`/`!==` 엄격화, `!X === Y` → `X !== Y` 우선순위 버그 교정 |
+| 규칙 8 | `var` → `const`/`let` (재할당 분석 — 단일 할당 const, 재할당 let) |
+| 규칙 6·12·16 | 서브미션을 await 순차 스타일로 생성(핸들러 정의 존재 시 직접 호출 연결, 부재 시 `// TODO Stage2`) |
+| async 부여 | await 포함 함수에 `async` 자동 삽입 + 호출부 await 전파 검토 리포트 |
+
+상세: [conversion_rules.md](../../conversion/md/conversion_rules.md) §규칙 4·6, [conversion_pipeline.md](../../conversion/md/conversion_pipeline.md)
