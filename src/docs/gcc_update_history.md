@@ -277,7 +277,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 ## 2026년 9월
 
 ### 공동인증서 공통 신설·DOM 로더·웹스토리지 보강 (09-15)
-- (미커밋) (09-15) — **`cert.xml`(`$c.cert`) 신설 + `$c.util` DOM 로더 3종** (292→301 메서드, 12→13 모듈):
+- `bcd1d06` (09-15) — **`cert.xml`(`$c.cert`) 신설 + `$c.util` DOM 로더 3종** (292→301 메서드, 12→13 모듈):
   - 출발점: 정적 HTML 샘플(`resources/sample/initech-cert-sample2.html`)을 가이드 화면 `SMPCRT10000`으로 전환한 뒤, 화면 함수 25개 중 9개를 gcc 로 분리(사용자 지시: `ext.xml` 이 아닌 별도 파일)
   - `$c.cert`(6 공개 + 내부 `__findKeypadConf`): `isReady`·`loadModule(opt)`(벤더 준비 확인 → 키패드 style 주입 → `initModule`; **동적 스크립트 로드 없음** — crosswebex6.js 가 로드 즉시 `document.write` 로 하위 스크립트를 끌어와 문서 로드 후 주입 시 페이지가 지워지므로, 벤더 4종+CSS 는 config.xml/config.js `<engine><module>`·stylesheet earlyImportList 에 정적 등록. jQuery 는 셸 전역(gcc win/data 도 의존)을 그대로 사용, jQuery 4 미등록)·`initModule({ onStatus })`(유일한 모듈 초기화 지점 — `resources/js/common/initech-common.js` 의 `window.onload` 초기화 블록·토스트·`initechLoad` 제거, PC 만)·`applyKeypadStyle`·`setTranskeyUse(use)`(cwui_conf TRANS_KEY USE)·`auth(url, callback, { params, useTranskey, popupOptions })`(미로드 시 loadModule 후 벤더 `fnInitechAuthWithParams` 호출). **콜백을 Promise 로 감싸지 않음** — 벤더가 실패·취소 시 콜백을 부르지 않아 영구 pending(submitDoneHandler 함정과 동일)
   - `$c.util`: `loadScript(src)`(Promise, 동일 src 재삽입 방지, 실패 reject)·`loadCss(href)`·`addStyle(id, cssText)`(멱등 style 주입) 신설(범용 — document.write 를 쓰지 않는 스크립트용, cert 는 addStyle 만 사용); 웹스토리지 8종이 `window.localStorage` 접근 자체의 SecurityError(프라이빗 모드·사이트 데이터 차단)를 흡수하도록 내부 `__getWebStorageObject(name)` 도입, `__getWebStorage` 의 getItem 예외 처리 추가
@@ -374,7 +374,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
-| 2026-09-15 | (미커밋) | feat(gcc): cert.xml($c.cert) 공동인증서 연동 공통 신설 + util loadScript/loadCss/addStyle·웹스토리지 접근 예외 흡수 (292→301 메서드) |
+| 2026-09-15 | `bcd1d06` | feat(gcc): cert.xml($c.cert) 공동인증서 연동 공통 신설 + util loadScript/loadCss/addStyle·웹스토리지 접근 예외 흡수 (292→301 메서드) |
 | 2026-09-10 | `9b9a5ef` | feat(gcc): $c.data.setBroadcast 공통함수 신설 + SMPDLT10000 전역 setBroadcast 호출 교체 (318→319 메서드) |
 | 2026-09-10 | `be4ecc3` | refactor(udc): bulkFileSaver saveMapForm 파일 인덱스를 dmaFileIndex dataMap 단일 파트로 전달 — [연관, gcc 무변경] |
 | 2026-09-10 | `064a753` | fix(gcc): sbm options 방어 초기화·validate REQUIRED 목적격 조사·session 디버그 로그 제거 |
