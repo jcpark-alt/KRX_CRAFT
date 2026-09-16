@@ -15,8 +15,8 @@ module.exports = [
   {
     // cm/conversion/sample-front: 샘플 갤러리에 동봉된 벤더 배포본(sbchart.js 압축본 등) — lint 대상 아님
     // websquare/**: 엔진 번들(websquare/engine)과 배포 환경 WebSquare 설정 참조본(config.js 는 ES 모듈, 훅 이름 SOT 용도) — lint 대상 아님
-    // cm/cert/**: 백엔드 정적 폴더(/cm/cert/**) 사본 — 이니텍·라온 벤더 JS, jQuery, 부트스트랩, 정적 HTML 샘플. lint 대상 아님
-    ignores: ["node_modules/**", "coverage/**", "tools/wsxml_lint/**", "cm/cert/**", "websquare/**", "cm/conversion/sample-front/**"],
+    // resources/**: 백엔드 정적 폴더(/resources/**) 사본 — 이니텍·라온 벤더 JS, jQuery, 부트스트랩, 정적 HTML 샘플. lint 대상 아님
+    ignores: ["node_modules/**", "coverage/**", "tools/wsxml_lint/**", "resources/**", "websquare/**", "cm/conversion/sample-front/**"],
   },
   {
     files: ["**/*.js"],

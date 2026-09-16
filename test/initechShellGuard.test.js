@@ -1,5 +1,5 @@
 /**
- * cm/cert/js/common/initech-shell-guard.js 회귀 테스트 (전역 Promise 보호 + document.write 캡처·자동 재생).
+ * resources/js/common/initech-shell-guard.js 회귀 테스트 (전역 Promise 보호 + document.write 캡처·자동 재생).
  *
  * 재현 시나리오(2026-09-16 실환경):
  *  - crosswebex6.js 가 끌어오는 bluebird-3.5.0 이 window.Promise 를 덮어써 엔진의 Promise.allSettled 가 TypeError.
@@ -11,8 +11,8 @@
 const fs = require("fs");
 const vm = require("vm");
 
-const GUARD = "cm/cert/js/common/initech-shell-guard.js";
-const BLUEBIRD = "cm/cert/vendor/SW/initech/extension/common/js/bluebird-3.5.0.min.js";
+const GUARD = "resources/js/common/initech-shell-guard.js";
+const BLUEBIRD = "resources/vendor/SW/initech/extension/common/js/bluebird-3.5.0.min.js";
 
 // 가짜 브라우저: window === globalThis, document.write 원본, head.appendChild 가 인라인 script 를 즉시 실행, 동기 XHR 은 files 맵 응답
 function makeBrowser(files) {

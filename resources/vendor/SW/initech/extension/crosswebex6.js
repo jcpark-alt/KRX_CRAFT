@@ -7,8 +7,8 @@
 /************************************************************
  * @brief		기반 경로 설정
  ************************************************************/
-var crosswebexBaseDir = "/cm/cert/vendor/SW/initech/extension";
-var INI_html5BasePath = "/cm/cert/vendor/SW/initech/webui";
+var crosswebexBaseDir = "/resources/vendor/SW/initech/extension";
+var INI_html5BasePath = "/resources/vendor/SW/initech/webui";
 var inihubPagePath = "";
 
 var IniSafeCrossWebEx = {};
@@ -621,17 +621,17 @@ var GINI_DYNAMIC_LOAD = (function () {
 				var loadTransKey = function () {
 					/*
 					return new Promise(function (loadTransKeyResolve, loadTransKeyReject) {
-						jsloaderWithPromise("/cm/cert/vendor/transkey/rsa_oaep_files/rsa_oaep-min.js" + dummyTime, "utf-8")
+						jsloaderWithPromise("/resources/vendor/transkey/rsa_oaep_files/rsa_oaep-min.js" + dummyTime, "utf-8")
 							.then(function () {
-								return jsloaderWithPromise("/cm/cert/vendor/transkey/jsbn/jsbn-min.js" + dummyTime, "utf-8");
+								return jsloaderWithPromise("/resources/vendor/transkey/jsbn/jsbn-min.js" + dummyTime, "utf-8");
 							}).then(function () {
-								return jsloaderWithPromise("/cm/cert/vendor/transkey/TranskeyLibPack_op.js" + dummyTime, "utf-8");
+								return jsloaderWithPromise("/resources/vendor/transkey/TranskeyLibPack_op.js" + dummyTime, "utf-8");
 							}).then(function () {
 								return jsloaderWithPromise("/api/discls/vendor/raon/transkey-servlet?op=getToken&" + new Date().getTime(), "utf-8");
 							}).then(function () {
-								return jsloaderWithPromise("/cm/cert/vendor/transkey/transkey.js" + dummyTime, "utf-8");
+								return jsloaderWithPromise("/resources/vendor/transkey/transkey.js" + dummyTime, "utf-8");
 							}).then(function () {
-								return cssloaderWithPromise("/cm/cert/vendor/transkey/transkey.css", "utf-8");
+								return cssloaderWithPromise("/resources/vendor/transkey/transkey.css", "utf-8");
 							}).then(function () {
 								loadTransKeyResolve();
 							});
@@ -1051,8 +1051,8 @@ if (!isInihubOndemand || inihubVersion === "V1") {
 /************************************************************
  * @brief		CrossWeb EX 클라이언트 변수
  ************************************************************/
-var importURL = window.location.protocol + "//" + window.location.host + inihubPagePath + "/cm/cert/vendor/SW/initech/webui/certRelay/GetCertificate_v12.jsp";
-var exportURL = window.location.protocol + "//" + window.location.host + inihubPagePath +"/cm/cert/vendor/SW/initech/webui/certRelay/GetCertificate_v12.jsp";
+var importURL = window.location.protocol + "//" + window.location.host + inihubPagePath + "/resources/vendor/SW/initech/webui/certRelay/GetCertificate_v12.jsp";
+var exportURL = window.location.protocol + "//" + window.location.host + inihubPagePath +"/resources/vendor/SW/initech/webui/certRelay/GetCertificate_v12.jsp";
 
 var importV13URL = window.location.protocol + "//" + window.location.host + "/CertRelay/GetCertificate_v13.jsp";
 var exportV13URL = window.location.protocol + "//" + window.location.host + "/CertRelay/GetCertificate_v13.jsp";

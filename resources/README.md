@@ -1,7 +1,8 @@
-# cm/cert — 공동인증서(이니텍 INISAFE Sign) · 라온 가상키보드(TransKey) 정적 리소스
+# resources — 공동인증서(이니텍 INISAFE Sign) · 라온 가상키보드(TransKey) 정적 리소스
 
-백엔드 정적 폴더(`src/main/resources/static/resources`)의 사본이다. 저장소 폴더와 배포 URL이 1:1 이 되도록
-2026-09-16 에 루트 `resources/` 에서 `cm/cert/` 로 옮기고, 배포 URL 도 `/resources/**` 에서 **`/cm/cert/**`** 로 통일했다.
+백엔드 정적 폴더(`src/main/resources/static/resources`)의 사본이며 배포 URL 은 **`/resources/**`** 다. 폴더명·URL 은 원본과 같다.
+(2026-09-16 에 `cm/cert/` + `/cm/cert/**` 로 옮겨 봤으나, 벤더가 파일 안에 기준 경로를 하드코딩해 업그레이드마다 76건을 재적용해야 하는 비용이 커서
+같은 날 되돌렸다. 벤더 파일은 경로 면에서 원본 그대로이고, 저장소 폴더와 배포 URL 의 1:1 원칙은 우리 파일(`cm/**`)에만 적용한다.)
 WebSquare 화면에서는 이 폴더의 스크립트를 직접 쓰지 않고 gcc 공통 **`$c.cert`**(`cm/gcc/cert.xml`)를 통해 호출한다.
 
 > 여기서 고친 파일은 백엔드 정적 폴더에 복사해야 배포에 반영된다. 벤더 패키지를 업그레이드하면 §5 의 `[KRX 수정]` 목록을 재적용한다.
@@ -27,7 +28,7 @@ initech-shell-guard.js          ← 벤더 그룹 맨 앞에 1회
 transkey_config.js → transkey.js
 crosswebex6.js?dt=…
 initech-common.js
-(stylesheet earlyImportList: /cm/cert/vendor/transkey/transkey.css)
+(stylesheet earlyImportList: /resources/vendor/transkey/transkey.css)
 ```
 
 이 순서는 아래 §4 의 세 가지 함정을 피하기 위한 것이며 **바꾸면 안 된다.** 벤더 스크립트는 셸에서 한 번만 정적으로 로드하고, 화면(`$c.cert`)은 동적 로드를 하지 않는다 — `crosswebex6.js` 가 로드 즉시 `document.write` 로 하위 스크립트를 끌어오기 때문에 화면에서 동적 주입하면 하위 파일이 빠진다.
@@ -59,9 +60,6 @@ initech-common.js
 |---|---|
 | `js/common/initech-common.js` | `window.onload` 초기화 블록·토스트·`initechLoad` 제거 — 매 페이지 로드마다 토스트가 뜨고 다른 onload 핸들러를 덮어쓰던 문제. 초기화는 `$c.cert.initModule` 이 유일한 지점 |
 | `vendor/SW/initech/webui/crossd_iframe.html` | §4.2 메시지 가드 |
-| `vendor/SW/initech/extension/crosswebex6.js` | 기준 경로 `crosswebexBaseDir`·`INI_html5BasePath` 를 `/cm/cert/…` 로 |
-| `vendor/transkey/transkey_config.js` | `transkey_url` 을 `/cm/cert/vendor/transkey` 로 |
-| `vendor/SW/initech/webui/conf/customerConf.json`(JSONC), `webui/manifest.json`, `extension/install/install.html` | 경로 접두 `/resources/` → `/cm/cert/` |
 | `sample/initech-cert-sample2.html` | 등록 API 주석 정합(업무 API `/info/cert/insert`)·콜백 담당자 필드·오타·전화번호/이메일 형식 검증 |
 
 정적 HTML 샘플 2종은 onload 블록 제거로 자동 초기화를 잃었다. 계속 쓰려면 ready 핸들러에서 `cwModuleInstallWaitWithNoPopup` 을 직접 한 번 호출한다.
@@ -83,7 +81,7 @@ await $c.cert.auth(url, callback, { params : dma_chrgInfo.getJSON(), useTranskey
 
 개발자 도구 Network 탭에 `127.0.0.1:4441~4445` 로 가는 요청이 여러 건 보이고 일부가 `ERR_CONNECTION_REFUSED` 로 찍히는 것은
 이니텍 CrossWeb EX 가 **PC 에 설치된 로컬 에이전트(데몬)를 찾는 정상 동작**이다. 서버 API 가 아니라 브라우저에서 사용자 PC 로 직접
-보내는 요청이므로 WebtoB·백엔드 라우팅과 무관하고, `/cm/cert/**` 경로 변경의 영향도 받지 않는다.
+보내는 요청이므로 WebtoB·백엔드 라우팅과 무관하고, `/resources/**` 경로 변경의 영향도 받지 않는다.
 코드: `vendor/SW/initech/extension/common/js/exproto_ext_daemon.js` 의 `dmPortCheckStart`(472~479행 부근).
 
 | 채널 | URL | 비고 |
@@ -109,16 +107,16 @@ await $c.cert.auth(url, callback, { params : dma_chrgInfo.getJSON(), useTranskey
 
 ## 7. 배포 체크리스트
 
-1. 백엔드가 `cm/cert` 폴더를 **`/cm/cert/**`** 로 서비스하도록 정적 매핑을 바꾼다(옛 `/resources/**` 그대로면 404).
+1. 백엔드 정적 매핑은 원본 그대로 `/resources/**` 다(변경 불필요).
 2. `js/common/*.js`, `crossd_iframe.html` 등 §5 의 수정 파일을 백엔드 정적 폴더에 복사한다.
 3. 셸에서 확인: 메인 레이아웃 진입 시 콘솔 오류 없음 → `typeof Promise.allSettled === "function"`, `window.__replacedPromise.version === "3.5.0"`, `window.__initechDocWrite.failed.length === 0` → 인증서 팝업 열림·설치 상태 확인 → 전자서명 후 2xx 콜백 수신.
-4. 인증서 관련 배포 경로 20건(`customerConf.json` 의 다운로드·승인 페이지)이 함께 바뀌었으므로 설치 안내 페이지도 열리는지 확인한다.
+4. 설치 안내 페이지(`extension/install/install.html`)도 열리는지 확인한다.
 
 ## 8. 검증 명령
 
 ```
 npm test                      # Jest — initechShellGuard·cert 회귀 포함
-npm run lint                  # ESLint — cm/cert/** 는 ignore(벤더 번들), jest coverage 도 !cm/cert/**
+npm run lint                  # ESLint — resources/** 는 ignore(벤더 번들), jest coverage 도 !resources/**
 npm run lint:xml              # WebSquare XML lint (gcc 13 files 0/0 · legacy 227 files 0/0)
 ```
 
@@ -127,9 +125,10 @@ npm run lint:xml              # WebSquare XML lint (gcc 13 files 0/0 · legacy 2
 | 일자 | 커밋 | 내용 |
 |---|---|---|
 | 2026-09-15 | `bcd1d06` | `cm/gcc/cert.xml`(`$c.cert`) 신설, SMPCRT10000 가이드 샘플, `$c.util` DOM 로더·웹스토리지 보강 |
-| 2026-09-16 | `ccc7cc8` | `resources/` → `cm/cert/` 반입, `initech-common.js` onload 블록 제거, 샘플2 수정 4건 |
-| 2026-09-16 | `5166689` | 배포 경로 `/resources/**` → `/cm/cert/**` 통일(14파일 76건) |
+| 2026-09-16 | `ccc7cc8` | 루트 `resources/` 를 `cm/cert/` 로 반입, `initech-common.js` onload 블록 제거, 샘플2 수정 4건 |
+| 2026-09-16 | `5166689` | 배포 경로 `/resources/**` → `/cm/cert/**` 통일(14파일 76건) — 이후 되돌림 |
 | 2026-09-16 | `6c8a807` | `promise-guard.js` — bluebird 전역 Promise 덮어쓰기 차단 (§4.1, 이후 shell-guard 로 병합) |
 | 2026-09-16 | `6eba4b8` | `crossd_iframe.html` 메시지 가드 (§4.2) |
 | 2026-09-16 | `45abc9d` | `initech-docwrite-capture/replay.js` — 벤더 document.write 캡처·동기 재생 (§4.3, 이후 shell-guard 로 병합) |
 | 2026-09-16 | `8a4d452` | 위 3파일을 `initech-shell-guard.js` 1파일로 병합(재생을 스크립트 종료 직후 마이크로태스크로 자동화), 테스트 통합 |
+| 2026-09-16 | (미커밋) | 폴더를 루트 `resources/` 로, 배포 URL 을 `/resources/**` 로 원복 — 벤더 파일 경로 수정 76건 제거(업그레이드 시 재적용 불필요) |
