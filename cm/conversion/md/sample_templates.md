@@ -27,7 +27,7 @@
 | `SMPBTN10000.xml` | 버튼 상태 일괄 제어 (setButtonState) | (합성 가이드 — 원본 없음) | `/ui/sample/template/SMPBTN10000.xml` |
 | `SMPCRT10000.xml` | 이니텍 공동인증서 연동 (INISAFE Sign + 라온 TransKey) | `resources/sample/initech-cert-sample2.html` (정적 HTML 샘플) | `/ui/sample/template/SMPCRT10000.xml` |
 | `SMPIFR10000.xml` | iframe 팝업 호출 + 결과 수신 | (합성 가이드 — 원본 없음) | `/ui/sample/template/SMPIFR10000.xml` |
-| `SMPIFR10001.xml` | iframe 내부 페이지에서 닫는 팝업 (postMessage 수신) | (합성 가이드 — iframe 페이지 `resources/sample/iframe-popup-close-sample.html`) | `/ui/sample/template/SMPIFR10001.xml` |
+| `SMPIFR10001.xml` | iframe 내부 페이지에서 닫는 팝업 (postMessage 수신) | (합성 가이드 — iframe 페이지 `sample-front/ui/iframe-popup-close-sample.html`, 배포 `/ui/sample/template/`) | `/ui/sample/template/SMPIFR10001.xml` |
 
 > 소스↔원본은 파일 head(`meta_screenName`의 "원본 …" 표기) 기준 **1:1 매핑**이다.
 > `ULDSTF30702`만 배포 파일명이 `ULDSTF30710.xml`로 다르므로 배포 시 주의한다.
