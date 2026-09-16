@@ -991,11 +991,14 @@ scwin._checkDateFormat = function (value, dateFormat) {
  * @description 시작일·종료일 inputCalendar 컴포넌트의 기간 유효성을 검증하고 위반 시 안내 후 날짜를 동기화한다.
  * 시작일 변경(onviewchange) 시 시작일 > 종료일이면 안내 후 시작일을 종료일로 원복한다.
  * 종료일 변경(onviewchange) 시 종료일 < 시작일이면 안내 후 종료일을 시작일로 원복한다.
- * dateFormat 을 지정하면 변경된 값이 해당 포맷·실존 날짜인지 먼저 검증하고, 불일치 시 안내 후 기간 비교를 건너뛴다.
+ * dateFormat 을 지정하면 변경된 값이 해당 포맷·실존 날짜인지 먼저 검증하고, 불일치 시 안내 후 기본으로 값을 빈값으로 초기화하며 기간 비교를 건너뛴다.
  * @param {Object} calStartDate 시작일 inputCalendar 컴포넌트 객체
  * @param {Object} calEndDate 종료일 inputCalendar 컴포넌트 객체
  * @param {Array} msgOptions 메시지 치환 명칭 배열 [시작일 명칭, 종료일 명칭] (기본값 ["검색시작일", "검색종료일"])
  * @param {String} dateFormat 날짜 포맷 검증값 (예: "yyyyMMdd", "yyyy-MM-dd"). 생략 시 포맷 검증 미수행.
+ * @param {Object} options (선택) 동작 옵션
+ * @param {Boolean} options.clearOnInvalid [default : true] dateFormat 검증 실패 시 안내 후 해당 컴포넌트 값을 빈값(setValue(""))으로 초기화한다.
+ *                  false 면 잘못된 값을 그대로 두고 포커스만 준다(종전 동작).
  * @returns {void}
  * @hidden N
  * @exception
@@ -1004,10 +1007,14 @@ scwin._checkDateFormat = function (value, dateFormat) {
 $c.date.compareFromToDate(cal_start1, cal_end1);
 // 사용자 정의 명칭 지정
 $c.date.compareFromToDate(cal_start2, cal_end2, ["조회 시작일자", "조회 종료일자"]);
-// 날짜 포맷 검증 추가
+// 날짜 포맷 검증 추가 — 잘못 입력하면 안내 후 빈값으로 초기화
 $c.date.compareFromToDate(cal_start3, cal_end3, ["조회 시작일자", "조회 종료일자"], "yyyy-MM-dd");
+// 잘못된 값을 남겨 두고 안내·포커스만
+$c.date.compareFromToDate(cal_start4, cal_end4, ["조회 시작일자", "조회 종료일자"], "yyyy-MM-dd", { clearOnInvalid : false });
  */
-scwin.compareFromToDate = function (calStartDate, calEndDate, msgOptions, dateFormat) {
+scwin.compareFromToDate = function (calStartDate, calEndDate, msgOptions, dateFormat, options) {
+    const opts = Object.assign({ clearOnInvalid : true }, options || {});
+
     if ($c.util.isEmpty(calStartDate) || $c.util.isEmpty(calEndDate)) {
         console.error("[compareFromToDate] 필수 인자(calStartDate, calEndDate)가 누락되었습니다.");
         return;
@@ -1024,13 +1031,20 @@ scwin.compareFromToDate = function (calStartDate, calEndDate, msgOptions, dateFo
         return label + ($c.str.isFinalConsonant(String(label)) ? "을" : "를");
     };
 
-    // dateFormat 지정 시 : 값이 포맷·실존 날짜가 아니면 안내하고 true 반환(비교 건너뜀 신호).
-    const isFormatInvalid = async function (value) {
+    // dateFormat 지정 시 : 값이 포맷·실존 날짜가 아니면 안내하고(기본으로 빈값 초기화) true 반환(비교 건너뜀 신호).
+    // 빈값은 형식 오류로 보지 않으므로 초기화로 이벤트가 재진입해도 안내가 반복되지 않는다.
+    const isFormatInvalid = async function (comp) {
+        const value = comp.getValue();
         if ($c.util.isEmpty(dateFormat) || $c.util.isEmpty(value)) {
             return false;
         }
         if (!scwin._checkDateFormat(value, dateFormat)) {
             await $c.win.alert(dateFormat + " 형식의 올바른 날짜를 입력하세요.");
+            if (opts.clearOnInvalid) {
+                comp.setUserData("onkeyup", false);
+                comp.setValue("");
+                comp.setUserData("onkeyup", true);
+            }
             return true;
         }
         return false;
@@ -1041,8 +1055,8 @@ scwin.compareFromToDate = function (calStartDate, calEndDate, msgOptions, dateFo
     calStartDate.bind("onviewchange", async function (info) {
         const startVal = calStartDate.getValue();
         const endVal = calEndDate.getValue();
-		if (await isFormatInvalid(startVal)) {
-			calStartDate.focus();
+        if (await isFormatInvalid(calStartDate)) {
+            calStartDate.focus();
             return;
         }
         if (!$c.util.isEmpty(startVal) && !$c.util.isEmpty(endVal) && startVal > endVal) {
@@ -1059,10 +1073,10 @@ scwin.compareFromToDate = function (calStartDate, calEndDate, msgOptions, dateFo
     calEndDate.bind("onviewchange", async function (info) {
         const startVal = calStartDate.getValue();
         const endVal = calEndDate.getValue();
-        if (await isFormatInvalid(endVal)) {
-			calEndDate.focus();
+        if (await isFormatInvalid(calEndDate)) {
+            calEndDate.focus();
             return;
-        }		
+        }
         if (!$c.util.isEmpty(startVal) && !$c.util.isEmpty(endVal) && endVal < startVal) {
 			calEndDate.setUserData("onkeyup", false);
             await $c.win.alert(withJosa(endLabel) + " " + startLabel + " 이후로 선택하세요.");
@@ -1080,14 +1094,20 @@ scwin.compareFromToDate = function (calStartDate, calEndDate, msgOptions, dateFo
  * @param {Object|String} calendarObj inputCalendar 컴포넌트 객체 또는 컴포넌트 ID
  * @param {String} dateFormat 검증할 날짜 포맷 (예: "yyyyMMdd", "yyyy-MM-dd", "yyyy/MM/dd", "yyyy.MM.dd")
  * @param {String} objName 메시지 출력 용 명칭
- * @returns {Boolean} 포맷·유효성 만족 여부 (true: 정상, false: 오류)
+ * @param {Object} options (선택) 동작 옵션
+ * @param {Boolean} options.clearOnInvalid [default : true] 입력값 변경(onviewchange) 시 포맷 검증에 실패하면 안내 후 값을 빈값(setValue(""))으로 초기화한다.
+ *                  false 면 잘못된 값을 그대로 둔다(종전 동작).
+ * @returns {Boolean} 포맷·유효성 만족 여부 (true: 정상, false: 오류) — 호출 시점의 현재 값 기준
  * @hidden N
  * @exception
  * @example
-$c.date.checkCalendarFormat(ica_startDate, "yyyy-MM-dd"); // 컴포넌트 객체 전달
+$c.date.checkCalendarFormat(ica_startDate, "yyyy-MM-dd"); // 컴포넌트 객체 전달 — 잘못 입력하면 안내 후 빈값으로 초기화
 $c.date.checkCalendarFormat("ica_endDate", "yyyyMMdd");   // 컴포넌트 ID 전달
+$c.date.checkCalendarFormat(ica_baseDate, "yyyyMMdd", "기준일자", { clearOnInvalid : false }); // 잘못된 값을 남겨 두고 안내만
  */
-scwin.checkCalendarFormat = function (calendarObj, dateFormat, objName = "") {
+scwin.checkCalendarFormat = function (calendarObj, dateFormat, objName = "", options) {
+    const opts = Object.assign({ clearOnInvalid : true }, options || {});
+
     // 1. 컴포넌트 객체 확보 및 유효성 검사
     const comp = (typeof calendarObj === "string") ? $p.getComponentById(calendarObj) : calendarObj;
     if ($c.util.isEmpty(comp) || typeof comp.getValue !== "function") {
@@ -1104,13 +1124,22 @@ scwin.checkCalendarFormat = function (calendarObj, dateFormat, objName = "") {
         return scwin._checkDateFormat(comp.getValue(), dateFormat);
     };
 
-    // compareFromToDate 와 같이 onviewchange 이벤트에서 검증 실패 시 $c.win.alert 로 안내한다.
+    // compareFromToDate 와 같이 onviewchange 이벤트에서 검증 실패 시 $c.win.alert 로 안내하고, 기본으로 값을 빈값으로 초기화한다.
     comp.unbind("onviewchange");
     comp.bind("onviewchange", function () {
+        // 빈값은 형식 오류로 보지 않는다(필수 여부는 validateDataCollect 등 검증 공통의 몫).
+        // 초기화(setValue(""))로 이벤트가 재진입해도 안내가 반복되지 않게 하는 조건이기도 하다.
+        if ($c.util.isEmpty(String(comp.getValue()).trim())) {
+            return;
+        }
         if (!isValidFormat()) {
-	            // "com_valid_format_0051": "$[0] 형식의 올바른 날짜를 입력하세요.",  "com_valid_format_0052": "$[0]에 올바른 날짜를 입력하세요.",
+            // "com_valid_format_0051": "$[0] 형식의 올바른 날짜를 입력하세요.",  "com_valid_format_0052": "$[0]에 올바른 날짜를 입력하세요.",
             const msg = ($c.util.isEmpty(objName)) ? $c.data.getMessage("com_valid_format_0051", `${dateFormat}`) : $c.data.getMessage("com_valid_format_0052", `${objName}`);
             $c.win.alert(msg);
+
+            if (opts.clearOnInvalid) {
+                comp.setValue("");
+            }
         }
     });
 
