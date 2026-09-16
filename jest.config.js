@@ -7,10 +7,9 @@ module.exports = {
   passWithNoTests: true,
   // Page logic is embedded in .xml CDATA; coverage applies only to pure helpers
   // extracted into .js under the business-module trees.
-  // cm/engine 은 대용량 WebSquare 엔진 번들 — 계측 시 워커가 죽으므로 커버리지 대상에서 제외
-  // (eslint 도 cm/engine/** 를 ignore 한다).
-  // cm/websquare 는 배포 WebSquare 설정 참조본(config.js 는 ES 모듈) — 실행 코드가 아니므로 계측 제외
-  collectCoverageFrom: ["cm/**/*.js", "!cm/engine/**", "!cm/websquare/**"],
+  // websquare/(엔진 번들 websquare/engine + 배포 설정 참조본 config.js/config.xml)는 cm/ 밖이라 커버리지 대상이 아니다
+  // (대용량 엔진 번들은 계측 시 워커가 죽고, config.js 는 ES 모듈 참조본이라 실행 코드가 아니다; eslint 도 websquare/** 를 ignore 한다)
+  collectCoverageFrom: ["cm/**/*.js"],
   coverageReporters: ["text", "lcov"],
   // NOTE: the source repo enforced a global 80% threshold. It is omitted here
   // because no .js sources exist yet (the JS is in XML). Re-add a
