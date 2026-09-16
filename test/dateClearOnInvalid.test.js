@@ -22,14 +22,14 @@ function extractCdata(xmlPath) {
 }
 
 // 가짜 inputCalendar
-function makeCal(id, value) {
+function makeCal(id, value, log) {
   const cal = {
     id, value, handlers: {}, setValueCalls: [], focused: 0, userData: {},
     getValue() { return cal.value; },
-    setValue(v) { cal.setValueCalls.push(v); cal.value = v; },
+    setValue(v) { cal.setValueCalls.push(v); cal.value = v; if (log) log.push("setValue:" + v); },
     bind(ev, fn) { cal.handlers[ev] = fn; },
     unbind(ev) { delete cal.handlers[ev]; },
-    focus() { cal.focused += 1; },
+    focus() { cal.focused += 1; if (log) log.push("focus"); },
     setUserData(k, v) { cal.userData[k] = v; },
     getUserData(k) { return cal.userData[k]; },
     // 사용자 입력 변경 재현
@@ -39,7 +39,7 @@ function makeCal(id, value) {
 }
 
 function loadHarness() {
-  const calls = { alert: [] };
+  const calls = { alert: [], log: [] };
   const comps = {};
   const sandbox = {
     console: { log() {}, warn() {}, error() {} },
@@ -49,7 +49,8 @@ function loadHarness() {
       util: { isEmpty },
       str: { isFinalConsonant: (s) => { const c = s.charCodeAt(s.length - 1); return c >= 0xac00 && c <= 0xd7a3 && (c - 0xac00) % 28 !== 0; } },
       data: { getMessage: (id, arg) => id + ":" + arg },
-      win: { alert: (msg) => { calls.alert.push(msg); return Promise.resolve(); } },
+      // 실제 $c.win.alert 는 안내 창이 닫힐 때 resolve 된다 — 닫힘 시점을 로그에 남겨 순서를 검증한다
+      win: { alert: (msg) => { calls.alert.push(msg); calls.log.push("alert:" + msg); return Promise.resolve().then(() => { calls.log.push("alert-closed"); }); } },
     },
     $p: { getComponentById: (id) => comps[id] },
     window: {},
@@ -61,24 +62,27 @@ function loadHarness() {
 }
 
 describe("checkCalendarFormat — clearOnInvalid", () => {
-  test("기본값: 잘못된 포맷을 입력하면 안내 후 빈값으로 초기화한다", async () => {
+  test("기본값: 잘못된 포맷을 입력하면 안내 창이 닫힌 뒤 빈값으로 초기화하고 포커스를 준다(순서 보장)", async () => {
     const h = loadHarness();
-    const cal = makeCal("cal_a", "");
+    const cal = makeCal("cal_a", "", h.calls.log);
     h.date.checkCalendarFormat(cal, "yyyy-MM-dd", "기준일자");
     await cal.change("2026-13-99");
     expect(h.calls.alert).toEqual(["com_valid_format_0052:기준일자"]);
     expect(cal.setValueCalls).toEqual([""]);
     expect(cal.value).toBe("");
+    expect(cal.focused).toBe(1);
+    expect(h.calls.log).toEqual(["alert:com_valid_format_0052:기준일자", "alert-closed", "setValue:", "focus"]);
   });
 
-  test("clearOnInvalid:false 이면 안내만 하고 값을 남긴다(종전 동작)", async () => {
+  test("clearOnInvalid:false 이면 안내 창을 닫은 뒤 값을 남기고 포커스만 준다(종전 동작)", async () => {
     const h = loadHarness();
-    const cal = makeCal("cal_b", "");
+    const cal = makeCal("cal_b", "", h.calls.log);
     h.date.checkCalendarFormat(cal, "yyyyMMdd", "", { clearOnInvalid: false });
     await cal.change("20261399");
     expect(h.calls.alert).toEqual(["com_valid_format_0051:yyyyMMdd"]);
     expect(cal.setValueCalls).toEqual([]);
     expect(cal.value).toBe("20261399");
+    expect(h.calls.log).toEqual(["alert:com_valid_format_0051:yyyyMMdd", "alert-closed", "focus"]);
   });
 
   test("정상 포맷이면 안내·초기화가 없고, 빈값(초기화 재진입 포함)은 형식 오류로 보지 않는다", async () => {
@@ -103,14 +107,15 @@ describe("checkCalendarFormat — clearOnInvalid", () => {
 });
 
 describe("compareFromToDate — dateFormat 검증 실패 시 clearOnInvalid", () => {
-  test("기본값: 시작일 포맷 오류 → 안내 후 빈값 초기화·포커스, 기간 비교는 건너뛴다", async () => {
+  test("기본값: 시작일 포맷 오류 → 안내 창이 닫힌 뒤 빈값 초기화·포커스, 기간 비교는 건너뛴다(순서 보장)", async () => {
     const h = loadHarness();
-    const s = makeCal("s", ""), e = makeCal("e", "20260930");
+    const s = makeCal("s", "", h.calls.log), e = makeCal("e", "20260930");
     h.date.compareFromToDate(s, e, ["시작일", "종료일"], "yyyyMMdd");
     await s.change("2026099");
     expect(h.calls.alert).toEqual(["yyyyMMdd 형식의 올바른 날짜를 입력하세요."]);
     expect(s.setValueCalls).toEqual([""]);
     expect(s.focused).toBe(1);
+    expect(h.calls.log).toEqual(["alert:yyyyMMdd 형식의 올바른 날짜를 입력하세요.", "alert-closed", "setValue:", "focus"]);
     expect(s.userData.onkeyup).toBe(true);   // setUserData(false) → setValue → setUserData(true) 순서로 복원
   });
 

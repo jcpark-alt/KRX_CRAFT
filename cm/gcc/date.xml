@@ -1095,13 +1095,13 @@ scwin.compareFromToDate = function (calStartDate, calEndDate, msgOptions, dateFo
  * @param {String} dateFormat 검증할 날짜 포맷 (예: "yyyyMMdd", "yyyy-MM-dd", "yyyy/MM/dd", "yyyy.MM.dd")
  * @param {String} objName 메시지 출력 용 명칭
  * @param {Object} options (선택) 동작 옵션
- * @param {Boolean} options.clearOnInvalid [default : true] 입력값 변경(onviewchange) 시 포맷 검증에 실패하면 안내 후 값을 빈값(setValue(""))으로 초기화한다.
- *                  false 면 잘못된 값을 그대로 둔다(종전 동작).
+ * @param {Boolean} options.clearOnInvalid [default : true] 입력값 변경(onviewchange) 시 포맷 검증에 실패하면 안내 창을 닫은 뒤 값을 빈값(setValue(""))으로
+ *                  초기화하고 포커스를 준다. false 면 잘못된 값을 그대로 두고 포커스만 준다(종전 동작).
  * @returns {Boolean} 포맷·유효성 만족 여부 (true: 정상, false: 오류) — 호출 시점의 현재 값 기준
  * @hidden N
  * @exception
  * @example
-$c.date.checkCalendarFormat(ica_startDate, "yyyy-MM-dd"); // 컴포넌트 객체 전달 — 잘못 입력하면 안내 후 빈값으로 초기화
+$c.date.checkCalendarFormat(ica_startDate, "yyyy-MM-dd"); // 컴포넌트 객체 전달 — 잘못 입력하면 안내 창을 닫은 뒤 빈값으로 초기화하고 포커스
 $c.date.checkCalendarFormat("ica_endDate", "yyyyMMdd");   // 컴포넌트 ID 전달
 $c.date.checkCalendarFormat(ica_baseDate, "yyyyMMdd", "기준일자", { clearOnInvalid : false }); // 잘못된 값을 남겨 두고 안내만
  */
@@ -1124,9 +1124,10 @@ scwin.checkCalendarFormat = function (calendarObj, dateFormat, objName = "", opt
         return scwin._checkDateFormat(comp.getValue(), dateFormat);
     };
 
-    // compareFromToDate 와 같이 onviewchange 이벤트에서 검증 실패 시 $c.win.alert 로 안내하고, 기본으로 값을 빈값으로 초기화한다.
+    // compareFromToDate 와 같이 onviewchange 이벤트에서 검증 실패 시 $c.win.alert 로 안내하고,
+    // 안내 창이 닫히면(await) 기본으로 값을 빈값으로 초기화한 뒤 포커스를 준다.
     comp.unbind("onviewchange");
-    comp.bind("onviewchange", function () {
+    comp.bind("onviewchange", async function () {
         // 빈값은 형식 오류로 보지 않는다(필수 여부는 validateDataCollect 등 검증 공통의 몫).
         // 초기화(setValue(""))로 이벤트가 재진입해도 안내가 반복되지 않게 하는 조건이기도 하다.
         if ($c.util.isEmpty(String(comp.getValue()).trim())) {
@@ -1135,11 +1136,12 @@ scwin.checkCalendarFormat = function (calendarObj, dateFormat, objName = "", opt
         if (!isValidFormat()) {
             // "com_valid_format_0051": "$[0] 형식의 올바른 날짜를 입력하세요.",  "com_valid_format_0052": "$[0]에 올바른 날짜를 입력하세요.",
             const msg = ($c.util.isEmpty(objName)) ? $c.data.getMessage("com_valid_format_0051", `${dateFormat}`) : $c.data.getMessage("com_valid_format_0052", `${objName}`);
-            $c.win.alert(msg);
+            await $c.win.alert(msg);   // 안내 창이 닫힐 때 resolve
 
             if (opts.clearOnInvalid) {
                 comp.setValue("");
             }
+            comp.focus();
         }
     });
 
