@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:ev="http://www.w3.org/2001/xml-events"
+    xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+    <head meta_screenName="[가이드] iframe 팝업 호출 + 결과 수신" meta_screenId="SMPIFR10000" meta_screenDesc="iframe 을 품은 팝업(SMPIFR10001)을 await $c.win.openPopup 으로 열고, iframe 페이지가 postMessage 로 보낸 결과가 팝업의 closePopup 을 거쳐 돌아오는 것을 확인하는 호출 화면 골격." meta_author="Inswave" meta_type="가이드">
+        <w2:type>COMPONENT</w2:type>
+        <w2:buildDate/>
+        <w2:MSA/>
+        <xf:model>
+            <w2:dataCollection baseNode="map">
+                <w2:dataMap id="dma_result" baseNode="map">
+                    <w2:keyInfo>
+                        <w2:key id="status" name="처리 상태" dataType="text"></w2:key>
+                        <w2:key id="value" name="입력값" dataType="text"></w2:key>
+                        <w2:key id="closedAt" name="닫힌 시각" dataType="text"></w2:key>
+                    </w2:keyInfo>
+                </w2:dataMap>
+            </w2:dataCollection>
+            <w2:workflowCollection/>
+        </xf:model>
+        <w2:layoutInfo/>
+        <w2:publicInfo method="scwin.onpageload,scwin.btn_open_onclick,scwin.showResult"/>
+        <script lazy="false" type="text/javascript"><![CDATA[// 가이드 : iframe 내부 페이지에서 부모 팝업 창 닫기 — 호출 화면 (합성 화면, 팝업은 SMPIFR10001)
+
+/*
+ * 화면 동작
+ * 1. 「iframe 팝업 열기」 클릭시 SMPIFR10001 팝업을 await 로 열고 결과를 기다린다
+ * 2. 팝업 안의 iframe 페이지가 [확인] 을 누르면 결과 객체가, [취소] 나 팝업 자체 닫기면 undefined 가 돌아온다
+ * 3. 결과를 dma_result 와 결과 영역에 표시한다
+ *
+ * 담긴 패턴
+ * - 값을 돌려주는 팝업 호출 ($c.win.openPopup 을 await 로 수신, 취소는 빈 결과로 판단 — ULDFIL52100 과 동일)
+ * - 팝업에 파라미터 전달 (세 번째 인자 → 팝업의 $c.data.getParameter("pData"), 팝업은 이를 iframe 쿼리로 넘긴다)
+ *
+ * 변환 샘플과 달라진 곳
+ * - 합성 가이드라 원본 없음
+ *
+ * 복사해서 쓰는 순서
+ * 1. 파일명과 meta_screenId 를 실제 화면ID 로 변경
+ * 2. POPUP_URL 과 options.id/popupName/크기를 실제 팝업에 맞게 교체
+ * 3. 결과 객체의 키(status·value …)를 iframe 페이지가 보내는 result 형태에 맞춰 dma_result 와 showResult 를 조정
+ */
+
+
+///////// 1. 변수 및 선언 영역 /////////
+
+scwin.screenId = "SMPIFR10000";
+
+scwin.POPUP_URL = "/ui/sample/template/SMPIFR10001.xml";
+
+
+///////// 2. 초기화 영역 /////////
+
+/**
+ * @method
+ * @name scwin.onpageload
+ * @author Inswave
+ * @date 2026. 09. 16
+ * @description 페이지로드
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.onpageload = function () {
+    try {
+        txb_result.hide();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "SMPIFR10000.onpageload" });
+    }
+};
+
+
+///////// 3. 컴포넌트 이벤트 영역 /////////
+
+/**
+ * @event
+ * @name scwin.btn_open_onclick
+ * @author Inswave
+ * @date 2026. 09. 16
+ * @description iframe 팝업 열기. 팝업이 닫힐 때 closePopup 에 실린 값이 await 결과로 돌아온다.
+ *
+ * 복사해 쓸 때 바꿀 곳
+ *  - options.id 는 팝업 화면ID 와 같게, 파라미터 키는 팝업·iframe 페이지와 합의한 이름으로
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.btn_open_onclick = async function () {
+    try {
+        txb_result.hide();
+
+        const param = {
+            callerScreenId : scwin.screenId,
+            memo : "호출 화면이 넘긴 값"
+        };
+
+        const options = {
+            id : "SMPIFR10001",
+            popupName : "iframe 팝업 (postMessage 로 닫기)",
+            width : 720,
+            height : 560,
+            frameModal : "top",
+            type : "pageFramePopup"
+        };
+
+        const result = await $c.win.openPopup(scwin.POPUP_URL, options, param);
+
+        // [취소] 또는 팝업 자체 닫기 — 결과 없음. 이 확인을 빼면 아래에서 undefined 참조로 터진다
+        if ($c.util.isEmpty(result)) {
+            scwin.showResult(null);
+            return;
+        }
+
+        dma_result.set("status", result.status);
+        dma_result.set("value", result.value);
+        dma_result.set("closedAt", result.closedAt);
+        scwin.showResult(result);
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "SMPIFR10000.btn_open_onclick" });
+    }
+};
+
+
+///////// 4. 서브미션 콜백 영역 /////////
+
+
+///////// 5. 일반/업무 함수 영역 /////////
+
+/**
+ * @method
+ * @name scwin.showResult
+ * @author Inswave
+ * @date 2026. 09. 16
+ * @description 팝업 결과를 결과 영역에 표시한다. null 이면 "결과 없이 닫힘" 으로 표시한다.
+ * @param {Object|null} result 팝업이 돌려준 결과 객체
+ * @returns
+ * @hidden N
+*/
+scwin.showResult = function (result) {
+    txb_result.removeClass("blue");
+    txb_result.removeClass("red");
+
+    if (result === null) {
+        txb_result.addClass("red");
+        txb_result.setValue("팝업이 결과 없이 닫혔습니다 (iframe [취소] 또는 팝업 [닫기]).");
+    } else {
+        txb_result.addClass("blue");
+        txb_result.setValue("팝업 결과 수신 : " + JSON.stringify(result));
+    }
+
+    txb_result.show();
+};
+]]></script>
+    </head>
+    <body ev:onpageload="scwin.onpageload">
+        <xf:group class="sub_contents" id="" meta_componentContainer="true" style="">
+            <w2:pageFrame id="pfmContentHeader" src="/cm/xml/contentHeader.xml" style=""></w2:pageFrame>
+
+            <!-- SAMPLE_DESC -->
+            <xf:group style="width:100%;padding:8px 12px;margin-bottom:8px;background:#eef6f3;border-left:4px solid #0a8060;border-radius:4px;">
+                <w2:span label="iframe 팝업 호출 + 결과 수신" style="display:block;font-weight:bold;color:#0a7a52;"/>
+                <w2:span label="팝업(SMPIFR10001) 안의 iframe 페이지가 postMessage 로 닫기 요청을 보내면, 팝업이 자기 자신을 닫으면서 결과를 이 화면의 await $c.win.openPopup 결과로 돌려줍니다." style="display:block;font-size:12px;color:#555;margin-top:2px;"/>
+            </xf:group>
+
+            <xf:group class="btnbox" id="" style="">
+                <xf:group class="lt" id="" style="">
+                    <xf:trigger class="btn_cm" id="btn_open" style="" type="button" ev:onclick="scwin.btn_open_onclick">
+                        <xf:label><![CDATA[iframe 팝업 열기]]></xf:label>
+                    </xf:trigger>
+                </xf:group>
+            </xf:group>
+
+            <xf:group class="tblbox" id="" style="">
+                <xf:group adaptive="layout" adaptiveThreshold="768" class="w2tb tbl" id="grp_form" style="" tagname="table">
+                    <w2:attributes>
+                        <w2:summary></w2:summary>
+                    </w2:attributes>
+                    <xf:group tagname="colgroup">
+                        <xf:group style="width:170px;" tagname="col"></xf:group>
+                        <xf:group style="" tagname="col"></xf:group>
+                    </xf:group>
+                    <xf:group style="" tagname="tr">
+                        <xf:group class="w2tb_th" style="" tagname="th">
+                            <w2:textbox class="" id="" label="처리 상태" style=""></w2:textbox>
+                        </xf:group>
+                        <xf:group class="w2tb_td" style="" tagname="td">
+                            <w2:textbox id="txb_status" ref="data:dma_result.status" label="" style=""></w2:textbox>
+                        </xf:group>
+                    </xf:group>
+                    <xf:group style="" tagname="tr">
+                        <xf:group class="w2tb_th" style="" tagname="th">
+                            <w2:textbox class="" id="" label="입력값" style=""></w2:textbox>
+                        </xf:group>
+                        <xf:group class="w2tb_td" style="" tagname="td">
+                            <w2:textbox id="txb_value" ref="data:dma_result.value" label="" style=""></w2:textbox>
+                        </xf:group>
+                    </xf:group>
+                    <xf:group style="" tagname="tr">
+                        <xf:group class="w2tb_th" style="" tagname="th">
+                            <w2:textbox class="" id="" label="닫힌 시각" style=""></w2:textbox>
+                        </xf:group>
+                        <xf:group class="w2tb_td" style="" tagname="td">
+                            <w2:textbox id="txb_closedAt" ref="data:dma_result.closedAt" label="" style=""></w2:textbox>
+                        </xf:group>
+                    </xf:group>
+                </xf:group>
+            </xf:group>
+
+            <w2:textbox class="txt_info" id="txb_result" label="" style="display:none;margin-top:16px;padding:12px;border-radius:10px;white-space:pre-wrap;word-break:break-all;"></w2:textbox>
+        </xf:group>
+    </body>
+</html>

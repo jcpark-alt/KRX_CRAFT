@@ -1,6 +1,6 @@
 # gcc 공통함수 활용 최종 샘플 카탈로그 (sample-front)
 
-전환(Stage 2) 보강·신규 화면 개발 시 **화면 유형을 매칭해 그대로 참조하는 표준 템플릿 15종**을 정리한다.
+전환(Stage 2) 보강·신규 화면 개발 시 **화면 유형을 매칭해 그대로 참조하는 표준 템플릿 17종**을 정리한다.
 모든 샘플은 [code-convention.md](../../docs/code-convention/code-convention.md)의 **5단계 정형화 구조**(`///////// n. 영역명 /////////`)와
 **서브미션 async/await 순차 실행** 원칙을 따르며, gcc 공통함수(`$c.*`)만으로 화면을 구성한 최종 결과물이다. (2026-08-21 기준)
 
@@ -26,6 +26,8 @@
 | `SMPVAL10000.xml` | 통합 입력 검증 (validateDataCollect 전체 옵션) | (합성 가이드 — 원본 없음) | `/ui/sample/template/SMPVAL10000.xml` |
 | `SMPBTN10000.xml` | 버튼 상태 일괄 제어 (setButtonState) | (합성 가이드 — 원본 없음) | `/ui/sample/template/SMPBTN10000.xml` |
 | `SMPCRT10000.xml` | 이니텍 공동인증서 연동 (INISAFE Sign + 라온 TransKey) | `resources/sample/initech-cert-sample2.html` (정적 HTML 샘플) | `/ui/sample/template/SMPCRT10000.xml` |
+| `SMPIFR10000.xml` | iframe 팝업 호출 + 결과 수신 | (합성 가이드 — 원본 없음) | `/ui/sample/template/SMPIFR10000.xml` |
+| `SMPIFR10001.xml` | iframe 내부 페이지에서 닫는 팝업 (postMessage 수신) | (합성 가이드 — iframe 페이지 `resources/sample/iframe-popup-close-sample.html`) | `/ui/sample/template/SMPIFR10001.xml` |
 
 > 소스↔원본은 파일 head(`meta_screenName`의 "원본 …" 표기) 기준 **1:1 매핑**이다.
 > `ULDSTF30702`만 배포 파일명이 `ULDSTF30710.xml`로 다르므로 배포 시 주의한다.
@@ -49,10 +51,11 @@
 | 입력 검증이 많은 작성화면 | `SMPVAL10000` | `validateDataCollect` 전 규칙 한 벌 시연 — 필수/byte(`maxLengthB`)/형식(`corpNum`·`bizNum`·`urlNoProtocol`·`email`·`date`)/조건부(`emptyIf` 외국국적·`requiredIf` 선행조건)/중복(`duplicateGroup`·그리드 `duplicate`)/약관(`checked`) + `$c.util.checkFileTotalSize` 총용량 + `validateDataMap` 서버 체크 플래그 검사(alert/confirm 형·중단 code) 데모 |
 | 상태별 버튼 제어가 있는 화면 | `SMPBTN10000` | `$c.util.setButtonState` 상태별 버튼 일괄 활성/비활성 시연 — 역할→버튼 매핑(id 비통일 대응)·표준 상태 6종·동적 역할(출력)·override 예외·`registerButtonState` 전용 상태·즉석 상태 객체 |
 | 공동인증서(전자서명) 연동이 있는 화면 | `SMPCRT10000` | `$c.cert.loadModule`(벤더 준비 확인 — 스크립트는 config.xml engine 모듈이 정적 로드, crosswebex6 의 document.write 때문에 동적 로드 금지 — + 모듈 초기화 `onStatus` + 키패드 z-index 보정)·`$c.cert.auth(url, callback, { params, useTranskey })` 전자서명 호출(벤더 콜백은 2xx 에서만 호출 → 4구역에 수신 배치, Promise 대기 금지)·`validateDataCollect`(required/`maxLengthB`/`format` phone·email)로 동봉 파라미터 검증·라온 가상키보드 사용 여부(`$c.cert.setTranskeyUse`) 전환 + `$c.util.setSessionStorage` 보관·`$c.win.reload` 새로고침 안내. 키패드 id 는 `$c.cert.INITECH_INFO`·스크립트 경로는 config.xml 보유, 통신은 벤더 `$.ajax`(FormData) 라 `$c.sbm` 미사용 |
+| iframe(외부 페이지)을 품은 팝업 | `SMPIFR10000` + `SMPIFR10001` | 팝업이 `$c.win.getPopupId()` 를 iframe 쿼리로 넘기고 window `message` 리스너를 **onpageload 등록·onpageunload 해제**(scwin 에 보관한 같은 참조), 수신 필터 출처→형태→`execution`→`popupId`(엔진의 `{_wq_type}` 전파 메시지 배제), `$c.win.closePopup(result)` 로 자기 팝업을 닫아 호출 화면의 `await openPopup` 결과로 반환(취소는 undefined). iframe 정적 페이지는 `sendPopupMessage()` 로 `window.parent.postMessage` 만 한다 |
 
 ## 3. 샘플에 구현된 표준 패턴 (공통)
 
-15종 전체가 공유하는 규약 — 전환 결과물도 이 상태에 도달해야 한다.
+17종 전체가 공유하는 규약 — 전환 결과물도 이 상태에 도달해야 한다.
 
 1. **5단계 정형화 구조** — `///////// 1. 변수 및 선언 영역 /////////` ~ `///////// 5. 일반/업무 함수 영역 /////////` 5개 헤더, 서브미션 콜백은 4구역으로 분리.
 2. **서브미션 async/await** — `const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);` 순차 스타일. `submitDoneHandler`를 넘기면 Promise가 settle 되지 않으므로 핸들러 방식과 혼용하지 않는다.

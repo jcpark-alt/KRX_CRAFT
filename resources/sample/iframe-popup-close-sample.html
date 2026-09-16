@@ -1,0 +1,102 @@
+<!doctype html>
+<!--
+    iframe 내부 페이지 샘플 — 부모 팝업(WebSquare SMPIFR10001) 닫기 요청
+
+    - 팝업 XML 이 iframe src 에 ?popupId={popupId} 를 붙여 이 페이지를 띄운다 (호출 화면 파라미터도 쿼리로 함께 온다).
+    - [확인] / [취소] 클릭시 sendPopupMessage() 가 window.parent.postMessage 로
+      { execution: "closePopup", popupId, result } 를 보낸다. 팝업 XML 은 popupId 가 자기 것일 때만
+      $c.win.closePopup(result) 로 팝업을 닫고 result 를 호출 화면에 돌려준다.
+    - 같은 출처(/resources/**)이므로 targetOrigin 은 location.origin 으로 고정한다. 다른 도메인에 두면 부모의 출처로 바꾼다.
+    - 이 페이지에는 message 리스너를 두지 않는다 — 보내는 쪽이다.
+-->
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>iframe 내부 페이지 — 부모 팝업 닫기 샘플</title>
+    <style>
+        body { margin: 0; padding: 20px; font-family: "Malgun Gothic", "Segoe UI", sans-serif; color: #1f2933; background: #f8f9fa; font-size: 13px; }
+        h4 { margin: 0 0 6px; font-size: 15px; color: #243b53; }
+        .desc { color: #627d98; margin-bottom: 14px; word-break: keep-all; }
+        .meta { background: #eef2f7; border-radius: 8px; padding: 10px 12px; font-family: Consolas, "D2Coding", monospace; font-size: 12px; margin-bottom: 14px; word-break: break-all; }
+        label { display: block; font-weight: 700; color: #486581; font-size: 12px; margin-bottom: 4px; }
+        input { width: 100%; box-sizing: border-box; border: 1px solid #cbd2d9; border-radius: 8px; padding: 9px 11px; font-size: 13px; margin-bottom: 14px; }
+        .btns { display: flex; gap: 8px; }
+        button { flex: 1; border: 0; border-radius: 8px; padding: 10px 14px; font-size: 13px; font-weight: 700; cursor: pointer; }
+        .primary { background: #2563eb; color: #fff; }
+        .ghost { background: #eef2f7; color: #243b53; }
+        .warn { color: #b91c1c; margin-top: 10px; display: none; }
+    </style>
+</head>
+<body>
+    <h4>iframe 내부 페이지</h4>
+    <p class="desc">[확인]은 입력값을 결과로 돌려주며 팝업을 닫고, [취소]는 결과 없이 팝업을 닫습니다.</p>
+
+    <div class="meta" id="meta">popupId 확인 중…</div>
+
+    <label for="value">결과로 보낼 값</label>
+    <input type="text" id="value" value="iframe 에서 입력한 값" maxlength="100">
+
+    <div class="btns">
+        <button type="button" class="primary" id="btnOk">확인 (결과 전달 후 닫기)</button>
+        <button type="button" class="ghost" id="btnCancel">취소 (결과 없이 닫기)</button>
+    </div>
+    <p class="warn" id="warn">URL 파라미터에서 popupId 를 찾을 수 없습니다. 팝업 XML 을 통해 열어야 합니다.</p>
+
+    <script>
+        /**
+         * URL 파라미터에서 popupId 를 가져와 상위 창(Parent Window)으로 닫기 요청을 보낸다.
+         * @param {Object} [payload={}] 함께 전달할 추가 데이터 — result 키에 팝업 결과를 담는다
+         * @param {string} [targetOrigin=location.origin] 메시지를 수신할 상위 창의 Origin
+         * @returns {boolean} 전송했으면 true
+         */
+        function sendPopupMessage(payload = {}, targetOrigin = location.origin) {
+            const popupId = new URLSearchParams(window.location.search).get("popupId");
+
+            if (!popupId) {
+                document.getElementById("warn").style.display = "block";
+                return false;
+            }
+
+            const messageData = {
+                execution : "closePopup",
+                popupId   : popupId,
+                ...payload
+            };
+
+            window.parent.postMessage(messageData, targetOrigin);
+            return true;
+        }
+
+        (function init() {
+            const params = new URLSearchParams(window.location.search);
+            const popupId = params.get("popupId");
+            const others = [];
+
+            params.forEach(function (v, k) {
+                if (k !== "popupId") others.push(k + "=" + v);
+            });
+
+            document.getElementById("meta").textContent =
+                "popupId = " + (popupId || "(없음)") + (others.length ? "\n호출 화면 파라미터 : " + others.join(", ") : "");
+
+            if (!popupId) {
+                document.getElementById("warn").style.display = "block";
+            }
+
+            document.getElementById("btnOk").addEventListener("click", function () {
+                sendPopupMessage({
+                    result : {
+                        status   : "OK",
+                        value    : document.getElementById("value").value,
+                        closedAt : new Date().toISOString()
+                    }
+                });
+            });
+
+            document.getElementById("btnCancel").addEventListener("click", function () {
+                sendPopupMessage();   // result 없음 → 부모의 await 결과는 undefined
+            });
+        })();
+    </script>
+</body>
+</html>

@@ -20,6 +20,9 @@
   h2 { font-size: 19px; margin: 40px 0 14px; padding-left: 10px; border-left: 4px solid var(--accent); }
   h3 { font-size: 16px; margin: 22px 0 8px; }
   section.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 20px 24px; margin-bottom: 8px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; margin: 10px 0 4px; }
+  th, td { border: 1px solid var(--line); padding: 8px 12px; text-align: left; vertical-align: top; }
+  th { background: var(--accent-soft); font-weight: 700; white-space: nowrap; }
   code { background: var(--code-bg); border-radius: 4px; padding: 1px 6px; font-family: Consolas, "D2Coding", monospace; font-size: 13px; }
   pre { background: #10192b; color: #dfe8f6; border-radius: 8px; padding: 16px 18px; overflow-x: auto; font-size: 13px; line-height: 1.55; }
   pre code { background: none; color: inherit; padding: 0; }
@@ -27,6 +30,7 @@
   ul { margin: 8px 0; padding-left: 22px; }
   li { margin: 4px 0; }
   .note { background: var(--warn-soft); border-left: 4px solid var(--warn); border-radius: 6px; padding: 10px 14px; font-size: 14px; margin: 12px 0; }
+  .ok { background: var(--ok-soft); border-left: 4px solid var(--ok); border-radius: 6px; padding: 10px 14px; font-size: 14px; margin: 12px 0; }
   .step { display: inline-block; background: var(--accent-soft); color: var(--accent); border-radius: 20px; font-size: 12px; font-weight: 700; padding: 2px 10px; margin-right: 6px; }
   footer { margin-top: 48px; color: var(--sub); font-size: 13px; border-top: 1px solid var(--line); padding-top: 14px; }
 </style>
@@ -36,69 +40,117 @@
 
 <header>
   <h1>iframe 내부 페이지에서 부모 팝업 창을 닫는 처리 흐름</h1>
-  <div class="meta">작성일 2026-09-16 · WebSquare 팝업(XML) 안의 iframe 페이지 → <code>postMessage</code> → 부모가 <code>$c.win.closePopup</code> 실행</div>
+  <div class="meta">작성 2026-09-16 · WebSquare 팝업(XML) 안의 iframe 페이지 → <code>postMessage</code> → 팝업 XML 이 <code>$c.win.closePopup(result)</code> 로 자기 팝업을 닫고 결과를 호출 화면에 반환 · 샘플 <code>SMPIFR10000</code>(호출) / <code>SMPIFR10001</code>(팝업) / <code>resources/sample/iframe-popup-close-sample.html</code>(iframe 페이지)</div>
 </header>
 
 <section class="card">
   <h2 style="margin-top:0">1. 전체 연동 흐름 요약</h2>
-<pre class="flow">[1. 팝업 XML (Parent Window)]
+<pre class="flow">[0. 호출 화면 XML — SMPIFR10000]
    │
-   ├─ $c.win.getPopupId()로 popupId 획득
-   ├─ iframe src URL 뒤에 ?popupId={popupId} 전달
-   └─ window 'message' 이벤트 리스너 등록 (수신 대기)
+   └─ const result = await $c.win.openPopup("/ui/sample/template/SMPIFR10001.xml", options, param)
+      (팝업이 닫힐 때 closePopup 에 실린 값이 result 로 돌아온다. 취소·자체 닫기는 undefined)
 
-[2. iframe 내부 페이지 (Child Window)]
+[1. 팝업 XML (Parent Window) — SMPIFR10001]
+   │
+   ├─ onpageload : $c.win.getPopupId() 로 popupId 획득
+   ├─             iframe src URL 뒤에 ?popupId={popupId}(+ 호출 파라미터) 전달
+   ├─             window 'message' 리스너 등록 (핸들러는 scwin.onIframeMessage 에 보관)
+   └─ onpageunload : 같은 참조로 리스너 해제 (SPA 라 window 가 유지되므로 필수)
+
+[2. iframe 내부 페이지 (Child Window) — iframe-popup-close-sample.html]
    │
    ├─ URL 쿼리 파라미터에서 popupId 추출
-   └─ 닫기 버튼 클릭 시 sendPopupMessage() 실행 → postMessage 전송
+   └─ [확인]/[취소] 클릭 시 sendPopupMessage() → window.parent.postMessage({ execution, popupId, result })
 
 [3. 팝업 XML (Parent Window)]
    │
-   └─ postMessage 수신 후 $c.win.closePopup($p, popupId) 실행하여 팝업 종료</pre>
+   └─ 수신 필터 출처 → 형태 → execution → popupId 통과 시 $c.win.closePopup(result) 실행하여 팝업 종료</pre>
 </section>
 
 <section class="card">
   <h2 style="margin-top:0">2. 단계별 상세 코드 정리</h2>
 
-  <h3><span class="step">1</span>팝업 XML (부모 창)</h3>
-  <p>iframe을 포함하고 있는 팝업 페이지에서 <code>popupId</code>를 구하여 iframe URL에 파라미터로 붙여주고, 자식 창에서 전달되는 메세지를 수신하도록 설정합니다.</p>
-<pre><code>// 1. 팝업 ID 획득
-const popupId = $c.win.getPopupId();
+  <h3><span class="step">1</span>팝업 XML (부모 창) — <code>SMPIFR10001.xml</code></h3>
+  <p>iframe을 포함하는 팝업 화면에서 <code>popupId</code>를 구해 iframe URL에 붙이고, iframe 페이지가 보내는 메시지를 수신하도록 설정합니다. 리스너는 <strong>onpageload 에서 등록하고 onpageunload 에서 반드시 해제</strong>합니다.</p>
+<pre><code>///////// 1. 변수 및 선언 영역 /////////
+scwin.IFRAME_URL     = "/resources/sample/iframe-popup-close-sample.html";
+scwin.ALLOWED_ORIGIN = location.origin;   // iframe 페이지가 같은 출처. 다른 도메인이면 그 출처로 고정
+scwin.popupId        = "";
 
-// 2. iframe URL에 popupId 전달 (예시)
-const iframeEl = document.getElementById("myIframe");
-iframeEl.src = `/path/to/page.html?popupId=${encodeURIComponent(popupId)}`;
+///////// 2. 초기화 영역 /////////
+scwin.onpageload = async function () {
+    try {
+        await scwin.init();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "SMPIFR10001.onpageload" });
+    }
+};
 
-// 3. postMessage 수신 이벤트 리스너 등록
-window.addEventListener('message', (event) =&gt; {
-  // [보안] 필요한 경우 Origin 검증 추가
-  // if (event.origin !== 'https://your-domain.com') return;
+scwin.onpageunload = function () {
+    try {
+        window.removeEventListener("message", scwin.onIframeMessage);   // 등록과 같은 참조여야 해제된다
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "SMPIFR10001.onpageunload" });
+    }
+};
 
-  const { execution, popupId } = event.data;
+scwin.init = async function () {
+    scwin.popupId = $c.win.getPopupId();                                // 1. 팝업 ID 획득
 
-  // 팝업 닫기 요청 처리
-  if (execution === "closePopup" &amp;&amp; popupId) {
-    console.log(`수신된 Popup ID: ${popupId}`);
-    $c.win.closePopup($p, popupId);
-  }
-});</code></pre>
+    const param = $c.data.getParameter("pData") ?? {};                  // 호출 화면 파라미터(있으면 iframe 쿼리로 전달)
 
-  <h3><span class="step">2</span>iframe 내부 페이지 (자식 창)</h3>
-  <p>iframe 내부에서 팝업을 닫는 이벤트(예: 닫기/확인 버튼 클릭)가 발생할 때 호출할 함수입니다.</p>
+    // 2. iframe URL 에 popupId 전달 — w2:tag(iframe) 의 DOM 요소 id 는 컴포넌트 id 와 같다
+    document.getElementById(ifr_page.getID()).src = scwin.buildIframeUrl(param);
+
+    // 3. postMessage 수신 리스너 등록
+    window.addEventListener("message", scwin.onIframeMessage);
+};
+
+///////// 3. 컴포넌트 이벤트 영역 /////////
+scwin.onIframeMessage = function (event) {
+    try {
+        if (event.origin !== scwin.ALLOWED_ORIGIN) return;              // ① 출처
+        const data = event.data;
+        if (!data || typeof data !== "object") return;                  // ② 형태 (문자열·엔진 메시지 방어)
+        if (data.execution !== "closePopup") return;                    // ③ 우리 규약 (엔진의 {_wq_type} 배제)
+        if (data.popupId !== scwin.popupId) return;                     // ④ 다른 팝업의 iframe 메시지 무시
+
+        $c.win.closePopup(data.result);   // 자기 팝업을 닫고 result 를 호출 화면의 await 결과로 돌려준다
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "SMPIFR10001.onIframeMessage" });
+    }
+};
+
+///////// 5. 일반/업무 함수 영역 /////////
+scwin.buildIframeUrl = function (param) {
+    const query = new URLSearchParams();
+    query.set("popupId", scwin.popupId);
+    Object.keys(param || {}).forEach(function (key) {
+        if (typeof param[key] === "string" || typeof param[key] === "number") query.set(key, String(param[key]));
+    });
+    return scwin.IFRAME_URL + "?" + query.toString();
+};</code></pre>
+<pre><code>&lt;!-- body --&gt;
+&lt;body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload"&gt;
+  …
+  &lt;w2:tag id="ifr_page" tagname="iframe" style="width:100%;height:360px;" src="" name="ifr_page"/&gt;</code></pre>
+  <div class="note"><strong>closePopup 시그니처 주의</strong> — <code>$c.win.closePopup(callbackParam, callbackFnStr)</code> 는 <em>호출한 화면(<code>$p</code>)의 팝업</em>을 닫습니다. <code>$p</code> 는 빌드가 자동 주입하므로 <code>$c.win.closePopup($p, popupId)</code> 처럼 넘기면 <code>$p</code> 가 <code>callbackParam</code> 자리로 들어가는 오호출입니다. 팝업 XML 안에서는 <code>$c.win.closePopup(result)</code> 로 충분하며, 수신 메시지의 <code>popupId</code> 는 "다른 팝업의 iframe 메시지"를 거르는 용도로만 씁니다.</div>
+
+  <h3><span class="step">2</span>iframe 내부 페이지 (자식 창) — <code>iframe-popup-close-sample.html</code></h3>
+  <p>iframe 내부에서 팝업을 닫는 이벤트(닫기/확인 버튼 클릭)가 발생할 때 호출할 함수입니다. 이 페이지는 <strong>보내는 쪽</strong>이라 <code>message</code> 리스너를 두지 않습니다.</p>
 <pre><code>/**
- * URL 파라미터에서 popupId를 가져와 상위 창 (Parent Window)으로 메시지를 전송하는 함수
- * @param {Object} [payload={}] - 함께 전달할 추가 데이터
- * @param {string} [targetOrigin='*'] - 메시지를 수신할 상위 창의 Origin
+ * URL 파라미터에서 popupId 를 가져와 상위 창(Parent Window)으로 닫기 요청을 보낸다.
+ * @param {Object} [payload={}] 함께 전달할 추가 데이터 — result 키에 팝업 결과를 담는다
+ * @param {string} [targetOrigin=location.origin] 메시지를 수신할 상위 창의 Origin
  */
-function sendPopupMessage(payload = {}, targetOrigin = '*') {
+function sendPopupMessage(payload = {}, targetOrigin = location.origin) {
   // 1. 현재 URL의 쿼리 파라미터에서 popupId 추출
-  const urlParams = new URLSearchParams(window.location.search);
-  const popupId = urlParams.get('popupId');
+  const popupId = new URLSearchParams(window.location.search).get('popupId');
 
   // 2. popupId 유효성 검사
   if (!popupId) {
     console.warn('URL 파라미터에서 popupId를 찾을 수 없습니다.');
-    return;
+    return false;
   }
 
   // 3. 전달할 메시지 데이터 구성
@@ -110,20 +162,58 @@ function sendPopupMessage(payload = {}, targetOrigin = '*') {
 
   // 4. 상위 창(Parent Window)으로 메시지 전송
   window.parent.postMessage(messageData, targetOrigin);
-}</code></pre>
+  return true;
+}
+
+// [확인] — 결과를 실어 닫기 / [취소] — 결과 없이 닫기 (부모의 await 결과는 undefined)
+btnOk.addEventListener('click', () =&gt; sendPopupMessage({ result: { status: 'OK', value: input.value, closedAt: new Date().toISOString() } }));
+btnCancel.addEventListener('click', () =&gt; sendPopupMessage());</code></pre>
+
+  <h3><span class="step">0</span>호출 화면 XML — <code>SMPIFR10000.xml</code></h3>
+  <p>값을 돌려주는 팝업 호출은 기존 샘플(ULDFIL52100 → ULDFIL52110)과 같은 <code>await</code> 패턴입니다.</p>
+<pre><code>scwin.btn_open_onclick = async function () {
+    try {
+        const param   = { callerScreenId : scwin.screenId, memo : "호출 화면이 넘긴 값" };
+        const options = { id : "SMPIFR10001", popupName : "iframe 팝업", width : 720, height : 560, frameModal : "top", type : "pageFramePopup" };
+
+        const result = await $c.win.openPopup("/ui/sample/template/SMPIFR10001.xml", options, param);
+
+        if ($c.util.isEmpty(result)) { /* 취소 또는 팝업 자체 닫기 */ return; }
+
+        dma_result.set("status", result.status);
+        dma_result.set("value", result.value);
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "SMPIFR10000.btn_open_onclick" });
+    }
+};</code></pre>
 </section>
 
 <section class="card">
   <h2 style="margin-top:0">3. 핵심 포인트</h2>
   <ul>
-    <li><strong>안전한 데이터 전달</strong>: iframe 간 직접적인 스크립트 접근 대신 웹 표준인 <code>postMessage</code> API를 사용하여 도메인이 다르더라도(Cross-Origin) 안전하게 통신할 수 있습니다.</li>
-    <li><strong>유연한 데이터 확충</strong>: <code>sendPopupMessage({ result: 'SUCCESS' })</code>와 같이 호출 시 <code>payload</code> 객체를 전달하면, 팝업을 닫으면서 부모 창에 결과값이나 처리 상태를 함께 전달할 수 있습니다.</li>
-    <li><strong>보안 권장사항</strong>: 운영 환경에서는 <code>targetOrigin</code>과 <code>event.origin</code> 검증을 특정 도메인(예: <code>https://example.com</code>)으로 제한하는 것이 안전합니다.</li>
+    <li><strong>안전한 데이터 전달</strong>: iframe 간 직접적인 스크립트 접근 대신 웹 표준 <code>postMessage</code> API를 사용하여 도메인이 다르더라도(Cross-Origin) 안전하게 통신할 수 있습니다.</li>
+    <li><strong>유연한 데이터 확충</strong>: <code>sendPopupMessage({ result: { … } })</code> 처럼 <code>payload</code> 를 전달하면 팝업을 닫으면서 결과값이나 처리 상태를 호출 화면까지 한 번에 전달할 수 있습니다.</li>
+    <li><strong>리스너 생명주기</strong>: <code>message</code> 리스너는 <code>window</code> 전역에 붙습니다. WebSquare 는 SPA 라 화면이 바뀌어도 <code>window</code> 가 유지되므로, 등록한 팝업 XML 이 <code>onpageunload</code> 에서 같은 함수 참조로 해제해야 팝업을 열 때마다 리스너가 쌓이지 않습니다.</li>
+    <li><strong>수신 필터 4단계</strong>: 출처 → 데이터 형태 → <code>execution</code> → <code>popupId</code>. WebSquare 엔진도 iframe 클릭·마우스다운·키업 전파용 <code>{ _wq_type: … }</code> 객체를 같은 <code>message</code> 채널로 모든 iframe 에 보내므로, 자기 규약의 메시지만 골라내야 합니다.</li>
+    <li><strong>보안 권장사항</strong>: 이 샘플의 iframe 페이지는 같은 출처(<code>/resources/**</code>)라 <code>targetOrigin</code> 과 <code>event.origin</code> 을 <code>location.origin</code> 으로 고정했습니다. 다른 도메인에 두면 양쪽 모두 그 도메인으로 제한합니다.</li>
   </ul>
-  <div class="note">참고 — WebSquare 엔진도 iframe 클릭·마우스다운·키업 전파용으로 <code>{ _wq_type: … }</code> 객체를 <code>postMessage</code> 로 보낸다. 부모의 <code>message</code> 리스너는 위 코드처럼 <code>execution === "closePopup"</code> 조건으로 자기 메시지만 골라 처리하고, <code>event.data</code> 가 객체가 아닐 수 있으므로 구조 분해 전에 형태를 확인하면 더 안전하다.</div>
+  <div class="ok"><strong>리스너를 두는 위치</strong> — iframe 을 띄우는 <em>팝업 XML</em> 에 두는 것이 기본입니다(등록한 곳이 해제도 책임). iframe 팝업이 여러 화면에 생기면 <code>$c.win</code> 에 전역 브리지를 만들어 config.xml 최상위 <code>initScript</code> 에서 1회 초기화하고 <code>$p.closePopup(popupId, result)</code> 로 id 지정 닫기를 하는 방식으로 승격합니다. iframe 내부 페이지(보내는 쪽)와 화면마다 실행되는 <code>pageFrame initScript</code> 에는 두지 않습니다.</div>
 </section>
 
-<footer>cm/docs/작업확인 · iframe 팝업 닫기 처리 흐름 · 2026-09-16</footer>
+<section class="card">
+  <h2 style="margin-top:0">4. 샘플 파일</h2>
+  <table>
+    <thead><tr><th>파일</th><th>역할</th></tr></thead>
+    <tbody>
+      <tr><td><code>cm/conversion/sample-front/ui/SMPIFR10000.xml</code></td><td>호출 화면 — <code>await $c.win.openPopup</code> 으로 팝업을 열고 결과(status·value·closedAt)를 표시. 배포 <code>/ui/sample/template/SMPIFR10000.xml</code></td></tr>
+      <tr><td><code>cm/conversion/sample-front/ui/SMPIFR10001.xml</code></td><td>팝업 — iframe 띄우기, 리스너 등록/해제, 4단계 필터, <code>closePopup(result)</code>. 배포 <code>/ui/sample/template/SMPIFR10001.xml</code></td></tr>
+      <tr><td><code>resources/sample/iframe-popup-close-sample.html</code></td><td>iframe 내부 정적 페이지 — <code>sendPopupMessage()</code> 로 [확인]/[취소] 전송. 백엔드 static 폴더(<code>/resources/sample/</code>)에 복사해 배포</td></tr>
+    </tbody>
+  </table>
+  <p>검증: 두 XML 은 정형성·CDATA 구문·<code>wsxml_lint</code> 0/0·핸들러/publicInfo/컴포넌트 id 정합·<code>$c</code> API 실재를 통과했고, 샘플 카탈로그(<code>cm/conversion/md/sample_templates.md</code>) §1·§2 에 등재했다. iframe src 를 DOM(<code>document.getElementById(ifr_page.getID()).src</code>)으로 설정하는 부분은 브라우저 확인이 필요하다.</p>
+</section>
+
+<footer>cm/docs/작업확인 · iframe 팝업 닫기 처리 흐름 · 2026-09-16 (샘플 반영 갱신)</footer>
 
 </div>
 </body>
