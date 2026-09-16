@@ -131,4 +131,4 @@ npm run lint:xml              # WebSquare XML lint (gcc 13 files 0/0 · legacy 2
 | 2026-09-16 | `6eba4b8` | `crossd_iframe.html` 메시지 가드 (§4.2) |
 | 2026-09-16 | `45abc9d` | `initech-docwrite-capture/replay.js` — 벤더 document.write 캡처·동기 재생 (§4.3, 이후 shell-guard 로 병합) |
 | 2026-09-16 | `8a4d452` | 위 3파일을 `initech-shell-guard.js` 1파일로 병합(재생을 스크립트 종료 직후 마이크로태스크로 자동화), 테스트 통합 |
-| 2026-09-16 | (미커밋) | 폴더를 루트 `resources/` 로, 배포 URL 을 `/resources/**` 로 원복 — 벤더 파일 경로 수정 76건 제거(업그레이드 시 재적용 불필요) |
+| 2026-09-16 | `a4d8df5` | 폴더를 루트 `resources/` 로, 배포 URL 을 `/resources/**` 로 원복 — 벤더 파일 경로 수정 76건 제거(업그레이드 시 재적용 불필요) |
