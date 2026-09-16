@@ -82,7 +82,7 @@ The actively maintained core (most recent edits). Each file is one namespace und
 | `sbm.xml` | `$c.sbm` | **Server communication** — submit/workflow/dynamic calls; defines `CONTEXT_PATH`, `SERVICE_URL`, async/JSON defaults, `MESSAGE_CODE` (E/S/W/I) |
 | `hkey.xml` | `$c.hkey` | Keyboard shortcuts |
 | `ext.xml` | `$c.ext` | External-solution integration (SBChart) |
-| `cert.xml` | `$c.cert` | **Public-certificate (Initech INISAFE Sign + Raon TransKey) integration** — module init, keypad z-index fix, keypad-use toggle, `auth()` wrapper. Vendor scripts are loaded **statically only** as `<engine><module>` entries in `websquare/config.xml`/`config.js` (crosswebex6.js uses `document.write` at load, so never inject it dynamically); `$c.cert` is itself registered there too |
+| `cert.xml` | `$c.cert` | **Public-certificate (Initech INISAFE Sign + Raon TransKey) integration** — module init, keypad z-index fix, keypad-use toggle, `auth()` wrapper. Vendor scripts are loaded **statically only** as `<engine><module>` entries in `websquare/config.xml`/`config.js` (crosswebex6.js uses `document.write` at load, so never inject it dynamically; the engine loads modules async so that `document.write` is ignored — the `initech-docwrite-capture.js`/`-replay.js` pair around crosswebex6 captures and replays it, and `promise-guard.js` before it keeps the native `Promise` against bluebird); `$c.cert` is itself registered there too |
 
 When writing code in `cm/gcc/`, **reuse the `$c.*` helpers** instead of reimplementing (e.g. `$c.util.isEmpty(x)` over hand-rolled emptiness checks, `$c.str.*` for string ops, `$c.win.alert`/`$c.win.confirm` for dialogs, `$c.sbm.*` for all server calls). The files already cross-reference this way.
 
