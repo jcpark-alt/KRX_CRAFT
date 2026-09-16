@@ -71,6 +71,7 @@ initech-common.js
 ```js
 await $c.cert.loadModule({ onStatus : function (msg, done) { /* 진행 안내 */ } });   // onpageload 에서 1회
 await $c.cert.auth(url, callback, { params : dma_chrgInfo.getJSON(), useTranskey : true });
+await $c.cert.openManager({ useTranskey : true });                 // 인증서 관리 화면 (taskNm 으로 개별 메뉴 진입 가능)
 ```
 
 - 콜백은 서버 2xx 에서만 호출된다. 4xx/5xx·팝업 취소는 벤더 알림창(INI_ALERT)만 뜨고 콜백이 오지 않으므로 **콜백을 Promise 로 감싸 기다리지 않는다**(영구 pending).

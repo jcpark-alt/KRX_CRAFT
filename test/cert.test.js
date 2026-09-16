@@ -53,7 +53,7 @@ function makeFakeDocument(opts) {
 
 function loadHarness(opts) {
   opts = opts || {};
-  const calls = { vendorAuth: [], installWait: [] };
+  const calls = { vendorAuth: [], installWait: [], openManager: [] };
   const document = makeFakeDocument(opts);
   const window = { jQuery: opts.jQuery };
 
@@ -86,6 +86,8 @@ function loadHarness(opts) {
       sandbox.fnInitechAuthWithParams = window.fnInitechAuthWithParams;
       window.cwModuleInstallWaitWithNoPopup = (cb) => calls.installWait.push(cb);
       sandbox.cwModuleInstallWaitWithNoPopup = window.cwModuleInstallWaitWithNoPopup;
+      window.INIWEBEX = { openCertManager: (option) => calls.openManager.push(option) };
+      sandbox.INIWEBEX = window.INIWEBEX;
       window.cwui_conf = {
         defaultConf: { KeyStrokeSecurity: { KeyStrokeSecurityList: [
           { KEYPAD_NAME: "AHNLAB_KEY", USE: "N" },
@@ -192,6 +194,25 @@ describe("$c.cert 공동인증서 연동 (cm/gcc/cert.xml)", () => {
     expect(h.calls.vendorAuth[0].params).toBeNull();
     const list = h.window.cwui_conf.defaultConf.KeyStrokeSecurity.KeyStrokeSecurityList;
     expect(list.find((k) => k.KEYPAD_NAME === "TRANS_KEY").USE).toBe("N");
+  });
+
+  test("openManager 는 useTranskey 를 반영하고 INIWEBEX.openCertManager 에 isHtml5·langType·taskNm·processCallback 을 넘긴다", async () => {
+    const h = loadHarness();
+    h.vendor.installReady();
+    const cb = () => {};
+    await h.cert.openManager({ taskNm: "cert_change_password", callback: cb, useTranskey: true, popupOptions: { langType: "ENG" } });
+    expect(h.calls.openManager).toHaveLength(1);
+    expect(h.calls.openManager[0]).toEqual({ isHtml5: true, langType: "ENG", taskNm: "cert_change_password", processCallback: cb });   // popupOptions 가 기본값을 덮는다
+    const list = h.window.cwui_conf.defaultConf.KeyStrokeSecurity.KeyStrokeSecurityList;
+    expect(list.find((k) => k.KEYPAD_NAME === "TRANS_KEY").USE).toBe("Y");
+  });
+
+  test("openManager 는 옵션 생략 시 전체 관리 메뉴(taskNm undefined)·KOR 로 호출하고, 벤더 미로드면 예외를 던진다", async () => {
+    const h = loadHarness();
+    await expect(h.cert.openManager()).rejects.toThrow("로드되지 않았습니다");
+    h.vendor.installReady();
+    await h.cert.openManager();
+    expect(h.calls.openManager[0]).toEqual({ isHtml5: true, langType: "KOR", taskNm: undefined, processCallback: undefined });
   });
 
   test("auth 는 벤더 미로드 상태를 예외로 던진다(화면 진입점 handleError 로 수렴)", async () => {

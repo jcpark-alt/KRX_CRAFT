@@ -21,7 +21,7 @@
             <w2:workflowCollection/>
         </xf:model>
         <w2:layoutInfo/>
-        <w2:publicInfo method="scwin.onpageload,scwin.init,scwin.btn_certAuth_onclick,scwin.btn_certVerify_onclick,scwin.btn_certRegister_onclick,scwin.chk_useTranskey_onchange,scwin.btn_reload_onclick,scwin.certAuthCallback,scwin.certVerifyCallback,scwin.certRegisterCallback,scwin.useTranskey,scwin.beforeCertPopup,scwin.showTranskeyNotice,scwin.saveTranskeyPref,scwin.loadTranskeyPref,scwin.validateRegister,scwin.setResult,scwin.clearResult"/>
+        <w2:publicInfo method="scwin.onpageload,scwin.init,scwin.btn_certAuth_onclick,scwin.btn_certVerify_onclick,scwin.btn_certRegister_onclick,scwin.btn_certManage_onclick,scwin.chk_useTranskey_onchange,scwin.btn_reload_onclick,scwin.certAuthCallback,scwin.certVerifyCallback,scwin.certRegisterCallback,scwin.useTranskey,scwin.beforeCertPopup,scwin.showTranskeyNotice,scwin.saveTranskeyPref,scwin.loadTranskeyPref,scwin.validateRegister,scwin.setResult,scwin.clearResult"/>
         <script lazy="false" type="text/javascript"><![CDATA[// 원본 : resources/sample/initech-cert-sample2.html (정적 HTML 샘플) → /ui/sample/template/SMPCRT10000.xml
 
 /*
@@ -31,12 +31,14 @@
  * 2. 「공동인증서 인증」 클릭시 인증서 팝업 → 전자서명 → 서버 검증(로그인 처리) → 성공 콜백에 결과 표시
  * 3. 「인증서 검증」 클릭시 인증서 팝업 → 전자서명 → OCSP 실시간 폐기여부 확인 → 콜백에서 body.result 로 판정
  * 4. 「인증서 등록」 클릭시 담당자 정보 검증 → 인증서 팝업 → 전자서명 + 담당자 정보를 같은 요청으로 전송 → 결과 표시
- * 5. 「가상키보드 사용」 체크 변경시 이니텍 설정(cwui_conf)의 라온 키패드 USE 값을 바꾸고 sessionStorage 에 보관한다.
+ * 5. 「인증서 관리」 클릭시 이니텍 인증서 관리 화면(HTML5 UI)을 띄운다 — 서버 통신 없이 PC 인증서 저장소 관리, 결과 콜백 없음
+ * 6. 「가상키보드 사용」 체크 변경시 이니텍 설정(cwui_conf)의 라온 키패드 USE 값을 바꾸고 sessionStorage 에 보관한다.
  *    인증서 팝업을 이미 연 뒤에는 이니텍 UI 가 키패드 선택을 캐시하므로 새로고침 안내를 띄운다.
  *
  * 담긴 패턴
  * - 공동인증서 공통 ($c.cert) — loadModule(모듈 초기화 + 키패드 z-index 보정, 벤더 미로드면 등록 안내 오류) · auth(전자서명 호출,
- *   opt.params 동봉·opt.useTranskey 로 팝업 직전 키패드 설정 반영). 키패드 id 는 공통(INITECH_INFO), 스크립트 경로는 config.xml 이 보유한다.
+ *   opt.params 동봉·opt.useTranskey 로 팝업 직전 키패드 설정 반영) · openManager(인증서 관리 화면, taskNm 으로 개별 메뉴 진입 가능).
+ *   키패드 id 는 공통(INITECH_INFO), 스크립트 경로는 config.xml 이 보유한다.
  * - 벤더 콜백(initech-common.js → callback(res)) 수신을 4구역 "서브미션 콜백 영역" 에 배치
  * - 담당자 정보 검증 ($c.validate.validateDataCollect — required·maxLengthB·format phone/email)
  * - 화면 설정 보관 ($c.util.setSessionStorage/getSessionStorage — 저장 불가 환경은 공통이 흡수)
@@ -218,6 +220,30 @@ scwin.btn_certRegister_onclick = async function () {
         scwin.beforeCertPopup();
     } catch (ex) {
         await $c.exception.handleError(ex, { context : "SMPCRT10000.btn_certRegister_onclick" });
+    }
+};
+
+/**
+ * @event
+ * @name scwin.btn_certManage_onclick
+ * @author Inswave
+ * @date 2026. 09. 16
+ * @description 인증서 관리 버튼 클릭. 이니텍 인증서 관리 화면을 띄운다(인증서 목록·비밀번호 변경·가져오기/내보내기·삭제).
+ *
+ * 서버 통신이 없어 결과 콜백을 받지 않는다. 특정 메뉴로 바로 들어가려면 taskNm 을 준다(예: "cert_change_password").
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.btn_certManage_onclick = async function () {
+    try {
+        scwin.clearResult();
+
+        await $c.cert.openManager({ useTranskey : scwin.useTranskey() });
+
+        scwin.beforeCertPopup();   // 관리 화면도 인증서 UI 팝업이라 키패드 캐시 안내 조건에 포함
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "SMPCRT10000.btn_certManage_onclick" });
     }
 };
 
@@ -539,7 +565,7 @@ scwin.clearResult = function () {
             <!-- 인증서 등록 — 입력값이 있어 별도 영역으로 분리한다. grp_register 가 validateDataCollect 의 대상이다. -->
             <xf:group id="grp_register" style="">
                 <w2:textbox class="tit" id="" label="인증서 등록" style=""></w2:textbox>
-                <w2:textbox class="txt_info" id="" label="아래 입력값을 전자서명과 같은 요청으로 보냅니다. 검증이 정상이면 인증서 식별값과 등록 결과가 돌아오고, 실패하면 400 으로 안내 문구만 뜹니다." style=""></w2:textbox>
+                <w2:textbox class="txt_info" id="" label="아래 입력값을 전자서명과 같은 요청으로 보냅니다. 검증이 정상이면 인증서 식별값과 등록 결과가 돌아오고, 실패하면 400 으로 안내 문구만 뜹니다. [인증서 관리]는 PC 인증서 저장소 관리 화면(이니텍 UI)을 엽니다." style=""></w2:textbox>
 
                 <xf:group class="tblbox" id="" style="">
                     <xf:group adaptive="layout" adaptiveThreshold="768" class="w2tb tbl" id="grp_form" style="" tagname="table">
@@ -587,6 +613,9 @@ scwin.clearResult = function () {
                     <xf:group class="rt" id="" style="">
                         <xf:trigger class="btn_cm" id="btn_certRegister" style="" type="button" ev:onclick="scwin.btn_certRegister_onclick">
                             <xf:label><![CDATA[인증서 등록]]></xf:label>
+                        </xf:trigger>
+                        <xf:trigger class="btn_cm" id="btn_certManage" style="" type="button" ev:onclick="scwin.btn_certManage_onclick">
+                            <xf:label><![CDATA[인증서 관리]]></xf:label>
                         </xf:trigger>
                     </xf:group>
                 </xf:group>

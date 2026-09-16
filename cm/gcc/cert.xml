@@ -11,13 +11,13 @@
 			<w2:workflowCollection/>
 		</xf:model>
 		<w2:layoutInfo/>
-		<w2:publicInfo method="scwin.isReady,scwin.loadModule,scwin.initModule,scwin.applyKeypadStyle,scwin.setTranskeyUse,scwin.auth"/>
+		<w2:publicInfo method="scwin.isReady,scwin.loadModule,scwin.initModule,scwin.applyKeypadStyle,scwin.setTranskeyUse,scwin.auth,scwin.openManager"/>
 		<script lazy="false" type="text/javascript"><![CDATA[// =============================================================================
 /**
  * 공동인증서 연동 관련 함수.
  *
  * 이니텍 공동인증서(INISAFE Sign, crosswebex6)와 라온 가상키보드(TransKey)를 화면에 붙일 때 반복되는
- * 모듈 초기화·키패드 z-index 보정·키패드 사용 여부 전환·전자서명 호출을 모은다.
+ * 모듈 초기화·키패드 z-index 보정·키패드 사용 여부 전환·전자서명 호출·인증서 관리 화면 호출을 모은다.
  *
  * 벤더 스크립트 로드 방식 (정적 로드만 허용)
  * - websquare/config.xml·config.js 의 <engine><module> 에 등록해 셸이 초기 파싱 시점에 로드한다
@@ -237,6 +237,48 @@ scwin.auth = async function (url, callback, opt) {
     }
 
     fnInitechAuthWithParams(url, opt.params || null, callback, opt.popupOptions);
+};
+
+/**
+ * @method
+ * @name openManager
+ * @description 이니텍 인증서 관리 화면(HTML5 UI — 인증서 목록·비밀번호 변경·가져오기/내보내기·삭제 등)을 띄운다.
+ *              벤더 모듈 준비를 확인(미로드면 오류)하고, 가상키보드 사용 여부를 반영한 뒤 INIWEBEX.openCertManager 를 호출한다.
+ *              관리 화면은 서버 통신 없이 사용자 PC 의 인증서 저장소를 다루며, 사용자가 닫으면 그대로 끝난다(결과 콜백은 선택).
+ * @param {Object} opt (선택) 옵션
+ * @param {String} opt.taskNm 관리 메뉴 개별 진입 키(예: "cert_change_password"). 생략하면 전체 관리 메뉴
+ * @param {Function} opt.callback 관리 처리 결과 콜백 — 벤더 processCallback 그대로 전달(선택)
+ * @param {Boolean} opt.useTranskey 라온 가상키보드 사용 여부. 지정 시 화면을 열기 직전에 setTranskeyUse 를 적용
+ * @param {Object} opt.popupOptions 벤더 옵션 추가/재정의(langType 등, INIWEBEX.openCertManager 의 option 그대로)
+ * @returns {Promise<void>} 관리 화면을 띄운 뒤 resolve (사용자가 닫는 것을 기다리지 않는다)
+ * @hidden N
+ * @exception 벤더 스크립트가 셸에 로드되어 있지 않으면 Error
+ * @example
+await $c.cert.openManager({ useTranskey : chk_useTranskey.getValue() === "Y" });
+await $c.cert.openManager({ taskNm : "cert_change_password" });   // 비밀번호 변경 메뉴로 바로 진입
+ */
+scwin.openManager = async function (opt) {
+    opt = opt || {};
+
+    if (!scwin.isReady()) {
+        await scwin.loadModule();
+    }
+    if (typeof window.INIWEBEX === "undefined" || typeof INIWEBEX.openCertManager !== "function") {
+        throw new Error("이니텍 인증서 관리 API(INIWEBEX.openCertManager)를 찾을 수 없습니다. crosswebex6.js 로드 여부를 확인하세요.");
+    }
+
+    if (typeof opt.useTranskey === "boolean") {
+        scwin.setTranskeyUse(opt.useTranskey);
+    }
+
+    const option = Object.assign({
+        isHtml5         : true,
+        langType        : "KOR",
+        taskNm          : opt.taskNm,
+        processCallback : opt.callback
+    }, opt.popupOptions || {});
+
+    INIWEBEX.openCertManager(option);
 };
 ]]></script>
 	</head>
