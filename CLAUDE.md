@@ -26,7 +26,7 @@ A lint/test toolchain sits on top of the raw XML. All commands run from the repo
 A Python/lxml linter under `tools/wsxml_lint/` that parses the WebSquare `.xml` pages directly (the only tool that actually inspects this project's source).
 
 - **Run:** `npm run lint:xml` — a **split** of two scripts:
-  - `npm run lint:xml:gcc` → `python -m wsxml_lint src/gcc` (strict) → baseline **`12 files, 0 errors, 0 warnings`**.
+  - `npm run lint:xml:gcc` → `python -m wsxml_lint src/gcc` (strict) → baseline **`13 files, 0 errors, 0 warnings`**.
   - `npm run lint:xml:legacy` → `python -m wsxml_lint src/as-is/ins src/as-is/mgt src/as-is/stf src/as-is/fil --ignore WS111,WS112,WS113` → baseline **`227 files, 0 errors, 0 warnings`**.
   - Lint a single file: `python -m wsxml_lint src/gcc/win.xml`.
 - **Why the split:** `WS111`/`WS112`/`WS113` fire on *every* legacy page (missing `<head>` `@meta_*` / `<w2:layoutInfo>` / `<w2:dataCollection>`) — a systematic W-Craft conversion gap, not defects (~424 warnings). They are ignored for `src/as-is/ins|mgt|stf|fil` so real issues aren't buried, while `src/gcc` stays strict. To see the full legacy baseline, run `python -m wsxml_lint src/as-is/ins src/as-is/mgt src/as-is/stf src/as-is/fil` (no `--ignore`).
@@ -81,7 +81,8 @@ The actively maintained core (most recent edits). Each file is one namespace und
 | `validate.xml` | `$c.validate` | Business-screen validation |
 | `sbm.xml` | `$c.sbm` | **Server communication** — submit/workflow/dynamic calls; defines `CONTEXT_PATH`, `SERVICE_URL`, async/JSON defaults, `MESSAGE_CODE` (E/S/W/I) |
 | `hkey.xml` | `$c.hkey` | Keyboard shortcuts |
-| `ext.xml` | `$c.data`* | External-solution integration |
+| `ext.xml` | `$c.ext` | External-solution integration (SBChart) |
+| `cert.xml` | `$c.cert` | **Public-certificate (Initech INISAFE Sign + Raon TransKey) integration** — module init, keypad z-index fix, keypad-use toggle, `auth()` wrapper. Vendor scripts are loaded **statically only** as `<engine><module>` entries in `src/websquare/config.xml`/`config.js` (crosswebex6.js uses `document.write` at load, so never inject it dynamically); `$c.cert` is itself registered there too |
 
 When writing code in `src/gcc/`, **reuse the `$c.*` helpers** instead of reimplementing (e.g. `$c.util.isEmpty(x)` over hand-rolled emptiness checks, `$c.str.*` for string ops, `$c.win.alert`/`$c.win.confirm` for dialogs, `$c.sbm.*` for all server calls). The files already cross-reference this way.
 

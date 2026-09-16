@@ -1,7 +1,7 @@
 # gcc 공통 함수 업데이트 이력
 
 `src/gcc/` 공통 라이브러리(`$c.*`)의 최초 반입(2026-06-08, `92a35bd`) 이후 변경 내역 정리 (최종 갱신 2026-09-15).
-API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-09-15 기준 **12개 모듈 / 292개 공개 메서드**.
+API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-09-15 기준 **13개 모듈 / 301개 공개 메서드**.
 
 > `src/cm/gcc/`는 CM 모듈용 사본으로 일반적 개선만 선별 반영해 왔으나(2026-06-10 병합, 2026-07-22 대규모 동기화로 11파일 체제),
 > **2026-08-18 `26af3d5`에서 사용 중단으로 삭제**되어 `src/gcc/`가 유일한 canonical 라이브러리다.
@@ -17,12 +17,13 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 | `data.xml` (`$c.data`) | 공통코드 로딩(`COMMON_CODE_INFO.ACTION` 연동, `setCommonCode` 배열 매핑 → code별 키잉 응답 매핑(`mappingKey` = 응답 조회 key) 개편·응답 언래핑·기본 컬럼 cdVal/cdValNm·조회 URL 이원화(url/paramName 옵션은 추가 후 제거)), JSON 헬퍼 8종, 프로세스 메시지, 콤보 공통코드 세팅(`comboCbDataSet*`) 계열(이메일 도메인 `comboCbDataSetEmail` 포함), 업로드/리포트 헬퍼, 엑셀 다운로드 기본 옵션 개선, 화면/DC 단위 전파 제어 `setBroadcast` |
 | `win.xml` (`$c.win`) | 외부망 홈(`goHomeEx`), 프로그램 열기/내비게이션 단순화, `openFormSubmit`, 인쇄(`mainPrint`/`popupPrint`), `success`/`error` 알림, `openExternalPage`, **browserPopup 부모 화면 접근**(`getOpenerScope`/`callOpener`), 히스토리 기록·복원(`pushState`/`changePageState`) 결함 수정 및 `moveUrl`/`setPageFrameSrc` 이동 복원 확장(`restoreData` [목록] 복귀 포함), 프레임 초기화 `reinitialize` |
 | `exception.xml` (`$c.exception`) | **신설**(2026-08-26, win.xml 에서 분리) — 화면 try/catch 공통 오류 처리기 `handleError`(예외 분류·이중 알림 방지), 오류 수집 훅 `_reportError`(`ERROR_REPORT_INFO.URL` 설정 시 활성화) |
-| `util.xml` (`$c.util`) | 쿠키/웹스토리지 헬퍼 13종, 업로드(`onUploadClick`/`getUploadFiles` 등), `setTextLengthCounter`, `checkFileExtension`, 엑셀 다운로드 파일명 개선, `setGridVisibleRowNum`(gridView "all" 동적 적용), 버튼 상태 일괄 제어 `setButtonState`/`registerButtonState`, 동적 컬럼 그리드 `syncDataListColumns`/`buildGridStyleXml`(setGridStyle 2단 그룹 헤더) |
+| `util.xml` (`$c.util`) | 쿠키/웹스토리지 헬퍼 13종, 업로드(`onUploadClick`/`getUploadFiles` 등), `setTextLengthCounter`, `checkFileExtension`, 엑셀 다운로드 파일명 개선, `setGridVisibleRowNum`(gridView "all" 동적 적용), 버튼 상태 일괄 제어 `setButtonState`/`registerButtonState`, 동적 컬럼 그리드 `syncDataListColumns`/`buildGridStyleXml`(setGridStyle 2단 그룹 헤더), DOM 로더 `loadScript`/`loadCss`/`addStyle`, 웹스토리지 접근 예외 흡수(`__getWebStorageObject`) |
 | `date.xml` (`$c.date`) | 날짜 포맷 검증(`checkCalendarFormat`/`compareFromToDate`), `getDateInterval` 단위 버그 수정, commonPrototype 의존 제거 |
 | `str.xml` (`$c.str`) | validate 중복 검증기 통합, 목적격 조사(`attachObjectPostposition`), 바이트/포맷 함수 자체 구현 전환 |
 | `session.xml` (`$c.session`) | **신설**(2026-06-09) — 세션 체크, 로그인/사용자 정보 관리 |
 | `validate.xml` (`$c.validate`) | DataCollection/DataGroup 검증, `validateSiteUrl` |
-| `ext.xml` | SB차트 연동(`drawSBChart`/`drawChartData`) |
+| `ext.xml` (`$c.ext`) | SB차트 연동(`drawSBChart`/`drawChartData`) |
+| `cert.xml` (`$c.cert`) | **신설**(2026-09-15) — 이니텍 공동인증서(INISAFE Sign)+라온 TransKey 연동: 벤더 스크립트·CSS 동적 로드/모듈 초기화 `loadModule`·`initModule`, 키패드 z-index 보정 `applyKeypadStyle`, 키패드 사용 여부 `setTranskeyUse`, 전자서명 호출 `auth(url, callback, { params, useTranskey })`; 벤더 경로·키패드 id 상수 `INITECH_INFO` |
 
 ---
 
@@ -275,6 +276,14 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 ## 2026년 9월
 
+### 공동인증서 공통 신설·DOM 로더·웹스토리지 보강 (09-15)
+- (미커밋) (09-15) — **`cert.xml`(`$c.cert`) 신설 + `$c.util` DOM 로더 3종** (292→301 메서드, 12→13 모듈):
+  - 출발점: 정적 HTML 샘플(`resources/sample/initech-cert-sample2.html`)을 가이드 화면 `SMPCRT10000`으로 전환한 뒤, 화면 함수 25개 중 9개를 gcc 로 분리(사용자 지시: `ext.xml` 이 아닌 별도 파일)
+  - `$c.cert`(6 공개 + 내부 `__findKeypadConf`): `isReady`·`loadModule(opt)`(벤더 준비 확인 → 키패드 style 주입 → `initModule`; **동적 스크립트 로드 없음** — crosswebex6.js 가 로드 즉시 `document.write` 로 하위 스크립트를 끌어와 문서 로드 후 주입 시 페이지가 지워지므로, 벤더 4종+CSS 는 config.xml/config.js `<engine><module>`·stylesheet earlyImportList 에 정적 등록. jQuery 는 셸 전역(gcc win/data 도 의존)을 그대로 사용, jQuery 4 미등록)·`initModule({ onStatus })`(유일한 모듈 초기화 지점 — `resources/js/common/initech-common.js` 의 `window.onload` 초기화 블록·토스트·`initechLoad` 제거, PC 만)·`applyKeypadStyle`·`setTranskeyUse(use)`(cwui_conf TRANS_KEY USE)·`auth(url, callback, { params, useTranskey, popupOptions })`(미로드 시 loadModule 후 벤더 `fnInitechAuthWithParams` 호출). **콜백을 Promise 로 감싸지 않음** — 벤더가 실패·취소 시 콜백을 부르지 않아 영구 pending(submitDoneHandler 함정과 동일)
+  - `$c.util`: `loadScript(src)`(Promise, 동일 src 재삽입 방지, 실패 reject)·`loadCss(href)`·`addStyle(id, cssText)`(멱등 style 주입) 신설(범용 — document.write 를 쓰지 않는 스크립트용, cert 는 addStyle 만 사용); 웹스토리지 8종이 `window.localStorage` 접근 자체의 SecurityError(프라이빗 모드·사이트 데이터 차단)를 흡수하도록 내부 `__getWebStorageObject(name)` 도입, `__getWebStorage` 의 getItem 예외 처리 추가
+  - 등록: `src/websquare/config.xml`·`config.js` projectCommon 에 `$c.cert`(`/cm/gcc/cert.xml`), engine 에 벤더 스크립트 4종(transkey_config·transkey·crosswebex6·initech-common), stylesheet 에 transkey.css 추가. `SMPCRT10000` 을 새 공통 위에 재작성(18 함수), 샘플 카탈로그·CLAUDE.md(gcc 표·lint baseline 13 files) 갱신
+  - 검증: gcc lint 13 files 0/0, `npm run docs:gcc` 13 modules/301 methods, Jest 신규 `test/cert.test.js` 11건(vm 하니스 + fake DOM/벤더 전역 mock, 동적 로드 금지 회귀 포함) 포함 171건 통과
+
 ### 내부 헬퍼 비공개화 규칙 전환 (09-15)
 - `e0fd152` (09-15) — `$c.win` **openMenu 창 개수 초과 알림·pushState 위치 조정, `__changePageState` 명명 복원**: M 레이아웃에서 `wdc_main.windows.length === 15` 이면 `com_deny_0010` 알림(엔진 `windowMaxNum` 제한·`onwindowmaxnumexceeded` 이벤트와 중복 — 후속 정리 후보), history `pushState` 는 창이 실제 생성된 경우(`winScope` 존재)에만 기록, closeAction 들여쓰기 정리. popstate 핸들러는 `_changePageState`→`__changePageState` 로 명명 복원(사용자 결정, 테스트 2종 참조 동기화)
 - `e47d8e3` (09-15) — `$c.win` **`openPopup` 옵션 `disableCloseButton` 추가**: true 면 팝업 타이틀 닫기(X) 버튼을 비활성화해 화면 버튼 등 명시 흐름으로만 닫히게 한다 — `_openPopup` 이 엔진 `$p.openPopup` 옵션(w2window `disableCloseButton`, 클릭 무시·`w2window_close_disabled` 클래스)으로 그대로 전달, 불리언 true 외는 false 정규화. pageFramePopup 전용(browserPopup 은 브라우저가 닫기 제어). JSDoc·예제 추가, Jest 2케이스(`popupOpenerScope`), docs:gcc 재생성
@@ -365,6 +374,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 | 일자 | 커밋 | 제목 |
 |------|------|------|
+| 2026-09-15 | (미커밋) | feat(gcc): cert.xml($c.cert) 공동인증서 연동 공통 신설 + util loadScript/loadCss/addStyle·웹스토리지 접근 예외 흡수 (292→301 메서드) |
 | 2026-09-10 | `9b9a5ef` | feat(gcc): $c.data.setBroadcast 공통함수 신설 + SMPDLT10000 전역 setBroadcast 호출 교체 (318→319 메서드) |
 | 2026-09-10 | `be4ecc3` | refactor(udc): bulkFileSaver saveMapForm 파일 인덱스를 dmaFileIndex dataMap 단일 파트로 전달 — [연관, gcc 무변경] |
 | 2026-09-10 | `064a753` | fix(gcc): sbm options 방어 초기화·validate REQUIRED 목적격 조사·session 디버그 로그 제거 |

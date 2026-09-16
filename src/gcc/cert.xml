@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ev="http://www.w3.org/2001/xml-events"
+	xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_screenName="공동인증서 연동 관련 함수" meta_screenId="$c.cert" meta_desc="이니텍 공동인증서(INISAFE Sign)와 라온 가상키보드(TransKey) 연동 관련 함수를 작성한다.">
+		<w2:type>COMMON</w2:type>
+		<w2:buildDate/>
+		<w2:MSA/>
+		<xf:model>
+			<w2:dataCollection baseNode="map"/>
+			<w2:workflowCollection/>
+		</xf:model>
+		<w2:layoutInfo/>
+		<w2:publicInfo method="scwin.isReady,scwin.loadModule,scwin.initModule,scwin.applyKeypadStyle,scwin.setTranskeyUse,scwin.auth"/>
+		<script lazy="false" type="text/javascript"><![CDATA[// =============================================================================
+/**
+ * 공동인증서 연동 관련 함수.
+ *
+ * 이니텍 공동인증서(INISAFE Sign, crosswebex6)와 라온 가상키보드(TransKey)를 화면에 붙일 때 반복되는
+ * 모듈 초기화·키패드 z-index 보정·키패드 사용 여부 전환·전자서명 호출을 모은다.
+ *
+ * 벤더 스크립트 로드 방식 (정적 로드만 허용)
+ * - src/websquare/config.xml·config.js 의 <engine><module> 에 등록해 셸이 초기 파싱 시점에 로드한다
+ *   (순서: transkey_config.js → transkey.js → crosswebex6.js → initech-common.js, CSS 는 stylesheet earlyImportList).
+ * - crosswebex6.js 는 로드 즉시(GINI_DYNAMIC_LOAD.moduleLoad) document.write 로 crosswebexInit.js·cw_web6_adt.js 등을
+ *   끌어오므로, 문서 로드가 끝난 뒤 화면에서 script 태그를 동적으로 넣으면 document.write 가 문서를 통째로 지운다.
+ *   그래서 이 파일은 동적 로드를 하지 않으며, 미로드 상태에서 호출하면 오류를 던져 등록 누락을 드러낸다.
+ * - jQuery 는 셸의 전역 jQuery($)를 쓴다(gcc win/data 도 같은 전역 의존). 벤더가 쓰는 API 는 $.ajax(FormData)·
+ *   fadeIn/fadeOut·offset·remove 뿐이라 jQuery 1.9+ 어느 버전이든 동작한다(responseJSON 은 1.9+).
+ *
+ * 벤더 의존
+ * - /resources/js/common/initech-common.js : fnInitechAuthWithParams(url, params, callback, options)
+ *   전자서명(PKCS7SignedData) + params 를 FormData 로 POST 하고, 콜백은 HTTP 2xx 에서만 호출한다.
+ *   4xx/5xx·팝업 취소는 벤더 알림창(INI_ALERT)만 뜨고 콜백을 부르지 않는다. 그래서 auth 를 Promise 로 감싸
+ *   콜백을 기다리게 만들지 않는다(영구 pending). 결과 수신은 반드시 callback 으로 받는다.
+ * - crosswebex6.js / cwui_conf : 인증서 팝업. cwui_conf.defaultConf.KeyStrokeSecurity.KeyStrokeSecurityList 에서
+ *   KEYPAD_NAME 이 TRANS_KEY 인 항목의 USE 가 라온 키패드 사용 여부다(customerConf.json 배포 기본값을 런타임에 덮어쓴다).
+ * - 통신은 벤더 스크립트가 $.ajax 로 직접 수행하므로 $c.sbm 을 타지 않는다. API 경로의 프리픽스(app.api.prefix)를
+ *   바꾸면 벤더 스크립트의 하드코딩 경로도 함께 고친다.
+ *
+ * @author Inswave Systems
+ * @class cert
+ * @namespace $c.cert
+ */
+// =============================================================================
+
+scwin.onpageload = function () {
+
+};
+
+// 벤더 연동 설정 — 키패드 정보는 배포 환경에 맞춰 여기서만 바꾼다. (스크립트·CSS 경로는 config.xml/config.js 가 보유)
+scwin.INITECH_INFO = {
+    // 인증서 팝업이 쓰는 라온 키패드 레이아웃 id — 인증서 팝업(z-index 7001) 위로 올린다.
+    KEYPAD_LAYOUT_IDS: [
+        "ini_cert_pwd_layout", "ini_cert_pwd_cnf_layout",
+        "ini_cert_new_pwd_layout", "ini_cert_new_pwd_cnf_layout",
+        "ini_cert_pin_layout", "ini_cert_target_pin_layout"
+    ],
+    KEYPAD_Z_INDEX: 7002,
+    KEYPAD_STYLE_ID: "gcc_cert_keypad_style",
+    // 이니텍 설정(customerConf.json KeyStrokeSecurity.KeyStrokeSecurityList)의 라온 키패드 항목명
+    KEYPAD_NAME: "TRANS_KEY"
+};
+
+/**
+ * @method
+ * @name isReady
+ * @description 공동인증서 벤더 스크립트(initech-common.js)가 셸에 로드되어 전자서명 호출이 가능한 상태인지 반환한다.
+ * @returns {Boolean} 로드되어 있으면 true
+ * @hidden N
+ * @exception
+ * @example
+if (!$c.cert.isReady()) { await $c.win.alert("공동인증서 모듈이 준비되지 않았습니다."); return; }
+ */
+scwin.isReady = function () {
+    return typeof window.fnInitechAuthWithParams === "function";
+};
+
+/**
+ * @method
+ * @name loadModule
+ * @description 셸(config.xml engine 모듈)이 로드한 벤더 스크립트를 확인하고, 키패드 z-index 보정 후 공동인증서 모듈을
+ *              초기화한다. 벤더 스크립트를 화면에서 동적으로 로드하지는 않는다(crosswebex6.js 의 document.write 때문 — 파일 머리 주석).
+ *              화면 onpageload 에서 한 번 호출해 두면 이후 auth 호출이 즉시 팝업을 띄운다.
+ * @param {Object} opt (선택) 초기화 옵션
+ * @param {Function} opt.onStatus 모듈 초기화 진행 안내 콜백 — onStatus(message, done). done 은 초기화 완료 시 true
+ * @returns {Promise<void>} 초기화를 시작하면 resolve(모듈 초기화 완료를 기다리지는 않는다)
+ * @hidden N
+ * @exception 벤더 스크립트가 셸에 로드되어 있지 않으면 Error (config.xml/config.js 등록 누락)
+ * @example
+await $c.cert.loadModule({ onStatus : function (msg, done) { txb_status.setValue(msg); } });
+ */
+scwin.loadModule = async function (opt) {
+    if (!scwin.isReady()) {
+        throw new Error("공동인증서 벤더 스크립트가 로드되지 않았습니다. src/websquare/config.xml·config.js 의 engine 모듈 등록(transkey·crosswebex6·initech-common)을 확인하세요.");
+    }
+
+    scwin.applyKeypadStyle();
+    scwin.initModule(opt);
+};
+
+/**
+ * @method
+ * @name initModule
+ * @description 공동인증서 모듈(crosswebex)을 초기화한다(PC 만, 모바일은 건너뜀). 이 함수가 유일한 초기화 지점이다 —
+ *              initech-common.js 의 window.onload 초기화 블록은 제거했다(매 페이지 로드마다 토스트 노출·다른 onload 핸들러
+ *              덮어쓰기 문제). 벤더의 대기 함수는 설치 확인 후 콜백만 부르므로 화면 재진입으로 반복 호출해도 무해하다.
+ * @param {Object} opt (선택) 초기화 옵션
+ * @param {Function} opt.onStatus 진행 안내 콜백 — onStatus(message, done)
+ * @returns {Boolean} 초기화를 시작했으면 true (벤더 함수가 없거나 모바일이면 false)
+ * @hidden N
+ * @exception
+ * @example
+$c.cert.initModule({ onStatus : function (msg, done) { txb_status.setValue(msg); } });
+ */
+scwin.initModule = function (opt) {
+    const onStatus = (opt && typeof opt.onStatus === "function") ? opt.onStatus : function () {};
+
+    if (typeof window.cwModuleInstallWaitWithNoPopup !== "function") {
+        return false;
+    }
+    if (typeof window.INI_getPlatformInfo === "function" && INI_getPlatformInfo().Mobile) {
+        return false;
+    }
+
+    onStatus("공동인증서 모듈 초기화 중입니다.", false);
+
+    cwModuleInstallWaitWithNoPopup(function () {
+        onStatus("공동인증서 모듈 초기화가 완료되었습니다.", true);
+    });
+
+    return true;
+};
+
+/**
+ * @method
+ * @name applyKeypadStyle
+ * @description 인증서 팝업이 쓰는 라온 키패드 레이아웃만 인증서 팝업 위로 올리는 CSS 를 문서에 넣는다(멱등).
+ * @returns {void}
+ * @hidden N
+ * @exception
+ * @example
+$c.cert.applyKeypadStyle();
+ */
+scwin.applyKeypadStyle = function () {
+    const info = scwin.INITECH_INFO;
+    const cssText = info.KEYPAD_LAYOUT_IDS.map(function (id) { return "#" + id; }).join(",\n")
+        + " { z-index: " + info.KEYPAD_Z_INDEX + " !important; }";
+
+    $c.util.addStyle(info.KEYPAD_STYLE_ID, cssText);
+};
+
+/**
+ * @method
+ * @name setTranskeyUse
+ * @description 인증서 비밀번호 입력칸의 라온 가상키보드 사용 여부를 이니텍 설정(cwui_conf)에 반영한다.
+ *              이니텍 UI 는 팝업을 열 때 설정을 읽으므로 팝업 직전에 호출한다(auth 의 opt.useTranskey 가 이를 대신한다).
+ *              첫 팝업에서 고른 키패드는 이니텍 UI 가 내부 캐시하므로, 팝업을 이미 연 뒤 바꾸면 새로고침해야 확실히 반영된다.
+ * @param {Boolean} use 사용 여부
+ * @returns {Boolean} 반영 성공 여부 (이니텍 설정이 아직 없으면 false)
+ * @hidden N
+ * @exception
+ * @example
+$c.cert.setTranskeyUse(chk_useTranskey.getValue() === "Y");
+ */
+scwin.setTranskeyUse = function (use) {
+    const keypadConf = scwin.__findKeypadConf();
+
+    if (!keypadConf) {
+        return false;
+    }
+
+    keypadConf.USE = use ? "Y" : "N";
+
+    return true;
+};
+
+/**
+ * @method
+ * @name __findKeypadConf
+ * @description (내부) 이니텍 설정에서 라온 키패드 항목(KEYPAD_NAME === INITECH_INFO.KEYPAD_NAME)을 찾는다.
+ * @returns {Object|null} 키패드 설정 항목. 이니텍 설정이 없거나 항목이 없으면 null
+ * @hidden Y
+ * @exception
+ * @example
+ */
+scwin.__findKeypadConf = function () {
+    if (typeof window.cwui_conf === "undefined" || !window.cwui_conf) {
+        return null;
+    }
+
+    const conf = window.cwui_conf.defaultConf || {};
+    const keypadList = (conf.KeyStrokeSecurity || {}).KeyStrokeSecurityList || [];
+
+    for (const keypad of keypadList) {
+        if (keypad && keypad.KEYPAD_NAME === scwin.INITECH_INFO.KEYPAD_NAME) {
+            return keypad;
+        }
+    }
+
+    return null;
+};
+
+/**
+ * @method
+ * @name auth
+ * @description 공동인증서 전자서명을 시작한다. 벤더 모듈 준비를 확인(미로드면 오류)하고, 가상키보드 사용 여부를 반영한 뒤
+ *              인증서 팝업을 띄운다. 전자서명 데이터와 opt.params 가 같은 요청으로 url 에 POST 되고, 서버가 2xx 를 돌려주면
+ *              callback(res) 이 호출된다. 실패·취소는 벤더 알림창만 뜨고 callback 이 오지 않으므로 화면은 호출 전에
+ *              이전 결과 표시를 비워 둔다.
+ * @param {String} url 전자서명 검증 URL (예: 로그인 처리, 인증서 검증, 인증서 등록)
+ * @param {Function} callback 서버 2xx 응답 콜백 — callback(res)
+ * @param {Object} opt (선택) 옵션
+ * @param {Object} opt.params 전자서명과 함께 보낼 파라미터 ({파라미터명: 값}). 생략 시 전자서명만 전송
+ * @param {Boolean} opt.useTranskey 라온 가상키보드 사용 여부. 지정 시 팝업 직전에 setTranskeyUse 를 적용
+ * @param {Object} opt.popupOptions 벤더 인증서 팝업 옵션(initech-common.js 의 options 그대로 전달)
+ * @returns {Promise<void>} 팝업을 띄운 뒤 resolve (콜백 수신을 기다리지 않는다)
+ * @hidden N
+ * @exception 벤더 스크립트가 셸에 로드되어 있지 않으면 Error
+ * @example
+await $c.cert.auth("/api/discls/vendor/SW/initech/cert/verify", scwin.certVerifyCallback, { useTranskey : true });
+await $c.cert.auth("/api/discls/info/cert/insert", scwin.certRegisterCallback, { params : dma_chrgInfo.getJSON() });
+ */
+scwin.auth = async function (url, callback, opt) {
+    opt = opt || {};
+
+    if (!scwin.isReady()) {
+        await scwin.loadModule();
+    }
+
+    if (typeof opt.useTranskey === "boolean") {
+        scwin.setTranskeyUse(opt.useTranskey);
+    }
+
+    fnInitechAuthWithParams(url, opt.params || null, callback, opt.popupOptions);
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload"/>
+</html>
