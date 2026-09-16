@@ -193,6 +193,9 @@ export default {
           "@src": "/websquare/_websquare_/externalJS/sbchart/sbchart.js"
         },
         {
+          "@src": "/cm/cert/js/common/promise-guard.js"
+        },
+        {
           "@src": "/cm/cert/vendor/transkey/transkey_config.js"
         },
         {
