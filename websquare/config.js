@@ -152,7 +152,7 @@ export default {
       "@value": "false"
     },
     "stylesheet": {
-      "@earlyImportList": "/cm/css/base.css,/cm/css/contents.css,/cm/css/print.css,/resources/vendor/transkey/transkey.css",
+      "@earlyImportList": "/cm/css/base.css,/cm/css/contents.css,/cm/css/print.css,/cm/cert/vendor/transkey/transkey.css",
       "@enable": "true",
       "@import": "link",
       "@value": "stylesheet_ext.css"
@@ -193,16 +193,16 @@ export default {
           "@src": "/websquare/_websquare_/externalJS/sbchart/sbchart.js"
         },
         {
-          "@src": "/resources/vendor/transkey/transkey_config.js"
+          "@src": "/cm/cert/vendor/transkey/transkey_config.js"
         },
         {
-          "@src": "/resources/vendor/transkey/transkey.js"
+          "@src": "/cm/cert/vendor/transkey/transkey.js"
         },
         {
-          "@src": "/resources/vendor/SW/initech/extension/crosswebex6.js?dt=20260105"
+          "@src": "/cm/cert/vendor/SW/initech/extension/crosswebex6.js?dt=20260105"
         },
         {
-          "@src": "/resources/js/common/initech-common.js"
+          "@src": "/cm/cert/js/common/initech-common.js"
         }
       ]
     },

@@ -1,7 +1,7 @@
 /*Create transkey_config.js by TranskeySupporter
 2024-03-11*/
 
-var transkey_url = '/resources/vendor/transkey';
+var transkey_url = '/cm/cert/vendor/transkey';
 //var transkey_surl = '/api/transkeyServlet'; 추후 상대경로가 api 추가 될 경우
 // 서버의 raon.transkey.url-mappings(= ${app.api.prefix}/vendor/raon/transkey-servlet)와 같은 값이어야 한다.
 // app.api.prefix 를 바꾸면 이 값도 함께 고칠 것.
