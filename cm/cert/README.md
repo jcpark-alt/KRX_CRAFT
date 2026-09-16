@@ -104,4 +104,4 @@ npm run lint:xml              # WebSquare XML lint (gcc 13 files 0/0 · legacy 2
 | 2026-09-16 | `6c8a807` | `promise-guard.js` — bluebird 전역 Promise 덮어쓰기 차단 (§4.1, 이후 shell-guard 로 병합) |
 | 2026-09-16 | `6eba4b8` | `crossd_iframe.html` 메시지 가드 (§4.2) |
 | 2026-09-16 | `45abc9d` | `initech-docwrite-capture/replay.js` — 벤더 document.write 캡처·동기 재생 (§4.3, 이후 shell-guard 로 병합) |
-| 2026-09-16 | (미커밋) | 위 3파일을 `initech-shell-guard.js` 1파일로 병합(재생을 스크립트 종료 직후 마이크로태스크로 자동화), 테스트 통합 |
+| 2026-09-16 | `8a4d452` | 위 3파일을 `initech-shell-guard.js` 1파일로 병합(재생을 스크립트 종료 직후 마이크로태스크로 자동화), 테스트 통합 |
