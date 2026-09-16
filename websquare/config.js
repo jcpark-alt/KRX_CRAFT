@@ -193,10 +193,7 @@ export default {
           "@src": "/websquare/_websquare_/externalJS/sbchart/sbchart.js"
         },
         {
-          "@src": "/cm/cert/js/common/promise-guard.js"
-        },
-        {
-          "@src": "/cm/cert/js/common/initech-docwrite-capture.js"
+          "@src": "/cm/cert/js/common/initech-shell-guard.js"
         },
         {
           "@src": "/cm/cert/vendor/transkey/transkey_config.js"
@@ -205,16 +202,7 @@ export default {
           "@src": "/cm/cert/vendor/transkey/transkey.js"
         },
         {
-          "@src": "/cm/cert/js/common/initech-docwrite-replay.js"
-        },
-        {
-          "@src": "/cm/cert/js/common/initech-docwrite-capture.js"
-        },
-        {
           "@src": "/cm/cert/vendor/SW/initech/extension/crosswebex6.js?dt=20260105"
-        },
-        {
-          "@src": "/cm/cert/js/common/initech-docwrite-replay.js"
         },
         {
           "@src": "/cm/cert/js/common/initech-common.js"
