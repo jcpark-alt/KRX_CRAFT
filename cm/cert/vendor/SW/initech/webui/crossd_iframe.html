@@ -1,0 +1,225 @@
+<!DOCTYPE HTML> 
+<html lang="ko">
+<head>
+<title>Cross Domain Iframe</title>
+</head> 
+<body>
+	<script type="text/javascript">
+		(function() {
+
+			function getParam(name) {
+				var paramAll = window.location.search.substring(1);
+				var paramAllArray = paramAll.split("&");
+				for (var i = 0; i < paramAllArray.length; i++) {
+					var param = paramAllArray[i].split("=");
+					if (param[0] == name) {
+						return decodeURIComponent(param[1]);
+					}
+				}
+			}
+
+			//allowed domains (that can use RegExp)
+			//var whitelist = ["https?://localhost(:[0-9]+)","127.0.0.1", "^.*\.domain\.com"];
+			var whitelist = JSON.parse(getParam("WhiteList"));
+
+			var _debugLog = false;
+			var console = window.console || {
+				log : function() {
+				}
+			};
+
+			(function() {
+				if ( sessionStorage ) {
+					if ( sessionStorage.CWEX_CROSSDIFRAME_LOG === 'true' ) {
+						_debugLog = true;
+					}
+				}
+			})();
+		
+
+			function verifyOrigin(origin) {
+
+				var domain = origin.replace(/^https?\:\/\/|:\d+$/g, "").toLowerCase();
+				
+				//var domain = origin;
+				var i = 0, len = whitelist.length;
+
+				while (i < len) {
+					if (domain.match(new RegExp(whitelist[i]))) {
+						if (_debugLog)	console.log('access ok : ' + origin);
+						return true;
+					}
+					i++;
+				}
+
+				alert('access denied : ' + origin);
+				return false;
+			};
+
+			function handleRequest(event) {
+				var INI_PRIVATE_STORAGE = 'INI_PRIVATE_STORAGE';
+
+				if (verifyOrigin(event.origin)) {
+
+					var localRepository = (function() {
+
+						function write(certPriAttr) {
+							var certId = (certPriAttr.INHERENT_A['ISSUER'] + '-' + certPriAttr.INHERENT_A['SERIAL']).replace(/ /gi, "_") ;
+							var storageVal = localStorage.getItem(INI_PRIVATE_STORAGE);
+							try {
+								if (storageVal == null) {
+									var newPriCert = {};
+									newPriCert[certId] = certPriAttr;
+
+									if (_debugLog)	console.log(newPriCert);
+
+									localStorage.setItem(INI_PRIVATE_STORAGE, JSON.stringify(newPriCert));
+								} else {
+									var savedPriCert = JSON.parse(storageVal);
+
+									savedPriCert[certId] = certPriAttr;
+
+									if (_debugLog)	console.log(savedPriCert);
+
+									localStorage.removeItem(INI_PRIVATE_STORAGE);
+									localStorage.setItem(INI_PRIVATE_STORAGE, JSON.stringify(savedPriCert));
+								}
+							} catch (e) {
+								console.log(e.message);
+								console.log(e);
+								localStorage.setItem(INI_PRIVATE_STORAGE, storageVal);
+							}
+
+						};
+
+						function remove(certId) {
+
+							if (_debugLog)	console.log('remove certificate id : ' + certId);
+
+							var storageVal = localStorage[INI_PRIVATE_STORAGE];
+							try {
+								if (storageVal) {
+									storageVal = JSON.parse(storageVal);
+
+									delete storageVal[certId];
+									localStorage.removeItem(INI_PRIVATE_STORAGE);
+									localStorage.setItem(INI_PRIVATE_STORAGE, JSON.stringify(storageVal));
+								}
+							} catch (e) {
+								console.log(e.message);
+								console.log(e);
+								localStorage.setItem(INI_PRIVATE_STORAGE, storageVal);
+							}
+						};
+
+						function clear() {
+							localStorage.removeItem(INI_PRIVATE_STORAGE);
+						};
+
+						return {
+							write : write,
+							remove : remove,
+							clear : clear
+						};
+					}());
+
+					if (_debugLog)	console.log(event.origin);
+
+					var request = JSON.parse(event.data);
+
+					if (request.type == 'get') {
+						if (_debugLog)	console.log('[201]Cross iframe handler data : get');
+						var storageVal = localStorage.getItem(INI_PRIVATE_STORAGE);
+						if (storageVal) {
+							storageVal = JSON.parse(storageVal);
+
+// 							if (request.param !== undefined) {
+// 								var local = request.param.CROSS_LOCAL;
+// 								if (local) {
+// 									for (item in local) {
+// 										storageVal[item] = local[item];
+// 									}
+// 								}
+// 							}
+						} else {
+							var local = request.param.CROSS_LOCAL;
+							if (local) {
+								storageVal = local;
+							}
+						}
+						
+						var jsonObj = JSON.stringify({
+							id : request.id,
+							param : request.param,
+							value : storageVal
+						});
+						
+						event.source.postMessage(jsonObj.toString(), event.origin);
+
+						if (_debugLog)	console.log('[201]------------------------------------------------');
+
+					} else if (request.type == 'set') {
+						if (_debugLog)	console.log('[202]Cross iframe handler data : set');
+
+						localRepository.write(request.value);
+
+						if (_debugLog)	console.log('[202]------------------------------------------------');
+					} else if (request.type == 'unset') {
+						if (_debugLog)	console.log('[203]Cross iframe handler data : remove');
+						if (_debugLog)	console.log(request.certId);
+
+						localRepository.remove(request.certId);
+
+						if (_debugLog)	console.log('[203]------------------------------------------------');
+					} else if (request.type == 'clear') {
+						if (_debugLog)	console.log('[204]Cross iframe handler data : clear');
+
+						localRepository.clear();
+
+						if (_debugLog)	console.log('[204]------------------------------------------------');
+					} else if (request.type == 'refresh') {
+						event.source.postMessage(JSON.stringify({
+							id : request.id,
+							refresh : true,
+							param : request.param
+						}), event.origin);
+					}
+					/*
+					 // CrossDomain 의 sessionStorage 를 사용하기 위한 api
+					 // middleChannel 에서 사용할 예정이었으나, 비동기 이슈로 사용 안됨. 추후 사용 될 여지가 있으므로 주석처리만 해둠
+					else if (request.type == 'getSession') {
+						var selected = sessionStorage[request.key];
+
+						event.source.postMessage(selected, event.origin);
+					} else if (request.type == 'setSession') {
+
+						sessionStorage.removeItem(request.key);
+
+						sessionStorage.setItem(request.key, request.value);
+					}
+					*/
+
+					/*
+					else if(request.type == 'clearset') {
+						if (_debugLog)	console.log('[204]Cross iframe handler data : clearset');
+						if (_debugLog)	console.log(request.key);
+						
+					    localStorage.removeItem(request.key);
+					    localStorage.setItem(request.key, request.value);
+					    
+					    if (_debugLog)	console.log('[204]------------------------------------------------');
+					}
+					 */
+				}
+			}
+
+			if (window.addEventListener) {
+				window.addEventListener("message", handleRequest, false);
+			} else if (window.attachEvent) {
+				window.attachEvent("onmessage", handleRequest);
+			}
+		})();
+	</script>
+</body>
+</html>
+

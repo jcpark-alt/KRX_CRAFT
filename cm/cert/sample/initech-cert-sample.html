@@ -1,0 +1,470 @@
+<!doctype html>
+<!--
+    이니텍 공동인증서 연동 샘플
+
+    - 이 저장소의 프론트는 WebSquare 이며, 이 파일은 Thymeleaf 템플릿이 아닌
+      순수 정적 HTML 이다. (src/main/resources/static/resources 하위 → URL /resources/**)
+    - 용도: 공동인증서(INISAFE Sign) + 라온 가상키보드(TransKey) 연동 동작 확인.
+      로그인 화면이 아니다 — 로그인 화면은 프론트(WebSquare)가 제공한다.
+    - WebSquare 화면에 붙일 때는 아래 3단계만 옮기면 된다.
+        1) transkey / crosswebex6 / initech-common 스크립트·CSS 로드
+        2) fnInitechAuth(전자서명검증URL, 콜백) 호출
+           (화면 입력값을 함께 보내려면 fnInitechAuthWithParams(URL, {키:값}, 콜백))
+        3) 인증서 팝업 키패드가 가려지지 않도록 z-index 보정 CSS 적용
+    - 벤더 API 경로에는 app.api.prefix(/api/discls)가 포함된다. 서버(WebtoB)가 이 프리픽스로
+      라우팅하기 때문이며, 프리픽스를 바꾸면 이 파일과 벤더 스크립트의 하드코딩 경로도 함께 고쳐야 한다.
+    - 이 화면이 호출하는 API 는 두 종류다.
+        * 공통 : {prefix}/vendor/SW/initech/**  — 서버시각·전자서명 검증·인증서 검증
+                 (common.vendor.initech 패키지. 업무 화면에서도 그대로 쓴다)
+        * 샘플 : /api/common/sample/initech-cert/insert — 인증서 등록
+                 (fildis.common.api.sample 패키지. 공통 모듈 호출 예시일 뿐 업무 기능이 아니다)
+    - 콜백(fnXxxCallBack)은 HTTP 2xx 응답에서만 호출된다. 서버가 4xx/5xx 를 돌려주거나
+      사용자가 인증서 팝업을 취소하면 initech-common.js 가 벤더 알림창(INI_ALERT)만 띄우고
+      콜백은 부르지 않는다 — 그래서 버튼을 누를 때마다 #result 를 먼저 비운다.
+-->
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>이니텍 공동인증서 연동 샘플</title>
+    <link rel="icon" href="/resources/favicon.ico">
+    <link href="/resources/sample/startbootstrap-sb-admin-gh-pages/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- jQuery (initech-common.js 의 $.ajax 에서 사용) -->
+    <script type="text/javascript" src="/resources/js/lib/jquery-4.0.0.min.js"></script>
+
+    <!-- 라온 가상키보드 js, css 필수 (이니텍 인증서 비밀번호 입력에 물림) -->
+    <script type="text/javascript" src="/resources/vendor/transkey/transkey_config.js"></script>
+    <script type="text/javascript" src="/resources/vendor/transkey/transkey.js"></script>
+    <link rel="stylesheet" type="text/css" href="/resources/vendor/transkey/transkey.css" />
+
+    <!-- Start 이니텍 공동인증서 -->
+    <script type="text/javascript" src="/resources/vendor/SW/initech/extension/crosswebex6.js?dt=20260105"></script>
+    <script type="text/javascript" src="/resources/js/common/initech-common.js"></script>
+    <!--// End 이니텍 공동인증서 -->
+
+    <style>
+        body {
+            background: linear-gradient(to right, #e0eafc, #cfdef3);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .sample-card {
+            width: 100%;
+            max-width: 500px;
+            background-color: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .sample-card h3 {
+            margin-bottom: 10px;
+            font-weight: 600;
+            text-align: center;
+            color: #343a40;
+        }
+
+        .sample-card .guide {
+            margin-bottom: 20px;
+            text-align: center;
+            color: #6c757d;
+            font-size: 0.9rem;
+            word-break: keep-all;
+        }
+
+        .btn-primary {
+            border-radius: 10px;
+            font-weight: bold;
+            padding: 10px;
+        }
+
+        /* 인증서 팝업 가상키보드 선택 */
+        .tk-option {
+            margin-bottom: 6px;
+            padding: 12px 14px;
+            border: 1px solid #dee2e6;
+            border-radius: 10px;
+        }
+
+        .tk-option .form-check-label {
+            font-size: 0.9rem;
+            color: #343a40;
+        }
+
+        .tk-option .option-desc {
+            margin: 4px 0 0 0;
+            color: #6c757d;
+            font-size: 0.78rem;
+            word-break: keep-all;
+        }
+
+        #transkeyNotice {
+            margin-bottom: 20px;
+            color: #a2610a;
+            font-size: 0.78rem;
+            word-break: keep-all;
+            display: none;
+        }
+
+        /* 입력값이 필요한 기능은 별도 영역으로 묶는다 */
+        .sample-block {
+            margin-top: 28px;
+            padding: 20px;
+            border: 1px solid #dee2e6;
+            border-radius: 12px;
+            background: #f8f9fa;
+        }
+
+        .sample-block h5 {
+            margin-bottom: 4px;
+            font-weight: 600;
+            color: #343a40;
+        }
+
+        .sample-block .block-desc {
+            margin-bottom: 18px;
+            color: #6c757d;
+            font-size: 0.85rem;
+            word-break: keep-all;
+        }
+
+        #result {
+            margin-top: 20px;
+            padding: 12px;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            white-space: pre-wrap;
+            word-break: break-all;
+            display: none;
+        }
+
+        #result.ok   { background: #e7f5ec; color: #1b7a43; }
+        #result.fail { background: #fdecec; color: #c02626; }
+
+        /* 이니텍 인증서 팝업에서 사용하는 라온 키패드만 인증서 팝업 위로 */
+        #ini_cert_pwd_layout,
+        #ini_cert_pwd_cnf_layout,
+        #ini_cert_new_pwd_layout,
+        #ini_cert_new_pwd_cnf_layout,
+        #ini_cert_pin_layout,
+        #ini_cert_target_pin_layout {
+            z-index: 7002 !important;
+        }
+    </style>
+
+    <script>
+
+        // 이니텍 팝업이 쓰는 라온 키패드의 설정 이름
+        // (customerConf.json 의 KeyStrokeSecurity.KeyStrokeSecurityList 항목명)
+        var TRANSKEY_KEYPAD_NAME = "TRANS_KEY";
+
+        // 체크박스 상태 보관 키 - 새로고침으로 반영할 때 상태를 유지한다
+        var TRANSKEY_PREF_KEY = "initechSampleUseTranskey";
+
+        // 이 페이지에서 인증서 팝업을 한 번이라도 열었는지 여부
+        // (이니텍 UI 가 첫 팝업에서 고른 키패드를 내부에 캐시하므로 안내 조건으로 쓴다)
+        var certPopupOpened = false;
+
+        // 입력값 앞뒤 공백 제거 (jQuery 4 에서 $.trim 이 제거되었다)
+        function fnTrim(value) {
+            return (value || "").trim();
+        }
+
+        // 가상키보드 사용 여부 (체크박스 상태)
+        function fnUseTranskey() {
+            return $("#useTranskey").prop("checked");
+        }
+
+        // 결과 영역 초기화
+        // - 실패(4xx/5xx)·취소 시에는 콜백이 오지 않아 직전 결과가 남으므로 버튼을 누를 때 먼저 비운다
+        function fnClearResult() {
+            $("#result").hide().removeClass("ok fail").text("");
+        }
+
+        $(document).ready(function () {
+
+            // 저장된 체크박스 상태 복원
+            $("#useTranskey").prop("checked", fnLoadTranskeyPref());
+
+            // 이니텍 공동인증서 인증 버튼 클릭 이벤트
+            $("#initechCertBtn").on("click", function (e) {
+                e.preventDefault();
+                fnClearResult();
+                fnBeforeCertPopup();
+                fnInitechAuth("/api/discls/guest/auth/inisafe-sign-login-processing", fnInitechCallBack);
+            });
+
+            // 인증서 검증 버튼 클릭 이벤트 (OCSP 실시간 폐기여부 확인)
+            $("#certVerifyBtn").on("click", function (e) {
+                e.preventDefault();
+                fnClearResult();
+                fnBeforeCertPopup();
+                fnInitechAuth("/api/discls/vendor/SW/initech/cert/verify", fnCertVerifyCallBack);
+            });
+
+            // 인증서 등록 버튼 클릭 이벤트 (화면 입력값을 전자서명과 함께 전송)
+            $("#certRegisterBtn").on("click", function (e) {
+                e.preventDefault();
+
+                var comNm = fnTrim($("#comNm").val());
+                var regNm = fnTrim($("#regNm").val());
+
+                if (!comNm) {
+                    alert("회사명을 입력해주세요.");
+                    $("#comNm").focus();
+                    return;
+                }
+
+                if (!regNm) {
+                    alert("등록자명을 입력해주세요.");
+                    $("#regNm").focus();
+                    return;
+                }
+
+                fnClearResult();
+                fnBeforeCertPopup();
+
+                // 등록은 공통 기능이 아니라 샘플 API 다 (/api/common/sample/**)
+                // - 검증 실패는 400 으로 돌아와 콜백이 아니라 벤더 알림창(INI_ALERT)에 안내 문구가 뜬다
+                fnInitechAuthWithParams(
+                        "/api/common/sample/initech-cert/insert",
+                        { comNm : comNm, regNm : regNm },
+                        fnCertRegisterCallBack);
+            });
+
+            // 가상키보드 사용 여부 변경 - 인증서 비밀번호 입력칸에 적용된다
+            $("#useTranskey").on("change", function () {
+
+                fnSaveTranskeyPref(this.checked);
+                fnApplyTranskeyConf(this.checked);
+                fnShowTranskeyNotice();
+
+            });
+
+            // 안내문의 새로고침 링크
+            $("#transkeyReload").on("click", function (e) {
+                e.preventDefault();
+                location.reload();
+            });
+
+        });
+
+        // 인증서 팝업을 열기 직전 처리
+        // - 이니텍 UI(cwui)는 팝업을 열 때 설정을 다시 읽으므로 이 시점에 반영한다
+        function fnBeforeCertPopup() {
+
+            fnApplyTranskeyConf(fnUseTranskey());
+
+            certPopupOpened = true;
+        }
+
+        // 인증서 비밀번호 입력칸의 가상키보드 사용 여부를 이니텍 설정에 반영한다
+        // - customerConf.json 의 KeyStrokeSecurityList > TRANS_KEY > USE 와 같은 값이며,
+        //   배포본의 기본값을 바꾸려면 그 파일을 고친다 (여기서는 화면에서만 바꾼다)
+        function fnApplyTranskeyConf(use) {
+
+            var keypadConf = fnFindTranskeyConf();
+
+            // 이니텍 모듈이 아직 로드되지 않았으면 다음 호출에서 다시 시도한다
+            if (!keypadConf) {
+                return false;
+            }
+
+            keypadConf.USE = use ? "Y" : "N";
+
+            return true;
+        }
+
+        // 이니텍 설정에서 라온 키패드 항목을 찾는다
+        function fnFindTranskeyConf() {
+
+            try {
+
+                var keypadList = cwui_conf.defaultConf.KeyStrokeSecurity.KeyStrokeSecurityList;
+
+                for (var i = 0; i < keypadList.length; i++) {
+
+                    if (keypadList[i].KEYPAD_NAME === TRANSKEY_KEYPAD_NAME) {
+                        return keypadList[i];
+                    }
+
+                }
+
+            } catch (e) {
+                console.error("이니텍 키패드 설정을 찾지 못했습니다.", e);
+            }
+
+            return null;
+        }
+
+        // 새로고침 안내 노출 여부 결정
+        // - 이니텍 UI 는 첫 팝업에서 고른 키패드를 내부에 캐시해 두므로,
+        //   팝업을 이미 연 뒤에 체크박스를 바꾸면 새로고침해야 확실히 반영된다
+        function fnShowTranskeyNotice() {
+
+            if (certPopupOpened) {
+                $("#transkeyNotice").show();
+            } else {
+                $("#transkeyNotice").hide();
+            }
+
+        }
+
+        // 체크박스 상태 저장 (sessionStorage 사용 불가 환경도 있으므로 실패는 무시)
+        function fnSaveTranskeyPref(use) {
+
+            try {
+                sessionStorage.setItem(TRANSKEY_PREF_KEY, use ? "Y" : "N");
+            } catch (e) {
+                console.warn("가상키보드 설정을 저장하지 못했습니다.", e);
+            }
+
+        }
+
+        // 체크박스 상태 복원 (저장값이 없으면 기본 미사용)
+        function fnLoadTranskeyPref() {
+
+            try {
+                return sessionStorage.getItem(TRANSKEY_PREF_KEY) === "Y";
+            } catch (e) {
+                return false;
+            }
+
+        }
+
+        // 공동인증서 로그인(전자서명 검증) 성공 콜백
+        // - 로그인 실패는 401 로 돌아와 이 콜백에 오지 않고 벤더 알림창에 사유가 뜬다 (성공만 여기로 온다)
+        function fnInitechCallBack(res) {
+
+            console.log(res);
+
+            // 성공 결과를 화면에 표시한다 (연동 확인용 샘플이므로 화면 이동은 하지 않는다)
+            $("#result")
+                .removeClass("ok fail")
+                .addClass("ok")
+                .text("로그인 성공 — 인증 토큰(accessToken 쿠키) 발급"
+                        + (res.message ? " : " + res.message : ""))
+                .show();
+
+        }
+
+        // 인증서 검증(OCSP) 결과 콜백
+        // - 서버 응답은 CommonResponseDto 로 래핑되어 body 에 인증서 정보 DTO 가 담긴다
+        // - 이 공통 API 는 인증서가 비정상이어도 200 / success=true 다 — 판정은 반드시 body.result 로 한다
+        function fnCertVerifyCallBack(res) {
+
+            console.log(res);
+
+            var cert = res.body || {};
+
+            // 확인 결과를 alert 으로 표출
+            alert(cert.result
+                    ? "정상 등록된 인증서입니다.\n\n" + res.message
+                    : "인증서 확인 실패\n\n" + (res.message || "인증서 상태를 확인할 수 없습니다."));
+
+            // 화면에도 함께 남겨 결과를 다시 확인할 수 있게 한다
+            $("#result")
+                .removeClass("ok fail")
+                .addClass(cert.result ? "ok" : "fail")
+                .text("인증서 검증 : " + (cert.certInfo || "-") + " / " + res.message)
+                .show();
+
+        }
+
+        // 인증서 등록 성공 콜백
+        // - 업무 API 형태의 샘플이라 검증 실패는 400(BusinessException)으로 돌아오며 이 콜백에 오지 않는다
+        // - 성공 응답의 body 는 업무 응답 DTO(회사명·등록자명·인증서 식별값)이고 result 필드는 없다
+        function fnCertRegisterCallBack(res) {
+
+            console.log(res);
+
+            var data = res.body || {};
+
+            // 등록 결과를 alert 으로 표출
+            alert("인증서 등록 요청이 정상 처리되었습니다.\n\n일련번호 : " + (data.serialNumber || "-"));
+
+            // 화면에도 함께 남겨 결과를 다시 확인할 수 있게 한다
+            $("#result")
+                .removeClass("ok fail")
+                .addClass("ok")
+                .text("인증서 등록 : " + (data.certInfo || "-")
+                        + " / 일련번호 : " + (data.serialNumber || "-")
+                        + "\n회사명 : " + (data.comNm || "-")
+                        + " / 등록자명 : " + (data.regNm || "-"))
+                .show();
+
+        }
+
+    </script>
+
+</head>
+<body>
+
+<div class="sample-card">
+
+    <h3>이니텍 공동인증서 연동 샘플</h3>
+    <p class="guide">
+        <b>공동인증서 인증</b> — 전자서명 후 서버 검증, 성공 시 인증 토큰 발급<br>
+        <b>인증서 검증</b> — 정상 등록된 인증서인지 OCSP 로 확인
+    </p>
+
+    <!-- 인증서 팝업(인증서 비밀번호 입력칸)의 가상키보드 사용 여부 -->
+    <div class="tk-option">
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="useTranskey">
+            <label class="form-check-label" for="useTranskey">가상키보드(라온 TransKey) 사용</label>
+            <p class="option-desc">
+                체크하면 인증서 팝업의 비밀번호를 가상키보드로 입력합니다(기본은 물리 키보드).
+                아래 세 기능 모두에 적용됩니다.
+            </p>
+        </div>
+    </div>
+
+    <p id="transkeyNotice">
+        인증서 팝업을 이미 연 뒤에는 이니텍 모듈이 키패드 설정을 캐시하고 있어
+        <a href="#" id="transkeyReload">새로고침</a> 후에 확실히 반영됩니다.
+    </p>
+
+    <button id="initechCertBtn" type="button" class="btn btn-primary w-100 mb-3">
+        공동인증서 인증
+    </button>
+
+    <button id="certVerifyBtn" type="button" class="btn btn-outline-primary w-100">
+        인증서 검증
+    </button>
+
+    <!-- 인증서 등록 - 입력값이 있어 별도 영역으로 분리한다 -->
+    <div class="sample-block">
+
+        <h5>인증서 등록</h5>
+        <p class="block-desc">
+            아래 입력값을 전자서명과 같은 요청으로 보냅니다.
+            검증이 정상이면 인증서 식별값과 입력값이 돌아오고, 실패하면 400 으로 안내 문구만 뜹니다 (DB 저장 없음).
+        </p>
+
+        <div class="mb-3">
+            <label for="comNm" class="form-label">회사명</label>
+            <input type="text" id="comNm" class="form-control" maxlength="100" placeholder="회사명을 입력하세요">
+        </div>
+
+        <div class="mb-3">
+            <label for="regNm" class="form-label">등록자명</label>
+            <input type="text" id="regNm" class="form-control" maxlength="50" placeholder="등록자명을 입력하세요">
+        </div>
+
+        <button id="certRegisterBtn" type="button" class="btn btn-outline-primary w-100">
+            인증서 등록
+        </button>
+
+    </div>
+
+    <div id="result"></div>
+
+</div>
+
+</body>
+</html>

@@ -25,7 +25,7 @@
 | `ULDSTF30702.xml` | 조회조건 + 페이징 + 엑셀 | ULDSTF30702 비밀번호 재발급 | `/ui/sample/template/ULDSTF30710.xml` |
 | `SMPVAL10000.xml` | 통합 입력 검증 (validateDataCollect 전체 옵션) | (합성 가이드 — 원본 없음) | `/ui/sample/template/SMPVAL10000.xml` |
 | `SMPBTN10000.xml` | 버튼 상태 일괄 제어 (setButtonState) | (합성 가이드 — 원본 없음) | `/ui/sample/template/SMPBTN10000.xml` |
-| `SMPCRT10000.xml` | 이니텍 공동인증서 연동 (INISAFE Sign + 라온 TransKey) | `resources/sample/initech-cert-sample2.html` (정적 HTML 샘플) | `/ui/sample/template/SMPCRT10000.xml` |
+| `SMPCRT10000.xml` | 이니텍 공동인증서 연동 (INISAFE Sign + 라온 TransKey) | `cm/cert/sample/initech-cert-sample2.html` (정적 HTML 샘플) | `/ui/sample/template/SMPCRT10000.xml` |
 
 > 소스↔원본은 파일 head(`meta_screenName`의 "원본 …" 표기) 기준 **1:1 매핑**이다.
 > `ULDSTF30702`만 배포 파일명이 `ULDSTF30710.xml`로 다르므로 배포 시 주의한다.
