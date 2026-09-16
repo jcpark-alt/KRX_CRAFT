@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>iframe 내부 페이지에서 부모 팝업 창 닫기 — 처리 흐름</title>
+<style>
+  :root {
+    --ink: #1a2333; --sub: #5b6577; --line: #e3e7ee; --bg: #f6f8fb;
+    --card: #ffffff; --accent: #1c5dd9; --accent-soft: #eaf1fd;
+    --ok: #0f8a4d; --ok-soft: #e8f6ee; --warn: #b45309; --warn-soft: #fdf3e3;
+    --code-bg: #f0f3f8;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Malgun Gothic", "Segoe UI", sans-serif; color: var(--ink); background: var(--bg); line-height: 1.65; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 32px 24px 64px; }
+  header { border-bottom: 3px solid var(--accent); padding-bottom: 16px; margin-bottom: 28px; }
+  header h1 { margin: 0 0 6px; font-size: 26px; }
+  header .meta { color: var(--sub); font-size: 14px; }
+  h2 { font-size: 19px; margin: 40px 0 14px; padding-left: 10px; border-left: 4px solid var(--accent); }
+  h3 { font-size: 16px; margin: 22px 0 8px; }
+  section.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 20px 24px; margin-bottom: 8px; }
+  code { background: var(--code-bg); border-radius: 4px; padding: 1px 6px; font-family: Consolas, "D2Coding", monospace; font-size: 13px; }
+  pre { background: #10192b; color: #dfe8f6; border-radius: 8px; padding: 16px 18px; overflow-x: auto; font-size: 13px; line-height: 1.55; }
+  pre code { background: none; color: inherit; padding: 0; }
+  pre.flow { background: var(--code-bg); color: var(--ink); border: 1px solid var(--line); }
+  ul { margin: 8px 0; padding-left: 22px; }
+  li { margin: 4px 0; }
+  .note { background: var(--warn-soft); border-left: 4px solid var(--warn); border-radius: 6px; padding: 10px 14px; font-size: 14px; margin: 12px 0; }
+  .step { display: inline-block; background: var(--accent-soft); color: var(--accent); border-radius: 20px; font-size: 12px; font-weight: 700; padding: 2px 10px; margin-right: 6px; }
+  footer { margin-top: 48px; color: var(--sub); font-size: 13px; border-top: 1px solid var(--line); padding-top: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>iframe 내부 페이지에서 부모 팝업 창을 닫는 처리 흐름</h1>
+  <div class="meta">작성일 2026-09-16 · WebSquare 팝업(XML) 안의 iframe 페이지 → <code>postMessage</code> → 부모가 <code>$c.win.closePopup</code> 실행</div>
+</header>
+
+<section class="card">
+  <h2 style="margin-top:0">1. 전체 연동 흐름 요약</h2>
+<pre class="flow">[1. 팝업 XML (Parent Window)]
+   │
+   ├─ $c.win.getPopupId()로 popupId 획득
+   ├─ iframe src URL 뒤에 ?popupId={popupId} 전달
+   └─ window 'message' 이벤트 리스너 등록 (수신 대기)
+
+[2. iframe 내부 페이지 (Child Window)]
+   │
+   ├─ URL 쿼리 파라미터에서 popupId 추출
+   └─ 닫기 버튼 클릭 시 sendPopupMessage() 실행 → postMessage 전송
+
+[3. 팝업 XML (Parent Window)]
+   │
+   └─ postMessage 수신 후 $c.win.closePopup($p, popupId) 실행하여 팝업 종료</pre>
+</section>
+
+<section class="card">
+  <h2 style="margin-top:0">2. 단계별 상세 코드 정리</h2>
+
+  <h3><span class="step">1</span>팝업 XML (부모 창)</h3>
+  <p>iframe을 포함하고 있는 팝업 페이지에서 <code>popupId</code>를 구하여 iframe URL에 파라미터로 붙여주고, 자식 창에서 전달되는 메세지를 수신하도록 설정합니다.</p>
+<pre><code>// 1. 팝업 ID 획득
+const popupId = $c.win.getPopupId();
+
+// 2. iframe URL에 popupId 전달 (예시)
+const iframeEl = document.getElementById("myIframe");
+iframeEl.src = `/path/to/page.html?popupId=${encodeURIComponent(popupId)}`;
+
+// 3. postMessage 수신 이벤트 리스너 등록
+window.addEventListener('message', (event) =&gt; {
+  // [보안] 필요한 경우 Origin 검증 추가
+  // if (event.origin !== 'https://your-domain.com') return;
+
+  const { execution, popupId } = event.data;
+
+  // 팝업 닫기 요청 처리
+  if (execution === "closePopup" &amp;&amp; popupId) {
+    console.log(`수신된 Popup ID: ${popupId}`);
+    $c.win.closePopup($p, popupId);
+  }
+});</code></pre>
+
+  <h3><span class="step">2</span>iframe 내부 페이지 (자식 창)</h3>
+  <p>iframe 내부에서 팝업을 닫는 이벤트(예: 닫기/확인 버튼 클릭)가 발생할 때 호출할 함수입니다.</p>
+<pre><code>/**
+ * URL 파라미터에서 popupId를 가져와 상위 창 (Parent Window)으로 메시지를 전송하는 함수
+ * @param {Object} [payload={}] - 함께 전달할 추가 데이터
+ * @param {string} [targetOrigin='*'] - 메시지를 수신할 상위 창의 Origin
+ */
+function sendPopupMessage(payload = {}, targetOrigin = '*') {
+  // 1. 현재 URL의 쿼리 파라미터에서 popupId 추출
+  const urlParams = new URLSearchParams(window.location.search);
+  const popupId = urlParams.get('popupId');
+
+  // 2. popupId 유효성 검사
+  if (!popupId) {
+    console.warn('URL 파라미터에서 popupId를 찾을 수 없습니다.');
+    return;
+  }
+
+  // 3. 전달할 메시지 데이터 구성
+  const messageData = {
+    execution: 'closePopup',
+    popupId: popupId,
+    ...payload
+  };
+
+  // 4. 상위 창(Parent Window)으로 메시지 전송
+  window.parent.postMessage(messageData, targetOrigin);
+}</code></pre>
+</section>
+
+<section class="card">
+  <h2 style="margin-top:0">3. 핵심 포인트</h2>
+  <ul>
+    <li><strong>안전한 데이터 전달</strong>: iframe 간 직접적인 스크립트 접근 대신 웹 표준인 <code>postMessage</code> API를 사용하여 도메인이 다르더라도(Cross-Origin) 안전하게 통신할 수 있습니다.</li>
+    <li><strong>유연한 데이터 확충</strong>: <code>sendPopupMessage({ result: 'SUCCESS' })</code>와 같이 호출 시 <code>payload</code> 객체를 전달하면, 팝업을 닫으면서 부모 창에 결과값이나 처리 상태를 함께 전달할 수 있습니다.</li>
+    <li><strong>보안 권장사항</strong>: 운영 환경에서는 <code>targetOrigin</code>과 <code>event.origin</code> 검증을 특정 도메인(예: <code>https://example.com</code>)으로 제한하는 것이 안전합니다.</li>
+  </ul>
+  <div class="note">참고 — WebSquare 엔진도 iframe 클릭·마우스다운·키업 전파용으로 <code>{ _wq_type: … }</code> 객체를 <code>postMessage</code> 로 보낸다. 부모의 <code>message</code> 리스너는 위 코드처럼 <code>execution === "closePopup"</code> 조건으로 자기 메시지만 골라 처리하고, <code>event.data</code> 가 객체가 아닐 수 있으므로 구조 분해 전에 형태를 확인하면 더 안전하다.</div>
+</section>
+
+<footer>cm/docs/작업확인 · iframe 팝업 닫기 처리 흐름 · 2026-09-16</footer>
+
+</div>
+</body>
+</html>
