@@ -70,7 +70,7 @@
 
 ### 모듈 공통 의존 (배포 환경 전제)
 
-`ULDSTF30700/30702`는 gcc 외 **모듈 공통 네임스페이스**를 호출한다: `$c.stf.setFromToDate`/`openPopupCorpInfo`, `$c.cm.fn_com_isur`/`IsurcdSearch`/`IsurcdSearchBond`, `$c.data.comboCbDataSetDynamic`/`comboCbDataSetPeriod`.
+`ULDSTF30700/30702`는 gcc 외 **모듈 공통 네임스페이스**를 호출한다: `$c.stf.setFromToDate`/`openPopupCorpInfo`, `$c.cm.fn_com_isur`/`isurcdSearch`/`isurcdSearchBond`, `$c.data.comboCbDataSetDynamic`/`comboCbDataSetPeriod`.
 `$c.stf`/`$c.cm`은 본 저장소 밖(모듈 공통)에서 제공되므로, **다른 프로젝트에서 이 샘플을 참조할 때는 대응 공통이 있는지 확인**하고 없으면 해당 호출부를 프로젝트 공통으로 대체한다.
 
 ## 4. 관리 규칙
