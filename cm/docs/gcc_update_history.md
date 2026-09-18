@@ -282,7 +282,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
   - 신설 `__isExistingDate(year, month, day)`(순수 헬퍼, `@hidden Y`, publicInfo 미등재): 윤년 산술 규칙으로 판정 — Date 왕복 방식이 두 자리 연도(0001~0099)를 1900년대로 해석해 오판하던 결함 제거. `isDate`·`_checkDateFormat` 이 위임(파일 내 실존 규칙 1벌).
   - `compareFromToDate`: `dateFormat` 을 생략해도 실존 검사(`options.checkExists`, 기본 **true**, false 면 종전처럼 기간 비교만). 실패 흐름은 포맷 실패와 동일(안내 → `clearOnInvalid` 초기화 → 포커스 → 비교 생략). 안내 문구를 하드코딩에서 메시지 코드(`com_valid_format_0051` 포맷 / `com_valid_format_0052` 명칭)로 통일.
   - `checkCalendarFormat`: 흐름 변경 없음(실존 검사는 종전부터 포함). JSDoc 에 "dateFormat 은 ioFormat 기준" 명시, 예제의 `yyyy-MM-dd` 를 ioFormat 선언 사례로 정정.
-- (커밋 대기) (09-18) — **`com_valid_format_0051` 문구·포맷 표기 변경**: 서버 메시지 문구를 "올바른 형식의 날짜를 입력하세요.($[0])" 로 바꾸는 요청에 맞춰 `compareFromToDate`·`checkCalendarFormat` 이 `$[0]` 에 넘기는 `dateFormat` 을 대문자(`toUpperCase()`, 예 YYYYMMDD)로 전달. 문구 자체는 서버 메시지 카탈로그(저장소 밖) 변경 필요 — gcc 는 주석·테스트 기대값만 갱신
+- `0330397` (09-18) — **`com_valid_format_0051` 문구·포맷 표기 변경**: 서버 메시지 문구를 "올바른 형식의 날짜를 입력하세요.($[0])" 로 바꾸는 요청에 맞춰 `compareFromToDate`·`checkCalendarFormat` 이 `$[0]` 에 넘기는 `dateFormat` 을 대문자(`toUpperCase()`, 예 YYYYMMDD)로 전달. 문구 자체는 서버 메시지 카탈로그(저장소 밖) 변경 필요 — gcc 는 주석·테스트 기대값만 갱신
   - 검증: Jest 신규 `test/dateExistingDate.test.js` 14건(윤년·말일·두 자리 연도·위임 동일성·checkExists/clearOnInvalid 조합) + 기존 `dateClearOnInvalid` 기대 문구를 메시지 코드로 갱신, gcc lint 13 files 0/0, `npm run docs:gcc` 재생성. 브라우저 확인 1건 남음(입력 → 안내 → 빈값 초기화 UX).
 
 ### 공동인증서 공통 신설·DOM 로더·웹스토리지 보강 (09-15)
