@@ -1,6 +1,6 @@
 # gcc 공통 함수 업데이트 이력
 
-`cm/gcc/` 공통 라이브러리(`$c.*`)의 최초 반입(2026-06-08, `92a35bd`) 이후 변경 내역 정리 (최종 갱신 2026-09-15).
+`cm/gcc/` 공통 라이브러리(`$c.*`)의 최초 반입(2026-06-08, `92a35bd`) 이후 변경 내역 정리 (최종 갱신 2026-09-18).
 API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-09-15 기준 **13개 모듈 / 301개 공개 메서드**.
 
 > `src/cm/gcc/`는 CM 모듈용 사본으로 일반적 개선만 선별 반영해 왔으나(2026-06-10 병합, 2026-07-22 대규모 동기화로 11파일 체제),
@@ -277,7 +277,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 ## 2026년 9월
 
 ### 날짜 실존 검사 보강 (09-18)
-- (커밋 대기) (09-18) — **`$c.date` 실존 날짜 검사 단일화 + `compareFromToDate` 포맷 무관 실존 검사** (메서드 수 유지):
+- `87c20c5` (09-18) — **`$c.date` 실존 날짜 검사 단일화 + `compareFromToDate` 포맷 무관 실존 검사** (메서드 수 유지):
   - **배경(엔진 실측)**: 단독 inputCalendar 는 `websquare/config.xml` 기본 `validCheck=false` 라 2026-02-31 같은 값도 그대로 확정하고 blur 에서 원시 값으로 `onviewchange` 를 발화한다(`dateValidCheck/dateValidSet=true` 는 gridView 달력 컬럼에만 적용). `getValue()` 는 displayFormat 이 아닌 ioFormat(기본 yyyyMMdd) 값이다.
   - 신설 `__isExistingDate(year, month, day)`(순수 헬퍼, `@hidden Y`, publicInfo 미등재): 윤년 산술 규칙으로 판정 — Date 왕복 방식이 두 자리 연도(0001~0099)를 1900년대로 해석해 오판하던 결함 제거. `isDate`·`_checkDateFormat` 이 위임(파일 내 실존 규칙 1벌).
   - `compareFromToDate`: `dateFormat` 을 생략해도 실존 검사(`options.checkExists`, 기본 **true**, false 면 종전처럼 기간 비교만). 실패 흐름은 포맷 실패와 동일(안내 → `clearOnInvalid` 초기화 → 포커스 → 비교 생략). 안내 문구를 하드코딩에서 메시지 코드(`com_valid_format_0051` 포맷 / `com_valid_format_0052` 명칭)로 통일.
