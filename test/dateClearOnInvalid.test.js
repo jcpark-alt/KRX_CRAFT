@@ -79,10 +79,10 @@ describe("checkCalendarFormat — clearOnInvalid", () => {
     const cal = makeCal("cal_b", "", h.calls.log);
     h.date.checkCalendarFormat(cal, "yyyyMMdd", "", { clearOnInvalid: false });
     await cal.change("20261399");
-    expect(h.calls.alert).toEqual(["com_valid_format_0051:yyyyMMdd"]);
+    expect(h.calls.alert).toEqual(["com_valid_format_0051:YYYYMMDD"]);
     expect(cal.setValueCalls).toEqual([]);
     expect(cal.value).toBe("20261399");
-    expect(h.calls.log).toEqual(["alert:com_valid_format_0051:yyyyMMdd", "alert-closed", "focus"]);
+    expect(h.calls.log).toEqual(["alert:com_valid_format_0051:YYYYMMDD", "alert-closed", "focus"]);
   });
 
   test("정상 포맷이면 안내·초기화가 없고, 빈값(초기화 재진입 포함)은 형식 오류로 보지 않는다", async () => {
@@ -112,10 +112,10 @@ describe("compareFromToDate — dateFormat 검증 실패 시 clearOnInvalid", ()
     const s = makeCal("s", "", h.calls.log), e = makeCal("e", "20260930");
     h.date.compareFromToDate(s, e, ["시작일", "종료일"], "yyyyMMdd");
     await s.change("2026099");
-    expect(h.calls.alert).toEqual(["com_valid_format_0051:yyyyMMdd"]);   // "$[0] 형식의 올바른 날짜를 입력하세요." 메시지 코드
+    expect(h.calls.alert).toEqual(["com_valid_format_0051:YYYYMMDD"]);   // "올바른 형식의 날짜를 입력하세요.($[0])" 메시지 코드 — 포맷 인자는 대문자
     expect(s.setValueCalls).toEqual([""]);
     expect(s.focused).toBe(1);
-    expect(h.calls.log).toEqual(["alert:com_valid_format_0051:yyyyMMdd", "alert-closed", "setValue:", "focus"]);
+    expect(h.calls.log).toEqual(["alert:com_valid_format_0051:YYYYMMDD", "alert-closed", "setValue:", "focus"]);
     expect(s.userData.onkeyup).toBe(true);   // setUserData(false) → setValue → setUserData(true) 순서로 복원
   });
 

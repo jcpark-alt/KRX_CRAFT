@@ -168,7 +168,7 @@ describe("compareFromToDate — dateFormat 없이도 실존 날짜 검사(checkE
     const s = makeCal("s", ""), e = makeCal("e", "20260101");
     h.date.compareFromToDate(s, e, ["시작일", "종료일"], "yyyyMMdd");
     await s.change("20260231");
-    expect(h.calls.alert).toEqual(["com_valid_format_0051:yyyyMMdd"]);   // "$[0] 형식의 올바른 날짜를 입력하세요."
+    expect(h.calls.alert).toEqual(["com_valid_format_0051:YYYYMMDD"]);   // "올바른 형식의 날짜를 입력하세요.($[0])" — 포맷 인자는 대문자
     expect(s.value).toBe("");
   });
 });
