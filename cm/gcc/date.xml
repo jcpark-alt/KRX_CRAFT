@@ -321,20 +321,9 @@ scwin.isDate = function (sDate, timeChk, objName = "") {
         if (isNaN(y1) || isNaN(m1) || isNaN(d1) || isNaN(h1) || isNaN(t1) || isNaN(s1))
             flag = false;
 
-        if (m1 < 1 || m1 > 12)
+        // 월 범위·월별 말일(윤년 포함) 실존 검사 — 파일 내 단일 판정기에 위임한다.
+        if (!scwin.__isExistingDate(y1, m1, d1))
             flag = false;
-
-        let maxDay = 31;
-        if (m1 == 2) {
-            maxDay = ((y1 % 400 == 0) || ((y1 % 4 == 0) && (y1 % 100 != 0))) ? 29
-                : 28;
-        } else if (m1 == 4 || m1 == 6 || m1 == 9 || m1 == 11) {
-            maxDay = 30;
-        }
-
-        if (d1 < 1 || d1 > maxDay) {
-            flag = false;
-        }
 
         if (h1 + t1 + s1 != "") {
             if (h1 < 0 || h1 > 24) {
@@ -908,11 +897,39 @@ scwin.getWeekStartEndDay = function (dateVal) {
 
 /**
  * @method
+ * @name __isExistingDate
+ * @description 연·월·일 숫자가 실제 달력에 존재하는 날짜인지 판정한다. (월 1~12, 일 1~해당 월 말일, 윤년은 4년 주기·100년 예외·400년 재예외)
+ * Date 객체 왕복이 아닌 산술 규칙이라 연도 0001~0099 도 정확히 판정한다(Date 는 두 자리 연도를 1900년대로 해석).
+ * isDate / _checkDateFormat 이 공유하는 파일 내 단일 실존 판정기다.
+ * @param {Number} year 연 (숫자)
+ * @param {Number} month 월 (1~12)
+ * @param {Number} day 일
+ * @returns {Boolean} 실존 여부
+ * @hidden Y
+ * @exception
+ * @example
+ */
+scwin.__isExistingDate = function (year, month, day) {
+    if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
+        return false;
+    }
+    if (month < 1 || month > 12) {
+        return false;
+    }
+
+    const isLeapYear = (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
+    const lastDays = [31, isLeapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+    return day >= 1 && day <= lastDays[month - 1];
+};
+
+/**
+ * @method
  * @name _checkDateFormat
  * @description 날짜 문자열이 지정 포맷과 일치하고 실제 존재하는 유효한 날짜인지 검증한다.
- * (연 4자리, 월 2자리, 일 2자리 기준. 구분자 위치·숫자 여부·월/일 실존 여부를 검사)
+ * (연 4자리, 월 2자리, 일 2자리 기준. 구분자 위치·숫자 여부를 검사한 뒤 월/일 실존 여부는 __isExistingDate 로 판정)
  * checkCalendarFormat / compareFromToDate 가 공유하는 내부 검증 로직이다.
- * @param {String} value 검증할 날짜 문자열
+ * @param {String} value 검증할 날짜 문자열 (inputCalendar.getValue() 값 — displayFormat 이 아닌 ioFormat 기준, 기본 yyyyMMdd)
  * @param {String} dateFormat 검증 포맷 (예: "yyyyMMdd", "yyyy-MM-dd", "yyyy/MM/dd", "yyyy.MM.dd")
  * @returns {Boolean} 포맷·유효성 만족 여부
  * @hidden Y
@@ -971,18 +988,8 @@ scwin._checkDateFormat = function (value, dateFormat) {
     const month = parseInt(monthStr, 10);
     const day = parseInt(dayStr, 10);
 
-    // 월 범위 검증
-    if (month < 1 || month > 12) {
-        return false;
-    }
-
-    // 실존 날짜 검증 (예: 2026-02-31 방지)
-    const dateObj = new Date(year, month - 1, day);
-    if (dateObj.getFullYear() !== year || dateObj.getMonth() + 1 !== month || dateObj.getDate() !== day) {
-        return false;
-    }
-
-    return true;
+    // 월 범위·실존 날짜 검증 (예: 2026-02-31 방지) — 파일 내 단일 판정기에 위임한다.
+    return scwin.__isExistingDate(year, month, day);
 };
 
 /**
@@ -991,29 +998,35 @@ scwin._checkDateFormat = function (value, dateFormat) {
  * @description 시작일·종료일 inputCalendar 컴포넌트의 기간 유효성을 검증하고 위반 시 안내 후 날짜를 동기화한다.
  * 시작일 변경(onviewchange) 시 시작일 > 종료일이면 안내 후 시작일을 종료일로 원복한다.
  * 종료일 변경(onviewchange) 시 종료일 < 시작일이면 안내 후 종료일을 시작일로 원복한다.
- * dateFormat 을 지정하면 변경된 값이 해당 포맷·실존 날짜인지 먼저 검증하고, 불일치 시 안내 후 기본으로 값을 빈값으로 초기화하며 기간 비교를 건너뛴다.
+ * 변경된 값은 기간 비교에 앞서 실제 존재하는 날짜인지 검사한다(예: 2026-02-31 거부). dateFormat 을 지정하면 포맷 일치까지 함께 검사한다.
+ * 검사 실패 시 안내 후 기본으로 값을 빈값으로 초기화하고 기간 비교를 건너뛴다.
+ * 엔진 단독 inputCalendar 는 기본(validCheck=false)으로 실존하지 않는 날짜도 그대로 확정하므로 이 검사가 유일한 방어선이다.
  * @param {Object} calStartDate 시작일 inputCalendar 컴포넌트 객체
  * @param {Object} calEndDate 종료일 inputCalendar 컴포넌트 객체
  * @param {Array} msgOptions 메시지 치환 명칭 배열 [시작일 명칭, 종료일 명칭] (기본값 ["검색시작일", "검색종료일"])
- * @param {String} dateFormat 날짜 포맷 검증값 (예: "yyyyMMdd", "yyyy-MM-dd"). 생략 시 포맷 검증 미수행.
+ * @param {String} dateFormat 날짜 포맷 검증값 — 컴포넌트 getValue() 가 돌려주는 ioFormat(기본 "yyyyMMdd") 과 같아야 한다(displayFormat 아님).
+ *                  생략 시 포맷 검증 없이 실존 검사만 한다.
  * @param {Object} options (선택) 동작 옵션
- * @param {Boolean} options.clearOnInvalid [default : true] dateFormat 검증 실패 시 안내 후 해당 컴포넌트 값을 빈값(setValue(""))으로 초기화한다.
+ * @param {Boolean} options.clearOnInvalid [default : true] 실존·포맷 검증 실패 시 안내 후 해당 컴포넌트 값을 빈값(setValue(""))으로 초기화한다.
  *                  false 면 잘못된 값을 그대로 두고 포커스만 준다(종전 동작).
+ * @param {Boolean} options.checkExists [default : true] dateFormat 을 생략해도 실존 날짜 검사를 수행한다. false 면 종전처럼 기간 비교만 한다.
  * @returns {void}
  * @hidden N
  * @exception
  * @example
-// 기본 메시지 사용
+// 기본 메시지 사용 — 실존하지 않는 날짜는 "검색시작일에 올바른 날짜를 입력하세요." 안내 후 빈값 초기화
 $c.date.compareFromToDate(cal_start1, cal_end1);
 // 사용자 정의 명칭 지정
 $c.date.compareFromToDate(cal_start2, cal_end2, ["조회 시작일자", "조회 종료일자"]);
-// 날짜 포맷 검증 추가 — 잘못 입력하면 안내 후 빈값으로 초기화
-$c.date.compareFromToDate(cal_start3, cal_end3, ["조회 시작일자", "조회 종료일자"], "yyyy-MM-dd");
+// 날짜 포맷 검증 추가(ioFormat 기준) — 잘못 입력하면 안내 후 빈값으로 초기화
+$c.date.compareFromToDate(cal_start3, cal_end3, ["조회 시작일자", "조회 종료일자"], "yyyyMMdd");
 // 잘못된 값을 남겨 두고 안내·포커스만
-$c.date.compareFromToDate(cal_start4, cal_end4, ["조회 시작일자", "조회 종료일자"], "yyyy-MM-dd", { clearOnInvalid : false });
+$c.date.compareFromToDate(cal_start4, cal_end4, ["조회 시작일자", "조회 종료일자"], "yyyyMMdd", { clearOnInvalid : false });
+// 실존 검사 없이 기간 비교만(종전 동작)
+$c.date.compareFromToDate(cal_start5, cal_end5, null, null, { checkExists : false });
  */
 scwin.compareFromToDate = function (calStartDate, calEndDate, msgOptions, dateFormat, options) {
-    const opts = Object.assign({ clearOnInvalid : true }, options || {});
+    const opts = Object.assign({ clearOnInvalid : true, checkExists : true }, options || {});
 
     if ($c.util.isEmpty(calStartDate) || $c.util.isEmpty(calEndDate)) {
         console.error("[compareFromToDate] 필수 인자(calStartDate, calEndDate)가 누락되었습니다.");
@@ -1031,23 +1044,35 @@ scwin.compareFromToDate = function (calStartDate, calEndDate, msgOptions, dateFo
         return label + ($c.str.isFinalConsonant(String(label)) ? "을" : "를");
     };
 
-    // dateFormat 지정 시 : 값이 포맷·실존 날짜가 아니면 안내하고(기본으로 빈값 초기화) true 반환(비교 건너뜀 신호).
+    // 값이 실존 날짜(·지정 포맷)가 아니면 안내하고(기본으로 빈값 초기화) true 반환(비교 건너뜀 신호).
+    //  - dateFormat 지정 : 포맷 일치 + 실존 검사 → "yyyyMMdd 형식의 올바른 날짜를 입력하세요."
+    //  - dateFormat 생략 : getValue() 값(ioFormat, 기본 yyyyMMdd)의 실존 검사 → "시작일에 올바른 날짜를 입력하세요."
     // 빈값은 형식 오류로 보지 않으므로 초기화로 이벤트가 재진입해도 안내가 반복되지 않는다.
-    const isFormatInvalid = async function (comp) {
+    const isValueInvalid = async function (comp, label) {
         const value = comp.getValue();
-        if ($c.util.isEmpty(dateFormat) || $c.util.isEmpty(value)) {
+        if ($c.util.isEmpty(value)) {
             return false;
         }
-        if (!scwin._checkDateFormat(value, dateFormat)) {
-            await $c.win.alert(dateFormat + " 형식의 올바른 날짜를 입력하세요.");
-            if (opts.clearOnInvalid) {
-                comp.setUserData("onkeyup", false);
-                comp.setValue("");
-                comp.setUserData("onkeyup", true);
-            }
-            return true;
+
+        let msg = null;
+        if (!$c.util.isEmpty(dateFormat)) {
+            // "com_valid_format_0051": "$[0] 형식의 올바른 날짜를 입력하세요."
+            if (!scwin._checkDateFormat(value, dateFormat)) msg = $c.data.getMessage("com_valid_format_0051", `${dateFormat}`);
+        } else if (opts.checkExists) {
+            // "com_valid_format_0052": "$[0]에 올바른 날짜를 입력하세요."
+            if (!$c.date.isDate(String(value))) msg = $c.data.getMessage("com_valid_format_0052", `${label}`);
         }
-        return false;
+        if (msg === null) {
+            return false;
+        }
+
+        await $c.win.alert(msg);   // 안내 창이 닫힐 때 resolve
+        if (opts.clearOnInvalid) {
+            comp.setUserData("onkeyup", false);
+            comp.setValue("");
+            comp.setUserData("onkeyup", true);
+        }
+        return true;
     };
 
     // 시작일 변경 시 : 시작일 > 종료일이면 안내 후 시작일을 종료일로 원복한다.
@@ -1055,7 +1080,7 @@ scwin.compareFromToDate = function (calStartDate, calEndDate, msgOptions, dateFo
     calStartDate.bind("onviewchange", async function (info) {
         const startVal = calStartDate.getValue();
         const endVal = calEndDate.getValue();
-        if (await isFormatInvalid(calStartDate)) {
+        if (await isValueInvalid(calStartDate, startLabel)) {
             calStartDate.focus();
             return;
         }
@@ -1073,7 +1098,7 @@ scwin.compareFromToDate = function (calStartDate, calEndDate, msgOptions, dateFo
     calEndDate.bind("onviewchange", async function (info) {
         const startVal = calStartDate.getValue();
         const endVal = calEndDate.getValue();
-        if (await isFormatInvalid(calEndDate)) {
+        if (await isValueInvalid(calEndDate, endLabel)) {
             calEndDate.focus();
             return;
         }
@@ -1090,9 +1115,11 @@ scwin.compareFromToDate = function (calStartDate, calEndDate, msgOptions, dateFo
  * @method
  * @name checkCalendarFormat
  * @description inputCalendar 컴포넌트의 입력값이 지정한 포맷과 일치하고 실제 존재하는 유효한 날짜인지 검증한다.
- * (연 4자리, 월 2자리, 일 2자리 기준. 구분자 위치·숫자 여부·월/일 실존 여부를 검사)
+ * (연 4자리, 월 2자리, 일 2자리 기준. 구분자 위치·숫자 여부를 검사한 뒤 월/일 실존 여부(윤년 포함, 예: 2026-02-31 거부)를 판정)
+ * 엔진 단독 inputCalendar 는 기본(validCheck=false)으로 실존하지 않는 날짜도 그대로 확정하므로 이 검사가 유일한 방어선이다.
  * @param {Object|String} calendarObj inputCalendar 컴포넌트 객체 또는 컴포넌트 ID
- * @param {String} dateFormat 검증할 날짜 포맷 (예: "yyyyMMdd", "yyyy-MM-dd", "yyyy/MM/dd", "yyyy.MM.dd")
+ * @param {String} dateFormat 검증할 날짜 포맷 — 컴포넌트 getValue() 가 돌려주는 ioFormat(기본 "yyyyMMdd") 과 같아야 한다(displayFormat 아님).
+ *                  ioFormat 을 "yyyy-MM-dd" 등으로 지정한 컴포넌트에만 구분자 포맷을 넘긴다.
  * @param {String} objName 메시지 출력 용 명칭
  * @param {Object} options (선택) 동작 옵션
  * @param {Boolean} options.clearOnInvalid [default : true] 입력값 변경(onviewchange) 시 포맷 검증에 실패하면 안내 창을 닫은 뒤 값을 빈값(setValue(""))으로
@@ -1101,9 +1128,10 @@ scwin.compareFromToDate = function (calStartDate, calEndDate, msgOptions, dateFo
  * @hidden N
  * @exception
  * @example
-$c.date.checkCalendarFormat(ica_startDate, "yyyy-MM-dd"); // 컴포넌트 객체 전달 — 잘못 입력하면 안내 창을 닫은 뒤 빈값으로 초기화하고 포커스
+$c.date.checkCalendarFormat(ica_startDate, "yyyyMMdd");   // 컴포넌트 객체 전달 — 잘못 입력하면 안내 창을 닫은 뒤 빈값으로 초기화하고 포커스
 $c.date.checkCalendarFormat("ica_endDate", "yyyyMMdd");   // 컴포넌트 ID 전달
 $c.date.checkCalendarFormat(ica_baseDate, "yyyyMMdd", "기준일자", { clearOnInvalid : false }); // 잘못된 값을 남겨 두고 안내만
+$c.date.checkCalendarFormat(ica_isoDate, "yyyy-MM-dd");   // ioFormat="yyyy-MM-dd" 로 선언한 컴포넌트에만 구분자 포맷 사용
  */
 scwin.checkCalendarFormat = function (calendarObj, dateFormat, objName = "", options) {
     const opts = Object.assign({ clearOnInvalid : true }, options || {});

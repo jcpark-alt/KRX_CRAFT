@@ -276,6 +276,14 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 
 ## 2026년 9월
 
+### 날짜 실존 검사 보강 (09-18)
+- (커밋 대기) (09-18) — **`$c.date` 실존 날짜 검사 단일화 + `compareFromToDate` 포맷 무관 실존 검사** (메서드 수 유지):
+  - **배경(엔진 실측)**: 단독 inputCalendar 는 `websquare/config.xml` 기본 `validCheck=false` 라 2026-02-31 같은 값도 그대로 확정하고 blur 에서 원시 값으로 `onviewchange` 를 발화한다(`dateValidCheck/dateValidSet=true` 는 gridView 달력 컬럼에만 적용). `getValue()` 는 displayFormat 이 아닌 ioFormat(기본 yyyyMMdd) 값이다.
+  - 신설 `__isExistingDate(year, month, day)`(순수 헬퍼, `@hidden Y`, publicInfo 미등재): 윤년 산술 규칙으로 판정 — Date 왕복 방식이 두 자리 연도(0001~0099)를 1900년대로 해석해 오판하던 결함 제거. `isDate`·`_checkDateFormat` 이 위임(파일 내 실존 규칙 1벌).
+  - `compareFromToDate`: `dateFormat` 을 생략해도 실존 검사(`options.checkExists`, 기본 **true**, false 면 종전처럼 기간 비교만). 실패 흐름은 포맷 실패와 동일(안내 → `clearOnInvalid` 초기화 → 포커스 → 비교 생략). 안내 문구를 하드코딩에서 메시지 코드(`com_valid_format_0051` 포맷 / `com_valid_format_0052` 명칭)로 통일.
+  - `checkCalendarFormat`: 흐름 변경 없음(실존 검사는 종전부터 포함). JSDoc 에 "dateFormat 은 ioFormat 기준" 명시, 예제의 `yyyy-MM-dd` 를 ioFormat 선언 사례로 정정.
+  - 검증: Jest 신규 `test/dateExistingDate.test.js` 14건(윤년·말일·두 자리 연도·위임 동일성·checkExists/clearOnInvalid 조합) + 기존 `dateClearOnInvalid` 기대 문구를 메시지 코드로 갱신, gcc lint 13 files 0/0, `npm run docs:gcc` 재생성. 브라우저 확인 1건 남음(입력 → 안내 → 빈값 초기화 UX).
+
 ### 공동인증서 공통 신설·DOM 로더·웹스토리지 보강 (09-15)
 - `bcd1d06` (09-15) — **`cert.xml`(`$c.cert`) 신설 + `$c.util` DOM 로더 3종** (292→301 메서드, 12→13 모듈):
   - 출발점: 정적 HTML 샘플(`cm/cert/sample/initech-cert-sample2.html`)을 가이드 화면 `SMPCRT10000`으로 전환한 뒤, 화면 함수 25개 중 9개를 gcc 로 분리(사용자 지시: `ext.xml` 이 아닌 별도 파일)

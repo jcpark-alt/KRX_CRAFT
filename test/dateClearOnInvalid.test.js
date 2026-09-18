@@ -112,10 +112,10 @@ describe("compareFromToDate — dateFormat 검증 실패 시 clearOnInvalid", ()
     const s = makeCal("s", "", h.calls.log), e = makeCal("e", "20260930");
     h.date.compareFromToDate(s, e, ["시작일", "종료일"], "yyyyMMdd");
     await s.change("2026099");
-    expect(h.calls.alert).toEqual(["yyyyMMdd 형식의 올바른 날짜를 입력하세요."]);
+    expect(h.calls.alert).toEqual(["com_valid_format_0051:yyyyMMdd"]);   // "$[0] 형식의 올바른 날짜를 입력하세요." 메시지 코드
     expect(s.setValueCalls).toEqual([""]);
     expect(s.focused).toBe(1);
-    expect(h.calls.log).toEqual(["alert:yyyyMMdd 형식의 올바른 날짜를 입력하세요.", "alert-closed", "setValue:", "focus"]);
+    expect(h.calls.log).toEqual(["alert:com_valid_format_0051:yyyyMMdd", "alert-closed", "setValue:", "focus"]);
     expect(s.userData.onkeyup).toBe(true);   // setUserData(false) → setValue → setUserData(true) 순서로 복원
   });
 
@@ -139,10 +139,10 @@ describe("compareFromToDate — dateFormat 검증 실패 시 clearOnInvalid", ()
     expect(s.setValueCalls).toEqual(["20260910"]);
   });
 
-  test("dateFormat 을 생략하면 포맷 검증·초기화 없이 기간 비교만 한다(하위호환)", async () => {
+  test("dateFormat 생략 + checkExists:false 이면 포맷·실존 검증·초기화 없이 기간 비교만 한다(종전 동작 옵트아웃)", async () => {
     const h = loadHarness();
     const s = makeCal("s", "20260901"), e = makeCal("e", "");
-    h.date.compareFromToDate(s, e);
+    h.date.compareFromToDate(s, e, null, null, { checkExists: false });   // 기본(checkExists:true)의 실존 검사는 dateExistingDate.test.js 참조
     await e.change("garbage");
     expect(h.calls.alert).toHaveLength(0);
     expect(e.setValueCalls).toHaveLength(0);
