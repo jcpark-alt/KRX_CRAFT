@@ -1,6 +1,6 @@
 # gcc 공통함수 활용 최종 샘플 카탈로그 (sample-front)
 
-전환(Stage 2) 보강·신규 화면 개발 시 **화면 유형을 매칭해 그대로 참조하는 표준 템플릿 17종**을 정리한다.
+전환(Stage 2) 보강·신규 화면 개발 시 **화면 유형을 매칭해 그대로 참조하는 표준 템플릿 18종**을 정리한다.
 모든 샘플은 [code-convention.md](../../docs/code-convention/code-convention.md)의 **5단계 정형화 구조**(`///////// n. 영역명 /////////`)와
 **서브미션 async/await 순차 실행** 원칙을 따르며, gcc 공통함수(`$c.*`)만으로 화면을 구성한 최종 결과물이다. (2026-08-21 기준)
 
@@ -21,6 +21,7 @@
 | `ULDINF20000.xml` | 조회조건 + 기간검색 + 엑셀다운로드 | ULDINF20000 표준코드 조회 | `/ui/sample/template/ULDINF20000.xml` |
 | `ULDSTF07404.xml` | 메일 발송 팝업 | ULDSTF07404 전문평가 메일발송 | `/ui/sample/template/ULDSTF07404.xml` |
 | `ULDSTF05403.xml` | 신규·수정 겸용 입력 팝업 + 상태별 버튼 제어 | ULDSTF05403 (팝업)수익증권 신규상장관리 | `/ui/sample/template/ULDSTF05403.xml` |
+| `ULDSTF09343.xml` | 그리드 다건 저장·수정·삭제 팝업 + 상태별 버튼 제어 | ULDSTF09343 (팝업)투자유의종목 지정 | `/ui/sample/template/ULDSTF09343.xml` |
 | `ULDSTF30700.xml` | 조회조건 + 페이징 + 엑셀 | ULDSTF30700 비밀번호 신규 | `/ui/sample/template/ULDSTF30700.xml` |
 | `ULDSTF30702.xml` | 조회조건 + 페이징 + 엑셀 | ULDSTF30702 비밀번호 재발급 | `/ui/sample/template/ULDSTF30710.xml` |
 | `SMPVAL10000.xml` | 통합 입력 검증 (validateDataCollect 전체 옵션) | (합성 가이드 — 원본 없음) | `/ui/sample/template/SMPVAL10000.xml` |
@@ -48,6 +49,7 @@
 | 조회 팝업(값 반환) | `ULDFIL52110` | 팝업 내 페이징 조회, 선택값 `$c.win.closePopup(param)` 반환 (부모는 callbackFn 수신) |
 | 기능 팝업(부모 조작·발송) | `ULDSTF07404` | `$c.win.getParent` 부모 데이터 수신, `$c.validate.validateDataCollect`(폼)·`validateDataCollection`(그리드 행) 검증, 첨부 발송 |
 | 입력 팝업(신규·수정 겸용) + 상태별 버튼 | `ULDSTF05403` | 부모 파라미터(`$c.data.getParameter`) 유무로 신규/수정 분기, 선택 팝업 3종 `$c.win.openPopup` await 수신(취소 = 빈 결과), 조회 결과별 `$c.util.setButtonState`(insert/update/error) 를 `setFormState` 한 곳에 집중, `validateDataCollect`(readOnly 항목 `focus` 옵션·`maxLengthB`) + 통신 필요 중복확인·날짜 선후 비교는 뒤에 별도 배치, 신규/수정 공용 저장(action 분기) 후 부모 재조회, `$c.stf`/`$c.lc` 업무공통 의존 |
+| 그리드 다건을 행마다 전송하는 팝업(저장·수정·삭제) | `ULDSTF09343` | 부모 파라미터(`$c.data.getParameter`) 유무로 신규/수정 분기, 목록을 돌려주는 선택 팝업 `$c.win.openPopup` await 수신 → DataList 통째 교체(취소 = 빈 결과), 그리드 행을 한 전문 DataMap 에 옮겨 담아 `for + await` 순차 전송(`processRows`·`saveOne`, 행별 status Y/N 표시, 신규는 행마다 채번), 저장/수정/삭제 공용 전송(action 분기), 일부 실패 시 실패 안내 + 삭제는 성공 행만 제거, 전부 성공 시 삭제는 `closePopup`·저장은 수정 상태 전환, `setFormState` 한 곳에서 `$c.util.setButtonState`(insert/update/disabled) + 종목선택 잠금, `validateDataCollect`(바인딩 항목) + 그리드 행 유무·통신 필요 중복확인은 별도 배치, `$c.stf`/`$c.lc` 업무공통 의존 |
 | 입력 검증이 많은 작성화면 | `SMPVAL10000` | `validateDataCollect` 전 규칙 한 벌 시연 — 필수/byte(`maxLengthB`)/형식(`corpNum`·`bizNum`·`urlNoProtocol`·`email`·`date`)/조건부(`emptyIf` 외국국적·`requiredIf` 선행조건)/중복(`duplicateGroup`·그리드 `duplicate`)/약관(`checked`) + `$c.util.checkFileTotalSize` 총용량 + `validateDataMap` 서버 체크 플래그 검사(alert/confirm 형·중단 code) 데모 |
 | 상태별 버튼 제어가 있는 화면 | `SMPBTN10000` | `$c.util.setButtonState` 상태별 버튼 일괄 활성/비활성 시연 — 역할→버튼 매핑(id 비통일 대응)·표준 상태 6종·동적 역할(출력)·override 예외·`registerButtonState` 전용 상태·즉석 상태 객체 |
 | 공동인증서(전자서명) 연동이 있는 화면 | `SMPCRT10000` | `$c.cert.loadModule`(벤더 준비 확인 — 스크립트는 config.xml engine 모듈이 정적 로드, crosswebex6 의 document.write 때문에 동적 로드 금지 — + 모듈 초기화 `onStatus` + 키패드 z-index 보정)·`$c.cert.auth(url, callback, { params, useTranskey })` 전자서명 호출(벤더 콜백은 2xx 에서만 호출 → 4구역에 수신 배치, Promise 대기 금지)·`$c.cert.openManager({ useTranskey, taskNm })` 인증서 관리 화면·`validateDataCollect`(required/`maxLengthB`/`format` phone·email)로 동봉 파라미터 검증·라온 가상키보드 사용 여부(`$c.cert.setTranskeyUse`) 전환 + `$c.util.setSessionStorage` 보관·`$c.win.reload` 새로고침 안내. 키패드 id 는 `$c.cert.INITECH_INFO`·스크립트 경로는 config.xml 보유, 통신은 벤더 `$.ajax`(FormData) 라 `$c.sbm` 미사용 |
@@ -55,7 +57,7 @@
 
 ## 3. 샘플에 구현된 표준 패턴 (공통)
 
-17종 전체가 공유하는 규약 — 전환 결과물도 이 상태에 도달해야 한다.
+18종 전체가 공유하는 규약 — 전환 결과물도 이 상태에 도달해야 한다.
 
 1. **5단계 정형화 구조** — `///////// 1. 변수 및 선언 영역 /////////` ~ `///////// 5. 일반/업무 함수 영역 /////////` 5개 헤더, 서브미션 콜백은 4구역으로 분리.
 2. **서브미션 async/await** — `const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);` 순차 스타일. `submitDoneHandler`를 넘기면 Promise가 settle 되지 않으므로 핸들러 방식과 혼용하지 않는다.
