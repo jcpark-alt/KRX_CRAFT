@@ -1,0 +1,574 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"
+xmlns:ev="http://www.w3.org/2001/xml-events"
+xmlns:w2="http://www.inswave.com/websquare"
+xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_screenName="$c.tms" meta_screenId="$c.tms">
+		<w2:type>COMMON</w2:type>
+		<w2:buildDate/>
+		<w2:MSA/>
+		<xf:model>
+			<w2:dataCollection baseNode="map">
+			</w2:dataCollection>
+			<w2:workflowCollection>
+			</w2:workflowCollection>
+		</xf:model>
+		<w2:mfeSubmission>
+		</w2:mfeSubmission>
+		<w2:layoutInfo>
+		</w2:layoutInfo>
+		<w2:publicInfo method="scwin.getKeywordSave,scwin.setKeywordSave,scwin.disableBlockKor,scwin.downloadProc,scwin.validateGroupTms,scwin.getChildrenFind,scwin.chkDecimal,scwin.setSelectData,scwin.setGridButton,scwin.setDataListFilter,scwin.sendFileUpload,scwin.getPage,scwin.sendFileMultiUpload"/>
+		<script type="text/javascript" lazy="false"><![CDATA[
+/**
+ * @component
+ * @componentName udc_tmscommon
+ * @pluginName
+ * @company
+ * @developer
+ * @category /ui/js
+ * @notSupportBrowser
+ * @version
+ * @htmlRender
+ * @icon
+ * @disableIcon
+ * @description
+ * @width
+ * @height
+ * @license
+ * @imagePath
+ * @homepage
+ */
+
+scwin.onpageload = function() {
+	
+};
+
+/**
+ * @method
+ * @name getKeywordSave
+ * @description session storage에 저장되어 있는 정보를 조회
+ * @param {string} pageId session storage에 저장된 정보를 가지고 오는 key
+ * @param {object} dataMap session storage 저장된 정보를 넣을 데이타 맵
+ * @returns {float} grid scroll bar y좌표 값
+ * @hidden N
+ * @exception
+ * @migrationStatus
+ * @example
+ */
+
+scwin.getKeywordSave = function (pageId, dataMap) {
+
+    const scrollTop_ = sessionStorage.getItem(pageId + "_scrollTop");
+    // 저장한 데이타 맵 객체 체크
+    if (!$c.util.isEmpty(dataMap)) {
+        const storage_ = JSON.parse(sessionStorage.getItem(pageId + "_storage") || "{}");
+
+        if (!$c.util.isEmpty(storage_)) {
+            for (let key in storage_) {
+                dataMap.set(key, storage_[key]);
+            }                    
+        }
+        sessionStorage.removeItem(pageId + "_storage");
+    }                    
+    sessionStorage.removeItem(pageId + "_scrollTop");
+
+    return scrollTop_;	
+};
+
+/**
+ * @method
+ * @name setKeywordSave
+ * @description 조회 조건과 scroll bar 위치 정보를 session storage에 저장
+ * @param {string} pageId key로 사용하는 화면ID
+ * @param {object} gridObj scroll bar 위치 정보를 읽기 위한 grid 객체
+ * @param {object} dataMap 조회 조건 정보를 가지고 있는 data map
+ * @returns
+ * @hidden N
+ * @exception
+ * @migrationStatus
+ * @example
+ */
+
+scwin.setKeywordSave = function (pageId, gridObj, dataMap) {
+	
+    // 그리드 객체 체크
+    if (!$c.util.isEmpty(gridObj)) {
+        sessionStorage.setItem(pageId + "_scrollTop", gridObj.getScrollTop());
+    }
+
+    // 저장한 데이타 맵 객체 체크
+    if (!$c.util.isEmpty(dataMap)) {
+        const data_ = dataMap.getJSON();
+        const storage_ = {};
+
+        for (let key in data_) {
+            storage_[key] = data_[key];
+        };
+        sessionStorage.setItem(pageId + "_storage", JSON.stringify(storage_))
+    }
+};
+
+/**
+ * @method
+ * @name disableBlockKor
+ * @description 한글 입력한 내용을 삭제 처리
+ * @param {object} input 한글입력을 제안할 input 객체
+ * @returns
+ * @hidden N
+ * @exception
+ * @migrationStatus
+ * @example
+ */
+
+scwin.disableBlockKor = function (input) {
+
+    input.setValue(input.getValue().replace(/[ㄱ-ㅎㅏ-ㅣ가-힣]/g, ""));
+};
+
+/**
+ * @method
+ * @name downloadProc
+ * @description 엑셀 다운로드및 파일 다운로드 시 iframe 형식으로 받을때 필수로 
+ * 생성되는 객체를 처리
+ * @param {string} url 호출 서버 경로
+ * @param {object} params 파라미터 정보
+ * @param {string} errorMsg 에러 메시지
+ * @returns
+ * @hidden N
+ * @exception
+ * @migrationStatus
+ * @example
+ */
+
+scwin.downloadProc = function (url, params, msg) {
+
+    // 프로그래스바 시작
+    $c.win.showProcessMessage();
+
+    const params_ = new URLSearchParams();    
+    // 셋팅 처리
+    if (params != null && params != "") {
+        Object.entries(params).forEach(([key, value]) => {  
+            params_.append(
+                key,
+                value == null ? "":value
+            );
+        });
+    }
+        
+    fetch(url + "?" + params_, {
+        method: "GET"
+    }).then (function (res) {
+        if (!res.ok) {
+            throw new Error("파일다운로드 실패(" + res.statusText + ")");
+        }
+
+        let fileName = "";
+        // 파일명 검색
+        const disposition = res.headers.get("Content-Disposition");		
+        if ($c.util.isEmpty(disposition)) {
+            fileName = "download";
+        } else {
+            const utf8Match = disposition.match(/filename\*\s*=\s*UTF-8''([^;]+)/i);			
+            if (utf8Match && utf8Match[1]) {
+                fileName = decodeURIComponent(utf8Match[1]);
+            } else {
+				const reMatch = disposition.match(/filename\s*=\s*([^;]+)/i);
+				if (reMatch && reMatch[1]) {
+					fileName = decodeURIComponent(reMatch[1]);
+				} else {
+					fileName = "download";
+				}                
+            }
+        }
+        return res.blob().then(function(blob) {
+                                return {
+                                    blob: blob,
+                                    fileName: fileName
+                                };
+                        });
+    }).then (function (result) {
+        const blobUrl = URL.createObjectURL(result.blob);
+        const a = document.createElement("a");
+        a.style.display = "none";
+        a.href = blobUrl;
+        a.download = result.fileName;
+
+        document.body.appendChild(a);
+        // 강제 클릭
+        a.click();
+        // 프로그래스바 종료
+        $c.win.hideProcessMessage();
+        
+        setTimeout(function () {
+            URL.revokeObjectURL(
+                blobUrl
+            );
+            document.body.removeChild(a);
+        }, 100);     
+    }).catch (function (error) {        
+        $c.win.alert(error.message);
+        $c.win.hideProcessMessage();
+    });       
+};
+
+/**
+ * @method
+ * @name validateGroupTms
+ * @description 웹스퀘어 속성을 가지고 Validation을 처리
+ * @param {object} group 그룹ID 객체
+ * @returns {boolean} 결과
+ * @hidden N
+ * @exception
+ * @migrationStatus
+ * @example 속성 정보
+ *          mandatory : 필수 여부
+ *          title     : 오류 메시지에 뿌려줄 객체 명
+ *          minlength : 최소 입력 값 길이
+ * 
+ */
+
+scwin.validateGroupTms = function (group) {
+             
+    if (group) {
+        // Input 관련된 객체만 조회
+        let comps = scwin.getChildrenFind(group);        
+        for (let i = 0; i < comps.length; i++) {
+            let comp = comps[i];
+                        
+            // 값 가져오기
+            const value = comp.getValue ? comp.getValue() : "";
+            // Title (없으면 id로 대체)
+            const title = comp.getAttribute("title") || comp.id;
+            // 필수 체크
+            if (comp.getAttribute("mandatory")) {                                
+                if ($c.util.isEmpty(value)) {                    
+                    if (comp.getSelectedIndex) {
+                        $c.win.alert($c.data.getMessage("com_crud_0203", title), function () { comp.focus(); });                        
+                    } else {                        
+                        $c.win.alert($c.data.getMessage("com_crud_0204", title), function () { comp.focus(); });
+                    }
+                    return false;
+                }                
+
+                if (comp.getAttribute("minlength") && comp.getAttribute("minlength") > 0) {
+                    if (value.length < comp.getAttribute("minlength")) {
+                        let typeNm = "문자";
+                        if (comp.getAttribute("dataType") === "number") {
+                            typeNm = "숫자";
+                        }
+                        $c.win.alert($c.data.getMessage("com_crud_0205", title, typeNm, comp.getAttribute("minlength")), function () { comp.focus(); });                    
+                        return false;
+                    }
+                }
+            }        
+        }
+    }    
+    return true;
+}
+
+/**
+ * @method
+ * @name getChildrenFind
+ * @description Group 태그 안에서 input, select 등 입력 객체를 찾아 배열로 생성
+ * @param {object} comp Group 객체
+ * @returns {object} Input, Select등 입력 하는 객체
+ * @hidden N
+ * @exception
+ * @migrationStatus
+ * @example
+ */
+
+scwin.getChildrenFind = function (comp) {
+
+    var result = [];
+    function loop(c) {
+
+        if (!c || !c.getChildren) return;
+        const children = c.getChildren();
+        for (let i = 0; i < children.length; i++) {
+            const child = children[i];
+
+            if (child.setValue && child.getValue) {
+                result.push(child);
+            }
+            loop(child);
+        }
+    }
+    loop(comp);
+    
+    return result;
+};
+
+/**
+ * @method
+ * @name chkDecimal
+ * @description 소수점 자리 체크
+ * @param {object} obj 소수점을 체크 할 객체
+ * @param {int} max 입력 가능한 최대 길이
+ * @returns
+ * @hidden N
+ * @exception
+ * @migrationStatus
+ * @example
+ */
+
+scwin.chkDecimal = function (obj, max) {
+
+    let val = obj.getValue();
+                
+    // 숫자 + 소수점만
+    val = val.replace(/[^0-9.]/g, "");
+                
+    if (val != "") {
+        // 첫라인 소수점 체크
+        if (val != "" && val.substring(0, 1) == ".") {
+            val = "0" + val;
+        }
+        // 마지막 라인 소수점 체크
+        if (val.length == max && val.substring(val.length-1) == ".") {
+            val = val.substring(0, val.length-1);
+        }
+    }                                
+
+    // 소수점 1개 제한
+    var parts = val.split(".");
+    if (parts.length > 2) {
+        val = parts[0] + "." + parts.slice(1).join("");
+    }
+
+    // 소수점 2자리 제한
+    if (parts.length > 1) {
+        parts[1] = parts[1].substring(0, 2);
+        val = parts[0] + "." + parts[1];
+    }
+    obj.setValue(val);
+};
+
+/**
+ * @method
+ * @name setSelectData
+ * @description Json형태의 데이타를 받아서 select box에 특정 데이타를 저장
+ * @param {string} data filtering할 데이타 Json
+ * @param {object} obj filtering 된 데이타를 생성 할 select객체
+ * @param {string} name name 값
+ * @param {string} val value 값
+ * @param {string} filterCd filtering 할 코드
+ * @param {string} target filtering 대상 필드명
+ * @returns
+ * @hidden N
+ * @exception
+ * @migrationStatus
+ * @example
+ */
+
+scwin.setSelectData = function (data, obj, name, val, filterCd, target) {
+	
+    // 데이타 체크 로직 추가
+    if (!$c.util.isEmpty(data)) {
+        let filtered = "";        
+        if (!$c.util.isEmpty(filterCd)) {
+            filtered = data.filter(function(row) { return row[target] === filterCd; });
+        } else {
+            filtered = data;
+        }
+
+        if (filtered.length > 0) {
+            filtered.forEach(function(item) {            
+                obj.addItem(item[val], item[name]);                                                                                                                                      
+            });
+        }
+    }    
+};
+
+/**
+ * @method
+ * @name setGridButton
+ * @description grid에 있는 버튼의  위치를 찾아서 backgroup-color와 font color를 변경
+ *  
+ * @param {object} grdObj 변경 할 grid 객체
+ * @param {object} options 변경할 grid의 정보
+ * ex) options.target: 선택됨    : 비교 데이타
+ *     options.backColor: red    : 변경 버튼 색
+ *     options.color: black      : 변경 글자색
+ *     options.resBackColor: red : 원복 버튼 색
+ *     options.resColor: black   : 원복 글자색
+ * @returns
+ * @hidden N
+ * @exception
+ * @migrationStatus
+ * @example
+ */
+
+scwin.setGridButton = function (grdObj, options) {
+
+    // 그리드 객체에서 직접 핸들링
+    const doc = grdObj.body_table;
+    // button 객체만 검색
+    const buttons = doc.querySelectorAll("button");
+
+    if (!$c.util.isEmpty(options)) {
+        for (const btn of buttons) {            
+            if (btn.innerHTML == options.target) {
+                btn.style.backgroundColor = options.backColor;
+                btn.style.color = options.color;                
+            } else {                
+                btn.style.backgroundColor = options.resBackColor;
+                btn.style.color = options.resColor;                
+            }
+        }
+    }
+};
+
+/**
+ * @method
+ * @name setDataListFilter
+ * @description DataList에 Row 단위로 필터를 적용
+ * @param {object} obj Filter를 적용 할 DataList
+ * @param {string[]} columns Data List에 Filter를 적용 할 컬럼들 (2개 이상 배열로 넘어 올 경우 OR조건 자동 적용)
+ * @param {string} keyword Filter에 적용할 키워드
+ * @returns
+ * @hidden N
+ * @exception
+ * @migrationStatus
+ * @example
+ */
+
+scwin.setDataListFilter = function (obj, columns, keyword) {
+    
+    if (!$c.util.isEmpty(keyword)) {
+        let cond_ = "and";
+        let clear_ = "all";
+        for (let i=0; i < columns.length; i++) {
+            if (i > 0) {
+                cond_ = "or";
+                clear_ = "none";
+            }
+            // Filter 적용
+            obj.setColumnFilter({
+                type: "row",
+                colIndex: columns[i],
+                key: keyword,
+                condition: cond_,
+                exactMatch: false,
+                clearFilter: clear_
+            });                    
+        }
+    } else {
+        obj.clearFilter();
+    }
+};
+
+/**
+ * @method
+ * @name sendFileUpload
+ * @description FileUpload Componect 객체가 iframe기반으로 처리가 되는 관계로 
+ * 서버쪽 보안에 걸려 파일만 전송되고 결과를 못받는 문제가 발생하여
+ * 정상적으로 결과를 받을 수 있게 하기 위해  처리
+ * @param {object} fileObj FileUpload객체
+ * @param {string} url 파일을 전송 할 URL
+ * @param {string} name 서버에서 받을 파일은 Parameter명
+ * @param {object} callBack 응답을 받을 함수
+ * @returns
+ * @hidden N
+ * @exception
+ * @migrationStatus
+ * @example
+ */
+scwin.sendFileUpload = function (fileObj, url, name, callBack) {
+
+    // 프로그래스바 시작
+    $c.win.showProcessMessage();   
+    
+    const element_ = document.getElementById(fileObj.getID());
+    const fileInput = element_.querySelector("input[type='file']");
+
+    // 전송 할 Data
+    const formData = new FormData();    
+    formData.append(name, fileInput.files[0]);
+
+    fetch(url, {
+        method: "POST",
+        body: formData
+    }).then (function (res) {
+        return res.json();                            
+    }).then (function (result) {
+        // 프로그래스바 종료
+		if (!$c.util.isEmpty(progress_)) {
+         	progress_.style.display = "none";
+        	progress_.style.visibility = "hidden";
+		}
+
+        if (result.success) {
+            callBack(result);
+        } else {
+            throw new Error(result.message);
+        }       
+    }).catch (function (error) {
+        console.log(error);
+        // 프로그래스바 종료
+		$c.win.hideProcessMessage();
+        $c.win.alert(error.message);        
+    });                                
+};
+
+/**
+ * @method
+ * @name getPage
+ * @description 페이지 번호를 리턴
+ * @param {string} pagePerCnt 페이지내에 현재 조회된 건수
+ * @param {string} pageNo 현재 페이지 번호
+ * @returns
+ * @hidden N
+ * @exception
+ * @migrationStatus
+ * @example
+ */
+scwin.getPage = function (pagePerCnt, pageNo) {
+	    
+    if (pagePerCnt < 1) {
+        let page_ = "1";
+        if (Number(pageNo) > 1) {
+            page_ = (Number(pageNo) - 1).toString();
+        }
+        return page_;
+    } else {
+        return pageNo;
+    }
+};
+
+/**
+ * @method
+ * @name sendFileMultiUpload
+ * @description 멀티 업로드 처리
+ * @param {object} formData 전송 할 정보
+ * @param {string} url 파일을 전송 할 URL
+ * @param {object} callBack 응답을 받을 함수
+ * @returns
+ * @hidden N
+ * @exception
+ * @migrationStatus
+ * @example
+ */
+scwin.sendFileMultiUpload = function (formData, url, callBack) {
+
+    // 프로그래스바 시작
+    $c.win.showProcessMessage();
+    
+    fetch(url, {
+        method: "POST",
+        body: formData
+    }).then (function (res) {		        
+        return res.json();                            
+    }).then (function (result) {		
+        // 프로그래스바 종료
+		$c.win.hideProcessMessage();
+        callBack(result);
+    });
+};
+
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload">
+	</body>
+</html>
