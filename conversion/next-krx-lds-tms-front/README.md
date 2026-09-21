@@ -1,7 +1,7 @@
 # next-krx-lds-tms-front 전환 기록
 
 - `ui/` — 원본(수정 금지; TMS 는 Gauce 가 아닌 WebSquare 소스 프로젝트라 이미 `$c.win/util/sbm/data` 와 모듈 공통 `$c.tms` 를 부른다), `ui-tobe/` — Stage 1(`convert.py`) + Stage 2 보강 산출물 36화면(`TMS/` 34 + `common/` 2).
-- 업무공통은 **`cm/pcc/tms/`**(tms.xml `$c.tms`·main.xml) 를 참조한다(사용자 확정 2026-09-21, 트리 반입 직후 — [conversion_playbook.md §0](../md/conversion_playbook.md)). 아래 09-21 재전환 시점에는 트리가 없어 `$c.tms` 를 보류했으나, pcc/tms 대조 결과 113회 중 106회가 정의돼 있고 **`delKeyword`(7화면)** 만 없다. 공용 팝업 `common/ULDCOM00008` 의 `$c.cm.submitSearchRtn` 도 pcc/tms 에 없다.
+- 업무공통은 **`cm/pcc/tms/`**(tms.xml `$c.tms`·main.xml) 를 참조한다(사용자 확정 2026-09-21, 트리 반입 직후 — [conversion_playbook.md §0](../md/conversion_playbook.md)). 아래 09-21 재전환 시점에는 트리가 없어 `$c.tms` 를 보류했으나, pcc/tms 대조 결과 113회 중 106회가 정의돼 있었고, 없던 `delKeyword`(7화면)와 공용 팝업의 `$c.cm.submitSearchRtn` 은 2차(아래)에서 gcc·팝업 반환값 계약으로 해소 — 미정의 0.
 
 ## 2026-09-21 — 재전환 (22파일)
 
@@ -31,3 +31,18 @@ gcc 13모듈 + pcc/stf publicInfo 와 대조한 미정의 `$c` 호출 **114회(1
 
 ### 검증
 `python -m wsxml_lint conversion/next-krx-lds-tms-front/ui-tobe --ignore WS111,WS112,WS113` 36 files 0/0 · CDATA `node --check` 36/36 · 변경 22파일 `convert.py` 재실행 내용 변화 0 · 미정의 `$c` 호출 = 보류 목록과 일치(113).
+
+## 2026-09-21 (2차) — pcc/tms 기준 재대조 (8파일)
+
+gcc + pcc/tms(tms.xml `$c.tms` 13·main.xml) 만으로 대조: 미정의 **8회(2종) → 0**. pcc/tms 는 커밋 d74c963 판 그대로였다(파일 시각 09-17).
+
+| 화면 | 치환 | 근거 |
+|------|------|------|
+| `ULDTMS03170`·`04010`·`04030`·`04050`·`04070`·`04090`·`04130` | `$c.tms.delKeyword(scwin.pageId)` → `$c.util.removeSessionStorage(scwin.pageId + "_storage")` + `removeSessionStorage(scwin.pageId + "_scrollTop")` | pcc/tms 에 `delKeyword` 없음. `setKeywordSave` 가 sessionStorage 에 `pageId_storage`(검색조건 dataMap)·`pageId_scrollTop`(그리드 스크롤) 두 키로 저장하므로 삭제는 두 키 제거와 동치(`getKeywordSave` 는 dataMap 없이 부르면 `_storage` 를 지우지 않아 대체 불가) |
+| `common/ULDCOM00008` | `$c.cm.submitSearchRtn(code, nm)` + `closePopup()` → `closePopup(code + "^" + nm)` | pcc/tms 에 `$c.cm` 없음 — ULDCOM00007 과 같은 모듈 팝업 반환값 계약(mgt-front 와 동일 처리) |
+
+- 키 이름(`_storage`/`_scrollTop`)이 7화면에 들어가므로, pcc/tms 에 `delKeyword(pageId)` 가 추가되면 그 호출로 되돌리는 편이 깔끔하다.
+- `$c.tms` 나머지 10종 106회는 pcc/tms 정의를 그대로 사용(호출 변경 없음). 이전 보류표의 gcc 후보는 참고용으로만 남긴다.
+
+### 검증(2차)
+`python -m wsxml_lint conversion/next-krx-lds-tms-front/ui-tobe --ignore WS111,WS112,WS113` 36 files 0/0 · `node --check` 36/36 · 변경 8파일 `convert.py` 재실행 내용 변화 0 · 문제 파일 16 → 16 · 미정의 `$c` 호출 0.
