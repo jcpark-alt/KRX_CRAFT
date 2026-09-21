@@ -1,0 +1,737 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"
+	xmlns:ev="http://www.w3.org/2001/xml-events"
+	xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_screenName="공시제출 공통 함수" meta_screenId="$c.dis" meta_desc="공시 제출에서 사용하는 공통 함수를 작성한다.">
+		<w2:type>COMMON</w2:type>
+		<w2:buildDate/>
+		<w2:MSA/>
+		<xf:model>
+			<w2:dataCollection baseNode="map"/>
+			<w2:workflowCollection/>
+		</xf:model>
+		<w2:layoutInfo/>
+		<w2:publicInfo method="scwin.initGridSettings,scwin.getFromDateByPeriod,scwin.openPopupZipCode,scwin.openPopupFindCompany,scwin.callFormInfoLayer,scwin.openPopupEngMandatory1,scwin.openPopupSearchDisclosureContentPrint,scwin.callDisclsviewer,scwin.callDisclosurePreview,scwin.openPopupSubmissionStepNotice,scwin.openPopupExlUpload,scwin.openPopupElwNoticeDiscls,scwin.callViewManualKeyWord,scwin.callEditor,scwin.scwin.buildIframeUrl,scwin.buildIframeUrl"/>
+		<script lazy="false" type="text/javascript"><![CDATA[
+// =============================================================================
+/**
+ * [공시 제출] 공통 함수를 작성한다.
+ * 
+ * @description 1. 기존 as-is에서 header.jsp에 선언되어있는 공통 함수
+ *              2. fn_으로 시작하는 함수명을 to-be명명규칙에 맞게 카멜케이스로 변경
+ *              3. 공시제출 업무에 사용되는 공통팝업 호출 함수
+ * @author 최서희
+ * @class dis
+ * @namespace $c.dis
+ */
+// =============================================================================
+scwin.onpageload = function () {
+
+};
+
+/**
+ * @method
+ * @name initGridSettings
+ * @description 공시제출 그리드뷰 사용시 공통적으로 적용되는 설정값 세팅. 
+ *              존재하는 컴포넌트만 표준 적용 됨.
+ *              적용하고싶지 않은 공통은 컴포넌트를 id를 매핑하지 않으면 자동생략 됨.
+ * @hidden N
+ * @exception 
+ * @example $c.dis.initGridSettings();
+ * 
+ * [필요 컴포넌트] - 없는 경우 자동생략
+ *  __initPageSize : sel_size
+ *  __initDateValidation : ipt_startDate, ipt_endDate
+ *  __initEnterSearch : grp_search, (fn)scwin.btn_search_onclick
+ */
+scwin.initGridSettings = function () {
+    const page = $p;
+    const modules = [
+        "__initPageSize",
+        "__initDateValidation",
+        "__initEnterSearch"
+    ];
+
+    const fnSearch = $c.util.getFunction("scwin.btn_search_onclick");
+
+    modules.forEach(function (fnName) {
+        try {
+            scwin[fnName](page, fnSearch);
+        } catch (e) {
+            console.error(fnName, e);
+        }
+    });
+};
+
+/**
+ * @method
+ * @name __initPageSize
+ * @description 페이지 사이즈 selectbox생성
+ * @param {string} page 화면 컴포넌트
+ * @hidden Y
+ * @exception 
+ * @example ${example}
+ */
+scwin.__initPageSize = function (page) {
+    const sel_size = page.getComponentById("sel_size");
+    if (!sel_size) {
+        return;
+    }
+    $c.data.comboCbDataSetDynamic(sel_size, [15, 30, 50, 100], 0);
+};
+
+/**
+ * @method
+ * @name __initDateValidation
+ * @description 기간 유효성 검증
+ * @param {string} page 화면 컴포넌트
+ * @hidden Y
+ * @exception 
+ * @example ${example}
+ */
+scwin.__initDateValidation = function (page) {
+    const ipt_startDate = page.getComponentById("ipt_startDate");
+    const ipt_endDate = page.getComponentById("ipt_endDate");
+    if (!ipt_startDate || !ipt_endDate) {
+        return;
+    }
+    $c.date.compareFromToDate(ipt_startDate, ipt_endDate, ["시작일", "종료일"], "yyyyMMdd");
+};
+
+/**
+ * @method
+ * @name __initEnterSearch
+ * @description 엔터키 조회
+ * @param {string} page 화면 컴포넌트
+ * @param {function} fnSearch 조회함수
+ * @hidden Y
+ * @exception 
+ * @example ${example}
+ */
+scwin.__initEnterSearch = function (page, fnSearch) {
+    const grp_search = page.getComponentById("grp_search");
+    if (!grp_search || typeof fnSearch != "function") {
+        return;
+    }
+    $c.win.setEnterKeyEvent(grp_search, fnSearch);
+};
+
+
+
+/**
+ * @method
+ * @name getFromDateByPeriod
+ * @description 오늘 날짜 기준으로 type에 해당하는 기간의 시작날짜 구하는 함수
+ * @param {string} type 1week(1주), 1month(1개월), 3개월, 6개월, 1year(1년), 2년, 3년, all(전체)
+ * @hidden N
+ * @exception 
+ * @example $c.dis.getFromDateByPeriod("1week");
+ */
+scwin.getFromDateByPeriod = function (type) {
+    let edate = $c.date.getServerDateTime("yyyyMMdd"); //today
+    let sdate = "";
+    switch (type) {
+        case "1week":
+            sdate = $c.date.addDate(edate, -7);
+            break;
+        case "1month":
+            sdate = $c.date.addMonth(edate, -1);
+            break;
+        case "3month":
+            sdate = $c.date.addMonth(edate, -3);
+            break;
+        case "6month":
+            sdate = $c.date.addMonth(edate, -6);
+            break;
+        case "1year":
+            sdate = $c.date.addYear(edate, -1);
+            break;
+        case "2year":
+            sdate = $c.date.addYear(edate, -2);
+            break;
+        case "3year":
+            sdate = $c.date.addYear(edate, -3);
+            break;
+        case "all":
+            sdate = "";
+            break;
+        default:
+            break;
+    }
+    return sdate;
+};
+
+
+
+
+//공시제출 공통 팝업 //////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * @method
+ * @name openPopupZipCode
+ * @description 우편번호 검색 팝업
+ * @param {string} param
+ * @hidden N
+ * @exception 
+ * @example 
+ * const param = {
+        "data": {"idx": idx}, //선택
+        "callbackFn": "scwin.popZipCodeCallback" //콜백함수 명
+    };
+    $c.dis.openPopupZipCode(param);
+ */
+scwin.openPopupZipCode = function (param) {
+    const options = {
+        id: "ZipWinPop",
+        type: "pageFramePopup",
+        popupName: "우편번호검색",
+        width: "650",
+        height: "800",
+        resizable: true
+    };
+    $c.win.openPopup("/ui/dis/common/popup_roadZipcode.xml", options, param);
+
+};
+
+/**
+ * @method
+ * @name openPopupFindCompany
+ * @description 법인명 찾기 팝업
+ * asis) JLDFIL00033, JLDFIL00018
+ * @param {string} param 
+ * @hidden N
+ * @exception 
+ * @example 
+    const param = {
+        "action": "/ui/dis/company/JLDFIL00018.xml",
+        "marketType": "forLink", //시장구분(유가:stockMkt, 코스닥:kosdaqMkt, 코넥스:konexMkt, 연계공시:forLink)
+        "data": {
+        },
+        "callbackFn": "scwin.setCorpInfo"
+    };
+    $c.dis.openPopupFindCompany(param);
+ */
+scwin.openPopupFindCompany = function (param) {
+    let action = "/ui/dis/submission/JLDFIL00033.xml";
+    if (param && param.action) {
+        action = param.action;
+    }
+    const options = {
+        id: "SubcomPop",
+        type: "pageFramePopup",
+        popupName: "법인명 찾기",
+        width: "800",
+        height: "850",
+        resizable: true
+    };
+    $c.win.openPopup(action, options, param);
+
+};
+
+/**
+ * @method
+ * @name callFormInfoLayer
+ * @description 보고서 선택 팝업
+ * @param {string} param
+ * @hidden N
+ * @exception 
+ * @example 
+    let disclsFormList = [
+        {
+            formKorNm: row.formKorNm,
+            fromVer: row.beforeFormVer,
+            data: {
+                idx: idx,
+                isOld: "Y",
+                rowFn: "goWrite"
+            }
+        }
+    ];
+    const param = {
+        callbackFn: "scwin.formInfoLayerCallback",
+        isFormVer: "Y",
+        dataList: disclsFormList
+    };
+
+    $c.dis.callFormInfoLayer(param);
+ */
+scwin.callFormInfoLayer = function (param) {
+    let height = 81;
+    if (param.dataList && param.dataList.length > 1) {
+        for (let i = 1; i < param.dataList.length; i++) {
+            height += 38;
+        }
+    }
+
+    const options = {
+        id: "FormInfoLayer",
+        type: "pageFramePopup",
+        popupName: "아래중 작성하실 보고서를 선택하세요",
+        width: "500",
+        height: height,
+        resizable: false
+    };
+    $c.win.openPopup("/ui/dis/common/formInfo_layer.xml", options, param);
+};
+
+
+/**
+ * @method
+ * @name openPopupEngMandatory1
+ * @description 영문공시 의무화 대상서식 안내
+ *              asis) alertEngMandatory1
+ * @param {string} param
+ * @hidden N
+ * @exception 
+ * @example 
+    const param = {
+            "data": { 
+                row: row,
+                form: form 
+            },
+            "callbackFn": "scwin.popEngMandatory1Callback"
+        };
+    $c.dis.openPopupEngMandatory1(param);
+ */
+scwin.openPopupEngMandatory1 = function (param) {
+    const options = {
+        id: "EngMandatory1Pop",
+        type: "pageFramePopup",
+        popupName: "영문공시 의무화 대상서식 안내",
+        width: "840",
+        height: "440",
+        resizable: false
+    };
+    $c.win.openPopup("/ui/dis/common/popup_alertEngMandatory1.xml", options, param);
+};
+
+/**
+ * @method
+ * @name openPopupSearchDisclosureContentPrint
+ * @description 공시제출 미리보기
+ * @param {string} param
+ * @hidden N
+ * @exception 
+ * @example 
+ * $c.dis.openPopupSearchDisclosureContentPrint(param);
+ */
+scwin.openPopupSearchDisclosureContentPrint = function (param) {
+    $c.win.alert("공시제출 미리보기 팝업 개발예정");
+
+    /*
+    const options = {
+        id: "SearchDisclosureContentPrintPop",
+        type: "browserPopup",
+        modal: false,
+        title: "공시제출 미리보기",
+        popupName: "공시제출 미리보기",
+        width: "700",
+        height: "550",
+        resizable: true
+    };
+    $c.win.openPopup("/ui/dis/submission/JLDFIL00020.xml", options, param);
+    */
+
+};
+
+/**
+ * @method
+ * @name callDisclsviewer
+ * @description 공시뷰어
+ * @param {string} acptno
+ * @param {string} docNo
+ * @hidden N
+ * @exception 
+ * @example $c.dis.callDisclsviewer
+ */
+scwin.callDisclsviewer = function (acptno, docNo) {
+    $c.win.alert("공시뷰어 팝업 개발예정");
+
+    //var viewerUrl = "/submission/disclosureView.do?acptNo=" + _acptno + "&docNo=" + _docNo;
+    //window.open(viewerUrl , "viewer" , "scrollbars=yes,toolbar=no,resizable=no,width=1020,height=700,left=10,top=20");
+};
+
+/**
+ * @method
+ * @name callDisclosurePreview
+ * @description 미리보기 팝업
+ * @param {string} param
+ * @hidden N
+ * @exception 
+ * @example $c.dis.callDisclosurePreview(param);
+ */
+scwin.callDisclosurePreview = function (param) {
+    const options = {
+        id: "previewWin",
+        type: "browserPopup",
+        modal: false,
+        title: "상세내용 확인",
+        popupName: "상세내용 확인",
+        width: "835",
+        height: "600",
+        resizable: true
+    };
+    $c.win.openPopup("/ui/dis/common/popup_blank.xml", options, param);
+
+};
+
+
+/**
+ * @method
+ * @name openPopupSubmissionStepNotice
+ * @description 공시제출 프로세스 안내 팝업
+ * @param
+ * @hidden N
+ * @exception 
+ * @example $c.dis.openPopupSubmissionStepNotice();
+ */
+scwin.openPopupSubmissionStepNotice = function () {
+    const options = {
+        id: "SubmissionStepNotice",
+        type: "browserPopup",
+        modal: false,
+        title: "공시제출 프로세스 안내",
+        popupName: "공시제출 프로세스 안내",
+        width: "800",
+        height: "700",
+        resizable: true
+    };
+    $c.win.openPopup("/ui/dis/common/submission_step_notice.xml", options, {});
+
+};
+
+
+/**
+ * @method
+ * @name openPopupExlUpload
+ * @description 엑셀업로드 팝업
+ * asis에서 사용됐던 엑셀업로드 관련 팝업 통합
+    <action path="/disclosureExl" name="disclosureForm" type="krx.lds.fil.submission.action.DocumentRegistAction" scope="request" parameter="method">
+        <forward name="exl_pop" path="JLDFIL00052" />
+        <forward name="exl_result" path="JLDFIL00053" />
+        <forward name="exl_pop_batch" path="JLDFIL00054" />
+        <forward name="exl_result_batch" path="JLDFIL00056" />
+    </action>
+ * @param {string} param
+ * @param {string} title 타이틀제목
+ * @hidden N
+ * @exception 
+ * @example $c.dis.openPopupExlUpload(param, "권리행사보고서 업로드");
+ */
+scwin.openPopupExlUpload = function (param, title) {
+    title = title == null ? "엑셀업로드" : title;
+
+    const options = {
+        id: "ExlUpload",
+        type: "pageFramePopup",
+        popupName: title,
+        width: "600",
+        height: "260",
+        resizable: true
+    };
+    $c.win.openPopup("/ui/dis/common/popup_excelUpload.xml", options, param);
+
+};
+
+
+/**
+ * @method
+ * @name openPopupElwNoticeDiscls
+ * @description ELW 알림 목록 팝업
+ * @param {string} param
+ * @hidden N
+ * @exception 
+ * @example 
+ *  const param = {
+                popH: popH,
+                elwNoticeList1: elwNoticeList1,
+                elwNoticeList2: elwNoticeList2
+    };
+    $c.dis.openPopupElwNoticeDiscls(param);
+ */
+scwin.openPopupElwNoticeDiscls = function (param) {
+    let popH = !param.popH ? "250" : param.popH;
+    const options = {
+        id: "ElwNoticeDiscls",
+        type: "browserPopup",
+        modal: false,
+        title: "ELW 회원사 알림 (공시제출)",
+        popupName: "ELW 회원사 알림 (공시제출)",
+        width: "600",
+        height: popH,
+        resizable: false
+    };
+    $c.win.openPopup("/ui/dis/submission/JLDFIL01060.xml", options, param);
+};
+
+/**
+ * @method
+ * @name callViewManualKeyWord
+ * @description 도움말
+ * @param {string} submitManualClssId
+ * @hidden N
+ * @exception 
+ * @example $c.dis.callViewManualKeyWord
+ */
+scwin.callViewManualKeyWord = function (submitManualClssId) {
+    $c.win.alert("도움말 팝업 개발예정");
+
+    //var viewManulURL = '/support/manual.do?method=searchSubmitManual&submitManualClssId=' + submitManualClssId;
+    //window.open(viewManulURL, "manualWin", "scrollbars=yes,toolbar=no,resizable=no,width=1000,height=650,left=10,top=10");
+};
+
+
+/**
+ * @method
+ * @name callEditor
+ * @description 편집기 호출(모달) 
+ * @version 2026-08-20 버전 적용
+ * @param {string} param 
+ * [Query Parameter]
+    - formCd (필수)
+        값   : 서식코드 (예: 91370)
+        설명 : 진입할 서식(본문서식) 코드. entryTpCd=AS/CR일 때는 원문서의 본문서식 코드(disclsMaindocFormCd)
+    - entryTpCd (필수)
+        값   : NK | NE | CR | AS | QA
+        설명 : NK = 새문서 작성(국문) / NE = 새문서 작성(영문) / CR = 정정문서 작성 / AS = 첨부문서 추가 / QA = 조회공시/해명요구 답변작성
+    - lang (필수)
+        값   : 0 | 1
+        설명 : 언어구분코드 (0: 국문, 1: 영문)
+    - formVer (entryTpCd=CR/AS이면 필수, 그 외는 선택)
+        값   : 서식버전
+        설명 : 특정 버전의 서식을 띄워야 할 때 사용. 미지정 시 최신 버전으로 조회.
+            entryTpCd=AS일 때는 원문서의 서식버전(disclsMaindocFormVer)을 그대로 사용
+            entryTpCd=CR일 때는 최신 또는 이전 버전 중 선택된 값 (-> 사용자가 정정 시 버전을 선택할 수 있으므로 원문서 버전과 다를 수 있음)
+    - applNo (선택)
+        값   : 신청번호
+        설명 : 임시저장된 문서를 불러와야 할 때 사용(임시보관함 재개). 지정하면 해당 신청번호의 저장 데이터를 불러와 화면에 세팅.
+               미지정 시 신규 작성으로 시작합니다.
+    - targetFormCd (선택)
+        값   : 서식코드
+        설명 : applNo와 함께 넘기면(임시보관함 재개) 진입 직후 화면에 가장 먼저 열어야 할 서식(본문 또는 첨부) 코드로 사용됩니다.
+                미지정 시 첫 번째 서식(본문)으로 이동합니다. (단, entryTpCd=AS이거나 CR+첨부정정이어서 본문 클릭이 차단되는 경우엔
+                본문 대신 첫 번째 첨부서식으로 대체됩니다)
+
+* [Query Parameter - entryTpCd=NK/NE/QA 전용]
+    아래는 applNo 없이 처음 진입하는 경우(아직 저장한 적 없는 신규 작성)에만 필요합니다.
+    정정문서(CR), 첨부추가(AS) 신규작성의 경우엔 필요없습니다. (원문서 정보를 복사할 예정)
+    - tgtIsurCd (필수, 신규 진입 시)
+        값   : 공시대상법인발행기관코드
+
+    - tgtFssUnqNo (선택, 신규 진입 시)
+        값   : 공시대상법인금감원고유번호
+
+    - tgtIsuSrtCd (선택, 신규 진입 시)
+        값   : 공시대상대표종목단축코드
+
+* [Query Parameter - entryTpCd=AS 전용]
+    - acptNo (필수 - 신규 진입 시)
+        값   : 원문서(공시완료건) 접수번호
+        설명 : 어느 완료 공시 건에 첨부서식을 추가하는지 식별하는 키. acptNo 값 기준으로 목차를 구성합니다.
+    - asTargetFormCd (필수, 신규 진입 시)
+        값   : 작성할 첨부서식(subdoc) formCd
+        설명 : 진입 직후 자동으로 이 서식으로 이동함
+    - targetFormCd (임시보관함 첨부문서 선택 시 필수)
+        값   : 작성할 첨부서식(subdoc) formCd
+    - addOrgnDisclsAcptNo (필수, 신규 진입 시)
+        값   : 추가원공시접수번호
+        설명 : AS-IS 기준 modOrgnDisclsAcptNo(정정원공시접수번호) 값을 그대로 사용
+    - inqOrgnDisclsAcptNo (필수, 신규 진입 시)
+        값   : 조회원공시접수번호
+        설명 : acptNo와 다르면 저장 시 disclsModAddTpCd가 'A'(추가공시) 대신 'Q'(조회공시의 정정)로 처리됨
+    - engOrgnDisclsAcptNo (선택, 신규 진입 시)
+        값   : 영문원공시접수번호
+
+* [Query Parameter - entryTpCd=CR 전용]
+아래 4개(engOrgnDisclsAcptNo, modAddSeq 제외)는 applNo 없이 처음 진입하는 경우(아직 저장한 적 없는 신규 작성)에만 필요합니다. 빠지면 "잘못된 진입 정보입니다" 에러로 처리됩니다.
+
+    - acptNo (필수, 신규 진입 시)
+        값   : 정정 대상 원문서(공시완료건) 접수번호
+        설명 : 어느 완료 공시 건을 정정하는지 식별하는 키.
+                acptNo 값 기준으로 원공시접수번호를 조회하고, 원공시접수번호를 기준으로 서식코드별 최신 제출건으로 목차를 구성합니다.
+
+    - crTargetFormCdList (필수, 신규 진입 시)
+        값   : 정정할 서식코드 목록 (콤마로 구분, 예: 91370,99999)
+        설명 : 정정 대상으로 미리 선택한 서식(본문/첨부, 1개 이상).
+                목록에 formCd(본문서식코드)가 포함되지 않으면 첨부정정(U)으로 처리되어 진입 직후 목록의 첫 서식으로 자동 이동하며 본문 클릭이 차단됩니다.
+    - modOrgnDisclsAcptNo (필수, 신규 진입 시)
+        값   : 정정원공시접수번호
+    - inqOrgnDisclsAcptNo (필수, 신규 진입 시)
+        값   : 조회원공시접수번호
+    - engOrgnDisclsAcptNo (선택, 신규 진입 시)
+        값   : 영문원공시접수번호
+    - modAddSeq (선택, 신규 진입 시)
+        값   : 정정추가일련번호        
+
+  ---------------------------------------------------------------------------------------------------
+  # 2026-08-21
+  targetFormCd(선택) 파라미터 추가. applNo(임시보관함 재개) 진입 시 진입 직후 화면에 가장 먼저 열어야 할 서식(본문 또는 첨부)을 지정할 수 있습니다.
+  미지정 시 기존과 동일하게 동작합니다(첫 번째 서식으로 이동, 본문 클릭이 차단되는 경우엔 첫 번째 첨부로 대체).
+  ---------------------------------------------------------------------------------------------------
+  # 2026-08-21
+  entryTpCd=QA(조회공시/해명요구 답변작성) 추가. 
+  NK/NE와 동일하게 완전히 새로운 단일 문서라 formVer는 선택이며, 신규 진입 시 acptNo(조회공시 원문 접수번호) 하나만 필수입니다.
+  ---------------------------------------------------------------------------------------------------
+  # 2026-08-26
+  tgtIsurCd(필수)/tgtFssUnqNo(선택)/tgtIsuSrtCd(선택) 파라미터가 추가되었습니다.
+  entryTpCd=NK/NE/QA이고 applNo가 없는 신규 진입일 때 공시대상회사정보로 사용됩니다.
+  AS-IS 시스템과 동일하게 공시대상회사를 선택하지 않은 경우에는 로그인한 사용자의 세션 정보로 보내주시면 됩니다.
+  (-> CR/AS는 백엔드가 원문서 기준으로 세팅하므로 해당 없음. 임시보관함 재개(applNo 지정)는 저장된 값을 그대로 복원하므로 불필요.)
+  ---------------------------------------------------------------------------------------------------
+  # 2026-08-28
+  tgtIsurCd/tgtFssUnqNo/tgtIsuSrtCd 필요 범위가 CR/AS 신규 진입까지 확대되었습니다.
+  기존엔 NK/NE/QA만 필요했으나(위 2026-08-26 안내), 정정문서(CR)·첨부추가(AS) 신규 진입 시에도 원문서의 공시대상회사 정보를 이 파라미터로 그대로 넘겨주셔야 합니다.
+  ---------------------------------------------------------------------------------------------------
+ * @hidden N
+ * @exception 
+ * @example
+ 
+    [예시]
+    entryTpCd별로 "신규 진입"과 "임시보관함 진입" 두 형태를 보여줍니다.
+    formVer는 NK/NE만 선택 파라미터이고(생략 시 최신 버전으로 조회) CR/AS는 필수이며, 아래 예시에는 전부 포함해서 보여줍니다.
+
+    # NK - 새문서 작성(국문), 신규 진입 (빈 문서로 시작, tgtIsurCd 등 공시대상회사 정보 필수 - 위 [Query Parameter - entryTpCd=NK/NE/QA 전용] 참고)
+    /#/entry?formCd=91370&formVer=5.07&entryTpCd=NK&lang=0&tgtIsurCd=00202
+
+    # NK - 새문서 작성(국문), 임시보관함 진입 (targetFormCd로 진입 직후 열릴 첨부서식 지정)
+    /#/entry?formCd=91370&formVer=5.07&entryTpCd=NK&lang=0&applNo=20260820001638
+    /#/entry?formCd=91370&formVer=5.07&entryTpCd=NK&lang=0&applNo=20260820001638&targetFormCd=99999
+
+    # NE - 새문서 작성(영문), 신규 진입 (빈 문서로 시작, tgtIsurCd 등 공시대상회사 정보 필수 - 위 [Query Parameter - entryTpCd=NK/NE/QA 전용] 참고)
+    /#/entry?formCd=91370&formVer=5.07&entryTpCd=NE&lang=1&tgtIsurCd=00202
+
+    # NE - 새문서 작성(영문), 임시보관함 진입 (targetFormCd로 진입 직후 열릴 첨부서식 지정)
+    /#/entry?formCd=91370&formVer=5.07&entryTpCd=NE&lang=1&applNo=20260805001309
+    /#/entry?formCd=91370&formVer=5.07&entryTpCd=NE&lang=1&applNo=20260805001309&targetFormCd=99999
+
+    # CR - 정정문서 작성, 신규 진입 (formVer/acptNo/crTargetFormCdList 등 원공시 연결 정보 필수 - 위 [Query Parameter - entryTpCd=CR 전용] 참고)
+    /#/entry?formCd=91370&formVer=5.07&entryTpCd=CR&lang=0
+    &acptNo=20260812001209&crTargetFormCdList=91370
+    &modOrgnDisclsAcptNo=20260806001331&inqOrgnDisclsAcptNo=20260806001331
+
+    # CR - 정정문서 작성, 임시보관함 진입 (formVer/applNo만 필요, acptNo 등 원공시 연결 정보는 불필요, targetFormCd로 진입 직후 열릴 첨부서식 지정)
+    /#/entry?formCd=91370&formVer=5.07&entryTpCd=CR&lang=0&applNo=20260821001643
+    /#/entry?formCd=91370&formVer=5.07&entryTpCd=CR&lang=0&applNo=20260821001643&targetFormCd=99999
+
+    # AS - 첨부문서 추가, 신규 진입 (formVer/acptNo/asTargetFormCd 등 원공시 연결 정보 필수 - 위 [Query Parameter - entryTpCd=AS 전용] 참고)
+    /#/entry?formCd=91370&formVer=5.07&entryTpCd=AS&lang=0
+    &acptNo=20260812001209&addOrgnDisclsAcptNo=20260629000405
+    &inqOrgnDisclsAcptNo=20260629000405&asTargetFormCd=99999
+
+    # AS - 첨부문서 추가, 임시보관함 진입 (formVer/applNo만 필요, acptNo 등 원공시 연결 정보는 불필요, targetFormCd로 진입 직후 열릴 첨부서식 지정)
+    /#/entry?formCd=91370&formVer=5.07&entryTpCd=AS&lang=0&applNo=20260806001335
+    /#/entry?formCd=91370&formVer=5.07&entryTpCd=AS&lang=0&applNo=20260806001335&targetFormCd=99999
+
+    # QA - 조회공시/해명요구 답변작성, 신규 진입 (formCd/formVer는 사용자가 고른 "답변서식" 기준, acptNo 및 tgtIsurCd 등 공시대상회사 정보 필수 - 위 [Query Parameter - entryTpCd=QA 전용]/[Query Parameter - entryTpCd=NK/NE/QA 전용] 참고)
+    /#/entry?formCd=70685&entryTpCd=QA&lang=0&acptNo=20260821000001&tgtIsurCd=00202
+
+    # QA - 조회공시/해명요구 답변작성, 임시보관함 진입 (applNo만 필요, acptNo 등 원공시 연결 정보는 불필요)
+    /#/entry?formCd=70685&entryTpCd=QA&lang=0&applNo=20260824001656
+
+    const param = {
+        "formCd": formCd,
+        "entryTpCd": entryTpCd,
+        "lang": lang,
+        "formVer": formVer
+    };
+    $c.dis.callEditor(param);
+ * 
+ */
+scwin.callEditor = async function (param) {
+    console.log("req", param);
+
+    if (!param || !param.entryTpCd) {
+        $c.win.alert("문서불러오기에 실패하였습니다. 잠시후 다시 해주시기 바랍니다.");
+        return;
+    }
+
+    console.log("hostname", location.hostname);
+    let url = "https://n-editor.krx.co.kr/#/entry?"; //운영
+    let isDisableCloseButton = true;
+
+    //로컬, 개발
+    if (location.hostname === "localhost") {
+        url = "https://n-idev-editor.krx.co.kr/#/entry?"; //내부망에서 DMZ 개발계 접속
+        isDisableCloseButton = false;
+
+    } else if (location.hostname === "n-idev-filing.krx.co.kr") {
+        url = "https://n-idev-editor.krx.co.kr/#/entry?"; //내부망에서 DMZ 개발계 접속
+
+    } else if (location.hostname === "n-dev-filing.krx.co.kr") {
+        url = "https://n-dev-editor.krx.co.kr/#/entry?"; //외부망
+    }
+
+    //url = "/ui/sample/template/iframe-popup-close-sample.html?";// test
+    console.log("domain", url);
+
+    //기본 필수값 체크
+    if (!param.formCd || !param.entryTpCd || !param.lang) {
+        $c.win.alert("문서불러오기에 실패하였습니다. 잠시후 다시 해주시기 바랍니다.");
+        return;
+    }
+
+    //쿼리스트링 생성
+    url += scwin.buildIframeUrl(param);
+
+    const moveUrl = "/ui/dis/common/disclosure_editor_page.xml";
+    const data = {
+        url: url
+    };
+
+    let bSize = scwin.__getModalSize(95, 95);
+    const options = {
+        id: "DisclsEditor",
+        type: "pageFramePopup",
+        popupName: "문서작성",
+        width: bSize.width,
+        height: bSize.height,
+        resizable: true,
+        disableCloseButton: isDisableCloseButton  // true : 닫기 버튼을 안보이게 처리
+    };
+    const result = await $c.win.openPopup(moveUrl, options, data);
+
+    return result;
+
+};
+
+/**
+ * @method
+ * @name __getModalSize
+ * @description 사용자 브라우저의 너비, 높이 계산
+ * @param {int} widthPercent 너비 비율
+ * @param {int} heightPercent 높이 비율
+ * @hidden Y
+ * @exception 
+ * @example scwin.__getModalSize(95 ,95);
+ */
+scwin.__getModalSize = function (widthPercent, heightPercent) {
+    return {
+        width: Math.floor(window.innerWidth * (widthPercent / 100)),
+        height: Math.floor(window.innerHeight * (heightPercent / 100))
+    }
+};
+
+/**
+ * @method
+ * @name buildIframeUrl
+ * @description 파라미터를 쿼리스트링으로 만들어서서 리턴한다.
+ * @param {string} param 호출 화면이 넘긴 파라미터
+ * @returns {String} 쿼리스트링
+ * @hidden N
+ * @exception 
+ * @example ${example}
+ */
+scwin.buildIframeUrl = function (param) {
+    const query = new URLSearchParams();
+
+    Object.keys(param || {}).forEach(function (key) {
+        if (typeof param[key] === "string" || typeof param[key] === "number") {
+            query.set(key, String(param[key]));
+        }
+    });
+
+    return query.toString();
+};]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload"/>
+</html>
