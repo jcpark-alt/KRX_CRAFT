@@ -1,7 +1,7 @@
 # gcc 공통 함수 업데이트 이력
 
 `cm/gcc/` 공통 라이브러리(`$c.*`)의 최초 반입(2026-06-08, `92a35bd`) 이후 변경 내역 정리 (최종 갱신 2026-09-21).
-API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-09-21 기준 **13개 모듈 / 301개 공개 메서드**.
+API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-09-21 기준 **13개 모듈 / 300개 공개 메서드**.
 
 > `src/cm/gcc/`는 CM 모듈용 사본으로 일반적 개선만 선별 반영해 왔으나(2026-06-10 병합, 2026-07-22 대규모 동기화로 11파일 체제),
 > **2026-08-18 `26af3d5`에서 사용 중단으로 삭제**되어 `cm/gcc/`가 유일한 canonical 라이브러리다.
@@ -277,6 +277,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 ## 2026년 9월
 
 ### 화면 인쇄·PDF 저장 통합 (09-21)
+- (미커밋, 09-21) — **`$c.win.logout` 삭제** (301→300 메서드, 사용자 지시): `/main/logout` 제출 후 `goHome` 으로 이동하던 함수. 저장소 내 호출처·테스트 참조 없음 확인 후 본문·JSDoc·publicInfo 제거, API 문서 재생성.
 - (미커밋, 09-21) — **`$c.win.print` 신설 + `mainPrint`/`popupPrint` 통합 제거** (메서드 수 302→301):
   - 배경: 종전 두 함수는 모두 `window.print()` 만 호출하는 골격이라, 레이어 팝업(pageFramePopup)에서는 뒤에 깔린 메인 화면까지, 메인 화면에서는 헤더·사이드까지 함께 인쇄됐다. WebSquare 샘플(`pdf저장/sample01.xml`, html2canvas + jsPDF / html2pdf)을 참고해 **호출 화면의 frame DOM(`$p.getFrame().render`)만 캡처**하는 방식으로 바꾸고, 호출 화면의 `$p` 가 주입되므로 메인·팝업 구분이 필요 없어 한 함수로 통합했다(사용자 지시).
   - `print(options)`: `type` `print`(html2canvas 캡처 → 숨김 iframe 에 이미지만 넣어 인쇄, afterprint/60초 후 제거) | `pdf`(html2pdf 로 A4 페이지 분할 저장, `fileName`·`orientation`·`margin`), `target`(컴포넌트 객체·DOM id·DOM 요소 — 지정했는데 못 찾으면 Error), `scale`, `title`; 스크롤로 가려진 영역까지 캡처(scroll 크기를 캡처 크기로). frame 이 없으면 `document.body`.
