@@ -1,7 +1,7 @@
 # next-krx-lds-tms-front 전환 기록
 
 - `ui/` — 원본(수정 금지; TMS 는 Gauce 가 아닌 WebSquare 소스 프로젝트라 이미 `$c.win/util/sbm/data` 와 모듈 공통 `$c.tms` 를 부른다), `ui-tobe/` — Stage 1(`convert.py`) + Stage 2 보강 산출물 36화면(`TMS/` 34 + `common/` 2).
-- 업무공통: `cm/pcc` 에 tms 트리가 없다. 모듈 공통 **`$c.tms`** 는 원본 프로젝트의 자체 라이브러리로 이 저장소 슬라이스에 포함돼 있지 않아 호출을 그대로 둔다(아래 보류표). 공용 팝업 `common/ULDCOM00008` 의 `$c.cm` 호출만 pcc/stf 개명을 따른다(모듈별 pcc 트리 규칙 — [conversion_playbook.md §0](../md/conversion_playbook.md)).
+- 업무공통은 **`cm/pcc/tms/`**(tms.xml `$c.tms`·main.xml) 를 참조한다(사용자 확정 2026-09-21, 트리 반입 직후 — [conversion_playbook.md §0](../md/conversion_playbook.md)). 아래 09-21 재전환 시점에는 트리가 없어 `$c.tms` 를 보류했으나, pcc/tms 대조 결과 113회 중 106회가 정의돼 있고 **`delKeyword`(7화면)** 만 없다. 공용 팝업 `common/ULDCOM00008` 의 `$c.cm.submitSearchRtn` 도 pcc/tms 에 없다.
 
 ## 2026-09-21 — 재전환 (22파일)
 

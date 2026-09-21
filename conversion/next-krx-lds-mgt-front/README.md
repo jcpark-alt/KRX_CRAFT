@@ -1,7 +1,7 @@
 # next-krx-lds-mgt-front 전환 기록
 
 - `ui/` — W-Craft 1차 변환 원본(수정 금지), `ui-tobe/` — Stage 1(`convert.py`) + Stage 2 보강 산출물 165화면.
-- 업무공통은 **`cm/pcc/stf/`** 를 참조한다(`cm/pcc` 에 mgt 트리가 없고, 화면이 부르는 `$c.stf`·`$c.cm` 발행사검색 계열의 정의가 pcc/stf 에만 있음 — 모듈별 pcc 트리 규칙은 [conversion_playbook.md §0](../md/conversion_playbook.md); mgt 전용 pcc 트리가 생기면 대조 대상을 바꾼다). gcc(`cm/gcc`)는 공통.
+- 업무공통은 **`cm/pcc/mgt/`**(mgt.xml `$c.mgt`·main.xml) 를 참조한다(사용자 확정 2026-09-21 — [conversion_playbook.md §0](../md/conversion_playbook.md)). gcc(`cm/gcc`)는 공통. 1차 재전환(4a3da53)은 pcc/mgt 반입 전에 **pcc/stf 가정**으로 수행했고, 2차(아래)에서 pcc/mgt 기준으로 재대조했다. 남은 미정의는 발행사검색 `$c.cm.comIsur/comConfirmSet/comIsurNm` 6회(4화면) — pcc/mgt 에 발행사검색 공통 반입이 필요하다.
 
 ## 2026-09-21 — pcc/stf 기준 재전환 (11파일)
 
@@ -24,3 +24,22 @@
 
 ### 검증
 `python -m wsxml_lint conversion/next-krx-lds-mgt-front/ui-tobe --ignore WS111,WS112,WS113` 165 files 0 warnings(오류 1 = 기존 WS120) · CDATA `node --check` 165/165 · 미정의 `$c` 호출 0(gcc 957·pcc/stf 23) · 변경 11파일 `convert.py` 재실행 내용 변화 0(N010 의 첫 줄 헤더 1줄 제외) · 잔존 토큰(`stFocusGrid`/`js_com_`/`Grd_com_isur`/`fn_com_`/`$c.ut`/`$c.mgt`/`$c.frame`) 0.
+
+## 2026-09-21 (2차) — pcc/mgt 기준 재대조 (5파일)
+
+`cm/pcc/mgt/`(mgt.xml `$c.mgt` 32·main.xml) 반입 후 gcc + pcc/mgt 만으로 대조: 미정의 **23회(9종) → 6회(3종)**. pcc/mgt 에는 `$c.cm`·`$c.cp`·`$c.stf` 가 없으므로 1차에서 pcc/stf 로 보냈던 호출을 gcc·엔진 API·문자열로 내렸다.
+
+| 화면 | 치환 | 근거 |
+|------|------|------|
+| `ULDMGT30301` | `$c.stf.getMessageParam("MSG-A001/A002/A005", X)` 10회 → pcc/stf 메시지표의 문구를 그대로 문자열화(`"[X] 처리 성공하였습니다."`·`"[X] 처리 실패하였습니다."`·`"[X] 을(를) 입력하셔야 합니다."`); `eval($c.stf.getStringSize(obj.value/obj.text) - size)` → `$c.str.getByteLength(obj.getValue()) - size`(둘 다 한글 2byte 계산, `checkMaxLength1/2` 는 제목 textbox·내용 textarea 에서 호출됨) | pcc/mgt 에 메시지·바이트 공통 없음 |
+| `ULDMGT30309` | `$c.cp.setColumnProp(grd_Receiver, 'CHECK', 'HeadCheck', "false")` 2회 삭제 — 전환 그리드의 CHECK 컬럼에 헤더 체크박스(`useCheckAll`)가 없고 `OnHeadCheckClick` 핸들러도 없어 무의미(pcc/stf 구현도 HeadCheck 를 무시했음) | 대응 없음 |
+| `ULDMGT42045` | `$c.cp.valueOfIndex(cb_system_gbn, "VALUE", idx)` → `cb_system_gbn.getValue()`; `getNameValueRow(MxDataSet_code1, "CD_VAL", v)` + `setSelectedIndex(idx-1)` → `cb_system_gbn.setValue(v)` | select1 엔진 API 로 직접 표현 |
+| `common/ULDCOM00008` | `$c.cm.submitSearchRtn(code, nm)` + `closePopup()` → `closePopup(code + "^" + nm)` | ULDCOM00007 과 같은 모듈 팝업 반환값 계약(본 모듈에서 여는 화면은 아직 없음) |
+| `ULDMGT_N010` | `$c.date.getServerDateTime()` → **`$c.mgt.getSysDate()`** 복원(pcc/mgt 정의, 본문은 gcc 위임) | 모듈 공통 우선 |
+
+### 보류 — pcc/mgt 반입 필요
+- 발행사검색 `$c.cm.comIsur`(10108·10110·10201·95030)·`comConfirmSet`·`comIsurNm`(95030): autoComplete 바인더(`searchIsurCode` + 포맷터·`jongmokNameSearch` 의존)가 pcc/stf `common.xml` 에만 있다. pcc/mgt 에 같은 함수를 반입하면 호출 변경 없이 해소되고, 반입하지 않으면 4화면에 로컬 사본(약 150줄×4)이 필요하다.
+- 30309 수신자 그리드의 헤더 전체선택은 전환 마크업에서 사라진 기능 — 필요하면 CHECK 컬럼에 `useCheckAll` 부여로 복원.
+
+### 검증(2차)
+lint 165 files 0 warnings(오류 1 = 기존 WS120) · `node --check` 165/165 · 문제 파일 18 → 18 · 변경 5파일 `convert.py` 재실행 내용 변화 0(N010 첫 줄 헤더 제외) · 미정의 `$c` 호출 6 = 보류 목록.
