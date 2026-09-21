@@ -22,12 +22,15 @@
 | `ULDSTF07404.xml` | 메일 발송 팝업 | ULDSTF07404 전문평가 메일발송 | `/ui/sample/template/ULDSTF07404.xml` |
 | `ULDSTF05403.xml` | 신규·수정 겸용 입력 팝업 + 상태별 버튼 제어 | ULDSTF05403 (팝업)수익증권 신규상장관리 | `/ui/sample/template/ULDSTF05403.xml` |
 | `ULDSTF09343.xml` | 그리드 다건 저장·수정·삭제 팝업 + 상태별 버튼 제어 | ULDSTF09343 (팝업)투자유의종목 지정 | `/ui/sample/template/ULDSTF09343.xml` |
+| `ULDSTF05610.xml` | 입력 팝업 + 2단 헤더 편집 그리드 2개 + 저장·수정·삭제·상태별 버튼 | ULDSTF05610 결산기 변경 (화면 이미지 기준 재구성 — .gfm 원본 없음) | `/ui/sample/template/ULDSTF05610.xml` |
 | `ULDSTF30700.xml` | 조회조건 + 페이징 + 엑셀 | ULDSTF30700 비밀번호 신규 | `/ui/sample/template/ULDSTF30700.xml` |
 | `ULDSTF30702.xml` | 조회조건 + 페이징 + 엑셀 | ULDSTF30702 비밀번호 재발급 | `/ui/sample/template/ULDSTF30710.xml` |
 | `SMPVAL10000.xml` | 통합 입력 검증 (validateDataCollect 전체 옵션) | (합성 가이드 — 원본 없음) | `/ui/sample/template/SMPVAL10000.xml` |
 | `SMPBTN10000.xml` | 버튼 상태 일괄 제어 (setButtonState) | (합성 가이드 — 원본 없음) | `/ui/sample/template/SMPBTN10000.xml` |
 | `SMPCRT10000.xml` | 이니텍 공동인증서 연동 (INISAFE Sign + 라온 TransKey) | `resources/sample/initech-cert-sample2.html` (정적 HTML 샘플) | `/ui/sample/template/SMPCRT10000.xml` |
 | `SMPIFR10000.xml` | iframe 팝업 호출 + 결과 수신 | (합성 가이드 — 원본 없음) | `/ui/sample/template/SMPIFR10000.xml` |
+| `SMPPRT10000.xml` | 화면 인쇄·PDF 저장 호출 화면 ($c.win.print — 메인·팝업 공통) | (합성 가이드 — 원본 없음, 참고: WebSquare 샘플 `pdf저장/sample01.xml`) | `/ui/sample/template/SMPPRT10000.xml` |
+| `SMPPRT10001.xml` | 레이어 팝업 안에서 인쇄·PDF 저장 ($c.win.print type/target/fileName/orientation) | (합성 가이드 — 원본 없음) | `/ui/sample/template/SMPPRT10001.xml` |
 | `SMPIFR10001.xml` | iframe 내부 페이지에서 닫는 팝업 (postMessage 수신) | (합성 가이드 — iframe 페이지 `sample-front/ui/iframe-popup-close-sample.html`, 배포 `/ui/sample/template/`) | `/ui/sample/template/SMPIFR10001.xml` |
 
 > 소스↔원본은 파일 head(`meta_screenName`의 "원본 …" 표기) 기준 **1:1 매핑**이다.
@@ -45,19 +48,21 @@
 | 작성(등록·수정 겸용) | `JLDFIL25910` | 파라미터 유무로 등록/수정 분기(`$c.data.getParameter`), `$c.data.isModified` 이탈 확인, `validateGroup` + 저장 confirm→await 저장→이동 |
 | 입력폼 + 팝업조회 + 첨부저장 | `ULDFIL52100` | 모드(신규/수정/조회) 분기, `$c.win.openPopup` 값 채움, `$c.util.onUploadClick`/`checkFileExtension` 첨부, `$c.data.downFile` |
 | 대형 작성화면(다구역) | `ULDFIL59410` | 구역별 검증(`validateGroup`+`$c.str.isEmail/isPhone/isBizID`), 코드 팝업, 반복입력, 다중 첨부슬롯, 상태별 버튼, `setCommonCode` |
-| 탭 구성 + 입력 계산 | `ULDFIL35700` | 탭별 독립 로직, `$c.num.formatNumber/unFormatNumber/round` 합산 계산, `$c.win.mainPrint`/`openReportPdf` 출력 |
+| 탭 구성 + 입력 계산 | `ULDFIL35700` | 탭별 독립 로직, `$c.num.formatNumber/unFormatNumber/round` 합산 계산, `$c.win.print`/`openReportPdf` 출력 |
 | 조회 팝업(값 반환) | `ULDFIL52110` | 팝업 내 페이징 조회, 선택값 `$c.win.closePopup(param)` 반환 (부모는 callbackFn 수신) |
 | 기능 팝업(부모 조작·발송) | `ULDSTF07404` | `$c.win.getParent` 부모 데이터 수신, `$c.validate.validateDataCollect`(폼)·`validateDataCollection`(그리드 행) 검증, 첨부 발송 |
 | 입력 팝업(신규·수정 겸용) + 상태별 버튼 | `ULDSTF05403` | 부모 파라미터(`$c.data.getParameter`) 유무로 신규/수정 분기, 선택 팝업 3종 `$c.win.openPopup` await 수신(취소 = 빈 결과), 조회 결과별 `$c.util.setButtonState`(insert/update/error) 를 `setFormState` 한 곳에 집중, `validateDataCollect`(readOnly 항목 `focus` 옵션·`maxLengthB`) + 통신 필요 중복확인·날짜 선후 비교는 뒤에 별도 배치, 신규/수정 공용 저장(action 분기) 후 부모 재조회, `$c.stf`/`$c.lc` 업무공통 의존 |
 | 그리드 다건을 행마다 전송하는 팝업(저장·수정·삭제) | `ULDSTF09343` | 부모 파라미터(`$c.data.getParameter`) 유무로 신규/수정 분기, 목록을 돌려주는 선택 팝업 `$c.win.openPopup` await 수신 → DataList 통째 교체(취소 = 빈 결과), 그리드 행을 한 전문 DataMap 에 옮겨 담아 `for + await` 순차 전송(`processRows`·`saveOne`, 행별 status Y/N 표시, 신규는 행마다 채번), 저장/수정/삭제 공용 전송(action 분기), 일부 실패 시 실패 안내 + 삭제는 성공 행만 제거, 전부 성공 시 삭제는 `closePopup`·저장은 수정 상태 전환, `setFormState` 한 곳에서 `$c.util.setButtonState`(insert/update/disabled) + 종목선택 잠금, `validateDataCollect`(바인딩 항목) + 그리드 행 유무·통신 필요 중복확인은 별도 배치, `$c.stf`/`$c.lc` 업무공통 의존 |
+| 입력 팝업 안에 편집 그리드(다중 헤더)를 품은 화면(저장·수정·삭제) | `ULDSTF05610` | 부모 파라미터(`$c.data.getParameter`) 유무로 신규/수정 분기, 편집 gridView 2개를 DataList(`dlt_fscBf`·`dlt_fscAf`)에 바인딩하고 XML 정적 2단 헤더(`<w2:header>` row 2개 + 상단 `colSpan`)로 "결산기 → 월 | 일" 구성, 행추가·행삭제는 DataList `insertRow`/`removeRow`(+`getFocusedRowIndex`), 조회 응답 한 건을 `target` 쉼표 나열로 DataMap+DataList 2개에 동시 바인딩, 저장 전문은 `requestData` 를 직접 조립해 DataMap(`getJSON`)+DataList(`getAllJSON`) 를 한 JSON 으로 전송(저장/수정/삭제 action 분기), `validateDataCollect`(바인딩 항목) + 그리드 행 검증(`validateFscGrid`: 월 01~12·일 01~31·실존 날짜, `setFocusedCell` 포커스)은 별도 배치, 삭제 전 `$c.lc.checkDeleteDiscls`, `setFormState` 한 곳에서 `$c.util.setButtonState`(insert/update/error), `$c.stf`/`$c.lc` 업무공통 의존 |
 | 입력 검증이 많은 작성화면 | `SMPVAL10000` | `validateDataCollect` 전 규칙 한 벌 시연 — 필수/byte(`maxLengthB`)/형식(`corpNum`·`bizNum`·`urlNoProtocol`·`email`·`date`)/조건부(`emptyIf` 외국국적·`requiredIf` 선행조건)/중복(`duplicateGroup`·그리드 `duplicate`)/약관(`checked`) + `$c.util.checkFileTotalSize` 총용량 + `validateDataMap` 서버 체크 플래그 검사(alert/confirm 형·중단 code) 데모 |
 | 상태별 버튼 제어가 있는 화면 | `SMPBTN10000` | `$c.util.setButtonState` 상태별 버튼 일괄 활성/비활성 시연 — 역할→버튼 매핑(id 비통일 대응)·표준 상태 6종·동적 역할(출력)·override 예외·`registerButtonState` 전용 상태·즉석 상태 객체 |
 | 공동인증서(전자서명) 연동이 있는 화면 | `SMPCRT10000` | `$c.cert.loadModule`(벤더 준비 확인 — 스크립트는 config.xml engine 모듈이 정적 로드, crosswebex6 의 document.write 때문에 동적 로드 금지 — + 모듈 초기화 `onStatus` + 키패드 z-index 보정)·`$c.cert.auth(url, callback, { params, useTranskey })` 전자서명 호출(벤더 콜백은 2xx 에서만 호출 → 4구역에 수신 배치, Promise 대기 금지)·`$c.cert.openManager({ useTranskey, taskNm })` 인증서 관리 화면·`validateDataCollect`(required/`maxLengthB`/`format` phone·email)로 동봉 파라미터 검증·라온 가상키보드 사용 여부(`$c.cert.setTranskeyUse`) 전환 + `$c.util.setSessionStorage` 보관·`$c.win.reload` 새로고침 안내. 키패드 id 는 `$c.cert.INITECH_INFO`·스크립트 경로는 config.xml 보유, 통신은 벤더 `$.ajax`(FormData) 라 `$c.sbm` 미사용 |
+| 화면(메인 content·레이어 팝업)을 인쇄하거나 PDF 로 저장하는 화면 | `SMPPRT10000` + `SMPPRT10001` | `window.print` 는 문서 전체를 인쇄해 메인은 헤더·사이드가, 레이어 팝업은 뒤의 메인 화면까지 나오므로 `$c.win.print(options)` 를 쓴다(종전 `mainPrint`·`popupPrint` 통합) — html2canvas 로 호출 화면 frame DOM(`$p.getFrame().render`)만 캡처해 숨김 iframe 에서 인쇄(`type: "print"`)하거나 html2pdf 로 A4 PDF 저장(`type: "pdf"`, `fileName`·`orientation`·`margin`), `target` 에 컴포넌트 객체·DOM id·DOM 요소를 주면 그 영역만 출력(버튼 영역 제외 패턴), 스크롤로 가려진 영역까지 캡처, 라이브러리(`/cm/js/html2canvas.min.js`·`html2pdf.bundle.min.js`, `$c.win.PRINT_LIB_INFO`)는 `websquare/config.xml` 의 `<engine><module>` 로 정적 로드(화면에 `<script src>` 불필요, 동적 로드 없음 — 미등록이면 print 가 등록 안내 Error), 실패는 진입점 `handleError` 로. 호출 화면 frame 이 대상이라 메인·팝업 어디서 불러도 같은 함수(`/cm/css/print.css` 는 window.print 직접 사용 시의 보조). 팝업은 실행 횟수를 `closePopup(result)` 로 돌려준다. 회귀 테스트 `test/print.test.js` |
 | iframe(외부 페이지)을 품은 팝업 | `SMPIFR10000` + `SMPIFR10001` | 팝업이 `$c.win.getPopupId()` 를 iframe 쿼리로 넘기고 window `message` 리스너를 **onpageload 등록·onpageunload 해제**(scwin 에 보관한 같은 참조), 수신 필터 출처→형태→`execution`→`popupId`(엔진의 `{_wq_type}` 전파 메시지 배제), `$c.win.closePopup(result)` 로 자기 팝업을 닫아 호출 화면의 `await openPopup` 결과로 반환(취소는 undefined). iframe 정적 페이지는 `sendPopupMessage()` 로 `window.parent.postMessage` 만 한다 |
 
 ## 3. 샘플에 구현된 표준 패턴 (공통)
 
-18종 전체가 공유하는 규약 — 전환 결과물도 이 상태에 도달해야 한다.
+21종 전체가 공유하는 규약 — 전환 결과물도 이 상태에 도달해야 한다.
 
 1. **5단계 정형화 구조** — `///////// 1. 변수 및 선언 영역 /////////` ~ `///////// 5. 일반/업무 함수 영역 /////////` 5개 헤더, 서브미션 콜백은 4구역으로 분리.
 2. **서브미션 async/await** — `const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);` 순차 스타일. `submitDoneHandler`를 넘기면 Promise가 settle 되지 않으므로 핸들러 방식과 혼용하지 않는다.

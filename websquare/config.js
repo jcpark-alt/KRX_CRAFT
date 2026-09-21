@@ -206,6 +206,15 @@ export default {
         },
         {
           "@src": "/resources/js/common/initech-common.js"
+        },
+        {
+          "@src": "/cm/js/html2canvas.min.js"
+        },
+        {
+          "@src": "/cm/js/jspdf.umd.min.js"
+        },
+        {
+          "@src": "/cm/js/html2pdf.bundle.min.js"
         }
       ]
     },

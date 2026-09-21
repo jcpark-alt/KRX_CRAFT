@@ -1,0 +1,316 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:ev="http://www.w3.org/2001/xml-events"
+    xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+    <head meta_screenName="[가이드] 레이어 팝업 안에서 인쇄·PDF 저장 (print)" meta_screenId="SMPPRT10001" meta_screenDesc="호출 화면이 넘긴 안내문 데이터를 표와 그리드로 보여 주고, $c.win.print 로 팝업 화면 전체 또는 특정 영역만 인쇄·PDF 저장한 뒤 실행 횟수를 호출 화면에 돌려주는 레이어 팝업 표준 골격." meta_author="Inswave" meta_type="가이드">
+        <w2:type>COMPONENT</w2:type>
+        <w2:buildDate/>
+        <w2:MSA/>
+        <xf:model>
+            <w2:dataCollection baseNode="map">
+                <w2:dataMap baseNode="map" id="dma_notice">
+                    <w2:keyInfo>
+                        <w2:key id="title" name="안내문 제목" dataType="text"></w2:key>
+                        <w2:key id="comNm" name="회사명" dataType="text"></w2:key>
+                        <w2:key id="listDd" name="상장일" dataType="text"></w2:key>
+                        <w2:key id="contn" name="안내 내용" dataType="text"></w2:key>
+                    </w2:keyInfo>
+                </w2:dataMap>
+                <w2:dataList baseNode="list" repeatNode="map" id="dlt_items">
+                    <w2:columnInfo>
+                        <w2:column id="isuCd" name="종목코드" dataType="text"></w2:column>
+                        <w2:column id="isuNm" name="종목명" dataType="text"></w2:column>
+                        <w2:column id="qty" name="상장주식수" dataType="text"></w2:column>
+                        <w2:column id="amt" name="상장금액" dataType="text"></w2:column>
+                    </w2:columnInfo>
+                </w2:dataList>
+            </w2:dataCollection>
+            <w2:workflowCollection/>
+        </xf:model>
+        <w2:layoutInfo/>
+        <w2:publicInfo method="scwin.onpageload,scwin.init,scwin.btn_print_onclick,scwin.btn_pdf_onclick,scwin.btn_pdfGrid_onclick,scwin.btn_close_onclick"/>
+        <script lazy="false" type="text/javascript"><![CDATA[// 원본 : 없음 — $c.win.print 사용법 합성 가이드 (/ui/sample/template/SMPPRT10001.xml)
+
+/*
+ * 화면 동작
+ * 1. 팝업 로딩시 호출 화면이 넘긴 안내문 데이터(제목·회사명·상장일·내용·종목 목록)를 DataMap·DataList 에 담아 보여 준다
+ * 2. 「인쇄」 클릭시 $c.win.print() — 팝업 화면 전체를 캡처해 브라우저 인쇄 대화상자를 띄운다
+ * 3. 「PDF 저장」 클릭시 $c.win.print({ type : "pdf", fileName }) — 팝업 화면 전체를 A4 PDF 로 내려받는다
+ * 4. 「종목 목록만 PDF」 클릭시 $c.win.print({ type : "pdf", target : grp_printArea, orientation : "landscape" }) — 그리드 영역만 가로 PDF 로 내려받는다
+ * 5. 「닫기」 클릭시 인쇄·저장 횟수를 호출 화면에 돌려주며 닫는다
+ *
+ * 담긴 패턴
+ * - 부모 파라미터 수신 ($c.data.getParameter)
+ * - 레이어 팝업 영역만 인쇄·PDF 저장 ($c.win.print — type / target / fileName / orientation 옵션)
+ *   · 버튼 영역(btnbox)은 출력에서 빼고 싶으면 target 으로 본문 그룹을 지정한다(이 화면의 grp_printArea 처럼).
+ *   · print 는 async 라 await 로 완료를 기다리고, 실패(라이브러리 미등록 등)는 진입점의 handleError 가 안내한다.
+ *   · 라이브러리(/cm/js 의 html2canvas·html2pdf)는 config.xml 의 engine module 로 정적 로드된다 — 화면에서 로드하지 않는다.
+ * - 자기 팝업 닫기 + 결과 반환 ($c.win.closePopup(callbackParam))
+ *
+ * 복사해서 쓰는 순서
+ * 1. 파일명과 meta_screenId 를 실제 화면ID 로 변경
+ * 2. dma_notice·dlt_items 와 표·그리드 마크업을 업무 항목으로 교체
+ * 3. 필요 없는 출력 버튼은 함수와 마크업을 함께 삭제
+ */
+
+
+///////// 1. 변수 및 선언 영역 /////////
+
+scwin.screenId = "SMPPRT10001";
+
+// 화면 상태값 — 호출 화면에 돌려줄 실행 횟수
+scwin.printCnt = 0;
+scwin.pdfCnt = 0;
+
+
+///////// 2. 초기화 영역 /////////
+
+/**
+ * @method
+ * @name scwin.onpageload
+ * @author Inswave
+ * @date 2026. 09. 21
+ * @description 페이지로드
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.onpageload = function () {
+    try {
+        scwin.init();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "SMPPRT10001.onpageload" });
+    }
+};
+
+/**
+ * @method
+ * @name scwin.init
+ * @author Inswave
+ * @date 2026. 09. 21
+ * @description 초기화. 호출 화면이 openPopup 의 3번째 인자로 넘긴 안내문 데이터를 화면에 담는다.
+ *
+ * 복사해 쓸 때 바꿀 곳
+ *  - 받는 파라미터 이름
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.init = function () {
+    const param = $c.data.getParameter() ?? {};
+
+    dma_notice.set("title", param.title ?? "안내문");
+    dma_notice.set("comNm", param.comNm ?? "");
+    dma_notice.set("listDd", param.listDd ?? "");
+    dma_notice.set("contn", param.contn ?? "");
+
+    dlt_items.removeAll();
+
+    if ($c.util.isArray(param.rows)) {
+        dlt_items.setJSON(param.rows);
+    }
+};
+
+
+///////// 3. 컴포넌트 이벤트 영역 /////////
+
+/**
+ * @event
+ * @name scwin.btn_print_onclick
+ * @author Inswave
+ * @date 2026. 09. 21
+ * @description 인쇄 버튼 클릭. 팝업 화면 전체를 캡처해 인쇄 대화상자를 띄운다.
+ * @param {Object} e 이벤트 객체
+ * @returns
+ * @hidden N
+*/
+scwin.btn_print_onclick = async function (e) {
+    try {
+        await $c.win.print({ title : dma_notice.get("title") });
+
+        scwin.printCnt++;
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "SMPPRT10001.btn_print_onclick" });
+    }
+};
+
+/**
+ * @event
+ * @name scwin.btn_pdf_onclick
+ * @author Inswave
+ * @date 2026. 09. 21
+ * @description PDF 저장 버튼 클릭. 팝업 화면 전체를 A4 세로 PDF 로 내려받는다.
+ * @param {Object} e 이벤트 객체
+ * @returns
+ * @hidden N
+*/
+scwin.btn_pdf_onclick = async function (e) {
+    try {
+        await $c.win.print({
+            type : "pdf",
+            fileName : dma_notice.get("title") + "_" + dma_notice.get("listDd") + ".pdf"
+        });
+
+        scwin.pdfCnt++;
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "SMPPRT10001.btn_pdf_onclick" });
+    }
+};
+
+/**
+ * @event
+ * @name scwin.btn_pdfGrid_onclick
+ * @author Inswave
+ * @date 2026. 09. 21
+ * @description 종목 목록만 PDF 버튼 클릭. 그리드를 감싼 그룹(grp_printArea)만 가로 PDF 로 내려받는다.
+ * @param {Object} e 이벤트 객체
+ * @returns
+ * @hidden N
+*/
+scwin.btn_pdfGrid_onclick = async function (e) {
+    try {
+        await $c.win.print({
+            type : "pdf",
+            target : grp_printArea,
+            fileName : "종목목록_" + dma_notice.get("listDd") + ".pdf",
+            orientation : "landscape"
+        });
+
+        scwin.pdfCnt++;
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "SMPPRT10001.btn_pdfGrid_onclick" });
+    }
+};
+
+/**
+ * @event
+ * @name scwin.btn_close_onclick
+ * @author Inswave
+ * @date 2026. 09. 21
+ * @description 닫기 버튼 클릭. 인쇄·저장 횟수를 호출 화면에 돌려주며 팝업을 닫는다.
+ * @param {Object} e 이벤트 객체
+ * @returns
+ * @hidden N
+*/
+scwin.btn_close_onclick = function (e) {
+    try {
+        $c.win.closePopup({ printCnt : scwin.printCnt, pdfCnt : scwin.pdfCnt });
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "SMPPRT10001.btn_close_onclick" });
+    }
+};
+
+
+///////// 4. 서브미션 콜백 영역 /////////
+
+
+///////// 5. 일반/업무 함수 영역 /////////
+]]></script>
+    </head>
+    <body ev:onpageload="scwin.onpageload">
+        <xf:group class="pop_contents" id="" meta_snippetCategory="00_화면시작" meta_snippetKeyComponent="true" meta_snippetName="0_02 팝업페이지시작" style="">
+            <w2:pageFrame id="pfmContentHeader" src="/cm/xml/contentHeader.xml" style=""></w2:pageFrame>
+
+            <xf:group class="titbox" id="" style="">
+                <w2:textbox id="txb_title" label="" style="" tagname="h3" ref="data:dma_notice.title"></w2:textbox>
+            </xf:group>
+
+            <xf:group class="tblbox" id="grp_notice" style="">
+                <xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+                    <w2:attributes>
+                        <w2:summary>안내문 기본 정보</w2:summary>
+                    </w2:attributes>
+                    <xf:group tagname="colgroup">
+                        <xf:group style="width:120px;" tagname="col"></xf:group>
+                        <xf:group style="" tagname="col"></xf:group>
+                        <xf:group style="width:120px;" tagname="col"></xf:group>
+                        <xf:group style="" tagname="col"></xf:group>
+                    </xf:group>
+                    <xf:group style="" tagname="tr">
+                        <xf:group class="w2tb_th" tagname="th">
+                            <w2:attributes>
+                                <w2:scope>row</w2:scope>
+                            </w2:attributes>
+                            <w2:textbox id="label_comNm" label="회사명" style=""></w2:textbox>
+                        </xf:group>
+                        <xf:group class="w2tb_td" tagname="td">
+                            <w2:textbox id="txb_comNm" label="" style="" ref="data:dma_notice.comNm"></w2:textbox>
+                        </xf:group>
+                        <xf:group class="w2tb_th" tagname="th">
+                            <w2:attributes>
+                                <w2:scope>row</w2:scope>
+                            </w2:attributes>
+                            <w2:textbox id="label_listDd" label="상장일" style=""></w2:textbox>
+                        </xf:group>
+                        <xf:group class="w2tb_td" tagname="td">
+                            <w2:textbox id="txb_listDd" label="" style="" ref="data:dma_notice.listDd" displayFormat="####-##-##"></w2:textbox>
+                        </xf:group>
+                    </xf:group>
+                    <xf:group style="" tagname="tr">
+                        <xf:group class="w2tb_th" tagname="th">
+                            <w2:attributes>
+                                <w2:scope>row</w2:scope>
+                            </w2:attributes>
+                            <w2:textbox id="label_contn" label="안내 내용" style=""></w2:textbox>
+                        </xf:group>
+                        <xf:group class="w2tb_td" tagname="td">
+                            <w2:attributes>
+                                <w2:colspan>3</w2:colspan>
+                                <w2:rowspan>1</w2:rowspan>
+                            </w2:attributes>
+                            <w2:textbox id="txb_contn" label="" style="white-space:normal;line-height:1.5;" ref="data:dma_notice.contn"></w2:textbox>
+                        </xf:group>
+                    </xf:group>
+                </xf:group>
+            </xf:group>
+
+            <!-- 「종목 목록만 PDF」 의 target — 버튼 영역을 빼고 이 그룹만 출력한다 -->
+            <xf:group id="grp_printArea" style="">
+                <xf:group class="titbox" id="" style="">
+                    <xf:group class="lt" id="" style="">
+                        <w2:textbox id="label_items" label="종목 목록" style="" tagname="h4"></w2:textbox>
+                    </xf:group>
+                </xf:group>
+                <xf:group class="gvwbox" id="" style="">
+                    <w2:gridView dataList="data:dlt_items" id="grd_items" class="gvw" autoFit="allColumn" readOnly="true"
+                        rowNumVisible="true" rowNumHeaderValue="번호" style="height:180px;" visibleRowNum="auto">
+                        <w2:caption id="caption_items" style="" value="종목 목록"></w2:caption>
+                        <w2:header id="header_items" style="">
+                            <w2:row id="" style="">
+                                <w2:column width="140" inputType="text" id="h_isuCd" value="종목코드" textAlign="center"></w2:column>
+                                <w2:column width="200" inputType="text" id="h_isuNm" value="종목명" textAlign="center"></w2:column>
+                                <w2:column width="120" inputType="text" id="h_qty" value="상장주식수" textAlign="center"></w2:column>
+                                <w2:column width="140" inputType="text" id="h_amt" value="상장금액(원)" textAlign="center"></w2:column>
+                            </w2:row>
+                        </w2:header>
+                        <w2:gBody id="gBody_items" style="">
+                            <w2:row id="" style="">
+                                <w2:column width="140" inputType="text" id="isuCd" textAlign="center" displayMode="label"></w2:column>
+                                <w2:column width="200" inputType="text" id="isuNm" textAlign="left" displayMode="label"></w2:column>
+                                <w2:column width="120" inputType="text" id="qty" textAlign="right" displayMode="label"></w2:column>
+                                <w2:column width="140" inputType="text" id="amt" textAlign="right" displayMode="label"></w2:column>
+                            </w2:row>
+                        </w2:gBody>
+                    </w2:gridView>
+                </xf:group>
+            </xf:group>
+
+            <xf:group class="btnbox" id="grp_btnBox" style="">
+                <xf:group class="rt" id="" style="">
+                    <xf:trigger class="btn_cm pt" id="btn_print" style="" type="button" ev:onclick="scwin.btn_print_onclick">
+                        <xf:label><![CDATA[인쇄]]></xf:label>
+                    </xf:trigger>
+                    <xf:trigger class="btn_cm pt" id="btn_pdf" style="" type="button" ev:onclick="scwin.btn_pdf_onclick">
+                        <xf:label><![CDATA[PDF 저장]]></xf:label>
+                    </xf:trigger>
+                    <xf:trigger class="btn_cm" id="btn_pdfGrid" style="" type="button" ev:onclick="scwin.btn_pdfGrid_onclick">
+                        <xf:label><![CDATA[종목 목록만 PDF]]></xf:label>
+                    </xf:trigger>
+                    <xf:trigger class="btn_cm" id="btn_close" style="" type="button" ev:onclick="scwin.btn_close_onclick">
+                        <xf:label><![CDATA[닫기]]></xf:label>
+                    </xf:trigger>
+                </xf:group>
+            </xf:group>
+        </xf:group>
+    </body>
+</html>

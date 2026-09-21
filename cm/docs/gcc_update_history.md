@@ -1,7 +1,7 @@
 # gcc 공통 함수 업데이트 이력
 
-`cm/gcc/` 공통 라이브러리(`$c.*`)의 최초 반입(2026-06-08, `92a35bd`) 이후 변경 내역 정리 (최종 갱신 2026-09-18).
-API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-09-15 기준 **13개 모듈 / 301개 공개 메서드**.
+`cm/gcc/` 공통 라이브러리(`$c.*`)의 최초 반입(2026-06-08, `92a35bd`) 이후 변경 내역 정리 (최종 갱신 2026-09-21).
+API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-09-21 기준 **13개 모듈 / 301개 공개 메서드**.
 
 > `src/cm/gcc/`는 CM 모듈용 사본으로 일반적 개선만 선별 반영해 왔으나(2026-06-10 병합, 2026-07-22 대규모 동기화로 11파일 체제),
 > **2026-08-18 `26af3d5`에서 사용 중단으로 삭제**되어 `cm/gcc/`가 유일한 canonical 라이브러리다.
@@ -15,7 +15,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 |------|-----------|
 | `sbm.xml` (`$c.sbm`) | 중복 제출 가드, `executeDynamic` 간소화 ref/target 문법·gridview 자동 바인딩·`autoFocus`·다중 gridview 바인딩·스피너 오버레이·message 옵션(opt-in), RESTful URL 활성화, 단건 ref(DataMap)→`requestData` 추출, 페이징(`setPagingInfo`) 개선 — `maxRowNum "all"` 전체 행 표시·`rowNumVisble desc` 내림차순 순번, 그리드 DOM `render` 참조 전환 |
 | `data.xml` (`$c.data`) | 공통코드 로딩(`COMMON_CODE_INFO.ACTION` 연동, `setCommonCode` 배열 매핑 → code별 키잉 응답 매핑(`mappingKey` = 응답 조회 key) 개편·응답 언래핑·기본 컬럼 cdVal/cdValNm·조회 URL 이원화(url/paramName 옵션은 추가 후 제거)), JSON 헬퍼 8종, 프로세스 메시지, 콤보 공통코드 세팅(`comboCbDataSet*`) 계열(이메일 도메인 `comboCbDataSetEmail` 포함), 업로드/리포트 헬퍼, 엑셀 다운로드 기본 옵션 개선, 화면/DC 단위 전파 제어 `setBroadcast` |
-| `win.xml` (`$c.win`) | 외부망 홈(`goHomeEx`), 프로그램 열기/내비게이션 단순화, `openFormSubmit`, 인쇄(`mainPrint`/`popupPrint`), `success`/`error` 알림, `openExternalPage`, **browserPopup 부모 화면 접근**(`getOpenerScope`/`callOpener`), 히스토리 기록·복원(`pushState`/`changePageState`) 결함 수정 및 `moveUrl`/`setPageFrameSrc` 이동 복원 확장(`restoreData` [목록] 복귀 포함), 프레임 초기화 `reinitialize` |
+| `win.xml` (`$c.win`) | 외부망 홈(`goHomeEx`), 프로그램 열기/내비게이션 단순화, `openFormSubmit`, 인쇄·PDF 저장(`print` — 09-21 `mainPrint`/`popupPrint` 통합, html2canvas 캡처), `success`/`error` 알림, `openExternalPage`, **browserPopup 부모 화면 접근**(`getOpenerScope`/`callOpener`), 히스토리 기록·복원(`pushState`/`changePageState`) 결함 수정 및 `moveUrl`/`setPageFrameSrc` 이동 복원 확장(`restoreData` [목록] 복귀 포함), 프레임 초기화 `reinitialize` |
 | `exception.xml` (`$c.exception`) | **신설**(2026-08-26, win.xml 에서 분리) — 화면 try/catch 공통 오류 처리기 `handleError`(예외 분류·이중 알림 방지), 오류 수집 훅 `_reportError`(`ERROR_REPORT_INFO.URL` 설정 시 활성화) |
 | `util.xml` (`$c.util`) | 쿠키/웹스토리지 헬퍼 13종, 업로드(`onUploadClick`/`getUploadFiles` 등), `setTextLengthCounter`, `checkFileExtension`, 엑셀 다운로드 파일명 개선, `setGridVisibleRowNum`(gridView "all" 동적 적용), 버튼 상태 일괄 제어 `setButtonState`/`registerButtonState`, 동적 컬럼 그리드 `syncDataListColumns`/`buildGridStyleXml`(setGridStyle 2단 그룹 헤더), DOM 로더 `loadScript`/`loadCss`/`addStyle`, 웹스토리지 접근 예외 흡수(`__getWebStorageObject`) |
 | `date.xml` (`$c.date`) | 날짜 포맷 검증(`checkCalendarFormat`/`compareFromToDate`), `getDateInterval` 단위 버그 수정, commonPrototype 의존 제거 |
@@ -275,6 +275,14 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 ---
 
 ## 2026년 9월
+
+### 화면 인쇄·PDF 저장 통합 (09-21)
+- (미커밋, 09-21) — **`$c.win.print` 신설 + `mainPrint`/`popupPrint` 통합 제거** (메서드 수 302→301):
+  - 배경: 종전 두 함수는 모두 `window.print()` 만 호출하는 골격이라, 레이어 팝업(pageFramePopup)에서는 뒤에 깔린 메인 화면까지, 메인 화면에서는 헤더·사이드까지 함께 인쇄됐다. WebSquare 샘플(`pdf저장/sample01.xml`, html2canvas + jsPDF / html2pdf)을 참고해 **호출 화면의 frame DOM(`$p.getFrame().render`)만 캡처**하는 방식으로 바꾸고, 호출 화면의 `$p` 가 주입되므로 메인·팝업 구분이 필요 없어 한 함수로 통합했다(사용자 지시).
+  - `print(options)`: `type` `print`(html2canvas 캡처 → 숨김 iframe 에 이미지만 넣어 인쇄, afterprint/60초 후 제거) | `pdf`(html2pdf 로 A4 페이지 분할 저장, `fileName`·`orientation`·`margin`), `target`(컴포넌트 객체·DOM id·DOM 요소 — 지정했는데 못 찾으면 Error), `scale`, `title`; 스크롤로 가려진 영역까지 캡처(scroll 크기를 캡처 크기로). frame 이 없으면 `document.body`.
+  - 라이브러리: `cm/js/html2canvas.min.js`·`jspdf.umd.min.js`·`html2pdf.bundle.min.js` 반입, `websquare/config.xml`·`config.js` engine module 로 **정적 로드**(사용자 지시로 동적 로드 코드 제거). 전역이 없으면 `__checkPrintLib` 가 등록 안내 Error. 경로 상수 `PRINT_LIB_INFO`, 기본 옵션 `PRINT_DEFAULT_OPTIONS`. 내부 헬퍼 5종(`__checkPrintLib`·`__resolvePrintElement`·`__getCanvasOptions`·`__getDefaultPdfName`·`__savePdf`·`__printCanvas`)은 `@hidden Y`·publicInfo 미등재.
+  - 호출처 갱신: `conversion/jsp-front/{jsp,krx}_소스전환/jldfil35704·35708`(`popupPrint`→`print`), 샘플 `ULDFIL35700`(`mainPrint`→`print`), `window.print()` 직접 호출 6화면(`cm/as-is/{ins,stf}/listInvstg*` 3건, fil-front ui-tobe `JLDFIL16300_TAB1`·`JLDFIL16301`·`ULDFIL35700`)을 `await $c.win.print()` + handleError 로 전환(더는 직접 호출 없음, `print.css` 는 전역 설정만 유지). 가이드 샘플 `SMPPRT10000`(호출 화면 — 팝업 열기 + 이 화면 인쇄)·`SMPPRT10001`(팝업 — 인쇄/PDF/영역 PDF) 신설, `conversion/md/sample_templates.md` 등록. `/cm/css/print.css` 는 window.print 직접 사용 시의 보조 규칙으로 유지.
+  - 검증: Jest 신규 `test/print.test.js` 11건(vm 하니스 + fake DOM/라이브러리 전역 mock — print/pdf 경로, target 3형태, 미등록 Error, config 등록·실파일 일치, 통합 확인), gcc lint 13 files 0/0, `npm run docs:gcc`.
 
 ### 날짜 실존 검사 보강 (09-18)
 - `87c20c5` (09-18) — **`$c.date` 실존 날짜 검사 단일화 + `compareFromToDate` 포맷 무관 실존 검사** (메서드 수 유지):

@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:ev="http://www.w3.org/2001/xml-events"
+    xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+    <head meta_screenName="[가이드] 화면 인쇄·PDF 저장 호출 화면 ($c.win.print)" meta_screenId="SMPPRT10000" meta_screenDesc="레이어 팝업(SMPPRT10001)을 열어 팝업 화면 안에서 $c.win.print 로 팝업 영역만 인쇄하거나 PDF 로 저장하고, 같은 함수로 이 화면(메인 content)도 인쇄하는 흐름을 보여 주는 호출 화면 — 호출한 화면의 frame 이 출력 대상이 된다." meta_author="Inswave" meta_type="가이드">
+        <w2:type>COMPONENT</w2:type>
+        <w2:buildDate/>
+        <w2:MSA/>
+        <xf:model>
+            <w2:dataCollection baseNode="map">
+                <w2:dataMap baseNode="map" id="dma_result">
+                    <w2:keyInfo>
+                        <w2:key id="printCnt" name="팝업에서 인쇄한 횟수" dataType="text"></w2:key>
+                        <w2:key id="pdfCnt" name="팝업에서 PDF 저장한 횟수" dataType="text"></w2:key>
+                    </w2:keyInfo>
+                </w2:dataMap>
+            </w2:dataCollection>
+            <w2:workflowCollection/>
+        </xf:model>
+        <w2:layoutInfo/>
+        <w2:publicInfo method="scwin.onpageload,scwin.btn_open_onclick,scwin.btn_print_onclick,scwin.showResult"/>
+        <script lazy="false" type="text/javascript"><![CDATA[// 원본 : 없음 — $c.win.print 사용법 합성 가이드 (/ui/sample/template/SMPPRT10000.xml)
+
+/*
+ * 화면 동작
+ * 1. 「레이어 팝업 열기」 클릭시 안내문 미리보기 팝업(SMPPRT10001)을 pageFramePopup 으로 열고 표시할 데이터를 넘긴다
+ * 2. 팝업 안의 「인쇄」·「PDF 저장」 버튼이 $c.win.print 를 호출한다 — 팝업 영역만 캡처하므로 뒤에 있는 이 화면은 출력되지 않는다
+ * 3. 팝업이 닫히면 팝업에서 인쇄·저장한 횟수를 결과 영역에 표시한다
+ * 4. 「이 화면 인쇄」 클릭시 같은 $c.win.print 로 이 화면(메인 content frame)만 인쇄한다 — 헤더·사이드 메뉴는 캡처 대상이 아니다
+ *
+ * 담긴 패턴
+ * - 값을 돌려주는 레이어 팝업 호출 ($c.win.openPopup 을 await 로 수신, 취소는 빈 결과로 판단)
+ * - 화면 인쇄·PDF 저장 ($c.win.print — 메인 화면·레이어 팝업 공통)
+ *   · window.print 는 문서 전체를 인쇄한다. 메인 화면은 헤더·사이드가, 레이어 팝업은 뒤에 깔린 메인 화면까지 함께 나온다.
+ *   · print 는 html2canvas 로 호출 화면의 frame DOM 만 이미지로 그려 숨김 iframe 에서 인쇄하거나 html2pdf 로 PDF 를 만든다.
+ *   · 종전 mainPrint(window.print)·popupPrint 는 이 함수로 통합됐다.
+ *
+ * 이 화면이 쓰는 라이브러리
+ * - /cm/js/html2canvas.min.js, /cm/js/html2pdf.bundle.min.js — websquare/config.xml 의 <engine><module> 로 정적 로드된다($c.win.PRINT_LIB_INFO).
+ *   화면이 직접 <script src> 로 넣지 않는다. 등록이 빠지면 print 가 등록 안내와 함께 오류를 던진다.
+ *
+ * 복사해서 쓰는 순서
+ * 1. 파일명과 meta_screenId 를 실제 화면ID 로 변경
+ * 2. POPUP_URL 과 options.id/popupName/크기, 넘기는 파라미터를 실제 팝업에 맞게 교체
+ * 3. 팝업 화면은 SMPPRT10001 을 참고해 인쇄·PDF 버튼을 붙인다
+ */
+
+
+///////// 1. 변수 및 선언 영역 /////////
+
+scwin.screenId = "SMPPRT10000";
+
+// 인쇄 대상 레이어 팝업 화면
+scwin.POPUP_URL = "/ui/sample/template/SMPPRT10001.xml";
+
+
+///////// 2. 초기화 영역 /////////
+
+/**
+ * @method
+ * @name scwin.onpageload
+ * @author Inswave
+ * @date 2026. 09. 21
+ * @description 페이지로드. 결과 영역을 숨긴다.
+ * @param
+ * @returns
+ * @hidden N
+*/
+scwin.onpageload = function () {
+    try {
+        grp_result.hide();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "SMPPRT10000.onpageload" });
+    }
+};
+
+
+///////// 3. 컴포넌트 이벤트 영역 /////////
+
+/**
+ * @event
+ * @name scwin.btn_open_onclick
+ * @author Inswave
+ * @date 2026. 09. 21
+ * @description 레이어 팝업 열기. 팝업에 표시할 안내문 데이터를 넘기고, 팝업이 닫힐 때 돌려주는 인쇄·저장 횟수를 받는다.
+ *
+ * 복사해 쓸 때 바꿀 곳
+ *  - options.id 는 팝업 화면ID 와 같게, 파라미터 키는 팝업 화면과 합의한 이름으로
+ * @param {Object} e 이벤트 객체
+ * @returns
+ * @hidden N
+*/
+scwin.btn_open_onclick = async function (e) {
+    try {
+        grp_result.hide();
+
+        // 팝업이 표시할 데이터 — 실제 화면은 조회 결과를 넘긴다
+        const param = {
+            title : "신규상장 안내문",
+            comNm : "인스웨이브시스템즈",
+            listDd : "20261005",
+            contn : "아래 종목이 신규상장됩니다. 상장일 이후 매매거래가 가능하며, 자세한 내용은 공시를 참고하시기 바랍니다.",
+            rows : [
+                { isuCd : "KR7000001001", isuNm : "인스웨이브 보통주", qty : "1,200,000", amt : "6,000,000,000" },
+                { isuCd : "KR7000002009", isuNm : "인스웨이브 우선주", qty : "300,000", amt : "1,800,000,000" },
+                { isuCd : "KR7000003007", isuNm : "인스웨이브 2우B", qty : "150,000", amt : "1,050,000,000" }
+            ]
+        };
+
+        const options = {
+            id : "SMPPRT10001",
+            popupName : "안내문 미리보기 (인쇄·PDF 저장)",
+            width : 760,
+            height : 640,
+            frameModal : "top",
+            type : "pageFramePopup"
+        };
+
+        const result = await $c.win.openPopup(scwin.POPUP_URL, options, param);
+
+        // [닫기] 또는 팝업 자체 닫기 — 결과 없음
+        if ($c.util.isEmpty(result)) {
+            scwin.showResult(null);
+            return;
+        }
+
+        dma_result.set("printCnt", result.printCnt);
+        dma_result.set("pdfCnt", result.pdfCnt);
+        scwin.showResult(result);
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "SMPPRT10000.btn_open_onclick" });
+    }
+};
+
+/**
+ * @event
+ * @name scwin.btn_print_onclick
+ * @author Inswave
+ * @date 2026. 09. 21
+ * @description 이 화면(메인 content) 인쇄. 팝업과 같은 $c.win.print 가 이 화면의 frame 만 캡처해 인쇄 대화상자를 띄운다.
+ * @param {Object} e 이벤트 객체
+ * @returns
+ * @hidden N
+*/
+scwin.btn_print_onclick = async function (e) {
+    try {
+        await $c.win.print({ title : "화면 인쇄 가이드" });
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "SMPPRT10000.btn_print_onclick" });
+    }
+};
+
+
+///////// 4. 서브미션 콜백 영역 /////////
+
+
+///////// 5. 일반/업무 함수 영역 /////////
+
+/**
+ * @method
+ * @name scwin.showResult
+ * @author Inswave
+ * @date 2026. 09. 21
+ * @description 팝업 결과를 결과 영역에 표시한다. null 이면 "결과 없이 닫힘" 으로 표시한다.
+ * @param {Object|null} result 팝업이 돌려준 결과 객체 { printCnt, pdfCnt }
+ * @returns
+ * @hidden N
+*/
+scwin.showResult = function (result) {
+    if (result === null) {
+        txb_result.setValue("팝업이 결과 없이 닫혔습니다.");
+    } else {
+        txb_result.setValue("팝업에서 인쇄 " + (result.printCnt || 0) + "회, PDF 저장 " + (result.pdfCnt || 0) + "회 실행했습니다.");
+    }
+
+    grp_result.show();
+};
+]]></script>
+    </head>
+    <body ev:onpageload="scwin.onpageload">
+        <xf:group class="sub_contents" id="" meta_snippetCategory="00_화면시작" meta_snippetKeyComponent="true" meta_snippetName="0_01 페이지시작" style="">
+            <w2:pageFrame id="pfmContentHeader" src="/cm/xml/contentHeader.xml" style=""></w2:pageFrame>
+
+            <xf:group class="infobox" id="" style="">
+                <w2:textbox class="txt_info_gray" id="" label="화면 인쇄·PDF 저장 가이드 ($c.win.print)" style=""></w2:textbox>
+                <xf:group class="txt_list" id="" tagname="ul" style="">
+                    <xf:group id="" tagname="li">
+                        <w2:textbox id="" label="window.print() 는 문서 전체를 인쇄합니다. 메인 화면은 헤더·사이드 메뉴가, 레이어 팝업은 뒤에 깔린 메인 화면까지 함께 출력됩니다." style=""></w2:textbox>
+                    </xf:group>
+                    <xf:group id="" tagname="li">
+                        <w2:textbox id="" label="$c.win.print() 는 호출한 화면의 frame DOM(메인이면 content 영역, 팝업이면 팝업 페이지)만 이미지로 캡처해 숨김 iframe 에서 인쇄하거나(type: print) PDF 로 저장합니다(type: pdf)." style=""></w2:textbox>
+                    </xf:group>
+                    <xf:group id="" tagname="li">
+                        <w2:textbox id="" label="options.target 으로 팝업 안의 특정 영역(컴포넌트)만 출력할 수 있습니다. 라이브러리(/cm/js)는 config.xml 의 engine module 로 정적 로드됩니다." style=""></w2:textbox>
+                    </xf:group>
+                    <xf:group id="" tagname="li">
+                        <w2:textbox id="" label="메인 화면·레이어 팝업 모두 같은 $c.win.print() 를 씁니다(종전 mainPrint·popupPrint 통합). /cm/css/print.css 는 window.print 를 직접 쓰는 경우를 위한 보조 규칙입니다." style=""></w2:textbox>
+                    </xf:group>
+                </xf:group>
+            </xf:group>
+
+            <xf:group class="btnbox" id="grp_btnBox" style="">
+                <xf:group class="lt" id="" style="">
+                    <xf:trigger class="btn_cm pt" id="btn_open" style="" type="button" ev:onclick="scwin.btn_open_onclick">
+                        <xf:label><![CDATA[레이어 팝업 열기]]></xf:label>
+                    </xf:trigger>
+                    <xf:trigger class="btn_cm" id="btn_print" style="" type="button" ev:onclick="scwin.btn_print_onclick">
+                        <xf:label><![CDATA[이 화면 인쇄 ($c.win.print)]]></xf:label>
+                    </xf:trigger>
+                </xf:group>
+            </xf:group>
+
+            <xf:group class="tblbox" id="grp_result" style="">
+                <xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+                    <w2:attributes>
+                        <w2:summary>팝업 결과</w2:summary>
+                    </w2:attributes>
+                    <xf:group tagname="colgroup">
+                        <xf:group style="width:150px;" tagname="col"></xf:group>
+                        <xf:group style="" tagname="col"></xf:group>
+                    </xf:group>
+                    <xf:group style="" tagname="tr">
+                        <xf:group class="w2tb_th" tagname="th">
+                            <w2:attributes>
+                                <w2:scope>row</w2:scope>
+                            </w2:attributes>
+                            <w2:textbox id="label_result" label="팝업 결과" style=""></w2:textbox>
+                        </xf:group>
+                        <xf:group class="w2tb_td" tagname="td">
+                            <w2:textbox id="txb_result" label="" style="" class="txt_point"></w2:textbox>
+                        </xf:group>
+                    </xf:group>
+                </xf:group>
+            </xf:group>
+        </xf:group>
+    </body>
+</html>
