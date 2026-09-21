@@ -43,12 +43,12 @@
         	<w2:workflowCollection />
         </xf:model>
         <w2:layoutInfo/>
-        <w2:publicInfo method="scwin.onpageload,scwin.rd_data_yn_onchange,scwin.sel_chrgNm_onchange,scwin.ipt_quesContn_onkeyup,scwin.txt_quesAttachFileNm_onclick,scwin.btn_deleteFile_onclick,scwin.btn_fileUp_onclick,scwin.upd_compUpload_oninputvaluechange,scwin.btn_list_onclick,scwin.btn_insert_onclick,scwin.btn_update_onclick"></w2:publicInfo>
+        <w2:publicInfo method="scwin.onpageload,scwin.rd_data_yn_onchange,scwin.sel_chrgNm_onchange,scwin.txt_quesAttachFileNm_onclick,scwin.btn_deleteFile_onclick,scwin.btn_fileUp_onclick,scwin.upd_compUpload_oninputvaluechange,scwin.btn_list_onclick,scwin.btn_insert_onclick,scwin.btn_update_onclick,scwin.init_byteCounter"></w2:publicInfo>
         <script lazy="false" type="text/javascript"><![CDATA[
 ///////// 1. 변수 및 선언 영역 /////////
+scwin.isRealDeleteYn = "N";
 
 // [수정]시 첨부파일 실제 삭제 여부
-scwin.isRealDeleteYn = "N";
 
 ///////// 2. 초기화 영역 /////////
 /**
@@ -60,44 +60,60 @@ scwin.isRealDeleteYn = "N";
  * @example (body ev:onpageload 바인딩으로 자동 호출)
  */
 scwin.onpageload = async function() {
+    try {
+        scwin.init_byteCounter(); // 질의내용 byte 카운터 등록
 
-    // 공시담당자 정보
-    const sbmOptions = {
-        id : "sbm_SelectDisclsChrgList",
-        action : "/api/discls/support/qna/discls-chrg/select-list",
-        method : "get",
-        target : "dlt_DisclsChrgList=body",
-        isProcessMsg : false
-    };
-    await await $c.sbm.executeDynamic(sbmOptions);
-
-    const contnId = $c.data.getParameter("contnId");
-    if(!contnId) { // 신규
-        const comNm = $c.session.info("comAbbrv");
-        txt_comNm.setValue(comNm);
-
-        // 버튼
-        btn_update.hide();
-
-        // 첨부파일 다운로드 row 안보이게
-        grp_quesAttachFile.hide();
-
-    } else {
-        // [수정] 상세조회
-        btn_insert.hide();
-
-        dma_QnaInfo.set("contnId", contnId);
+        // 공시담당자 정보
         const sbmOptions = {
-            id : "sbm_SelectQna",
-            action : "/api/discls/support/qna/select-one",
+            id : "sbm_SelectDisclsChrgList",
+            action : "/api/discls/support/qna/discls-chrg/select-list",
             method : "get",
-            ref : "dma_QnaInfo",
-            target : "dma_QnaInfo=body",
+            target : "dlt_DisclsChrgList=body",
             isProcessMsg : false
         };
-        await await $c.sbm.executeDynamic(sbmOptions);
-    }
+        await $c.sbm.executeDynamic(sbmOptions);
 
+        const contnId = $c.data.getParameter("contnId");
+        if(!contnId) { // 신규
+            const comNm = $c.session.getUserInfo("comAbbrv");
+            txt_comNm.setValue(comNm);
+
+            // 버튼
+            btn_update.hide();
+
+            // 첨부파일 다운로드 row 안보이게
+            grp_quesAttachFile.hide();
+
+        } else {
+            // [수정] 상세조회
+            btn_insert.hide();
+
+            dma_QnaInfo.set("contnId", contnId);
+            const sbmOptions = {
+                id : "sbm_SelectQna",
+                action : "/api/discls/support/qna/select-one",
+                method : "get",
+                ref : "dma_QnaInfo",
+                target : "dma_QnaInfo=body",
+                isProcessMsg : false
+            };
+            await $c.sbm.executeDynamic(sbmOptions);
+        }
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "JLDFIL17301.onpageload" });
+    }
+};
+
+/**
+ * @method
+ * @name init_byteCounter
+ * @description 질의내용 byte 카운터 등록 — 입력 초과 차단과 "n / 2,000 byte" 표시를 gcc 공통이 담당한다(as-is common.js checkByte/getByte/calcContn 사본 대체).
+ * @returns {void}
+ * @hidden N
+ * @example scwin.init_byteCounter();
+ */
+scwin.init_byteCounter = function () {
+    $c.util.setTextLengthCounter(ipt_quesContn, txt_quesContnCnt, { maxLength : 2000, checkType : "byte" });
 };
 
 ///////// 3. 컴포넌트 이벤트 영역 /////////
@@ -113,7 +129,11 @@ scwin.onpageload = async function() {
  * @example scwin.rd_data_yn_onchange(info);
  */
 scwin.rd_data_yn_onchange = function (info) {
-    scwin.inCharge(info.newValue);
+    try {
+        scwin.inCharge(info.newValue);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "JLDFIL17301.rd_data_yn_onchange" });
+    }
 };
 
 /**
@@ -126,20 +146,11 @@ scwin.rd_data_yn_onchange = function (info) {
  * @example scwin.sel_chrgNm_onchange(info);
  */
 scwin.sel_chrgNm_onchange = function (info) {
-    scwin.selCharge(info.newValue);
-};
-
-/**
- * @method
- * @name ipt_quesContn_onkeyup
- * @description 질의 내용 입력 — 내용을 작성 할때마다 글자수(byte)를 계산해 출력한다(최대 2000byte).
- * @param {Object} e 이벤트 객체
- * @returns {void}
- * @hidden N
- * @example scwin.ipt_quesContn_onkeyup(e);
- */
-scwin.ipt_quesContn_onkeyup = function (e) {
-    scwin.checkByte(ipt_quesContn);
+    try {
+        scwin.selCharge(info.newValue);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "JLDFIL17301.sel_chrgNm_onchange" });
+    }
 };
 
 /**
@@ -152,9 +163,13 @@ scwin.ipt_quesContn_onkeyup = function (e) {
  * @example scwin.txt_quesAttachFileNm_onclick(e);
  */
 scwin.txt_quesAttachFileNm_onclick = function (e) {
-    const contnId = dma_QnaInfo.get("contnId");
-    const contnAttachSeq = dma_QnaInfo.get("contnAttachSeq");
-    scwin.fileDown(contnId, contnAttachSeq);
+    try {
+        const contnId = dma_QnaInfo.get("contnId");
+        const contnAttachSeq = dma_QnaInfo.get("contnAttachSeq");
+        scwin.fileDown(contnId, contnAttachSeq);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "JLDFIL17301.txt_quesAttachFileNm_onclick" });
+    }
 };
 
 /**
@@ -167,7 +182,11 @@ scwin.txt_quesAttachFileNm_onclick = function (e) {
  * @example scwin.btn_deleteFile_onclick(e);
  */
 scwin.btn_deleteFile_onclick = function (e) {
-    scwin.deleteAttachFile();
+    try {
+        scwin.deleteAttachFile();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "JLDFIL17301.btn_deleteFile_onclick" });
+    }
 };
 
 /**
@@ -180,7 +199,11 @@ scwin.btn_deleteFile_onclick = function (e) {
  * @example scwin.btn_fileUp_onclick(e);
  */
 scwin.btn_fileUp_onclick = function (e) {
-    upd_compUpload.openFileDialog();
+    try {
+        upd_compUpload.openFileDialog();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "JLDFIL17301.btn_fileUp_onclick" });
+    }
 };
 
 /**
@@ -193,7 +216,11 @@ scwin.btn_fileUp_onclick = function (e) {
  * @example scwin.upd_compUpload_oninputvaluechange("file.hwp");
  */
 scwin.upd_compUpload_oninputvaluechange = function (fileName) {
-    txt_presentAttachFile.setValue(fileName);
+    try {
+        txt_presentAttachFile.setValue(fileName);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "JLDFIL17301.upd_compUpload_oninputvaluechange" });
+    }
 };
 
 /**
@@ -206,7 +233,11 @@ scwin.upd_compUpload_oninputvaluechange = function (fileName) {
  * @example scwin.btn_list_onclick(e);
  */
 scwin.btn_list_onclick = function (e) {
-    scwin.goList();
+    try {
+        scwin.goList();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "JLDFIL17301.btn_list_onclick" });
+    }
 };
 
 /**
@@ -219,7 +250,11 @@ scwin.btn_list_onclick = function (e) {
  * @example scwin.btn_insert_onclick(e);
  */
 scwin.btn_insert_onclick = function (e) {
-    scwin.register("I");
+    try {
+        scwin.register("I");
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "JLDFIL17301.btn_insert_onclick" });
+    }
 };
 
 /**
@@ -232,7 +267,11 @@ scwin.btn_insert_onclick = function (e) {
  * @example scwin.btn_update_onclick(e);
  */
 scwin.btn_update_onclick = function (e) {
-    scwin.register("U");
+    try {
+        scwin.register("U");
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "JLDFIL17301.btn_update_onclick" });
+    }
 };
 
 ///////// 4. 서브미션 콜백 영역 /////////
@@ -330,22 +369,6 @@ scwin.sbm_UpdateQna_submitdone = function (e) {
     }
 };
 
-///////// 5. 일반/업무 함수 영역 /////////
-/// FUNCTION ///
-
-/**
- * @method
- * @name goList
- * @description 목록으로 이동 — Q&A 목록화면으로 이동한다.
- * @returns {void}
- * @hidden N
- * @example scwin.goList();
- */
-scwin.goList = function () {
-    const moveUrl = "/ui/dis/support/JLDFIL17300.xml";
-    $c.win.moveUrl(moveUrl, {});
-};
-
 /**
  * @method
  * @name register
@@ -375,8 +398,10 @@ scwin.register = async function (flag) {
     } else if(in_data_yn === "Y") { // 수동입력
         q_name = ipt_chrgNm;
 
-        if(scwin.nullChk(q_name)) {
-            return ;
+        if ($c.util.isEmpty($c.str.trim(q_name.getValue()))) {
+            await $c.win.alert("'등록자명' 항목을 입력하세요.");
+            q_name.focus();
+            return;
         }
         dma_QnaInfo.set("questrNm", q_name.getValue());
 
@@ -386,23 +411,23 @@ scwin.register = async function (flag) {
         return;
     }
 
-    if(scwin.nullChk(ipt_questrTelNo)) {
+    // 필수 입력 검증 — dma_QnaInfo 바인딩 항목은 gcc 공통 검증(as-is common.js nullChk 사본 대체)
+    const validateOptions = {
+        validateType : "alert",
+        checkType : "single",
+        fields : {
+            ipt_questrTelNo : { required : true, name : "연락처" },
+            ipt_questrEmail : { required : true, format : "email", name : "이메일" },
+            sel_quesBzTpCd : { required : true, name : "업무구분" },
+            ipt_quesTitle : { required : true, name : "제목" },
+            ipt_quesContn : { required : true, name : "질의내용" }
+        }
+    };
+    if (!await $c.validate.validateDataCollect(grp_form, validateOptions)) {
         return;
     }
-
-    if(scwin.nullChk(ipt_questrEmail)) {
-        return;
-    }
-
-    if(scwin.nullChk(sel_quesBzTpCd)) {
-        return;
-    }
-
-    if(scwin.nullChk(ipt_quesTitle)) {
-        return;
-    }
-
-    if(scwin.nullChk(ipt_quesContn)) {
+    // 질의내용 byte 상한 — fil 업무공통(pcc/fil)
+    if (!$c.fil.checkMaxLength(ipt_quesContn, 2000, "질의내용")) {
         return;
     }
 
@@ -428,6 +453,22 @@ scwin.register = async function (flag) {
         const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
         scwin.sbm_UpdateQna_submitdone(sbmRtn);
     }
+};
+
+///////// 5. 일반/업무 함수 영역 /////////
+/// FUNCTION ///
+
+/**
+ * @method
+ * @name goList
+ * @description 목록으로 이동 — Q&A 목록화면으로 이동한다.
+ * @returns {void}
+ * @hidden N
+ * @example scwin.goList();
+ */
+scwin.goList = function () {
+    const moveUrl = "/ui/dis/support/JLDFIL17300.xml";
+    $c.win.moveUrl(moveUrl, {});
 };
 
 /**
@@ -556,139 +597,10 @@ scwin.upload = async function (contnId, deleteAttachFileYn) {
     await scwin.goList();
 };
 
-// TODO : 추후 common.js 사용으로 변경------------------------------------------------------------------------------------------
-
-/**
- * @method
- * @name isNull
- * @description 항목 입력 사항 Null 체크 — 값이 비어있으면 안내 후 포커스를 이동한다.
- * @param {Object} _obj 검사 대상 컴포넌트
- * @param {String} _msg 안내 메시지에 표시할 항목명
- * @returns {Boolean} 빈 값 여부(true: 비어있음)
- * @hidden N
- * @example if (scwin.isNull(ipt_quesTitle, "제목")) return;
- */
-scwin.isNull = function (_obj, _msg) {
-    if(!_obj || $c.str.trim(_obj.getValue()) === '' || _obj.getValue() === null) {
-        alert("'" + _msg + "' 항목을 입력하세요.");
-        _obj.focus();
-        return true;
-    }
-    return false;
-};
-
-/**
- * @method
- * @name nullChk
- * @description Null 체크 — 컴포넌트의 title 속성을 항목명으로 하여 입력 사항 Null 체크를 수행한다.
- * @param {Object} _obj 검사 대상 컴포넌트
- * @returns {Boolean} 빈 값 여부(true: 비어있음)
- * @hidden N
- * @example if (scwin.nullChk(ipt_quesTitle)) return;
- */
-scwin.nullChk = function (_obj) {
-    return scwin.isNull(_obj, _obj.getAttribute("title"));
-};
-
-/**
- * @method
- * @name checkByte
- * @description 내용 바이트 계산, 초과시 초과 내용 삭제 — 글자수(byte)를 표시하고 2000byte 초과 시 초과분을 자동 삭제한다.
- * @param {Object} _obj 검사 대상 textarea 컴포넌트
- * @returns {void}
- * @hidden N
- * @example scwin.checkByte(ipt_quesContn);
- */
-scwin.checkByte = function (_obj) {
-    // 기준바이트 수
-    const standardByte = 2000;		// 2000B 제한
-    const contnByte = scwin.getByte(_obj);
-
-    txt_byteCnt.setValue("질의내용<br>(" + (contnByte) + "/2000 byte)");
-
-    if(contnByte > standardByte){
-        alert( (contnByte - standardByte) + "바이트가 초과되었습니다. 초과된 내용은 자동삭제됩니다.\n");
-        const contnValue = _obj.getValue();
-
-        // 초과한 문자열을 삭제
-        _obj.setValue(scwin.calcContn(contnValue, standardByte));
-
-        // 바이트수를 재계산
-        scwin.checkByte(_obj);
-    }
-};
-
-/**
- * @method
- * @name getByte
- * @description 바이트수 구하기 — 내용의 바이트 수를 계산한다(enter·한글 2byte 처리).
- * @param {Object} _obj 검사 대상 컴포넌트
- * @returns {Number} 내용 바이트 수
- * @hidden N
- * @example const contnByte = scwin.getByte(ipt_quesContn);
- */
-scwin.getByte = function (_obj) {
-    const sTmpCntnt = new String(_obj.getValue());	// 내용 저장 변수
-
-    let iCounts = 0;	// 바이트 수 저장 변수
-
-    for (let i = 0 ;i < sTmpCntnt.length; i++) {
-        //  16 진수 변환
-        const escapeChar = escape(sTmpCntnt.charAt(i));
-
-        if (escapeChar === '%0A') {	// enter 처리
-            iCounts += 2;
-        } else if (escapeChar.length > 4) {	// 한글 2byte 처리
-            iCounts += 2;
-        } else  {
-            iCounts++;
-        }
-    }
-    return iCounts;
-};
-
-/**
- * @method
- * @name calcContn
- * @description 초과 바이트 정리 — 최대 바이트 수를 넘지 않는 범위까지의 문자열을 잘라 반환한다.
- * @param {String} _contn 원본 내용 문자열
- * @param {Number} _maximum 최대 바이트 수
- * @returns {String} 최대 바이트 이내로 정리된 문자열
- * @hidden N
- * @example const cut = scwin.calcContn(contnValue, 2000);
- */
-scwin.calcContn = function (_contn, _maximum) {
-    let rContn = "";
-    let nbytes = 0;	// 총 byte 수
-
-    for (let i=0; i<_contn.length; i++) {
-        const ch = _contn.charAt(i);
-
-        let inc = 0;	// 증가치 변수
-
-        if (escape(ch) === '%0A') {
-            inc = 2;
-        }else if (escape(ch).length > 4) {
-            inc = 2;
-        } else {
-            inc = 1;
-        }
-
-        nbytes += inc;
-
-        if (nbytes > _maximum) {	// _maximum 넘어서면 break
-            break;
-        }
-
-        rContn += ch;	// ch 추가
-    }
-
-    return rContn;
-};
 ]]></script>
     </head>
     <body ev:onpageload="scwin.onpageload">
-    	<xf:group class="sub_contents" id="" meta_snippetCategory="00_화면시작" meta_snippetKeyComponent="true" meta_snippetName="0_01 페이지시작"
+    	<xf:group class="sub_contents" id="grp_form" meta_snippetCategory="00_화면시작" meta_snippetKeyComponent="true" meta_snippetName="0_01 페이지시작"
     		style="">
     		<xf:group class="pgtbox" id="" meta_snippetCategory="02_타이틀" meta_snippetKeyComponent="true" meta_snippetName="2_01 페이지타이틀"
     			style="">
@@ -878,14 +790,14 @@ scwin.calcContn = function (_contn, _maximum) {
     				<xf:group tagname="tr" style="">
     					<xf:group tagname="th" class="w2tb_th "><w2:attributes>
     							<w2:scope>row</w2:scope>
-    						</w2:attributes><w2:textbox class="" id="txt_byteCnt" label="질의내용&lt;br/&gt;(0/2000 byte)" ref="" style="" userData2="" escape="false"></w2:textbox></xf:group>
+    						</w2:attributes><w2:textbox class="" id="txt_byteCnt" label="질의내용" ref="" style="" userData2="" escape="false"></w2:textbox><w2:textbox class="" id="txt_quesContnCnt" label="0 / 2,000 byte" ref="" style="display:block;font-weight:normal;"></w2:textbox></xf:group>
     					<xf:group tagname="td" class="w2tb_td">
     						<w2:attributes>
     							<w2:colspan>3</w2:colspan>
     							<w2:rowspan>1</w2:rowspan>
     						</w2:attributes>
     						<xf:textarea class="" id="ipt_quesContn" meta_snippetCategory="10_입력폼" meta_snippetKeyComponent="true"
-    							meta_snippetName="10_09 Textarea_100per" placeholder="" style="width:100%;height:300px;" metaev_oneditkeyup_name="요청사항" metaev_oneditkeyup_desc="내용을 작성 할때마다 글자수(byte) 출력, 최대 2000" maxByteLength="2000" validator="" title="질의내용" ev:onkeyup="scwin.ipt_quesContn_onkeyup" ref="data:dma_QnaInfo.quesContn">
+    							meta_snippetName="10_09 Textarea_100per" placeholder="" style="width:100%;height:300px;" metaev_oneditkeyup_name="요청사항" metaev_oneditkeyup_desc="내용을 작성 할때마다 글자수(byte) 출력, 최대 2000" maxByteLength="2000" validator="" title="질의내용" ref="data:dma_QnaInfo.quesContn">
     						</xf:textarea>
     					</xf:group>
     				</xf:group>
