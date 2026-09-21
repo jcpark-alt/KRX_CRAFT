@@ -105,3 +105,35 @@
 - script CDATA 추출 → `node --check` 통과.
 - 전환 후 `$(` 잔존 3건 = 보류 목록(`layer_popup`)과 일치, `changeType`·`fn_reset` 내 jQuery 0건.
 - XML well-formed(lxml parse OK), `wsxml_lint --min-severity error` → 1 files, 0 errors, 0 warnings.
+
+## conversion 규칙 재적용 (2026-09-21)
+
+> `convert.py` 단계1을 제자리 실행하고 후처리로 보정(init 2구역 복원·5b DOM 수신 원복·개명 충돌 조정·JSDoc 동기화). 경위·공통 게이트: [krx_소스전환_미적용분석.md §5 이력 6](krx_소스전환_미적용분석.md). diff +190/−232.
+
+| 항목 | 건수 | 내용 |
+|------|------|------|
+| 규칙 13 `fn_*` 개명 | 13건 | `fn_taxCalc_trust`→`taxCalcTrust`, `fn_taxCalc`→`taxCalc`, `fn_checkValue`→`checkValue`, `fn_checkValueMkt`→`checkValueMkt`, `fn_rowInput`→`rowInput`, `fn_reset`→`reset`, `fn_rules`→`rules`, `fn_print`→`print`, `fn_print_trust`→`printTrust`, `fn_goTab1`→`goTab1`, `fn_goTab2`→`goTab2`, `fn_kosdaqNewListChk`→`kosdaqNewListChk`, `fn_multInputChk`→`multInputChk`. 정의·호출·body `ev:`·publicInfo 동기화(도구), JSDoc `@name`/`@example` 옛 이름 72건 후처리 동기화. 교차 화면 호출 없음 |
+| 규칙 5a 엄격 비교 | 4건 | `==`/`!=` → `===`/`!==` |
+| 규칙 2 전역 선언 이동 | 3건 | 최상위 `scwin.X = …` 선언을 1구역으로 |
+| 규칙 4 구역 재배치 | 0건 이동 | `init_*` 3건은 도구가 5구역으로 옮긴 것을 code-convention 대로 2구역(`onpageload` 아래)에 복원 |
+| 규칙 5b `.value=` → `setValue` | 7건 원복·보류 | 수신 객체가 `ev.target`(DOM 요소)이라 `setValue` 가 TypeError — 원복. 컴포넌트 API(getValue/setValue) 전환은 호출부 재설계와 함께 후속 |
+| 암묵 전역 루프변수 | 5건 | `for (i = 0;` → `for (let i = 0;` (루프 밖 미사용 확인) |
+| 단계2 잔여(보류 유지) | 1 | 규칙 7 `$(…)` 잔존 — 규칙 19 보류 유형(§3 보류 항목) 그대로 |
+
+검증: node --check 통과 · wsxml_lint 0 errors/0 warnings(WS111~113 제외) · body `ev:`·publicInfo ↔ 정의 일치 · 재변환 수렴(잔여 차이는 5b 보류분·빈 5구역 헤더뿐).
+
+### A 그룹 — 운영 gcc 확장 7종 치환 (2026-09-21)
+
+> 리포 `cm/gcc` 에 없는 운영 확장 함수를 dataMap/dataList·컴포넌트·`$c.session` API 로 치환(검토안: 미적용분석 §7.1). 전제: 페이지 컨텍스트 값은 `paramData` 파라미터로 전달된다(JSP 서버 모델값이 파라미터로 오지 않으면 별도 조회 API 필요).
+
+| 대상 | 건수 | 치환 |
+|------|------|------|
+| `$c.data.recvParamData("dma_pageContext")` | 1 | `dma_pageContext.setJSON($c.data.getParameter() \|\| {})` — gcc `getParameter` 가 파라미터 키 `paramData` 를 고정 사용 |
+| `$c.util.fieldEl(id, name)` | 39 | `$c.util.getComponent(id)` |
+| `$c.util.evalConds(binds)` | 1 | 로컬 `binds.forEach` — `bind.fn() ? comp.show() : comp.hide()` |
+| `$c.data.readSessionValue(key, path)` | 1 | `$c.session.getUserInfo(key)` — 세션 응답에 해당 키 존재 전제 |
+| 숫자 DOM 헬퍼·핸들러 컴포넌트 API 전환 | 17줄 / 핸들러 100 | `obj.value` → `getValue()/setValue()`, `self` → `comp` |
+
+`ipt_*` onfocus/onblur 핸들러 100개: DOM `self`(ev.target) → `const comp = $c.util.getComponent('<id>')`, `self.select()` → `comp.select()`. 숫자 헬퍼 `unformat`·`numFormat`·`checkMax`·`checkMaxValue` 를 `getValue()/setValue()` 로 전환(17줄) — 규칙 재적용 때 보류했던 5b 7건 해소. `document.getElementsByName(...).value` 3건은 DOM 잔존(규칙 19 유형) 보류
+
+검증: node --check 통과 · wsxml_lint 0/0 · 코드 내 미정의 dataCollection 참조 0 · `$c.data.readValue` 잔존 0건(보류) 외 A 그룹 호출 0.

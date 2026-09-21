@@ -20,6 +20,7 @@
           <w2:key id="beginIndex" name="beginIndex" dataType="text"/>
           <w2:key id="bzProcsNo" name="bzProcsNo" dataType="text"/>
           <w2:key id="isurCd" name="isurCd" dataType="text"/>
+          <w2:key id="returnKey" name="returnKey" dataType="text"/>
         </w2:keyInfo>
         <w2:data use="true"/>
       </w2:dataMap>
@@ -30,15 +31,12 @@
   <w2:layoutInfo></w2:layoutInfo>
   <w2:publicInfo method="scwin.onpageload,scwin.btn_window_onclick"></w2:publicInfo>
   <script lazy="false" type="text/javascript"><![CDATA[
+///////// 1. 변수 및 선언 영역 /////////
 scwin.screenId = "jldfil52120";
 
-///////// 1. 변수 및 선언 영역 /////////
-
-
+// 화면 진입점 — 초기화 단계를 데이터 의존 순서로 호출한다.
 
 ///////// 2. 초기화 영역 /////////
-
-// 화면 진입점 — 초기화 단계를 데이터 의존 순서로 호출한다.
 /**
  * @method
  * @name onpageload
@@ -70,30 +68,40 @@ scwin.init_attrReals = function () {
         childId: "iframe_10",
         attr: "src",
         fn: function () {
-            const isurCd = String($c.data.readValue("dma_pageContext", "isurCd", { silent: true }));
-            const bzProcsNo = String($c.data.readValue("dma_pageContext", "bzProcsNo", { silent: true }));
+            const isurCd = String(dma_pageContext.get("isurCd"));
+            const bzProcsNo = String(dma_pageContext.get("bzProcsNo"));
             return "/listInvstg/prtDepoInfoSearchPop.do?method=searchPrtDepoPop&isurCd=" + isurCd + "&bzProcsNo=" + bzProcsNo;
         }
     }];
-    $c.util.applyAttrReals(attrReals);
+    attrReals.forEach(function (ar) {
+        const comp = $c.util.getComponent(ar.childId);
+        if (!comp) { return; }
+        const val = ar.fn();
+        if (ar.attr === "__html") {
+            comp.render.innerHTML = val;                     // 그룹 내부 HTML 치환
+        } else if (ar.attr === "label" && typeof comp.setLabel === "function") {
+            comp.setLabel(val);
+        } else {
+            comp.render.setAttribute(ar.attr, val);         // src 등 일반 속성
+        }
+    });
 };
 
-// 화면 전환 파라미터 수신 — 공용 $c.data.recvParamData (§106, 이름 고정 "paramData"; 실패 표출은 gcc 함수 몫). onpageload 합성 단계.
+// 화면 전환 파라미터 수신 — $c.data.getParameter → dma_pageContext.setJSON (§106, 이름 고정 "paramData"; 실패 표출은 gcc 함수 몫). onpageload 합성 단계.
 /**
  * @method
  * @name init_recvParam
- * @description 화면 전환 파라미터를 dma_pageContext 로 수신한다(공용 $c.data.recvParamData, 이름 고정 "paramData").
+ * @description 화면 전환 파라미터를 dma_pageContext 로 수신한다($c.data.getParameter → dma_pageContext.setJSON, 키 "paramData" 고정).
  * @returns {void}
  * @hidden N
  * @example scwin.init_recvParam();
  */
 scwin.init_recvParam = function () {
-    $c.data.recvParamData('dma_pageContext');
+    // 화면 전환 파라미터(paramData) 수신 → dma_pageContext ($c.data.getParameter 는 키 "paramData" 고정)
+    dma_pageContext.setJSON($c.data.getParameter() || {});
 };
 
-
 ///////// 3. 컴포넌트 이벤트 영역 /////////
-
 /**
  * @event
  * @name btn_window_onclick
@@ -111,13 +119,7 @@ scwin.btn_window_onclick = function (e) {
     }
 };
 
-
-///////// 4. 서브미션 콜백 영역 /////////
-
-
-
 ///////// 5. 일반/업무 함수 영역 /////////
-
 /**
  * @method
  * @name setCorpInfo
@@ -136,8 +138,8 @@ scwin.setCorpInfo = async function (nm, prtDepoId, prtDepoShrs, objKind) {
     str += "nm : " + nm + "\n";
     str += "prtDepoShrs : " + prtDepoShrs + "\n";
     str += "objKind : " + objKind + "\n";
-    const returnKeyRaw = $c.data.readValue("dma_pageContext", "returnKey", { ctx: true, soft: true, label: "param.returnKey" });
-    const returnKeyStr = String(returnKeyRaw == null ? '' : returnKeyRaw);
+    const returnKeyRaw = dma_pageContext.get("returnKey");
+    const returnKeyStr = String(returnKeyRaw === null ? '' : returnKeyRaw);
     const returnKey = (returnKeyStr.indexOf('$' + '{') >= 0 ? '' : returnKeyStr);
     try {
         const openerScope = ($c.win && $c.win.getOpenerScope ? $c.win.getOpenerScope() : null) || { getComponentById: function () { return null; }, scwin: {} };
@@ -152,8 +154,6 @@ scwin.setCorpInfo = async function (nm, prtDepoId, prtDepoShrs, objKind) {
         await $c.win.alert("<ERROR>\n\n" + "부모창을 찾을 수가 없습니다. \n\n" + str);
     }
 };
-
-
 ]]></script>
 </head>
 <body ev:onpageload="scwin.onpageload">

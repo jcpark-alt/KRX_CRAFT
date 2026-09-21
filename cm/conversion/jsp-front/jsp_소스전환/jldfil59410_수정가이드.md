@@ -91,3 +91,36 @@ as-is JSP 의 insertForm/downloadForm 제출 기계부를 gcc 공통함수 `$c.w
 - script CDATA 추출 → `node --check` 통과.
 - `python -m wsxml_lint jldfil59410.xml --min-severity error` → 0 errors.
 - `document.폼`·`scwin.form` 잔존 = fn_Register(document.insertForm, multipart 보류)·setData 계약용 scwin.form 뿐 — 보류 목록과 일치. `.submit()`·`tx_fn_*` 잔존 0건.
+
+## conversion 규칙 재적용 (2026-09-21)
+
+> `convert.py` 단계1을 제자리 실행하고 후처리로 보정(init 2구역 복원·5b DOM 수신 원복·개명 충돌 조정·JSDoc 동기화). 경위·공통 게이트: [krx_소스전환_미적용분석.md §5 이력 6](krx_소스전환_미적용분석.md). diff +113/−145.
+
+| 항목 | 건수 | 내용 |
+|------|------|------|
+| 규칙 13 `fn_*` 개명 | 14건 | `fn_PopZipCode`→`popZipCode`, `fn_toList`→`toList`, `fn_chkDuplicateMbrNo`→`chkDuplicateMbrNo`, `fn_chkDuplicateExcInstCd`→`chkDuplicateExcInstCd`, `fn_chkValuInstApplCnt`→`chkValuInstApplCnt`, `fn_chkOnecomApplRsnCd`→`chkOnecomApplRsnCd`, `fn_chkFornComYn`→`chkFornComYn`, `fn_checkCorpRegNo`→`checkCorpRegNo`, `fn_Register`→`register`, `fn_Delete`→`delete`, `fn_RetrRequest`→`retrRequest`, `fn_DownloadFile`→`downloadFile`, `fn_chkUploadFile`→`chkUploadFile`, `fn_checkBzRegNo`→`checkBzRegNo`. 정의·호출·body `ev:`·publicInfo 동기화(도구), JSDoc `@name`/`@example` 옛 이름 50건 후처리 동기화. 교차 화면 호출 없음 |
+| 규칙 5a 엄격 비교 | 10건 | `==`/`!=` → `===`/`!==` |
+| 규칙 2 전역 선언 이동 | 5건 | 최상위 `scwin.X = …` 선언을 1구역으로 |
+| 규칙 4 구역 재배치 | 0건 이동 | 도구가 재정렬 보류(함수 사이 최상위 실행문) — 기존 5단계 배치 유지 |
+| 규칙 5b `.value=` → `setValue` | 2건 원복·보류 | 수신 객체가 `ev.target`(DOM 요소)이라 `setValue` 가 TypeError — 원복. 컴포넌트 API(getValue/setValue) 전환은 호출부 재설계와 함께 후속 |
+| 규칙 5d `getTotalRow()` → `getRowCount()` | 1건 | dataList 행 수 API |
+| 규칙 26 진입점 try/catch | 2건 | 이벤트 핸들러 에 `$c.exception.handleError` 래핑 |
+
+검증: node --check 통과 · wsxml_lint 0 errors/0 warnings(WS111~113 제외) · body `ev:`·publicInfo ↔ 정의 일치 · 재변환 수렴(잔여 차이는 5b 보류분·빈 5구역 헤더뿐).
+
+### A 그룹 — 운영 gcc 확장 7종 치환 (2026-09-21)
+
+> 리포 `cm/gcc` 에 없는 운영 확장 함수를 dataMap/dataList·컴포넌트·`$c.session` API 로 치환(검토안: 미적용분석 §7.1). 전제: 페이지 컨텍스트 값은 `paramData` 파라미터로 전달된다(JSP 서버 모델값이 파라미터로 오지 않으면 별도 조회 API 필요).
+
+| 대상 | 건수 | 치환 |
+|------|------|------|
+| `$c.data.recvParamData("dma_pageContext")` | 1 | `dma_pageContext.setJSON($c.data.getParameter() \|\| {})` — gcc `getParameter` 가 파라미터 키 `paramData` 를 고정 사용 (keyInfo 에 사용 키 1개 추가) |
+| `$c.data.readValue(dc, key, opts)` | 45 | dataMap → `dc.get("key")` 22건, dataList → `dc.getCellData(row, "key")` 21건, 변수 키 래퍼 → `.get(key)` 2건. `silent`/`soft`/`ctx`/`label` 옵션은 의미 없어 제거 |
+| `$c.data.readValue("entity", …)` | 3 보류 | JSP 모델 객체 — 대응 dataMap 없음(§보류) |
+| `$c.util.evalConds(binds)` | 1 | 로컬 `binds.forEach` — `bind.fn() ? comp.show() : comp.hide()` |
+| `$c.data.copyRows(rowCopies)` | 1 | 로컬 `rowCopies.forEach` — `comp.setValue(rc.fn())` |
+| `$c.util.applyAttrReals(attrReals)` | 1 | 로컬 `attrReals.forEach` — `__html` → `comp.render.innerHTML`, `label` → `setLabel`, 그 외 → `render.setAttribute` |
+
+**보류 3건**: `readValue("entity", …)`(seq·leadcom_mbr_no·specy_valu_inst_cd) 는 JSP 모델 객체라 대응 dataMap 없음 — 조회 API 응답 dataMap 신설 후 전환. `readPageParam(key)` 래퍼는 `dma_pageContext.get(key)`(키 `returnVal` 선언 추가). `dlt_attachList01` 의 행 미지정 읽기는 0행으로 고정
+
+검증: node --check 통과 · wsxml_lint 0/0 · 코드 내 미정의 dataCollection 참조 0 · `$c.data.readValue` 잔존 3건(보류) 외 A 그룹 호출 0.

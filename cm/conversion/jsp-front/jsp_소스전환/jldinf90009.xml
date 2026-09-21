@@ -30,6 +30,7 @@
           <w2:key id="searchBldgNo" name="searchBldgNo" dataType="text"/>
           <w2:key id="searchType" name="searchType" dataType="text"/>
           <w2:key id="searchWord" name="searchWord" dataType="text"/>
+          <w2:key id="zipList" name="zipList" dataType="text"/>
         </w2:keyInfo>
         <w2:data use="true"/>
       </w2:dataMap>
@@ -40,15 +41,12 @@
   <w2:layoutInfo></w2:layoutInfo>
   <w2:publicInfo method="scwin.onpageload,scwin.btn_sddSearchZip_onclick,scwin.grd_zipList_oncellclick"></w2:publicInfo>
   <script lazy="false" type="text/javascript"><![CDATA[
+///////// 1. 변수 및 선언 영역 /////////
 scwin.screenId = "jldinf90009";
 
-///////// 1. 변수 및 선언 영역 /////////
-
-
+// 화면 진입점 — 초기화 단계를 데이터 의존 순서로 호출한다.
 
 ///////// 2. 초기화 영역 /////////
-
-// 화면 진입점 — 초기화 단계를 데이터 의존 순서로 호출한다.
 /**
  * @method
  * @name onpageload
@@ -66,12 +64,12 @@ scwin.onpageload = function () {
     }
 };
 
-// 런타임 분기 평가 — 공용 $c.util.evalConds (화면은 조건 바인딩 목록만 보유)
+// 런타임 분기 평가 — 바인딩별 컴포넌트 show/hide 평가 (화면은 조건 바인딩 목록만 보유)
 // 조건 평가 — 진입점에서 1회. 데이터 재적재 시 ev:ondataload 가 다시 부른다.
 /**
  * @method
  * @name init_conds
- * @description 검색 결과 목록(zipList)이 비어 있을 때만 안내 문구(txt_p8)를 표시하도록 조건을 평가한다(공용 $c.util.evalConds).
+ * @description 검색 결과 목록(zipList)이 비어 있을 때만 안내 문구(txt_p8)를 표시하도록 조건을 평가한다(바인딩별 컴포넌트 show/hide 평가).
  * @returns {void}
  * @hidden N
  * @example scwin.init_conds();
@@ -80,29 +78,31 @@ scwin.init_conds = function () {
     const binds = [{
         id: "txt_p8",
         fn: function () {
-            const zipList = $c.data.readValue("dma_pageContext", "zipList", { ctx: true, label: "zipList" });
-            return String(zipList == null ? '' : zipList).length === 0;
+            const zipList = dma_pageContext.get("zipList");
+            return String(zipList === null ? '' : zipList).length === 0;
         }
     }];
-    $c.util.evalConds(binds);
+    binds.forEach(function (bind) {
+        const comp = $c.util.getComponent(bind.id);
+        if (comp) { bind.fn() ? comp.show() : comp.hide(); }
+    });
 };
 
-// 화면 전환 파라미터 수신 — 공용 $c.data.recvParamData (§106, 이름 고정 "paramData"; 실패 표출은 gcc 함수 몫). onpageload 합성 단계.
+// 화면 전환 파라미터 수신 — $c.data.getParameter → dma_pageContext.setJSON (§106, 이름 고정 "paramData"; 실패 표출은 gcc 함수 몫). onpageload 합성 단계.
 /**
  * @method
  * @name init_recvParam
- * @description 화면 전환 파라미터를 dma_pageContext 로 수신한다(공용 $c.data.recvParamData, 이름 고정 "paramData").
+ * @description 화면 전환 파라미터를 dma_pageContext 로 수신한다($c.data.getParameter → dma_pageContext.setJSON, 키 "paramData" 고정).
  * @returns {void}
  * @hidden N
  * @example scwin.init_recvParam();
  */
 scwin.init_recvParam = function () {
-    $c.data.recvParamData('dma_pageContext');
+    // 화면 전환 파라미터(paramData) 수신 → dma_pageContext ($c.data.getParameter 는 키 "paramData" 고정)
+    dma_pageContext.setJSON($c.data.getParameter() || {});
 };
 
-
 ///////// 3. 컴포넌트 이벤트 영역 /////////
-
 /**
  * @event
  * @name grd_zipList_oncellclick
@@ -125,7 +125,6 @@ scwin.grd_zipList_oncellclick = async function (rowIndex, columnIndex, columnId)
         await $c.exception.handleError(e, { notify: 'none', context: 'grd_zipList.oncellclick' });
     }
 };
-
 
 /**
  * @event
@@ -155,13 +154,7 @@ scwin.btn_sddSearchZip_onclick = function () {
     }
 };
 
-
-///////// 4. 서브미션 콜백 영역 /////////
-
-
-
 ///////// 5. 일반/업무 함수 영역 /////////
-
 /**
  * @method
  * @name setZipCode
@@ -181,8 +174,6 @@ scwin.setZipCode = function (zipCode, address, engAddress) {
     }
     $c.win.closePopup([zipCode, address, engAddress]);
 };
-
-
 ]]></script>
 </head>
 <body ev:onpageload="scwin.onpageload">

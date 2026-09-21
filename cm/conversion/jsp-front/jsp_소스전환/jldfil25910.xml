@@ -172,17 +172,13 @@
   }
   ]]></style>
   <script lazy="false" type="text/javascript"><![CDATA[
-scwin.screenId = "jldfil25910";
-
 ///////// 1. 변수 및 선언 영역 /////////
-
+scwin.screenId = "jldfil25910";
+scwin.modifiyDate = "N";
+scwin.delck = "N";
 scwin.ex = $c.util.getComponent('ex');
 
 scwin.filebox = $c.util.getComponent('filebox');
-
-scwin.modifiyDate = "N";
-
-scwin.delck = "N";
 
 ///////// 2. 초기화 영역 /////////
 
@@ -222,22 +218,29 @@ scwin.init_attrReals = function() {
             childId: "txa_shrhdNmlistClsBasddContn",
             attr: "label",
             fn: function() {
-                return String($c.data.readValue("dma_dividendDate", "shrhdNmlistClsBasddContn", {
-                    silent: true
-                }));
+                return String(dma_dividendDate.get("shrhdNmlistClsBasddContn"));
             }
         },
         {
             childId: "txa_proftDivRemk",
             attr: "label",
             fn: function() {
-                return String($c.data.readValue("dma_dividendDate", "proftDivRemk", {
-                    silent: true
-                }));
+                return String(dma_dividendDate.get("proftDivRemk"));
             }
         }
     ];
-    $c.util.applyAttrReals(attrReals);
+    attrReals.forEach(function (ar) {
+        const comp = $c.util.getComponent(ar.childId);
+        if (!comp) { return; }
+        const val = ar.fn();
+        if (ar.attr === "__html") {
+            comp.render.innerHTML = val;                     // 그룹 내부 HTML 치환
+        } else if (ar.attr === "label" && typeof comp.setLabel === "function") {
+            comp.setLabel(val);
+        } else {
+            comp.render.setAttribute(ar.attr, val);         // src 등 일반 속성
+        }
+    });
 };
 
 // B. 기준년도·결산월 표시 행 복사 (구 __rowCopies IIFE)
@@ -252,21 +255,20 @@ scwin.init_rowCopies = function() {
     const rowCopies = [{
             childId: "__rb2",
             fn: function() {
-                return String($c.data.readValue("dma_dividendDate", "basYy", {
-                    silent: true
-                })) + " 년";
+                return String(dma_dividendDate.get("basYy")) + " 년";
             }
         },
         {
             childId: "__rb3",
             fn: function() {
-                return String($c.data.readValue("dma_dividendDate", "acntclsMm", {
-                    silent: true
-                })) + " 월";
+                return String(dma_dividendDate.get("acntclsMm")) + " 월";
             }
         }
     ];
-    $c.data.copyRows(rowCopies);
+    rowCopies.forEach(function (rc) {
+        const comp = $c.util.getComponent(rc.childId);
+        if (comp) { comp.setValue(rc.fn()); }
+    });
 };
 
 // C. dma_pageContext.sysYear 서버 연도 충전 (구 __fillNow IIFE)
@@ -284,7 +286,7 @@ scwin.init_fillNow = function() {
     }
 };
 
-// 화면 전환 파라미터 수신 (공용 $c.data.recvParamData, 이름 고정 "paramData")
+// 화면 전환 파라미터 수신 ($c.data.getParameter → dma_pageContext.setJSON, 키 "paramData" 고정)
 /**
  * @method
  * @name init_recvParam
@@ -293,7 +295,8 @@ scwin.init_fillNow = function() {
  * @hidden N
  */
 scwin.init_recvParam = function() {
-    $c.data.recvParamData("dma_pageContext");
+    // 화면 전환 파라미터(paramData) 수신 → dma_pageContext ($c.data.getParameter 는 키 "paramData" 고정)
+    dma_pageContext.setJSON($c.data.getParameter() || {});
 };
 
 // D. 조건부 표시 영역 런타임 평가 (구 evalConds IIFE)
@@ -306,16 +309,10 @@ scwin.init_recvParam = function() {
  */
 scwin.init_conds = function() {
     const modChk = function() {
-        return $c.data.readValue("dma_pageContext", "checkModifiyDate", {
-            ctx: true,
-            label: "checkModifiyDate"
-        });
+        return dma_pageContext.get("checkModifiyDate");
     };
     const listStat = function() {
-        return $c.data.readValue("dma_pageContext", "listStatCd", {
-            ctx: true,
-            label: "listStatCd"
-        });
+        return dma_pageContext.get("listStatCd");
     };
     const isEditable = function() {
         return (modChk() === "Y" || modChk() === "U") && listStat() === "Y";
@@ -324,16 +321,12 @@ scwin.init_conds = function() {
         return modChk() === "N" || listStat() !== "Y";
     };
     const hasBzProcsNo = function() {
-        return !$c.util.isEmpty($c.data.readValue("dma_dividendDate", "bzProcsNo", {
-            label: "dividendDate.bzProcsNo"
-        }));
+        return !$c.util.isEmpty(dma_dividendDate.get("bzProcsNo"));
     };
     const binds = [{
             id: "if_attachFileNm",
             fn: function() {
-                return !$c.util.isEmpty($c.data.readValue("dma_dividendDate", "attachFileNm", {
-                    label: "dividendDate.attachFileNm"
-                }));
+                return !$c.util.isEmpty(dma_dividendDate.get("attachFileNm"));
             }
         },
         {
@@ -395,7 +388,10 @@ scwin.init_conds = function() {
             fn: hasBzProcsNo
         }
     ];
-    $c.util.evalConds(binds);
+    binds.forEach(function (bind) {
+        const comp = $c.util.getComponent(bind.id);
+        if (comp) { bind.fn() ? comp.show() : comp.hide(); }
+    });
 };
 
 // E. 배당기준일 라디오 초기 표시 (구 화면 onpageload 본문) — change 바인딩은 rd_divBasDdYn ev:onchange 선언 바인딩으로 이관(규칙 19)
@@ -498,7 +494,7 @@ scwin.txt_exTable_onmouseout = function(e) {
 scwin.txa_shrhdNmlistClsBasddContn_onkeyup = function(e) {
     try {
         const __self = (e && (e.element || e.target || e.srcElement)) || this;
-        scwin.fn_setLength(__self.value, 'text1', '4000');
+        scwin.setLength(__self.value, 'text1', '4000');
     } catch (ex) {
         $c.exception.handleError(ex, {
             context: "jldfil25910.txa_shrhdNmlistClsBasddContn_onkeyup"
@@ -517,7 +513,7 @@ scwin.txa_shrhdNmlistClsBasddContn_onkeyup = function(e) {
 scwin.txa_shrhdNmlistClsBasddContn_onblur = async function(e) {
     try {
         const __self = (e && (e.element || e.target || e.srcElement)) || this;
-        await scwin.fn_estimateCounter(__self, '4000');
+        await scwin.estimateCounter(__self, '4000');
     } catch (ex) {
         await $c.exception.handleError(ex, {
             context: "jldfil25910.txa_shrhdNmlistClsBasddContn_onblur"
@@ -536,7 +532,7 @@ scwin.txa_shrhdNmlistClsBasddContn_onblur = async function(e) {
 scwin.txa_proftDivRemk_onkeyup = function(e) {
     try {
         const __self = (e && (e.element || e.target || e.srcElement)) || this;
-        scwin.fn_setLength(__self.value, 'text2', '4000');
+        scwin.setLength(__self.value, 'text2', '4000');
     } catch (ex) {
         $c.exception.handleError(ex, {
             context: "jldfil25910.txa_proftDivRemk_onkeyup"
@@ -555,7 +551,7 @@ scwin.txa_proftDivRemk_onkeyup = function(e) {
 scwin.txa_proftDivRemk_onblur = async function(e) {
     try {
         const __self = (e && (e.element || e.target || e.srcElement)) || this;
-        await scwin.fn_estimateCounter(__self, '4000');
+        await scwin.estimateCounter(__self, '4000');
     } catch (ex) {
         await $c.exception.handleError(ex, {
             context: "jldfil25910.txa_proftDivRemk_onblur"
@@ -573,7 +569,7 @@ scwin.txa_proftDivRemk_onblur = async function(e) {
  */
 scwin.btn_FileDown_onclick = async function(e) {
     try {
-        await scwin.fn_FileDown('' + scwin.getDmaValue("dma_dividendDate", "bzProcsNo") + '', '' + scwin.getDmaValue("dma_dividendDate", "attachFileNm") + '');
+        await scwin.fileDown('' + scwin.getDmaValue("dma_dividendDate", "bzProcsNo") + '', '' + scwin.getDmaValue("dma_dividendDate", "attachFileNm") + '');
     } catch (ex) {
         await $c.exception.handleError(ex, {
             context: "jldfil25910.btn_FileDown_onclick"
@@ -634,7 +630,7 @@ scwin.rd_divBasDdYn2_onclick = function(e) {
  */
 scwin.btn_FileDown_2_onclick = async function(e) {
     try {
-        await scwin.fn_FileDown('' + scwin.getDmaValue("dma_dividendDate", "bzProcsNo") + '', '' + scwin.getDmaValue("dma_dividendDate", "attachFileNm") + '');
+        await scwin.fileDown('' + scwin.getDmaValue("dma_dividendDate", "bzProcsNo") + '', '' + scwin.getDmaValue("dma_dividendDate", "attachFileNm") + '');
     } catch (ex) {
         await $c.exception.handleError(ex, {
             context: "jldfil25910.btn_FileDown_2_onclick"
@@ -652,7 +648,7 @@ scwin.btn_FileDown_2_onclick = async function(e) {
  */
 scwin.btn_list_onclick = function(e) {
     try {
-        scwin.fn_list();
+        scwin.list();
     } catch (ex) {
         $c.exception.handleError(ex, {
             context: "jldfil25910.btn_list_onclick"
@@ -670,7 +666,7 @@ scwin.btn_list_onclick = function(e) {
  */
 scwin.registerBtn_onclick = async function(e) {
     try {
-        await scwin.fn_register();
+        await scwin.register();
     } catch (ex) {
         await $c.exception.handleError(ex, {
             context: "jldfil25910.registerBtn_onclick"
@@ -688,7 +684,7 @@ scwin.registerBtn_onclick = async function(e) {
  */
 scwin.registerBtn_2_onclick = async function(e) {
     try {
-        await scwin.fn_register();
+        await scwin.register();
     } catch (ex) {
         await $c.exception.handleError(ex, {
             context: "jldfil25910.registerBtn_2_onclick"
@@ -750,13 +746,13 @@ scwin.tx_fn_modifiyDate = async function() {
 
 /**
  * @method
- * @name fn_list
+ * @name list
  * @description 목록 화면 전환 제출 — dividendDateForm 전송 필드를 params 로 수집해
  *  dividendBaseDate.do(method=dividendDateList)로 동적 폼 POST 제출한다(JSP 페이지 전환 의미 보존).
  * @returns {void}
  * @hidden N
  */
-scwin.fn_list = function() {
+scwin.list = function() {
     $c.util.getComponent("dma_listReq").set("method", "dividendDateList");
     // dividendDateForm 전송 필드 실측(bzProcsNo/isurCd/basYy/divBasDdYn/divBasDd/주주명부·이익배당) + method
     // → params 수집 후 동적 폼 제출. 파일 컨트롤 upd_attachFile(name=attachFile)은 목록 전환에 불필요하여 제외.
@@ -775,16 +771,16 @@ scwin.fn_list = function() {
 
 /**
  * @method
- * @name fn_register
+ * @name register
  * @description 수정 가능 여부 확인·검증 후 등록을 실행한다. 저장 제출은 dividendDateForm 이
  *  파일 컨트롤(upd_attachFile, name=attachFile)을 폼으로 전송하는 multipart 제출이라 openFormSubmit
  *  전환 대상에서 제외(원형 유지)한다.
  * @returns {void}
  * @hidden N
  */
-scwin.fn_register = async function() {
-    await scwin.fn_modifiyDate();
-    if (await scwin.fn_validation()) {
+scwin.register = async function() {
+    await scwin.selectModifiyDate();
+    if (await scwin.validation()) {
         if (!await $c.win.confirm("저장하시겠습니까")) {
             return;
         }
@@ -800,21 +796,21 @@ scwin.fn_register = async function() {
 
 /**
  * @method
- * @name fn_fileValidation
+ * @name fileValidation
  * @description 첨부파일 확장자·용량 유효성을 검사한다.
  * @returns {void}
  * @hidden N
  */
-scwin.fn_fileValidation = async function() {
+scwin.fileValidation = async function() {
     // 파일 컨트롤 내부 input 은 컴포넌트 API 부재 — 헬퍼(resolveFileControlRoot) 경유 원시 DOM 접근으로 jQuery 만 제거(규칙 19)
     const fileEl = scwin.resolveFileControlRoot().querySelectorAll('input[type="file"]')[0];
     const fileVal = fileEl ? fileEl.value : null;
-    if (fileVal !== "" && fileVal != null) {
-        if (scwin.fn_fileTypeChk(fileVal) > 0) {
+    if (fileVal !== "" && fileVal !== null) {
+        if (scwin.fileTypeChk(fileVal) > 0) {
             await $c.win.alert('첨부할 수 없는 확장자를 가지 파일이 ' + '있습니다.\n사용가능 확장자 : DRT, bmp, gif, jpeg, jpg, png, hwp, docx, doc, xls, xlsx, ppt, pptx, pdf, zip, txt');
             return false;
         }
-        if (scwin.fn_fileSizeChk($c.util.getComponent("upd_attachFile").files[0].size) > 0) {
+        if (scwin.fileSizeChk($c.util.getComponent("upd_attachFile").files[0].size) > 0) {
             await $c.win.alert('첨부파일의 용량은 개당 20MB를 넘을수 없습니다.');
             return false;
         }
@@ -824,13 +820,13 @@ scwin.fn_fileValidation = async function() {
 
 /**
  * @method
- * @name fn_fileTypeChk
+ * @name fileTypeChk
  * @description 파일 확장자가 허용 목록에 없으면 1을 반환한다.
  * @param {Object} val
  * @returns {void}
  * @hidden N
  */
-scwin.fn_fileTypeChk = function(val) {
+scwin.fileTypeChk = function(val) {
     let isFileType = new Array("drt", "bmp", "gif", "jpeg", "jpg", "png", "hwp", "docx", "doc", "xls", "xlsx", "ppt", "pptx", "pdf", "zip", "txt");
     let fileType = val.substring(val.lastIndexOf(".") + 1).toLowerCase();
     let returnVal = 0;
@@ -848,13 +844,13 @@ scwin.fn_fileTypeChk = function(val) {
 
 /**
  * @method
- * @name fn_fileSizeChk
+ * @name fileSizeChk
  * @description 파일 용량이 20MB 를 초과하면 1을 반환한다.
  * @param {Object} fileSize
  * @returns {void}
  * @hidden N
  */
-scwin.fn_fileSizeChk = function(fileSize) {
+scwin.fileSizeChk = function(fileSize) {
     if (fileSize > (1024 * 1024 * 20)) {
         return 1;
     }
@@ -863,30 +859,30 @@ scwin.fn_fileSizeChk = function(fileSize) {
 
 /**
  * @method
- * @name fn_validation
+ * @name validation
  * @description 배당기준일·주주명부·이익배당·첨부 등 등록 전 필수 항목을 검증한다.
  * @returns {void}
  * @hidden N
  */
-scwin.fn_validation = async function() {
+scwin.validation = async function() {
     if (scwin.modifiyDate === "N") {
         await $c.win.alert("제출 시간을 초과했습니다.");
         return false;
     }
-    if (($c.util.getComponent('cal_divBasDd').getValue() == null ? '' : String($c.util.getComponent('cal_divBasDd').getValue())) === '') {
+    if (($c.util.getComponent('cal_divBasDd').getValue() === null ? '' : String($c.util.getComponent('cal_divBasDd').getValue())) === '') {
         await $c.win.alert("배당기준일을 등록해주세요.");
         return false;
     }
-    if (($c.util.getComponent('txa_shrhdNmlistClsBasddContn').getValue() == null ? '' : String($c.util.getComponent('txa_shrhdNmlistClsBasddContn').getValue())) === '') {
+    if (($c.util.getComponent('txa_shrhdNmlistClsBasddContn').getValue() === null ? '' : String($c.util.getComponent('txa_shrhdNmlistClsBasddContn').getValue())) === '') {
         await $c.win.alert("주주명부의 폐쇄 및 기준일을 등록해주세요.");
         return false;
     }
-    if (($c.util.getComponent('txa_proftDivRemk').getValue() == null ? '' : String($c.util.getComponent('txa_proftDivRemk').getValue())) === '') {
+    if (($c.util.getComponent('txa_proftDivRemk').getValue() === null ? '' : String($c.util.getComponent('txa_proftDivRemk').getValue())) === '') {
         await $c.win.alert("이익배당을 등록해주세요.");
         return false;
     }
-    if (($c.util.getComponent('upd_attachFile').getValue() == null ? '' : String($c.util.getComponent('upd_attachFile').getValue())) === '') {
-        if (($c.util.getComponent('ipt_bzProcsNo').getValue() == null ? '' : String($c.util.getComponent('ipt_bzProcsNo').getValue())) === '') {
+    if (($c.util.getComponent('upd_attachFile').getValue() === null ? '' : String($c.util.getComponent('upd_attachFile').getValue())) === '') {
+        if (($c.util.getComponent('ipt_bzProcsNo').getValue() === null ? '' : String($c.util.getComponent('ipt_bzProcsNo').getValue())) === '') {
             await $c.win.alert("첨부파일을 등록해주세요.");
             return false;
         } else {
@@ -896,7 +892,7 @@ scwin.fn_validation = async function() {
             }
         }
     }
-    if (!await scwin.fn_fileValidation()) {
+    if (!await scwin.fileValidation()) {
         return false;
     }
     return true;
@@ -904,13 +900,13 @@ scwin.fn_validation = async function() {
 
 /**
  * @method
- * @name fn_fileDel
+ * @name fileDel
  * @description 첨부파일을 삭제한다(확인 후).
  * @param {Object} ipt_attachFileNm
  * @returns {void}
  * @hidden N
  */
-scwin.fn_fileDel = async function(ipt_attachFileNm) {
+scwin.fileDel = async function(ipt_attachFileNm) {
     const msg = ipt_attachFileNm + " 첨부파일을 삭제하시겠습니까?\n삭제된 파일은 복구가 불가능합니다.";
     if (!await $c.win.confirm(msg)) {
         return;
@@ -928,7 +924,7 @@ scwin.fn_fileDel = async function(ipt_attachFileNm) {
 
 /**
  * @method
- * @name fn_setLength
+ * @name setLength
  * @description 입력 바이트 수를 계산해 카운터 표시에 반영한다.
  * @param {Object} obj
  * @param {Object} tdName
@@ -936,22 +932,22 @@ scwin.fn_fileDel = async function(ipt_attachFileNm) {
  * @returns {void}
  * @hidden N
  */
-scwin.fn_setLength = function(obj, tdName, maxLength) {
-    let strLength = scwin.fn_calBytes(obj);
+scwin.setLength = function(obj, tdName, maxLength) {
+    let strLength = scwin.calBytes(obj);
     scwin.setComponentText($c.util.getComponent(tdName), "(" + strLength + "/" + maxLength + ")", tdName);
 };
 
 /**
  * @method
- * @name fn_estimateCounter
+ * @name estimateCounter
  * @description 입력 길이가 최대치를 초과하면 알림 후 선택 상태로 되돌린다.
  * @param {Object} obj
  * @param {Object} maxLength
  * @returns {void}
  * @hidden N
  */
-scwin.fn_estimateCounter = async function(obj, maxLength) {
-    if (scwin.fn_calBytes(obj.value) > maxLength) {
+scwin.estimateCounter = async function(obj, maxLength) {
+    if (scwin.calBytes(obj.value) > maxLength) {
         await $c.win.alert('한글 2000자 이하, 숫자/영문 4000자 이하까지만 입력이 가능합니다.');
         obj.select();
         return;
@@ -960,13 +956,13 @@ scwin.fn_estimateCounter = async function(obj, maxLength) {
 
 /**
  * @method
- * @name fn_calBytes
+ * @name calBytes
  * @description 문자열의 바이트 길이를 계산한다(한글 2·개행 2·그 외 1).
  * @param {Object} str
  * @returns {void}
  * @hidden N
  */
-scwin.fn_calBytes = function(str) {
+scwin.calBytes = function(str) {
     let tcount = 0;
     let tmpStr = new String(str);
     let temp = tmpStr.length;
@@ -988,7 +984,7 @@ scwin.fn_calBytes = function(str) {
 
 /**
  * @method
- * @name fn_FileDown
+ * @name fileDown
  * @description 첨부파일 다운로드 제출 — dividendDateAttachForm 전송 필드(method/contnId/attachFileNm)를
  *  params 로 수집해 dividendDateFiledown.do 로 동적 폼 POST 제출한다(Content-Disposition 파일 다운로드 의미 보존).
  * @param {Object} ipt_contnId 콘텐츠 아이디(업무처리번호)
@@ -996,7 +992,7 @@ scwin.fn_calBytes = function(str) {
  * @returns {void}
  * @hidden N
  */
-scwin.fn_FileDown = function(ipt_contnId, ipt_attachFileNm) {
+scwin.fileDown = function(ipt_contnId, ipt_attachFileNm) {
     $c.util.getComponent("dma_listReq").set("method", "dividendDateAttachFile");
     $c.util.getComponent('ipt_contnId').setValue(ipt_contnId);
     $c.util.getComponent('ipt_attachFileNm').setValue(ipt_attachFileNm);
@@ -1051,14 +1047,14 @@ scwin.onMout = function() {
 // 억제된 trigger 함수의 as-is 이름 별칭 (호출자 정합)
 /**
  * @method
- * @name fn_modifiyDate
+ * @name selectModifiyDate
  * @description 수정 가능 여부 조회 후 결과를 scwin.result/modifiyDate 에 반영한다.
  * @returns {void}
  * @hidden N
  */
-scwin.fn_modifiyDate = async function() {
+scwin.selectModifiyDate = async function() {
     const res = await scwin.tx_fn_modifiyDate();
-    const body = (res && res.responseJSON && (res.responseJSON.body != null ? res.responseJSON.body : res.responseJSON)) || {};
+    const body = (res && res.responseJSON && (res.responseJSON.body !== null ? res.responseJSON.body : res.responseJSON)) || {};
     scwin.result = body;
     scwin.modifiyDate = scwin.result.checkModifiyDate;
     return res;

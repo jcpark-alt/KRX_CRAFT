@@ -141,17 +141,15 @@
   <w2:layoutInfo></w2:layoutInfo>
   <w2:publicInfo method="scwin.onpageload,scwin.cal_startDate_onblur,scwin.cal_endDate_onblur,scwin.rd_period_onclick,scwin.btn_searchList_onclick,scwin.slc_pageSize_onchange,scwin.krxpage_pagenavigator_87_onclick,scwin.btn_printReceipt_onclick"></w2:publicInfo>
   <script lazy="false" type="text/javascript"><![CDATA[
-scwin.screenId = "jldfil35706";
-
 ///////// 1. 변수 및 선언 영역 /////////
-
-// as-is 흐름 보존 — 스켈레톤이 대체한 함수가 쓰던 전역 선언
+scwin.screenId = "jldfil35706";
 scwin.sub_printDate_Y = undefined;
 scwin.sub_printDate_M = undefined;
 scwin.sub_printDate_D = undefined;
 
-///////// 2. 초기화 영역 /////////
+// as-is 흐름 보존 — 스켈레톤이 대체한 함수가 쓰던 전역 선언
 
+///////// 2. 초기화 영역 /////////
 /**
  * @method
  * @name onpageload
@@ -210,7 +208,7 @@ scwin.init_fillGen = function () {
         const gen = $c.util.getComponent(f.genId);
         const ds = $c.util.getComponent(f.entity);
         if (!gen || !ds || !ds.getTotalRow) { continue; }
-        const n = ds.getTotalRow();
+        const n = ds.getRowCount();
         if (!n) { continue; }
         // 멱등 — 이미 채워진 제너레이터는 건너뛴다(플래그 없이 컴포넌트 상태로 판단).
         if (gen.getLength && gen.getLength() > 0) { continue; }
@@ -248,12 +246,28 @@ scwin.init_rowCopy = function () {
         childId: "__rb0",
         fn: function () {
             const readPage = function (key) {
-                return String($c.data.readValue("dma_page", key, { silent: true }));
+                return String(dma_page.get(key));
             };
             return "전체 " + readPage("total") + "건 (" + readPage("currentPage") + "/" + readPage("endListPage") + " 페이지) ";
         }
     }];
-    $c.data.copyRows(rowCopies);
+    rowCopies.forEach(function (rc) {
+        const comp = $c.util.getComponent(rc.childId);
+        if (comp) { comp.setValue(rc.fn()); }
+    });
+};
+
+/**
+ * @method
+ * @name init_recvParam
+ * @description 화면 전환 파라미터를 dma_pageContext 로 수신한다($c.data.getParameter → dma_pageContext.setJSON, 키 "paramData" 고정; 실패 표출은 gcc 함수 몫).
+ * @returns {void}
+ * @hidden N
+ * @example scwin.init_recvParam();
+ */
+scwin.init_recvParam = function () {
+    // 화면 전환 파라미터(paramData) 수신 → dma_pageContext ($c.data.getParameter 는 키 "paramData" 고정)
+    dma_pageContext.setJSON($c.data.getParameter() || {});
 };
 
 /**
@@ -268,21 +282,7 @@ scwin.initPageIndex = function () {
     $c.util.getComponent('dma_goPrintReq').set('pageIndex', "1");
 };
 
-/**
- * @method
- * @name init_recvParam
- * @description 화면 전환 파라미터를 dma_pageContext 로 수신한다(공용 $c.data.recvParamData, 이름 고정 "paramData"; 실패 표출은 gcc 함수 몫).
- * @returns {void}
- * @hidden N
- * @example scwin.init_recvParam();
- */
-scwin.init_recvParam = function () {
-    $c.data.recvParamData('dma_pageContext');
-};
-
-
 ///////// 3. 컴포넌트 이벤트 영역 /////////
-
 /**
  * @method
  * @name cal_startDate_onblur
@@ -346,7 +346,7 @@ scwin.rd_period_onclick = function (e) {
 /**
  * @method
  * @name btn_searchList_onclick
- * @description [검색] 버튼 클릭 — 입금일 기간으로 상장수수료 영수증 목록을 조회한다(scwin.fn_searchList).
+ * @description [검색] 버튼 클릭 — 입금일 기간으로 상장수수료 영수증 목록을 조회한다(scwin.searchList).
  * @param {Object} e 이벤트 객체
  * @returns {void}
  * @hidden N
@@ -357,7 +357,7 @@ scwin.btn_searchList_onclick = async function (e) {
         const ev = e;
         const event = ev;
         const selfEl = (ev && (ev.element || ev.target || ev.srcElement)) || this;
-        await scwin.fn_searchList();
+        await scwin.searchList();
     } catch (_ex) {
         await $c.exception.handleError(_ex, { context: 'jldfil35706.btn_searchList_onclick' });
     }
@@ -378,7 +378,7 @@ scwin.slc_pageSize_onchange = async function (e) {
         const event = ev;
         const selfEl = (ev && (ev.element || ev.target || ev.srcElement)) || this;
         scwin.initPageIndex();
-        await scwin.fn_searchList();
+        await scwin.searchList();
     } catch (_ex) {
         await $c.exception.handleError(_ex, { context: 'jldfil35706.slc_pageSize_onchange' });
     }
@@ -387,7 +387,7 @@ scwin.slc_pageSize_onchange = async function (e) {
 /**
  * @method
  * @name btn_printReceipt_onclick
- * @description [인쇄] 버튼 클릭 — 체크한 영수증발급 대상 1건을 확인해 영수증을 인쇄한다(scwin.fn_printReceipt).
+ * @description [인쇄] 버튼 클릭 — 체크한 영수증발급 대상 1건을 확인해 영수증을 인쇄한다(scwin.printReceipt).
  * @param {Object} e 이벤트 객체
  * @returns {void}
  * @hidden N
@@ -398,33 +398,31 @@ scwin.btn_printReceipt_onclick = async function (e) {
         const ev = e;
         const event = ev;
         const selfEl = (ev && (ev.element || ev.target || ev.srcElement)) || this;
-        await scwin.fn_printReceipt();
+        await scwin.printReceipt();
     } catch (_ex) {
         await $c.exception.handleError(_ex, { context: 'jldfil35706.btn_printReceipt_onclick' });
     }
 };
 
-
-///////// 4. 서브미션 콜백 영역 /////////
-
 /**
  * @method
- * @name tx_fn_goPrint
- * @description 상장수수료 영수증 리포트 파일을 다운로드한다(공용 $c.data.downFile, dma_goPrintReq 전문 사용). 실패 시 오류를 무통지 수집하고 null 을 반환한다.
- * @returns {Object} 다운로드 결과 객체(실패 시 null)
+ * @name krxpage_pagenavigator_87_onclick
+ * @description 페이지 내비게이터 클릭 — 선택한 페이지 번호를 pageIndex 에 반영한 뒤 목록을 재조회한다.
+ * @param {Number} index 이동할 페이지 번호
+ * @returns {void}
  * @hidden N
- * @example await scwin.tx_fn_goPrint();
+ * @example (body ev:onclick 바인딩으로 자동 호출)
  */
-scwin.tx_fn_goPrint = async function () {
+scwin.krxpage_pagenavigator_87_onclick = function (index) {
     try {
-        const printReq = $c.util.getComponent("dma_goPrintReq");
-        return await $c.data.downFile("/common/newPrint.do", "", (printReq ? printReq.getJSON() : {}));
-    } catch (_e) {
-        await $c.exception.handleError(_e, { notify: 'none', context: '다운로드' });
-        return null;
+        $c.util.getComponent('dma_goPrintReq').set('pageIndex', index);
+    } catch (e) {
+        $c.exception.handleError(e, { notify: 'none', context: 'krxpage_pagenavigator_87.page' });
     }
+    scwin.searchList();
 };
 
+///////// 4. 서브미션 콜백 영역 /////////
 /**
  * @method
  * @name tx_fn_goTab2
@@ -458,18 +456,34 @@ scwin.tx_fn_goTab2 = async function () {
     return res;
 };
 
-
 ///////// 5. 일반/업무 함수 영역 /////////
+/**
+ * @method
+ * @name tx_fn_goPrint
+ * @description 상장수수료 영수증 리포트 파일을 다운로드한다(공용 $c.data.downFile, dma_goPrintReq 전문 사용). 실패 시 오류를 무통지 수집하고 null 을 반환한다.
+ * @returns {Object} 다운로드 결과 객체(실패 시 null)
+ * @hidden N
+ * @example await scwin.tx_fn_goPrint();
+ */
+scwin.tx_fn_goPrint = async function () {
+    try {
+        const printReq = $c.util.getComponent("dma_goPrintReq");
+        return await $c.data.downFile("/common/newPrint.do", "", (printReq ? printReq.getJSON() : {}));
+    } catch (_e) {
+        await $c.exception.handleError(_e, { notify: 'none', context: '다운로드' });
+        return null;
+    }
+};
 
 /**
  * @method
- * @name fn_searchList
+ * @name searchList
  * @description 입금일 기간을 검증한 뒤(시작일 > 종료일이면 중단) 조회 전문(dma_goPrintReq, method=searchListFeeReceipt)을 listFee.do 에 POST 제출한다($c.win.openFormSubmit — as-is listFeeReceiptForm.submit 의 JSP 페이지 전환 의미 보존).
  * @returns {void}
  * @hidden N
- * @example await scwin.fn_searchList();
+ * @example await scwin.searchList();
  */
-scwin.fn_searchList = async function () {
+scwin.searchList = async function () {
     if ($c.util.getComponent('cal_startDate').getValue() > $c.util.getComponent('cal_endDate').getValue()) {
         await $c.win.alert('시작일이 종료일보다 이후 일자 입니다.');
         return;
@@ -480,24 +494,23 @@ scwin.fn_searchList = async function () {
     $c.win.openFormSubmit('listFee.do', printReq.getJSON());
 };
 
-
 /**
  * @method
- * @name fn_printReceipt
- * @description 목록(dlt_result)에서 체크(seq)된 영수증발급 대상을 집계해 정확히 1건이면 인쇄(fn_goPrint)를 호출하고, 아니면 1건 체크 안내를 띄운다.
+ * @name printReceipt
+ * @description 목록(dlt_result)에서 체크(seq)된 영수증발급 대상을 집계해 정확히 1건이면 인쇄(goPrint)를 호출하고, 아니면 1건 체크 안내를 띄운다.
  * @returns {void}
  * @hidden N
- * @example await scwin.fn_printReceipt();
+ * @example await scwin.printReceipt();
  */
-scwin.fn_printReceipt = async function () {
+scwin.printReceipt = async function () {
     const dltResult = $c.util.getComponent('dlt_result');
     let cnt = 0;
     let seq = 0;
     let isurCd = "";
     let rcvDd = "";
-    if ((dltResult.getTotalRow() > 0)) {
-        if (dltResult.getTotalRow()) {
-            for (let i = 0; i < dltResult.getTotalRow(); i++) {
+    if ((dltResult.getRowCount() > 0)) {
+        if (dltResult.getRowCount()) {
+            for (let i = 0; i < dltResult.getRowCount(); i++) {
                 if ((['true', 'Y', '1'].indexOf(String(dltResult.getCellData(i, 'seq'))) >= 0)) {
                     cnt = cnt + 1;
                     seq = dltResult.getCellData(i, 'seq');
@@ -506,7 +519,7 @@ scwin.fn_printReceipt = async function () {
                 }
             }
         } else {
-            if ((dltResult.getTotalRow() > 0).checked) {
+            if ((dltResult.getRowCount() > 0).checked) {
                 cnt = cnt + 1;
                 seq = dltResult.getCellData(0, 'seq');
                 isurCd = $c.util.getComponent('dma_goPrintReq').get('isurCd');
@@ -515,26 +528,25 @@ scwin.fn_printReceipt = async function () {
         }
     }
     if (cnt === 1) {
-        scwin.fn_goPrint(seq, isurCd, rcvDd);
+        scwin.goPrint(seq, isurCd, rcvDd);
     } else {
         await $c.win.alert("영수증발급 대상을 1개 체크후 인쇄를 누르세요.");
         return;
     }
 };
 
-
 /**
  * @method
- * @name fn_goPrint
+ * @name goPrint
  * @description 선택 건의 영수증 리포트 데이터를 동기 ajax 로 조회해 dma_goPrintReq 전문(회사명·입금일·입금액 1~9·수수료구분·템플릿코드·출력일)을 채운 뒤 리포트 다운로드(tx_fn_goPrint)를 호출한다. 조회 실패 시 장애 알림을 띄운다.
  * @param {String} seq 영수증 일련번호
  * @param {String} isurCd 발행사 고유코드
  * @param {String} rcvDd 입금일
  * @returns {void}
  * @hidden N
- * @example scwin.fn_goPrint(seq, isurCd, rcvDd);
+ * @example scwin.goPrint(seq, isurCd, rcvDd);
  */
-scwin.fn_goPrint = function (seq, isurCd, rcvDd) {
+scwin.goPrint = function (seq, isurCd, rcvDd) {
     const rexName = "RLDFIL00030";
     const dataLocation = "/outer/reportPrint.do?ipt_method_2=searchListFeeNewReport&isurCd=" + isurCd + "&rcvDd=" + rcvDd + "&seq=" + seq;
     $.ajax({
@@ -609,11 +621,10 @@ scwin.fn_goPrint = function (seq, isurCd, rcvDd) {
     });
 };
 
-
 /**
  * @method
  * @name changePeriod
- * @description 기간 유형('7D'/'1M'/'1Y'/'2Y')에 따라 시작/종료일 달력을 오늘 기준 상대 기간으로 재설정한다(fn_setDate/fn_setMonth/fn_setFullYear 위임).
+ * @description 기간 유형('7D'/'1M'/'1Y'/'2Y')에 따라 시작/종료일 달력을 오늘 기준 상대 기간으로 재설정한다(setDate/setMonth/setFullYear 위임).
  * @param {String} type 기간 유형 코드('7D'|'1M'|'1Y'|'2Y')
  * @param {Object} obj 이벤트 발생 컴포넌트(as-is 시그니처 보존용, 미사용)
  * @returns {void}
@@ -626,24 +637,23 @@ scwin.changePeriod = function (type, obj) {
     const ie = null;
     switch (type) {
         case '7D':
-            scwin.fn_setDate(7, startDate, endDate, ie);
+            scwin.setDate(7, startDate, endDate, ie);
             break;
         case '1M':
-            scwin.fn_setMonth(1, startDate, endDate, ie);
+            scwin.setMonth(1, startDate, endDate, ie);
             break;
         case '1Y':
-            scwin.fn_setFullYear(1, startDate, endDate, ie);
+            scwin.setFullYear(1, startDate, endDate, ie);
             break;
         case '2Y':
-            scwin.fn_setFullYear(2, startDate, endDate, ie);
+            scwin.setFullYear(2, startDate, endDate, ie);
             break;
     }
 };
 
-
 /**
  * @method
- * @name fn_setDate
+ * @name setDate
  * @description 오늘부터 pNewDd 일 전 ~ 오늘 구간을 yyyyMMdd 로 조립해 cal_startDate/cal_endDate 에 설정한다(월·일 2자리 0 패딩).
  * @param {Number} pNewDd 시작일을 오늘로부터 며칠 전으로 둘지(일수)
  * @param {Object} startDate 시작일 컴포넌트(as-is 시그니처 보존용, 미사용)
@@ -651,9 +661,9 @@ scwin.changePeriod = function (type, obj) {
  * @param {Object} ie 브라우저 구분 플래그(as-is 시그니처 보존용, 미사용)
  * @returns {void}
  * @hidden N
- * @example scwin.fn_setDate(7, startDate, endDate, null);
+ * @example scwin.setDate(7, startDate, endDate, null);
  */
-scwin.fn_setDate = function (pNewDd, startDate, endDate, ie) {
+scwin.setDate = function (pNewDd, startDate, endDate, ie) {
     const vDate = new Date();
     const vDate2 = new Date();
     let vMon2;
@@ -686,10 +696,9 @@ scwin.fn_setDate = function (pNewDd, startDate, endDate, ie) {
     $c.util.getComponent("cal_endDate").setValue(String(vDate.getFullYear()) + String(vMon) + String(vDay));
 };
 
-
 /**
  * @method
- * @name fn_setMonth
+ * @name setMonth
  * @description 오늘부터 pNewmonth 개월 전 ~ 오늘 구간을 yyyyMMdd 로 조립해 cal_startDate/cal_endDate 에 설정한다(월·일 2자리 0 패딩).
  * @param {Number} pNewmonth 시작일을 오늘로부터 몇 개월 전으로 둘지(개월수)
  * @param {Object} startDate 시작일 컴포넌트(as-is 시그니처 보존용, 미사용)
@@ -697,9 +706,9 @@ scwin.fn_setDate = function (pNewDd, startDate, endDate, ie) {
  * @param {Object} ie 브라우저 구분 플래그(as-is 시그니처 보존용, 미사용)
  * @returns {void}
  * @hidden N
- * @example scwin.fn_setMonth(1, startDate, endDate, null);
+ * @example scwin.setMonth(1, startDate, endDate, null);
  */
-scwin.fn_setMonth = function (pNewmonth, startDate, endDate, ie) {
+scwin.setMonth = function (pNewmonth, startDate, endDate, ie) {
     const vDate = new Date();
     const vDate2 = new Date();
     let vMon2;
@@ -732,10 +741,9 @@ scwin.fn_setMonth = function (pNewmonth, startDate, endDate, ie) {
     $c.util.getComponent("cal_endDate").setValue(String(vDate.getFullYear()) + String(vMon) + String(vDay));
 };
 
-
 /**
  * @method
- * @name fn_setFullYear
+ * @name setFullYear
  * @description 오늘부터 pNewyear 년 전 ~ 오늘 구간을 yyyyMMdd 로 조립해 cal_startDate/cal_endDate 에 설정한다(월·일 2자리 0 패딩, ie 분기는 as-is 잔재로 양쪽 동일 로직).
  * @param {Number} pNewyear 시작일을 오늘로부터 몇 년 전으로 둘지(연수)
  * @param {Object} startDate 시작일 컴포넌트(as-is 시그니처 보존용, 미사용)
@@ -743,9 +751,9 @@ scwin.fn_setMonth = function (pNewmonth, startDate, endDate, ie) {
  * @param {Object} ie 브라우저 구분 플래그(as-is 잔재 — 분기 양쪽이 동일 로직)
  * @returns {void}
  * @hidden N
- * @example scwin.fn_setFullYear(1, startDate, endDate, null);
+ * @example scwin.setFullYear(1, startDate, endDate, null);
  */
-scwin.fn_setFullYear = function (pNewyear, startDate, endDate, ie) {
+scwin.setFullYear = function (pNewyear, startDate, endDate, ie) {
     const vDate = new Date();
     const vDate2 = new Date();
     let vMon2;
@@ -783,51 +791,30 @@ scwin.fn_setFullYear = function (pNewyear, startDate, endDate, ie) {
     $c.util.getComponent("cal_endDate").setValue(String(vDate.getFullYear()) + String(vMon) + String(vDay));
 };
 
-
 /**
  * @method
- * @name fn_goTab1
+ * @name goTab1
  * @description 상장수수료 계산 탭(jldfil35700)으로 이동한다(method=searchListFeeCalc 설정 후 화면 전환 — as-is listFeeReceiptForm 제출은 $c.win.moveUrl 화면 전환으로 재설계됨).
  * @returns {void}
  * @hidden N
- * @example scwin.fn_goTab1();
+ * @example scwin.goTab1();
  */
-scwin.fn_goTab1 = function () {
+scwin.goTab1 = function () {
     $c.util.getComponent('dma_goPrintReq').set('method', 'searchListFeeCalc');
     $c.win.moveUrl("/jldfil35700/jldfil35700.xml", { "method": 'searchListFeeCalc' });
 };
 
-
 /**
  * @method
- * @name fn_goTab2
+ * @name goTab2
  * @description 영수증출력 탭 초기 조회를 수행한다(method=initListFeeReceipt 설정 후 tx_fn_goTab2 호출 — as-is listFeeReceiptForm 제출(listFee.do)은 executeDynamic 조회로 재설계됨).
  * @returns {void}
  * @hidden N
- * @example await scwin.fn_goTab2();
+ * @example await scwin.goTab2();
  */
-scwin.fn_goTab2 = async function () {
+scwin.goTab2 = async function () {
     $c.util.getComponent('dma_goPrintReq').set('method', 'initListFeeReceipt');
     await scwin.tx_fn_goTab2();
-};
-
-
-/**
- * @method
- * @name krxpage_pagenavigator_87_onclick
- * @description 페이지 내비게이터 클릭 — 선택한 페이지 번호를 pageIndex 에 반영한 뒤 목록을 재조회한다.
- * @param {Number} index 이동할 페이지 번호
- * @returns {void}
- * @hidden N
- * @example (body ev:onclick 바인딩으로 자동 호출)
- */
-scwin.krxpage_pagenavigator_87_onclick = function (index) {
-    try {
-        $c.util.getComponent('dma_goPrintReq').set('pageIndex', index);
-    } catch (e) {
-        $c.exception.handleError(e, { notify: 'none', context: 'krxpage_pagenavigator_87.page' });
-    }
-    scwin.fn_searchList();
 };
 ]]></script>
 </head>

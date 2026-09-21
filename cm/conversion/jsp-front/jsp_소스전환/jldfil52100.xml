@@ -52,6 +52,8 @@
       <w2:dataMap baseNode="map" id="dma_pageContext">
         <w2:keyInfo>
           <w2:key id="searchType" name="searchType" dataType="text"/>
+          <w2:key id="prtDepoNo" name="prtDepoNo" dataType="text"/>
+          <w2:key id="uploadCode" name="uploadCode" dataType="text"/>
         </w2:keyInfo>
         <w2:data use="true"/>
       </w2:dataMap>
@@ -166,14 +168,12 @@
   <w2:layoutInfo></w2:layoutInfo>
   <w2:publicInfo method="scwin.onpageload,scwin.btn_findAcptCompany_onclick,scwin.btn_findPrtDepo_onclick,scwin.ipt_fstPrtDepoShrs_onkeyup,scwin.ipt_prtDepoWithdShrs_onkeyup,scwin.ipt_lstPrtDepoShrs_onkeyup,scwin.btn_FileDown_onclick,scwin.btn_FileDown_2_onclick,scwin.btn_filePrtDepoWithd_onclick,scwin.btn_list_onclick,scwin.btn_insertPrtDepoWithd_onclick,scwin.btn_updatePrtDepoWithd_onclick,scwin.btn_updatePrtDepoWithd_2_onclick"></w2:publicInfo>
   <script lazy="false" type="text/javascript"><![CDATA[
-scwin.screenId = "jldfil52100";
-
 ///////// 1. 변수 및 선언 영역 /////////
+scwin.screenId = "jldfil52100";
+scwin.form = null;
 
 // as-is 흐름 보존 — 활성 폼 캐시(각 업무 함수 진입 시 prtDepoForm 으로 재설정)
 // TODO form-재설계-보류: multipart 파일 전송 — prtDepoForm 은 업로드(upd_attachFiles*, name="attachFiles[n]") 파일을 전송하므로 $c.win.openFormSubmit 전환 불가(원형 유지)
-scwin.form = null;
-
 
 ///////// 2. 초기화 영역 /////////
 
@@ -221,17 +221,17 @@ scwin.init_ctxDefaults = function () {
 /**
  * @method
  * @name init_conds
- * @description searchType(dma_pageContext)·재의무보유 여부(dma_loadDetailList.prtdepoReopnYn) 값으로 업로드/다운로드 영역과 제출·저장 버튼의 표시 조건을 평가한다(공용 $c.util.evalConds) — 진입점에서 1회, 데이터 재적재 시 ev:ondataload 가 다시 부른다.
+ * @description searchType(dma_pageContext)·재의무보유 여부(dma_loadDetailList.prtdepoReopnYn) 값으로 업로드/다운로드 영역과 제출·저장 버튼의 표시 조건을 평가한다(바인딩별 컴포넌트 show/hide 평가) — 진입점에서 1회, 데이터 재적재 시 ev:ondataload 가 다시 부른다.
  * @returns {void}
  * @hidden N
  * @example scwin.init_conds();
  */
 scwin.init_conds = function () {
     const readSearchType = function () {
-        return $c.data.readValue("dma_pageContext", "searchType", { ctx: true, label: "searchType" });
+        return dma_pageContext.get("searchType");
     };
     const readReopnYn = function () {
-        return $c.data.readValue("dma_loadDetailList", "prtdepoReopnYn", { label: "loadDetailList.prtdepoReopnYn" });
+        return dma_loadDetailList.get("prtdepoReopnYn");
     };
     const binds = [
         { id: "ipt_prtDepoReopnYn", fn: function () { return (readReopnYn() === 'Y'); } },
@@ -249,7 +249,10 @@ scwin.init_conds = function () {
         { id: "btn_updatePrtDepoWithd", fn: function () { return (readSearchType() === '2'); } },
         { id: "btn_updatePrtDepoWithd_2", fn: function () { return (readSearchType() === '3'); } }
     ];
-    $c.util.evalConds(binds);
+    binds.forEach(function (bind) {
+        const comp = $c.util.getComponent(bind.id);
+        if (comp) { bind.fn() ? comp.show() : comp.hide(); }
+    });
 };
 
 /**
@@ -262,7 +265,7 @@ scwin.init_conds = function () {
  */
 scwin.init_rowCopy = function () {
     const readAttachNm = function (row) {
-        return String($c.data.readValue("dlt_attachList", "attachFileNm", { row: row, silent: true }));
+        return String(dlt_attachList.getCellData(row, "attachFileNm"));
     };
     const rowCopies = [
         {
@@ -277,7 +280,10 @@ scwin.init_rowCopy = function () {
         { childId: "btn_FileDown_2", fn: function () { return readAttachNm(1); } },
         { childId: "__rb2", fn: function () { return " 기 첨부된 파일 : " + readAttachNm(1); } }
     ];
-    $c.data.copyRows(rowCopies);
+    rowCopies.forEach(function (rc) {
+        const comp = $c.util.getComponent(rc.childId);
+        if (comp) { comp.setValue(rc.fn()); }
+    });
 };
 
 /**
@@ -290,8 +296,8 @@ scwin.init_rowCopy = function () {
  */
 scwin.init = async function () {
     const readCtx = function (key) {
-        const raw = $c.data.readValue("dma_pageContext", key, { ctx: true, soft: true, label: key });
-        const val = String(raw == null ? '' : raw);
+        const raw = dma_pageContext.get(key);
+        const val = String(raw === null ? '' : raw);
         return val.indexOf('$' + '{') >= 0 ? '' : val;
     };
     const uploadCode = readCtx("uploadCode");
@@ -315,7 +321,6 @@ scwin.init = async function () {
         }
     }
 };
-
 
 /**
  * @method
@@ -379,13 +384,14 @@ scwin.init_sessionFill = function () {
 /**
  * @method
  * @name init_recvParam
- * @description 화면 전환 파라미터를 dma_pageContext 로 수신한다(공용 $c.data.recvParamData, 이름 고정 "paramData"; 실패 표출은 gcc 함수 몫).
+ * @description 화면 전환 파라미터를 dma_pageContext 로 수신한다($c.data.getParameter → dma_pageContext.setJSON, 키 "paramData" 고정; 실패 표출은 gcc 함수 몫).
  * @returns {void}
  * @hidden N
  * @example scwin.init_recvParam();
  */
 scwin.init_recvParam = function () {
-    $c.data.recvParamData('dma_pageContext');
+    // 화면 전환 파라미터(paramData) 수신 → dma_pageContext ($c.data.getParameter 는 키 "paramData" 고정)
+    dma_pageContext.setJSON($c.data.getParameter() || {});
 };
 
 // 파일 업로드 컨트롤 결선 — __krxFileControl 이 있으면 그것으로, 없으면 렌더 루트에서 id 로 조회한다.
@@ -413,13 +419,12 @@ scwin.upd_attachFiles_4 = (typeof __krxFileControl === 'function')
         ? $c.win.getFrame().render
         : document).querySelector('[id="upd_attachFiles_4"]');
 
-
 ///////// 3. 컴포넌트 이벤트 영역 /////////
 
 /**
  * @method
  * @name btn_findAcptCompany_onclick
- * @description 회사명 검색 버튼 클릭 — 법인 검색 팝업을 연다(scwin.fn_findAcptCompany).
+ * @description 회사명 검색 버튼 클릭 — 법인 검색 팝업을 연다(scwin.findAcptCompany).
  * @param {Object} e 이벤트 객체
  * @returns {void}
  * @hidden N
@@ -430,7 +435,7 @@ scwin.btn_findAcptCompany_onclick = function (e) {
         const ev = e;
         const event = ev;
         const selfEl = (ev && (ev.element || ev.target || ev.srcElement)) || this;
-        scwin.fn_findAcptCompany();
+        scwin.findAcptCompany();
     } catch (_ex) {
         $c.exception.handleError(_ex, { context: 'jldfil52100.btn_findAcptCompany_onclick' });
     }
@@ -439,7 +444,7 @@ scwin.btn_findAcptCompany_onclick = function (e) {
 /**
  * @method
  * @name btn_findPrtDepo_onclick
- * @description [의무보유내역 선택] 버튼 클릭 — 의무보유내역 검색 팝업을 연다(scwin.fn_findPrtDepo).
+ * @description [의무보유내역 선택] 버튼 클릭 — 의무보유내역 검색 팝업을 연다(scwin.findPrtDepo).
  * @param {Object} e 이벤트 객체
  * @returns {void}
  * @hidden N
@@ -450,7 +455,7 @@ scwin.btn_findPrtDepo_onclick = function (e) {
         const ev = e;
         const event = ev;
         const selfEl = (ev && (ev.element || ev.target || ev.srcElement)) || this;
-        scwin.fn_findPrtDepo();
+        scwin.findPrtDepo();
     } catch (_ex) {
         $c.exception.handleError(_ex, { context: 'jldfil52100.btn_findPrtDepo_onclick' });
     }
@@ -469,8 +474,8 @@ scwin.ipt_fstPrtDepoShrs_onkeyup = function (e) {
     try {
         const ev = e;
         const event = ev;
-        const selfEl = (ev && (ev.element || ev.target || ev.srcElement)) || this;
-        (selfEl.value = $c.num.formatNumber(selfEl.value));
+        const comp = $c.util.getComponent('ipt_fstPrtDepoShrs');
+        comp.setValue($c.num.formatNumber(comp.getValue()));
     } catch (_ex) {
         $c.exception.handleError(_ex, { context: 'jldfil52100.ipt_fstPrtDepoShrs_onkeyup' });
     }
@@ -489,8 +494,8 @@ scwin.ipt_prtDepoWithdShrs_onkeyup = function (e) {
     try {
         const ev = e;
         const event = ev;
-        const selfEl = (ev && (ev.element || ev.target || ev.srcElement)) || this;
-        (selfEl.value = $c.num.formatNumber(selfEl.value));
+        const comp = $c.util.getComponent('ipt_prtDepoWithdShrs');
+        comp.setValue($c.num.formatNumber(comp.getValue()));
     } catch (_ex) {
         $c.exception.handleError(_ex, { context: 'jldfil52100.ipt_prtDepoWithdShrs_onkeyup' });
     }
@@ -509,8 +514,8 @@ scwin.ipt_lstPrtDepoShrs_onkeyup = function (e) {
     try {
         const ev = e;
         const event = ev;
-        const selfEl = (ev && (ev.element || ev.target || ev.srcElement)) || this;
-        (selfEl.value = $c.num.formatNumber(selfEl.value));
+        const comp = $c.util.getComponent('ipt_lstPrtDepoShrs');
+        comp.setValue($c.num.formatNumber(comp.getValue()));
     } catch (_ex) {
         $c.exception.handleError(_ex, { context: 'jldfil52100.ipt_lstPrtDepoShrs_onkeyup' });
     }
@@ -519,7 +524,7 @@ scwin.ipt_lstPrtDepoShrs_onkeyup = function (e) {
 /**
  * @method
  * @name btn_FileDown_onclick
- * @description 처분신청 공문 기첨부 파일 버튼 클릭 — dlt_attachList 0행의 식별자(의무보유ID·신청 일련번호·파일 일련번호)로 파일을 다운로드한다(scwin.fn_FileDown).
+ * @description 처분신청 공문 기첨부 파일 버튼 클릭 — dlt_attachList 0행의 식별자(의무보유ID·신청 일련번호·파일 일련번호)로 파일을 다운로드한다(scwin.fileDown).
  * @param {Object} e 이벤트 객체
  * @returns {void}
  * @hidden N
@@ -530,10 +535,10 @@ scwin.btn_FileDown_onclick = async function (e) {
         const ev = e;
         const event = ev;
         const selfEl = (ev && (ev.element || ev.target || ev.srcElement)) || this;
-        const prtdepoId = '' + $c.data.readValue("dlt_attachList", "prtdepoId", { row: 0, silent: true }) + '';
-        const applSeq = '' + $c.data.readValue("dlt_attachList", "prtdepoWithdApplSeq", { row: 0, silent: true }) + '';
-        const fileSeq = '' + $c.data.readValue("dlt_attachList", "attachFileSeq", { row: 0, silent: true }) + '';
-        await scwin.fn_FileDown(prtdepoId, applSeq, fileSeq);
+        const prtdepoId = '' + dlt_attachList.getCellData(0, "prtdepoId") + '';
+        const applSeq = '' + dlt_attachList.getCellData(0, "prtdepoWithdApplSeq") + '';
+        const fileSeq = '' + dlt_attachList.getCellData(0, "attachFileSeq") + '';
+        await scwin.fileDown(prtdepoId, applSeq, fileSeq);
     } catch (_ex) {
         await $c.exception.handleError(_ex, { context: 'jldfil52100.btn_FileDown_onclick' });
     }
@@ -542,7 +547,7 @@ scwin.btn_FileDown_onclick = async function (e) {
 /**
  * @method
  * @name btn_FileDown_2_onclick
- * @description 첨부서류 기첨부 파일 버튼 클릭 — dlt_attachList 1행의 식별자(의무보유ID·신청 일련번호·파일 일련번호)로 파일을 다운로드한다(scwin.fn_FileDown).
+ * @description 첨부서류 기첨부 파일 버튼 클릭 — dlt_attachList 1행의 식별자(의무보유ID·신청 일련번호·파일 일련번호)로 파일을 다운로드한다(scwin.fileDown).
  * @param {Object} e 이벤트 객체
  * @returns {void}
  * @hidden N
@@ -553,10 +558,10 @@ scwin.btn_FileDown_2_onclick = async function (e) {
         const ev = e;
         const event = ev;
         const selfEl = (ev && (ev.element || ev.target || ev.srcElement)) || this;
-        const prtdepoId = '' + $c.data.readValue("dlt_attachList", "prtdepoId", { row: 1, silent: true }) + '';
-        const applSeq = '' + $c.data.readValue("dlt_attachList", "prtdepoWithdApplSeq", { row: 1, silent: true }) + '';
-        const fileSeq = '' + $c.data.readValue("dlt_attachList", "attachFileSeq", { row: 1, silent: true }) + '';
-        await scwin.fn_FileDown(prtdepoId, applSeq, fileSeq);
+        const prtdepoId = '' + dlt_attachList.getCellData(1, "prtdepoId") + '';
+        const applSeq = '' + dlt_attachList.getCellData(1, "prtdepoWithdApplSeq") + '';
+        const fileSeq = '' + dlt_attachList.getCellData(1, "attachFileSeq") + '';
+        await scwin.fileDown(prtdepoId, applSeq, fileSeq);
     } catch (_ex) {
         await $c.exception.handleError(_ex, { context: 'jldfil52100.btn_FileDown_2_onclick' });
     }
@@ -585,7 +590,7 @@ scwin.btn_filePrtDepoWithd_onclick = function (e) {
 /**
  * @method
  * @name btn_list_onclick
- * @description [목록] 버튼 클릭 — 의무보유주식 처분 목록 화면(jldfil52000)으로 이동한다(scwin.fn_list).
+ * @description [목록] 버튼 클릭 — 의무보유주식 처분 목록 화면(jldfil52000)으로 이동한다(scwin.list).
  * @param {Object} e 이벤트 객체
  * @returns {void}
  * @hidden N
@@ -596,7 +601,7 @@ scwin.btn_list_onclick = function (e) {
         const ev = e;
         const event = ev;
         const selfEl = (ev && (ev.element || ev.target || ev.srcElement)) || this;
-        scwin.fn_list();
+        scwin.list();
     } catch (_ex) {
         $c.exception.handleError(_ex, { context: 'jldfil52100.btn_list_onclick' });
     }
@@ -661,7 +666,6 @@ scwin.btn_updatePrtDepoWithd_2_onclick = async function (e) {
         await $c.exception.handleError(_ex, { context: 'jldfil52100.btn_updatePrtDepoWithd_2_onclick' });
     }
 };
-
 
 ///////// 4. 서브미션 콜백 영역 /////////
 
@@ -761,21 +765,20 @@ scwin.tx_sendPrtDepoWithd = async function () {
     return res;
 };
 
-
 ///////// 5. 일반/업무 함수 영역 /////////
 
 /**
  * @method
- * @name fn_FileDown
+ * @name fileDown
  * @description 첨부파일 다운로드 — 의무보유ID·신청 일련번호·파일 일련번호와 method(downloadPrtdepoFile)를 전송 파라미터로 구성해 $c.win.openFormSubmit 으로 다운로드 폼을 제출한다(POST, as-is fileDownForm submit 의 파일 다운로드 의미 보존).
  * @param {String} prtDepoId 의무보유 ID
  * @param {String} prtDepoIdSeq 처분신청 일련번호
  * @param {String} attachFileSeq 첨부파일 일련번호
  * @returns {void}
  * @hidden N
- * @example await scwin.fn_FileDown(prtDepoId, prtDepoIdSeq, attachFileSeq);
+ * @example await scwin.fileDown(prtDepoId, prtDepoIdSeq, attachFileSeq);
  */
-scwin.fn_FileDown = async function (prtDepoId, prtDepoIdSeq, attachFileSeq) {
+scwin.fileDown = async function (prtDepoId, prtDepoIdSeq, attachFileSeq) {
     // as-is: fileDownForm(action='/listInvstg/lplAttach.do') hidden 세팅 + submit — 폼 필드 실측: form_1 그룹은 빈 그룹, 전송 필드는 이 흐름이 세팅하던 4키
     const params = {
         method: 'downloadPrtdepoFile',
@@ -786,29 +789,27 @@ scwin.fn_FileDown = async function (prtDepoId, prtDepoIdSeq, attachFileSeq) {
     $c.win.openFormSubmit('/listInvstg/lplAttach.do', params);
 };
 
-
 /**
  * @method
- * @name fn_list
+ * @name list
  * @description 의무보유주식 처분 목록 화면(jldfil52000)으로 페이지 프레임을 전환한다.
  * @returns {void}
  * @hidden N
- * @example scwin.fn_list();
+ * @example scwin.list();
  */
-scwin.fn_list = function () {
+scwin.list = function () {
     $c.win.setPageFrameSrc($c.win.getFrame(), '/jldfil52000/jldfil52000.xml');
 };
 
-
 /**
  * @method
- * @name fn_findPrtDepo
+ * @name findPrtDepo
  * @description 의무보유내역 검색 팝업(jldfil52120)을 열고, 회신 인자를 setPrtDepoInfo_recv 로 넘겨 화면에 반영한다(고유코드·업무처리번호를 파라미터로 전달).
  * @returns {void}
  * @hidden N
- * @example await scwin.fn_findPrtDepo();
+ * @example await scwin.findPrtDepo();
  */
-scwin.fn_findPrtDepo = async function () {
+scwin.findPrtDepo = async function () {
     const w = '600';
     const h = '530';
     const l = screen.width / 2 - w / 2;
@@ -821,7 +822,6 @@ scwin.fn_findPrtDepo = async function () {
         { method: "loadInitPagePreDepo", isurCd: isurCD, bzProcsNo: bzNo });
     scwin.setPrtDepoInfo_recv(popupRes);
 };
-
 
 /**
  * @method
@@ -855,16 +855,15 @@ scwin.setPrtDepoInfo = async function (nm, id, shrs, objKind) {
     $c.util.getComponent("ipt_objKind").setValue(objKind);
 };
 
-
 /**
  * @method
- * @name fn_findAcptCompany
+ * @name findAcptCompany
  * @description 법인 검색 팝업(jldfil52110)을 열고, 회신 인자를 setCorpInfo_recv 로 넘겨 화면에 반영한다.
  * @returns {void}
  * @hidden N
- * @example await scwin.fn_findAcptCompany();
+ * @example await scwin.findAcptCompany();
  */
-scwin.fn_findAcptCompany = async function () {
+scwin.findAcptCompany = async function () {
     const w = '600';
     const h = '530';
     const l = screen.width / 2 - w / 2;
@@ -875,7 +874,6 @@ scwin.fn_findAcptCompany = async function () {
         { method: "loadInitPage" });
     scwin.setCorpInfo_recv(popupRes);
 };
-
 
 /**
  * @method
@@ -905,7 +903,6 @@ scwin.setCorpInfo = async function (isurCd, comNm, bzProcsNo) {
     }
 };
 
-
 /**
  * @method
  * @name checkValue
@@ -917,23 +914,23 @@ scwin.setCorpInfo = async function (isurCd, comNm, bzProcsNo) {
 scwin.checkValue = async function () {
     scwin.form = (document.prtDepoForm || { elements: [] });
     const withdShrs = $c.util.getComponent('ipt_prtDepoWithdShrs').getValue();
-    if ((withdShrs == null ? '' : String(withdShrs)) === '') {
+    if ((withdShrs === null ? '' : String(withdShrs)) === '') {
         await $c.win.alert("처분주식수를 입력하십시오.");
         return false;
     }
     const lstShrs = $c.util.getComponent('ipt_lstPrtDepoShrs').getValue();
-    if ((lstShrs == null ? '' : String(lstShrs)) === '') {
+    if ((lstShrs === null ? '' : String(lstShrs)) === '') {
         await $c.win.alert("최종의무보유주식수를 입력하십시오.");
         return false;
     }
     const reopnYnComp = $c.util.getComponent('ipt_prtDepoReopnYn');
     const reopnYnChecked = (!reopnYnComp || typeof reopnYnComp.getValue !== 'function')
         ? (console.warn('[sdd] .checked 대상 미해결: ipt_prtDepoReopnYn'), false)
-        : (reopnYnComp.getValue() != null && String(reopnYnComp.getValue()) !== '');
+        : (reopnYnComp.getValue() !== null && String(reopnYnComp.getValue()) !== '');
     if (reopnYnChecked === true) {
         $c.util.getComponent("ipt_prtDepoReopnYn").setValue('Y');
         const reopnDd = $c.util.getComponent('cal_prtDepoReopnDD').getValue();
-        if ((reopnDd == null ? '' : String(reopnDd)) === '') {
+        if ((reopnDd === null ? '' : String(reopnDd)) === '') {
             await $c.win.alert('재의무보유일을 입력하십시오.');
             return false;
         }
@@ -942,7 +939,6 @@ scwin.checkValue = async function () {
     }
     return true;
 };
-
 
 /**
  * @method
@@ -958,12 +954,12 @@ scwin.insertPrtDepoWithd = async function () {
     scwin.form.action = '/listInvstg/prtDepo.do';
     $c.util.getComponent('dma_FileDownReq').set('method', 'write');
     const attachFiles = $c.util.getComponent('upd_attachFiles').getValue();
-    if ((attachFiles == null ? '' : String(attachFiles)) === '') {
+    if ((attachFiles === null ? '' : String(attachFiles)) === '') {
         await $c.win.alert("처분신청 공문 관련 파일을 선택바랍니다.");
         return;
     }
     const attachFiles3 = $c.util.getComponent('upd_attachFiles_3').getValue();
-    if ((attachFiles3 == null ? '' : String(attachFiles3)) === '') {
+    if ((attachFiles3 === null ? '' : String(attachFiles3)) === '') {
         await $c.win.alert("첨부서류을 선택바랍니다.");
         return;
     }
@@ -973,7 +969,7 @@ scwin.insertPrtDepoWithd = async function () {
     if (await $c.win.confirm('저장하시겠습니까?')) {
         // 주식수 입력 콤마 제거 — fieldEl 해석 대상에 따라 setValue/getValue 또는 value 속성으로 반영
         const unformatField = function (compId, fieldName) {
-            const el = $c.util.fieldEl(compId, fieldName);
+            const el = $c.util.getComponent(compId);
             if (!el) { return; }
             if (el.setValue && el.getValue) {
                 el.setValue(String($c.num.unFormatNumber(el.getValue())));
@@ -987,7 +983,6 @@ scwin.insertPrtDepoWithd = async function () {
         await scwin.tx_insertPrtDepoWithd();
     }
 };
-
 
 /**
  * @method
@@ -1011,7 +1006,7 @@ scwin.updatePrtDepoWithd = async function (updateType) {
     if (await $c.win.confirm('저장하시겠습니까?')) {
         // 주식수 입력 콤마 제거 — fieldEl 해석 대상에 따라 setValue/getValue 또는 value 속성으로 반영
         const unformatField = function (compId, fieldName) {
-            const el = $c.util.fieldEl(compId, fieldName);
+            const el = $c.util.getComponent(compId);
             if (!el) { return; }
             if (el.setValue && el.getValue) {
                 el.setValue(String($c.num.unFormatNumber(el.getValue())));
@@ -1025,7 +1020,6 @@ scwin.updatePrtDepoWithd = async function (updateType) {
         await scwin.tx_updatePrtDepoWithd();
     }
 };
-
 
 /**
  * @method
@@ -1050,8 +1044,6 @@ scwin.sendPrtDepoWithd = async function (prtDepoNo, updateType) {
         await scwin.tx_sendPrtDepoWithd();
     }
 };
-
-
 
 /**
  * @method

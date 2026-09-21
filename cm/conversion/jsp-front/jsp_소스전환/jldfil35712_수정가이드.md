@@ -30,3 +30,24 @@
 - [x] __ 접두 지역변수 0
 - [x] 로직 동등(동작 변경 없음)
 - [x] node --check 통과
+
+## conversion 규칙 재적용 (2026-09-21)
+
+> `convert.py` 단계1을 제자리 실행하고 후처리로 보정(init 2구역 복원·5b DOM 수신 원복·개명 충돌 조정·JSDoc 동기화). 경위·공통 게이트: [krx_소스전환_미적용분석.md §5 이력 6](krx_소스전환_미적용분석.md). diff +1/−16.
+
+| 항목 | 건수 | 내용 |
+|------|------|------|
+| 규칙 2 전역 선언 이동 | 1건 | 최상위 `scwin.X = …` 선언을 1구역으로 |
+| 규칙 4 구역 재배치 | 0건 이동 | `init_*` 1건은 도구가 5구역으로 옮긴 것을 code-convention 대로 2구역(`onpageload` 아래)에 복원 |
+
+검증: node --check 통과 · wsxml_lint 0 errors/0 warnings(WS111~113 제외) · body `ev:`·publicInfo ↔ 정의 일치 · 재변환 수렴(잔여 차이는 5b 보류분·빈 5구역 헤더뿐).
+
+### A 그룹 — 운영 gcc 확장 7종 치환 (2026-09-21)
+
+> 리포 `cm/gcc` 에 없는 운영 확장 함수를 dataMap/dataList·컴포넌트·`$c.session` API 로 치환(검토안: 미적용분석 §7.1). 전제: 페이지 컨텍스트 값은 `paramData` 파라미터로 전달된다(JSP 서버 모델값이 파라미터로 오지 않으면 별도 조회 API 필요).
+
+| 대상 | 건수 | 치환 |
+|------|------|------|
+| `$c.data.recvParamData("dma_pageContext")` | 1 | 이 화면은 페이지 컨텍스트 값을 읽지 않아 수신 생략(주석)으로 대체 — `dma_pageContext` 미보유 |
+
+검증: node --check 통과 · wsxml_lint 0/0 · 코드 내 미정의 dataCollection 참조 0 · `$c.data.readValue` 잔존 0건(보류) 외 A 그룹 호출 0.

@@ -32,3 +32,29 @@
 - [x] __ 접두 지역변수 0
 - [x] 로직 동등(동작 변경 없음)
 - [x] node --check 통과
+
+## conversion 규칙 재적용 (2026-09-21)
+
+> `convert.py` 단계1을 제자리 실행하고 후처리로 보정(init 2구역 복원·5b DOM 수신 원복·개명 충돌 조정·JSDoc 동기화). 경위·공통 게이트: [krx_소스전환_미적용분석.md §5 이력 6](krx_소스전환_미적용분석.md). diff +7/−26.
+
+| 항목 | 건수 | 내용 |
+|------|------|------|
+| 규칙 13 `fn_*` 개명 | 1건 | `fn_init`→`init`. 정의·호출·body `ev:`·publicInfo 동기화(도구), JSDoc `@name`/`@example` 옛 이름 3건 후처리 동기화. 교차 화면 호출 없음 |
+| 규칙 2 전역 선언 이동 | 2건 | 최상위 `scwin.X = …` 선언을 1구역으로 |
+| 규칙 4 구역 재배치 | 1건 이동 | `init_*` 2건은 도구가 5구역으로 옮긴 것을 code-convention 대로 2구역(`onpageload` 아래)에 복원; 구역 이동: `init`(5구역→2구역) |
+| 규칙 5b `.value=` → `setValue` | 6건 원복·보류 | 수신 객체가 `ev.target`(DOM 요소)이라 `setValue` 가 TypeError — 원복. 컴포넌트 API(getValue/setValue) 전환은 호출부 재설계와 함께 후속 |
+
+검증: node --check 통과 · wsxml_lint 0 errors/0 warnings(WS111~113 제외) · body `ev:`·publicInfo ↔ 정의 일치 · 재변환 수렴(잔여 차이는 5b 보류분·빈 5구역 헤더뿐).
+
+### A 그룹 — 운영 gcc 확장 7종 치환 (2026-09-21)
+
+> 리포 `cm/gcc` 에 없는 운영 확장 함수를 dataMap/dataList·컴포넌트·`$c.session` API 로 치환(검토안: 미적용분석 §7.1). 전제: 페이지 컨텍스트 값은 `paramData` 파라미터로 전달된다(JSP 서버 모델값이 파라미터로 오지 않으면 별도 조회 API 필요).
+
+| 대상 | 건수 | 치환 |
+|------|------|------|
+| `$c.data.recvParamData("dma_pageContext")` | 1 | 이 화면은 페이지 컨텍스트 값을 읽지 않아 수신 생략(주석)으로 대체 — `dma_pageContext` 미보유 |
+| 숫자 DOM 헬퍼·핸들러 컴포넌트 API 전환 | 12줄 / 핸들러 0 | `obj.value` → `getValue()/setValue()`, `self` → `comp` |
+
+숫자 헬퍼 `unformat`·`numFormat` 을 `getValue()/setValue()` 로 전환(12줄) — 5b 보류 6건 해소. 호출부는 이미 `getComponent`
+
+검증: node --check 통과 · wsxml_lint 0/0 · 코드 내 미정의 dataCollection 참조 0 · `$c.data.readValue` 잔존 0건(보류) 외 A 그룹 호출 0.

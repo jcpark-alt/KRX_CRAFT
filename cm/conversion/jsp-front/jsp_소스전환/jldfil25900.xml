@@ -67,16 +67,12 @@
   <w2:layoutInfo></w2:layoutInfo>
   <w2:publicInfo method="scwin.onpageload,scwin.btn_goWrite_onclick,scwin.grd_dividendDateList_oncellclick"></w2:publicInfo>
   <script lazy="false" type="text/javascript"><![CDATA[
-scwin.screenId = "jldfil25900";
-
 ///////// 1. 변수 및 선언 영역 /////////
-
+scwin.screenId = "jldfil25900";
 scwin.result = "";
-
 scwin.modifiyDate = "";
 
 ///////// 2. 초기화 영역 /////////
-
 /**
  * @method
  * @name onpageload
@@ -111,16 +107,25 @@ scwin.init_attrReals = function() {
         childId: "td_16",
         attr: "__html",
         fn: function() {
-            const sysYear = String($c.data.readValue("dma_pageContext", "sysYear", {
-                silent: true
-            }));
+            const sysYear = String(dma_pageContext.get("sysYear"));
             if (sysYear.trim() === "") return "";
             return "『배당기준일자 신고』작성하는 화면입니다.<br/> <span style=\"color:red\">" + sysYear +
                 "</span>년도 배당기준일 신고는 반드시 <span style=\"color:red\">작성하기</span> 버튼을 눌러서 제출해주시기 바랍니다. (※ " +
                 (Number(sysYear) - 1) + "년도 신고내용 수정·제출 금지)";
         }
     }];
-    $c.util.applyAttrReals(attrReals);
+    attrReals.forEach(function (ar) {
+        const comp = $c.util.getComponent(ar.childId);
+        if (!comp) { return; }
+        const val = ar.fn();
+        if (ar.attr === "__html") {
+            comp.render.innerHTML = val;                     // 그룹 내부 HTML 치환
+        } else if (ar.attr === "label" && typeof comp.setLabel === "function") {
+            comp.setLabel(val);
+        } else {
+            comp.render.setAttribute(ar.attr, val);         // src 등 일반 속성
+        }
+    });
 };
 
 /**
@@ -141,19 +146,20 @@ scwin.init_fillNow = function() {
 /**
  * @method
  * @name init_recvParam
- * @description 화면 전환 파라미터를 dma_pageContext 로 수신한다(공용 $c.data.recvParamData, 이름 고정 "paramData").
+ * @description 화면 전환 파라미터를 dma_pageContext 로 수신한다($c.data.getParameter → dma_pageContext.setJSON, 키 "paramData" 고정).
  * @returns {void}
  * @hidden N
  * @example scwin.init_recvParam();
  */
 scwin.init_recvParam = function() {
-    $c.data.recvParamData("dma_pageContext");
+    // 화면 전환 파라미터(paramData) 수신 → dma_pageContext ($c.data.getParameter 는 키 "paramData" 고정)
+    dma_pageContext.setJSON($c.data.getParameter() || {});
 };
 
 /**
  * @method
  * @name init_conds
- * @description btn_goWrite 표시 조건(listStatCd == "Y")을 평가한다(공용 $c.util.evalConds).
+ * @description btn_goWrite 표시 조건(listStatCd == "Y")을 평가한다(바인딩별 컴포넌트 show/hide 평가).
  * @returns {void}
  * @hidden N
  * @example scwin.init_conds();
@@ -162,17 +168,16 @@ scwin.init_conds = function() {
     const binds = [{
         id: "btn_goWrite",
         fn: function() {
-            return $c.data.readValue("dma_pageContext", "listStatCd", {
-                ctx: true,
-                label: "listStatCd"
-            }) === "Y";
+            return dma_pageContext.get("listStatCd") === "Y";
         }
     }];
-    $c.util.evalConds(binds);
+    binds.forEach(function (bind) {
+        const comp = $c.util.getComponent(bind.id);
+        if (comp) { bind.fn() ? comp.show() : comp.hide(); }
+    });
 };
 
 ///////// 3. 컴포넌트 이벤트 영역 /////////
-
 /**
  * @method
  * @name btn_goWrite_onclick
@@ -216,7 +221,6 @@ scwin.grd_dividendDateList_oncellclick = async function(rowIndex) {
 };
 
 ///////// 4. 서브미션 콜백 영역 /////////
-
 /**
  * @method
  * @name tx_fn_modifiyDate
@@ -243,7 +247,6 @@ scwin.tx_fn_modifiyDate = async function() {
 };
 
 ///////// 5. 일반/업무 함수 영역 /////////
-
 /**
  * @method
  * @name goWrite
@@ -278,7 +281,7 @@ scwin.goWrite = async function() {
  */
 scwin.goView = async function(ipt_bzProcsNo, basYear) {
     $c.util.getComponent("ipt_method").setValue("dividendDateModifiy");
-    $c.util.getComponent("ipt_status").setValue(await scwin.fn_modifiyDate());
+    $c.util.getComponent("ipt_status").setValue(await scwin.selectModifiyDate());
     $c.util.getComponent("ipt_bzProcsNo").setValue(ipt_bzProcsNo);
     // dividendDateForm 전송 필드 실측(method/status/bzProcsNo) → params 수집 후 동적 폼 제출
     const params = {
@@ -291,15 +294,15 @@ scwin.goView = async function(ipt_bzProcsNo, basYear) {
 
 /**
  * @method
- * @name fn_modifiyDate
+ * @name selectModifiyDate
  * @description 수정 가능 여부 조회(tx_fn_modifiyDate) 후 결과를 scwin.result/modifiyDate 에 반영한다.
  * @returns {Object} executeDynamic 응답 객체(resObj)
  * @hidden N
- * @example const res = await scwin.fn_modifiyDate();
+ * @example const res = await scwin.selectModifiyDate();
  */
-scwin.fn_modifiyDate = async function() {
+scwin.selectModifiyDate = async function() {
     const res = await scwin.tx_fn_modifiyDate();
-    const body = (res && res.responseJSON && (res.responseJSON.body != null ? res.responseJSON.body : res.responseJSON)) || {};
+    const body = (res && res.responseJSON && (res.responseJSON.body !== null ? res.responseJSON.body : res.responseJSON)) || {};
     scwin.result = body;
     scwin.modifiyDate = scwin.result.checkModifiyDate;
     return res;

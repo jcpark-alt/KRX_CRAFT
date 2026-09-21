@@ -46,6 +46,9 @@
           <w2:key id="searchRadio" name="searchRadio" dataType="text"/>
           <w2:key id="stdCdGrntEndDd" name="stdCdGrntEndDd" dataType="text"/>
           <w2:key id="stdCdGrntStartDd" name="stdCdGrntStartDd" dataType="text"/>
+          <w2:key id="result" name="result" dataType="text"/>
+          <w2:key id="std_cd_grnt_end_dd" name="std_cd_grnt_end_dd" dataType="text"/>
+          <w2:key id="std_cd_grnt_start_dd" name="std_cd_grnt_start_dd" dataType="text"/>
         </w2:keyInfo>
         <w2:data use="true"/>
       </w2:dataMap>
@@ -130,17 +133,16 @@
   					select.long{width:500px;}
   ]]></style>
   <script lazy="false" type="text/javascript"><![CDATA[
-scwin.screenId = "jldinf20000p";
-
 ///////// 1. 변수 및 선언 영역 /////////
-
-// as-is 흐름 보존 — 스켈레톤이 대체한 함수가 쓰던 전역 선언
+scwin.screenId = "jldinf20000p";
 scwin._popupWindow = undefined;
 scwin.type = undefined;
 
-///////// 2. 초기화 영역 /////////
+// as-is 흐름 보존 — 스켈레톤이 대체한 함수가 쓰던 전역 선언
 
 // 화면 진입점 — 초기화 단계를 데이터 의존 순서로 호출한다.
+
+///////// 2. 초기화 영역 /////////
 /**
  * @method
  * @name onpageload
@@ -174,7 +176,7 @@ scwin.onpageload = function () {
  */
 scwin.init_attrReals = function () {
     const readPage = function (key) {
-        return String($c.data.readValue("dma_page", key, { silent: true }));
+        return String(dma_page.get(key));
     };
     const attrReals = [{
         childId: "ul_68",
@@ -182,16 +184,27 @@ scwin.init_attrReals = function () {
         fn: function () {
             const vals = [readPage("total"), readPage("currentPage"), readPage("pageCount")];
             const hasValue = vals.some(function (v) {
-                return String(v == null ? '' : v).trim() !== '';
+                return String(v === null ? '' : v).trim() !== '';
             });
             if (!hasValue) { return ''; }
             return "총 <strong id=\"totPage\">" + vals[0] + "</strong>건 <span id=\"totPage1\">(" + vals[1] + "/" + vals[2] + ")</span>";
         }
     }];
-    $c.util.applyAttrReals(attrReals);
+    attrReals.forEach(function (ar) {
+        const comp = $c.util.getComponent(ar.childId);
+        if (!comp) { return; }
+        const val = ar.fn();
+        if (ar.attr === "__html") {
+            comp.render.innerHTML = val;                     // 그룹 내부 HTML 치환
+        } else if (ar.attr === "label" && typeof comp.setLabel === "function") {
+            comp.setLabel(val);
+        } else {
+            comp.render.setAttribute(ar.attr, val);         // src 등 일반 속성
+        }
+    });
 };
 
-// 런타임 분기 평가 — 공용 $c.util.evalConds (화면은 조건 바인딩 목록만 보유)
+// 런타임 분기 평가 — 바인딩별 컴포넌트 show/hide 평가 (화면은 조건 바인딩 목록만 보유)
 // 조건 평가 — 진입점에서 1회. 데이터 재적재 시 ev:ondataload 가 다시 부른다.
 /**
  * @method
@@ -205,11 +218,14 @@ scwin.init_conds = function () {
     const binds = [{
         id: "if_result",
         fn: function () {
-            const result = $c.data.readValue("dma_pageContext", "result", { ctx: true, label: "result" });
-            return (!(String(result == null ? '' : result).length === 0));
+            const result = dma_pageContext.get("result");
+            return (!(String(result === null ? '' : result).length === 0));
         }
     }];
-    $c.util.evalConds(binds);
+    binds.forEach(function (bind) {
+        const comp = $c.util.getComponent(bind.id);
+        if (comp) { bind.fn() ? comp.show() : comp.hide(); }
+    });
 };
 
 // dataList 단건 표시 복사 — 진입점에서 1회. 데이터 재적재 시 ev:ondataload 가 다시 부른다.
@@ -225,10 +241,13 @@ scwin.init_rowCopy = function () {
     const rowCopies = [{
         childId: "ipt_searchRadio",
         fn: function () {
-            return String(String($c.data.readValue("dma_pageContext", "searchRadio", { silent: true })));
+            return String(String(dma_pageContext.get("searchRadio")));
         }
     }];
-    $c.data.copyRows(rowCopies);
+    rowCopies.forEach(function (rc) {
+        const comp = $c.util.getComponent(rc.childId);
+        if (comp) { comp.setValue(rc.fn()); }
+    });
 };
 
 /**
@@ -265,11 +284,11 @@ scwin.init_datefmt_cal_stdCdGrntEndDd = function () {
  */
 scwin.init_pageBody = function () {
     try {
-        const startDdRaw = $c.data.readValue("dma_pageContext", "std_cd_grnt_start_dd", { ctx: true, soft: true, label: "std_cd_grnt_start_dd" });
-        const startDdStr = String(startDdRaw == null ? '' : startDdRaw);
+        const startDdRaw = dma_pageContext.get("std_cd_grnt_start_dd");
+        const startDdStr = String(startDdRaw === null ? '' : startDdRaw);
         const std_cd_grnt_start_dd = startDdStr.indexOf('$' + '{') >= 0 ? '' : startDdStr;
-        const endDdRaw = $c.data.readValue("dma_pageContext", "std_cd_grnt_end_dd", { ctx: true, soft: true, label: "std_cd_grnt_end_dd" });
-        const endDdStr = String(endDdRaw == null ? '' : endDdRaw);
+        const endDdRaw = dma_pageContext.get("std_cd_grnt_end_dd");
+        const endDdStr = String(endDdRaw === null ? '' : endDdRaw);
         const std_cd_grnt_end_dd = endDdStr.indexOf('$' + '{') >= 0 ? '' : endDdStr;
         if (std_cd_grnt_start_dd !== "") {
             const calStart = $c.util.getComponent('cal_stdCdGrntStartDd');
@@ -292,21 +311,21 @@ scwin.init_pageBody = function () {
     }
 };
 
-// 화면 전환 파라미터 수신 — 공용 $c.data.recvParamData (§106, 이름 고정 "paramData"; 실패 표출은 gcc 함수 몫). onpageload 합성 단계.
+// 화면 전환 파라미터 수신 — $c.data.getParameter → dma_pageContext.setJSON (§106, 이름 고정 "paramData"; 실패 표출은 gcc 함수 몫). onpageload 합성 단계.
 /**
  * @method
  * @name init_recvParam
- * @description 화면 전환 파라미터를 dma_pageContext 로 수신한다(공용 $c.data.recvParamData, 이름 고정 "paramData").
+ * @description 화면 전환 파라미터를 dma_pageContext 로 수신한다($c.data.getParameter → dma_pageContext.setJSON, 키 "paramData" 고정).
  * @returns {void}
  * @hidden N
  * @example scwin.init_recvParam();
  */
 scwin.init_recvParam = function () {
-    $c.data.recvParamData('dma_pageContext');
+    // 화면 전환 파라미터(paramData) 수신 → dma_pageContext ($c.data.getParameter 는 키 "paramData" 고정)
+    dma_pageContext.setJSON($c.data.getParameter() || {});
 };
 
 ///////// 3. 컴포넌트 이벤트 영역 /////////
-
 /**
  * @event
  * @name btn_appDate2_onclick
@@ -318,7 +337,7 @@ scwin.init_recvParam = function () {
  */
 scwin.btn_appDate2_onclick = function (e) {
     try {
-        scwin.fn_appDate2('stdCdGrntStartDd', 'stdCdGrntEndDd', 3);
+        scwin.appDate2('stdCdGrntStartDd', 'stdCdGrntEndDd', 3);
     } catch (_ex) {
         $c.exception.handleError(_ex, { context: 'jldinf20000p.btn_appDate2_onclick' });
     }
@@ -335,7 +354,7 @@ scwin.btn_appDate2_onclick = function (e) {
  */
 scwin.btn_appDate2_2_onclick = function (e) {
     try {
-        scwin.fn_appDate2('stdCdGrntStartDd', 'stdCdGrntEndDd', 6);
+        scwin.appDate2('stdCdGrntStartDd', 'stdCdGrntEndDd', 6);
     } catch (_ex) {
         $c.exception.handleError(_ex, { context: 'jldinf20000p.btn_appDate2_2_onclick' });
     }
@@ -352,7 +371,7 @@ scwin.btn_appDate2_2_onclick = function (e) {
  */
 scwin.btn_appDate2_3_onclick = function (e) {
     try {
-        scwin.fn_appDate2('stdCdGrntStartDd', 'stdCdGrntEndDd', 12);
+        scwin.appDate2('stdCdGrntStartDd', 'stdCdGrntEndDd', 12);
     } catch (_ex) {
         $c.exception.handleError(_ex, { context: 'jldinf20000p.btn_appDate2_3_onclick' });
     }
@@ -361,7 +380,7 @@ scwin.btn_appDate2_3_onclick = function (e) {
 /**
  * @event
  * @name btn_search_onclick
- * @description [조회] 버튼 클릭 — 검색 조건으로 표준코드 채권 목록을 조회한다(fn_search(1)).
+ * @description [조회] 버튼 클릭 — 검색 조건으로 표준코드 채권 목록을 조회한다(search(1)).
  * @param {Object} e 이벤트 객체
  * @returns {void}
  * @hidden N
@@ -369,7 +388,7 @@ scwin.btn_appDate2_3_onclick = function (e) {
  */
 scwin.btn_search_onclick = async function (e) {
     try {
-        await scwin.fn_search(1);
+        await scwin.search(1);
     } catch (_ex) {
         await $c.exception.handleError(_ex, { context: 'jldinf20000p.btn_search_onclick' });
     }
@@ -435,8 +454,6 @@ scwin.btn_window_onfocus = function (e) {
     }
 };
 
-///////// 4. 서브미션 콜백 영역 /////////
-
 /**
  * @method
  * @name tx_onPopupCode
@@ -471,6 +488,24 @@ scwin.tx_onPopupCode = async function () {
 };
 
 /**
+ * @event
+ * @name krxpage_pagenavigator_127_onclick
+ * @description 페이지 내비게이터 클릭 — 선택한 페이지 인덱스로 목록을 조회한다.
+ * @param {Number} index 선택한 페이지 번호
+ * @returns {void}
+ * @hidden N
+ * @example (krxpage_pagenavigator_127 ev:onclick 바인딩으로 자동 호출)
+ */
+scwin.krxpage_pagenavigator_127_onclick = function (index) {
+    try {
+        scwin.search(index);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "jldinf20000p.krxpage_pagenavigator_127_onclick" });
+    }
+};
+
+///////// 4. 서브미션 콜백 영역 /////////
+/**
  * @method
  * @name tx_fn_search
  * @description 표준코드 채권 목록 조회를 서버에 요청한다(dma_searchReq → dlt_result). 응답 실패 시 서버 메시지를 알린다.
@@ -504,20 +539,19 @@ scwin.tx_fn_search = async function () {
 };
 
 ///////// 5. 일반/업무 함수 영역 /////////
-
 // 표준 API 조합으로 새로 작성한 검사 함수
 /**
  * @method
- * @name fn_appDate2
+ * @name appDate2
  * @description 종료일을 서버 오늘 날짜로, 시작일을 그로부터 months 개월 전으로 계산해 시작·종료 달력(cal_ 또는 ipt_ 접두 컴포넌트)에 설정한다.
  * @param {String} startId 시작일 컴포넌트 id 접미(name)
  * @param {String} endId 종료일 컴포넌트 id 접미(name)
  * @param {Number} months 소급할 개월 수
  * @returns {void}
  * @hidden N
- * @example scwin.fn_appDate2('stdCdGrntStartDd', 'stdCdGrntEndDd', 3);
+ * @example scwin.appDate2('stdCdGrntStartDd', 'stdCdGrntEndDd', 3);
  */
-scwin.fn_appDate2 = function (startId, endId, months) {
+scwin.appDate2 = function (startId, endId, months) {
     try {
         const endDate = $c.date.getServerDateTime();
         const startDate = $c.date.addMonth(endDate, -Number(months || 0));
@@ -529,7 +563,7 @@ scwin.fn_appDate2 = function (startId, endId, months) {
         const endComp = resolveComp(String(endId));
         if (endComp && endComp.setValue) { endComp.setValue(endDate); }
     } catch (_e) {
-        $c.exception.handleError(_e, { notify: 'none', context: 'fn_appDate2' });
+        $c.exception.handleError(_e, { notify: 'none', context: 'appDate2' });
     }
 };
 
@@ -542,8 +576,8 @@ scwin.fn_appDate2 = function (startId, endId, months) {
  * @example scwin.dateSetting();
  */
 scwin.dateSetting = function () {
-    const curDateRaw = $c.data.readValue("dma_pageContext", "curDate", { ctx: true, soft: true, label: "curDate" });
-    const curDateStr = String(curDateRaw == null ? '' : curDateRaw);
+    const curDateRaw = dma_pageContext.get("curDate");
+    const curDateStr = String(curDateRaw === null ? '' : curDateRaw);
     const curDate = curDateStr.indexOf('$' + '{') >= 0 ? '' : curDateStr;
     const curYY = curDate.substring(0, 4);
     const curMM = curDate.substring(4, 6);
@@ -674,14 +708,14 @@ scwin.open_corp_cd = function (item_id, item_nm) {
 
 /**
  * @method
- * @name fn_search
+ * @name search
  * @description 검색 라디오·상장 구분 체크 목록(list_cd3)을 수집해 dma_hiddenStore.ipt_listCd 에 저장하고, 폼 action 설정·로딩 표시 후 목록 조회(tx_fn_search)를 실행한다.
  * @param {Number|String} idx 조회할 페이지 인덱스(문자열 '1' 이면 pageIndex 를 1로 리셋)
  * @returns {void}
  * @hidden N
- * @example await scwin.fn_search(1);
+ * @example await scwin.search(1);
  */
-scwin.fn_search = async function (idx) {
+scwin.search = async function (idx) {
     // 규칙 19 — 원본 라디오 그룹(input[name=ipt_searchRadio])은 전환 시 hidden 컴포넌트(ipt_searchRadio)로
     // 대체되어 선택값을 컴포넌트 API 로 읽는다.
     const srIdx = $c.util.getComponent('ipt_searchRadio').getValue();
@@ -710,19 +744,6 @@ scwin.fn_search = async function (idx) {
     frm.target = "_self";
     blockLoading();
     await scwin.tx_fn_search();
-};
-
-/**
- * @event
- * @name krxpage_pagenavigator_127_onclick
- * @description 페이지 내비게이터 클릭 — 선택한 페이지 인덱스로 목록을 조회한다.
- * @param {Number} index 선택한 페이지 번호
- * @returns {void}
- * @hidden N
- * @example (krxpage_pagenavigator_127 ev:onclick 바인딩으로 자동 호출)
- */
-scwin.krxpage_pagenavigator_127_onclick = function (index) {
-    scwin.fn_search(index);
 };
 ]]></script>
 </head>

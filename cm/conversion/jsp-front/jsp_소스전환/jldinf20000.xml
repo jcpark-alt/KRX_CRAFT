@@ -50,6 +50,15 @@
           <w2:key id="stdCdGrntStartDd" name="stdCdGrntStartDd" dataType="text"/>
           <w2:key id="stdcdfind" name="stdcdfind" dataType="text"/>
           <w2:key id="thisServer" name="thisServer" dataType="text"/>
+          <w2:key id="com_nm" name="com_nm" dataType="text"/>
+          <w2:key id="gubunRadio" name="gubunRadio" dataType="text"/>
+          <w2:key id="isur_cd" name="isur_cd" dataType="text"/>
+          <w2:key id="isur_nm" name="isur_nm" dataType="text"/>
+          <w2:key id="result" name="result" dataType="text"/>
+          <w2:key id="searchRadio" name="searchRadio" dataType="text"/>
+          <w2:key id="searchRadio1" name="searchRadio1" dataType="text"/>
+          <w2:key id="std_cd_grnt_end_dd" name="std_cd_grnt_end_dd" dataType="text"/>
+          <w2:key id="std_cd_grnt_start_dd" name="std_cd_grnt_start_dd" dataType="text"/>
         </w2:keyInfo>
         <w2:data use="true"/>
       </w2:dataMap>
@@ -150,12 +159,12 @@
   				select.long{width:500px;}
   ]]></style>
   <script lazy="false" type="text/javascript"><![CDATA[
-scwin.screenId = "jldinf20000";
-
 ///////// 1. 변수 및 선언 영역 /////////
-
-// as-is 메뉴 위치 상태 (bmenu/mmenu)
+scwin.screenId = "jldinf20000";
 scwin.dmenus = undefined;
+scwin._popupWindow = undefined;
+scwin.type = undefined;
+// as-is 메뉴 위치 상태 (bmenu/mmenu)
 try {
     scwin.dmenus = {
         "bmenu": 4,
@@ -166,12 +175,10 @@ try {
 }
 
 // as-is 흐름 보존 — 스켈레톤이 대체한 함수가 쓰던 전역 선언
-scwin._popupWindow = undefined;
-scwin.type = undefined;
-
-///////// 2. 초기화 영역 /////////
 
 // 화면 진입점 — 초기화 단계를 데이터 의존 순서로 호출한다.
+
+///////// 2. 초기화 영역 /////////
 /**
  * @method
  * @name onpageload
@@ -208,7 +215,7 @@ scwin.init_entryDefaults = function () {
     const pcDownloadReq = $c.util.getComponent('dma_DownloadReq');
     if (!pcDownloadReq || typeof pcDownloadReq.get !== 'function') {
         console.warn('[sdd] entry_defaults 대상 부재: dma_DownloadReq');
-    } else if (($c.data.getParameter('gubunRadio') == null || $c.data.getParameter('gubunRadio') === '') && (pcDownloadReq.get('gubunRadio') == null || pcDownloadReq.get('gubunRadio') === '')) {
+    } else if (($c.data.getParameter('gubunRadio') === null || $c.data.getParameter('gubunRadio') === '') && (pcDownloadReq.get('gubunRadio') === null || pcDownloadReq.get('gubunRadio') === '')) {
         pcDownloadReq.set('gubunRadio', "1");
     }
 };
@@ -227,11 +234,11 @@ scwin.init_attrReals = function () {
         childId: "ul_186",
         attr: "__html",
         fn: function () {
-            const total = String($c.data.readValue("dma_page", "total", { silent: true }));
-            const currentPage = String($c.data.readValue("dma_page", "currentPage", { silent: true }));
-            const pageCount = String($c.data.readValue("dma_page", "pageCount", { silent: true }));
+            const total = String(dma_page.get("total"));
+            const currentPage = String(dma_page.get("currentPage"));
+            const pageCount = String(dma_page.get("pageCount"));
             const hasAny = [total, currentPage, pageCount].some(function (v) {
-                return String(v == null ? '' : v).trim() !== '';
+                return String(v === null ? '' : v).trim() !== '';
             });
             if (!hasAny) {
                 return '';
@@ -239,10 +246,21 @@ scwin.init_attrReals = function () {
             return "총 <strong id=\"totPage\">" + total + "</strong>건 <span id=\"totPage1\">(" + currentPage + "/" + pageCount + ")</span>";
         }
     }];
-    $c.util.applyAttrReals(attrReals);
+    attrReals.forEach(function (ar) {
+        const comp = $c.util.getComponent(ar.childId);
+        if (!comp) { return; }
+        const val = ar.fn();
+        if (ar.attr === "__html") {
+            comp.render.innerHTML = val;                     // 그룹 내부 HTML 치환
+        } else if (ar.attr === "label" && typeof comp.setLabel === "function") {
+            comp.setLabel(val);
+        } else {
+            comp.render.setAttribute(ar.attr, val);         // src 등 일반 속성
+        }
+    });
 };
 
-// 런타임 분기 평가 — 공용 $c.util.evalConds (화면은 조건 바인딩 목록만 보유)
+// 런타임 분기 평가 — 바인딩별 컴포넌트 show/hide 평가 (화면은 조건 바인딩 목록만 보유)
 // 조건 평가 — 진입점에서 1회. 데이터 재적재 시 ev:ondataload 가 다시 부른다.
 /**
  * @method
@@ -256,17 +274,20 @@ scwin.init_conds = function () {
     const binds = [{
         id: "c_otherwise_54",
         fn: function () {
-            const thisServer = $c.data.readValue("dma_pageContext", "thisServer", { ctx: true, label: "thisServer" });
+            const thisServer = dma_pageContext.get("thisServer");
             return (!((thisServer === 'dr1') || (thisServer === 'dr2') || (thisServer === 'real1') || (thisServer === 'real2')));
         }
     }, {
         id: "if_result",
         fn: function () {
-            const result = $c.data.readValue("dma_pageContext", "result", { ctx: true, label: "result" });
-            return (!(String(result == null ? '' : result).length === 0));
+            const result = dma_pageContext.get("result");
+            return (!(String(result === null ? '' : result).length === 0));
         }
     }];
-    $c.util.evalConds(binds);
+    binds.forEach(function (bind) {
+        const comp = $c.util.getComponent(bind.id);
+        if (comp) { bind.fn() ? comp.show() : comp.hide(); }
+    });
 };
 
 // dataList 단건 표시 복사 — 진입점에서 1회. 데이터 재적재 시 ev:ondataload 가 다시 부른다.
@@ -279,14 +300,17 @@ scwin.init_conds = function () {
  * @example scwin.init_rowCopy();
  */
 scwin.init_rowCopy = function () {
-    const rowCopies = [{ childId: "ipt_curSh", fn: function () { return String(String($c.data.readValue("dma_pageContext", "curSh", { silent: true }))); } },
-        { childId: "ipt_isurNm1", fn: function () { return String(String($c.data.readValue("dma_pageContext", "isurNm", { silent: true }))); } },
-        { childId: "ipt_stdCdFind", fn: function () { return String(String($c.data.readValue("dma_pageContext", "stdcdfind", { silent: true }))); } },
-        { childId: "ipt_comNm1", fn: function () { return String(String($c.data.readValue("dma_pageContext", "comNm", { silent: true }))); } },
-        { childId: "ipt_isurCd1", fn: function () { return String(String($c.data.readValue("dma_pageContext", "isurCd", { silent: true }))); } },
-        { childId: "cal_stdCdGrntStartDd", fn: function () { return String(String($c.data.readValue("dma_pageContext", "stdCdGrntStartDd", { silent: true }))); } },
-        { childId: "cal_stdCdGrntEndDd", fn: function () { return String(String($c.data.readValue("dma_pageContext", "stdCdGrntEndDd", { silent: true }))); } }];
-    $c.data.copyRows(rowCopies);
+    const rowCopies = [{ childId: "ipt_curSh", fn: function () { return String(String(dma_pageContext.get("curSh"))); } },
+        { childId: "ipt_isurNm1", fn: function () { return String(String(dma_pageContext.get("isurNm"))); } },
+        { childId: "ipt_stdCdFind", fn: function () { return String(String(dma_pageContext.get("stdcdfind"))); } },
+        { childId: "ipt_comNm1", fn: function () { return String(String(dma_pageContext.get("comNm"))); } },
+        { childId: "ipt_isurCd1", fn: function () { return String(String(dma_pageContext.get("isurCd"))); } },
+        { childId: "cal_stdCdGrntStartDd", fn: function () { return String(String(dma_pageContext.get("stdCdGrntStartDd"))); } },
+        { childId: "cal_stdCdGrntEndDd", fn: function () { return String(String(dma_pageContext.get("stdCdGrntEndDd"))); } }];
+    rowCopies.forEach(function (rc) {
+        const comp = $c.util.getComponent(rc.childId);
+        if (comp) { comp.setValue(rc.fn()); }
+    });
 };
 
 /**
@@ -342,11 +366,11 @@ scwin.init_pageBody = function () {
         // 규칙 19: 종목명 Enter 조회 keypress 바인딩 → ipt_isurNm1 ev:onkeydown(scwin.ipt_isurNm1_onkeydown) 이관,
         // 상품선택 라디오 bind("click") → 각 ipt_searchRadioN_onclick 말미의 scwin.searchRadioClickCommon 호출로 이관.
         $c.util.getComponent("ipt_isurNm1").focus();
-        const gubunRadioRaw = $c.data.readValue("dma_pageContext", "gubunRadio", { ctx: true, soft: true, label: "gubunRadio" });
-        const gubunRadioStr = String(gubunRadioRaw == null ? '' : gubunRadioRaw);
+        const gubunRadioRaw = dma_pageContext.get("gubunRadio");
+        const gubunRadioStr = String(gubunRadioRaw === null ? '' : gubunRadioRaw);
         const gubunRadio = (gubunRadioStr.indexOf('$' + '{') >= 0 ? '' : gubunRadioStr);
         if (gubunRadio === '') {
-            scwin.fn_appDate2('stdCdGrntStartDd', 'stdCdGrntEndDd', 12);
+            scwin.appDate2('stdCdGrntStartDd', 'stdCdGrntEndDd', 12);
         }
 
     } catch (_ex) {
@@ -354,22 +378,21 @@ scwin.init_pageBody = function () {
     }
 };
 
-// 화면 전환 파라미터 수신 — 공용 $c.data.recvParamData (§106, 이름 고정 "paramData"; 실패 표출은 gcc 함수 몫). onpageload 합성 단계.
+// 화면 전환 파라미터 수신 — $c.data.getParameter → dma_pageContext.setJSON (§106, 이름 고정 "paramData"; 실패 표출은 gcc 함수 몫). onpageload 합성 단계.
 /**
  * @method
  * @name init_recvParam
- * @description 화면 전환 파라미터를 dma_pageContext 로 수신한다(공용 $c.data.recvParamData, 이름 고정 "paramData").
+ * @description 화면 전환 파라미터를 dma_pageContext 로 수신한다($c.data.getParameter → dma_pageContext.setJSON, 키 "paramData" 고정).
  * @returns {void}
  * @hidden N
  * @example scwin.init_recvParam();
  */
 scwin.init_recvParam = function () {
-    $c.data.recvParamData('dma_pageContext');
+    // 화면 전환 파라미터(paramData) 수신 → dma_pageContext ($c.data.getParameter 는 키 "paramData" 고정)
+    dma_pageContext.setJSON($c.data.getParameter() || {});
 };
 
-
 ///////// 3. 컴포넌트 이벤트 영역 /////////
-
 /**
  * @event
  * @name JLDINF20000_onsubmit
@@ -473,7 +496,7 @@ scwin.ipt_isurNm1_onkeyup = function(e) {
 /**
  * @event
  * @name ipt_isurNm1_onkeydown
- * @description 한글종목명/표준코드 입력 keydown — Enter(13) 입력 시 1페이지부터 표준코드 목록을 재조회한다(fn_search('1')). (규칙 19: as-is jQuery keypress 바인딩 이관)
+ * @description 한글종목명/표준코드 입력 keydown — Enter(13) 입력 시 1페이지부터 표준코드 목록을 재조회한다(search('1')). (규칙 19: as-is jQuery keypress 바인딩 이관)
  * @param {Object} e 이벤트 객체
  * @returns {void}
  * @hidden N
@@ -482,7 +505,7 @@ scwin.ipt_isurNm1_onkeyup = function(e) {
 scwin.ipt_isurNm1_onkeydown = async function(e) {
     try {
         if (e && e.keyCode === 13) {
-            await scwin.fn_search('1');
+            await scwin.search('1');
         }
     } catch (_ex) {
         $c.exception.handleError(_ex, { context: 'jldinf20000.ipt_isurNm1_onkeydown' });
@@ -890,7 +913,7 @@ scwin.ipt_searchRadio17_onclick = function(e) {
 /**
  * @event
  * @name ipt_searchDateRadio1_onclick
- * @description 일자구분 [발행일] 라디오 클릭 — 다운로드 버튼을 숨긴다(fn_viewDownloadBtn('N')).
+ * @description 일자구분 [발행일] 라디오 클릭 — 다운로드 버튼을 숨긴다(viewDownloadBtn('N')).
  * @param {Object} e 이벤트 객체
  * @returns {void}
  * @hidden N
@@ -901,7 +924,7 @@ scwin.ipt_searchDateRadio1_onclick = function(e) {
         const ev = e;
         const event = ev;
         const self = (ev && (ev.element || ev.target || ev.srcElement)) || this;
-        scwin.fn_viewDownloadBtn('N');
+        scwin.viewDownloadBtn('N');
     } catch (_ex) {
         $c.exception.handleError(_ex, { context: 'jldinf20000.ipt_searchDateRadio1_onclick' });
     }
@@ -910,7 +933,7 @@ scwin.ipt_searchDateRadio1_onclick = function(e) {
 /**
  * @event
  * @name ipt_searchDateRadio2_onclick
- * @description 일자구분 [만기일] 라디오 클릭 — 다운로드 버튼을 숨긴다(fn_viewDownloadBtn('N')).
+ * @description 일자구분 [만기일] 라디오 클릭 — 다운로드 버튼을 숨긴다(viewDownloadBtn('N')).
  * @param {Object} e 이벤트 객체
  * @returns {void}
  * @hidden N
@@ -921,7 +944,7 @@ scwin.ipt_searchDateRadio2_onclick = function(e) {
         const ev = e;
         const event = ev;
         const self = (ev && (ev.element || ev.target || ev.srcElement)) || this;
-        scwin.fn_viewDownloadBtn('N');
+        scwin.viewDownloadBtn('N');
     } catch (_ex) {
         $c.exception.handleError(_ex, { context: 'jldinf20000.ipt_searchDateRadio2_onclick' });
     }
@@ -930,7 +953,7 @@ scwin.ipt_searchDateRadio2_onclick = function(e) {
 /**
  * @event
  * @name ipt_searchDateRadio3_onclick
- * @description 일자구분 [상장일] 라디오 클릭 — 다운로드 버튼을 숨긴다(fn_viewDownloadBtn('N')).
+ * @description 일자구분 [상장일] 라디오 클릭 — 다운로드 버튼을 숨긴다(viewDownloadBtn('N')).
  * @param {Object} e 이벤트 객체
  * @returns {void}
  * @hidden N
@@ -941,7 +964,7 @@ scwin.ipt_searchDateRadio3_onclick = function(e) {
         const ev = e;
         const event = ev;
         const self = (ev && (ev.element || ev.target || ev.srcElement)) || this;
-        scwin.fn_viewDownloadBtn('N');
+        scwin.viewDownloadBtn('N');
     } catch (_ex) {
         $c.exception.handleError(_ex, { context: 'jldinf20000.ipt_searchDateRadio3_onclick' });
     }
@@ -950,7 +973,7 @@ scwin.ipt_searchDateRadio3_onclick = function(e) {
 /**
  * @event
  * @name ipt_searchDateRadio4_onclick
- * @description 일자구분 [코드부여일] 라디오 클릭 — 다운로드 버튼을 숨긴다(fn_viewDownloadBtn('N')).
+ * @description 일자구분 [코드부여일] 라디오 클릭 — 다운로드 버튼을 숨긴다(viewDownloadBtn('N')).
  * @param {Object} e 이벤트 객체
  * @returns {void}
  * @hidden N
@@ -961,7 +984,7 @@ scwin.ipt_searchDateRadio4_onclick = function(e) {
         const ev = e;
         const event = ev;
         const self = (ev && (ev.element || ev.target || ev.srcElement)) || this;
-        scwin.fn_viewDownloadBtn('N');
+        scwin.viewDownloadBtn('N');
     } catch (_ex) {
         $c.exception.handleError(_ex, { context: 'jldinf20000.ipt_searchDateRadio4_onclick' });
     }
@@ -970,7 +993,7 @@ scwin.ipt_searchDateRadio4_onclick = function(e) {
 /**
  * @event
  * @name btn_appDate2_onclick
- * @description [3개월] 버튼 클릭 — 코드부여일 조회 기간을 최근 3개월(종료일=서버 오늘)로 설정한다(fn_appDate2).
+ * @description [3개월] 버튼 클릭 — 코드부여일 조회 기간을 최근 3개월(종료일=서버 오늘)로 설정한다(appDate2).
  * @param {Object} e 이벤트 객체
  * @returns {void}
  * @hidden N
@@ -981,7 +1004,7 @@ scwin.btn_appDate2_onclick = function(e) {
         const ev = e;
         const event = ev;
         const self = (ev && (ev.element || ev.target || ev.srcElement)) || this;
-        scwin.fn_appDate2('stdCdGrntStartDd','stdCdGrntEndDd',3);
+        scwin.appDate2('stdCdGrntStartDd','stdCdGrntEndDd',3);
     } catch (_ex) {
         $c.exception.handleError(_ex, { context: 'jldinf20000.btn_appDate2_onclick' });
     }
@@ -990,7 +1013,7 @@ scwin.btn_appDate2_onclick = function(e) {
 /**
  * @event
  * @name btn_appDate2_2_onclick
- * @description [6개월] 버튼 클릭 — 코드부여일 조회 기간을 최근 6개월(종료일=서버 오늘)로 설정한다(fn_appDate2).
+ * @description [6개월] 버튼 클릭 — 코드부여일 조회 기간을 최근 6개월(종료일=서버 오늘)로 설정한다(appDate2).
  * @param {Object} e 이벤트 객체
  * @returns {void}
  * @hidden N
@@ -1001,7 +1024,7 @@ scwin.btn_appDate2_2_onclick = function(e) {
         const ev = e;
         const event = ev;
         const self = (ev && (ev.element || ev.target || ev.srcElement)) || this;
-        scwin.fn_appDate2('stdCdGrntStartDd','stdCdGrntEndDd',6);
+        scwin.appDate2('stdCdGrntStartDd','stdCdGrntEndDd',6);
     } catch (_ex) {
         $c.exception.handleError(_ex, { context: 'jldinf20000.btn_appDate2_2_onclick' });
     }
@@ -1010,7 +1033,7 @@ scwin.btn_appDate2_2_onclick = function(e) {
 /**
  * @event
  * @name btn_appDate2_3_onclick
- * @description [1년] 버튼 클릭 — 코드부여일 조회 기간을 최근 1년(종료일=서버 오늘)로 설정한다(fn_appDate2).
+ * @description [1년] 버튼 클릭 — 코드부여일 조회 기간을 최근 1년(종료일=서버 오늘)로 설정한다(appDate2).
  * @param {Object} e 이벤트 객체
  * @returns {void}
  * @hidden N
@@ -1021,7 +1044,7 @@ scwin.btn_appDate2_3_onclick = function(e) {
         const ev = e;
         const event = ev;
         const self = (ev && (ev.element || ev.target || ev.srcElement)) || this;
-        scwin.fn_appDate2('stdCdGrntStartDd','stdCdGrntEndDd',12);
+        scwin.appDate2('stdCdGrntStartDd','stdCdGrntEndDd',12);
     } catch (_ex) {
         $c.exception.handleError(_ex, { context: 'jldinf20000.btn_appDate2_3_onclick' });
     }
@@ -1030,7 +1053,7 @@ scwin.btn_appDate2_3_onclick = function(e) {
 /**
  * @event
  * @name btn_appDate2_4_onclick
- * @description [3년] 버튼 클릭 — 코드부여일 조회 기간을 최근 3년(종료일=서버 오늘)로 설정한다(fn_appDate2).
+ * @description [3년] 버튼 클릭 — 코드부여일 조회 기간을 최근 3년(종료일=서버 오늘)로 설정한다(appDate2).
  * @param {Object} e 이벤트 객체
  * @returns {void}
  * @hidden N
@@ -1041,7 +1064,7 @@ scwin.btn_appDate2_4_onclick = function(e) {
         const ev = e;
         const event = ev;
         const self = (ev && (ev.element || ev.target || ev.srcElement)) || this;
-        scwin.fn_appDate2('stdCdGrntStartDd','stdCdGrntEndDd',36);
+        scwin.appDate2('stdCdGrntStartDd','stdCdGrntEndDd',36);
     } catch (_ex) {
         $c.exception.handleError(_ex, { context: 'jldinf20000.btn_appDate2_4_onclick' });
     }
@@ -1050,7 +1073,7 @@ scwin.btn_appDate2_4_onclick = function(e) {
 /**
  * @event
  * @name btn_Download_onclick
- * @description [다운로드] 버튼 클릭 — 표준코드 목록 엑셀 다운로드를 실행한다(fn_Download).
+ * @description [다운로드] 버튼 클릭 — 표준코드 목록 엑셀 다운로드를 실행한다(download).
  * @param {Object} e 이벤트 객체
  * @returns {void}
  * @hidden N
@@ -1061,7 +1084,7 @@ scwin.btn_Download_onclick = async function(e) {
         const ev = e;
         const event = ev;
         const self = (ev && (ev.element || ev.target || ev.srcElement)) || this;
-        await scwin.fn_Download();
+        await scwin.download();
     } catch (_ex) {
         await $c.exception.handleError(_ex, { context: 'jldinf20000.btn_Download_onclick' });
     }
@@ -1070,7 +1093,7 @@ scwin.btn_Download_onclick = async function(e) {
 /**
  * @event
  * @name btn_search_onclick
- * @description [조회] 버튼 클릭 — 표준코드 목록을 1페이지부터 조회한다(fn_search(1)).
+ * @description [조회] 버튼 클릭 — 표준코드 목록을 1페이지부터 조회한다(search(1)).
  * @param {Object} e 이벤트 객체
  * @returns {void}
  * @hidden N
@@ -1081,7 +1104,7 @@ scwin.btn_search_onclick = async function(e) {
         const ev = e;
         const event = ev;
         const self = (ev && (ev.element || ev.target || ev.srcElement)) || this;
-        await scwin.fn_search(1);
+        await scwin.search(1);
     } catch (_ex) {
         await $c.exception.handleError(_ex, { context: 'jldinf20000.btn_search_onclick' });
     }
@@ -1111,28 +1134,6 @@ scwin.dataTb_oncellclick = async function (rowIndex, columnIndex, columnId) {
         }
     } catch (e) {
         await $c.exception.handleError(e, { notify: 'none', context: 'dataTb.oncellclick' });
-    }
-};
-
-
-///////// 4. 서브미션 콜백 영역 /////////
-
-/**
- * @method
- * @name tx_fn_Download
- * @description dma_DownloadReq 전문으로 표준코드 목록 파일 다운로드(srchDownElsdlsList)를 요청한다. 실패 시 null 을 반환한다.
- * @returns {Object} $c.data.downFile 결과 (실패 시 null)
- * @hidden N
- * @example const res = await scwin.tx_fn_Download();
- */
-scwin.tx_fn_Download = async function () {
-    try {
-        const downloadReq = $c.util.getComponent("dma_DownloadReq");
-        const reqJSON = (downloadReq ? downloadReq.getJSON() : {});
-        return await $c.data.downFile("/srch/srch.do?method=srchDownElsdlsList", "", reqJSON);
-    } catch (_e) {
-        await $c.exception.handleError(_e, { notify: 'none', context: '다운로드' });
-        return null;
     }
 };
 
@@ -1170,6 +1171,24 @@ scwin.tx_onPopupCode = async function () {
 };
 
 /**
+ * @event
+ * @name krxpage_pagenavigator_263_onclick
+ * @description 페이지 내비게이터 클릭 — 선택한 페이지 번호로 표준코드 목록을 재조회한다(search).
+ * @param {Number} index 이동할 페이지 번호
+ * @returns {void}
+ * @hidden N
+ * @example (body ev:onclick 바인딩으로 자동 호출)
+ */
+scwin.krxpage_pagenavigator_263_onclick = function (index) {
+    try {
+        scwin.search(index);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "jldinf20000.krxpage_pagenavigator_263_onclick" });
+    }
+};
+
+///////// 4. 서브미션 콜백 영역 /////////
+/**
  * @method
  * @name tx_fn_search
  * @description dma_searchReq 전문으로 표준코드 목록(srchList)을 조회해 dlt_result 에 적재한다. 응답 실패 시 메시지를 알린다.
@@ -1202,22 +1221,39 @@ scwin.tx_fn_search = async function () {
     return res;
 };
 
-
 ///////// 5. 일반/업무 함수 영역 /////////
+/**
+ * @method
+ * @name tx_fn_Download
+ * @description dma_DownloadReq 전문으로 표준코드 목록 파일 다운로드(srchDownElsdlsList)를 요청한다. 실패 시 null 을 반환한다.
+ * @returns {Object} $c.data.downFile 결과 (실패 시 null)
+ * @hidden N
+ * @example const res = await scwin.tx_fn_Download();
+ */
+scwin.tx_fn_Download = async function () {
+    try {
+        const downloadReq = $c.util.getComponent("dma_DownloadReq");
+        const reqJSON = (downloadReq ? downloadReq.getJSON() : {});
+        return await $c.data.downFile("/srch/srch.do?method=srchDownElsdlsList", "", reqJSON);
+    } catch (_e) {
+        await $c.exception.handleError(_e, { notify: 'none', context: '다운로드' });
+        return null;
+    }
+};
 
 // 표준 API 조합으로 새로 작성한 검사 함수
 /**
  * @method
- * @name fn_appDate2
+ * @name appDate2
  * @description 종료일을 서버 오늘로, 시작일을 오늘부터 months 개월 전으로 계산해 시작/종료 달력 컴포넌트에 설정한다(cal_/ipt_/원본 id 순으로 탐색).
  * @param {String} startId 시작일 컴포넌트 id 접미(예: 'stdCdGrntStartDd')
  * @param {String} endId 종료일 컴포넌트 id 접미(예: 'stdCdGrntEndDd')
  * @param {Number} months 소급 개월 수(3/6/12/36)
  * @returns {void}
  * @hidden N
- * @example scwin.fn_appDate2('stdCdGrntStartDd', 'stdCdGrntEndDd', 12);
+ * @example scwin.appDate2('stdCdGrntStartDd', 'stdCdGrntEndDd', 12);
  */
-scwin.fn_appDate2 = function (startId, endId, months) {
+scwin.appDate2 = function (startId, endId, months) {
     try {
         const endDate = $c.date.getServerDateTime();
         const startDate = $c.date.addMonth(endDate, -Number(months || 0));
@@ -1233,7 +1269,7 @@ scwin.fn_appDate2 = function (startId, endId, months) {
             endComp.setValue(endDate);
         }
     } catch (_e) {
-        $c.exception.handleError(_e, { notify: 'none', context: 'fn_appDate2' });
+        $c.exception.handleError(_e, { notify: 'none', context: 'appDate2' });
     }
 };
 
@@ -1246,8 +1282,8 @@ scwin.fn_appDate2 = function (startId, endId, months) {
  * @example scwin.dateSetting();
  */
 scwin.dateSetting = function () {
-    const curDateRaw = $c.data.readValue("dma_pageContext", "curDate", { ctx: true, soft: true, label: "curDate" });
-    const curDateStr = String(curDateRaw == null ? '' : curDateRaw);
+    const curDateRaw = dma_pageContext.get("curDate");
+    const curDateStr = String(curDateRaw === null ? '' : curDateRaw);
     const curDate = (curDateStr.indexOf('$' + '{') >= 0 ? '' : curDateStr);
     const curYY = curDate.substring(0, 4);
     const curMM = curDate.substring(4, 6);
@@ -1311,7 +1347,6 @@ scwin.dateSetting = function () {
     (hiddenStore && hiddenStore.set ? hiddenStore.set('ipt_hdSixDate', bfSixDate) : console.warn('[sdd] hiddenStore 부재: ipt_hdSixDate'));
 };
 
-
 /**
  * @method
  * @name setSearchRadioChecked
@@ -1329,7 +1364,6 @@ scwin.setSearchRadioChecked = function (value) {
         console.warn('[sdd] searchRadio 라디오 부재: ipt_searchRadio' + value);
     }
 };
-
 
 /**
  * @method
@@ -1352,7 +1386,6 @@ scwin.searchRadioClickCommon = function (value) {
         "<td style='padding-left:5px'><img src='/img/btn/btn-nnext.gif' alt='' ></a></td></tr>";
     $('.paging').append(resetPaging);
 };
-
 
 /**
  * @method
@@ -1399,20 +1432,19 @@ scwin.cgSearch = function (idx, check) {
             }
         }
     }
-    scwin.fn_viewDownloadBtn("N");
+    scwin.viewDownloadBtn("N");
 };
-
 
 /**
  * @method
- * @name fn_viewDownloadBtn
+ * @name viewDownloadBtn
  * @description 다운로드 버튼 영역(downExcel)을 표시("Y")하거나 숨긴다("N").
  * @param {String} div 표시 여부 구분("Y"=표시, "N"=숨김)
  * @returns {void}
  * @hidden N
- * @example scwin.fn_viewDownloadBtn('N');
+ * @example scwin.viewDownloadBtn('N');
  */
-scwin.fn_viewDownloadBtn = function (div) {
+scwin.viewDownloadBtn = function (div) {
     const downExcel = $c.util.getComponent("downExcel");
     if (div === "Y") {
         (downExcel && downExcel.show ? downExcel.show() : console.warn('[sdd] show 대상 미해결: ' + "downExcel"));
@@ -1423,26 +1455,25 @@ scwin.fn_viewDownloadBtn = function (div) {
     }
 };
 
-
 /**
  * @method
- * @name fn_Download
+ * @name download
  * @description 엑셀 다운로드 실행 — 현재는 "조회 내용이 없습니다." 안내 후 즉시 종료한다(이하 as-is 로직 보존: 코드부여일 기간 1년 이내 검증, 조회 조건 hiddenStore 보관, 상품별 다운로드 action 분기 후 tx_fn_Download 호출 — 도달 불가).
  * @returns {void}
  * @hidden N
- * @example await scwin.fn_Download();
+ * @example await scwin.download();
  */
-scwin.fn_Download = async function () {
+scwin.download = async function () {
     await $c.win.alert("조회 내용이 없습니다.");
     return;
     const startVal = $c.util.getComponent('cal_stdCdGrntStartDd').getValue();
-    if ((startVal == null ? '' : String(startVal)) === '') {
+    if ((startVal === null ? '' : String(startVal)) === '') {
         await $c.win.alert('다운로드는 일자를 1년 이내로 설정하여야\n\r사용이 가능합니다.');
         std_cd_grnt_start_dd.focus();
         return;
     } else {
         const endVal = $c.util.getComponent('cal_stdCdGrntEndDd').getValue();
-        if ((endVal == null ? '' : String(endVal)) === '') {
+        if ((endVal === null ? '' : String(endVal)) === '') {
             await $c.win.alert('다운로드는 일자를 1년 이내로 설정하여야\n\r사용이 가능합니다.');
             std_cd_grnt_end_dd.focus();
             return;
@@ -1483,7 +1514,6 @@ scwin.fn_Download = async function () {
     await scwin.tx_fn_Download();
 };
 
-
 /**
  * @method
  * @name searchData
@@ -1494,27 +1524,27 @@ scwin.fn_Download = async function () {
  * @example scwin.searchData(1);
  */
 scwin.searchData = function (idx) {
-    const startDdRaw = $c.data.readValue("dma_pageContext", "std_cd_grnt_start_dd", { ctx: true, soft: true, label: "std_cd_grnt_start_dd" });
-    const startDdStr = String(startDdRaw == null ? '' : startDdRaw);
+    const startDdRaw = dma_pageContext.get("std_cd_grnt_start_dd");
+    const startDdStr = String(startDdRaw === null ? '' : startDdRaw);
     let std_cd_grnt_start_dd = (startDdStr.indexOf('$' + '{') >= 0 ? '' : startDdStr);
-    const endDdRaw = $c.data.readValue("dma_pageContext", "std_cd_grnt_end_dd", { ctx: true, soft: true, label: "std_cd_grnt_end_dd" });
-    const endDdStr = String(endDdRaw == null ? '' : endDdRaw);
+    const endDdRaw = dma_pageContext.get("std_cd_grnt_end_dd");
+    const endDdStr = String(endDdRaw === null ? '' : endDdRaw);
     let std_cd_grnt_end_dd = (endDdStr.indexOf('$' + '{') >= 0 ? '' : endDdStr);
-    const searchRadio2Raw = $c.data.readValue("dma_pageContext", "searchRadio", { ctx: true, soft: true, label: "searchRadio" });
-    const searchRadio2Str = String(searchRadio2Raw == null ? '' : searchRadio2Raw);
+    const searchRadio2Raw = dma_pageContext.get("searchRadio");
+    const searchRadio2Str = String(searchRadio2Raw === null ? '' : searchRadio2Raw);
     const searchRadio2 = (searchRadio2Str.indexOf('$' + '{') >= 0 ? '' : searchRadio2Str);
-    const searchRadio1Raw = $c.data.readValue("dma_pageContext", "searchRadio1", { ctx: true, soft: true, label: "searchRadio1" });
-    const searchRadio1Str = String(searchRadio1Raw == null ? '' : searchRadio1Raw);
+    const searchRadio1Raw = dma_pageContext.get("searchRadio1");
+    const searchRadio1Str = String(searchRadio1Raw === null ? '' : searchRadio1Raw);
     const searchRadio1 = (searchRadio1Str.indexOf('$' + '{') >= 0 ? '' : searchRadio1Str);
     const searchRadio = $c.util.getComponent('ipt_curSh').getValue();
-    const isurCdRaw = $c.data.readValue("dma_pageContext", "isur_cd", { ctx: true, soft: true, label: "isur_cd" });
-    const isurCdStr = String(isurCdRaw == null ? '' : isurCdRaw);
+    const isurCdRaw = dma_pageContext.get("isur_cd");
+    const isurCdStr = String(isurCdRaw === null ? '' : isurCdRaw);
     const isur_cd = (isurCdStr.indexOf('$' + '{') >= 0 ? '' : isurCdStr);
-    const isurNmRaw = $c.data.readValue("dma_pageContext", "isur_nm", { ctx: true, soft: true, label: "isur_nm" });
-    const isurNmStr = String(isurNmRaw == null ? '' : isurNmRaw);
+    const isurNmRaw = dma_pageContext.get("isur_nm");
+    const isurNmStr = String(isurNmRaw === null ? '' : isurNmRaw);
     const isur_nm = (isurNmStr.indexOf('$' + '{') >= 0 ? '' : isurNmStr);
-    const comNmRaw = $c.data.readValue("dma_pageContext", "com_nm", { ctx: true, soft: true, label: "com_nm" });
-    const comNmStr = String(comNmRaw == null ? '' : comNmRaw);
+    const comNmRaw = dma_pageContext.get("com_nm");
+    const comNmStr = String(comNmRaw === null ? '' : comNmRaw);
     const com_nm = (comNmStr.indexOf('$' + '{') >= 0 ? '' : comNmStr);
     if (std_cd_grnt_start_dd === '11111111') {
         std_cd_grnt_start_dd = '';
@@ -1531,19 +1561,19 @@ scwin.searchData = function (idx) {
         const n = parseInt(toDate.substr(4, 2), 10) - 1;
         const st = new Date(toDate.substr(0, 4), n, toDate.substr(6, 2));
         const apDate = new Date(st - 30 * 1000 * 60 * 60 * 24);
-        const startDate = apDate.getFullYear() + "" + fnLeg(apDate.getMonth() + 1) + "" + fnLeg(apDate.getDate());
+        const startDate = apDate.getFullYear() + "" + $c.str.lpad(apDate.getMonth() + 1) + "" + $c.str.lpad(apDate.getDate());
         std_cd_grnt_start_dd = startDate;
         std_cd_grnt_end_dd = toDate;
         $c.util.getComponent('cal_stdCdGrntStartDd').setValue(std_cd_grnt_start_dd);
         $c.util.getComponent('cal_stdCdGrntEndDd').setValue(std_cd_grnt_end_dd);
     }
     // 규칙 19: $('#id').length 존재 확인 → $c.util.getComponent(id) null/undefined 판별
-    const hasIsurCd1 = $c.util.getComponent('ipt_isurCd1') != null;
+    const hasIsurCd1 = $c.util.getComponent('ipt_isurCd1') !== null;
     if (hasIsurCd1) {
         $c.util.getComponent('ipt_isurCd1').setValue(isur_cd);
         $c.util.getComponent('ipt_comNm1').setValue(com_nm);
     }
-    const hasIsurNm1 = $c.util.getComponent('ipt_isurNm1') != null;
+    const hasIsurNm1 = $c.util.getComponent('ipt_isurNm1') !== null;
     if (hasIsurNm1) {
         $c.util.getComponent('ipt_isurNm1').setValue(isur_nm);
     }
@@ -1551,7 +1581,6 @@ scwin.searchData = function (idx) {
     $c.util.getComponent('cal_stdCdGrntEndDd').setValue(std_cd_grnt_end_dd);
     scwin.setSearchRadioChecked(searchRadio);
 };
-
 
 /**
  * @method
@@ -1678,7 +1707,6 @@ scwin.onPopupCode = async function (type, ipt_stdCd) {
     // to-be 는 위 $c.win.openPopup(파라미터 전달) + 팝업 화면 자체 조회로 대체돼 잔존 action 대입(무효 기계부)을 제거.
 };
 
-
 /**
  * @method
  * @name open_corp_cd
@@ -1694,21 +1722,20 @@ scwin.open_corp_cd = function (item_id, item_nm) {
     fn_popupCorpSearch2(formName, item_id, item_nm);
 };
 
-
 /**
  * @method
- * @name fn_search
+ * @name search
  * @description 검색구분별 필수 조건(개별종목: 종목명 2byte 초과, 발행기관별: 발행기관 선택)을 검증하고 조건을 dma_hiddenStore 에 보관한 뒤 표준코드 목록을 조회한다(tx_fn_search). 일자구분이 코드부여일("4")이면 다운로드 버튼을 표시한다.
  * @param {String|Number} idx 페이지 구분('1' 이면 1페이지부터 조회)
  * @returns {void}
  * @hidden N
- * @example await scwin.fn_search(1);
+ * @example await scwin.search(1);
  */
-scwin.fn_search = async function (idx) {
+scwin.search = async function (idx) {
     const gubun = $c.util.getComponent("dma_DownloadReq").get("gubunRadio");
     const hiddenStore = $c.util.getComponent('dma_hiddenStore');
     if (gubun === '1') {
-        if (($c.util.getComponent('ipt_isurNm1').getValue() == null ? '' : String($c.util.getComponent('ipt_isurNm1').getValue())) === '') {
+        if (($c.util.getComponent('ipt_isurNm1').getValue() === null ? '' : String($c.util.getComponent('ipt_isurNm1').getValue())) === '') {
             await $c.win.alert("한글종목명 및 표준코드을 입력하세요.");
             $c.util.getComponent("ipt_isurNm1").focus();
             return;
@@ -1722,7 +1749,7 @@ scwin.fn_search = async function (idx) {
         (hiddenStore && hiddenStore.set ? hiddenStore.set('ipt_isurNm', ($c.util.getComponent("ipt_isurNm1").getValue() || '')) : console.warn('[sdd] hiddenStore 부재: ipt_isurNm'));
     } else {
         if (gubun === '2') {
-            if (($c.util.getComponent('ipt_comNm1').getValue() == null ? '' : String($c.util.getComponent('ipt_comNm1').getValue())) === '') {
+            if (($c.util.getComponent('ipt_comNm1').getValue() === null ? '' : String($c.util.getComponent('ipt_comNm1').getValue())) === '') {
                 await $c.win.alert("발행기관을 선택하세요.");
                 return;
             }
@@ -1747,25 +1774,10 @@ scwin.fn_search = async function (idx) {
     await scwin.tx_fn_search();
     const dateGubun = $c.util.getComponent("dma_DownloadReq").get("searchDateRadio");
     if (dateGubun === "4") {
-        scwin.fn_viewDownloadBtn("Y");
+        scwin.viewDownloadBtn("Y");
     } else {
-        scwin.fn_viewDownloadBtn("N");
+        scwin.viewDownloadBtn("N");
     }
-};
-
-
-
-/**
- * @event
- * @name krxpage_pagenavigator_263_onclick
- * @description 페이지 내비게이터 클릭 — 선택한 페이지 번호로 표준코드 목록을 재조회한다(fn_search).
- * @param {Number} index 이동할 페이지 번호
- * @returns {void}
- * @hidden N
- * @example (body ev:onclick 바인딩으로 자동 호출)
- */
-scwin.krxpage_pagenavigator_263_onclick = function (index) {
-    scwin.fn_search(index);
 };
 ]]></script>
 </head>

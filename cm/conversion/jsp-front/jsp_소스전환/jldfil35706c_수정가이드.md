@@ -55,3 +55,30 @@
 - **전환 1건**(fn_searchList — 유일한 실제 `.submit()`), **기계부 제거 4건**, **보류 0건**(multipart 파일 전송 폼 없음).
 - JSDoc 갱신: fn_searchList(openFormSubmit 제출 명시)·fn_goTab1·fn_goTab2(재설계 경위 명시).
 - **검증**: script CDATA 추출 → `node --check` 통과, `document.폼`·`.submit()` 잔존 0건(보류 0건과 일치, 주석 제외), `wsxml_lint --min-severity error` 0 errors(publicInfo 변경 없음).
+
+## conversion 규칙 재적용 (2026-09-21)
+
+> `convert.py` 단계1을 제자리 실행하고 후처리로 보정(init 2구역 복원·5b DOM 수신 원복·개명 충돌 조정·JSDoc 동기화). 경위·공통 게이트: [krx_소스전환_미적용분석.md §5 이력 6](krx_소스전환_미적용분석.md). diff +84/−101.
+
+| 항목 | 건수 | 내용 |
+|------|------|------|
+| 규칙 13 `fn_*` 개명 | 8건 | `fn_searchList`→`searchList`, `fn_printReceipt`→`printReceipt`, `fn_goPrint`→`goPrint`, `fn_setDate`→`setDate`, `fn_setMonth`→`setMonth`, `fn_setFullYear`→`setFullYear`, `fn_goTab1`→`goTab1`, `fn_goTab2`→`goTab2`. 정의·호출·body `ev:`·publicInfo 동기화(도구), JSDoc `@name`/`@example` 옛 이름 22건 후처리 동기화. 교차 화면 호출 없음 |
+| 규칙 2 전역 선언 이동 | 4건 | 최상위 `scwin.X = …` 선언을 1구역으로 |
+| 규칙 4 구역 재배치 | 2건 이동 | `init_*` 4건은 도구가 5구역으로 옮긴 것을 code-convention 대로 2구역(`onpageload` 아래)에 복원; 구역 이동: `tx_fn_goPrint`(4구역→5구역), `krxpage_pagenavigator_87_onclick`(5구역→3구역) ; `initPageIndex`(camelCase init 헬퍼)도 도구가 5구역으로 옮긴 것을 2구역에 복원 |
+| 규칙 5d `getTotalRow()` → `getRowCount()` | 5건 | dataList 행 수 API |
+
+검증: node --check 통과 · wsxml_lint 0 errors/0 warnings(WS111~113 제외) · body `ev:`·publicInfo ↔ 정의 일치 · 재변환 수렴(잔여 차이는 5b 보류분·빈 5구역 헤더뿐).
+
+### A 그룹 — 운영 gcc 확장 7종 치환 (2026-09-21)
+
+> 리포 `cm/gcc` 에 없는 운영 확장 함수를 dataMap/dataList·컴포넌트·`$c.session` API 로 치환(검토안: 미적용분석 §7.1). 전제: 페이지 컨텍스트 값은 `paramData` 파라미터로 전달된다(JSP 서버 모델값이 파라미터로 오지 않으면 별도 조회 API 필요).
+
+| 대상 | 건수 | 치환 |
+|------|------|------|
+| `$c.data.recvParamData("dma_pageContext")` | 1 | `dma_pageContext.setJSON($c.data.getParameter() \|\| {})` — gcc `getParameter` 가 파라미터 키 `paramData` 를 고정 사용 |
+| `$c.data.readValue(dc, key, opts)` | 1 | dataMap → `dc.get("key")` 0건, dataList → `dc.getCellData(row, "key")` 0건, 변수 키 래퍼 → `.get(key)` 1건. `silent`/`soft`/`ctx`/`label` 옵션은 의미 없어 제거 |
+| `$c.data.copyRows(rowCopies)` | 1 | 로컬 `rowCopies.forEach` — `comp.setValue(rc.fn())` |
+
+`readPage(key)` 래퍼는 `dma_page.get(key)`
+
+검증: node --check 통과 · wsxml_lint 0/0 · 코드 내 미정의 dataCollection 참조 0 · `$c.data.readValue` 잔존 0건(보류) 외 A 그룹 호출 0.
