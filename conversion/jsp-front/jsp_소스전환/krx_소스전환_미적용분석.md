@@ -141,7 +141,7 @@ krx_소스전환 사본과 jsp_소스전환 최종본의 차이(각 303줄·1,01
 
 ### 7.2 B — pcc `$c.cm` 네임스페이스의 옛 `fn_*` 9종 (정의 없음 — as-is `cm/as-is/fil/common.xml` 에만 존재, 갱신 pcc 에 camelCase 대응도 없음)
 
-> 2026-09-21 재대조: pcc stf 갱신본(`1b0a7a9`) API 문서 `cm/docs/api/stf/index.html`(7모듈 329메서드 — lc 87·cm 72·stf 52·print 16·bns 90·cp 8·main 4) 기준으로도 아래 9종은 옛 이름·camelCase 이름 어느 쪽도 없다. 즉 gcc 대체 또는 pcc 신규 정의가 필요하며, 정비본에도 같은 호출이 있다(59410 8종 24회 · 35706c 1종 4회 — 규칙 재적용 뒤 호출 수).
+> 2026-09-21 재대조: pcc stf 갱신본(`1b0a7a9`) API 문서 `cm/docs/api/stf/index.html`(7모듈 329메서드 — lc 87·cm 72·stf 52·print 16·bns 90·cp 8·main 4) 기준으로도 아래 9종은 옛 이름·camelCase 이름 어느 쪽도 없다. **jsp-front 는 fil 계열 화면이므로 참조 가능한 업무공통은 `cm/pcc/fil/`(`$c.fil` 2·`$c.cm` 4·`$c.cp` 12·`$c.dis` 15, 2026-09-21 초기 반입)뿐이다(모듈별 pcc 트리 규칙, playbook §0) — 그 트리에도 대응 정의가 없어 gcc 대체가 정답이며, pcc/stf 대조는 참고용이다.** 즉 gcc 대체 또는 pcc 신규 정의가 필요하며, 정비본에도 같은 호출이 있다(59410 8종 24회 · 35706c 1종 4회 — 규칙 재적용 뒤 호출 수).
 
 59410 에 8종, 35706c 에 1종. 전부 gcc 공통·`setValue()` 로 치환 가능(59410 약 20줄 + 마크업 소폭, 35706c 핸들러 2개 → 등록 1회).
 

@@ -11,6 +11,7 @@
 - [ ] **W-Craft 1차 변환 완료** — 구 플랫폼(Gauce/X-Internet) 화면이 WebSquare XML 골격(`ui/`)으로 변환되어 있음 (`★Wcraft guide★` 마커)
 - [ ] **Python 3.9+** — 변환 도구는 stdlib 만 사용(추가 패키지 불필요). 검증용 `wsxml_lint` 는 `pip install ./tools/wsxml_lint` (lxml 필요)
 - [ ] **모듈 공통 확인** — 대상 화면이 gcc 외 네임스페이스(`$c.stf`/`$c.cm`/`$c.frame` 등 모듈 공통)를 쓰면 대응 공통의 존재 여부 확인(없으면 Stage 2 대체 대상)
+- [ ] **모듈별 업무공통(pcc) 트리 고정** — 전환 대상 모듈에 따라 참조할 업무공통이 정해져 있다(2026-09-21 확정): `conversion/jsp-front/**`·`conversion/next-krx-lds-fil-front/**` 화면은 **`cm/pcc/fil/`**(`$c.fil`·`$c.cm`·`$c.cp`·`$c.dis`), `conversion/next-krx-lds-stf-front/**` 화면은 **`cm/pcc/stf/`**(`$c.stf`·`$c.lc`·`$c.cm`·`$c.bns`·`$c.print`·`$c.cp`). 두 트리는 `$c.cm`·`$c.cp` 를 각자 정의하므로 배포 프로젝트마다 한 트리만 로드된다 — fil 화면이 `$c.stf/$c.lc/$c.bns` 를, stf 화면이 `$c.fil/$c.dis` 를 부르면 실환경 미정의 호출이 된다. 미정의 `$c` 함수 대조·레거시 치환 시 publicInfo 대조 대상을 해당 트리로 한정한다(gcc `cm/gcc` 는 공통).
 
 ## 1. 작업 공간 구성
 
