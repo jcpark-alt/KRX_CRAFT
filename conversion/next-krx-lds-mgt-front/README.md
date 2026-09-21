@@ -1,7 +1,7 @@
 # next-krx-lds-mgt-front 전환 기록
 
 - `ui/` — W-Craft 1차 변환 원본(수정 금지), `ui-tobe/` — Stage 1(`convert.py`) + Stage 2 보강 산출물 165화면.
-- 업무공통은 **`cm/pcc/mgt/`**(mgt.xml `$c.mgt`·main.xml) 를 참조한다(사용자 확정 2026-09-21 — [conversion_playbook.md §0](../md/conversion_playbook.md)). gcc(`cm/gcc`)는 공통. 1차 재전환(4a3da53)은 pcc/mgt 반입 전에 **pcc/stf 가정**으로 수행했고, 2차(아래)에서 pcc/mgt 기준으로 재대조했다. 남은 미정의는 발행사검색 `$c.cm.comIsur/comConfirmSet/comIsurNm` 6회(4화면) — pcc/mgt 에 발행사검색 공통 반입이 필요하다.
+- 업무공통은 **`cm/pcc/mgt/`**(mgt.xml `$c.mgt`·main.xml) 를 참조한다(사용자 확정 2026-09-21 — [conversion_playbook.md §0](../md/conversion_playbook.md)). gcc(`cm/gcc`)는 공통. 1차 재전환(4a3da53)은 pcc/mgt 반입 전에 **pcc/stf 가정**으로 수행했고, 2차(아래)에서 pcc/mgt 기준으로 재대조했다. 3차에서 `cm/pcc/mgt/common.xml`(`$c.cm`, pcc/stf common.xml 사본) 이 반입되어 발행사검색 `$c.cm.comIsur/comConfirmSet/comIsurNm` 6회도 해소 — 미정의 0.
 
 ## 2026-09-21 — pcc/stf 기준 재전환 (11파일)
 
@@ -43,3 +43,14 @@
 
 ### 검증(2차)
 lint 165 files 0 warnings(오류 1 = 기존 WS120) · `node --check` 165/165 · 문제 파일 18 → 18 · 변경 5파일 `convert.py` 재실행 내용 변화 0(N010 첫 줄 헤더 제외) · 미정의 `$c` 호출 6 = 보류 목록.
+
+## 2026-09-21 (3차) — `cm/pcc/mgt/common.xml` 반입 후 재대조 (화면 변경 0)
+
+`cm/pcc/mgt/common.xml` = `cm/pcc/stf/common.xml` 사본(2588줄, `$c.cm` 72 공개 함수). 화면 호출은 이미 `$c.cm.comIsur`·`comConfirmSet`·`comIsurNm` 이라 변경 없이 gcc + pcc/mgt 대조 **미정의 6 → 0**(pcc/mgt 해소 7회 = 발행사검색 6 + `$c.mgt.getSysDate` 1).
+
+- 사본 조정 1건: 파일 안의 `$c.stf.getObjectValue` 3곳(`changeCheck` 2 + 주석 1) → **`$c.mgt.getObjectValue`**(mgt 배포에는 `$c.stf` 가 없고 pcc/mgt mgt.xml 에 동명 함수가 있음). 그 외 타 pcc 네임스페이스 의존 없음(주석 제외). mgt 화면이 타는 경로(`comIsur→searchIsurCode`, `comConfirmSet`, `comIsurNm→jongmokNameSearch`)는 gcc 만 사용.
+- 참고: 사본에는 stf 전용 팝업 경로(`/ui/dis/...`)를 여는 함수도 그대로 들어 있다 — mgt 에서 쓰지 않는 함수는 정리 대상.
+- API 문서: `npm run docs:pcc:mgt` → `cm/docs/api/mgt/index.html`(3 modules, 109 methods).
+
+### 검증(3차)
+`python -m wsxml_lint cm/pcc/mgt` 3 files 0/0 · 미정의 `$c` 호출 0 · 화면 파일 변경 없음(2차 게이트 유지).
