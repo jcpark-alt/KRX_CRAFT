@@ -82,3 +82,13 @@
 `readPage(key)` 래퍼는 `dma_page.get(key)`
 
 검증: node --check 통과 · wsxml_lint 0/0 · 코드 내 미정의 dataCollection 참조 0 · `$c.data.readValue` 잔존 0건(보류) 외 A 그룹 호출 0.
+
+### B 그룹 — `$c.cm.fn_CheckDate` 치환 (2026-09-21, 재전환 2차)
+
+> as-is 에만 있던 날짜 형식 검사 함수를 gcc 공통 등록 방식으로 치환(검토안: 미적용분석 §7.2). 이번 재전환의 `convert.py` dry-run 은 신규 적용분 0(고정점).
+
+| 대상 | 건수 | 치환 |
+|------|------|------|
+| `fn_CheckDate(selfEl)` (`cal_startDate_onblur`·`cal_endDate_onblur`) | 2 | 신설 `scwin.init_dateFormat()`(onpageload 5단계)에서 `$c.date.checkCalendarFormat(cal, "yyyyMMdd", "입금일 시작일/종료일")` 2건 등록 — 형식·실존 오류 시 안내 후 빈값 초기화·포커스(원본의 `-`/`/` 제거는 ioFormat 이 yyyyMMdd 라 불필요). onblur 핸들러 2개·`ev:onblur` 속성·publicInfo 항목 삭제 |
+
+검증: node --check 통과 · wsxml_lint 0/0 · `ev:`·publicInfo ↔ 정의 일치 · `$c.cm.fn_` 잔존 0.

@@ -124,3 +124,22 @@ as-is JSP 의 insertForm/downloadForm 제출 기계부를 gcc 공통함수 `$c.w
 **보류 3건**: `readValue("entity", …)`(seq·leadcom_mbr_no·specy_valu_inst_cd) 는 JSP 모델 객체라 대응 dataMap 없음 — 조회 API 응답 dataMap 신설 후 전환. `readPageParam(key)` 래퍼는 `dma_pageContext.get(key)`(키 `returnVal` 선언 추가). `dlt_attachList01` 의 행 미지정 읽기는 0행으로 고정
 
 검증: node --check 통과 · wsxml_lint 0/0 · 코드 내 미정의 dataCollection 참조 0 · `$c.data.readValue` 잔존 3건(보류) 외 A 그룹 호출 0.
+
+### B 그룹 — `$c.cm.fn_*` 8종 치환 (2026-09-21, 재전환 2차)
+
+> as-is `cm/as-is/fil/common.xml` 에만 있고 갱신 pcc·gcc 어디에도 없던 함수를 gcc 공통·컴포넌트 API 로 치환(검토안: 미적용분석 §7.2). 이번 재전환의 `convert.py` dry-run 은 신규 적용분 0(고정점).
+
+| 대상 | 건수 | 치환 |
+|------|------|------|
+| `fn_CheckByte(txa_remk, '2000', 'byteCnt')` | 3 | `$c.util.setTextLengthCounter(txa_remk, txt_byteCnt, { maxLength: 2000, checkType: "byte" })` 를 `init_pageBody` 에서 1회 등록 — 초과 입력 차단·"n / 2,000 byte" 표시. 표시용 `<w2:textbox id="txt_byteCnt">` 를 textarea 옆에 추가, `txa_remk_onkeyup/onchange` 핸들러·`ev:` 속성·publicInfo 삭제 |
+| `fn_SetPhoneValue('telNo'…, scwin.form)` | 3 | 신설 `scwin.fillSplitFields(value, '-', ['ipt_telNo1','ipt_telNo2','ipt_telNo3'])`(faxNo·apctTelNo 동일) — 구분자 기준 뒤에서부터 분할 |
+| `fn_SetEmaileValue('apctEmail'…, scwin.form)` | 1 | `scwin.fillSplitFields(value, '@', ['ipt_apctEmail1','ipt_apctEmail2'])` |
+| `scwin.form` / `document.insertForm` 참조 | 2 | 위 두 함수의 form 인자 계약용이었으므로 1구역 선언·init_pageBody 확보 코드·주석 삭제 |
+| `fn_SelEmail(srcElem, ipt_apctEmail2)` | 1 | `slc_setEmail.getValue()` → `ipt_apctEmail2.setValue()`, 첫 항목(index 0)이면 `focus()` |
+| `fn_ChkNumber()` (법인등록번호 keyup 2) | 2 | 컴포넌트 값에서 숫자 외 문자 제거(`setValue`) + "숫자만 입력 가능합니다." 안내 |
+| `fn_IsExceedMaxLen(this)` / `fn_ChkNumber2(this)` | 2 | `.form_search` focusout·`.chkNumber` keyup 클래스 바인딩 — 전환 마크업에 대상 요소가 없어(실측 0건) 죽은 바인딩 2블록과 함께 삭제. 길이 제한은 컴포넌트 `maxLength`/`maxByteLength` 속성으로 대체 가능 |
+| `fn_Trim(x)` | 2 | `$c.str.trim(x)` |
+
+주의: 공통 카운터의 byte 는 UTF-8(한글 3byte) 기준이라 as-is `fn_GetByte`(한글 2byte)보다 한글 허용량이 줄어든다 — 비고 컬럼 DB 기준으로 `maxLength` 를 맞춘다.
+
+검증: node --check 통과 · wsxml_lint 0/0 · `ev:`·publicInfo ↔ 정의 일치 · `$c.cm.fn_` 잔존 0 · `scwin.form` 참조 0.

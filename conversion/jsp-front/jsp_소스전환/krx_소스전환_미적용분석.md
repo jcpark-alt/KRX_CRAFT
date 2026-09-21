@@ -10,6 +10,7 @@
 > **4차 갱신: 2026-09-21** — 정비본 31파일에 **conversion 규칙 재적용**(convert.py 단계1 제자리 + 후처리): 규칙 13 `fn_*` 개명 65건(충돌 1쌍은 `selectModifiyDate`), 5a 67·2 54·5d 8·26 6·7 2, JSDoc 옛 이름 동기화, 35700c 암묵 전역 `i`→`let` 5. 규칙 4 의 `init_*`/`initXxx` 5구역 이동은 code-convention(2구역)에 맞춰 65건 복원, 규칙 5b 는 DOM 수신(ev.target) 23건 원복·보류(52100 keyup 3건만 컴포넌트 API 전환). §5 이력 6 참조.
 > **5차 갱신: 2026-09-21** — §7.1 **A 그룹 7종을 정비본 31파일에 적용**(전제: 페이지 컨텍스트는 `paramData` 파라미터 — gcc `$c.data.getParameter` 가 이 키를 고정 사용): readValue 109건(get 75·getCellData 28·래퍼 6) · recvParamData 27(치환 17·생략 10) · fieldEl 51 · evalConds 14 · copyRows 8 · applyAttrReals 6 · readSessionValue 2, `dma_pageContext` 신설 4·키 추가 19, 숫자 DOM 헬퍼 3파일 컴포넌트 API 전환(5b 보류 19건 해소)·35700c 핸들러 100개 `self`→`comp`. 보류: 59410 `entity` 3건. §5 이력 7·§7.4 참조.
 > **6차 갱신: 2026-09-21** — pcc stf 업무공통 갱신본(`1b0a7a9`, `fn_` 접두 제거·camelCase: list_common 82→93·common 63→62 개명, bns_common publicInfo 56→90) 기준으로 §7.2 B 그룹을 재대조 — 정비본 59410·35706c 의 `$c.cm.fn_*` 9종은 갱신 pcc(7모듈 329메서드, `npm run docs:pcc:stf` → `cm/docs/api/stf/index.html`)에 이름·camelCase 대응 모두 없음(정의 부재 확정). `bns_common.xml` 은 `<head>` 에 `meta_screenId="$c.bns"` 가 추가돼 API 문서에 포함됨.
+> **7차 갱신: 2026-09-21** — 정비본 재전환 2차: `convert.py` dry-run 은 규칙 재적용 뒤 고정점(신규 적용분 0 — 남는 차이는 규칙 4 `init_*` 이동·5b DOM 보류 4건뿐)이라 기계 패스 없음. **§7.2 B 그룹 9종을 59410·35706c 에 적용**(§5 이력 8·§7.4): `$c.cm.fn_*` 호출 잔존 0, 정비본의 gcc 미존재 `$c` 함수는 `entity` 3건(보류)만 남음.
 
 ---
 
@@ -106,6 +107,8 @@ krx_소스전환 사본과 jsp_소스전환 최종본의 차이(각 303줄·1,01
 
 7. **A 그룹(운영 gcc 확장 7종) 치환 적용(2026-09-21)** — §7.1 검토안대로 31파일 제자리 적용(스크립트 `apply_a.py` 패턴): (a) `recvParamData("dma_pageContext")` 27건 → `dma_pageContext.setJSON($c.data.getParameter() || {})` 17건(gcc `getParameter` 가 `paramData` 키를 고정 사용하므로 "이름 고정 paramData" 계약과 일치), 컨텍스트 값을 읽지 않는 10파일은 수신 생략 주석; `dma_pageContext` 미정의 4파일(35702·35714~35716) 에 dataMap 신설, 기존 파일엔 사용 키 19개 추가(래퍼 `readPageParam/readCtx` 호출부 키 포함); (b) `readValue` 109건 → dataMap `get` 75·dataList `getCellData(row)` 28(행 미지정 1건은 0행)·변수 키 래퍼 6 → `.get(key)`; 보류 3건은 59410 `readValue("entity", …)`(JSP 모델 객체, dataMap 없음); 59400 의 스크립트 적재 시점 컨텍스트 읽기 2건은 `init_recvParam` 수신 직후로 이동; (c) `fieldEl` 51 → `getComponent`, `evalConds` 14 → 로컬 `forEach`(show/hide), `copyRows` 8 → `forEach`(setValue), `applyAttrReals` 6 → `forEach`(`__html`→`render.innerHTML`, `label`→`setLabel`, 그 외 `render.setAttribute`), `readSessionValue` 2 → `$c.session.getUserInfo(key)`(세션 응답 키 존재 전제); (d) `fieldEl` 치환이 DOM 숫자 헬퍼와 결합돼 있어 35700c·35704·35708 의 `unformat/numFormat/checkMax*` 를 `getValue()/setValue()` 로 전환(41줄)하고 35700c `ipt_*` 핸들러 100개의 `self`(ev.target) 를 `$c.util.getComponent('<id>')` 로 교체 — 이력 6 의 5b 보류 23건 중 19건 해소(잔여: 59410 chkObj 2·52100 fallback 2). 게이트: node --check 31/31, wsxml_lint 31 files 0/0, 코드 내 미정의 dataCollection 참조 0, A 그룹 호출 잔존 0(보류 3 제외). **실환경 확인 필요**: `paramData` 로 전달되는 키 집합, 세션 응답의 `corpUsrTpCd`·`repIdYn`, `render.innerHTML`/`setAttribute` 로 대체한 `__html`·`src` 3건.
 
+8. **B 그룹(`$c.cm.fn_*` 9종) 치환 적용(2026-09-21)** — §7.2 검토안대로 정비본 2파일 적용: **59410** — `fn_CheckByte` 3호출(txa_remk keyup/onchange 핸들러 2개 + setData) → `$c.util.setTextLengthCounter(txa_remk, txt_byteCnt, { maxLength: 2000, checkType: "byte" })` 1회 등록(init_pageBody; 표시용 `w2:textbox id="txt_byteCnt"` 를 textarea 옆에 추가, 핸들러·`ev:onkeyup/onchange`·publicInfo 삭제); `fn_SetPhoneValue` 3·`fn_SetEmaileValue` 1 → 신설 `scwin.fillSplitFields(value, sep, ids)`(구분자 기준 뒤에서부터 분할, form DOM 의존 제거 — `scwin.form`/`document.insertForm` 참조 삭제); `fn_SelEmail` → `slc_setEmail.getValue()` 를 `ipt_apctEmail2` 에 setValue, 첫 항목이면 focus; `fn_ChkNumber` 2(법인등록번호 keyup) → 숫자 외 문자 제거 + 안내; `fn_IsExceedMaxLen`·`fn_ChkNumber2` 는 `.form_search`/`.chkNumber` 클래스 대상이 전환 마크업에 없어(실측 0건) 죽은 바인딩 2블록과 함께 삭제; `fn_Trim` 2 → `$c.str.trim`. **35706c** — `fn_CheckDate` onblur 2핸들러 → `init_dateFormat()` 에서 `$c.date.checkCalendarFormat(cal, "yyyyMMdd", 명칭)` 2건 등록(onpageload 5단계, `ev:onblur`·publicInfo 정리). 게이트: node --check 2/2, wsxml_lint 31 files 0/0, `ev:`·publicInfo↔정의 전수 일치, `$c.cm.fn_` 잔존 0. **byte 기준 주의**: 공통 카운터는 UTF-8(한글 3byte)로 재므로 as-is `fn_GetByte`(한글 2byte)보다 한글 허용량이 줄어든다 — 비고 컬럼 DB 기준으로 `maxLength` 조정.
+
 ---
 
 ## 6. 권고 후속 순서 — 진행 현황
@@ -113,7 +116,7 @@ krx_소스전환 사본과 jsp_소스전환 최종본의 차이(각 303줄·1,01
 1. ~~**기계 적용 가능(전 파일 일괄)**: publicInfo 등재(+`ipt_method` 오기 교정) → let→const → var 제거 → `__` 접두 개명 → 과밀 라인 뷰티파이~~ → **완료(2026-09-07)** — 기계 패스 스크립트로 일괄 처리. **파이프라인 개선 권고는 유효**: editor-web generate 에 동일 규칙 반영 시 신규 화면부터 재생성만으로 해소.
 2. ~~**반자동(템플릿 + 내용 작성)**: JSDoc 591건~~ → **완료(2026-09-07)** — 9배치 병렬 작업으로 @description 540/540 작성(25900·25910 기작성 51 별도).
 3. **판단/재설계(단계 2) — 잔여 과제**: §3 유형 — ~~jQuery 94건~~·~~form 제출 12건~~ → **규칙 19 전환·openFormSubmit 재설계 완료(2026-09-07)**. 잔여: **multipart 파일 전송 제출 4건**(25910 fn_register·52100 3제출·59410 fn_Register — 파일 업로드 API 확정 필요), 페이징 DOM 재설계(inf20000), ~~`fn_*` 개명 77건~~ → **`fn_*` 65건 개명 완료(2026-09-21, §5 이력 6)**·`tx_fn_*` 24건 보류, 규칙 5b DOM 수신 `.value=` 23건 보류(컴포넌트 API 재설계 필요), 컴포넌트 캐싱 전역 22건, layer 2파일 편입 방식, datepicker 위젯 1건 + 각 수정가이드 §3에 기록된 원본 유래 결함(35708 미해결 컴포넌트 참조, 52100 미정의 전역 호출, 20000p 숫자/문자열 비교 등).
-4. **gcc 미존재 함수 16종 치환**: A(운영 gcc 확장 7종) → **정비본 적용 완료(2026-09-21, §5 이력 7·§7.4)**, 보류 `entity` 3건. B(`$c.cm.fn_*` 9종)는 §7.2 검토안대로 gcc/`setValue()` 치환 대기(정비본 59410·35706c 에도 동일 호출 존재).
+4. **gcc 미존재 함수 16종 치환**: A(운영 gcc 확장 7종)·B(`$c.cm.fn_*` 9종) 모두 **정비본 적용 완료(2026-09-21, §5 이력 7·8, §7.4)** — 잔여 보류는 59410 `entity` 3건. 원본 `krx_소스전환/` 33화면의 동일 호출은 재생성기 개선 대상.
 
 ---
 
@@ -169,5 +172,6 @@ krx_소스전환 사본과 jsp_소스전환 최종본의 차이(각 303줄·1,01
 | `readSessionValue` | `$c.session.getUserInfo` | 2 | 세션 키 존재 확인 |
 | `fieldEl` | `getComponent` | 51 (+ 숫자 헬퍼 3파일 컴포넌트 API 전환, 35700c 핸들러 100개) | — |
 | `evalConds` | show/hide | 14 (로컬 forEach) | — |
+| **B** `$c.cm.fn_*` 9종 | gcc / `setValue()` | 59410 8종(CheckByte→setTextLengthCounter 등록, SetPhone/SetEmaile→`fillSplitFields`, SelEmail→setValue, ChkNumber→숫자 필터, Trim→`$c.str.trim`, IsExceedMaxLen/ChkNumber2 죽은 바인딩 삭제) · 35706c 1종(CheckDate→`checkCalendarFormat` 등록) | byte 기준(UTF-8 3byte) DB 대조 |
 
 원본 폴더 `krx_소스전환/` 은 editor-web 재생성 산출물 보존 원칙에 따라 손대지 않았다(원본 33화면의 동일 호출은 재생성기 개선으로 해소).
