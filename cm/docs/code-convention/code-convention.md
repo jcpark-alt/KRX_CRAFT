@@ -118,7 +118,7 @@ scwin.init_conds     = function () { $c.util.evalConds(binds); };
 - 초기화 IIFE 는 정의만 하고 `onpageload` 에서 호출한다(위 초기화 절 참조).
 - **오버라이딩 금지**: `var __prev = scwin.onpageload;` 형태의 래핑을 만들지 않는다. `scwin.onpageload` 는 파일당 1회만 정의한다.
 - **순차 호출 순서는 데이터 의존성**을 따른다(파라미터 수신 → 파생값 충전 → 화면 렌더/조건 평가). 렌더가 데이터를 기다리려 `setTimeout` 다중 예약에 의존하지 말고 **선행 함수 완료 후 호출**로 순서를 보장한다. 비동기 초기화면 `onpageload`/`init_*` 를 `async`/`await` 로 전환해 순차 배치한다.
-- 진입점이므로 `onpageload` 를 단일 try/catch + `$c.exception.handleError` 로 감싼다(오류 처리 절·규칙 26 정합). 정답지: `cm/conversion/jsp-front/jsp_소스전환/jldfil25900.xml`.
+- 진입점이므로 `onpageload` 를 단일 try/catch + `$c.exception.handleError` 로 감싼다(오류 처리 절·규칙 26 정합). 정답지: `conversion/jsp-front/jsp_소스전환/jldfil25900.xml`.
 
 ## 서브미션 — async/await 순차 실행 우선
 
@@ -219,7 +219,7 @@ scwin.popupCallback = function (resultData) { /* 리턴 데이터 처리 */ };
 ```
 
 - `data`(3번째 인자) 페이로드 전달은 **pageFramePopup 전용** — browserPopup 은 콜백/부모 접근 공통함수(`getOpenerScope`/`callOpener`)로 대체한다.
-- 변환 도구가 자동 적용한다(convert.py **규칙 17** — 팝업 타입별 수신 형태로 산출, [createdialogframe_popup_guide.md](../../conversion/md/createdialogframe_popup_guide.md) §1b).
+- 변환 도구가 자동 적용한다(convert.py **규칙 17** — 팝업 타입별 수신 형태로 산출, [createdialogframe_popup_guide.md](../../../conversion/md/createdialogframe_popup_guide.md) §1b).
 
 ## 반복문 내 Map/List 데이터 수정 시 UI 갱신 제어
 
@@ -262,4 +262,4 @@ scwin.btn_search_onclick = function () {
 | 규칙 6·12·16 | 서브미션을 await 순차 스타일로 생성(핸들러 정의 존재 시 직접 호출 연결, 부재 시 `// TODO Stage2`) |
 | async 부여 | await 포함 함수에 `async` 자동 삽입 + 호출부 await 전파 검토 리포트 |
 
-상세: [conversion_rules.md](../../conversion/md/conversion_rules.md) §규칙 4·6, [conversion_pipeline.md](../../conversion/md/conversion_pipeline.md)
+상세: [conversion_rules.md](../../../conversion/md/conversion_rules.md) §규칙 4·6, [conversion_pipeline.md](../../../conversion/md/conversion_pipeline.md)

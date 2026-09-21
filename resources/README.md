@@ -66,7 +66,7 @@ initech-common.js
 
 ## 6. 화면에서 쓰는 법
 
-`cm/conversion/sample-front/ui/SMPCRT10000.xml`(가이드 샘플)과 `cm/gcc/cert.xml` 머리 주석을 기준으로 한다.
+`conversion/sample-front/ui/SMPCRT10000.xml`(가이드 샘플)과 `cm/gcc/cert.xml` 머리 주석을 기준으로 한다.
 
 ```js
 await $c.cert.loadModule({ onStatus : function (msg, done) { /* 진행 안내 */ } });   // onpageload 에서 1회

@@ -114,6 +114,6 @@ try {
 
 ## 참고
 
-- 실행 가능한 데모: `cm/conversion/sample-front/ui/SMPBTN10000.xml` ([샘플 카탈로그](../conversion/md/sample_templates.md) "상태별 버튼 제어가 있는 화면" 유형)
+- 실행 가능한 데모: `conversion/sample-front/ui/SMPBTN10000.xml` ([샘플 카탈로그](../../conversion/md/sample_templates.md) "상태별 버튼 제어가 있는 화면" 유형)
 - API 명세: [api/gcc/index.html](api/gcc/index.html) ($c.util 모듈, `npm run docs:gcc` 자동 생성)
 - 도입 이력: [gcc_update_history.md](gcc_update_history.md) 2026-08-26 항목(`d0f21d9`·`ef9628d`)

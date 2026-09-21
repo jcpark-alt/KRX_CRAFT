@@ -22,7 +22,7 @@ scwin.btn_save_onclick = async function (e) {
 ```
 
 - `context` 는 `"화면ID.함수명"` 형식을 권장한다 — 콘솔 로그와 서버 수집의 식별자로 쓰인다.
-- 적용 예시는 샘플 `SMPVAL10000`(`cm/conversion/sample-front/ui/`)의 `onpageload`·`btn_save_onclick` 참고.
+- 적용 예시는 샘플 `SMPVAL10000`(`conversion/sample-front/ui/`)의 `onpageload`·`btn_save_onclick` 참고.
 
 ## 예외 분류 규약 — 이중 알림은 자동으로 방지된다
 

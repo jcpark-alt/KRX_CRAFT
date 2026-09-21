@@ -9,11 +9,11 @@
 
 ```bash
 npm run docs:transfer
-# → python cm/conversion/tools/gen_index_transfer.py
+# → python conversion/tools/gen_index_transfer.py
 ```
 
 - 출력: `cm/docs/api/gcc/index_transfer.html` **단일 파일**(CSS/JS 인라인, 외부 의존성 없음 → `file://` 로 열림).
-- 생성기: `cm/conversion/tools/gen_index_transfer.py` (+ 로더 `gcc_mapping.py`, 셸 템플릿 `index_transfer.template.html`).
+- 생성기: `conversion/tools/gen_index_transfer.py` (+ 로더 `gcc_mapping.py`, 셸 템플릿 `index_transfer.template.html`).
 
 ## 2. 데이터 출처(SOT)
 
