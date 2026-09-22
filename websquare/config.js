@@ -152,7 +152,7 @@ export default {
       "@value": "false"
     },
     "stylesheet": {
-      "@earlyImportList": "/cm/css/base.css,/cm/css/contents.css,/cm/css/print.css,/resources/vendor/transkey/transkey.css",
+      "@earlyImportList": "/cm/css/base.css,/cm/css/contents.css,/cm/css/dashboard_widget.css,/cm/css/print.css,/resources/vendor/transkey/transkey.css",
       "@enable": "true",
       "@import": "link",
       "@value": "stylesheet_ext.css"
