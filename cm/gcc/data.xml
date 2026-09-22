@@ -1222,8 +1222,33 @@ scwin.isModified = function (dcObjArr) {
 
 /**
  * @method
+ * @name _hasDownloadData
+ * @description 다운로드 대상 DataList 객체 배열 중 하나라도 데이터(getRowCount() > 0)가 있는지 검사한다.
+ * 전부 없거나(null) 0건이면 com_file_0107("다운로드 할 데이터가 없습니다.") 메시지를 alert 로 표시하고 false 를 반환한다.
+ * @param {Array} dataListObjArr 검사할 DataList 객체 배열(null 요소 허용)
+ * @returns {Boolean} 다운로드할 데이터가 있으면 true, 없으면(alert 표시 후) false
+ * @hidden Y
+ * @exception
+ * @example
+if (scwin._hasDownloadData([dlt_main]) === false) { return; }
+ */
+scwin._hasDownloadData = function (dataListObjArr) {
+    const arr = $c.util.isArray(dataListObjArr) ? dataListObjArr : [dataListObjArr];
+    const hasData = arr.some(function (dltObj) {
+        return !$c.util.isEmpty(dltObj) && (typeof dltObj.getRowCount === "function") && (dltObj.getRowCount() > 0);
+    });
+    if (hasData === false) {
+        // "com_file_0107" : "다운로드 할 데이터가 없습니다."
+        $c.win.alert($c.data.getMessage("com_file_0107"));
+    }
+    return hasData;
+};
+
+/**
+ * @method
  * @name downloadMultipleDataList
  * @description DataList의 데이터를 엑셀 파일로 저장한다.
+ * 대상 DataList 가 전부 0건이면 com_file_0107("다운로드 할 데이터가 없습니다.") alert 후 종료한다.
  * @param {Object}	optionsParam							다운로드 옵션이 저장된 객체
  * @param {Object}	infoArrParam							추가 정보 삽입을 위한 infoArr 배열 객체
  * @param {Object}	options.common							JSON형태로 저장된 dataList의 엑셀 다운로드 옵션
@@ -1337,6 +1362,7 @@ scwin.downloadMultipleDataList = function (optionsParam, infoArrParam) {
         excelInfo: []
     };
 
+    const dataListObjArr = [];
     if (optionsParam.excelInfo.length > 0) {
         let excelInfoCount = optionsParam.excelInfo.length;
 
@@ -1351,10 +1377,11 @@ scwin.downloadMultipleDataList = function (optionsParam, infoArrParam) {
                 dataListObj = $p.getComponentById(dataListId);
             }
 
-            if (typeof dataListObj === "undefined") {
+            if ($c.util.isEmpty(dataListObj)) {
                 console.warn("[$c.data.downloadMultipleDataList] excelInfo.dataListId에 설정된 DataList(" + dataListId + ")를 찾을 수 없습니다.");
                 return;
             }
+            dataListObjArr.push(dataListObj);
 
             const excelInfo = {
                 dataListId: dataListId,
@@ -1376,6 +1403,11 @@ scwin.downloadMultipleDataList = function (optionsParam, infoArrParam) {
         return;
     }
 
+    // 대상 DataList 가 전부 0건이면 메시지 표시 후 종료
+    if (scwin._hasDownloadData(dataListObjArr) === false) {
+        return;
+    }
+
     WebSquare.util.multipleDataListDownload(options, infoArrParam);
 };
 
@@ -1383,6 +1415,7 @@ scwin.downloadMultipleDataList = function (optionsParam, infoArrParam) {
  * @method
  * @name downloadMultipleGridView
  * @description gridView의 데이터를 액셀 다운로드 한다.
+ * 대상 gridView 에 연결된 DataList 가 전부 0건이면 com_file_0107("다운로드 할 데이터가 없습니다.") alert 후 종료한다.
  * @param {Object}	optionsParam							다운로드 옵션을 가지고 있는 객체
  * @param {Object}	infoArrParam							추가 정보 삽입을 위한 infoArr 배열 객체
  * @param {Object}	options.common							JSON형태로 저장된 dataList의 엑셀 다운로드 옵션
@@ -1498,6 +1531,7 @@ scwin.downloadMultipleGridView = function (optionsParam, infoArrParam) {
         excelInfo: []
     };
 
+    const dataListObjArr = [];
     if (optionsParam.excelInfo.length > 0) {
         let excelInfoCount = optionsParam.excelInfo.length;
 
@@ -1512,10 +1546,11 @@ scwin.downloadMultipleGridView = function (optionsParam, infoArrParam) {
                 gridObj = $p.getComponentById(gridId);
             }
 
-            if (typeof gridObj === "undefined") {
-                console.warn("[$c.data.downloadMultipleDataList] excelInfo.gridId에 설정된 " + gridId + " GridView를 찾을 수 없습니다.");
+            if ($c.util.isEmpty(gridObj)) {
+                console.warn("[$c.data.downloadMultipleGridView] excelInfo.gridId에 설정된 " + gridId + " GridView를 찾을 수 없습니다.");
                 return;
             }
+            dataListObjArr.push($c.data.getDataList(gridObj));
 
             const excelInfo = {
                 gridId: gridId,
@@ -1537,6 +1572,11 @@ scwin.downloadMultipleGridView = function (optionsParam, infoArrParam) {
         return;
     }
 
+    // 대상 gridView 의 DataList 가 전부 0건이면 메시지 표시 후 종료
+    if (scwin._hasDownloadData(dataListObjArr) === false) {
+        return;
+    }
+
     WebSquare.util.multipleExcelDownload(options, infoArrParam);
 };
 
@@ -1545,6 +1585,7 @@ scwin.downloadMultipleGridView = function (optionsParam, infoArrParam) {
  * @method
  * @name downloadGridViewExcel
  * @description 설정된 옵션으로 엑셀을 다운로드 한다.
+ * gridView 에 연결된 DataList 가 없거나 0건이면 com_file_0107("다운로드 할 데이터가 없습니다.") alert 후 종료한다.
  * @param {Object} grdObj GridView 객체
  * @param {Object} options JSON형태로 저장된 그리드의 엑셀 다운로드 옵션
  * @param {Boolean} options.hiddenVisible			[default: false] GridView 내 Hidden 컬럼을 엑셀 다운로드 시 포함시킬지 여부 (true : 포함, false : 미포함)
@@ -1670,6 +1711,11 @@ const options = {
 $c.data.downloadGridViewExcel(grdObj, options, infoArr);
  */
 scwin.downloadGridViewExcel = function (grdObj, options, infoArr) {
+    // gridView 에 연결된 DataList 가 없거나 0건이면 메시지 표시 후 종료
+    if (scwin._hasDownloadData([$c.data.getDataList(grdObj)]) === false) {
+        return;
+    }
+
     if ($c.util.isEmpty(options)) {
         options = {};
     }
@@ -1796,6 +1842,7 @@ scwin.downloadGridViewExcel = function (grdObj, options, infoArr) {
  * @method
  * @name downloadGridViewCSV
  * @description 설정된 옵션으로 CSV파일을 다운로드 한다.
+ * gridView 에 연결된 DataList 가 없거나 0건이면 com_file_0107("다운로드 할 데이터가 없습니다.") alert 후 종료한다.
  * @param {Object} grdObj GridView Object
  * @param {Object} options 					JSON형태로 저장된 그리드의 엑셀 다운로드 옵션
  * @param {String} options.fileName			[default: csvfile.csv] 엑셀파일 선택 대화상자가 나타날 때 기본으로 지정 될 파일 이름
@@ -1825,6 +1872,11 @@ $c.data.downloadGridViewCSV(grdObj, options);
 //return 예시) 엑셀 파일 다운로드
  */
 scwin.downloadGridViewCSV = function (grdObj, options) {
+    // gridView 에 연결된 DataList 가 없거나 0건이면 메시지 표시 후 종료
+    if (scwin._hasDownloadData([$c.data.getDataList(grdObj)]) === false) {
+        return;
+    }
+
     if ($c.util.isEmpty(options)) {
         options = {};
     }
