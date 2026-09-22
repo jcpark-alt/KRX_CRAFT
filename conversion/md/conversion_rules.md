@@ -186,6 +186,12 @@
 
 ### 규칙 16: Gauce 트랜잭션(trs) `Action`/`KeyValue`/`Parameters`/`Post` → `$c.sbm.executeDynamic`
 
+* **주석 처리된 함수 내부 보류**(2026-09-22, 규칙 12 동일): `// scwin.old = function () { … dts.DataID = …; dts.reset(); … }` 처럼
+  함수 전체가 주석이면 중괄호가 주석이라 패턴이 최상위(depth 0)에 놓인다. 종전에는 이를 변환해 **활성 `const sbmOptions`·`await` 문장이
+  함수 밖에 생성**되어 규칙 4 재정렬 보류·await 소속 없음(구문 오류)이 됐다(sample-front/ui/stf ULDSTF05003·92050). 이제 depth 0 의
+  DataID/Post 패턴은 변환하지 않고 `규칙12/16 … 미변환(최상위/주석 처리된 함수 내부)` 으로 리포트한다. 활성 함수 안의 주석 처리된
+  DataID 라인(W-Craft 마커 변형)은 종전대로 변환한다.
+
 * 같은 블록 스코프에서 레거시 Gauce 트랜잭션 객체의 아래 묶음을 `$c.sbm.executeDynamic(sbmOptions)` 로 전환합니다(규칙 12 와 동일 계열).
 
 ```javascript

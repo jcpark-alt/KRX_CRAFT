@@ -1830,6 +1830,11 @@ def rule12_dynamic_submission(script, report):
     converted, skipped = [], []
     for mo in _DATAID_RE.finditer(script):
         dc, rhs = mo.group(2), mo.group(3).strip()
+        if depth[mo.start()] == 0:
+            # 주석 처리된 함수 안의 DataID(중괄호가 주석이라 depth 0) — 변환하면 실행문이 함수 밖에 생겨 규칙 4 보류·
+            # await 소속 없음(구문 오류)이 된다(2026-09-22). 보류·리포트.
+            skipped.append("%s.DataID (최상위/주석 처리된 함수 내부 — 함수 밖 실행문 생성 방지)" % dc)
+            continue
         bk = block_range(mo.start())[0]
         # 같은 블록·같은 dc 의 reset 짝(미사용) 찾기 — 뒤쪽 reset 우선
         pair = None
@@ -2030,6 +2035,9 @@ def rule16_trs_submission(script, report):
     converted, skipped = [], []
     for pm in _TRS_POST_RE.finditer(script):
         obj = pm.group(1)
+        if depth[pm.start()] == 0:
+            skipped.append("%s.Post (최상위/주석 처리된 함수 내부 — 함수 밖 실행문 생성 방지)" % obj)
+            continue
         bk = block_range(pm.start())[0]
         am = latest_before(obj, "Action", bk, pm.start())
         if am is None:
