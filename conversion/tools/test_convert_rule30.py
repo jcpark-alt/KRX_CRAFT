@@ -7,9 +7,11 @@
 - 규칙 11: `// #include(...)`, `// //#include(...)` 등 다중 주석 접두·`#` 변형 include 삭제
 - 규칙 30: `// \t//----W-Craft …----//` 다중 접두 마커 삭제(끝 `----/` 결손 허용), `★Wcraft guide★` 블록 삭제,
   guide 안내 문장은 judgment 리포트로 이관(상용구만이면 리포트 없음), 멱등, 파이프라인 결과에 W-Craft 흔적 0.
+- 긴 `////…` 구분선에서 정규식이 선형 시간에 끝나는지(파국적 역추적 회귀) 검증.
 """
 import os
 import sys
+import time
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _HERE)
@@ -133,3 +135,19 @@ def test_full_pipeline_leaves_no_wcraft_trace():
     assert "W-Craft" not in out and "Wcraft" not in out and "include(" not in out
     assert "scwin.cnt = 1;" in out
     assert report["wcraft"] >= 2 and report["wcraft_guide"] == 1 and report["rule11"] == 1
+
+
+def test_long_slash_divider_lines_do_not_backtrack():
+    # (?:/+[ \t]*)* 류 중첩 수량자는 60자 이상의 '////…' 구분선에서 2^n 역추적으로 멈춘다(bns_common.xml 사례).
+    # 규칙 11/30 정규식은 선형 시간에 끝나야 하며 구분선 자체는 보존되어야 한다.
+    divider = ("/" * 120 + "\n" + "// " + "/" * 90 + " 구분선\n" + "/" * 200 + "\n") * 20
+    src = (divider
+           + '// //#include("../js/a.js");\n'
+           + '//     //----W-Craft WebSquare 변환 확인: include----//\n'
+           + 'scwin.a = 1;\n')
+    t0 = time.time()
+    out, rep = _run(src)
+    assert time.time() - t0 < 2.0
+    assert rep["rule11"] == 1 and rep["wcraft"] == 1
+    assert "scwin.a = 1;" in out
+    assert out.count("\n" + "/" * 200 + "\n") == 20   # 구분선 보존

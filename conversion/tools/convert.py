@@ -554,7 +554,9 @@ def rule11_remove_include(code, report):
     2026-09-22 보강: `// #include(...)`, `// //#include(...)` 처럼 **주석 접두가 여러 겹**이거나 `#` 가 붙은
     W-Craft 이중 주석 변형도 삭제한다(ULDSTF07400 계열·ULDMGT50002 잔존 사례).
     라인 선두 앵커 매칭이라 문자열 내부 오탐은 사실상 없다(레거시 소스에 개행 포함 템플릿 리터럴 없음)."""
-    pat = re.compile(r'(?m)^[ \t]*(?:/+[ \t]*)*#?include\b\s*\([^\n]*\r?\n?')
+    # 주석 접두는 단일 문자클래스 [ \t/]* 로 소비한다 — (?:/+[ \t]*)* 같은 중첩 수량자는 긴 '////…' 구분선에서
+    # 파국적 역추적(2^n)을 일으켜 bns_common.xml(4444행) 변환이 끝나지 않았다(2026-09-22 교정).
+    pat = re.compile(r'(?m)^[ \t/]*#?include\b\s*\([^\n]*\r?\n?')
     code, removed = pat.subn('', code)
     report["rule11"] = removed
     return code
@@ -1274,7 +1276,8 @@ def remove_wcraft_markers(script, report=None):
         return ""
     script = _WCRAFT_GUIDE_RE.sub(_drop_guide, script)
     lines = script.split("\n")
-    marker_re = re.compile(r'^[ \t]*(?://[ \t]*)*//-+\s*W-Craft[^\n]*$')
+    # `//` 뒤의 추가 주석 접두는 [ \t/]* 한 클래스로 소비(중첩 수량자 금지 — 긴 '////…' 구분선 파국적 역추적 방지)
+    marker_re = re.compile(r'^[ \t]*//[ \t/]*-+\s*W-Craft[^\n]*$')
     kept = [ln for ln in lines if not marker_re.match(ln)]
     cnt = len(lines) - len(kept)
     script = "\n".join(kept)
