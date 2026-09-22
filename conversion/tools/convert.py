@@ -318,12 +318,27 @@ def rule5e_neg_compare(code, report):
     return "".join(res)
 
 
-def rule5b_setvalue(code, report):
+def _is_body_component(recv, body_ids):
+    """수신 객체 식이 body 컴포넌트 id(단일 식별자, 또는 `scwin.X`/`$p.X` 아닌 루트)인지. body_ids 가 None 이면 검사 생략(종전 동작)."""
+    if body_ids is None:
+        return True
+    parts = recv.split(".")
+    if len(parts) != 1:
+        return False   # `downForm.prtDepoId`, `codeComp.dom.input` 처럼 체인 수신은 DOM/객체 필드로 본다
+    return parts[0] in body_ids
+
+
+def rule5b_setvalue(code, report, body_ids=None):
+    """`X.value = v;` → `X.setValue(v);`. body_ids 를 넘기면 **body 에 id 가 있는 컴포넌트 수신만** 변환하고,
+    DOM 요소·form 필드로 보이는 수신(`input.value`, `downForm.x.value`)은 보류·리포트한다(2026-09-22 보강)."""
     mask = code_mask(code)
     pat = re.compile(r'(\b[\w$]+(?:\.[\w$]+)*)\.value\s*=\s*(?!=)([^;\n]+);')
     res, last = [], 0
     for mo in pat.finditer(code):
         if not mask[mo.start()]:
+            continue
+        if not _is_body_component(mo.group(1), body_ids):
+            report["judgment"].append("규칙5b .value 대입 보류(body 컴포넌트 id 아님 — DOM 요소/form 필드 가능): " + mo.group(0).strip())
             continue
         report["rule5b"].append(mo.group(0).strip())
         res.append(code[last:mo.start()])
@@ -333,12 +348,16 @@ def rule5b_setvalue(code, report):
     return "".join(res)
 
 
-def rule5c_setbgimage(code, report):
+def rule5c_setbgimage(code, report, body_ids=None):
+    """`X.src = v;` → `X.setBackgroundImage(v);`. body_ids 지정 시 body 컴포넌트 수신만 변환(규칙 5b 와 동일 가드)."""
     mask = code_mask(code)
     pat = re.compile(r'(\b[\w$]+(?:\.[\w$]+)*)\.src\s*=\s*(?!=)([^;\n]+);')
     res, last = [], 0
     for mo in pat.finditer(code):
         if not mask[mo.start()]:
+            continue
+        if not _is_body_component(mo.group(1), body_ids):
+            report["judgment"].append("규칙5c .src 대입 보류(body 컴포넌트 id 아님 — img DOM 가능): " + mo.group(0).strip())
             continue
         report["rule5c"].append(mo.group(0).strip())
         res.append(code[last:mo.start()])
@@ -429,7 +448,9 @@ def rule13_rename_scwin_fn(head, script, body, report):
         rename[old] = new
     if rename:
         pat = re.compile(r'(scwin\.)(' + "|".join(re.escape(o) for o in rename) + r')\b')
-        script = _replace_in_code(script, pat, lambda m: m.group(1) + rename[m.group(2)])
+        # `scwin.fn_X` 접두 형태는 문자열 리터럴(그리드 셀 HTML 의 onclick="scwin.fn_X(...)" 등)·주석 안까지 함께 개명한다 —
+        # 코드만 바꾸면 인라인 핸들러 문자열이 옛 이름을 불러 런타임에 깨진다(ULDFIL52810 사례, 2026-09-22). bare 참조는 코드만.
+        script = pat.sub(lambda m: m.group(1) + rename[m.group(2)], script)
         head = pat.sub(lambda m: m.group(1) + rename[m.group(2)], head)
         body = pat.sub(lambda m: m.group(1) + rename[m.group(2)], body)
         # bare 참조 동기화 — 접두 없는 잔존 참조(`scwin.fn_GetPar = fn_GetReturn;` 의 RHS 등)를 scwin.{신이름} 으로 교정
@@ -1113,6 +1134,21 @@ def _clean_lead(text):
     return _strip_section_headers(text).strip("\n")
 
 
+def _func_body_open(script, mask, pos):
+    """pos(function 키워드/이름 뒤) 이후 함수 본문의 '{' 인덱스. 파라미터 목록 `(…)` 을 _scan_call 로 건너뛰어
+    ES6 기본값 인자 `options = {}` / `arr = []` 의 중괄호를 본문으로 오인하지 않는다(2026-09-22 — ULDFIL05040 사례). 실패 시 -1."""
+    p = script.find("(", pos)
+    if p < 0:
+        return -1
+    scanned = _scan_call(script, mask, p)
+    if scanned is None:
+        return -1
+    b = script.find("{", scanned[1])
+    if b < 0 or script[scanned[1]:b].strip() != "":
+        return -1
+    return b
+
+
 def rule4_structure(script, body, report):
     """
     최상위 함수 정의를 초기화/이벤트/서브미션 콜백/일반 4구역으로 분류·재배치하고
@@ -1131,7 +1167,7 @@ def rule4_structure(script, body, report):
     for mo in fpat.finditer(script):
         if depth[mo.start()] != 0:
             continue
-        b = script.find("{", mo.end())
+        b = _func_body_open(script, mask, mo.end())   # 기본값 인자 `= {}` 를 본문으로 오인하지 않음
         if b < 0:
             continue
         d, j = 0, b
@@ -1568,10 +1604,14 @@ def rule6_submission(head, body, script, report):
                     block += "%s// TODO Stage2: %s 응답 처리 로직 작성 (구 submitDoneHandler 자리)\n" % (indent, rtn)
                 edits.append((ls, le, block))
             elif awaitable:
-                # 표현식 내 호출: rtn 캡처 없이 await 만 부여(응답 사용 여부는 단계 2 검토)
+                # 표현식 내 호출: 이미 `await` 가 앞에 있으면 덧붙이지 않는다(`await await` 방지 — 2026-09-22).
+                # `x = await execute(id)` 대입형은 응답이 캡처된 것이므로 리포트하지 않고, 그 외(인자·조건식 등)만 단계 2 검토.
+                has_await = re.search(r'\bawait\s*$', prefix) is not None
                 edits.append((ls, ls, const_block))
-                edits.append((m.start(), m.end(), "await $c.sbm.executeDynamic(%s)" % name))
-                report["judgment"].append("규칙6 %s: 표현식 내 호출 — await 전환했으나 응답(rtn) 캡처 없음(단계2 검토)" % sid)
+                edits.append((m.start(), m.end(), ("" if has_await else "await ") + "$c.sbm.executeDynamic(%s)" % name))
+                captured = re.search(r'(?:\b(?:const|let|var)\s+)?[A-Za-z_$][\w$.]*\s*=\s*(?:await\s*)?$', prefix) is not None
+                if not captured:
+                    report["judgment"].append("규칙6 %s: 표현식 내 호출 — await 전환했으나 응답(rtn) 캡처 없음(단계2 검토)" % sid)
             else:
                 edits.append((ls, ls, const_block))                                   # 옵션 변수 선언 삽입
                 edits.append((m.start(), m.end(), "$c.sbm.executeDynamic(%s)" % name))  # 호출부 치환
@@ -1611,7 +1651,7 @@ def mark_async_functions(script, report):
     for mo in re.finditer(r'\bfunction\b', script):
         if not mask[mo.start()]:
             continue
-        b = script.find("{", mo.end())
+        b = _func_body_open(script, mask, mo.end())   # 기본값 인자 `= {}` 를 본문으로 오인하지 않음
         if b < 0:
             continue
         d, j = 0, b
@@ -2339,7 +2379,9 @@ def rule26_entry_trycatch(script, report, screen_id):
         for mo in fpat.finditer(script, st, en):
             if sec == 2 and mo.group(1) not in ("onpageload", "onpageunload"):
                 continue   # 2구역 내부 헬퍼(init 등)는 진입점이 아님 — onpageload 의 catch 로 수렴
-            bopen = script.index("{", mo.end() - 1)
+            bopen = _func_body_open(script, mask, mo.start())   # 기본값 인자 `= {}` 를 본문으로 오인하지 않음(2026-09-22)
+            if bopen < 0:
+                continue
             bclose = _match_brace(script, mask, bopen)
             if bclose < 0:
                 continue
@@ -2364,11 +2406,12 @@ def rule26_entry_trycatch(script, report, screen_id):
     return script
 
 
-_GRID_CHILD_TAGS = ("w2:caption", "w2:header", "w2:gBody")
+# 2026-09-22: w2:row 추가 — header/gBody 안의 row 도 그리드마다 row3/row4 로 복제되어 WS120 이 남던 사례(ULDFIL57000 그리드 3·4)
+_GRID_CHILD_TAGS = ("w2:caption", "w2:header", "w2:gBody", "w2:row")
 
 
 def rule27_dedup_grid_child_ids(body, report):
-    """그리드 표준 자식 요소(caption/header/gBody)의 문서 전체 중복 id 를 순번으로 재부여한다(규칙 27).
+    """그리드 표준 자식 요소(caption/header/gBody/row)의 문서 전체 중복 id 를 순번으로 재부여한다(규칙 27).
     W-Craft 변환기가 그리드마다 caption1/header1/gBody1 을 복제 생성해 wsxml_lint WS120 이 발생하는 문제 해소.
     첫 등장은 유지, 이후 중복은 "{base}{n}" 의 미사용 순번으로 개명(표시 전용 id 만 대상). 멱등."""
     changes = []
@@ -2575,8 +2618,9 @@ def _convert_once(raw, filename, profile="screen"):
     s = rule2_globals(s, report)
     s = rule5a_strict_eq(s, report)
     s = rule5e_neg_compare(s, report)   # !X === Y 우선순위 버그 교정(5a 로 === 통일 후)
-    s = rule5b_setvalue(s, report)
-    s = rule5c_setbgimage(s, report)
+    body_ids = set(re.findall(r'\bid="([^"]+)"', reg["body"]))
+    s = rule5b_setvalue(s, report, body_ids)   # body 컴포넌트 수신만(DOM/form 필드 보류)
+    s = rule5c_setbgimage(s, report, body_ids)
     s = rule5d_method_rename(s, report)
     reg["head"], s = rule6_submission(reg["head"], reg["body"], s, report)
     s = rule12_dynamic_submission(s, report)

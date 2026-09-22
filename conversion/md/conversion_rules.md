@@ -22,6 +22,10 @@
     * *예시:* `ev:onclick="scwin.btn_Search_onclick"`
 
 ### 규칙 4: 코드 구조화 및 영역 분리 (5단계 정형화 구조)
+
+* **함수 경계 해석**(2026-09-22 보강): `function (params, options = {})` 처럼 ES6 기본값 인자에 중괄호가 있으면 파라미터 목록을
+  건너뛴 뒤의 `{` 를 본문 시작으로 잡습니다(종전에는 `{}` 를 본문으로 오인해 "함수 사이 최상위 실행문" 으로 재정렬이 보류됨 —
+  ULDFIL05040 사례). 규칙 26 진입점 try/catch 와 async 부여도 같은 탐지를 씁니다.
 스크립트 영역의 코드를 **5단계 정형화 구조**([code-convention.md](../../cm/docs/code-convention/code-convention.md))로 분류하고,
 표준 섹션 헤더(`///////// n. {영역명} /////////` 한 줄)를 바운더리로 삼아 순서를 재정렬합니다.
 
@@ -38,6 +42,10 @@
 * 비어 있는 영역의 헤더는 생략합니다. 구(舊) 형식 — 한 줄 경계 주석(`// 전역 변수 선언` 등)과 3줄 블록 헤더(`/**** * n. ****/`) — 은 재변환 시 현행 슬래시 헤더로 자동 마이그레이션됩니다(멱등).
 
 ### 규칙 5: 코드 문법 및 컴포넌트 API 최적화
+* **5b/5c 수신 객체 가드**(2026-09-22 보강): `X.value = v` → `X.setValue(v)`, `X.src = v` → `X.setBackgroundImage(v)` 치환은
+  **body 에 `id` 가 선언된 컴포넌트 수신(단일 식별자)** 에만 적용합니다. `input.value = …`, `downForm.prtDepoId.value = …` 처럼
+  DOM 요소·form 필드로 보이는 수신(체인 수신 또는 body 에 없는 id)은 그대로 두고 `규칙5b .value 대입 보류` 로 리포트합니다
+  (DOM 에는 `setValue` 가 없어 런타임 오류가 되던 오변환 방지 — sample-front/ui/fil ULDFIL52100·05040 사례).
 * **비교 연산자 엄격화**: `==` 및 `!=`를 찾아 타입 체크가 포함된 일치 연산자 `===` 및 `!==`로 수정.
 * **값 설정 API 변환**: `{컴포넌트명}.value = "";` 형태의 코드를 `{컴포넌트명}.setValue("");` 구조로 전면 치환.
 * **값 설정 API 변환**: `{컴포넌트명}.src = "";` 형태의 코드를 `{컴포넌트명}.setBackgroundImage("");` 구조로 전면 치환.
@@ -52,6 +60,9 @@
   - 원본 노드에 `ev:submitdone` 핸들러가 있으면 await 뒤에 `scwin.{핸들러}(sbmRtn);` 직접 호출로 순차 실행을 보존하고, 없으면 `// TODO Stage2: 응답 처리` 주석을 남깁니다.
   - await 이 삽입된 함수에는 `async` 키워드가 자동 부여되며, **호출부의 await 전파 필요 여부는 단계 2 검토**로 리포트됩니다.
   - **예외(콜백 스타일 유지)**: `ev:submiterror` 가 있는 노드는 오류 흐름이 콜백 기반이므로 기존 `submitDoneHandler` 옵션 스타일로 변환하고 단계 2 검토로 리포트합니다. 규칙 12/16 도 동일한 await 규약을 따릅니다.
+  - **표현식 내 호출**(2026-09-22 보강): `let res = await $c.sbm.execute(sbm_x);` 처럼 이미 `await` 가 붙어 있으면 `await` 를 덧붙이지 않고
+    (`await await` 방지) `let res = await $c.sbm.executeDynamic(sbmOptions);` 로 바꾸며, 대입형은 응답이 캡처된 것이므로 리포트하지 않습니다.
+    인자·조건식 위치 호출만 `await` 를 부여하고 "응답(rtn) 캡처 없음" 으로 단계 2 검토 리포트합니다.
 * 상세 매핑·`gridview` 역추적 규칙은 아래 [규칙 6 보충: Submission 변환 상세](#규칙-6-보충-submission-변환-상세) 를 참조하세요.
 
 ### 규칙 7: 레거시 공통함수 → gcc 공통함수($c.*) 치환
@@ -135,6 +146,11 @@
 * 문자열/비코드 내부는 보호합니다.
 
 ### 규칙 13: `scwin.fn_*` 정의 함수명 정규화 (`fn_` 제거 + camelCase)
+
+* **문자열 내 참조 동기화**(2026-09-22 보강): `scwin.fn_X` 접두 참조는 코드뿐 아니라 **문자열 리터럴·주석 안**(그리드 셀 HTML 의
+  `onclick="scwin.fn_X(...)"`, `href="javascript:scwin.fn_X(...)"`)까지 함께 개명합니다. 코드만 바꾸면 인라인 핸들러 문자열이
+  옛 이름을 불러 런타임에 깨집니다(sample-front/ui/fil ULDFIL52810 사례). 접두 없는 bare 참조(`fn_X`)는 종전대로 코드 세그먼트만 대상입니다
+  (전역 노출 `window.fn_X = scwin.X` 의 좌변·HTML 의 `javascript:fn_X(` 는 전역 이름이라 유지).
 
 * 스크립트에 **정의된** `scwin.fn_*` 함수(`scwin.fn_setFromToDate = function …`)의 `fn_` 접두어를 제거하고 **camelCase** 로 정규화합니다.
     * *변환 예:* `fn_setFromToDate` → `setFromToDate`, `fn_OpenRecvDetail` → `openRecvDetail`, `fn_in_charge` → `inCharge`, `fn_code1_sync` → `code1Sync`, `fn_GetByte` → `getByte`
@@ -393,7 +409,7 @@ $c.win.setEnterKeyEvent(tbl_search, scwin.btn_Search_onclick);
 
 ### 규칙 27: 그리드 자식 중복 id 재부여 (wsxml_lint WS120 해소)
 
-* **대상**: BODY 의 `<w2:caption>`/`<w2:header>`/`<w2:gBody>` — W-Craft 변환기가 그리드마다 `caption1`/`header1`/`gBody1` 을
+* **대상**: BODY 의 `<w2:caption>`/`<w2:header>`/`<w2:gBody>`/`<w2:row>`(2026-09-22 row 추가 — 그리드 3개 이상인 화면에서 `row3`/`row4` 중복이 남던 ULDFIL57000 사례) — W-Craft 변환기가 그리드마다 `caption1`/`header1`/`gBody1` 을
   복제 생성해 문서 전체에서 id 가 중복됩니다(wsxml_lint **WS120** 오류). (2026-09-01 확정)
 * **변환 규약**(결정적, convert.py 규칙 27): 태그별로 **첫 등장 id 는 유지**하고, 이후 중복은 `{base}{n}` 의 미사용 순번으로
   재부여합니다(`caption1`→유지, 두 번째 그리드→`caption2`, …). 그리드 내부 표시 전용 id 라 스크립트 참조가 없어 안전합니다.

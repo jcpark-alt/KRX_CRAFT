@@ -1,0 +1,459 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:ev="http://www.w3.org/2001/xml-events"
+    xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+    <head meta_screenName="ELW상장수수료계산기" meta_screenId="ULDFIL05040">
+        <w2:type>COMPONENT</w2:type>
+        <w2:buildDate/>
+        <w2:MSA/>
+        <xf:model>
+            <w2:dataCollection baseNode="map">
+            	<w2:dataMap baseNode="map" id="dlt_fileInfo">
+            		<w2:keyInfo>
+            			<w2:key id="binary" name="name1" dataType="text"></w2:key>
+            		</w2:keyInfo>
+            	</w2:dataMap>
+            	<w2:dataList baseNode="list" repeatNode="map" id="dlt_resultCalc">
+            		<w2:columnInfo>
+            			<w2:column id="isuAbbrv" name="종목약명" dataType="text"></w2:column>
+            			<w2:column id="isuQty" name="발행수량" dataType="text"></w2:column>
+            			<w2:column id="isuPrc" name="발행가액" dataType="text"></w2:column>
+            			<w2:column id="isuTotamt" name="발행총액" dataType="number"></w2:column>
+            			<w2:column id="isuFee" name="수수료" dataType="number"></w2:column>
+            		</w2:columnInfo>
+            	</w2:dataList>
+            </w2:dataCollection>
+            <w2:workflowCollection/>
+        </xf:model>
+        <w2:layoutInfo/>
+        <w2:publicInfo method=""/>
+        <script lazy="false" type="text/javascript"><![CDATA[
+///////// 1. 변수 및 선언 영역 /////////
+scwin.rsltFlag = "";
+
+///////// 2. 초기화 영역 /////////
+scwin.onpageload = function() {
+
+};
+
+///////// 3. 컴포넌트 이벤트 영역 /////////
+/* 
+ * 파일업로드 Event
+ */
+scwin.btn_upload_onclick = async function (e) {
+	try {
+		await scwin.feeCalcUploadPop();
+	} catch (ex) {
+		await $c.exception.handleError(ex, { context : "ULDFIL05040.btn_upload_onclick" });
+	}
+};
+
+/* 
+ * 양식다운로드 Event
+ */
+scwin.btn_excel_onclick = function (e) {
+    try {
+        scwin.openFormSubmit();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDFIL05040.btn_excel_onclick" });
+    }
+};
+
+/* 
+ * 엑셀다운로드 Event
+ */
+scwin.btn_excelDown_onclick = function (e) {
+	try {
+		scwin.saveExcel();
+	} catch (ex) {
+		$c.exception.handleError(ex, { context : "ULDFIL05040.btn_excelDown_onclick" });
+	}
+};
+
+/* 
+ * 계산원칙 Event
+ */
+scwin.btn_rules_onclick = function (e) {
+	try {
+		scwin.rules();
+	} catch (ex) {
+		$c.exception.handleError(ex, { context : "ULDFIL05040.btn_rules_onclick" });
+	}
+};
+
+/* 
+ * 초기화 Event
+ */
+scwin.btn_reset_onclick = function (e) {
+	try {
+		scwin.reset();
+	} catch (ex) {
+		$c.exception.handleError(ex, { context : "ULDFIL05040.btn_reset_onclick" });
+	}
+};
+
+/* 
+ * 인쇄 Event
+ */
+scwin.btn_print_onclick = async function (e) {
+	try {
+		await scwin.print();
+	} catch (ex) {
+		await $c.exception.handleError(ex, { context : "ULDFIL05040.btn_print_onclick" });
+	}
+};
+
+///////// 4. 서브미션 콜백 영역 /////////
+/* 
+ * 엑셀 다운로드
+ */
+ scwin.saveExcel = async function(){
+	
+	if(scwin.rsltFlag === "Y") {
+        const sbmOptions = {
+            id : "sbm_saveHdnchamp",
+            action : "/api/listing/applsubmit/elwappl/listing-fee-calc/calc-result-download",
+            method : "post",
+            ref : "dma_hdnchampReqRes",
+            isProcessMsg : true
+        };
+
+        const res =  await $c.sbm.executeDynamic(sbmOptions);
+        if (res.responseJSON.success === true) {
+            await $c.win.alert(sText+' 처리 성공했습니다.');
+            $c.win.closeAllPopup();
+        }
+            
+	} else {
+		$c.win.alert( '계산된 결과가 없습니다.');
+	}
+};
+
+/* 
+ * 인쇄
+ */
+ scwin.print = async function(){
+       
+	if(scwin.rsltFlag === "Y") {
+
+        const params = {
+            "printListDto" : dlt_resultCalc.getAllJSON()
+            ,"totFee"       : ibx_totFee.getValue()
+        }
+
+        const jsonData = JSON.stringify(params);
+        const sbmOptions = {
+            id: "sbm_print",
+            action: "/api/listing/applsubmit/elwappl/listing-fee-calc/calc-result-print",
+            method: "post",
+        };
+
+	    const res = await $c.sbm.executeDynamic(sbmOptions, jsonData);
+
+        if(res.responseJSON.success === true)  {
+            // TODO Stage2: 프로젝트 공통 $c.win.popupPrint 는 gcc 에 없다(gcc $c.win.print 는 화면 캡처 인쇄). 서버가 돌려준 인쇄 HTML 표시 방식 결정 후 대체
+            await $c.win.popupPrint(res.responseJSON.body); // 인쇄
+        }
+	} else {
+		$c.win.alert( '계산된 결과가 없습니다.');
+	}
+
+};
+
+///////// 5. 일반/업무 함수 영역 /////////
+/* 
+ * 계산원칙
+ */
+scwin.rules = function() {	
+
+    const url = "/ui/lst/helper/ULDFIL35709.xml";
+    const popTitle = "ELW 계산원칙";
+
+    const opts = {
+        id: "ULDFIL35709",
+        popupName: popTitle,
+        width: 700,
+        height: 700,
+        frameModal: "top",
+    };
+
+    $c.win.openPopup(url, opts);
+};
+
+/* 
+ * 양식다운로드
+ */
+// scwin.feeCalcSample = function() {
+
+//     // const sbmOptions = {
+//     //     id : "sbm_templateDownload",
+//     //     action : "/api/listing/applsubmit/elwappl/listing-fee-calc/template-download",
+//     //     method : "get",
+//     // };
+
+//     //  $c.sbm.executeDynamic(sbmOptions);
+
+//      //
+//      //
+// }
+
+/**
+ * @method
+ * @name openFormSubmit
+ * @description 폼(Form) 동적 생성 및 제출 공통함수
+ * @param {string} url - 요청할 엔드포인트 URL
+ * @hidden N
+ * @param {Object} [params={}] - 전송할 key-value 데이터 객체
+ * @param {Object} [options={}] - 추가 옵션 (method, target, removeAfterSubmit)
+ * @param {string} [options.method='POST'] - HTTP 메소드 ('POST', 'GET')
+ * @param {string} [options.target='_self'] - 제출 대상 ('_self', '_blank', 또는 iframe name)
+ * @param {boolean} [options.removeAfterSubmit=true] - 제출 후 DOM에서 form 제거 여부
+ * @example
+ * const url = "/api/listing/applsubmit/elwappl/listing-fee-calc/template-download"; 
+ * const params = {};
+ * const options = {
+ * 	   method : "GET"
+ * };
+ * $c.win.openFormSubmit(url, params, options);
+ */
+scwin.openFormSubmit = function(url, params = {}, options = {}) {
+	const {
+		method = 'GET',
+		target = '_self',
+		removeAfterSubmit = true
+	} = options;
+
+	// 1. Form 엘리먼트 생성 및 속성 설정
+	const form = document.createElement('form');
+	form.method = method.toUpperCase();
+	form.action = "/api/listing/applsubmit/elwappl/listing-fee-calc/template-download";
+	form.target = target;
+	form.style.display = 'none';
+
+	// 2. 파라미터 객체를 hidden input으로 변환하여 추가
+	Object.entries(params).forEach(([key, value]) => {
+		// 배열이나 객체 형태 처리 (문자열 변환)
+		const val = typeof value === 'object' ? JSON.stringify(value) : value;
+
+		const input = document.createElement('input');
+		input.type = 'hidden';
+		input.name = key;
+		input.value = val ?? '';
+		form.appendChild(input);
+	});
+
+	// 3. DOM에 추가 후 제출
+	document.body.appendChild(form);
+	form.submit();
+
+	// 4. 제출 후 DOM 정리
+	if (removeAfterSubmit) {
+		// submit 직후 삭제하면 일부 브라우저에서 취소될 수 있어 약간의 지연 후 삭제
+		setTimeout(() => {
+			form.remove();
+		}, 100);
+	}
+};
+
+/* 
+ * 파일업로드
+ */
+scwin.feeCalcUploadPop = async function() {
+
+    scwin.rsltFlag = "N";
+    
+    let url = "/ui/lst/list/ULDFIL05040_i0.xml";
+    let popTitle = "양식 파일업로드";
+
+    const opts = {
+        id: "ULDFIS00300_P3",
+        popupName: popTitle,
+        width: 800,
+        height: 700,
+        frameModal: "top",
+    };
+
+    const childData =  await $c.win.openPopup(url, opts);
+
+    if(childData.length > 0) await scwin.setGridData(childData);
+};
+
+/* 
+ * 그리드에 데이터 세팅
+ */
+scwin.setGridData = async function(childData){
+
+  dlt_resultCalc.setBroadcast(false);
+  for(let i = 0; i < childData.length; i++) {
+    dlt_resultCalc.insertRow(i);
+    dlt_resultCalc.setCellData(i, "isuAbbrv", childData[i].isuAbbrv );
+    dlt_resultCalc.setCellData(i, "isuQty", childData[i].isuQty );
+    dlt_resultCalc.setCellData(i, "isuPrc", childData[i].isuPrc );
+    dlt_resultCalc.setCellData(i, "isuTotamt", childData[i].isuTotamt );
+    dlt_resultCalc.setCellData(i, "isuFee", childData[i].isuFee );
+  }
+  dlt_resultCalc.setBroadcast(true, true);
+   ibx_totFee.setValue(childData[0].isuTotFee)
+
+   scwin.rsltFlag = "Y";
+};
+
+/* 
+ * 초기화
+ */
+ scwin.reset = function(){
+
+	if(scwin.rsltFlag  === "Y") {
+		scwin.rsltFlag  = "N"
+		ibx_totFee.setValue("");
+
+		// document.getElementById("feeCalcDiv_data").innerHTML = "";
+		dlt_resultCalc.removeAll();
+        // $("#feeCalcDiv_data").hide();
+		// $("#feeCalcDiv").show();		
+	} else {
+		$c.win.alert( '계산된 결과가 없습니다.');
+	}  
+};
+]]></script>
+    </head>
+    <body ev:onpageload="scwin.onpageload">
+    	<xf:group class="sub_contents" id="" meta_snippetCategory="00_화면시작" meta_snippetKeyComponent="true" meta_snippetName="0_01 페이지시작"
+    		style="">
+    		<w2:pageFrame src="/cm/xml/contentHeader.xml" style="" id="pfmContentHeader"></w2:pageFrame>
+    		<xf:group class="titbox" id="" meta_snippetCategory="02_타이틀" meta_snippetKeyComponent="true" meta_snippetName="2_03 서브타이틀(h4)"
+    			style="">
+    			<w2:textbox class="" id="" label="ELW 상장수수료 계산기 사용방법" style="" tagname="h4"></w2:textbox>
+    			<xf:group class="rt" id="" style="">
+    				<xf:trigger class="btn_cm  upload" id="btn_upload" style="" type="button" ev:onclick="scwin.btn_upload_onclick">
+    					<xf:label><![CDATA[엑셀업로드]]></xf:label>
+    				</xf:trigger>
+    				<xf:trigger class="btn_cm download" id="btn_excel" style="" type="button" ev:onclick="scwin.btn_excel_onclick">
+    					<xf:label><![CDATA[엑셀 양식 다운로드]]></xf:label>
+    				</xf:trigger>
+    			</xf:group>
+    		</xf:group>
+    		<xf:group class="txt_list char num" id="" tagname="ol" style="">
+    			<xf:group id="" tagname="li">
+    				<w2:textbox class="" escape="false" for="" id=""
+    					label="[양식 다운로드]를 통해서 양식 엑셀파일 다운로드 후 ELW 상장수수료 정보(종목약명, 발행수량, 발행가액)를 입력하고 저장합니다." style="" tagname="">
+    				</w2:textbox>
+    			</xf:group>
+    			<xf:group id="" tagname="li">
+    				<w2:textbox class="" escape="false" for="" id="" label="[파일 업로드] 버튼을 선택하면 '양식 파일 업로드' 팝업 화면이 표시됩니다." style=""
+    					tagname="">
+    				</w2:textbox>
+    			</xf:group>
+    			<xf:group id="" tagname="li">
+    				<w2:textbox class="" escape="false" for="" id="" label="'양식 파일 업로드' 팝업 화면을 통해서 엑셀 파일을 등록한 후 내용을 확인하고 [계산하기] 버튼을 선택합니다."
+    					style="" tagname="">
+    				</w2:textbox>
+    			</xf:group>
+    			<xf:group id="" tagname="li">
+    				<w2:textbox class="" escape="false" for="" id=""
+    					label="ELW 계산원칙에 의해 계산된 ELW 상장수수료 정보(상장발행총액, 수수료 포함)가 [ELW 상장수수료 계산 결과] 화면에 표시됩니다." style="" tagname="">
+    				</w2:textbox>
+    			</xf:group>
+    			<xf:group id="" tagname="li" style="">
+    				<w2:textbox class="" escape="false" for="" id="" label="[ELW 상장수수료 계산 결과] 정보는 버튼을 통해서 '엑셀 저장' 및 '인쇄'를 할 수 있습니다."
+    					style="" tagname="">
+    				</w2:textbox>
+    			</xf:group>
+    		</xf:group>
+    		<xf:group class="titbox" id="" meta_snippetCategory="02_타이틀" meta_snippetKeyComponent="true" meta_snippetName="2_02 서브타이틀(h3)"
+    			style="">
+    			<w2:textbox class="" id="" label="ELW 상장수수료 계산 결과" style="" tagname="h3"></w2:textbox>
+    			<xf:group class="rt" id="" style="">
+    				<w2:textbox id="" label="부과 수수료 합계" style=""></w2:textbox>
+    				<xf:input class="" id="ibx_totFee" meta_snippetCategory="10_입력폼" meta_snippetKeyComponent="true"
+    					meta_snippetName="10_01 InputBox" placeholder="" style="width:100px;" disabled="true">
+    				</xf:input>
+    				<xf:trigger class="btn_cm download" id="btn_excelDown" style="" type="button"
+    					ev:onclick="scwin.btn_excelDown_onclick">
+    					<xf:label><![CDATA[엑셀다운로드]]></xf:label>
+    				</xf:trigger>
+    				<xf:trigger class="btn_cm " id="btn_rules" style="" type="button" ev:onclick="scwin.btn_rules_onclick">
+    					<xf:label><![CDATA[계산원칙]]></xf:label>
+    				</xf:trigger>
+    				<xf:trigger class="btn_cm " id="btn_reset" style="" type="button" ev:onclick="scwin.btn_reset_onclick">
+    					<xf:label><![CDATA[초기화]]></xf:label>
+    				</xf:trigger>
+    				<xf:trigger class="btn_cm " id="btn_print" style="" type="button" ev:onclick="scwin.btn_print_onclick">
+    					<xf:label><![CDATA[인쇄]]></xf:label>
+    				</xf:trigger>
+    			</xf:group>
+    		</xf:group>
+    		<xf:group adaptiveThreshold="" class="gvwbox" id="" meta_snippetCategory="06_그리드" meta_snippetKeyComponent="true"
+    			meta_snippetName="6_02 그리드_순번_상태" style="">
+    			<w2:gridView autoFit="allColumn" checkReadOnlyOnPasteEnable="" class="gvw" dataList="data:dlt_resultCalc" focusMode="row"
+    				id="grd_list" keepDefaultColumnWidth="true" rowNumHeaderValue="번호" rowNumVisible="true" rowNumWidth="50" scrollByColumn="false"
+    				scrollByColumnAdaptive="false" style="height:280px;">
+    				<w2:caption id="caption2" style="" value="this is a grid caption."></w2:caption>
+    				<w2:header id="header2" style="">
+    					<w2:row id="row3" style="">
+    						<w2:column blockSelect="false" displayMode="label" id="column11" inputType="text" removeBorderStyle="false"
+    							value="종목약명" width="70">
+    						</w2:column>
+    						<w2:column blockSelect="false" displayMode="label" id="column10" inputType="text" removeBorderStyle="false"
+    							value="발행수량" width="70">
+    						</w2:column>
+    						<w2:column blockSelect="false" displayMode="label" id="column9" inputType="text" removeBorderStyle="false"
+    							value="발행가액" width="70">
+    						</w2:column>
+    						<w2:column blockSelect="false" displayMode="label" id="column8" inputType="text" removeBorderStyle="false"
+    							value="발행총액" width="70">
+    						</w2:column>
+    						<w2:column blockSelect="false" displayMode="label" id="column7" inputType="text" removeBorderStyle="false"
+    							value="수수료" width="70">
+    						</w2:column>
+    					</w2:row>
+    				</w2:header>
+    				<w2:gBody id="gBody2" style="">
+    					<w2:row id="row4" style="">
+    						<w2:column blockSelect="false" displayMode="label" id="isuAbbrv" inputType="text" removeBorderStyle="false"
+    							width="70">
+    						</w2:column>
+    						<w2:column blockSelect="false" displayMode="label" id="isuQty" inputType="text" removeBorderStyle="false"
+    							width="70" textAlign="right" dataType="number" displayFormat="#,##0">
+    						</w2:column>
+    						<w2:column blockSelect="false" displayMode="label" id="isuPrc" inputType="text" removeBorderStyle="false"
+    							width="70" textAlign="right" dataType="number" displayFormat="#,##0">
+    						</w2:column>
+    						<w2:column blockSelect="false" displayMode="label" id="isuTotamt" inputType="text" removeBorderStyle="false"
+    							width="70" dataType="number" displayFormat="#,##0" textAlign="right">
+    						</w2:column>
+    						<w2:column blockSelect="false" displayMode="label" id="isuFee" inputType="text" removeBorderStyle="false"
+    							width="70" dataType="number" displayFormat="#,##0" textAlign="right">
+    						</w2:column>
+    					</w2:row>
+    				</w2:gBody>
+    			</w2:gridView>
+    		</xf:group>
+    		<w2:textbox class="txt_info mb5 mt30" dataType="" id="" label="ELW 상장수수료 납부계좌" meta_snippetCategory="11_메시지"
+    			meta_snippetKeyComponent="true" meta_snippetName="11_03 정보제공메시지" style="">
+    		</w2:textbox>
+    		<xf:group class="txt_list" id="" tagname="ul" style="">
+    			<xf:group id="" tagname="li" class="red">
+    				<w2:textbox class="" escape="false" for="" id="" label="신한은행 140-003-997689 (구. 계좌번호 신한은행 305-05-042570)" style=""
+    					tagname="">
+    				</w2:textbox>
+    			</xf:group>
+    			<xf:group id="" tagname="li" class="blue">
+    				<w2:textbox class="" escape="false" for="" id="" label="예금주 : (주)한국거래소" style="" tagname=""></w2:textbox>
+    			</xf:group>
+    		</xf:group>
+    		<w2:textbox class="txt_info mt10" dataType="" id="" label="상장금액에 따라 정해진 요율을 적용하여 상장수수료를 자동 계산합니다." meta_snippetCategory="11_메시지"
+    			meta_snippetKeyComponent="true" meta_snippetName="11_03 정보제공메시지" style="">
+    		</w2:textbox>
+    		<w2:textbox class="txt_info mt10" dataType="" id="" label="10억원당 수수료율 산정시 10억원 미만의 금액은 버림하여 산정합니다." meta_snippetCategory="11_메시지"
+    			meta_snippetKeyComponent="true" meta_snippetName="11_03 정보제공메시지" style="">
+    		</w2:textbox>
+    		<w2:textbox class="txt_info mt10" dataType="" id="" label="계산된 상장수수료금액은 예정상장 수수료금액이므로 확정 상장수수료금액을 확인 하시려면 개별종목 거래소 공시담당자에게&lt;br/&gt;문의하시기 바랍니다." meta_snippetCategory="11_메시지"
+    			meta_snippetKeyComponent="true" meta_snippetName="11_03 정보제공메시지" style="">
+    		</w2:textbox>
+    		<w2:textbox class="txt_info mt10" dataType="" id="" label="상장수수료 부과 관련 상세내용은 KRX법규서비스(https://rule.krx.co.kr)를 참조해주세요." meta_snippetCategory="11_메시지"
+    			meta_snippetKeyComponent="true" meta_snippetName="11_03 정보제공메시지" style="">
+    		</w2:textbox>
+    	</xf:group>
+    </body>
+</html>
