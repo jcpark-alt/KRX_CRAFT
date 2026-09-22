@@ -57,10 +57,26 @@ function loadWindow(overrides = {}) {
     save() { calls.pdfSave++; return Promise.resolve(); },
   };
 
+  // 최대화된 windowContainer 창(.w2window.w2window_maximized.w2window_selected) — overrides.maximizedWin 으로 주입.
+  // 캡처 시점의 inline width 를 기록해 "캡처 중에만 px 고정, 끝나면 복원" 을 검증한다.
+  const maximizedWin = overrides.maximizedWin || null;
+  // 출력 대상은 element.closest(".w2window.w2window_maximized") 로 자기가 속한 최대화 창을 찾는다 — 주입된 창을 돌려주는 closest 를 심는다
+  const closest = (sel) => (sel === ".w2window.w2window_maximized" ? maximizedWin : null);
+  frameRender.closest = closest; body.closest = closest;
+  Object.values(elements).forEach((el) => { el.closest = closest; });
+  calls.widthAtCapture = [];
+  const noteWidth = () => { if (maximizedWin) calls.widthAtCapture.push(maximizedWin.style.width); };
+
   // config.xml engine module 로 로드된 전역을 흉내 낸다
   const win = { screen: { availWidth: 1920, availHeight: 1080, availTop: 0, availLeft: 0 }, opener: null };
-  if (libs.html2canvas) win.html2canvas = async (el, o) => { calls.html2canvas.push({ el, o }); return canvasMock; };
+  if (libs.html2canvas) win.html2canvas = async (el, o) => {
+    noteWidth();
+    if (overrides.captureError) throw new Error(overrides.captureError);
+    calls.html2canvas.push({ el, o }); return canvasMock;
+  };
   if (libs.html2pdf) win.html2pdf = () => pdfChain;
+  const pdfFromOrig = pdfChain.from;
+  pdfChain.from = (el) => { noteWidth(); return pdfFromOrig(el); };
 
   const sandbox = {
     console, JSON, Array, String, Object, Date, Boolean, Number, Promise, Math, Error,
@@ -103,10 +119,48 @@ function loadWindow(overrides = {}) {
   vm.runInContext(extractCdata(XML_FILE), sandbox, { filename: path.basename(XML_FILE) + ".cdata.js" });
   sandbox.$c.win = sandbox.scwin;
 
-  return { scwin: sandbox.scwin, calls, frameRender, elements, iframe, body, win };
+  return { scwin: sandbox.scwin, calls, frameRender, elements, iframe, body, win, maximizedWin };
 }
 
 describe("화면 인쇄·PDF 저장 $c.win.print — 메인·팝업 공통 (cm/gcc/win.xml)", () => {
+  // 최대화된 windowContainer 창은 폭이 % 라 html2canvas 가 폭을 잘못 재므로 캡처 중에만 px 로 고정하고 끝나면 복원한다.
+  const makeMaximized = () => ({ clientWidth: 1280, style: { width: "" } });
+
+  test("최대화 창: print 캡처 중에는 폭이 clientWidth px 로 고정되고, 끝나면 원래 inline width 로 복원된다", async () => {
+    const w = loadWindow({ maximizedWin: makeMaximized() });
+    await w.scwin.print();
+    expect(w.calls.widthAtCapture).toEqual(["1280px"]);
+    expect(w.maximizedWin.style.width).toBe("");
+  });
+
+  test("최대화 창: pdf 경로도 캡처 중 고정·완료 후 복원(기존 inline width 유지)", async () => {
+    const w = loadWindow({ maximizedWin: { clientWidth: 1024, style: { width: "50%" } } });
+    await w.scwin.print({ type: "pdf" });
+    expect(w.calls.widthAtCapture).toEqual(["1024px"]);
+    expect(w.maximizedWin.style.width).toBe("50%");
+  });
+
+  test("최대화 창: 캡처가 실패해도 폭은 복원된다(try/finally)", async () => {
+    const w = loadWindow({ maximizedWin: makeMaximized(), captureError: "canvas fail" });
+    await expect(w.scwin.print()).rejects.toThrow("canvas fail");
+    expect(w.maximizedWin.style.width).toBe("");
+  });
+
+  test("최대화 창이 없으면(일반 화면) 폭 조작 없이 그대로 캡처한다", async () => {
+    const w = loadWindow();
+    await w.scwin.print();
+    expect(w.calls.widthAtCapture).toEqual([]);
+    expect(w.calls.html2canvas).toHaveLength(1);
+  });
+
+  test("최대화 창은 출력 대상(element)이 속한 창에서 closest 로 찾는다 — closest 가 없는 요소(구형 DOM)면 조작 없이 진행", async () => {
+    const w = loadWindow({ maximizedWin: makeMaximized() });
+    const bare = { id: "bare", nodeType: 1, scrollWidth: 100, scrollHeight: 100 };   // closest 없음
+    await w.scwin.print({ target: bare });
+    expect(w.calls.widthAtCapture).toEqual([""]);                                   // 캡처 시점에도 폭이 그대로(px 고정 없음) — 대상이 최대화 창 안이 아니면 건드리지 않는다
+    expect(w.maximizedWin.style.width).toBe("");
+  });
+
   test("기본(print): 현재 frame DOM 캡처 → 숨김 iframe 에 이미지를 써서 인쇄 (동적 로드 없음)", async () => {
     const w = loadWindow();
     await w.scwin.print();

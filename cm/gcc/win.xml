@@ -2195,6 +2195,8 @@ scwin.PRINT_DEFAULT_OPTIONS = {
  *              전역이 없으면 등록 안내와 함께 Error 를 던진다(동적 로드는 하지 않는다).
  *              options.target 으로 화면 안의 특정 영역만 출력할 수 있고, frame 이 없는 화면에서 부르면 document.body 를 출력한다.
  *              스크롤로 가려진 영역까지 캡처하므로 긴 내용도 잘리지 않는다.
+ *              출력 대상이 최대화된 windowContainer 창(.w2window.w2window_maximized) 안에 있으면 캡처하는 동안만 그 창의 폭을
+ *              현재 픽셀 폭으로 고정해 html2canvas 의 % 폭 오측정을 막고, 캡처가 끝나면(실패해도) 원래 inline width 로 되돌린다.
  * @param {Object} options 출력 옵션 (생략 시 기본값 — 화면 전체 인쇄)
  * @param {String} options.type [default : "print"] "print" 인쇄 대화상자 | "pdf" PDF 파일 저장
  * @param {Object|String|HTMLElement} options.target [default : 현재 화면 frame] 출력 영역 — WebSquare 컴포넌트 객체, DOM id, DOM 요소
@@ -2236,14 +2238,30 @@ scwin.print = async function (options) {
     // 라이브러리는 config.xml 의 engine module 로 정적 로드돼 있어야 한다 (html2pdf 번들은 전역 html2canvas 를 노출하지 않으므로 둘 다 필요)
     scwin.__checkPrintLib(opt.type);
 
-    if (opt.type === "pdf") {
-        await scwin.__savePdf(element, opt);
-        return;
+    // 출력 대상이 최대화된 windowContainer 창 안에 있으면 그 창을 잡는다(문서 전체의 "선택된 창"이 아니라 대상이 속한 창).
+    // 최대화 창은 폭이 % 라 html2canvas 가 폭을 잘못 재므로, 캡처하는 동안만 현재 픽셀 폭으로 고정하고
+    // 캡처가 끝나면(실패해도) 원래 inline width 로 되돌린다 — 그대로 두면 이후 브라우저 크기 변경에 창이 따라가지 않는다.
+    const maximizedWin = (typeof element.closest === "function") ? element.closest(".w2window.w2window_maximized") : null;
+    const prevWidth = maximizedWin ? maximizedWin.style.width : "";
+
+    if (maximizedWin) {
+        maximizedWin.style.width = maximizedWin.clientWidth + "px";
     }
 
-    const canvas = await window.html2canvas(element, scwin.__getCanvasOptions(element, opt));
+    try {
+        if (opt.type === "pdf") {
+            await scwin.__savePdf(element, opt);
+            return;
+        }
 
-    scwin.__printCanvas(canvas, opt.title || document.title);
+        const canvas = await window.html2canvas(element, scwin.__getCanvasOptions(element, opt));
+
+        scwin.__printCanvas(canvas, opt.title || document.title);
+    } finally {
+        if (maximizedWin) {
+            maximizedWin.style.width = prevWidth;
+        }
+    }
 };
 
 /**
