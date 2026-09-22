@@ -551,8 +551,10 @@ def _defined_function_names(code):
 def rule11_remove_include(code, report):
     """스크립트 영역에서 `include(...)` 로 시작하는 라인을 삭제한다 — 활성·`//` 주석 처리·**블록 주석(`/* */`) 내부** 모두
     (2026-09-03 보강: 블록 주석으로 감싼 include 묶음이 잔존하던 사례 대응 — ULDSTF30304).
+    2026-09-22 보강: `// #include(...)`, `// //#include(...)` 처럼 **주석 접두가 여러 겹**이거나 `#` 가 붙은
+    W-Craft 이중 주석 변형도 삭제한다(ULDSTF07400 계열·ULDMGT50002 잔존 사례).
     라인 선두 앵커 매칭이라 문자열 내부 오탐은 사실상 없다(레거시 소스에 개행 포함 템플릿 리터럴 없음)."""
-    pat = re.compile(r'(?m)^[ \t]*(/+[ \t]*)?include\b\s*\([^\n]*\r?\n?')
+    pat = re.compile(r'(?m)^[ \t]*(?:/+[ \t]*)*#?include\b\s*\([^\n]*\r?\n?')
     code, removed = pat.subn('', code)
     report["rule11"] = removed
     return code
@@ -1236,11 +1238,43 @@ def rule4_structure(script, body, report):
     return result, body
 
 
+_WCRAFT_GUIDE_RE = re.compile(r'(?ms)^[ \t]*/\*[ \t]*★Wcraft guide★.*?\*/[ \t]*\r?\n?')
+# guide 블록 상용구(정보 없음) — 이 줄들만으로 이뤄진 블록은 리포트 없이 삭제
+_WCRAFT_GUIDE_BOILER_RE = re.compile(r'^(?:\*/|/\*.*|★Wcraft guide★.*|스크립트 수작업 유의사항|-+|\d+\.|\d+\.\s*include 제거)$')
+
+
+def _wcraft_guide_notes(block):
+    """guide 블록 본문에서 상용구를 제외한 안내 문장만 추려 한 줄로 요약한다(단계 2 리포트용)."""
+    notes = []
+    for ln in block.splitlines():
+        s = ln.strip()
+        if s == "" or _WCRAFT_GUIDE_BOILER_RE.match(s):
+            continue
+        notes.append(s)
+    summary = " | ".join(notes)
+    return summary if len(summary) <= 300 else summary[:297] + "..."
+
+
 def remove_wcraft_markers(script, report=None):
-    """`//----W-Craft ...----//` 변환 확인 마커 주석 라인을 **삭제**한다(2026-09-03 변경 — 종전 "들여쓰기 정렬 유지" 폐기).
-    블록 주석 내부의 마커 라인도 삭제하며, 삭제로 내용이 비게 된 블록 주석(`/* */`)은 함께 제거한다. 멱등."""
+    """W-Craft 도구가 남긴 주석을 **전부 삭제**한다(2026-09-03 마커 삭제 확정, 2026-09-22 범위 확대).
+    - `//----W-Craft ...----//` 변환 확인 마커 라인: `// \t//----W-Craft …` 처럼 주석 접두가 여러 겹인 이중 주석 변형 포함,
+      블록 주석 내부 포함. 삭제로 내용이 비게 된 블록 주석(`/* */`)은 함께 제거한다.
+    - `/* ★Wcraft guide★ … */` 파일 헤더 안내 블록: 2026-09-22 부터 **삭제**(종전 "유지" 폐기 — 변환 검수용 표식은 산출물에 남기지 않음).
+      상용구(제목·구분선·"N. include 제거") 외의 안내 문장(예: "X 로 변환된 곳 확인", "eval함수 사용 수")은 삭제 전에
+      `judgment` 리포트로 이관해 단계 2 확인 사항으로 남긴다.
+    멱등."""
+    guide_cnt = 0
+    def _drop_guide(mo):
+        nonlocal guide_cnt
+        guide_cnt += 1
+        if report is not None:
+            notes = _wcraft_guide_notes(mo.group(0))
+            if notes:
+                report.setdefault("judgment", []).append("규칙30 ★Wcraft guide★ 안내 삭제 — 단계2 확인 사항: " + notes)
+        return ""
+    script = _WCRAFT_GUIDE_RE.sub(_drop_guide, script)
     lines = script.split("\n")
-    marker_re = re.compile(r'^[ \t]*//-+\s*W-Craft[^\n]*$')
+    marker_re = re.compile(r'^[ \t]*(?://[ \t]*)*//-+\s*W-Craft[^\n]*$')
     kept = [ln for ln in lines if not marker_re.match(ln)]
     cnt = len(lines) - len(kept)
     script = "\n".join(kept)
@@ -1248,6 +1282,7 @@ def remove_wcraft_markers(script, report=None):
     script = re.sub(r'(?m)^[ \t]*/\*[ \t]*\n(?:[ \t]*\n)*[ \t]*\*/[ \t]*\r?\n?', '', script)
     if report is not None:
         report["wcraft"] = cnt
+        report["wcraft_guide"] = guide_cnt
     return script
 
 
@@ -2558,6 +2593,7 @@ def print_report(rep, filename):
     print("규칙9 불필요 $c.cm.* 호출 제거 :", rep["rule9"], "건")
     print("규칙10 <xf:events>/<xf:event> 삭제 :", rep["rule10"], "건")
     print("규칙11 include(...) 라인 삭제 :", rep["rule11"], "건")
+    print("규칙30 W-Craft 변환 확인 마커 삭제 :", rep.get("wcraft", 0), "건 / ★Wcraft guide★ 블록 삭제 :", rep.get("wcraft_guide", 0), "건")
     print("규칙12 DataID/reset → executeDynamic :", len(rep["rule12"]["converted"]), "건")
     for s in rep["rule12"]["converted"]:
         print("   -", s)

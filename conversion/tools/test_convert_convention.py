@@ -440,11 +440,12 @@ scwin.a = function () {
     out = convert.rule11_remove_include(src, rep)
     assert rep["rule11"] == 2
     out = convert.remove_wcraft_markers(out, rep)
-    assert "W-Craft" not in out.replace("★Wcraft guide★", "")   # 확인 마커 전부 삭제
+    assert "W-Craft" not in out                                   # 확인 마커 전부 삭제
     assert "include(" not in out
-    assert "★Wcraft guide★" in out                               # 파일 헤더 가이드 블록은 유지
-    assert out.count("/*") == 1                                   # 빈 껍데기 블록 주석 제거
-    assert rep["wcraft"] == 3
+    assert "★Wcraft guide★" not in out                           # 파일 헤더 가이드 블록도 삭제(2026-09-22 정책)
+    assert out.count("/*") == 0                                   # 빈 껍데기 블록 주석 제거
+    assert rep["wcraft"] == 3 and rep["wcraft_guide"] == 1
+    assert rep.get("judgment", []) == []                          # 상용구만 있던 guide 는 리포트 없음
     again = convert.remove_wcraft_markers(convert.rule11_remove_include(out, {}), {})
     assert again == out                                           # 멱등
 
