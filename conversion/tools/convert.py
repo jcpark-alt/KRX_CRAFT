@@ -265,14 +265,38 @@ def rule2_globals(code, report):
     return res
 
 
-def rule5a_strict_eq(code, report):
-    cnt = [0]
+_NULLISH_RE = re.compile(r'\b(?:null|undefined)\b')
+
+
+def _is_nullish_compare(seg, start, end):
+    """seg[start:end] 가 `==`/`!=` 연산자일 때 좌·우 피연산자 중 하나가 null/undefined 리터럴인지."""
+    right = seg[end:].lstrip()
+    m = _NULLISH_RE.match(right)
+    if m and (len(right) == m.end() or not (right[m.end()].isalnum() or right[m.end()] in "_$")):
+        return True
+    left = seg[:start].rstrip()
+    return bool(re.search(r'(?<![\w$.])(?:null|undefined)$', left))
+
+
+def rule5a_strict_eq(code, report, keep_nullish=False):
+    """`==`/`!=` → `===`/`!==`. keep_nullish=True(라이브러리 프로파일)면 `x == null`/`x != undefined` 처럼
+    null 과 undefined 를 함께 걸러내는 관용구는 그대로 두고 건수만 리포트한다(`=== null` 로 바꾸면 undefined 가 새어 나가
+    공통함수 호출부 전체의 동작이 달라질 수 있음 — 2026-09-22)."""
+    cnt = [0, 0]
     def sub_seg(s):
-        s = re.sub(r'(?<![=!<>])==(?!=)', lambda m: (cnt.__setitem__(0, cnt[0]+1) or "==="), s)
-        s = re.sub(r'(?<![<>])!=(?!=)', lambda m: (cnt.__setitem__(0, cnt[0]+1) or "!=="), s)
+        def repl(m, strict):
+            if keep_nullish and _is_nullish_compare(s, m.start(), m.end()):
+                cnt[1] += 1
+                return m.group(0)
+            cnt[0] += 1
+            return strict
+        s = re.sub(r'(?<![=!<>])==(?!=)', lambda m: repl(m, "==="), s)
+        s = re.sub(r'(?<![<>])!=(?!=)', lambda m: repl(m, "!=="), s)
         return s
     out = [sub_seg(t) if c else t for t, c in segments(code)]
     report["rule5a"] = cnt[0]
+    if keep_nullish:
+        report["rule5a_nullish_kept"] = cnt[1]
     return "".join(out)
 
 
@@ -2471,23 +2495,78 @@ def rule28_broadcast_guard(script, head, report):
     return script
 
 
-def convert(raw, filename):
+# 라이브러리 프로파일(--profile lib) — cm/pcc/** 업무공통 파일용 규칙 화이트리스트.
+# 화면 전용 규칙(1 vScrenID·2/4 섹션 재배치·3 핸들러·6/12/16/17/25 서브미션·popup·10 events·13 rename·
+# 26 try/catch·27 grid id·28 broadcast·5b/5c DOM 대입·format_script JSDoc 정렬)은 라이브러리에서 오변환/노이즈를
+# 내므로 제외한다(2026-09-22 dry-run 근거: 규칙 1 이 vScrenID **파라미터**를 파일명으로 치환, 5b 가 DOM .value 를 setValue 로 변환).
+LIB_PROFILE_RULES = ("5a(nullish 보존)", "5e", "5d", "9", "11", "8", "7", "7m", "7n", "14", "15", "20", "20b", "21", "23", "31",
+                     "30", "fmt_comment_space", "collapse_blank_runs")
+PROFILES = ("screen", "lib")
+
+
+def _new_report(profile="screen"):
+    return {"profile": profile, "rule1": "", "rule2": 0, "rule2_skip": [], "rule3": [], "rule4": None, "rule4_merge": None,
+            "rule5a": 0, "rule5b": [], "rule5c": [], "rule5d": [], "rule6": {"converted": [], "deleted": 0}, "rule7": [],
+            "rule7m": [], "rule7n": [], "rule8": {"const": 0, "let": 0}, "rule9": 0, "rule10": 0, "rule11": 0,
+            "rule12": {"converted": []}, "rule13": [], "rule14": [], "rule15": [], "rule16": {"converted": [], "skipped": []},
+            "rule17": {"converted": [], "skipped": []}, "rule20": [], "rule21": [], "rule23": [], "rule31": [],
+            "async_marked": [], "wcraft": 0, "judgment": []}
+
+
+def convert(raw, filename, profile="screen"):
     """단계 1 변환 진입점 — 규칙 파이프라인(_convert_once)을 고정점까지 반복 적용한다.
+    profile="screen"(기본, ui→ui-tobe 화면) 또는 "lib"(cm/pcc 업무공통 라이브러리 — LIB_PROFILE_RULES 화이트리스트).
     개별 규칙은 멱등이지만 재배치·헤더 삽입·공백 정리의 상호작용으로 1회차에 미세 공백이
     남는 사례가 있어, 출력이 더 이상 변하지 않을 때까지(최대 2회 추가) 재적용해 수렴시킨다.
     리포트는 실질 변환이 일어난 1회차 것을 반환한다. a↔b 진동은 수렴하지 않으므로
     convert_all 의 IDEM 검사에 그대로 검출된다."""
-    result, report = _convert_once(raw, filename)
+    if profile not in PROFILES:
+        raise ValueError("알 수 없는 profile: %s (screen|lib)" % profile)
+    result, report = _convert_once(raw, filename, profile)
     for _ in range(2):
-        again, _rep = _convert_once(result, filename)
+        again, _rep = _convert_once(result, filename, profile)
         if again == result:
             break
         result = again
     return result, report
 
 
-def _convert_once(raw, filename):
-    report = {"rule1": "", "rule2": 0, "rule2_skip": [], "rule3": [], "rule4": None, "rule4_merge": None, "rule5a": 0, "rule5b": [], "rule5c": [], "rule5d": [], "rule6": {"converted": [], "deleted": 0}, "rule7": [], "rule7m": [], "rule7n": [], "rule8": {"const": 0, "let": 0}, "rule9": 0, "rule10": 0, "rule11": 0, "rule12": {"converted": []}, "rule13": [], "rule14": [], "rule15": [], "rule16": {"converted": [], "skipped": []}, "rule17": {"converted": [], "skipped": []}, "rule20": [], "rule21": [], "rule23": [], "rule31": [], "async_marked": [], "wcraft": 0, "judgment": []}
+def _convert_once_lib(raw, filename):
+    """라이브러리 프로파일 1회 적용 — 함수 순서·JSDoc 들여쓰기·publicInfo 를 건드리지 않는 코드 품질 규칙만 실행한다.
+    스크립트 선두 개행도 보존(format_script 미적용)."""
+    report = _new_report("lib")
+    reg = split_regions(raw)
+    if reg is None:
+        raise ValueError("SCRIPT(CDATA) 영역을 찾지 못했습니다.")
+    s = reg["script"]
+    s = rule5a_strict_eq(s, report, keep_nullish=True)
+    s = rule5e_neg_compare(s, report)
+    s = rule5d_method_rename(s, report)
+    s = rule9_remove_obsolete(s, report)
+    s = rule11_remove_include(s, report)
+    s = rule8_var(s, report)
+    s = rule7_gcc_substitute(s, report)
+    s = rule7m_method_substitute(s, report)
+    s = rule7n_normalize_module_fn(s, report)
+    s = rule14_component_method(s, report)
+    s = rule15_alert_error(s, report)
+    s = rule20_grid_excel_download(s, report)
+    s = rule20b_normalize_excel_positional(s, report)
+    s = rule21_frame_provider(s, report)
+    s = rule23_grid_visible_rownum_all(s, report)
+    s = rule31_remove_eval(s, report)
+    s = remove_wcraft_markers(s, report)
+    s = format_comment_space(s, report)
+    s = collapse_blank_runs(s)
+    collect_judgment(s, reg["head"], reg["body"], report)
+    result = reg["head"] + reg["script_open"] + s + reg["script_close"] + reg["body"]
+    return result, report
+
+
+def _convert_once(raw, filename, profile="screen"):
+    if profile == "lib":
+        return _convert_once_lib(raw, filename)
+    report = _new_report("screen")
     reg = split_regions(raw)
     if reg is None:
         raise ValueError("SCRIPT(CDATA) 영역을 찾지 못했습니다.")
@@ -2537,7 +2616,10 @@ def _convert_once(raw, filename):
 
 
 def print_report(rep, filename):
-    print("==== [단계1] Python 기계 치환 리포트 :", filename, "====")
+    print("==== [단계1] Python 기계 치환 리포트 :", filename, "(profile=%s) ====" % rep.get("profile", "screen"))
+    if rep.get("profile") == "lib":
+        print("적용 규칙(라이브러리 프로파일) :", ", ".join(LIB_PROFILE_RULES))
+        print("규칙5a nullish 비교(== null/undefined) 보존 :", rep.get("rule5a_nullish_kept", 0), "건")
     print("규칙1 vScrenID :", rep["rule1"])
     print("규칙2 전역변수 이동 :", rep["rule2"], "건", ("(이동보류 %d건)" % len(rep["rule2_skip"])) if rep["rule2_skip"] else "")
     for s in rep["rule2_skip"]:
@@ -2630,13 +2712,35 @@ def print_report(rep, filename):
         print(" * " + s)
 
 
+def _parse_cli(argv):
+    """argv(프로그램명 제외) → (src, out|None, profile). `--profile lib` / `--profile=lib` 지원."""
+    profile, pos = "screen", []
+    i = 0
+    while i < len(argv):
+        a = argv[i]
+        if a == "--profile":
+            if i + 1 >= len(argv):
+                raise ValueError("--profile 값이 없습니다(screen|lib)")
+            profile = argv[i + 1]; i += 2; continue
+        if a.startswith("--profile="):
+            profile = a.split("=", 1)[1]; i += 1; continue
+        pos.append(a); i += 1
+    if not pos:
+        raise ValueError("usage: python convert.py <src.xml> [out.xml] [--profile screen|lib]")
+    if profile not in PROFILES:
+        raise ValueError("알 수 없는 profile: %s (screen|lib)" % profile)
+    return pos[0], (pos[1] if len(pos) > 1 else None), profile
+
+
 def main():
-    if len(sys.argv) < 2:
-        print("usage: python convert.py <src.xml> [out.xml]", file=sys.stderr); sys.exit(2)
-    src = Path(sys.argv[1])
-    out = Path(sys.argv[2]) if len(sys.argv) > 2 else src.with_suffix(".converted.xml")
+    try:
+        src_arg, out_arg, profile = _parse_cli(sys.argv[1:])
+    except ValueError as e:
+        print(str(e), file=sys.stderr); sys.exit(2)
+    src = Path(src_arg)
+    out = Path(out_arg) if out_arg else src.with_suffix(".converted.xml")
     raw = io.open(src, "r", encoding="utf-8").read()
-    result, report = convert(raw, src.name)
+    result, report = convert(raw, src.name, profile)
     io.open(out, "w", encoding="utf-8", newline="").write(result)
     sys.stdout.reconfigure(encoding="utf-8")
     print_report(report, src.name)

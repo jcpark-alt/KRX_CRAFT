@@ -23,6 +23,8 @@ WebSquare XML 은 `head(xml) → script(JavaScript, CDATA) → body(xml)` 구조
 
 "입력이 같으면 출력이 항상 같은" **결정적(deterministic)** 변환만 Python 으로 일괄 처리합니다. 판단이 필요 없는 1:1 규칙이 대상입니다.
 
+> **프로파일**: 기본 `screen`(ui → ui-tobe 화면, 아래 표 전부) / `--profile lib`(`cm/pcc/**` 업무공통 라이브러리 — 규칙 5a(nullish 보존)·5d·5e·7·7m·7n·8·9·11·14·15·20·20b·21·23·30·31 화이트리스트만, 제자리 멱등 실행). 상세는 [conversion_rules.md](conversion_rules.md) §라이브러리 프로파일.
+>
 > **참조 구현**: `conversion/tools/convert.py` — 영역 분리 + 규칙 1~12 결정적 치환(문자열/주석/정규식 보호)과 단계 2 리포트 출력. 규칙 7 은 `gcc_mapping.substitution_dict()` 를 단일 출처로 쓰고, 검토/대체 태그·충돌 함수는 자동 치환하지 않고 리포트로 분리합니다. 마지막에 포매팅을 적용합니다: **`//----W-Craft` 변환 확인 마커 주석 전부 삭제**(규칙 30 — 2026-09-03 변경, 종전 "정렬 유지" 폐기·빈 블록 주석 껍데기 동반 제거), **함수 단위 빈 줄 1개 삽입**, **함수 주석 맨앞(컬럼 0) 정렬**. 일괄 실행은 `conversion/tools/convert_all.py`.
 > 실행: `python conversion/tools/convert.py <src.xml> [out.xml]`
 

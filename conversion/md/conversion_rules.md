@@ -500,6 +500,33 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
   결과에 `eval(` 이 남지 않아 **재변환 no-op(멱등)** 이고, 보류 건은 실행마다 리포트됩니다.
 * **기대 효과**: CSP `unsafe-eval` 불필요, 코드 의도(숫자/컴포넌트/JSON)가 드러나 정적 검사(ESLint `no-eval`)·리팩토링 가능.
 
+### 라이브러리 프로파일 (`--profile lib`) — `cm/pcc/**` 업무공통 파일 적용 규약
+
+* **대상**: `cm/pcc/{fil,mgt,stf,tms}/*.xml` — `<w2:type>COMMON</w2:type>` + `$c.<ns>` 네임스페이스 + publicInfo 를 가진
+  **함수 라이브러리**(이벤트 핸들러·submission·body 컴포넌트 없음). 화면(ui → ui-tobe)과 달리 이미 to-be 트리이므로
+  **제자리(in-place) 멱등 실행**한다. (2026-09-22 확정 — 17파일 dry-run 근거)
+  ```
+  python conversion/tools/convert.py cm/pcc/stf/stf.xml cm/pcc/stf/stf.xml --profile lib
+  ```
+* **적용 규칙(화이트리스트)**: 5a(`==`→`===`, **`== null`/`!= undefined` 관용구는 보존·건수 리포트**), 5d, 5e, 7, 7m, 7n, 8(var→const/let),
+  9, 11, 14, 15, 20, 20b, 21, 23, 30(W-Craft 주석), 31(eval), `//` 주석 뒤 공백, 다중 빈 줄 정리, 단계 2 리포트(collect_judgment).
+* **제외 규칙과 근거**:
+
+  | 제외 | 라이브러리에서의 문제 |
+  |---|---|
+  | 규칙 1 vScrenID | `insComboSet(dtsObj, vScrenID, …)` 처럼 **화면ID 파라미터**를 파일명 리터럴로 치환 → 버그(common.xml 9건·bns_common 46건) |
+  | 규칙 2/4 | 5단계 섹션 헤더·함수 재배치 — gcc/pcc 라이브러리 컨벤션(JSDoc 순서, 섹션 헤더 없음)과 불일치 |
+  | 규칙 5b/5c | `codeComp.dom.input.value = ""`·`btn.src = …` 는 DOM 대입 → `setValue`/`setBackgroundImage` 로 바꾸면 런타임 오류 |
+  | 규칙 6/12/16/17/25 + async 부여 | 인자로 받은 데이터셋을 다루는 범용 함수라 action URL 해석이 절반만 되고, 함수가 async 로 바뀌어 화면 호출부(300여 곳)의 await 계약이 변함 |
+  | 규칙 3/10/13/26/27/28 | 핸들러·events·`fn_` 정의·진입점·그리드 id·반복문 broadcast — 라이브러리에 해당 없음(13 은 publicInfo·호출부 계약 보호) |
+  | `format_script` | JSDoc 닫는 ` */` 를 컬럼 0 으로 이동 — gcc/pcc 17/17 파일이 들여쓴 ` */` 컨벤션. 스크립트 선두 개행도 보존 |
+
+* **5a nullish 보존 근거**: `x == null` 은 null 과 undefined 를 함께 걸러내는 관용구다. 라이브러리에서 `=== null` 로 바꾸면
+  undefined 인자가 새어 나가 모든 호출 화면의 동작이 달라질 수 있어 보존한다(pcc 81건). 화면 프로파일은 종전대로 전부 엄격 비교로 바꾼다.
+* **게이트**: publicInfo 불변, `python -m wsxml_lint cm/pcc` 0 errors, `npm run docs:pcc:{stf,fil,mgt,tms}` 재생성, `pytest conversion/tools`.
+* **단계 2 수동 항목(리포트)**: 규칙 7 검토/대체 태그 함수, 레거시 Gauce API(`MxDataSet_com_isur.NameValue` 등 죽은 코드) 삭제 여부,
+  `window.event.keyCode`, `debugger`, 암묵적 전역 루프변수.
+
 ---
 
 ## 규칙 6 보충: Submission 변환 상세
