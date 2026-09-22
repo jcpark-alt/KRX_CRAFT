@@ -866,6 +866,163 @@ def rule23_grid_visible_rownum_all(code, report):
             report["judgment"].append("규칙23 setVisibleRowNum(\"all\") 미변환(호출 체인 수신 등, 단계2 검토): " + snippet.strip())
     return out
 
+# 규칙 31: eval 제거 → 일반 코드 전환 (숫자 변환 / 동적 컴포넌트 참조 / JSON 파싱 / 동적 속성 접근)
+_R31_BIN_OPS = ("===", "!==", "==", "!=", "<=", ">=", "&&", "||", "+", "-", "*", "/", "%", "<", ">", "?", ":")
+_R31_STR_LIT = re.compile(r'^(?:"(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\')$')
+_R31_ID_PREFIX = re.compile(r'^[A-Za-z_$][\w$]*$')            # 컴포넌트 id 접두(문자열 조각)
+_R31_ID_TAIL = re.compile(r'^[\w$]*$')                        # id 조각(문자열 조각, 빈 문자열 허용)
+_R31_PROP_PREFIX = re.compile(r'^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*\.$')   # "obj.prop." 접두
+_R31_NUM_WRAP = re.compile(r'^(?:Number|parseInt|parseFloat)\s*\(')
+_R31_STR_ASSIGN = re.compile(r'(?<![.\w$])(?:(?:const|let|var)\s+)?([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)\s*=\s*(?:"[^"\n]*"|\'[^\'\n]*\')\s*;')
+# eval 결과에 바로 접근하는 멤버가 DOM 요소/레거시 객체 속성이면 컴포넌트 조회로 단정할 수 없어 보류
+_R31_DOM_MEMBERS = ("innerHTML", "innerText", "outerHTML", "style", "className", "checked", "options",
+                    "selectedIndex", "src", "href", "Text", "Value", "value")
+
+
+def _r31_top_ops(expr):
+    """expr 의 최상위(괄호·리터럴 밖) 이항 연산자 [(op, idx)] — 단항 +/- 는 제외."""
+    mask = code_mask(expr)
+    depth, ops, i, n = 0, [], 0, len(expr)
+    prev = ""   # 직전 유효 문자(공백 제외). 리터럴은 "s"
+    while i < n:
+        if not mask[i]:
+            prev = "s"; i += 1; continue
+        c = expr[i]
+        if c.isspace():
+            i += 1; continue
+        if c in "([{":
+            depth += 1; prev = c; i += 1; continue
+        if c in ")]}":
+            depth -= 1; prev = c; i += 1; continue
+        if depth == 0:
+            hit = None
+            for op in _R31_BIN_OPS:
+                if expr.startswith(op, i):
+                    hit = op; break
+            if hit:
+                unary = hit in ("+", "-") and (prev == "" or prev in "(+-*/%<>=&|?:,!")
+                if not unary:
+                    ops.append((hit, i))
+                prev = hit[-1]; i += len(hit); continue
+        prev = c; i += 1
+    return ops
+
+
+def _r31_split_plus(expr, ops):
+    parts, last = [], 0
+    for op, idx in ops:
+        if op == "+":
+            parts.append(expr[last:idx].strip()); last = idx + 1
+    parts.append(expr[last:].strip())
+    return parts
+
+
+def _r31_is_num_wrapped(arg):
+    """arg 전체가 Number(...)/parseInt(...)/parseFloat(...) 한 호출인지."""
+    if not _R31_NUM_WRAP.match(arg):
+        return False
+    r = _scan_call(arg, code_mask(arg), arg.index("("))
+    return r is not None and arg[r[1]:].strip() == ""
+
+
+def _r31_classify(arg, str_vars, member):
+    """eval 인자 → (치환 코드 | None, 종별 라벨). None 이면 보류(단계 2)."""
+    ops = _r31_top_ops(arg)
+    parts = _r31_split_plus(arg, ops) if any(op == "+" for op, _ in ops) else [arg]
+    lit_idx = [k for k, p in enumerate(parts) if _R31_STR_LIT.match(p)]
+    var_concat = any(p in str_vars for p in parts if not _R31_STR_LIT.match(p))
+    # ── 문자열 결합형 ────────────────────────────────────────────────
+    if lit_idx or (var_concat and len(parts) > 1):
+        if len(lit_idx) == len(parts):
+            return None, "상수 코드 문자열 실행"
+        if lit_idx and lit_idx[0] == 0:
+            first = parts[0][1:-1]
+            lastp = parts[-1]
+            # eval("(" + json + ")") → JSON.parse(json)
+            if len(parts) == 3 and first.strip() == "(" and _R31_STR_LIT.match(lastp) and lastp[1:-1].strip() == ")":
+                return "JSON.parse(%s)" % parts[1], "JSON 파싱"
+            # eval("obj.prop." + key) → obj.prop[key]
+            if len(parts) == 2 and _R31_PROP_PREFIX.match(first):
+                return "%s[%s]" % (first[:-1], parts[1]), "동적 속성 접근"
+            if not _R31_ID_PREFIX.match(first):
+                return None, "코드 문자열 실행"
+        # 나머지 리터럴 조각은 id 조각([\w$]*)만 허용 — "(" "[" "." "=" 포함 시 코드 실행으로 보고 보류
+        for k in lit_idx:
+            if k != 0 and not _R31_ID_TAIL.match(parts[k][1:-1]):
+                return None, "코드 문자열 실행"
+        return "$p.getComponentById(%s)" % arg, "동적 컴포넌트 참조"
+    # ── 비문자열 표현식형 ─────────────────────────────────────────────
+    if member is not None:
+        if member in _R31_DOM_MEMBERS:
+            return None, "DOM/레거시 객체 속성 접근(.%s)" % member
+        if not ops:
+            return "$p.getComponentById(%s)" % arg, "동적 컴포넌트 참조(변수 id)"
+        return None, "연산식 결과의 멤버 접근"
+    if _r31_is_num_wrapped(arg):
+        return arg, "중복 숫자 변환 제거"
+    if ops:
+        return "(%s)" % arg, "연산식 괄호 유지"
+    return "Number(%s)" % arg, "숫자 변환"
+
+
+def rule31_remove_eval(code, report):
+    """`eval(...)` 호출을 제거하고 의미가 결정적인 일반 코드로 전환한다(2026-09-22 확정).
+    - 숫자 변환 : `eval(x)`(식별자/멤버/호출) → `Number(x)`, `eval(a - b)`(연산식) → `(a - b)`,
+      `eval(parseInt(x))` → `parseInt(x)` (Number/parseFloat 동일)
+    - 동적 컴포넌트 참조 : `eval("txb_" + i)`, `eval(prefixVar + i)`(prefixVar 가 문자열 리터럴로 대입된 변수),
+      `eval(idVar).setValue(…)` → `$p.getComponentById(…)`
+    - JSON 파싱 : `eval("(" + txt + ")")` → `JSON.parse(txt)`
+    - 동적 속성 접근 : `eval("this.json." + attr)` → `this.json[attr]`
+    - 보류·리포트(단계 2) : 문장 단독 `eval(x);`(코드 문자열 실행), 상수 코드 문자열, 조각에 `(`/`[`/`.`/`=` 를
+      포함한 결합 문자열, DOM/레거시 속성 접근(`eval(id).innerHTML` 등), 연산식 결과의 멤버 접근
+    - 코드 세그먼트(문자열/주석/정규식 제외)만 대상. `window.eval`/`.eval` 은 대상 외. 결과에 `eval(` 이
+      남지 않아 재변환 no-op(멱등)이며, 보류 건은 실행마다 리포트된다."""
+    mask = code_mask(code)
+    str_vars = set(m.group(1) for m in _R31_STR_ASSIGN.finditer(code))
+    pat = re.compile(r'(?<![.\w$])eval\s*\(')
+    res, last = [], 0
+    for mo in pat.finditer(code):
+        if mo.start() < last or not mask[mo.start()]:
+            continue
+        open_idx = mo.end() - 1
+        scanned = _scan_call(code, mask, open_idx)
+        if scanned is None:
+            continue
+        args, end = scanned
+        line_start = code.rfind("\n", 0, mo.start()) + 1
+        line_end = code.find("\n", end)
+        line_end = len(code) if line_end < 0 else line_end
+        snippet = code[line_start:line_end].strip()
+        if len(args) != 1 or args[0] == "":
+            report["judgment"].append("규칙31 eval 미변환(인자 %d개, 단계2 검토): %s" % (len(args), snippet))
+            continue
+        arg = args[0]
+        # 뒤따르는 멤버 접근(eval(x).foo) / 문장 단독 실행(eval(x);) 판별
+        j = end
+        while j < len(code) and code[j] in " \t":
+            j += 1
+        member = None
+        mm = re.match(r'\.([A-Za-z_$][\w$]*)', code[j:])
+        if mm:
+            member = mm.group(1)
+        k = mo.start() - 1
+        while k >= 0 and code[k] in " \t":
+            k -= 1
+        stmt_alone = (k < 0 or code[k] in ";{}\n") and j < len(code) and code[j] == ";"
+        if stmt_alone:
+            report["judgment"].append("규칙31 eval 미변환(문장 단독 코드 문자열 실행, 단계2 검토): " + snippet)
+            continue
+        new, kind = _r31_classify(arg, str_vars, member)
+        if new is None:
+            report["judgment"].append("규칙31 eval 미변환(%s, 단계2 검토): %s" % (kind, snippet))
+            continue
+        res.append(code[last:mo.start()])
+        res.append(new)
+        report["rule31"].append("%s -> %s [%s]" % (code[mo.start():end], new, kind))
+        last = end
+    res.append(code[last:])
+    return "".join(res)
+
 
 def rule7_gcc_substitute(code, report):
     """substitution_dict() 의 함수 호출부를 단어경계로 치환(코드 세그먼트만, 메서드 호출 .fn() 제외).
@@ -2292,7 +2449,7 @@ def convert(raw, filename):
 
 
 def _convert_once(raw, filename):
-    report = {"rule1": "", "rule2": 0, "rule2_skip": [], "rule3": [], "rule4": None, "rule4_merge": None, "rule5a": 0, "rule5b": [], "rule5c": [], "rule5d": [], "rule6": {"converted": [], "deleted": 0}, "rule7": [], "rule7m": [], "rule7n": [], "rule8": {"const": 0, "let": 0}, "rule9": 0, "rule10": 0, "rule11": 0, "rule12": {"converted": []}, "rule13": [], "rule14": [], "rule15": [], "rule16": {"converted": [], "skipped": []}, "rule17": {"converted": [], "skipped": []}, "rule20": [], "rule21": [], "rule23": [], "async_marked": [], "wcraft": 0, "judgment": []}
+    report = {"rule1": "", "rule2": 0, "rule2_skip": [], "rule3": [], "rule4": None, "rule4_merge": None, "rule5a": 0, "rule5b": [], "rule5c": [], "rule5d": [], "rule6": {"converted": [], "deleted": 0}, "rule7": [], "rule7m": [], "rule7n": [], "rule8": {"const": 0, "let": 0}, "rule9": 0, "rule10": 0, "rule11": 0, "rule12": {"converted": []}, "rule13": [], "rule14": [], "rule15": [], "rule16": {"converted": [], "skipped": []}, "rule17": {"converted": [], "skipped": []}, "rule20": [], "rule21": [], "rule23": [], "rule31": [], "async_marked": [], "wcraft": 0, "judgment": []}
     reg = split_regions(raw)
     if reg is None:
         raise ValueError("SCRIPT(CDATA) 영역을 찾지 못했습니다.")
@@ -2322,6 +2479,7 @@ def _convert_once(raw, filename):
     s = rule20b_normalize_excel_positional(s, report)
     s = rule21_frame_provider(s, report)
     s = rule23_grid_visible_rownum_all(s, report)
+    s = rule31_remove_eval(s, report)   # eval 제거 → Number/getComponentById/JSON.parse/속성 접근
     reg["head"], s, reg["body"] = rule13_rename_scwin_fn(reg["head"], s, reg["body"], report)
     s, reg["body"] = rule3_handlers(s, reg["body"], report)
     s, reg["body"] = rule4_structure(s, reg["body"], report)
@@ -2392,6 +2550,9 @@ def print_report(rep, filename):
         print("   -", s)
     print("규칙23 setVisibleRowNum(\"all\") → $c.util.setGridVisibleRowNum :", len(rep["rule23"]), "건")
     for s in rep["rule23"]:
+        print("   -", s)
+    print("규칙31 eval 제거 → 일반 코드 :", len(rep.get("rule31", [])), "건")
+    for s in rep.get("rule31", []):
         print("   -", s)
     print("규칙8 var→const/let : const %d, let %d" % (rep["rule8"]["const"], rep["rule8"]["let"]))
     print("규칙9 불필요 $c.cm.* 호출 제거 :", rep["rule9"], "건")

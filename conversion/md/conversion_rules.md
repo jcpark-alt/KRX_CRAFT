@@ -464,6 +464,34 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
 * convert.py 포매팅 단계(`remove_wcraft_markers`)가 자동 적용하며 멱등입니다. 규칙 7m/12/20 이 개별 치환 시
   직전 마커를 함께 지우는 동작은 그대로 유지됩니다(본 규칙이 최종 일괄 정리).
 
+### 규칙 31: `eval(...)` 제거 → 일반 코드 전환
+
+* **배경**: 레거시 화면은 `eval` 을 (1) 문자열→숫자 변환, (2) 문자열로 조립한 id 의 컴포넌트 참조, (3) JSON 텍스트 파싱,
+  (4) 동적 속성 접근 용도로 남용하고 있습니다. `eval` 은 임의 코드 실행 경로(보안·CSP 위반), 성능 저하, 정적 분석 불가의
+  원인이므로 **전부 제거하고 의도에 맞는 일반 코드로 전환**합니다. (2026-09-22 확정 — 대상 실측: fil 1·mgt 7·stf 6 화면)
+* **변환 규약**(결정적, convert.py `rule31_remove_eval` — 규칙 7/7m/7n/14 치환 뒤, 규칙 13 앞에 적용):
+
+  | 형태 | as-is | to-be | 판정 근거 |
+  |---|---|---|---|
+  | 숫자 변환 | `eval(x)` / `eval(dataArr[i].amt)` / `eval(delComma(v))` | `Number(x)` … | 인자가 식별자·멤버·호출(최상위 연산자 없음) |
+  | 연산식 | `eval(a - b)` / `eval(byteLen - 80)` | `(a - b)` | 인자에 최상위 연산자 있음 → 연산이 이미 숫자 강제, `eval` 만 제거 |
+  | 중복 변환 | `eval(parseInt(x))` / `eval(Number(x))` | `parseInt(x)` / `Number(x)` | 인자 전체가 Number/parseInt/parseFloat 한 호출 |
+  | 동적 컴포넌트 참조 | `eval("txb_FILE_NM" + i)` / `eval(prefixVar + i)` / `eval(idVar).setValue(v)` | `$p.getComponentById("txb_FILE_NM" + i)` … | 첫 조각이 id 접두 문자열(또는 문자열 리터럴로 대입된 변수)이고 나머지 리터럴 조각이 `[\w$]*` |
+  | JSON 파싱 | `eval("(" + jsonText + ")")` | `JSON.parse(jsonText)` | `"("` + 식 + `")"` 3조각 |
+  | 동적 속성 접근 | `eval("this.json." + attr)` | `this.json[attr]` | `"obj.prop."` 접두 + 식 2조각 |
+
+  숫자 변환은 `Number()` 로 통일합니다(`parseInt` 는 소수·진법 함정). 유의: `eval("")` 은 `undefined`(연산 시 `NaN`)였으나
+  `Number("")` 은 `0` 입니다 — 합산 로직에서는 오히려 의도에 맞는 결과이며, 빈값 판정이 필요한 곳은 단계 2에서 `$c.util.isEmpty` 가드를 검토합니다.
+* **보류(단계 2 검토·리포트)** — 코드 문자열을 실행하는 진짜 `eval` 은 자동 전환하지 않고 `규칙31 eval 미변환(…)` 으로 리포트합니다:
+  문장 단독 실행 `eval(t.action);`, 상수 코드 문자열 `eval("try{ … }catch(e){}")`, 조각에 `(`·`[`·`.`·`=` 를 포함한 결합
+  (`eval("fm.attach_chk" + i + "[0]")`, 정규식 조립 `eval("/^…{" + n + "}$/")` → `new RegExp(...)` 수동 전환),
+  DOM/레거시 객체 속성 접근 `eval(spanid).innerHTML` (WebSquare 컴포넌트인지 DOM 요소인지 단정 불가), 연산식 결과의 멤버 접근.
+  단계 2 지침: 함수명 디스패치 `eval(fnName + "()")` 는 `scwin[fnName]()`, 정규식 조립은 `new RegExp(pattern)`,
+  DOM 접근은 컴포넌트 API(`setValue`/`show`)로 재설계합니다.
+* 코드 세그먼트(문자열/주석/정규식 리터럴 제외)만 대상이며 `window.eval`/`obj.eval` 은 대상 외입니다.
+  결과에 `eval(` 이 남지 않아 **재변환 no-op(멱등)** 이고, 보류 건은 실행마다 리포트됩니다.
+* **기대 효과**: CSP `unsafe-eval` 불필요, 코드 의도(숫자/컴포넌트/JSON)가 드러나 정적 검사(ESLint `no-eval`)·리팩토링 가능.
+
 ---
 
 ## 규칙 6 보충: Submission 변환 상세
