@@ -76,8 +76,13 @@
             <w2:workflowCollection/>
         </xf:model>
         <w2:layoutInfo/>
-        <w2:publicInfo method=""/>
-        <script lazy="false" type="text/javascript"><![CDATA[///////// 2. 초기화 영역 /////////
+        <w2:publicInfo method="scwin.onpageload,scwin.grd_list_oncellclick,scwin.write_onclick,scwin.search,scwin.setPaging,scwin.sendPrtDepoWithd,scwin.sbm_submit_submitdone,scwin.popupCallback,scwin.initPageSize,scwin.setStatNm,scwin.setPrtdepoNm,scwin.viewDetail,scwin.openAdjReqPop"/>
+        <script lazy="false" type="text/javascript"><![CDATA[
+///////// 1. 변수 및 선언 영역 /////////
+scwin.pageIndex = 1;        // 현재 페이지
+scwin.pageItemCnt = 10;     // 페이징 시 출력할 페이지 번호 개수
+
+///////// 2. 초기화 영역 /////////
 /**
  * @method
  * @name onpageload
@@ -89,46 +94,15 @@ scwin.onpageload = function() {
     try {
         dma_SearchReq.set("integUsrId",$c.session.getUserInfo("integUsrId"));
         scwin.initPageSize();
-        scwin.search(true);
+        // 통신 전 : paging 설정
+        scwin.setPaging();
+        scwin.search(1);
     } catch (ex) {
         $c.exception.handleError(ex, { context : "ULDFIL52000.onpageload" });
     }
 };
 
 ///////// 3. 컴포넌트 이벤트 영역 /////////
-/**
- * @method
- * @name sel_size_onviewchange
- * @description 페이지 사이즈 변경
- * @param {Object} info 이벤트 정보 객체
- * @returns {void}
- * @hidden N
- */
-scwin.sel_size_onviewchange = function (info) {
-    try {
-        scwin.search(false);
-    } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDFIL52000.sel_size_onviewchange" });
-    }
-};
-
-/**
- * @method
- * @name pageList1_onclick
- * @description 페이지네이션 현재 페이지 변경
- * @param {Number} index 인덱스
- * @returns {void}
- * @hidden N
- */
-scwin.pageList1_onclick = function (index) {
-    try {
-        dma_SearchReq.set("page", index);// 현재페이지
-        scwin.search(false);
-    } catch (ex) {
-        $c.exception.handleError(ex, { context : "ULDFIL52000.pageList1_onclick" });
-    }
-};
-
 /**
  * @method
  * @name grd_list_oncellclick
@@ -216,17 +190,15 @@ scwin.write_onclick = function (e) {
 /**
  * @method
  * @name search
- * @description 의무보유주식 처분 목록을 페이징 조회한다.
- * @param {Boolean} isFirst 최초 조회 여부
+ * @description 의무보유주식 처분 목록을 페이징 조회한다. 페이지 이동·페이지당 건수 변경 시 $c.sbm.setPagingInfo 가 이 함수를 pageFunction 으로 호출한다.
+ * @param {Number} gPageNo 조회할 페이지 번호(기본 1)
  * @returns {Promise<void>}
  * @hidden N
  */
-scwin.search = async function (isFirst) {
-
-    if(isFirst) {
-        dma_SearchReq.set("page", 1);// 현재페이지 초기화
-        dma_SearchReq.set("size", 10);// 페이지당 데이터 개수
-    }
+scwin.search = async function (gPageNo = 1) {
+    scwin.pageIndex = gPageNo;
+    dma_SearchReq.set("page", scwin.pageIndex);          // 현재 페이지
+    dma_SearchReq.set("size", sel_size.getValue());      // 페이지당 데이터 개수
 
     const sbmOptions = {
         id : "sbm_prtdepoDisposa",
@@ -240,21 +212,8 @@ scwin.search = async function (isFirst) {
 
     const res = await $c.sbm.executeDynamic(sbmOptions);
 
-    if (res.responseJSON.success === true) {
-        const prtdepoDisposalList = dlt_prtdepoDisposalRes.getAllJSON();
-
-        if(!prtdepoDisposalList || prtdepoDisposalList.length === 0) {
-            dma_SearchRes.set("page", 0);
-
-        }
-        if (isFirst) {
-            // 페이지네이션 생성
-            pageList1.setCount(dma_SearchRes.get("totalPages"));
-        } else {
-            // 페이지네이션 선택
-            pageList1.setSelectedIndex(dma_SearchRes.get("page"));
-        }
-    }
+    // 통신 후 : paging 설정(전체 건수로 페이지 리스트 렌더링·총건수·순번)
+    scwin.setPaging(res);
 };
 
 /**
@@ -299,21 +258,47 @@ scwin.sendPrtDepoWithd = async function (prtDepoNo, updateType) {
  */
 scwin.sbm_submit_submitdone = function(e) {
     $c.win.alert($c.data.getMessage("com_complete_0150", "제출"));
-    scwin.search(true);
+    scwin.search(1);
 }
 
 /**
  * @method
  * @name popupCallback
- * @description 수정요청 팝업을 열고 닫힌 뒤 목록을 재조회한다.이 닫힌 뒤 목록을 재조회한다.
+ * @description 수정요청 팝업이 닫힌 뒤 현재 페이지를 재조회한다.
  * @returns {void}
  * @hidden N
  */
 scwin.popupCallback = function(){
-    scwin.search(false);
+    scwin.search(scwin.pageIndex);
 }
 
 ///////// 5. 일반/업무 함수 영역 /////////
+/**
+ * @method
+ * @name setPaging
+ * @description 페이징 컴포넌트 설정 — 통신 전(인자 없음)에는 기본값 병합·조회 DataMap 컬럼 설정만 하고,
+ *              통신 후(응답 전달)에는 전체 건수로 페이지 리스트를 렌더링하고 총건수·행 번호 시작값을 맞춘다.
+ *              페이지 이동과 페이지당 건수 변경은 공통이 pageFunction(scwin.search) 에 바인딩한다.
+ * @param {Object} result $c.sbm.executeDynamic 응답 객체(통신 전 호출이면 생략)
+ * @returns {void}
+ * @hidden N
+ */
+scwin.setPaging = function (result = {}) {
+    const pagingInfo = {
+        pageType : "P",                          // S/P/A Default=P
+        rowNumVisble : "grd_list|asc",           // gridView 순번 시작 인덱스(현재 페이지 기준 오름차순)
+        maxRowNum : 100,                         // gridView 최대 visibleRowNum
+        pageListId : "pageList1",                // 페이지 리스트 아이디
+        pageFunction : "scwin.search",           // 페이징 처리 함수(페이지 번호를 인자로 호출됨)
+        currentPage : scwin.pageIndex,           // 현재 페이지
+        totalCountId : "txt_totalCount",         // 총건수 출력 아이디
+        recordPerPageId : sel_size,              // 페이지당 건수 컴포넌트
+        pageSize : scwin.pageItemCnt             // 페이징 시 출력할 페이지 번호 개수
+    };
+
+    $c.sbm.setPagingInfo(pagingInfo, "dmaPaging", result.responseJSON?.body?.totalCount || 0);
+};
+
 /**
  * @method
  * @name initPageSize
@@ -505,15 +490,11 @@ scwin.openAdjReqPop = async function(prtdepoNo, listInvstgBzTpCd) {
     			<xf:group class="rt" id="" style="">
     				<xf:group class="count" id="" style="">
     					<w2:textbox escape="false" id="" label="전체&amp;nbsp;" style=""></w2:textbox>
-    					<w2:textbox class="num" id="txt_totalCount" label="0" ref="data:dma_SearchRes.totalCount" style=""></w2:textbox>
-    					<w2:textbox escape="false" id="" label="건 (" style=""></w2:textbox>
-    					<w2:textbox class="" id="" label="0" ref="data:dma_SearchRes.page" style=""></w2:textbox>
-    					<w2:textbox class="" id="" label="/" style=""></w2:textbox>
-    					<w2:textbox class="" id="" label="0" ref="data:dma_SearchRes.totalPages" style=""></w2:textbox>
-    					<w2:textbox class="" escape="false" id="" label="&amp;nbsp;페이지)" style=""></w2:textbox>
+    					<w2:textbox class="num" id="txt_totalCount" label="0" style=""></w2:textbox>
+    					<w2:textbox escape="false" id="" label="건" style=""></w2:textbox>
     				</xf:group>
     				<xf:select1 allOption="" appearance="minimal" chooseOption="" class="" direction="auto" disabled="false"
-    					disabledClass="w2selectbox_disabled" ev:onchange="" ev:onviewchange="scwin.sel_size_onviewchange" id="sel_size"
+    					disabledClass="w2selectbox_disabled" id="sel_size"
     					metaev_onchange_desc="페이지 당 게시물 갯수를 지정" metaev_onchange_name="페이지 당 게시물 갯수" ref="data:dma_SearchReq.size" renderType=""
     					style="width: 100px;" submenuSize="auto">
     					<xf:choices></xf:choices>
@@ -580,7 +561,7 @@ scwin.openAdjReqPop = async function(prtdepoNo, listInvstgBzTpCd) {
     		</xf:group>
     		<xf:group class="pglbox" id="" meta_snippetCategory="06_그리드" meta_snippetKeyComponent="true" meta_snippetName="6_03 페이지리스트">
     			<w2:pageList class="pgl" displayButtonType="display" displayFormat="#" id="pageList1" pageSize="10" pagingType="0"
-    				style="" ev:onclick="scwin.pageList1_onclick">
+    				style="">
     			</w2:pageList>
     		</xf:group>
     		<xf:group class="btnbox" id="" meta_snippetCategory="08_버튼" meta_snippetKeyComponent="true" meta_snippetName="8_04 전체제어버튼"
