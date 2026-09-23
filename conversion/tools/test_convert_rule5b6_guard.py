@@ -128,3 +128,17 @@ def test_rule32_pagelist_without_common_paging_is_reported():
     out2, rep2 = convert.convert(xml2, "ULDTST00003.xml")
     assert not any("규칙32" in j for j in rep2["judgment"])
 
+
+def test_rule4_init_functions_go_to_section2_after_onpageload():
+    script = ("scwin.helper = function () {\n    return 1;\n};\n"
+              "scwin.init_conds = function () {\n    scwin.x = 1;\n};\n"
+              "scwin.onpageload = function () {\n    scwin.init();\n    scwin.init_conds();\n};\n"
+              "scwin.init = function () {\n    scwin.y = 2;\n};\n"
+              "scwin.btn_a_onclick = function (e) {\n    scwin.helper();\n};\n")
+    out, rep = convert.convert(_HEAD + script + _TAIL, "ULDTST00004.xml")
+    sec2 = out[out.index("///////// 2. "):out.index("///////// 3. ")]
+    assert "scwin.onpageload = function" in sec2 and "scwin.init = function" in sec2 and "scwin.init_conds = function" in sec2
+    # onpageload 가 2구역 최상단, init* 는 그 아래(원래 정의 순서 유지)
+    assert sec2.index("scwin.onpageload") < min(sec2.index("scwin.init = "), sec2.index("scwin.init_conds"))
+    assert "scwin.helper" not in sec2 and rep["rule4"]["init"] == 3
+

@@ -333,10 +333,12 @@ scwin.BTN_MAP = {
  * @returns {void}
  * @hidden N
  */
-scwin.onpageload = function () {
+scwin.onpageload = async function () {
     try {
-        scwin.market = $c.session.getUserInfo("market");
-        scwin.init();
+
+        // 초기화함수
+
+        await scwin.init();
     } catch (ex) {
         $c.exception.handleError(ex, { context : "ULDSTF92050.onpageload" });
     }
@@ -351,6 +353,104 @@ scwin.onpageload = function () {
  */
 scwin.onpageunload = function () {
 };
+
+/**
+ * @method
+ * @name init
+ * @description 화면 초기화 — 조회조건·상태값 기본 설정.
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.init = async function () {
+    scwin.market = $c.session.getUserInfo("market");
+
+    // let parentWin = scwin.getProvider();
+    let parentWin = $c.data.getParameter();
+
+    scwin.vBzProcsNo = parentWin.clickBzProcsNo;
+    scwin.vSecugrpID = parentWin.fr_SecuGrpId;
+    scwin.vPageTYp = parentWin.vPageTYp;
+    scwin.vSpotIsuTrdMktTpCd = parentWin.vSpotIsuTrdMktTpCd;
+    ibx_isurCd.setValue(parentWin.isurCd);
+    ibx_comNm.setValue(parentWin.comNm);
+    scwin.gAcptNo = parentWin.gAcptNo;
+    scwin.gAcptSeq = (parentWin.gAcptSeq === "" ? 0 : parentWin.gAcptSeq);
+
+    // 상장수수료를 위한 접수번호
+    scwin.gAcptNoListFee = parentWin.gAcptNoListFee;
+    scwin.setObjectState();
+
+    await scwin.searchCode();
+    scwin.setPanelPREFSTK(false); // 일단 false;
+    scwin.setPREFSTKItem(false); // 일단 false;
+
+    cal_approvDd.setValue($c.date.getServerDateTime());
+    dlt_listMethdTpCdCodRes_sub.removeAll();
+    if (scwin.vBzProcsNo !== "") {
+        // sbx_listMethdTpCd.CBData = "1^신주상장,2^추가상장,3^변경상장,4^신규상장,5^재상장";
+        dlt_listMethdTpCdCodRes_sub.setJSON(dlt_listMethdTpCdCodRes.getAllJSON());
+        await scwin.readSync();
+    } else {
+        $c.util.setButtonState("grpBtnBox", "insert", scwin.BTN_MAP);
+        if ($c.util.isNotEmpty(scwin.gAcptNo)) {
+            await scwin.extrReadSync();
+            // scwin.setHeader('N');
+        } else {
+            // scwin.setHeader('Y');
+        }
+
+        // let vListMthTpCd;
+        if (scwin.vPageTYp === '1') {
+            // vListMthTpCd = "2^추가상장";
+            // sbx_listMethdTpCd.CBData = vListMthTpCd;
+            dlt_listMethdTpCdCodRes_sub.setRowData(0, ["추가상장", "2"]);
+            // sbx_listMethdTpCd.Index = 1;
+            sbx_listMethdTpCd.setSelectedIndex(1);
+            await scwin.nprefstkReadSync(ibx_isuCd.getValue());
+        } else if (scwin.vPageTYp === '2') {
+            // vListMthTpCd = "3^변경상장";
+            // sbx_listMethdTpCd.CBData = vListMthTpCd;
+            dlt_listMethdTpCdCodRes_sub.setRowData(0, ["변경상장", "3"]);
+            sbx_listMethdTpCd.setSelectedIndex(1);
+        }
+    }
+    scwin.setTabPanel();
+
+    // TODO: TEST - 저장 테스트
+    // ibx_isuCd.setValue("KR7043910009");
+    // ibx_isuSrtCd.setValue("A043910");
+    // ibx_isuEngSymbl.setValue("");
+    // ibx_isuKorNm.setValue("자연과환경보통주");
+    // ibx_isuKorAbbrv.setValue("자연과환경");
+    // ibx_isuEngNm.setValue("NatureandEnvironment");
+    // ibx_isuEngAbbrv.setValue("NNE");
+
+    // buttonSet.setButtonDepCd(dts_ByCorpDepCd, ibx_isurCd.getValue(), js_dep_cd);
+    if (sbx_stkcertKindCd.getValue() !== "KDR" && sbx_stkcertKindCd.getValue().substring(0, 1) === "K") {
+        scwin.setNPARVALSTK(true);
+    } else {
+        scwin.setNPARVALSTK(false);
+    }
+    // 주식발행사유가 스톡옵션행사(117)(유), 주식매수선택권행사(614)(코) 인경우 주식매수선택권 의무보유 관리 팝업창 호출
+    // let parentSrc = parentWin.menuInfo.src;
+    let parentSrc = $c.win.getParent().scwin.vScrenID;
+    if ((parentSrc === "ULDSTF05200.xml" || parentSrc === "ULDSTF05255.xml") && (scwin.vSecugrpID === "ST" || scwin.vSecugrpID === "DR" || scwin.vSecugrpID === "FS") &&
+        // if ((parentSrc.indexOf("ULDSTF05200.xml") > 0 || parentSrc.indexOf("ULDSTF05255.xml") > 0) && (scwin.vSecugrpID === "ST" || scwin.vSecugrpID === "DR" || scwin.vSecugrpID === "FS") &&
+        (sbx_stkIsuRsnCd.getValue() === "117" || sbx_stkIsuRsnCd.getValue() === "614")) {
+        scwin.vStkOptIsurCd = ibx_isurCd.getValue();
+        scwin.vStkOptComNm = ibx_comNm.getValue();
+
+        const opts = {
+            id: "ULDSTF40003",
+            popupName: "주식매수선택권 의무보유 관리",
+            width: 900,
+            height: 1000,
+            frameModal: "top",
+            type: "pageFramePopup",
+        };
+        const res = await $c.win.openPopup("/ui/lst/lstmgt/ULDSTF40003.xml", opts);
+    }
+}
 
 ///////// 3. 컴포넌트 이벤트 영역 /////////
 /**
@@ -2325,102 +2425,6 @@ scwin.listFee = async function () {
 };
 
 ///////// 5. 일반/업무 함수 영역 /////////
-/**
- * @method
- * @name init
- * @description 화면 초기화 — 조회조건·상태값 기본 설정.
- * @returns {Promise<void>}
- * @hidden N
- */
-scwin.init = async function () {
-    // let parentWin = scwin.getProvider();
-    let parentWin = $c.data.getParameter();
-
-    scwin.vBzProcsNo = parentWin.clickBzProcsNo;
-    scwin.vSecugrpID = parentWin.fr_SecuGrpId;
-    scwin.vPageTYp = parentWin.vPageTYp;
-    scwin.vSpotIsuTrdMktTpCd = parentWin.vSpotIsuTrdMktTpCd;
-    ibx_isurCd.setValue(parentWin.isurCd);
-    ibx_comNm.setValue(parentWin.comNm);
-    scwin.gAcptNo = parentWin.gAcptNo;
-    scwin.gAcptSeq = (parentWin.gAcptSeq === "" ? 0 : parentWin.gAcptSeq);
-
-    // 상장수수료를 위한 접수번호
-    scwin.gAcptNoListFee = parentWin.gAcptNoListFee;
-    scwin.setObjectState();
-
-    await scwin.searchCode();
-    scwin.setPanelPREFSTK(false); // 일단 false;
-    scwin.setPREFSTKItem(false); // 일단 false;
-
-    cal_approvDd.setValue($c.date.getServerDateTime());
-    dlt_listMethdTpCdCodRes_sub.removeAll();
-    if (scwin.vBzProcsNo !== "") {
-        // sbx_listMethdTpCd.CBData = "1^신주상장,2^추가상장,3^변경상장,4^신규상장,5^재상장";
-        dlt_listMethdTpCdCodRes_sub.setJSON(dlt_listMethdTpCdCodRes.getAllJSON());
-        await scwin.readSync();
-    } else {
-        $c.util.setButtonState("grpBtnBox", "insert", scwin.BTN_MAP);
-        if ($c.util.isNotEmpty(scwin.gAcptNo)) {
-            await scwin.extrReadSync();
-            // scwin.setHeader('N');
-        } else {
-            // scwin.setHeader('Y');
-        }
-
-        // let vListMthTpCd;
-        if (scwin.vPageTYp === '1') {
-            // vListMthTpCd = "2^추가상장";
-            // sbx_listMethdTpCd.CBData = vListMthTpCd;
-            dlt_listMethdTpCdCodRes_sub.setRowData(0, ["추가상장", "2"]);
-            // sbx_listMethdTpCd.Index = 1;
-            sbx_listMethdTpCd.setSelectedIndex(1);
-            await scwin.nprefstkReadSync(ibx_isuCd.getValue());
-        } else if (scwin.vPageTYp === '2') {
-            // vListMthTpCd = "3^변경상장";
-            // sbx_listMethdTpCd.CBData = vListMthTpCd;
-            dlt_listMethdTpCdCodRes_sub.setRowData(0, ["변경상장", "3"]);
-            sbx_listMethdTpCd.setSelectedIndex(1);
-        }
-    }
-    scwin.setTabPanel();
-
-    // TODO: TEST - 저장 테스트
-    // ibx_isuCd.setValue("KR7043910009");
-    // ibx_isuSrtCd.setValue("A043910");
-    // ibx_isuEngSymbl.setValue("");
-    // ibx_isuKorNm.setValue("자연과환경보통주");
-    // ibx_isuKorAbbrv.setValue("자연과환경");
-    // ibx_isuEngNm.setValue("NatureandEnvironment");
-    // ibx_isuEngAbbrv.setValue("NNE");
-
-    // buttonSet.setButtonDepCd(dts_ByCorpDepCd, ibx_isurCd.getValue(), js_dep_cd);
-    if (sbx_stkcertKindCd.getValue() !== "KDR" && sbx_stkcertKindCd.getValue().substring(0, 1) === "K") {
-        scwin.setNPARVALSTK(true);
-    } else {
-        scwin.setNPARVALSTK(false);
-    }
-    // 주식발행사유가 스톡옵션행사(117)(유), 주식매수선택권행사(614)(코) 인경우 주식매수선택권 의무보유 관리 팝업창 호출
-    // let parentSrc = parentWin.menuInfo.src;
-    let parentSrc = $c.win.getParent().scwin.vScrenID;
-    if ((parentSrc === "ULDSTF05200.xml" || parentSrc === "ULDSTF05255.xml") && (scwin.vSecugrpID === "ST" || scwin.vSecugrpID === "DR" || scwin.vSecugrpID === "FS") &&
-        // if ((parentSrc.indexOf("ULDSTF05200.xml") > 0 || parentSrc.indexOf("ULDSTF05255.xml") > 0) && (scwin.vSecugrpID === "ST" || scwin.vSecugrpID === "DR" || scwin.vSecugrpID === "FS") &&
-        (sbx_stkIsuRsnCd.getValue() === "117" || sbx_stkIsuRsnCd.getValue() === "614")) {
-        scwin.vStkOptIsurCd = ibx_isurCd.getValue();
-        scwin.vStkOptComNm = ibx_comNm.getValue();
-
-        const opts = {
-            id: "ULDSTF40003",
-            popupName: "주식매수선택권 의무보유 관리",
-            width: 900,
-            height: 1000,
-            frameModal: "top",
-            type: "pageFramePopup",
-        };
-        const res = await $c.win.openPopup("/ui/lst/lstmgt/ULDSTF40003.xml", opts);
-    }
-}
-
 /**
  * @method
  * @name setObjectState

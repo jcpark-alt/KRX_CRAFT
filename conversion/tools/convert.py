@@ -1244,6 +1244,9 @@ def rule4_structure(script, body, report):
         name = f["name"]
         if name in ("onpageload", "onpageunload"):
             return "init"
+        # 컨벤션 '초기화' 절: 로딩 시점 초기화 단위(scwin.init / scwin.init_*)는 onpageload 아래 2구역에 둔다(2026-09-23)
+        if name == "init" or name.startswith("init_"):
+            return "init"
         if name == "gform_onload":
             return "general"   # 병합 안 된 경우 일반으로
         if name in handler_refs or re.search(r'_submitdone$|_submiterror$|[Cc]allback$', name):
@@ -1256,6 +1259,7 @@ def rule4_structure(script, body, report):
         return "general"
 
     buckets = {"init": [], "event": [], "callback": [], "general": []}
+    _INIT_ORDER = {"onpageload": 0, "onpageunload": 1}
     for i, f in enumerate(funcs):
         if removed[i]:
             continue
@@ -1283,6 +1287,7 @@ def rule4_structure(script, body, report):
         preamble_clean = preamble_clean[:mdoc.start()].rstrip("\n")
 
     parts = [preamble_clean]
+    buckets["init"].sort(key=lambda i: _INIT_ORDER.get(funcs[i]["name"], 2))   # onpageload 최상단, 이어서 onpageunload, init*
     for cat, header in (("init", _SEC2_INIT), ("event", _SEC3_EVENT),
                         ("callback", _SEC4_CALLBACK), ("general", _SEC5_GENERAL)):
         blocks = emit(cat)
