@@ -522,6 +522,44 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
   결과에 `eval(` 이 남지 않아 **재변환 no-op(멱등)** 이고, 보류 건은 실행마다 리포트됩니다.
 * **기대 효과**: CSP `unsafe-eval` 불필요, 코드 의도(숫자/컴포넌트/JSON)가 드러나 정적 검사(ESLint `no-eval`)·리팩토링 가능.
 
+### 규칙 32: `w2:pageList` 페이징 → `scwin.setPaging` + `$c.sbm.setPagingInfo` 공통 전환 (단계 2 판단)
+
+* **대상**: body 에 `<w2:pageList>` 가 있는 목록 화면. 화면마다 손으로 짜던 페이징(페이지 리스트 `setCount/setSelectedIndex`, 총건수 textbox `setValue`,
+  `pageList_onviewchange`/`sel_size_onviewchange` 핸들러, 순번 시작값)을 gcc 공통 `$c.sbm.setPagingInfo` 로 통합한다.
+  (2026-09-23 확정 — 정답지: `conversion/sample-front/ui/ULDSTF30702.xml`, 첫 적용: `sample-front/ui/fil/ULDFIL52800.xml`)
+* **전환 골격**:
+  1. **1구역**: `scwin.pageIndex = 1;`(현재 페이지) `scwin.pageItemCnt = 10;`(페이지 번호 표시 개수)
+  2. **조회 함수**는 `scwin.search = async function (gPageNo = 1)` 처럼 **페이지 번호를 첫 인자**로 받는다. 본문에서
+     `scwin.pageIndex = gPageNo;` → 조회 DataMap 에 `page`/`size`(페이지당 건수 컴포넌트 값) 설정 → `executeDynamic` → **`scwin.setPaging(res)`**.
+     **`scwin.setPaging(res)` 뒤에는 응답을 직접 다루는 후처리 코드를 두지 않는다** — 총건수는 `totalCountId` 옵션에 컴포넌트 id 를 넣어 공통이 쓰고,
+     페이지 리스트·순번도 공통이 렌더링한다. 응답에서 직접 하던 `pageList.setSelectedIndex(…)`·`totalCount.setValue(…)`·`page/totalPages` 표시 코드는 삭제한다.
+  3. **`scwin.setPaging(result = {})`**(통신하지 않는 함수라 규칙 4 분류상 5구역)가 `pagingInfo` 를 만들어 `$c.sbm.setPagingInfo(pagingInfo, "dmaPaging", result.responseJSON?.body?.totalCount || 0)` 를 호출한다.
+     ```javascript
+     const pagingInfo = {
+         pageType : "P",                    // S/P/A
+         rowNumVisble : "grd_Grid|asc",     // gridView 순번 시작 인덱스(현재 페이지 기준 asc | desc 는 rowNum 컬럼 역순)
+         maxRowNum : 100,                   // gridView 최대 visibleRowNum
+         pageListId : "pageList1",          // 페이지 리스트 아이디
+         pageFunction : "scwin.search",     // 페이징 처리 함수 — 공통이 (페이지번호, 이전인덱스) 로 호출
+         currentPage : scwin.pageIndex,
+         totalCountId : "tbx_totalCount",   // 총건수 출력 아이디
+         recordPerPageId : sbx_PerPage,     // 페이지당 건수 컴포넌트(변경 시 공통이 1페이지 재조회)
+         pageSize : scwin.pageItemCnt
+     };
+     ```
+  4. **init(통신 전)** 에서 `scwin.setPaging();` 을 한 번 호출해 기본값 병합·조회 DataMap 컬럼을 준비한다.
+  5. **삭제**: 화면 자체 `pageList_onviewchange`·페이지당 건수 `onviewchange` 핸들러(공통이 `pageFunction` 으로 바인딩)와 body 의 `<w2:pageList>` 이벤트 속성(`ev:onviewchange`·`ev:onclick`) 자체.
+  6. **미사용 페이징 표시 컴포넌트 삭제**: 응답 후처리를 없애 스크립트 참조가 0건이 된 페이지 표시 textbox(`txb_page`·`txb_totalPages` 와
+     그 사이의 `/`·`페이지)` 구분 textbox)는 body 에서도 삭제한다 — 정적 라벨(`(0 / 0 페이지)`)만 남으면 갱신되지 않는 잘못된 정보가 표시된다.
+     총건수 영역은 `총 [tbx_totalCount] 건` 만 남기고 `totalCountId` 로 공통이 채운다(ULDFIL52800 적용 결과).
+     조회 버튼·초기 조회는 `scwin.search(1)` 로 호출한다.
+* **판정 근거**: `$c.sbm.setPagingInfo` 는 `pageListId` 의 onviewchange 를 자체 바인딩해 pageFunction 을 호출하고, `recordPerPageId` 변경 시 visibleRowNum 조정 후
+  1페이지를 재조회하며, `totalCountId` 에 콤마 포맷 총건수를, `rowNumVisble` 그리드에 순번 시작값을 설정한다. 화면 코드가 같은 일을 중복하면 이벤트가 두 번 발생한다.
+* **자동화 범위**: 결정적 치환이 아니라 **단계 2 판단 작업**이다. convert.py 는 `<w2:pageList>` 가 있는데 스크립트에 `$c.sbm.setPagingInfo` 호출이 없으면
+  `규칙32 pageList 화면 — 페이징 공통 미적용` 으로 리포트만 한다(조회 함수·DataMap·컴포넌트 id 는 화면마다 달라 사람이 매핑).
+* **유의**: 총건수 textbox 의 `ref` 가 존재하지 않는 DataMap 을 가리키면(개발자 사본에 흔함) 제거한다 — 값은 공통이 `totalCountId` 로 직접 쓴다.
+  응답의 `page/totalPages` 를 따로 보여 주던 textbox 갱신 코드도 두지 않는다(공통 외 후처리 금지 — 표시가 필요하면 pagingInfo 확장으로 공통에서 처리).
+
 ### 라이브러리 프로파일 (`--profile lib`) — `cm/pcc/**` 업무공통 파일 적용 규약
 
 * **대상**: `cm/pcc/{fil,mgt,stf,tms}/*.xml` — `<w2:type>COMMON</w2:type>` + `$c.<ns>` 네임스페이스 + publicInfo 를 가진

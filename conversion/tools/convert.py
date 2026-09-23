@@ -2268,6 +2268,10 @@ def collect_judgment(script, head, body, report):
         report["judgment"].append("window.event.keyCode (IE 레거시) → 표준 이벤트 인자 검토")
     if re.search(r'\bdebugger\b', script):
         report["judgment"].append("debugger; 잔존 → 제거 검토")
+    # 규칙 32: pageList 화면은 페이징 공통($c.sbm.setPagingInfo) 으로 전환한다 — 단계 2 판단 작업이라 리포트만
+    if re.search(r'<w2:pageList\b', body) and "$c.sbm.setPagingInfo" not in script:
+        ids = ", ".join(re.findall(r'<w2:pageList\b[^>]*\bid="([^"]+)"', body)) or "(id 없음)"
+        report["judgment"].append("규칙32 pageList 화면(%s) — 페이징 공통 미적용: scwin.search(gPageNo)+scwin.setPaging(res)→$c.sbm.setPagingInfo 로 전환(정답지 ULDSTF30702, 단계2)" % ids)
     # 규칙8 후속: var 없이 대입되는 암묵적 전역(예: for (i = ...))은 명시 선언 검토 대상
     implicit = sorted(set(re.findall(r'\bfor\s*\(\s*([A-Za-z_$][\w$]*)\s*=(?!=)', script)))
     if implicit:

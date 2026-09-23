@@ -117,3 +117,14 @@ def test_rule12_skips_dataid_inside_commented_out_function():
     assert any("dts_x.DataID" in j and "함수 밖" in j for j in rep["judgment"])
     assert not any("재정렬 보류" in j for j in rep["judgment"])
 
+
+def test_rule32_pagelist_without_common_paging_is_reported():
+    body_pl = ']]></script>\n</head>\n<body>\n<w2:gridView id="grd_main" dataList="data:dlt_res"/>\n<w2:pageList id="pageList1"/>\n</body>\n</html>\n'
+    xml = _HEAD + "scwin.onpageload = function () {\n    scwin.a();\n};\n" + body_pl
+    out, rep = convert.convert(xml, "ULDTST00003.xml")
+    assert any("규칙32" in j and "pageList1" in j for j in rep["judgment"])
+    # 공통 페이징을 이미 쓰는 화면은 리포트하지 않는다
+    xml2 = _HEAD + "scwin.setPaging = function (r) {\n    $c.sbm.setPagingInfo({}, \"dmaPaging\", 0);\n};\n" + body_pl
+    out2, rep2 = convert.convert(xml2, "ULDTST00003.xml")
+    assert not any("규칙32" in j for j in rep2["judgment"])
+
