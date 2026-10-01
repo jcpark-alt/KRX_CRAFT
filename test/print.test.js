@@ -320,6 +320,69 @@ describe("화면 인쇄·PDF 저장 $c.win.print — 메인·팝업 공통 (cm/g
     expect(p[0].o).toMatchObject({ width: 800, height: 1200, windowWidth: 800, windowHeight: 1200 });
   });
 
+  // ---- input 버튼 value 텍스트 상단 쏠림 — 복제본의 input[type=button|submit|reset] 을 계산 스타일을 복사한 <button> 으로 치환 ----
+  // html2canvas 는 input 의 value 를 content box 상단에 직접 찍어 세로 가운데 정렬이 무시된다(1.4.1 도 동일, 실측).
+  // <button> 의 텍스트 노드는 실제 배치대로 그린다. class 만 옮기면 input.w2trigger 류 타입 선택자 스타일이 빠지므로 계산 스타일 전 속성을 복사한다.
+  const makeComputed = (props) => {
+    const keys = Object.keys(props);
+    const cs = { length: keys.length, getPropertyValue: (p) => props[p], getPropertyPriority: (p) => (p === "color" ? "important" : "") };
+    keys.forEach((k, i) => { cs[i] = k; });
+    return cs;
+  };
+  const makeStyle = () => { const s = { props: {}, setProperty(p, v, prio) { this.props[p] = [v, prio]; } }; return s; };
+  const makeClonedDocWithInputs = (inputs) => {
+    const created = [];
+    const doc = {
+      defaultView: { getComputedStyle: (el) => el.computed },
+      querySelectorAll: (sel) => (sel.includes('input[type="button"]') ? inputs : []),
+      createElement: (tag) => { const el = { tag, style: makeStyle() }; created.push(el); return el; },
+    };
+    return { doc, created };
+  };
+
+  test("onclone: 복제본의 input 버튼을 같은 value·id·class 의 <button> 으로 바꾸고 계산 스타일 전 속성(우선순위 포함)과 border-box 폭·높이를 옮긴다", async () => {
+    const w = loadWindow();
+    await w.scwin.print();
+    const o = w.calls.html2canvas[0].o;
+
+    const replaced = [];
+    const parent = { replaceChild: (nu, old) => replaced.push([nu, old]) };
+    const trigger = { id: "mf_frame_btn_search", className: "w2trigger btn_primary", value: "조회", disabled: false, parentNode: parent,
+      getBoundingClientRect: () => ({ width: 80.5, height: 40 }),
+      computed: makeComputed({ "background-color": "rgb(200, 230, 255)", "border-top-width": "2px", color: "rgb(0, 0, 0)", "font-size": "14px" }) };
+    const disabledBtn = { id: "mf_frame_btn_save", className: "w2trigger", value: "저장", disabled: true, parentNode: parent,
+      getBoundingClientRect: () => ({ width: 60, height: 30 }), computed: makeComputed({ opacity: "0.5" }) };
+    const { doc, created } = makeClonedDocWithInputs([trigger, disabledBtn]);
+
+    o.onclone(doc, { id: "mf_frame_render", nodeType: 1, style: {}, parentNode: null });
+
+    expect(created.map((b) => b.tag)).toEqual(["button", "button"]);
+    expect(replaced).toEqual([[created[0], trigger], [created[1], disabledBtn]]);
+    const b = created[0];
+    expect(b).toMatchObject({ type: "button", id: "mf_frame_btn_search", className: "w2trigger btn_primary", textContent: "조회" });
+    expect(b.style.props["background-color"]).toEqual(["rgb(200, 230, 255)", ""]);   // 타입 선택자 스타일도 계산값으로 보존
+    expect(b.style.props["color"]).toEqual(["rgb(0, 0, 0)", "important"]);
+    expect(b.style.props["font-size"]).toEqual(["14px", ""]);
+    expect(b.style).toMatchObject({ boxSizing: "border-box", width: "80.5px", height: "40px" });
+    expect(b.disabled).toBeUndefined();
+    expect(created[1].disabled).toBe(true);
+    expect(created[1].style.props["opacity"]).toEqual(["0.5", ""]);
+  });
+
+  test("onclone: 부모가 없는 input 은 건너뛰고, 렌더되지 않은 문서(getComputedStyle 없음)·html2pdf 1인자 호출에서도 예외 없이 동작", async () => {
+    const w = loadWindow();
+    await w.scwin.print({ type: "pdf" });
+    const o = w.calls.pdfSet[0].html2canvas;
+
+    const orphan = { id: "x", className: "", value: "고아", parentNode: null, getBoundingClientRect: () => ({ width: 1, height: 1 }), computed: makeComputed({}) };
+    const { doc, created } = makeClonedDocWithInputs([orphan]);
+    expect(() => o.onclone(doc)).not.toThrow();                              // html2pdf: (복제 문서) 1인자
+    expect(created).toEqual([]);
+
+    expect(() => o.onclone({ querySelectorAll: () => [] })).not.toThrow();   // defaultView 없음 → 치환 생략
+    expect(() => w.calls.html2canvas).not.toThrow();
+  });
+
   test("id 없는 대상(document.body)·clonedElement 없음(html2pdf) 조합이면 보정 없이 조용히 넘어간다", async () => {
     const w = loadWindow({ $p: { getFrame: () => null } });
     await w.scwin.print({ type: "pdf" });

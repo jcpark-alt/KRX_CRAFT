@@ -2381,11 +2381,69 @@ scwin.__getCanvasOptions = function (element, opt) {
         height : height,
         windowWidth : width,
         windowHeight : height,
-        // 캡처용 복제본에서만 대상의 스크롤·overflow 클리핑을 푼다 — 실제 화면 DOM 은 건드리지 않는다
+        // 캡처용 복제본에서만 대상의 스크롤·overflow 클리핑을 풀고 input 버튼을 <button> 으로 바꾼다 — 실제 화면 DOM 은 건드리지 않는다
         onclone : function (clonedDoc, clonedElement) {
             scwin.__unclipPrintClone(clonedDoc, clonedElement, element);
+            scwin.__replacePrintInputButtons(clonedDoc);
         }
     };
+};
+
+/**
+ * @method
+ * @name __replacePrintInputButtons
+ * @description html2canvas 가 캡처용으로 만든 복제 문서의 input 버튼(type=button|submit|reset)을 같은 모양의 <button> 으로 바꾼다.
+ *              html2canvas 는 input 의 value 텍스트를 직접 합성해 content box 상단에서 글꼴 ascent 만큼 내린 자리에 찍으므로
+ *              브라우저의 세로 가운데 정렬이 무시되어 글자가 위로 쏠린다(40px 버튼에서 약 4.5px, html2canvas 1.4.1 도 동일 — 실측).
+ *              <button> 의 텍스트 노드는 브라우저 실제 배치대로 그리므로 가운데에 온다. WebSquare trigger 가 input type=button 으로
+ *              렌더되므로 화면의 모든 버튼이 해당된다. class 만 옮기면 input.w2trigger 류 타입 선택자 스타일이 빠지므로(배경·테두리 소실)
+ *              계산된 스타일(getComputedStyle) 전 속성을 복사하고 폭·높이는 border-box 로 고정한다. 실제 화면 DOM 은 건드리지 않는다.
+ *              렌더되지 않은 문서(getComputedStyle 없음)면 아무것도 하지 않는다.
+ * @param {Document} clonedDoc html2canvas 가 만든 복제 문서
+ * @returns
+ * @hidden Y
+ * @exception
+ * @example
+html2canvas(element, { onclone : function (clonedDoc) { scwin.__replacePrintInputButtons(clonedDoc); } });
+ */
+scwin.__replacePrintInputButtons = function (clonedDoc) {
+    const view = clonedDoc ? clonedDoc.defaultView : null;
+
+    if (!view || typeof view.getComputedStyle !== "function" || typeof clonedDoc.querySelectorAll !== "function") {
+        return;
+    }
+
+    const inputs = clonedDoc.querySelectorAll("input[type=\"button\"], input[type=\"submit\"], input[type=\"reset\"]");
+
+    Array.prototype.forEach.call(inputs, function (input) {
+        if (!input.parentNode) {
+            return;
+        }
+
+        const rect = input.getBoundingClientRect();
+        const computed = view.getComputedStyle(input);
+        const button = clonedDoc.createElement("button");
+
+        button.type = "button";
+        button.id = input.id;
+        button.className = input.className;
+        button.textContent = input.value;
+
+        for (let i = 0; i < computed.length; i++) {
+            const prop = computed[i];
+            button.style.setProperty(prop, computed.getPropertyValue(prop), computed.getPropertyPriority(prop));
+        }
+
+        button.style.boxSizing = "border-box";
+        button.style.width = rect.width + "px";
+        button.style.height = rect.height + "px";
+
+        if (input.disabled) {
+            button.disabled = true;
+        }
+
+        input.parentNode.replaceChild(button, input);
+    });
 };
 
 /**
