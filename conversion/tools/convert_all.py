@@ -32,6 +32,8 @@ MAPPINGS = [
     ("next-krx-lds-mgt-front/ui", "next-krx-lds-mgt-front/ui-tobe"),
     ("next-krx-lds-stf-front/ui", "next-krx-lds-stf-front/ui-tobe"),
     ("next-krx-lds-tms-front/ui", "next-krx-lds-tms-front/ui-tobe"),
+    # 공급사(editor-web generate) r13 전달본 — jld*/uld* 1,677화면. 원본은 jsp-front/ui, 공급사 문서는 jsp-front/r13.
+    ("jsp-front/ui", "jsp-front/ui-tobe"),
 ]
 
 
