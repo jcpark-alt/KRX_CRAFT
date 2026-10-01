@@ -563,6 +563,37 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
 * **유의**: 총건수 textbox 의 `ref` 가 존재하지 않는 DataMap 을 가리키면(개발자 사본에 흔함) 제거한다 — 값은 공통이 `totalCountId` 로 직접 쓴다.
   응답의 `page/totalPages` 를 따로 보여 주던 textbox 갱신 코드도 두지 않는다(공통 외 후처리 금지 — 표시가 필요하면 pagingInfo 확장으로 공통에서 처리).
 
+### 규칙 33: 공급사(editor-web generate r13) 산출 전용 후처리 — `vendor_postprocess.py` (V1~V20)
+
+* 대상은 `conversion/jsp-front/ui/`(공급사 13차 전달본 1,677화면). convert.py 가 모르는 공급사 관용구를 convert **앞에서** 접는다
+  (규칙 13 충돌 개명·규칙 4 보류 원인 제거가 먼저여야 하므로). 전부 결정적 치환이고 화면 동작은 바꾸지 않는다.
+* 규칙 목록은 도구 머리 주석이 정본이다 — 요지: V1 head `/_commons` script 삭제 · V2 `meta_screenName` ← `pgt_tit` 라벨 ·
+  V3/V4 `init_attrReals`/`init_conds` 범용 루프 → 표준 forEach(동기화) · V5 빈값/경고/세션 래퍼 → `?? ""`·`getUserInfo`(+TODO) ·
+  V6 tx 보일러플레이트 → `const res = await executeDynamic` + `skipped` 가드 · V7 핸들러 머리 미사용 변수·lifecycle 마커 삭제 ·
+  V8 `typeof scwin.X === 'function'` 가드 접기 · V9 `[sdd]` 콘솔 → `/* TODO Stage2 */` · V10 `throw { bizMessage }` 위 TODO ·
+  V11 jQuery 폼 action 사문화 · V12 「as-is 흐름 보존」 전역 정리 · V13 `fn_X`↔전역 충돌 선개명 · V14 JSDoc 위 `//` → `@description` ·
+  V15 `{ const nr = await tx; if (...) { 이동 } };` 블록 펼침 · V16 같은 함수 `var` 중복 선언 → 대입 · V17 `new Array/Object` 리터럴화 ·
+  V18 `fieldEl` TODO · V19 `popupPrint/mainPrint` → `$c.win.print` · V20 최상위 호출식 전역 → 1구역 선언 + onpageload 선두 대입.
+* **드러냄 표지 원칙**: 공급사가 전환 미완 자리에 남긴 `[sdd]` 콘솔·`bizMessage` throw·`unresolved` 는 결함이 아니라 표식이므로
+  지우지 않고 `TODO Stage2` 로 바꿔 집계한다(화면 알림은 유지).
+
+### 규칙 34: 퍼블리싱 정규화 — `publish_normalize.py` (P1~P11, lxml · body 만)
+
+* sample-front 가이드 골격으로 접는 1:1 구조 치환만 한다. P1 `pgtbox`(제목+breadcrumb) → `w2:pageFrame contentHeader` ·
+  P2 순수 컨테이너(`#content` div·JSP form 이월 그룹) 해제 · P3 `meta_snippet*` 삭제 · P4 간격 표·`<br>` 삭제 ·
+  P5 버튼만 든 표 → `titbox/rt`(다음 형제가 그리드) 또는 `btnbox/rt` · P6 맨 `table.w2tb` → `tblbox` + `tbl` ·
+  P7 gridView → `gvwbox` + `gvw rowN` · P8 pageList → `pglbox` · P9 th/td class 정리 · P10 trigger 인라인 style 삭제 + `btn_cm`/`type` ·
+  P11 스크립트가 참조하지 않는 생성 id(`td_16`·`tr_63` …) 비움.
+* **판단 영역(손대지 않음)**: 안내문의 `msgbox/txt_list` 분해, `#if_*`/`#c_choose_*` 조건 래퍼(스크립트 show/hide 로 재설계 필요),
+  표형 그리드(중첩 표), 레거시 `lybox`/`search_box`/`tip_box` 레이아웃, 탭 본문(`<id>c`) 병합, hidden `ipt_*`(스크립트가 DOM 으로 참조).
+* id 참조 판정은 스크립트의 **문자열 리터럴·`#id` 셀렉터**(주석 제외)로 한다 — `init_attrReals` 의 `td_16`·`ul_186` 처럼 생성 id 로
+  보여도 스크립트가 쥐고 있는 것은 보존한다.
+
+### 파이프라인 — `jspfront_pipeline.py` (규칙 33 → convert → 컨벤션 → convert 수렴 → 규칙 34 → convert 수렴 → 게이트)
+
+* convert 는 결과가 안 바뀔 때까지(최대 3회) 돌린다 — 컨벤션 단계가 규칙 4 보류 원인을 치우면 다음 회차에서야 재정렬된다.
+* 파일럿 33화면(2026-10-01): 게이트 33/33 · `wsxml_lint` strict 0/0 · 수렴 1회 이내. 잔여는 `conversion/jsp-front/README.md`.
+
 ### 라이브러리 프로파일 (`--profile lib`) — `cm/pcc/**` 업무공통 파일 적용 규약
 
 * **대상**: `cm/pcc/{fil,mgt,stf,tms}/*.xml` — `<w2:type>COMMON</w2:type>` + `$c.<ns>` 네임스페이스 + publicInfo 를 가진

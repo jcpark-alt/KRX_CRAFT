@@ -37,13 +37,19 @@ EVENT_KO = {"onclick": "클릭", "oncellclick": "셀 클릭", "oncelldblclick": 
 PARAM_DESC = {
     "e": "이벤트 객체", "info": "이벤트 정보 객체", "rowIndex": "행 인덱스", "columnIndex": "열 인덱스", "columnId": "컬럼 id",
     "oldRow": "이전 행 인덱스", "oldRowIndex": "이전 행 인덱스", "tabId": "탭 id", "index": "index",
-    "data": "셀 원본 값", "formattedData": "포맷된 값", "arrPar": "팝업 파라미터 배열(참조 채움)", "comp": "입력 컴포넌트",
+    "data": "데이터", "formattedData": "포맷된 값", "arrPar": "팝업 파라미터 배열(참조 채움)", "comp": "입력 컴포넌트",
     "obj": "컴포넌트", "msg": "항목명", "rowcount": "조회 건수", "row": "행 인덱스", "screnId": "화면 ID", "ex": "예외 객체",
 }
 DEFAULT_OVERRIDES = {
     "onpageload": "화면 로딩 시 초기 처리 — init 순차 호출",
     "onpageunload": "화면 언로드 시 정리 처리",
     "init": "화면 초기화 — 파라미터 수신·기본값·컴포넌트 초기 설정(onpageload 에서 순차 호출)",
+    # 공급사(r13) 합성 초기화 단계 — 이름이 고정이라 설명도 고정
+    "init_recvParam": "화면 전환 파라미터 수신 — $c.data.getParameter() 를 dma_pageContext 에 담는다",
+    "init_nowVars": "현재 시각 파생값 충전 — as-is JSP 계산분(서버 데이터 아님)",
+    "init_attrReals": "속성 실현 — as-is EL 이 그리던 안내 문구·속성을 컨텍스트 값으로 반영(진입 1회·데이터 재적재 시 재호출)",
+    "init_conds": "표시 조건 평가 — 컨텍스트·세션 값에 따라 영역·버튼을 show/hide(진입 1회·데이터 재적재 시 재호출)",
+    "init_loadList": "초기 목록 조회 — as-is 는 진입 자체가 조회였다",
 }
 
 
@@ -109,7 +115,16 @@ def ptype(p):
 
 
 def returns_of(body_code, is_async):
-    rets = re.findall(r'\breturn\s+([^;\n]+)', body_code)
+    """함수 자신의 깊이(중괄호 0)에 있는 return 만 본다 — forEach 콜백·내부 function 의 return 은 제외."""
+    mask = cv.code_mask(body_code)
+    depth, rets = 0, []
+    for m in re.finditer(r'\breturn\b[ \t]*([^;\n]*)', body_code):
+        p = m.start()
+        if not mask[p]:
+            continue
+        depth = sum(1 for i in range(p) if mask[i] and body_code[i] == "{") - sum(1 for i in range(p) if mask[i] and body_code[i] == "}")
+        if depth == 0 and m.group(1).strip():
+            rets.append(m.group(1).strip())
     if not rets:
         return "{Promise<void>}" if is_async else "{void}"
     vals = " ".join(rets)
@@ -205,10 +220,22 @@ def convention_jsdoc(script, body_xml, fallback_log=None, overrides=None):
                 desc = d.group(1).strip() if d else ""
                 if name in overrides:
                     desc = overrides[name]
+                if not desc:
+                    # JSDoc 바로 위의 `//` 설명 줄(공급사 산출 꼴: 설명은 JSDoc 밖, JSDoc 은 @description 없음) → 흡수
+                    above = preceding_comment(script[:start])
+                    if above and not above[0].lstrip().startswith("/*"):
+                        txt = " ".join(re.sub(r'^\s*//\s?', '', l).strip() for l in above[0].strip().split("\n"))
+                        if txt and not st.looks_like_code(txt) and "@" not in txt and len(txt) < 200:
+                            desc = txt
+                            start = above[1]
                 if not desc or desc.lower() in ("desc", "description"):
                     desc = describe(name, params, body_xml, fallback_log, overrides)
-                for pm in re.finditer(r'@param\s*(?:\{[^}]*\})?\s*(\w+)\s*([^\n]*)', block):
-                    pdesc[pm.group(1)] = pm.group(2).strip()
+                for pm in re.finditer(r'@param[ \t]*(?:\{[^}]*\})?[ \t]*(\w+)[ \t]*([^\n]*)', block):
+                    d_ = pm.group(2).strip()
+                    # 공급사 꼴 `@param rowIndex columnIndex columnId`(설명 자리에 다른 매개변수 이름 나열)는 설명이 아니다
+                    if d_ and all(tok in params for tok in d_.split()):
+                        d_ = ""
+                    pdesc[pm.group(1)] = d_
                 rm = re.search(r'@returns?\s*(\{[^}]*\}[^\n]*)', block)
                 if rm and rm.group(1).strip() not in ("{*}", "{void}"):
                     ret = rm.group(1).strip()
@@ -222,12 +249,17 @@ def convention_jsdoc(script, body_xml, fallback_log=None, overrides=None):
                     cut_from = start
             else:
                 txt = " ".join(re.sub(r'^\s*//\s?', '', l).strip() for l in block.strip().split("\n"))
-                code_like = re.search(r'scwin\.|\(|;|=|\$c\.|@', txt) or txt.startswith("TODO")
+                code_like = st.looks_like_code(txt) or "@" in txt or txt.startswith("TODO")
                 if txt and not code_like and len(txt) < 200:
                     desc = txt
                     cut_from = start
         if desc is None:
-            desc = describe(name, params, body_xml, fallback_log, overrides)
+            # 본문 첫 줄이 `//` 설명이면 그것을 쓴다(공급사 산출: `// 초기 목록 — …` 꼴)
+            first = re.match(r'\s*//[ \t]?([^\n]*)', script[b + 1:e])
+            if first and first.group(1).strip() and not st.looks_like_code(first.group(1)) and not re.search(r'@|TODO', first.group(1)):
+                desc = first.group(1).strip()
+            else:
+                desc = describe(name, params, body_xml, fallback_log, overrides)
         desc = desc.replace("\n", " ").strip()
         jsdoc = build_jsdoc(name, params, desc, pdesc, ret)
         script = script[:cut_from].rstrip("\n") + "\n\n" + jsdoc + "\n" + script[s:]
@@ -303,7 +335,10 @@ def reindent(script):
         if stripped.startswith("/*") and "*/" not in stripped:
             in_block, block_col = True, new_col
         out.append(new)
-    return "\n".join(out)
+    result = "\n".join(out)
+    # 줄 중간의 정렬용 탭(`",\t//` 꼴)은 코드 영역에서만 공백으로 — 문자열·주석 안은 그대로
+    mask = cv.code_mask(result)
+    return "".join(" " if (ch == "\t" and mask[i]) else ch for i, ch in enumerate(result))
 
 
 KEEP_GLOBALS = ("screenId",)  # 1구역 표준 선언 — 샘플은 정의만 하고 대개 읽지 않는다
@@ -332,6 +367,9 @@ def finalize_head_body(head, script, body, name):
     head = st.set_public_info(head, funcs)
     if "<w2:layoutInfo" not in head:
         head = re.sub(r'(<w2:buildDate\s*/>)', r'\1\n\t\t<w2:layoutInfo/>', head, 1)
+    # <xf:model> 에 dataCollection 이 없으면 빈 것을 둔다(wsxml_lint WS113 — 탭 호스트 같은 뼈대 화면)
+    if "<xf:model" in head and "<w2:dataCollection" not in head:
+        head = re.sub(r'(<xf:model>)(\s*)', lambda m: m.group(1) + m.group(2) + '<w2:dataCollection baseNode="map"></w2:dataCollection>' + m.group(2), head, 1)
     defined = set(funcs)
 
     def drop(m):
@@ -372,6 +410,7 @@ def apply(path, steps=STEPS, pcc=None, async_common=None, dry=False, overrides=N
         return {"name": name, "fatal": "script 영역 없음"}
     head, script, body = reg["head"], reg["script"], reg["body"]
     log = {"name": name}
+    lead = re.match(r'\s*', script).group(0)  # 스크립트 선두 공백은 입력(convert 출력) 그대로 — 고정점 유지
     if "jsdoc" in steps:
         fb = []
         script = convention_jsdoc(script, body, fb, overrides)
@@ -390,6 +429,10 @@ def apply(path, steps=STEPS, pcc=None, async_common=None, dry=False, overrides=N
     if "finalize" in steps:
         head, script, body, l2 = finalize_head_body(head, script, body, name)
         log.update(l2)
+    # convert 포매터와 같은 빈 줄 규약 — 연속 빈 줄 최대 1줄, 섹션 헤더 바로 뒤 빈 줄 없음(고정점 유지)
+    script = re.sub(r'\n{3,}', '\n\n', script)
+    script = re.sub(r'(?m)^(///////// \d\. [^\n]*)\n\n', r'\1\n', script)
+    script = lead + script.lstrip()
     new = st.join_regions(reg, script=script, head=head, body=body)
     log["changed"] = new != raw
     if not dry and log["changed"]:

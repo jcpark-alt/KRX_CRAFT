@@ -77,6 +77,17 @@ def common_inventory(pcc=None):
 
 
 # ---------------------------------------------------------------- 스크립트 분석
+def without_comments(script):
+    """주석(`//`·`/* */`)만 공백으로 바꾼 같은 길이의 문자열 — 문자열 리터럴은 남긴다(id 참조 판정용)."""
+    out = []
+    for text, is_code in cv.segments(script):
+        if not is_code and text.startswith(("//", "/*")):
+            out.append("".join("\n" if ch == "\n" else " " for ch in text))
+        else:
+            out.append(text)
+    return "".join(out)
+
+
 def code_only(script):
     """비코드(문자열·주석·정규식) 자리를 공백으로 바꾼 같은 길이의 문자열 — 줄 번호가 보존된다."""
     mask = cv.code_mask(script)
@@ -140,8 +151,20 @@ def set_public_info(head, names):
     pat = r'<w2:publicInfo\b[^>]*?(?:/>|>\s*</w2:publicInfo>)'
     if re.search(pat, head):
         return re.sub(pat, '<w2:publicInfo method="%s"/>' % public, head, 1)
-    ins = '\n\t\t<w2:layoutInfo/>' if "<w2:layoutInfo" not in head else ""
-    return re.sub(r'(<w2:buildDate\s*/>)', r'\1%s\n\t\t<w2:publicInfo method="%s"/>' % (ins, public), head, 1)
+    ins = '<w2:layoutInfo/>' if "<w2:layoutInfo" not in head else ""
+    tag = '<w2:publicInfo method="%s"/>' % public
+    if re.search(r'<w2:buildDate\s*/>', head):
+        return re.sub(r'(<w2:buildDate\s*/>)', r'\1' + ('\n\t\t' + ins if ins else '') + '\n\t\t' + tag, head, 1)
+    # buildDate 가 없는 head(레이어 분리 문서 등) — </xf:model> 뒤, 없으면 head 끝(script 직전)에 둔다
+    m = re.search(r'</xf:model>', head)
+    pos = m.end() if m else len(head.rstrip())
+    indent = "\n" + (re.search(r'\n([ \t]*)<', head[pos:]) or re.search(r'\n([ \t]*)\S', head)).group(1) if head[pos:].strip() or "\n" in head else "\n\t"
+    return head[:pos] + (indent + ins if ins else "") + indent + tag + head[pos:]
+
+
+def looks_like_code(txt):
+    """주석 텍스트가 사실은 주석 처리된 코드인지 — 설명 문장(괄호·한글 포함)은 통과, 문장 부호·키워드 꼴은 코드."""
+    return bool(re.search(r'scwin\.|\$c\.|[;{}]|\s=\s|\w+\s*\([^)]*\)\s*$|^\s*(if|for|while|return|const|let|var|else|try|catch)\b|^\s*//', txt))
 
 
 def strip_for_scan(code):

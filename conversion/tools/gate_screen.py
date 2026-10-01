@@ -38,6 +38,8 @@ TOKENS = {
 }
 # 샘플 규약상 정의만 하고 안 읽어도 되는 전역 — scwin.screenId 는 1구역 표준 선언(샘플 18화면 정의 / 2화면 참조)
 KEEP_GLOBALS = {"screenId"}
+# 공급사 확장 중 2차(컴포넌트 계약 전환)로 미룬 것 — 호출은 남고 TODO Stage2 로 집계한다(r13 README §2-2 fieldEl 199~239자리)
+KNOWN_TODO_C = {"$c.util.fieldEl"}
 FAIL_TOKENS = ("console.log", "var ", "fn_ def", "loose ==/!=", "native alert(", "debugger", "tab char", "trailing ws",
                "new Object/Array", "/_commons script")
 
@@ -81,7 +83,9 @@ def gate_file(path, inventory=None, node=True):
     refs = set(re.findall(ID_PREFIX, code))
     res["refs_missing"] = sorted(refs - ids)
     calls = re.findall(r'\$c\.(\w+)\.(\w+)', code)
-    res["undefined_c"] = sorted({"$c.%s.%s" % (a, b) for a, b in calls if b not in public.get(a, set())})
+    undef = {"$c.%s.%s" % (a, b) for a, b in calls if b not in public.get(a, set())}
+    res["todo_c"] = sorted(undef & KNOWN_TODO_C)      # 전환 미완으로 합의된 공급사 확장 — 실패시키지 않고 따로 센다
+    res["undefined_c"] = sorted(undef - KNOWN_TODO_C)
     globs = re.findall(r'^scwin\.(\w+)\s*=\s*(?!\s*(?:async\s+)?function)', script, re.M)
     res["unused_globals"] = [g for g in sorted(set(globs)) if g not in KEEP_GLOBALS
                              and len(re.findall(r'scwin\.%s\b' % re.escape(g), code)) <= 1 and ("scwin." + g) not in body]
@@ -107,7 +111,7 @@ def print_result(ok, r):
     print("  publicInfo-only:", r["public_only"], "| defined-only:", r["defined_only"])
     print("  handlers not defined:", r["handlers_undefined"])
     print("  comp refs not in body/head:", r["refs_missing"])
-    print("  undefined $c:", r["undefined_c"])
+    print("  undefined $c:", r["undefined_c"], ("| todo $c: %s" % r["todo_c"]) if r.get("todo_c") else "")
     print("  unused globals:", r["unused_globals"])
     print("  tokens:", r["tokens"])
     print("  GATE:", "OK" if ok else "FAIL")

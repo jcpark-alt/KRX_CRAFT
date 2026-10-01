@@ -5,7 +5,7 @@ JSP 원본 화면을 WebSquare 로 옮기는 작업의 두 갈래가 한 폴더�
 | 폴더 | 무엇 | 상태 |
 |---|---|---|
 | `ui/` | **공급사 13차 최종 전달본(2026-09-30, `16bf420e194` · `dep20260930_095541`)의 원본** — `jld*`/`uld*` 접두 화면 1,677본. 내용 무수정(반입 커밋 그대로) | 원본. **손대지 않는다** |
-| `ui-tobe/` | `ui/` 를 우리 규칙(퍼블리싱·conversion·code convention)으로 전환한 산출 | 0단계 완료 시점엔 비어 있음 |
+| `ui-tobe/` | `ui/` 를 우리 규칙(퍼블리싱·conversion·code convention)으로 전환한 산출 | 1단계 파일럿 33본(기계 단계 완료, Stage 2 판단 보강 전) |
 | `r13/` | 공급사 전달 문서 — `README.md`(13차 안내서) · `MD5SUMS.txt` · `_meta/`(치환 대응표 `krx-tobe.yaml`, `fn_*` 재고, 규약 계수표, forward 판별표) | 참고 자료 |
 | `krx_소스전환/` | 2026-09 초 공급사 자동 산출 33화면(옛 판) | 역사. 정비 기준 비교용 |
 | `jsp_소스전환/` | 위 31화면을 우리가 손으로 정비한 **정비본 + 화면별 수정가이드 + conversion-report** | **파일럿 정답지** |
@@ -23,19 +23,53 @@ JSP 원본 화면을 WebSquare 로 옮기는 작업의 두 갈래가 한 폴더�
 - **원본 보존**: `ui/` 는 git 에 반입 커밋돼 있다. 전환은 반드시 `ui-tobe/` 에 쓴다(`convert_all.py jsp-front`).
   제자리 변환으로 원본 복구 수단을 잃었던 교훈(2026-09-22 fil 10화면)의 재발 방지.
 
-## 파이프라인(계획 — 상세는 전환 계획서)
+## 파이프라인 — `python conversion/tools/jspfront_pipeline.py <name|폴더> ...`
 
 ```
-ui/*.xml ──convert_all.py(Stage 1)──▶ ui-tobe/*.xml
-            └ publish_normalize.py(퍼블리싱, 1단계에서 신설)
-            └ 공급사 산출 전용 후처리(fn_NullChk→isEmpty 등, 1단계에서 신설)
-            └ screen_convention.py(jsdoc·await·reindent·unused·finalize)
-            └ init_restructure.py(필요 화면만)
-            └ convert.py 재실행(고정점 확인)
-게이트: gate_screen.py · scan_mixed_compare.py · wsxml_lint(strict) · pytest conversion/tools
+ui/<name>.xml
+  1 vendor_postprocess.py  공급사 관용구 접기 V1~V20 (규칙 33)  ← convert 보다 먼저(규칙 13 충돌 개명·규칙 4 보류 원인 제거)
+  2 convert.convert        Stage 1 기계 치환(규칙 1~32)
+  3 screen_convention.py   jsdoc·await·reindent·unused·finalize
+  4 convert 수렴            결과가 안 바뀔 때까지(최대 3회) — 3 이 규칙 4 보류를 풀면 다음 회차에 재정렬된다
+  5 publish_normalize.py   body 퍼블리싱 정규화 P1~P11 (규칙 34, lxml)
+  6 convert 수렴
+  7 gate_screen.py         정적 게이트(node --check·publicInfo↔정의·ev:on↔정의·컴포넌트 참조↔id·미정의 $c·미사용 전역·레거시 토큰)
+→ ui-tobe/<name>.xml
 ```
 
-도구는 모두 `conversion/tools/` 에 있고 `python conversion/tools/<도구>.py` 로 실행한다(`--pcc` 생략 시 파일명 접두로 결정).
+보조 도구: `scan_mixed_compare.py`(규칙 5a 회귀 후보) · `init_restructure.py`(onpageload 인라인 초기화 분리 — 공급사 산출은 이미 init_* 구조라 대개 불필요) ·
+`python -m wsxml_lint conversion/jsp-front/ui-tobe`(strict) · `pytest conversion/tools`. 규칙 본문은 각 도구의 머리 주석과
+`conversion/md/conversion_rules.md` 규칙 33·34.
+
+## 1단계 파일럿 결과(2026-10-01, 33화면 = `krx_소스전환/` 명부)
+
+| 잣대 | 값 |
+|---|---|
+| 파이프라인 | 33/33 완주 · 게이트 **33/33 OK** · convert 수렴 1회 이내 · `wsxml_lint` strict **0 errors / 0 warnings** |
+| 테스트 | `pytest conversion/tools` 104 passed(신규: `test_screen_tools.py` 7 · `test_jspfront_tools.py` 4) |
+| 정답지 대조 | jldfil25900 ↔ 정비본·가이드 샘플: 스크립트는 정비본과 같은 꼴(init_* 동기화·tx 단순화·selectModifiyDate 개명·TODO 명부), body 는 pageFrame·tblbox·titbox/rt·gvwbox 까지 기계로 도달. 남는 차이는 전부 판단 영역(아래) |
+
+**Stage 2 잔여 명부(ui-tobe 33본 실측)** — 기계가 닫지 못해 화면별 판단이 필요한 자리:
+
+| 축 | 규모 | 무엇 |
+|---|---|---|
+| `TODO Stage2` 주석 | 69자리 / 29화면 | 컨텍스트 키 출처(A-3) 12 · 파라미터 수신 대상 없음 10 · 부모 스코프 없음 9 · 행 복사 대상 부재 8 · 공급사 bizMessage 7 · 미실현 동작(set_visible/label/focus) 10 · 세션 키 2 · 폼 action 사문 2 … |
+| jQuery `$(` | 48(35700c) · 24(20000) · 14(25910) · 3·3·2·1 | 규칙 19 — name→id 실측 매핑(09-07 지식 재사용) |
+| `document.` | 39자리 / 10화면 | 규칙 19 |
+| `$c.util.fieldEl` | 32자리 / 1화면(35700c) | DOM 요소 계약 → 컴포넌트 계약(README §2-2 fieldEl 잔존) |
+| `#if_*` 조건 래퍼 | 32 / 12화면 | 스크립트 show/hide 로 재설계 |
+| `#c_choose_*` 래퍼 | 29 / 4화면(59410 에 21) | 같음 |
+| `lybox` 레거시 레이아웃 | 3화면 | 표형 그리드·레이아웃 재구성 |
+| 안내문(`td_16` 류 `__html`) | 화면별 | `msgbox/txt_list` 분해 + 연도 값 `txt_thisYear` 식 추출(가이드 샘플 꼴) |
+| hidden `ipt_*` | 25900 3 · 35700c ~200 … | 스크립트가 DOM 으로 쥔 입력 — dataMap 접근으로 옮긴 뒤 삭제 |
+
+**유형별 기계 처리율(파일럿)**: 단순 조회+그리드(25900·59400·52110·52120)와 탭 본문 소형(357xx 대부분)은 TODO 1~4 로 거의 닫힘,
+입력폼(25910·52100·59410)은 조건 래퍼·hidden 입력·jQuery 가 남고, 대형 계산 화면(35700c 5.5k 줄)은 fieldEl·jQuery 80건이 남는다.
+2단계 전량 적용 순서(계획서 §3)는 이 분포 그대로 유효하다.
+
+**알아 둘 함정(1단계에서 확인)**: 규칙 13 이 `fn_modifiyDate→modifiyDate` 로 상태 변수를 덮는다(V13 선개명) · 공급사 `var` 중복 선언이 규칙 8 로
+`let` 중복이 된다(V16) · 최상위 `getComponent` 호출 전역이 규칙 4 를 보류시킨다(V20) · lxml 왕복은 `<x></x>`→`<x/>`·속성 `>`→`&gt;` 만 바꾼다 ·
+PowerShell 5.1 `Out-File` 의 BOM 이 커밋 제목에 섞인다.
 
 ## 기준선(2026-10-01, `ui/` 1,677본)
 
@@ -53,3 +87,4 @@ ui/*.xml ──convert_all.py(Stage 1)──▶ ui-tobe/*.xml
 - 2026-09-07 `jsp_소스전환` 31화면 정비 종결(브라우저 확인까지). 2026-09-21 규칙 재적용 + 공급사 확장 7종·`$c.cm.fn_*` 9종 치환.
 - 2026-10-01 r13 전달본 반입(`ui/`·`r13/`), `convert_all.py` 등록, 잡 tmp 도구 5종 `conversion/tools` 승격
   (`screen_tools` · `gate_screen` · `scan_mixed_compare` · `screen_convention` · `init_restructure`) — 0단계.
+- 2026-10-01 1단계 파일럿 — `vendor_postprocess.py`(규칙 33)·`publish_normalize.py`(규칙 34)·`jspfront_pipeline.py` 신설, 33화면 `ui-tobe/` 착지.
