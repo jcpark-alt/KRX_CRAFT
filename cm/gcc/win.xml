@@ -503,11 +503,25 @@ scwin.openMenu = function (menuNm, url, menuCode, paramObj, option) {
  * @param {Boolean} options.disableCloseButton [default : false] true 면 팝업 타이틀의 닫기(X) 버튼을 비활성화한다 — 화면의 확인/취소 버튼 등 명시적 흐름으로만 닫히게 할 때 사용. pageFramePopup(wframe 창) 에만 적용되며 browserPopup(브라우저 창) 은 브라우저가 닫기를 제어하므로 무시된다
  * @param {String|Function} options.callbackFn 팝업 결과 수신 콜백(함수명 문자열 또는 함수) — 팝업 타입별 수신 규약상 browserPopup 은 이 콜백으로 비동기 수신하고, pageFramePopup 은 await 반환값으로 수신한다
  * @param {Object} data 팝업 화면에 전달할 데이터 객체 (type이 pageFramePopup인 경우만 지원)
+ * @returns {Promise<Object|String|Number>} 팝업이 닫힐 때 resolve 되는 결과(pageFramePopup 전용. browserPopup 은 options.callbackFn 으로 수신). 팝업이 $c.win.closePopup(param) 으로 넘긴 param 에 따라 다음과 같다.
+ *   - param 이 객체(또는 JSON 문자열)면 그 객체에 isCloseButtonClick(Boolean) 속성이 추가되어 전달된다.
+ *   - param 없이 닫힌 경우(취소 버튼, 닫기(X) 버튼, ESC)에도 빈 값이 아니라 { isCloseButtonClick } 객체가 전달된다. 닫기(X)·ESC 로 닫혔으면 true, 그 외(취소 버튼 등 param 없는 closePopup 호출)는 false.
+ *   - param 이 JSON 이 아닌 문자열·숫자(원시값)면 가공 없이 그대로 전달된다(isCloseButtonClick 미첨부. 이 경우는 명시적 closePopup 호출이므로 X 닫기가 아님이 보장된다).
+ *   따라서 결과 유무는 $c.util.isEmpty(result) 나 result !== "" 가 아니라 필요한 필드의 존재(예: $c.util.isEmpty(result.cd))로 판정해야 한다.
+ *   messageType 이 "confirm" 인 팝업은 param 없이 닫히면 { clickValue: false, isCloseButtonClick } 가 전달된다.
  * @hidden N
  * @exception
  * @example
 // pageFramePopup — async/await 로 리턴값 동기 수신
 const result = await $c.win.openPopup("/ui/samplePopup.xml", { type : "pageFramePopup", width : "600px", height : "400px" }, data);
+// 결과 유무는 필요한 필드로 판정한다(취소/X 닫기에도 { isCloseButtonClick } 객체가 오므로 isEmpty(result) 는 항상 false)
+if ($c.util.isEmpty(result.cd)) {
+    return;
+}
+// 닫기(X) 버튼·ESC 로 닫혔는지 구분
+if (result.isCloseButtonClick === true) {
+    return;
+}
 
 // browserPopup — options.callbackFn 콜백으로 비동기 수신
 $c.win.openPopup("/ui/samplePopup.xml", { type : "browserPopup", callbackFn : "scwin.popupCallback", width : "600px", height : "400px" });
@@ -532,8 +546,8 @@ scwin.openPopup = function (url, opts, data) {
             data.callbackFn = opts.callbackFn;
         }
 
-        let closeActionFunc = function () {
-            let popupWindow = $p.getPopupWindow(this.id);
+        let closeActionFunc = function (id, info) {
+            let popupWindow = $p.getPopupWindow(id);
             if (popupWindow == undefined) {
                 popupWindow = this.getScopeWindow();
             }
@@ -578,6 +592,21 @@ scwin.openPopup = function (url, opts, data) {
                 } else {
                     closeParam = "";
                 }
+            }
+
+            // 닫기(X) 버튼·ESC 로 닫혔는지 여부 — 엔진이 close({ isCloseButtonClick: true }) 로 넘겨준다(그 외 경로는 undefined).
+            // 엔진이 넘긴 info 객체는 변형하지 않고 지역 상수로 판정한다.
+            const isCloseButtonClick = (info.isCloseButtonClick === true);
+
+            // closeParam 이 빈 문자열이면 객체로 변환, 객체면 속성 추가. 취소/X 닫기에서도 호출처가 isCloseButtonClick 을 받아야 하므로
+            // 빈 결과도 객체로 돌려준다(= 호출처는 결과 자체의 비어있음이 아니라 필요한 필드의 존재로 결과 유무를 판정해야 한다).
+            // 원시값 가드: $c.util.getJSON 은 JSON 이 아닌 문자열("A^B" 등)·숫자를 그대로 돌려주는데, 원시값에 속성을 대입하면
+            // (non-strict) 조용히 무시되므로 덧붙이지 않고 그대로 전달한다. callbackParam 은 $c.win.closePopup(param) 명시 호출에서만
+            // 설정되고 X/ESC 닫기에서는 항상 "" 이므로, 원시값 결과는 X 닫기가 아님(isCloseButtonClick=false)이 보장되어 정보 손실이 없다.
+            if (closeParam === "") {
+                closeParam = { isCloseButtonClick: isCloseButtonClick };
+            } else if (typeof closeParam === "object" && closeParam !== null) {
+                closeParam.isCloseButtonClick = isCloseButtonClick;
             }
 
             if (typeof callbackFunc === "function") {
