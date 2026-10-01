@@ -253,6 +253,85 @@ describe("화면 인쇄·PDF 저장 $c.win.print — 메인·팝업 공통 (cm/g
     expect(w.calls.print).toBe(1);
   });
 
+  // ---- 스크롤된 화면 전체 캡처 — 캡처용 복제본에서만 대상의 스크롤·overflow 클리핑을 푼다 (헤드리스 실측으로 검증한 보정) ----
+  // html2canvas 는 대상 자체의 overflow:auto 로 클리핑하고 scrollTop 까지 복제본에 복원하므로, 대상이 스크롤 컨테이너면
+  // 스크롤된 뷰포트 부분만 밀린 위치에 그려지고 나머지는 흰 여백이 된다. onclone 에서 복제본을 보정해 전체를 그린다.
+  const makeCloneNode = (id, opts = {}) => Object.assign({ id, nodeType: 1, scrollTop: 0, scrollLeft: 0, style: {}, parentNode: null }, opts);
+  const makeCloneChain = (targetId) => {
+    // html(복제 루트) > body > content(스크롤된 조상) > target(스크롤 컨테이너 자신)
+    const html = makeCloneNode("", { scrollTop: 0 });
+    const body = makeCloneNode("", { parentNode: html, style: { overflow: "hidden" } });
+    const content = makeCloneNode("content", { parentNode: body, scrollTop: 400, style: { overflow: "auto", height: "740px" } });
+    const target = makeCloneNode(targetId, { parentNode: content, scrollTop: 400, scrollLeft: 30, style: { overflow: "auto", height: "500px", maxHeight: "500px" } });
+    html.parentNode = { nodeType: 9 };                                      // Document — 체인 종료
+    return { html, body, content, target };
+  };
+
+  test("print: html2canvas 옵션에 onclone 이 있고, 복제본의 대상을 내용 높이로 펼치며 대상→루트의 스크롤 0·overflow visible 로 보정한다 (실제 DOM 은 그대로)", async () => {
+    const w = loadWindow();
+    await w.scwin.print();
+    const o = w.calls.html2canvas[0].o;
+    expect(typeof o.onclone).toBe("function");
+    expect(o.height).toBe(1200);                                             // 캡처 크기는 여전히 scroll 크기
+
+    const c = makeCloneChain("mf_frame_render");
+    const clonedDoc = { querySelectorAll: () => { throw new Error("clonedElement 가 있으면 문서 검색을 하지 않는다"); } };
+    o.onclone(clonedDoc, c.target);                                          // html2canvas 1.3.2: (복제 문서, 복제 대상)
+
+    expect(c.target.style).toMatchObject({ height: "auto", maxHeight: "none", overflow: "visible" });
+    expect(c.target.scrollTop).toBe(0);
+    expect(c.target.scrollLeft).toBe(0);
+    expect(c.content.scrollTop).toBe(0);                                     // 스크롤된 조상도 되돌린다
+    expect(c.content.style.overflow).toBe("visible");
+    expect(c.content.style.height).toBe("740px");                            // 조상의 높이는 건드리지 않는다
+    expect(c.body.style.overflow).toBe("visible");
+    expect(c.html.style.overflow).toBe("visible");
+    expect(w.frameRender.style).toBeUndefined();                             // 실제 화면 DOM 은 손대지 않는다
+  });
+
+  test("pdf: html2pdf 내장 html2canvas 는 onclone 에 복제 문서만 넘기고 같은 id 가 둘(원본·사본)이므로 마지막 것(사본)을 보정한다", async () => {
+    const w = loadWindow();
+    await w.scwin.print({ type: "pdf" });
+    const o = w.calls.pdfSet[0].html2canvas;
+    expect(typeof o.onclone).toBe("function");
+
+    const original = makeCloneChain("mf_frame_render");                     // 원본(화면 안)
+    const copy = makeCloneChain("mf_frame_render");                          // html2pdf 사본(body 끝 오버레이 안)
+    const clonedDoc = { querySelectorAll: (sel) => (sel === '[id="mf_frame_render"]' ? [original.target, copy.target] : []) };
+    o.onclone(clonedDoc);                                                    // html2pdf 0.9.2: (복제 문서) 1인자
+
+    expect(copy.target.style).toMatchObject({ height: "auto", overflow: "visible" });
+    expect(copy.target.scrollTop).toBe(0);
+    expect(original.target.style.height).toBe("500px");                      // 원본 쪽은 그대로
+  });
+
+  test("pdf: 화면 요소의 폭·높이를 html2pdf 쪽 html2canvas 에 강제하지 않는다 (A4 폭 재배치와 충돌해 오른쪽 여백·축소 발생)", async () => {
+    const w = loadWindow();
+    await w.scwin.print({ type: "pdf" });
+    const o = w.calls.pdfSet[0].html2canvas;
+    expect(o).not.toHaveProperty("width");
+    expect(o).not.toHaveProperty("height");
+    expect(o).not.toHaveProperty("windowWidth");
+    expect(o).not.toHaveProperty("windowHeight");
+    expect(o).toMatchObject({ scale: 2, useCORS: true, backgroundColor: "#FFFFFF" });
+
+    const p = w.calls.html2canvas;                                           // print 경로는 종전대로 scroll 크기를 준다
+    await w.scwin.print();
+    expect(p[0].o).toMatchObject({ width: 800, height: 1200, windowWidth: 800, windowHeight: 1200 });
+  });
+
+  test("id 없는 대상(document.body)·clonedElement 없음(html2pdf) 조합이면 보정 없이 조용히 넘어간다", async () => {
+    const w = loadWindow({ $p: { getFrame: () => null } });
+    await w.scwin.print({ type: "pdf" });
+    const o = w.calls.pdfSet[0].html2canvas;
+    expect(() => o.onclone({ querySelectorAll: () => [] })).not.toThrow();
+
+    await w.scwin.print();                                                   // print 경로: clonedElement 가 있으면 그것을 보정
+    const el = makeCloneNode("", { style: {} });
+    w.calls.html2canvas[0].o.onclone({}, el);
+    expect(el.style.overflow).toBe("visible");
+  });
+
   test("상수: 라이브러리 경로는 /cm/js 아래(config.xml engine module 과 일치), 기본 옵션은 print/세로/여백 10/배율 2", () => {
     const w = loadWindow();
     expect(w.scwin.PRINT_LIB_INFO).toEqual({
