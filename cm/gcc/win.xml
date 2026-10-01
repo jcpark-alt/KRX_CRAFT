@@ -2226,8 +2226,8 @@ scwin.PRINT_DEFAULT_OPTIONS = {
  *              스크롤로 가려진 영역까지 캡처하므로 긴 내용도 잘리지 않는다 — 출력 대상(frame 영역·레이어 팝업 본문)이 스크롤 컨테이너여서
  *              화면이 스크롤된 상태라도, 캡처용 복제본에서만 대상의 스크롤 위치와 overflow 클리핑을 풀어(__unclipPrintClone) 전체를 그린다.
  *              PDF 는 html2pdf 가 대상을 A4 본문 폭에 다시 배치하므로 화면 폭·높이를 강제하지 않는다(강제하면 오른쪽이 비고 내용이 축소된다).
- *              출력 대상이 최대화된 windowContainer 창(.w2window.w2window_maximized) 안에 있으면 캡처하는 동안만 그 창의 폭을
- *              현재 픽셀 폭으로 고정해 html2canvas 의 % 폭 오측정을 막고, 캡처가 끝나면(실패해도) 원래 inline width 로 되돌린다.
+ *              input 버튼(WebSquare trigger)은 복제본에서 계산 스타일을 복사한 <button> 으로 바꿔 value 텍스트가 세로 가운데에 오게 한다.
+ *              캡처에 필요한 보정은 모두 복제본에서 하므로 실제 화면 DOM 은 건드리지 않는다.
  * @param {Object} options 출력 옵션 (생략 시 기본값 — 화면 전체 인쇄)
  * @param {String} options.type [default : "print"] "print" 인쇄 대화상자 | "pdf" PDF 파일 저장
  * @param {Object|String|HTMLElement} options.target [default : 현재 화면 frame] 출력 영역 — WebSquare 컴포넌트 객체, DOM id, DOM 요소
@@ -2269,30 +2269,16 @@ scwin.print = async function (options) {
     // 라이브러리는 config.xml 의 engine module 로 정적 로드돼 있어야 한다 (html2pdf 번들은 전역 html2canvas 를 노출하지 않으므로 둘 다 필요)
     scwin.__checkPrintLib(opt.type);
 
-    // 출력 대상이 최대화된 windowContainer 창 안에 있으면 그 창을 잡는다(문서 전체의 "선택된 창"이 아니라 대상이 속한 창).
-    // 최대화 창은 폭이 % 라 html2canvas 가 폭을 잘못 재므로, 캡처하는 동안만 현재 픽셀 폭으로 고정하고
-    // 캡처가 끝나면(실패해도) 원래 inline width 로 되돌린다 — 그대로 두면 이후 브라우저 크기 변경에 창이 따라가지 않는다.
-    const maximizedWin = (typeof element.closest === "function") ? element.closest(".w2window.w2window_maximized") : null;
-    const prevWidth = maximizedWin ? maximizedWin.style.width : "";
-
-    if (maximizedWin) {
-        maximizedWin.style.width = maximizedWin.clientWidth + "px";
+    // 실제 화면 DOM 은 건드리지 않는다 — 캡처에 필요한 보정(스크롤·overflow·input 버튼)은 모두 html2canvas 복제본(onclone)에서 한다.
+    // (종전의 "최대화 windowContainer 창 폭을 캡처 동안 px 고정" 은 복제본 보정 도입 후 실화면 확인 결과 불필요해 제거 — 2026-10-01)
+    if (opt.type === "pdf") {
+        await scwin.__savePdf(element, opt);
+        return;
     }
 
-    try {
-        if (opt.type === "pdf") {
-            await scwin.__savePdf(element, opt);
-            return;
-        }
+    const canvas = await window.html2canvas(element, scwin.__getCanvasOptions(element, opt));
 
-        const canvas = await window.html2canvas(element, scwin.__getCanvasOptions(element, opt));
-
-        scwin.__printCanvas(canvas, opt.title || document.title);
-    } finally {
-        if (maximizedWin) {
-            maximizedWin.style.width = prevWidth;
-        }
-    }
+    scwin.__printCanvas(canvas, opt.title || document.title);
 };
 
 /**
