@@ -581,7 +581,8 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
   V23 공급사 pcc 번들 의존 — `$c.fil.alert_error` → `$c.win.alert`, `getObjectValue/setObjectValue` → `getValue/setValue`,
   `fn_setFromToDate` → `setFromToDate`, 나머지 `$c.lc.*`·`$c.frame.*`·저장소 pcc/fil 에 없는 `$c.fil.*` 는 TODO(게이트는 todo 로 집계).
   V16 은 2단계에서 매개변수 동명 `var`·초기값 없는 중복 `var x;`·함수 최상위 `const/let` 중복까지 넓혔다(규칙 8 구문 오류 예방).
-  V24 `$c.lc.fn_isProcess(X)` → 화면 로컬 `scwin.confirmJob(X)`(`$c.win.confirm("[저장] 하시겠습니까?")`, as-is 의미 보존) — Stage 2 수작업 1축(2026-10-02).
+  V24 `$c.lc.fn_isProcess(X)` → 화면 로컬 `scwin.confirmJob(X)`(`$c.win.confirm("[저장] 하시겠습니까?")`, as-is 의미 보존, 처리명을 `scwin.lastJob` 에 기록) — Stage 2 수작업 1축(2026-10-02).
+  V25 `$c.lc.fn_alertMsg(X)` → 화면 로컬 `scwin.alertJobResult(X)`(S/S1/F → MSG-A001/0001/A002 문구, `scwin.lastJob` 사용) · as-is 전역 `LastJob` → `scwin.lastJob` — 2축(2026-10-02).
 * **드러냄 표지 원칙**: 공급사가 전환 미완 자리에 남긴 `[sdd]` 콘솔·`bizMessage` throw·`unresolved` 는 결함이 아니라 표식이므로
   지우지 않고 `TODO Stage2` 로 바꿔 집계한다(화면 알림은 유지).
 

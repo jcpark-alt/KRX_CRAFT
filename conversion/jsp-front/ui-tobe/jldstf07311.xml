@@ -367,13 +367,14 @@
 
   </xf:model>
   <w2:layoutInfo></w2:layoutInfo>
-  <w2:publicInfo method="scwin.onpageload,scwin.init_pageBody,scwin.init_recvParam,scwin.btn_close_onclick,scwin.dts_Fnc_onloaderror,scwin.dts_common_info_onloaderror,scwin.dts_BSList_onloadcompleted,scwin.dts_PubOfr_onloadcompleted,scwin.trs_Save_onfail,scwin.trs_Save_onsuccess,scwin.txb_ATTACH_FILE_NM_onclick,scwin.btn_Acpt_onclick,scwin.btn_Reject_onclick,scwin.MaxTab_01_preselchangenotify,scwin.tx_script_dts_common_info,scwin.tx_script_dts_PubOfr,scwin.tx_script_dts_Fnc,scwin.sbm_trs_Save,scwin.initForm,scwin.setPubOfrDataSet,scwin.setPriOfrDataSet,scwin.setPriOfrAssgnDataSet,scwin.setPubOfrGrid,scwin.setPriOfrGrid,scwin.setPriOfrAssgnGrid,scwin.setAssgnDataSet,scwin.setAssgnGrid,scwin.syncPub,scwin.setFncDataSet,scwin.setBIGrid,scwin.setBSGrid,scwin.setPLGrid,scwin.setCFGrid,scwin.syncFnc,scwin.parentRefresh,scwin.filedown"/>
+  <w2:publicInfo method="scwin.onpageload,scwin.init_pageBody,scwin.init_recvParam,scwin.btn_close_onclick,scwin.dts_Fnc_onloaderror,scwin.dts_common_info_onloaderror,scwin.dts_BSList_onloadcompleted,scwin.dts_PubOfr_onloadcompleted,scwin.trs_Save_onfail,scwin.trs_Save_onsuccess,scwin.txb_ATTACH_FILE_NM_onclick,scwin.btn_Acpt_onclick,scwin.btn_Reject_onclick,scwin.MaxTab_01_preselchangenotify,scwin.tx_script_dts_common_info,scwin.tx_script_dts_PubOfr,scwin.tx_script_dts_Fnc,scwin.sbm_trs_Save,scwin.initForm,scwin.setPubOfrDataSet,scwin.setPriOfrDataSet,scwin.setPriOfrAssgnDataSet,scwin.setPubOfrGrid,scwin.setPriOfrGrid,scwin.setPriOfrAssgnGrid,scwin.setAssgnDataSet,scwin.setAssgnGrid,scwin.syncPub,scwin.setFncDataSet,scwin.setBIGrid,scwin.setBSGrid,scwin.setPLGrid,scwin.setCFGrid,scwin.syncFnc,scwin.parentRefresh,scwin.filedown,scwin.alertJobResult"/>
   <style type="text/css"><![CDATA[
   @import url('../css/global.gss');
   ]]></style>
   <script lazy="false" type="text/javascript"><![CDATA[
 ///////// 1. 변수 및 선언 영역 /////////
 scwin.screenId = "jldstf07311";
+scwin.lastJob = "";  // 업무 처리명(confirmJob 이 채우고 alertJobResult 가 읽는다 — as-is 전역 LastJob)
 scwin.btn_Acpt = null;
 scwin.grd_BIList = null;
 scwin.grd_BSList = null;
@@ -564,13 +565,12 @@ scwin.dts_PubOfr_onloadcompleted = function (rowcount) {
  * @returns {void}
  * @hidden N
  */
-scwin.trs_Save_onfail = function () {
+scwin.trs_Save_onfail = async function () {
     try {
-        // TODO Stage2: 공급사 pcc 의존(저장소 pcc/fil 에 없음 · 반입 또는 치환 판단) — $c.lc.fn_alertMsg
-        $c.lc.fn_alertMsg('F');
+        await scwin.alertJobResult('F');
         $c.win.alert(trs_Save);
     } catch (ex) {
-        $c.exception.handleError(ex, { context : "jldstf07311.trs_Save_onfail" });
+        await $c.exception.handleError(ex, { context : "jldstf07311.trs_Save_onfail" });
     }
 };
 
@@ -581,18 +581,18 @@ scwin.trs_Save_onfail = function () {
  * @returns {void}
  * @hidden N
  */
-scwin.trs_Save_onsuccess = function () {
+scwin.trs_Save_onsuccess = async function () {
     try {
-        // TODO Stage2: 공급사 pcc 의존(저장소 pcc/fil 에 없음 · 반입 또는 치환 판단) — $c.frame.CloseFrame, $c.lc.fn_alertMsg
+        // TODO Stage2: 공급사 pcc 의존(저장소 pcc/fil 에 없음 · 반입 또는 치환 판단) — $c.frame.CloseFrame
         scwin.btn_Acpt.setDisabled(true);
         scwin.btn_Acpt.setDisabled(true);
         $c.util.getComponent('btn_Reject').setSrc("../img/btn_reject_d.gif");
         $c.util.getComponent('btn_Reject').setDisabled(true);
-        $c.lc.fn_alertMsg('S1');
+        await scwin.alertJobResult('S1');
         scwin.parentRefresh();
         $c.win.closePopup();
     } catch (ex) {
-        $c.exception.handleError(ex, { context : "jldstf07311.trs_Save_onsuccess" });
+        await $c.exception.handleError(ex, { context : "jldstf07311.trs_Save_onsuccess" });
     }
 };
 
@@ -1488,7 +1488,23 @@ scwin.parentRefresh = function () {
 scwin.filedown = async function (attach_seq) {
     await $c.win.alert('화면 이동 미완 — 목적지 미확인(as-is: /filedownload.do?attach_seq=). 전환 대상 화면이 확정되면 연결됩니다.') + attach_seq + "&gubun=25" + "&bzProcsNo=" + scwin.vBzProcsNo + "&fileTpCd=04&dtlTpCd=00";
 };
+
 // 억제된 trigger 함수의 as-is 이름 별칭 (호출자 정합)
+
+/**
+ * @method
+ * @name alertJobResult
+ * @description 업무 처리 결과 알림 — S "[처리명] 처리 성공하였습니다." · S1 "성공적으로 처리되었습니다." · F "[처리명] 처리 실패하였습니다."
+ * @param {*} gubun 결과 구분(S 성공 · S1 성공(처리명 없음) · F 실패)
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.alertJobResult = async function (gubun) {
+    const job = scwin.lastJob || "";
+    if (gubun === "S") { await $c.win.alert("[" + job + "] 처리 성공하였습니다."); }
+    else if (gubun === "S1") { await $c.win.alert("성공적으로 처리되었습니다."); }
+    else if (gubun === "F") { await $c.win.alert("[" + job + "] 처리 실패하였습니다."); }
+};
 ]]></script>
 </head>
 <body ev:onpageload="scwin.onpageload">

@@ -163,6 +163,16 @@ scwin.doSubmit = function () {
     return 1;
 };
 
+scwin.trs_Save_onfail = function () {
+    LastJob = "승인";
+    $c.lc.fn_alertMsg('F');
+    const s = "LastJob = 'x'";  // 문자열 안은 그대로
+};
+scwin.trs_Save_onsuccess = async function () {
+    $c.lc.fn_alertMsg('S1');
+    await scwin.listSync();
+};
+
 scwin.legacyPcc = function () {
     $c.fil.alert_error("x" + 1);
     const v = $c.fil.getObjectValue($c.util.getComponent('ipt_a')) + $c.fil.getObjectValue(ipt_b);
@@ -305,6 +315,19 @@ def test_is_process_to_confirm_job():
     # 컨벤션 단계가 await 를 붙이고 호출 함수를 async 로 만든다
     s2, _ = sc.propagate_await(script, set())
     assert "if (!await scwin.confirmJob('S')) { return; }" in s2 and "scwin.doSubmit = async function" in s2
+
+
+def test_alert_msg_to_alert_job_result():
+    import screen_convention as sc
+    head, script, body, log = _post()
+    assert log["V25_alertMsg"] == {"calls": 2, "lastJob_refs": 1}
+    assert 'scwin.lastJob = "승인";' in script and "const s = \"LastJob = 'x'\";" in script
+    assert "scwin.alertJobResult('F');" in script and "scwin.alertJobResult('S1');" in script and "$c.lc.fn_alertMsg" not in script
+    assert script.count("scwin.alertJobResult = async function") == 1 and script.count('scwin.lastJob = "";') == 1
+    assert "scwin.lastJob = job;" in script  # confirmJob 이 처리명을 기록
+    assert script.index('scwin.lastJob = "";') < script.index("///////// 2. ")
+    s2, _ = sc.propagate_await(script, set())
+    assert "scwin.trs_Save_onfail = async function" in s2 and "await scwin.alertJobResult('F');" in s2
 
 
 def test_vendor_pcc_rules():

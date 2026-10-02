@@ -32,7 +32,8 @@
   V21 `$c.cm.fn_NullChk/IsNumber`→화면 로컬 헬퍼(checkRequired/isNumberInput) · `fn_IsNotNull`→`!isEmpty` · `fn_CheckEmail`→`$c.str.isEmail` · 나머지 TODO
   V22 같은 이름 함수 이중 정의 — 본문 동일이면 둘째 삭제, 다르면 `X_2` 개명 + TODO
   V23 공급사 pcc 의존 — alert_error→win.alert · get/setObjectValue→getValue/setValue · fn_setFromToDate→setFromToDate · 나머지 TODO
-  V24 `$c.lc.fn_isProcess(X)`(확인창) → 화면 로컬 `scwin.confirmJob(X)`(`$c.win.confirm`, as-is 문구 보존) — Stage 2 수작업 1축
+  V24 `$c.lc.fn_isProcess(X)`(확인창) → 화면 로컬 `scwin.confirmJob(X)`(`$c.win.confirm`, as-is 문구 보존, `scwin.lastJob` 기록) — Stage 2 수작업 1축
+  V25 `$c.lc.fn_alertMsg(X)`(결과 알림 MSG-A001/0001/A002) → 화면 로컬 `scwin.alertJobResult(X)` · as-is 전역 `LastJob` → `scwin.lastJob` — 2축
 """
 import re
 import sys
@@ -653,9 +654,64 @@ CONFIRM_JOB_HELPER = '''/**
  */
 scwin.confirmJob = async function (gubun) {
     const job = { I: "저장", U: "수정", D: "삭제", S: "제출", R: "해제", DSCL: "안내문작성" }[gubun] || gubun;
+    scwin.lastJob = job;  // 결과 알림(alertJobResult)이 같은 처리명을 쓴다 — as-is 전역 LastJob
     return $c.win.confirm("[" + job + "] 하시겠습니까?");
 };
 '''
+ALERT_JOB_HELPER = '''/**
+ * @method
+ * @name alertJobResult
+ * @description 업무 처리 결과 알림 — S "[처리명] 처리 성공하였습니다." · S1 "성공적으로 처리되었습니다." · F "[처리명] 처리 실패하였습니다."
+ *  (as-is 공통 fn_alertMsg · 메시지 MSG-A001/MSG-0001/MSG-A002 · 처리명은 scwin.lastJob — confirmJob 이 채운다 · pcc/fil 반입 후보)
+ * @param {String} gubun 결과 구분(S 성공 · S1 성공(처리명 없음) · F 실패)
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.alertJobResult = async function (gubun) {
+    const job = scwin.lastJob || "";
+    if (gubun === "S") { await $c.win.alert("[" + job + "] 처리 성공하였습니다."); }
+    else if (gubun === "S1") { await $c.win.alert("성공적으로 처리되었습니다."); }
+    else if (gubun === "F") { await $c.win.alert("[" + job + "] 처리 실패하였습니다."); }
+};
+'''
+
+
+def _append_helper(script, name, helper):
+    if re.search(r'(?m)^scwin\.%s\s*=' % name, script):
+        return script
+    m5 = re.search(r'(?m)^///////// 5\. [^\n]*\n', script)
+    return script.rstrip("\n") + ("\n\n" if m5 else "\n\n///////// 5. 일반/업무 함수 영역 /////////\n\n") + helper
+
+
+def replace_alert_msg(script):
+    """V25 `$c.lc.fn_alertMsg(X)`(공급사 pcc: alert(getMessageParam(MSG-A001|0001|A002, LastJob))) → `scwin.alertJobResult(X)`.
+    as-is 전역 `LastJob` 참조(`LastJob = "승인";` 꼴)는 `scwin.lastJob` 로. await 부여는 컨벤션 단계."""
+    n = 0
+    out, pos = [], 0
+    mask = cv.code_mask(script)
+    for m in re.finditer(r'\$c\.lc\.fn_alertMsg\(', script):
+        if m.start() < pos or not mask[m.start()]:
+            continue
+        cl = _balanced(script, m.end() - 1)
+        if cl < 0:
+            continue
+        out.append(script[pos:m.start()]); out.append("scwin.alertJobResult(%s)" % script[m.end():cl]); pos = cl + 1; n += 1
+    out.append(script[pos:])
+    script = "".join(out)
+    # 코드 영역에서만 LastJob → scwin.lastJob
+    parts, k = [], 0
+    for text, is_code in cv.segments(script):
+        if is_code:
+            text, c = re.subn(r'(?<![\w$.])(?:window\.)?LastJob\b', 'scwin.lastJob', text); k += c
+        parts.append(text)
+    script = "".join(parts)
+    if n:
+        script = _append_helper(script, "alertJobResult", ALERT_JOB_HELPER)
+    if (n or k) and not re.search(r'(?m)^scwin\.lastJob\s*=', script):
+        m1 = re.search(r'(?m)^///////// 1\. [^\n]*\n', script)
+        decl = 'scwin.lastJob = "";  // 업무 처리명(confirmJob 이 채우고 alertJobResult 가 읽는다 — as-is 전역 LastJob)\n'
+        script = (script[:m1.end()] + decl + script[m1.end():]) if m1 else decl + script
+    return script, {"calls": n, "lastJob_refs": k}
 
 
 def replace_is_process(script):
@@ -673,9 +729,12 @@ def replace_is_process(script):
         out.append(script[pos:m.start()]); out.append("scwin.confirmJob(%s)" % script[m.end():cl]); pos = cl + 1; n += 1
     out.append(script[pos:])
     script = "".join(out)
-    if n and not re.search(r'(?m)^scwin\.confirmJob\s*=', script):
-        m5 = re.search(r'(?m)^///////// 5\. [^\n]*\n', script)
-        script = script.rstrip("\n") + ("\n\n" if m5 else "\n\n///////// 5. 일반/업무 함수 영역 /////////\n\n") + CONFIRM_JOB_HELPER
+    if n:
+        script = _append_helper(script, "confirmJob", CONFIRM_JOB_HELPER)
+        if not re.search(r'(?m)^scwin\.lastJob\s*=', script):
+            m1 = re.search(r'(?m)^///////// 1\. [^\n]*\n', script)
+            decl = 'scwin.lastJob = "";  // 업무 처리명(confirmJob 이 채우고 alertJobResult 가 읽는다 — as-is 전역 LastJob)\n'
+            script = (script[:m1.end()] + decl + script[m1.end():]) if m1 else decl + script
     return script, n
 
 
@@ -800,6 +859,7 @@ def apply_regions(head, script, body):
     script, log["V20_hoisted"] = hoist_call_globals(script)
     script, log["V21_cm_fn"] = replace_cm_helpers(script)
     script, log["V24_isProcess"] = replace_is_process(script)   # V23 보다 먼저 — 남은 $c.lc 만 TODO 로 집계되게
+    script, log["V25_alertMsg"] = replace_alert_msg(script)
     script, log["V23_vendor_pcc"] = replace_vendor_pcc(script)
     return head, script, body, log
 
