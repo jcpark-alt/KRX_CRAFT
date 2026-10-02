@@ -15,7 +15,7 @@ xmlns:xf="http://www.w3.org/2002/xforms">
 		</xf:model>
 		<w2:layoutInfo>
 		</w2:layoutInfo>
-		<w2:publicInfo method="scwin.comboCbDataSet,scwin.comboCbDataSetPaging,scwin.comboCbDataSetLimit,scwin.comboCbDataSetDynamic,scwin.comboCbDataSetPeriod,scwin.comboCbDataSetEmail,scwin.getValResultMsg,scwin.setDownloadGridViewOption,scwin.loadMessage,scwin.loadCommonMessage,scwin.initChangeCheckedDc,scwin.setChangeCheckedDc,scwin.getChangeCheckedMainFrame,scwin.setCommonCode,scwin.getCommonCodeDataList,scwin.executeCommonCode,scwin.getParameter,scwin.getColumnName,scwin.getDataCollection,scwin.getDataList,scwin.getMessage,scwin.isModified,scwin.downloadMultipleDataList,scwin.downloadMultipleGridView,scwin.downloadGridViewExcel,scwin.downloadGridViewCSV,scwin.uploadGridViewExcel,scwin.uploadGridViewCSV,scwin.openReportPdf,scwin.validateGroup,scwin.validateGridView,scwin.createDataList,scwin.createDataMap,scwin.setBroadcast,scwin.undoAll,scwin.undoRow,scwin.undoGridView,scwin.deleteRow,scwin.insertRow,scwin.getMatchedJSON,scwin.getDiffJSON,scwin.pickJSON,scwin.omitJSON,scwin.keyByJSON,scwin.groupByJSON,scwin.deepClone,scwin.mergeJSON,scwin.setUserData,scwin.getUserData,scwin.createHolidayDataList,scwin.loadHoliday,scwin.serializeFormToQueryString,scwin.downFile,scwin.getSingleUploadFileInfo,scwin.bindDragDropUpload"/>
+		<w2:publicInfo method="scwin.comboCbDataSet,scwin.comboCbDataSetPaging,scwin.comboCbDataSetLimit,scwin.comboCbDataSetDynamic,scwin.comboCbDataSetPeriod,scwin.comboCbDataSetEmail,scwin.getValResultMsg,scwin.setDownloadGridViewOption,scwin.loadMessage,scwin.loadCommonMessage,scwin.initChangeCheckedDc,scwin.setChangeCheckedDc,scwin.getChangeCheckedMainFrame,scwin.setCommonCode,scwin.getCommonCodeDataList,scwin.executeCommonCode,scwin.getUrlParameter,scwin.getUrlParameterJSON,scwin.getParameter,scwin.getColumnName,scwin.getDataCollection,scwin.getDataList,scwin.getMessage,scwin.isModified,scwin.downloadMultipleDataList,scwin.downloadMultipleGridView,scwin.downloadGridViewExcel,scwin.downloadGridViewCSV,scwin.uploadGridViewExcel,scwin.uploadGridViewCSV,scwin.openReportPdf,scwin.validateGroup,scwin.validateGridView,scwin.createDataList,scwin.createDataMap,scwin.setBroadcast,scwin.undoAll,scwin.undoRow,scwin.undoGridView,scwin.deleteRow,scwin.insertRow,scwin.getMatchedJSON,scwin.getDiffJSON,scwin.pickJSON,scwin.omitJSON,scwin.keyByJSON,scwin.groupByJSON,scwin.deepClone,scwin.mergeJSON,scwin.setUserData,scwin.getUserData,scwin.setScwinData,scwin.createHolidayDataList,scwin.loadHoliday,scwin.serializeFormToQueryString,scwin.downFile,scwin.getSingleUploadFileInfo,scwin.bindDragDropUpload"/>
 		<script type="text/javascript" lazy="false"><![CDATA[// =============================================================================
 /**
  * 공통 코드 & 메세지, DataCollection 제어, 글로벌 데이터 제어($c의 함수를 호출), 화면 간 데이터 전달, 데이터 유효성 검사 함수를 작성한다.
@@ -919,6 +919,91 @@ scwin.executeCommonCode = function () {
 };
 
 
+// URL QueryString(location.search 형식 문자열)을 { key : value } JSON 으로 파싱한다.(내부 헬퍼)
+// - "?", "&", "#" 를 구분자로 분리하고 "=" 가 없는 조각은 무시한다. 같은 키가 여러 번 있으면 첫 번째 값을 사용한다.
+// - decode 가 true 이면 key/value 를 decodeURIComponent 로 디코딩한다(디코딩 실패 시 원문 유지).
+scwin.__parseQueryString = function (search, decode) {
+    const result = {};
+    if (typeof search !== "string" || search === "") {
+        return result;
+    }
+    const decodeSafe = function (text) {
+        if (decode !== true) {
+            return text;
+        }
+        try {
+            return decodeURIComponent(text);
+        } catch (ex) {
+            return text;
+        }
+    };
+    const paramArray = search.split(/[\&\?\#]/);
+    for (let i = 0; i < paramArray.length; i++) {
+        const token = paramArray[i];
+        if (token === "") { continue; }
+        const valueIdx = token.indexOf("=");
+        if (valueIdx <= 0) { continue; }
+        const key = decodeSafe(token.substring(0, valueIdx));
+        if (Object.prototype.hasOwnProperty.call(result, key)) { continue; }
+        result[key] = decodeSafe(token.substring(valueIdx + 1));
+    }
+    return result;
+};
+
+/**
+ * @method
+ * @name getUrlParameter
+ * @description 현재 URL 의 QueryString(location.search) 에서 지정한 키의 값을 반환한다.
+ *              같은 키가 여러 번 있으면 첫 번째 값을 반환하고, 키가 없으면 빈 문자열("")을 반환한다.
+ * @param {String} paramKey 읽을 파라미터 키
+ * @param {Boolean} decode (선택) 값을 decodeURIComponent 로 디코딩할지 여부. 기본값 true (false 지정 시 URL 원문 그대로 반환)
+ * @returns {String} 파라미터 값. 없으면 ""
+ * @hidden N
+ * @exception
+ * @example // URL 이 /cm/main.xml?menuCd=M001&name=%ED%99%8D 인 경우
+const menuCd = $c.data.getUrlParameter("menuCd");          // "M001"
+const name = $c.data.getUrlParameter("name");              // "홍" (디코딩)
+const raw = $c.data.getUrlParameter("name", false);        // "%ED%99%8D" (원문)
+ */
+scwin.getUrlParameter = function (paramKey, decode) {
+    try {
+        if ($c.util.isEmpty(paramKey)) {
+            return "";
+        }
+        const params = scwin.__parseQueryString(location.search, (decode !== false));
+        const value = params[paramKey];
+        return $c.util.isEmpty(value) ? "" : value;
+    } catch (ex) {
+        console.error("[$c.data.getUrlParameter] Exception :: " + ex.message);
+        return "";
+    }
+};
+
+/**
+ * @method
+ * @name getUrlParameterJSON
+ * @description URL 의 QueryString(location.search) 전체를 { key : value } 형태의 JSON 객체로 반환한다.
+ *              "=" 가 없는 조각은 무시하고, 같은 키가 여러 번 있으면 첫 번째 값을 사용한다. 파라미터가 없으면 빈 객체({})를 반환한다.
+ * @param {String} search (선택) 파싱할 QueryString 문자열. 미지정 시 현재 URL 의 location.search
+ * @param {Boolean} decode (선택) key/value 를 decodeURIComponent 로 디코딩할지 여부. 기본값 true
+ * @returns {Object} QueryString 을 파싱한 JSON 객체
+ * @hidden N
+ * @exception
+ * @example // URL 이 /cm/main.xml?menuCd=M001&name=%ED%99%8D&flag 인 경우
+const params = $c.data.getUrlParameterJSON();
+// → { menuCd : "M001", name : "홍" }   ("flag" 는 "=" 가 없어 무시)
+const popupParams = $c.data.getUrlParameterJSON(popupWindow.location.search);   // 다른 창의 QueryString 파싱
+ */
+scwin.getUrlParameterJSON = function (search, decode) {
+    try {
+        const target = $c.util.isEmpty(search) ? location.search : search;
+        return scwin.__parseQueryString(target, (decode !== false));
+    } catch (ex) {
+        console.error("[$c.data.getUrlParameterJSON] Exception :: " + ex.message);
+        return {};
+    }
+};
+
 /**
  * @method
  * @name getParameter
@@ -946,7 +1031,7 @@ scwin.getParameter = function (paramKey, scopeObj) {
                 return paramData;
             }
         } else {
-            paramData = getUrlParameter("paramData");
+            paramData = $c.data.getUrlParameter("paramData", false);   // base64 원문 그대로(디코딩 안 함)
             if ($c.util.isEmpty(paramData) === false) {
                 paramData = $c.util.getJSON(WebSquare.text.BASE64Decode(paramData));
                 if ($c.util.isEmpty(paramKey) === false) {
@@ -962,24 +1047,7 @@ scwin.getParameter = function (paramKey, scopeObj) {
     }
 
     return paramData;
-
-    function getUrlParameter(paramKey) {
-        let param = [];
-        const paramArray = location.search.split(/[\&\?\#]/);
-        for (let i = 0; i < paramArray.length; i++) {
-            if ($c.util.isEmpty(paramArray[i]) === false) {
-                const valueIdx = paramArray[i].indexOf("=");
-                if (valueIdx > 0) {
-                    const key = paramArray[i].substring(0, valueIdx);
-                    const value = paramArray[i].substring(valueIdx + 1);
-                    if (key === paramKey) {
-                        return value;
-                    }
-                }
-            }
-        }
-    }
-}
+};
 
 /**
  * @method
@@ -3259,6 +3327,47 @@ scwin.setUserData = function (comObj, key, value) {
  */
 scwin.getUserData = function (comObj, key) {
     return comObj.getUserData("__" + key);
+};
+
+/**
+ * @method
+ * @name setScwinData
+ * @description JSON 객체의 key 를 호출 화면 scwin 전역변수명으로, value 를 그 값으로 하여 일괄 설정한다.
+ *              동일한 이름의 scwin 전역변수가 이미 있으면 값을 덮어쓰고, 없으면 새로 생성하여 값을 설정한다.
+ *              (scwin 객체 자체가 없는 scope 인 경우 빈 객체를 생성한 뒤 설정한다.)
+ * @param {Object} dataObj 설정할 데이터 객체. { scwin전역변수명 : 값, ... }
+ * @param {Object} scopeObj (선택) 설정 대상 scope($p) 객체. 미지정 시 호출 화면 scope
+ * @returns {Boolean} 설정 성공 여부 (dataObj 가 일반 객체(plain object)가 아니면 false)
+ * @hidden N
+ * @exception
+ * @example $c.data.setScwinData({ searchCnt : 0, userInfo : { userId : "M000001" } });
+// → scwin.searchCnt = 0, scwin.userInfo = { userId : "M000001" } (없으면 생성, 있으면 덮어쓰기)
+$c.data.setScwinData({ searchCnt : 0 }, popupWindow.$p);   // 특정 scope 의 scwin 에 설정
+ */
+scwin.setScwinData = function (dataObj, scopeObj) {
+    // 빌드 시 첫 인자로 호출 화면의 $p 가 주입된다(호출부에서 $p 를 명시적으로 넘기지 않는다). scopeObj 지정 시 그 scope 를 우선한다.
+    const scope = $c.util.isEmpty(scopeObj) ? $p : scopeObj;
+
+    try {
+        if ($c.util.isPlainObject(dataObj) === false) {
+            console.warn("[$c.data.setScwinData] dataObj 는 일반 객체(plain object)여야 합니다.");
+            return false;
+        }
+
+        const selfScope = scope.self();
+        if ($c.util.isEmpty(selfScope.scwin)) {
+            selfScope.scwin = {};
+        }
+        const scwinObj = selfScope.scwin;
+
+        Object.keys(dataObj).forEach(function (key) {
+            scwinObj[key] = dataObj[key];
+        });
+        return true;
+    } catch (ex) {
+        console.error("[$c.data.setScwinData] Exception :: " + ex.message);
+        return false;
+    }
 };
 
 /**
