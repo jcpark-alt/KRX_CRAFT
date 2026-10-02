@@ -80,6 +80,8 @@ def run(name, publish=True, gate=True, inventory=None):
     if gate:
         ok, g = gate_screen.gate_file(str(dst), inventory or st.common_inventory(st.pcc_for(name)))
         rep["gate"] = "OK" if ok else {k: v for k, v in g.items() if v and k not in ("name", "node")} | {"node": g.get("node")}
+        rep["todo"] = {k: v for k, v in (("todo_c", g.get("todo_c")), ("refs_missing", g.get("refs_missing")),
+                                          ("TODO Stage2", g.get("tokens", {}).get("TODO Stage2"))) if v}
     return rep
 
 
@@ -109,7 +111,7 @@ def main(argv=None):
         g = r.get("gate")
         ok_all &= (g == "OK") and r.get("idem_after_convention", True) and r.get("idem_after_publish", True)
         print("=== %s" % n)
-        for k in ("fatal", "vendor", "convert", "convention", "convert_passes", "idem_after_convention", "publish", "idem_after_publish", "gate"):
+        for k in ("fatal", "vendor", "convert", "convention", "convert_passes", "idem_after_convention", "publish", "idem_after_publish", "gate", "todo"):
             if k in r:
                 print("  %-24s %s" % (k, r[k]))
     print("\nALL:", "OK" if ok_all else "FAIL")

@@ -132,6 +132,40 @@ scwin.goView = function (a) {
 };
 
 scwin.fn_modifiyDate = async function () { return 1; };
+
+scwin.sendForm = function (fm) {
+    var fm = (document.F || { elements: [] });
+    var kind = "";
+    var kind;
+    const isurCd = 1;
+    const isurCd = 2;
+    if (fm) { const isurCd = 3; }
+    return kind + isurCd;
+};
+
+scwin.td_1_oncellclick = async function (rowIndex) { await scwin.goView(rowIndex); };
+scwin.td_1_oncellclick = async function (rowIndex) { await scwin.goView(rowIndex); };
+scwin.td_2_oncellclick = async function (rowIndex) { await scwin.goView(rowIndex); };
+scwin.td_2_oncellclick = async function (rowIndex) { await scwin.goView(rowIndex + 1); };
+
+scwin.checkForm = function () {
+    if ($c.cm.fn_NullChk($c.util.getComponent('ipt_method')) || $c.cm.fn_NullChk($c.util.getComponent(["a", "b"][0]))) { return false; }
+    if (!$c.cm.fn_IsNumber($c.util.getComponent('ipt_status'))) { return false; }
+    if ($c.cm.fn_IsNotNull($c.util.getComponent('ipt_status')) && $c.cm.fn_CheckEmail($c.util.getComponent('ipt_status').getValue())) { return true; }
+    if ($c.cm.fn_ChkZipCd($c.util.getComponent('ipt_status'))) { return true; }
+    const z = new Array(0);
+    return true;
+};
+
+scwin.legacyPcc = function () {
+    $c.fil.alert_error("x" + 1);
+    const v = $c.fil.getObjectValue($c.util.getComponent('ipt_a')) + $c.fil.getObjectValue(ipt_b);
+    $c.fil.setObjectValue($c.util.getComponent('ipt_a'), fn(1, 2));
+    $c.fil.fn_setFromToDate(a, b);
+    if ($c.lc.fn_isProcess()) { return; }
+    $c.frame.CloseFrame();
+    return $c.fil.checkMaxLength(v) + $c.fil.showObj('x', true);
+};
 '''
 BODY = '''<body ev:onpageload="scwin.onpageload">
   <xf:group class="sub_contents">
@@ -215,6 +249,41 @@ def test_handlers_tx_typeof_sdd_and_literals():
     assert log["V20_hoisted"] == ["ex"] and "scwin.ex = null;" in script
     assert "try {\n        scwin.ex = $c.util.getComponent('ex');\n        scwin.init_attrReals();" in script
     assert " * @description 속성 EL 실현 — 진입점에서 1회." in script             # JSDoc 위 // 설명 → @description
+
+
+def test_redeclaration_and_duplicate_functions():
+    head, script, body, log = _post()
+    assert "    fm = (document.F || { elements: [] });" in script           # 매개변수 동명 var → 대입
+    assert 'var kind = "";' in script and "var kind;" not in script       # 초기값 없는 중복 → 삭제
+    assert "const isurCd = 1;\n    isurCd = 2;\n    if (fm) { const isurCd = 3; }" in script  # 최상위 const 중복만
+    assert script.count("scwin.td_1_oncellclick = ") == 1 and log["V22_dup_fn"]["removed"] == ["td_1_oncellclick"]
+    assert "scwin.td_2_oncellclick_2 = async function" in script and log["V22_dup_fn"]["renamed"] == ["td_2_oncellclick_2"]
+    assert "// TODO Stage2: 공급사 산출의 중복 정의" in script
+
+
+def test_vendor_pcc_rules():
+    head, script, body, log = _post()
+    assert '$c.win.alert("x" + 1);' in script
+    assert "const v = $c.util.getComponent('ipt_a').getValue() + ipt_b.getValue();" in script
+    assert "$c.util.getComponent('ipt_a').setValue(fn(1, 2));" in script
+    assert "$c.fil.setFromToDate(a, b);" in script
+    assert "$c.lc.fn_isProcess()" in script and "$c.frame.CloseFrame()" in script and "$c.fil.showObj('x', true)" in script
+    assert "// TODO Stage2: 공급사 pcc 의존(저장소 pcc/fil 에 없음 · 반입 또는 치환 판단) — $c.fil.showObj, $c.frame.CloseFrame, $c.lc.fn_isProcess" in script
+    assert log["V23_vendor_pcc"] == {"alert_error": 1, "getObjectValue": 2, "setObjectValue": 1, "fn_setFromToDate": 1, "todo_left": 3}
+
+
+def test_cm_helpers():
+    head, script, body, log = _post()
+    assert log["V21_cm_fn"] == {"NullChk": 2, "IsNumber": 1, "IsNotNull": 1, "CheckEmail": 1, "todo_left": 1}
+    assert "scwin.checkRequired($c.util.getComponent('ipt_method')) || scwin.checkRequired($c.util.getComponent([\"a\", \"b\"][0]))" in script
+    assert "!scwin.isNumberInput($c.util.getComponent('ipt_status'))" in script
+    assert "!$c.util.isEmpty(($c.util.getComponent('ipt_status')).getValue()) && $c.str.isEmail($c.util.getComponent('ipt_status').getValue())" in script
+    assert script.count("scwin.checkRequired = async function") == 1 and script.count("scwin.isNumberInput = function") == 1
+    assert "// TODO Stage2: $c.cm.fn_* 정의 없음(pcc/fil 미반입 · 치환 방향 미결) — fn_ChkZipCd" in script
+    assert "const z = [];" in script
+    # 재실행 멱등(헬퍼 중복 삽입 없음)
+    _, script2, _, log2 = vp.apply_regions(head, script, body)
+    assert script2.count("scwin.checkRequired = async function") == 1 and log2["V21_cm_fn"].get("NullChk") is None
 
 
 def test_publish_normalize_body():

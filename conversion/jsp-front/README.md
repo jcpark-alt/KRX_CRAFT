@@ -5,7 +5,7 @@ JSP 원본 화면을 WebSquare 로 옮기는 작업의 두 갈래가 한 폴더�
 | 폴더 | 무엇 | 상태 |
 |---|---|---|
 | `ui/` | **공급사 13차 최종 전달본(2026-09-30, `16bf420e194` · `dep20260930_095541`)의 원본** — `jld*`/`uld*` 접두 화면 1,677본. 내용 무수정(반입 커밋 그대로) | 원본. **손대지 않는다** |
-| `ui-tobe/` | `ui/` 를 우리 규칙(퍼블리싱·conversion·code convention)으로 전환한 산출 | 1단계 파일럿 33본(기계 단계 완료, Stage 2 판단 보강 전) |
+| `ui-tobe/` | `ui/` 를 우리 규칙(퍼블리싱·conversion·code convention)으로 전환한 산출 | 1,677본 전량(기계 단계 완료 2026-10-02, Stage 2 판단 보강 전) |
 | `r13/` | 공급사 전달 문서 — `README.md`(13차 안내서) · `MD5SUMS.txt` · `_meta/`(치환 대응표 `krx-tobe.yaml`, `fn_*` 재고, 규약 계수표, forward 판별표) | 참고 자료 |
 | `krx_소스전환/` | 2026-09 초 공급사 자동 산출 33화면(옛 판) | 역사. 정비 기준 비교용 |
 | `jsp_소스전환/` | 위 31화면을 우리가 손으로 정비한 **정비본 + 화면별 수정가이드 + conversion-report** | **파일럿 정답지** |
@@ -67,6 +67,34 @@ ui/<name>.xml
 입력폼(25910·52100·59410)은 조건 래퍼·hidden 입력·jQuery 가 남고, 대형 계산 화면(35700c 5.5k 줄)은 fieldEl·jQuery 80건이 남는다.
 2단계 전량 적용 순서(계획서 §3)는 이 분포 그대로 유효하다.
 
+## 2단계 전량 결과(2026-10-02, 1,677화면 = 파일럿 33 + 나머지 1,644)
+
+| 잣대 | 값 |
+|---|---|
+| 파이프라인 | 접두별 7배치 + 재처리, 1,677/1,677 완주 · 게이트 **1,677/1,677 OK** · 수렴 실패 0 · fatal 0 · 약 3.4초/화면(총 ≈ 95분) |
+| `wsxml_lint` strict | **1,677 files, 0 errors, 0 warnings** |
+| 테스트 | `pytest conversion/tools` 107 passed |
+| 배치 중 보강한 규칙 | V16 확장(재선언)·V21(`$c.cm` 헬퍼)·V22(이중 정의)·V23(공급사 pcc 의존)·head 키 중복 제거(WS120)·게이트 todo 분류(`$c.cm/lc/frame/utils/fil`·`refs_missing`·`fn_ def`·`new Array(n)` 은 보고만) |
+| 배치별 1차 통과율 | jldods 88% → jldinf 96% → jlddst 99.5% → jldstf 75%(공급사 pcc 의존 집중) → jldbnf 100% → uldmgt 97% → jldfil 99.7%; 실패 유형마다 규칙을 넓혀 재처리로 전부 닫음 |
+
+**Stage 2 잔여 명부(ui-tobe 1,677본 실측 — 화면별 판단이 필요한 자리)**
+
+| 축 | 자리 / 화면 | 무엇 |
+|---|---|---|
+| `TODO Stage2` 주석 | 5,638 / 1,475 | 상위: 부모 화면 스코프 없음 1,154 · 전환 미완(공급사 bizMessage) 769 · 행 복사 대상 부재 671 · 미실현 set_focus 591 · 파라미터 수신 대상 없음 528 · 컨텍스트 키 출처(A-3) 515 · 공급사 pcc 의존 427 · `$c.cm.fn_*` 83 · 세션 키 59 · 폼 action 사문 37 |
+| jQuery `$(` | 7,322 / 516 | 규칙 19 — jldinf 2,470 · jldfil 1,828 · jlddst 1,559 · jldods 755 |
+| `document.` | 3,733 / 872 | 규칙 19 — jldfil 2,345 |
+| hidden `xf:input` | 4,485 / 833 | 스크립트가 DOM 으로 쥔 입력 → dataMap 접근 전환 후 삭제 |
+| `#c_choose_*` 래퍼 | 3,007 / 316 | JSTL 조건 이월 → 스크립트 show/hide |
+| `#if_*` 래퍼 | 2,631 / 373 | 같음 |
+| `lybox` 레거시 레이아웃 | 575 / 319 | 표형 그리드·레이아웃 재구성(jldfil 494) |
+| `$c.util.fieldEl` | 239 / 33 | DOM 요소 계약 → 컴포넌트 계약(jldfil 213) |
+| 미정의 `$c`(todo) | — | `$c.lc.fn_isProcess` 92화면 · `$c.frame.CreateDialogFrame` 19 · `$c.fil.SCREN_PROCS_TP_CD_*` 25 · `$c.cm.fn_CheckDateGn` 15 · `fn_ChkZipCd` 14 · `$c.lc.fn_alertMsg` 12 · `$c.fil.doLogSave` 9 · `$c.frame.Provider("../../"|"/top")` 9 |
+| body 에 없는 참조 | 39 / 26 | 서버 렌더 hidden·동적 조립(공급사 README 「화면에 없는 필드」) |
+
+접두별 밀도: jldinf 가 jQuery 비중이 가장 높고(2,470), jldfil 이 `document.`·조건 래퍼·lybox·fieldEl 의 대부분, jldstf 는 공급사 pcc 의존(`$c.lc`·`$c.fil` 상수)이 집중된다.
+공급사 "드러냄" 표지는 전부 TODO 로 남아 있으며 화면 알림은 유지된다(삭제 0).
+
 **알아 둘 함정(1단계에서 확인)**: 규칙 13 이 `fn_modifiyDate→modifiyDate` 로 상태 변수를 덮는다(V13 선개명) · 공급사 `var` 중복 선언이 규칙 8 로
 `let` 중복이 된다(V16) · 최상위 `getComponent` 호출 전역이 규칙 4 를 보류시킨다(V20) · lxml 왕복은 `<x></x>`→`<x/>`·속성 `>`→`&gt;` 만 바꾼다 ·
 PowerShell 5.1 `Out-File` 의 BOM 이 커밋 제목에 섞인다.
@@ -88,3 +116,4 @@ PowerShell 5.1 `Out-File` 의 BOM 이 커밋 제목에 섞인다.
 - 2026-10-01 r13 전달본 반입(`ui/`·`r13/`), `convert_all.py` 등록, 잡 tmp 도구 5종 `conversion/tools` 승격
   (`screen_tools` · `gate_screen` · `scan_mixed_compare` · `screen_convention` · `init_restructure`) — 0단계.
 - 2026-10-01 1단계 파일럿 — `vendor_postprocess.py`(규칙 33)·`publish_normalize.py`(규칙 34)·`jspfront_pipeline.py` 신설, 33화면 `ui-tobe/` 착지.
+- 2026-10-02 2단계 전량 — 1,677화면 `ui-tobe/` 착지(게이트 전건·lint 0/0), 규칙 V16 확장·V21~V23, `jspfront_summary.py`(배치 로그 집계) 신설.

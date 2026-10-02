@@ -573,7 +573,12 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
   V8 `typeof scwin.X === 'function'` 가드 접기 · V9 `[sdd]` 콘솔 → `/* TODO Stage2 */` · V10 `throw { bizMessage }` 위 TODO ·
   V11 jQuery 폼 action 사문화 · V12 「as-is 흐름 보존」 전역 정리 · V13 `fn_X`↔전역 충돌 선개명 · V14 JSDoc 위 `//` → `@description` ·
   V15 `{ const nr = await tx; if (...) { 이동 } };` 블록 펼침 · V16 같은 함수 `var` 중복 선언 → 대입 · V17 `new Array/Object` 리터럴화 ·
-  V18 `fieldEl` TODO · V19 `popupPrint/mainPrint` → `$c.win.print` · V20 최상위 호출식 전역 → 1구역 선언 + onpageload 선두 대입.
+  V18 `fieldEl` TODO · V19 `popupPrint/mainPrint` → `$c.win.print` · V20 최상위 호출식 전역 → 1구역 선언 + onpageload 선두 대입 ·
+  V21 `$c.cm.fn_NullChk/IsNumber` → 화면 로컬 헬퍼 `checkRequired/isNumberInput`(as-is 의미 보존 · pcc/fil 반입 후보), `fn_IsNotNull` → `!isEmpty`,
+  `fn_CheckEmail` → `$c.str.isEmail`, 나머지 `$c.cm.*` TODO · V22 같은 이름 함수 이중 정의(동일 본문 삭제 · 상이 본문 `_2` 개명 + TODO) ·
+  V23 공급사 pcc 번들 의존 — `$c.fil.alert_error` → `$c.win.alert`, `getObjectValue/setObjectValue` → `getValue/setValue`,
+  `fn_setFromToDate` → `setFromToDate`, 나머지 `$c.lc.*`·`$c.frame.*`·저장소 pcc/fil 에 없는 `$c.fil.*` 는 TODO(게이트는 todo 로 집계).
+  V16 은 2단계에서 매개변수 동명 `var`·초기값 없는 중복 `var x;`·함수 최상위 `const/let` 중복까지 넓혔다(규칙 8 구문 오류 예방).
 * **드러냄 표지 원칙**: 공급사가 전환 미완 자리에 남긴 `[sdd]` 콘솔·`bizMessage` throw·`unresolved` 는 결함이 아니라 표식이므로
   지우지 않고 `TODO Stage2` 로 바꿔 집계한다(화면 알림은 유지).
 
@@ -592,7 +597,10 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
 ### 파이프라인 — `jspfront_pipeline.py` (규칙 33 → convert → 컨벤션 → convert 수렴 → 규칙 34 → convert 수렴 → 게이트)
 
 * convert 는 결과가 안 바뀔 때까지(최대 3회) 돌린다 — 컨벤션 단계가 규칙 4 보류 원인을 치우면 다음 회차에서야 재정렬된다.
-* 파일럿 33화면(2026-10-01): 게이트 33/33 · `wsxml_lint` strict 0/0 · 수렴 1회 이내. 잔여는 `conversion/jsp-front/README.md`.
+* 파일럿 33화면(2026-10-01): 게이트 33/33 · `wsxml_lint` strict 0/0 · 수렴 1회 이내.
+* 전량 1,677화면(2026-10-02, 2단계): 게이트 1,677/1,677 · `wsxml_lint` strict 0 errors / 0 warnings · 수렴 실패 0 · 약 3.4초/화면.
+  게이트가 실패로 치지 않고 집계만 하는 것: `todo_c`(공급사 확장·`$c.cm/lc/frame/utils/fil` 미정의), `refs_missing`(body 에 없는 id —
+  서버 렌더 hidden), `fn_ def`·`new Array(n)` 토큰. 잔여 명부는 `conversion/jsp-front/README.md`.
 
 ### 라이브러리 프로파일 (`--profile lib`) — `cm/pcc/**` 업무공통 파일 적용 규약
 

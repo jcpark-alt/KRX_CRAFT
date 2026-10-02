@@ -26,6 +26,11 @@
       `fn_modifiyDate` → `selectModifiyDate`(상태 변수 `scwin.modifiyDate` 와 충돌, 정비본 선례)). 규칙 13 이 못 보는 충돌
   V14 JSDoc 바로 위의 `//` 설명 줄 → JSDoc `@description` 으로(규칙 4 재정렬 때 `//` 줄만 고아가 되는 것을 막는다)
   V15 `{ const nr = await scwin.tx_x(); if (nr && … success === true) { 이동 } };` 한 줄 블록 → 여러 줄 문장(함수당 1개일 때만)
+  V16 같은 스코프 재선언 접기(`var` 중복·매개변수 동명 `var`·최상위 `const/let` 중복) — 규칙 8 의 let/const 화 구문 오류 예방
+  V17 `new Array()/new Array(0)`→`[]` · `new Object()`→`{}` · `new Array(a, b)`→`[a, b]`
+  V18 `$c.util.fieldEl` 호출 함수 머리 TODO · V19 `popupPrint/mainPrint`→`$c.win.print` · V20 최상위 호출식 전역 → 1구역 선언 + onpageload 선두
+  V21 `$c.cm.fn_NullChk/IsNumber`→화면 로컬 헬퍼(checkRequired/isNumberInput) · `fn_IsNotNull`→`!isEmpty` · `fn_CheckEmail`→`$c.str.isEmail` · 나머지 TODO
+  V22 같은 이름 함수 이중 정의 — 본문 동일이면 둘째 삭제, 다르면 `X_2` 개명 + TODO
 """
 import re
 import sys
@@ -283,31 +288,96 @@ def fold_comment_into_jsdoc(script):
 
 
 def dedupe_var_in_function(script):
-    """같은 함수 안에서 같은 이름을 `var` 로 두 번 이상 선언한 꼴(as-is 관용) → 둘째부터는 선언 없이 대입.
-    규칙 8 이 `let` 으로 바꾸면 `Identifier has already been declared` 구문 오류가 되므로 convert 보다 먼저 접는다.
-    (블록 스코프가 달라지는 꼴 — `for (var i…)` 둘 — 은 `let` 로 가도 합법이라 그대로 둔다.)"""
+    """같은 스코프 재선언(as-is 관용)을 규칙 8 전에 접는다 — 그대로 두면 `let/const` 로 바뀌며 구문 오류가 된다.
+    · `var X` 가 같은 함수에 두 번 이상, 또는 X 가 매개변수 이름 → 둘째부터(매개변수면 첫째부터) 선언 없이 대입.
+      초기값이 없는 중복 `var X;` 는 문장을 지운다.
+    · 함수 최상위(블록 깊이 0)의 `const/let X` 중복 → 둘째부터 대입(초기값 없으면 삭제).
+    · `for (var i…)` 머리와 `var a, b` 다중 선언은 건드리지 않는다(전자는 블록 스코프로 합법, 후자는 단순 치환 불가)."""
     n = 0
     for name, s, b, e, _ in reversed(st.func_spans(script)):
+        sig = re.match(r'^scwin\.[\w$]+\s*=\s*(?:async\s+)?function\s*\(([^)]*)\)', script[s:], re.S)
+        params = set(p.strip().split("=")[0].strip() for p in sig.group(1).split(",") if p.strip()) if sig else set()
         body = script[b + 1:e]
         mask = cv.code_mask(body)
-        seen = set()
-        out, pos = [], 0
-        for m in re.finditer(r'(?<![\w$.])var\s+([A-Za-z_$][\w$]*)(\s*=)', body):
+        seen_var, seen_top = set(params), set()
+        edits = []  # (start, end, replacement)
+        depth = 0
+        pos_scan = 0
+        for m in re.finditer(r'(?<![\w$.])(var|let|const)\s+([A-Za-z_$][\w$]*)([ \t]*=|[ \t]*;)', body):
             if not mask[m.start()]:
                 continue
-            # for(…) 머리의 var 는 제외
+            # 선언 위치의 블록 깊이
+            for i in range(pos_scan, m.start()):
+                if mask[i]:
+                    if body[i] == "{": depth += 1
+                    elif body[i] == "}": depth -= 1
+            pos_scan = m.start()
             line_start = body.rfind("\n", 0, m.start()) + 1
             if re.match(r'\s*for\s*\(', body[line_start:m.start() + 1]):
                 continue
-            nm = m.group(1)
-            if nm in seen:
-                out.append(body[pos:m.start()]); out.append(nm + m.group(2)); pos = m.end(); n += 1
+            kw, nm, tail = m.groups()
+            dup = False
+            if kw == "var":
+                dup = nm in seen_var; seen_var.add(nm)
+            elif depth == 0:
+                dup = nm in seen_top or nm in params; seen_top.add(nm)
+            if not dup:
+                continue
+            if tail.strip() == "=":
+                edits.append((m.start(), m.end(), nm + tail))
             else:
-                seen.add(nm)
-        if pos:
-            out.append(body[pos:])
-            script = script[:b + 1] + "".join(out) + script[e:]
+                # `var X;` 한 줄 전체 삭제(줄에 그것만 있을 때), 아니면 선언만 빈 문장으로
+                line_end = body.find("\n", m.end())
+                line_end = len(body) if line_end < 0 else line_end + 1
+                if body[line_start:line_end].strip() == body[m.start():m.end()].strip():
+                    edits.append((line_start, line_end, ""))
+                else:
+                    edits.append((m.start(), m.end(), ""))
+            n += 1
+        if edits:
+            for a, z, rep in reversed(edits):
+                body = body[:a] + rep + body[z:]
+            script = script[:b + 1] + body + script[e:]
     return script, n
+
+
+def dedupe_function_defs(script):
+    """같은 이름의 최상위 함수가 두 번 정의된 꼴(공급사가 같은 id 의 표 둘에 핸들러를 각각 냄 — JS 는 마지막이 이긴다).
+    본문이 같으면 둘째를 지우고, 다르면 둘째를 `X_2` 로 개명하고 TODO 를 단다(어느 본문이 맞는지는 판단)."""
+    spans = st.func_spans(script)
+    by = {}
+    for sp in spans:
+        by.setdefault(sp[0], []).append(sp)
+    cuts, renames = [], []
+    for nm, lst in by.items():
+        if len(lst) < 2:
+            continue
+        first = re.sub(r'\s+', ' ', script[lst[0][2]:lst[0][3] + 1])
+        for k, sp in enumerate(lst[1:], start=2):
+            if re.sub(r'\s+', ' ', script[sp[2]:sp[3] + 1]) == first:
+                cuts.append(sp)
+            else:
+                renames.append((sp, "%s_%d" % (nm, k)))
+    log = {"removed": [], "renamed": []}
+    # 삭제·개명을 한 목록으로 모아 뒤에서부터 적용(앞의 편집이 뒤 오프셋을 흔들지 않도록)
+    edits = [("cut", sp, None) for sp in cuts] + [("ren", sp, new) for sp, new in renames]
+    for kind, sp, new in sorted(edits, key=lambda x: -x[1][1]):
+        nm, s, b, e, _ = sp
+        if kind == "cut":
+            pc = re.search(r'/\*\*(?:(?!\*/).)*\*/\s*$', script[:s], re.S)
+            start = pc.start() if pc else s
+            end = e + 1
+            if script[end:end + 1] == ";":
+                end += 1
+            script = script[:start].rstrip("\n") + "\n\n" + script[end:].lstrip("\n")
+            log["removed"].append(nm)
+        else:
+            head = script[s:b].replace("scwin.%s" % nm, "scwin.%s" % new, 1)
+            todo = "// TODO Stage2: 공급사 산출의 중복 정의(둘째 본문 — 첫째와 다름, 어느 쪽이 맞는지 판단) — 원이름 %s\n" % nm
+            script = script[:s] + todo + head + script[b:]
+            log["renamed"].append(new)
+    log["removed"].reverse(); log["renamed"].reverse()
+    return script, log
 
 
 def literal_constructors(script):
@@ -325,7 +395,7 @@ def literal_constructors(script):
         args = script[m.end():cl].strip()
         if m.group(1) == "Object":
             rep = "{}" if not args else None
-        elif not args:
+        elif not args or args == "0":
             rep = "[]"
         elif "," in args or args[:1] in "\"'`":
             rep = "[" + args + "]"
@@ -474,6 +544,166 @@ def hoist_call_globals(script):
     return script, [nm for nm, _ in reversed(names)]
 
 
+# ---------------------------------------------------------------- V21 $c.cm.fn_* (B 그룹 잔존 — pcc/fil 에 정의 없음)
+CM_HELPERS = {
+    "checkRequired": '''/**
+ * @method
+ * @name checkRequired
+ * @description 필수 입력 검사 — 값이 비면 항목명으로 알리고 포커스를 준 뒤 true(as-is fn_NullChk 의미 보존 · pcc/fil 반입 후보)
+ * @param {Object} comp 입력 컴포넌트
+ * @returns {Promise<Boolean>} 비어 있으면 true
+ * @hidden N
+ */
+scwin.checkRequired = async function (comp) {
+    if (!comp || !$c.util.isEmpty($c.str.trim(String(comp.getValue() ?? "")))) { return false; }
+    const name = (typeof comp.getTitle === "function" && comp.getTitle()) || comp.getID();
+    await $c.win.alert("'" + name + "' 항목을 입력하세요");
+    comp.focus();
+    return true;
+};
+''',
+    "isNumberInput": '''/**
+ * @method
+ * @name isNumberInput
+ * @description 숫자만 입력됐는지 검사 — 아니면 포커스를 주고 false(as-is fn_IsNumber 의미 보존 · pcc/fil 반입 후보)
+ * @param {Object} comp 입력 컴포넌트
+ * @returns {Boolean} 숫자(공백 제외)만이면 true
+ * @hidden N
+ */
+scwin.isNumberInput = function (comp) {
+    const v = String(comp.getValue() ?? "").replace(/\\s/g, "");
+    if (!/^\\d*$/.test(v)) { comp.focus(); return false; }
+    return true;
+};
+''',
+}
+
+
+def replace_cm_helpers(script):
+    """`$c.cm.fn_NullChk(X)`→`scwin.checkRequired(X)`(await 는 컨벤션 단계가 전파) · `fn_IsNumber(X)`→`scwin.isNumberInput(X)` ·
+    `fn_IsNotNull(X)`→`!$c.util.isEmpty(X.getValue())` · `fn_CheckEmail(S)`→`$c.str.isEmail(S)`. 쓰인 헬퍼는 5구역 끝에 정의를 넣는다.
+    그 밖의 `$c.cm.fn_*` 는 그대로 두고(정의 없음 — 닿으면 오류로 드러남) 함수 머리에 TODO 1줄."""
+    log = {}
+    n, script = 0, script
+    out, pos = [], 0
+    mask = cv.code_mask(script)
+    used = set()
+    for m in re.finditer(r'\$c\.cm\.fn_(NullChk|IsNumber|IsNotNull|CheckEmail)\(', script):
+        if m.start() < pos or not mask[m.start()]:
+            continue
+        cl = _balanced(script, m.end() - 1)
+        if cl < 0:
+            continue
+        arg = script[m.end():cl]
+        kind = m.group(1)
+        if kind == "NullChk":
+            rep = "scwin.checkRequired(%s)" % arg; used.add("checkRequired")
+        elif kind == "IsNumber":
+            rep = "scwin.isNumberInput(%s)" % arg; used.add("isNumberInput")
+        elif kind == "IsNotNull":
+            rep = "!$c.util.isEmpty((%s).getValue())" % arg
+        else:
+            rep = "$c.str.isEmail(%s)" % arg
+        out.append(script[pos:m.start()]); out.append(rep); pos = cl + 1; n += 1
+        log[kind] = log.get(kind, 0) + 1
+    out.append(script[pos:])
+    script = "".join(out)
+    for h in sorted(used):
+        if not re.search(r'(?m)^scwin\.%s\s*=' % h, script):
+            m5 = re.search(r'(?m)^///////// 5\. [^\n]*\n', script)
+            if m5:
+                script = script.rstrip("\n") + "\n\n" + CM_HELPERS[h]
+            else:
+                script = script.rstrip("\n") + "\n\n///////// 5. 일반/업무 함수 영역 /////////\n\n" + CM_HELPERS[h]
+    # 남은 $c.cm.fn_* → 함수 머리 TODO
+    left = 0
+    for name, s, b, e, _ in reversed(st.func_spans(script)):
+        body = script[b + 1:e]
+        known_cm = set(st.common_inventory("fil")[0].get("cm", set()))
+        names = sorted({x for x in re.findall(r'\$c\.cm\.(\w+)\(', st.code_only(body)) if x not in known_cm})
+        if not names or "TODO Stage2: $c.cm.fn_" in body:
+            continue
+        nl = script.find("\n", b) + 1
+        ind = re.match(r'[ \t]*', script[nl:]).group(0) or "    "
+        script = script[:nl] + ind + "// TODO Stage2: $c.cm.fn_* 정의 없음(pcc/fil 미반입 · 치환 방향 미결) — " + ", ".join(names) + "\n" + script[nl:]
+        left += len(names)
+    log["todo_left"] = left
+    return script, log
+
+
+# ---------------------------------------------------------------- V23 공급사 pcc 번들($c.fil/$c.lc/$c.frame/$c.utils) 의존
+def _split_args(s):
+    """최상위 쉼표로 인자 분리(문자열·괄호 안 쉼표 제외)."""
+    out, d, cur, i, n = [], 0, [], 0, len(s)
+    while i < n:
+        ch = s[i]
+        if ch in "\"'`":
+            q = ch; j = i + 1
+            while j < n and s[j] != q:
+                j += 2 if s[j] == "\\" else 1
+            cur.append(s[i:j + 1]); i = j + 1; continue
+        if ch in "([{": d += 1
+        elif ch in ")]}": d -= 1
+        if ch == "," and d == 0:
+            out.append("".join(cur).strip()); cur = []
+        else:
+            cur.append(ch)
+        i += 1
+    if cur or out:
+        out.append("".join(cur).strip())
+    return out
+
+
+def replace_vendor_pcc(script):
+    """공급사 pcc 번들에만 있는 호출 중 뜻이 분명한 것만 gcc/컴포넌트 API 로:
+    `$c.fil.alert_error(m)`→`$c.win.alert(m)` · `$c.fil.getObjectValue(X)`→`X.getValue()` · `$c.fil.setObjectValue(X, v)`→`X.setValue(v)`
+    (2026-09-30 ISIN 화면 선례) · `$c.fil.fn_setFromToDate`→`$c.fil.setFromToDate`(pcc/fil 실존) · `$c.utils.`→`$c.ut.` 오기는 두고 TODO.
+    나머지 `$c.lc.*`·`$c.frame.*`·저장소 pcc/fil 에 없는 `$c.fil.*` 는 그대로 두고 함수 머리에 TODO 1줄(게이트는 todo 로 집계)."""
+    log = {}
+    out, pos = [], 0
+    mask = cv.code_mask(script)
+    for m in re.finditer(r'\$c\.fil\.(alert_error|getObjectValue|setObjectValue)\(', script):
+        if m.start() < pos or not mask[m.start()]:
+            continue
+        cl = _balanced(script, m.end() - 1)
+        if cl < 0:
+            continue
+        args = _split_args(script[m.end():cl])
+        kind = m.group(1)
+        if kind == "alert_error":
+            rep = "$c.win.alert(%s)" % script[m.end():cl]
+        elif kind == "getObjectValue" and len(args) == 1:
+            a = args[0]
+            rep = "%s.getValue()" % (a if re.fullmatch(r'[\w$.]+(?:\([^()]*\))?', a) else "(%s)" % a)
+        elif kind == "setObjectValue" and len(args) == 2:
+            a = args[0]
+            rep = "%s.setValue(%s)" % (a if re.fullmatch(r'[\w$.]+(?:\([^()]*\))?', a) else "(%s)" % a, args[1])
+        else:
+            continue
+        out.append(script[pos:m.start()]); out.append(rep); pos = cl + 1
+        log[kind] = log.get(kind, 0) + 1
+    out.append(script[pos:])
+    script = "".join(out)
+    script, k = re.subn(r'\$c\.fil\.fn_setFromToDate\(', '$c.fil.setFromToDate(', script)
+    if k:
+        log["fn_setFromToDate"] = k
+    # 남은 공급사 pcc 의존 → 함수 머리 TODO
+    left = 0
+    known_fil = set(st.common_inventory("fil")[0].get("fil", set()))
+    for name, s, b, e, _ in reversed(st.func_spans(script)):
+        body = st.code_only(script[b + 1:e])
+        calls = sorted({x for x in re.findall(r'\$c\.(?:lc|frame|utils)\.[\w$]+', body)}
+                       | {x for x in re.findall(r'\$c\.fil\.[\w$]+', body) if x.split(".")[-1] not in known_fil})
+        if not calls or "TODO Stage2: 공급사 pcc 의존" in script[b + 1:e]:
+            continue
+        nl = script.find("\n", b) + 1
+        ind = re.match(r'[ \t]*', script[nl:]).group(0) or "    "
+        script = script[:nl] + ind + "// TODO Stage2: 공급사 pcc 의존(저장소 pcc/fil 에 없음 · 반입 또는 치환 판단) — " + ", ".join(calls) + "\n" + script[nl:]
+        left += len(calls)
+    log["todo_left"] = left
+    return script, log
+
+
 # ---------------------------------------------------------------- V13 fn_ collisions
 def _camel(fn):
     base = fn[3:] if fn.startswith("fn_") else fn
@@ -509,6 +739,7 @@ def apply_regions(head, script, body):
     script, log["V7_handlers"] = clean_handler_heads(script)
     script, log["V15_unwrap_nr"] = unwrap_tx_then_move(script)
     script, log["V16_dup_var"] = dedupe_var_in_function(script)
+    script, log["V22_dup_fn"] = dedupe_function_defs(script)
     script, log["V17_literals"] = literal_constructors(script)
     script, log["V18_fieldEl_todo"] = fieldel_todo(script)
     # V19 공급사 gcc 스냅샷(08-04)에만 있던 인쇄 함수 → 현재 gcc 의 $c.win.print(메인·팝업 통합, 2026-09-30)
@@ -519,6 +750,8 @@ def apply_regions(head, script, body):
     script, log["V11_jq_action"] = jquery_form_action(script)
     script, log["V12_flow"] = flow_globals(script)
     script, log["V20_hoisted"] = hoist_call_globals(script)
+    script, log["V21_cm_fn"] = replace_cm_helpers(script)
+    script, log["V23_vendor_pcc"] = replace_vendor_pcc(script)
     return head, script, body, log
 
 

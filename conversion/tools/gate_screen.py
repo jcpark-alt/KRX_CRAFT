@@ -40,8 +40,14 @@ TOKENS = {
 KEEP_GLOBALS = {"screenId"}
 # 공급사 확장 중 2차(컴포넌트 계약 전환)로 미룬 것 — 호출은 남고 TODO Stage2 로 집계한다(r13 README §2-2 fieldEl 199~239자리)
 KNOWN_TODO_C = {"$c.util.fieldEl"}
-FAIL_TOKENS = ("console.log", "var ", "fn_ def", "loose ==/!=", "native alert(", "debugger", "tab char", "trailing ws",
-               "new Object/Array", "/_commons script")
+# 정의가 어디에도 없는 as-is 공통(`$c.cm.fn_*`, 공급사 README §2-2 B 그룹 잔존·목록 밖 19종) — 닿으면 오류로 드러나는 자리, TODO 집계
+KNOWN_TODO_RE = re.compile(r'^\$c\.(cm\.|lc\.|frame\.|utils\.|fil\.)')
+# $c.lc/$c.frame/$c.utils 는 공급사 pcc 번들·Gauce 프레임 의존(저장소에 정의 없음), $c.fil 은 저장소 pcc/fil 이 부분 반입(2종)이라
+# 재고에 없는 호출은 결함이 아니라 「반입 또는 치환 판단」 명부다(2026-10-02 2단계 jldstf 배치)
+FAIL_TOKENS = ("console.log", "var ", "loose ==/!=", "native alert(", "debugger", "tab char", "trailing ws",
+               "/_commons script")
+# 보고만 하는 토큰: `new Array(n)`(길이 지정) · `fn_ def`(규칙 13 이 못 바꾸는 정의 — 숫자 시작 `fn_70000Table_*`·예약어·동명 전역, 공급사 README 52자리)
+# · `$c.frame`(todo_c 로 집계)
 
 
 def node_check(script, name):
@@ -84,8 +90,9 @@ def gate_file(path, inventory=None, node=True):
     res["refs_missing"] = sorted(refs - ids)
     calls = re.findall(r'\$c\.(\w+)\.(\w+)', code)
     undef = {"$c.%s.%s" % (a, b) for a, b in calls if b not in public.get(a, set())}
-    res["todo_c"] = sorted(undef & KNOWN_TODO_C)      # 전환 미완으로 합의된 공급사 확장 — 실패시키지 않고 따로 센다
-    res["undefined_c"] = sorted(undef - KNOWN_TODO_C)
+    todo = {u for u in undef if u in KNOWN_TODO_C or KNOWN_TODO_RE.match(u)}
+    res["todo_c"] = sorted(todo)      # 전환 미완으로 합의된 자리(공급사 확장·정의 없는 $c.cm.fn_*) — 실패시키지 않고 따로 센다
+    res["undefined_c"] = sorted(undef - todo)
     globs = re.findall(r'^scwin\.(\w+)\s*=\s*(?!\s*(?:async\s+)?function)', script, re.M)
     res["unused_globals"] = [g for g in sorted(set(globs)) if g not in KEEP_GLOBALS
                              and len(re.findall(r'scwin\.%s\b' % re.escape(g), code)) <= 1 and ("scwin." + g) not in body]
@@ -95,8 +102,10 @@ def gate_file(path, inventory=None, node=True):
         if n:
             tok[k] = n
     res["tokens"] = tok
+    # refs_missing(스크립트가 쥐는데 body 에 없는 id — 서버 렌더 hidden·동적 조립, 공급사 README 「화면에 없는 필드」 221자리)은
+    # 실패가 아니라 Stage 2 명부다 — 결과에 남겨 집계한다
     bad |= bool(res["dup_defs"] or res["public_only"] or res["defined_only"] or res["handlers_undefined"]
-                or res["refs_missing"] or res["undefined_c"] or res["unused_globals"]
+                or res["undefined_c"] or res["unused_globals"]
                 or any(k in tok for k in FAIL_TOKENS))
     return not bad, res
 

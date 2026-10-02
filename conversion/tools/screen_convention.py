@@ -367,6 +367,19 @@ def finalize_head_body(head, script, body, name):
     head = st.set_public_info(head, funcs)
     if "<w2:layoutInfo" not in head:
         head = re.sub(r'(<w2:buildDate\s*/>)', r'\1\n\t\t<w2:layoutInfo/>', head, 1)
+    # dataMap keyInfo / dataList columnInfo 안의 같은 id 중복 선언 삭제(wsxml_lint WS120 — 공급사 산출이 응답 필드를 두 번 낸 자리)
+    def dedupe_ids(m):
+        seen, out, n = set(), [], 0
+        for part in re.split(r'(<w2:(?:key|column)\b[^>]*?/>|<w2:(?:key|column)\b[^>]*>.*?</w2:(?:key|column)>)', m.group(0), flags=re.S):
+            idm = re.match(r'<w2:(?:key|column)\b[^>]*\sid="([^"]*)"', part)
+            if idm:
+                if idm.group(1) in seen:
+                    n += 1
+                    continue
+                seen.add(idm.group(1))
+            out.append(part)
+        return "".join(out)
+    head = re.sub(r'<w2:(keyInfo|columnInfo)\b[^>]*>.*?</w2:\1>', dedupe_ids, head, flags=re.S)
     # <xf:model> 에 dataCollection 이 없으면 빈 것을 둔다(wsxml_lint WS113 — 탭 호스트 같은 뼈대 화면)
     if "<xf:model" in head and "<w2:dataCollection" not in head:
         head = re.sub(r'(<xf:model>)(\s*)', lambda m: m.group(1) + m.group(2) + '<w2:dataCollection baseNode="map"></w2:dataCollection>' + m.group(2), head, 1)
