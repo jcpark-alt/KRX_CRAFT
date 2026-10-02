@@ -1,0 +1,733 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDSTF08057.gfm" meta_screenName="(팝업)최종거래일에의한상장폐지" meta_screenId="ULDSTF08057">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<w2:layoutInfo/>
+		<w2:publicInfo method="scwin.onpageload,scwin.init,scwin.btn_Dscl_onclick,scwin.btn_Update_onclick,scwin.btn_Delete_onclick,scwin.btn_Save_onclick,scwin.btn_Close_onclick,scwin.edt_DelistDd_onchange,scwin.MxGrid_2_oncellclick,scwin.search,scwin.searchLsttrdIsu,scwin.checkDuplicate,scwin.saveTrs,scwin.finishJob,scwin.setNewDefaults,scwin.checkForm,scwin.save,scwin.update,scwin.remove,scwin.dscl,scwin.selectGridRow"/>
+		<xf:model>
+			<w2:workflowCollection/>
+			<w2:dataCollection baseNode="map">
+				<w2:dataList baseNode="list" repeatNode="map" id="dlt_isu" saveRemovedData="true">
+					<w2:columnInfo>
+						<w2:column id="isurCd" name="발행회사코드" dataType="text"></w2:column>
+						<w2:column id="isuCd" name="종목코드" dataType="text"></w2:column>
+						<w2:column id="isuNm" name="종목명" dataType="text"></w2:column>
+						<w2:column id="isurNm" name="발행회사" dataType="text"></w2:column>
+						<w2:column id="comNm" name="회사명" dataType="text"></w2:column>
+						<w2:column id="lsttrdDd" name="최종거래일" dataType="text"></w2:column>
+						<w2:column id="expDd" name="만기일" dataType="text"></w2:column>
+						<w2:column id="bzProcsNo" name="업무처리번호" dataType="text"></w2:column>
+					</w2:columnInfo>
+				</w2:dataList>
+				<w2:dataMap baseNode="map" id="dma_mst">
+					<w2:keyInfo>
+						<w2:key id="bzProcsNo" name="업무처리번호" dataType="text"></w2:key>
+						<w2:key id="isurCd" name="발행회사코드" dataType="text"></w2:key>
+						<w2:key id="isurNm" name="발행회사" dataType="text"></w2:key>
+						<w2:key id="comNm" name="회사명" dataType="text"></w2:key>
+						<w2:key id="mktactApplObjTpCd" name="시장조치적용대상구분코드" dataType="text"></w2:key>
+						<w2:key id="delistDd" name="상장폐지일" dataType="text"></w2:key>
+						<w2:key id="delistRsnCd" name="상장폐지사유코드" dataType="text"></w2:key>
+						<w2:key id="delistRsnDsc" name="상장폐지사유" dataType="text"></w2:key>
+						<w2:key id="grndRegulNm" name="근거규정" dataType="text"></w2:key>
+						<w2:key id="remk" name="기타" dataType="text"></w2:key>
+					</w2:keyInfo>
+				</w2:dataMap>
+			</w2:dataCollection>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+///////// 1. 변수 및 선언 영역 /////////
+scwin.screenId = "ULDSTF08057"; // 화면 ID(ETN 최종거래일 도래 상장폐지 등록 팝업 — 단건형. W-Craft 원본이 ULDSTF08053.xml 과 동일 내용이라 같은 로직을 쓴다. 종목별 전송형은 ULDSTF08057_new. TODO Stage2: 부모 탭3 고유 업무(조회 구분·기본 사유) 확정 시 반영)
+scwin.isurCd = ""; // 발행기관코드(부모 전달값 → 조회된 첫 종목의 발행회사코드)
+scwin.isurNm = ""; // 발행기관명(공시안내문 대상명)
+scwin.frBzProcsNo = ""; // 업무처리번호(수정·삭제 시 부모가 전달, 신규 저장 시 1회 채번)
+scwin.selectedRow = -1; // 상장폐지종목 그리드 선택 행(-1: 미선택 → 안내문작성은 첫 행 기준, AS-IS RowPosition 기본값)
+// 처리구분별 전송 정보 — key 는 $c.lc.isProcess 의 구분값(I: 저장, U: 수정, D: 삭제)
+scwin.JOB_INFO = {
+    I : { name : "저장", action : "/api/listing/lstproc/etn/delisting/detail/delisting/register" },
+    U : { name : "수정", action : "/api/listing/lstproc/etn/delisting/detail/delisting/modify" },
+    D : { name : "삭제", action : "/api/listing/lstproc/etn/delisting/detail/delisting/remove" }
+};
+
+// 신규작성 기본값 — 최종거래일 도래에 의한 상장폐지는 사유·근거규정이 고정이다
+scwin.NEW_DEFAULTS = {
+    delistRsnCd : "720015",
+    delistRsnDsc : "상장지수증권 최종거래일 도래",
+    grndRegulNm : "유가증권시장상장규정 제149조의7"
+};
+
+// 버튼 역할 → 버튼 id 매핑($c.util.setButtonState 용). insert: 저장만 활성, update: 저장 외 전부 활성, error: 전부 비활성
+scwin.BTN_MAP = {
+    save : "btn_Save",
+    modify : "btn_Update",
+    "delete" : "btn_Delete",
+    guide : "btn_Dscl"
+};
+
+///////// 2. 초기화 영역 /////////
+/**
+ * @method
+ * @name onpageload
+ * @description 화면 로딩 시 초기 처리 — init 순차 호출
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.onpageload = async function () {
+    try {
+        await scwin.init();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF08057.onpageload" });
+    }
+};
+
+/**
+ * @method
+ * @name init
+ * @description 화면 초기화 — 부모 화면 파라미터 수신, 신규(저장만 활성·사유/근거규정 기본값·최종거래일 도래 종목 조회)/수정(저장분 조회 후 상장폐지일 경과 여부로 버튼 상태) 분기
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.init = async function () {
+    // AS-IS gform_onload: Provider 화면의 fn_GetPar(arrPar) 콜백으로 7개 인수를 넘겨받음 → TO-BE: 부모가 openPopup data 로 전달한 paramData
+    const param = $c.data.getParameter() || {};
+    scwin.isurCd = param.isurCd || ""; // 발행기관코드
+    scwin.isurNm = param.isurNm || ""; // 발행기관명
+    scwin.frBzProcsNo = param.bzProcsNo || ""; // 업무처리번호(수정시만 유효)
+    // secugrpId(증권그룹ID)·mktId(시장구분코드)·gubun·selectGubun 도 전달되지만 이 화면에서는 사용하지 않는다.
+
+    if ($c.util.isEmpty(scwin.frBzProcsNo)) {
+        // 신규작성 — 저장만 활성, 사유·근거규정 기본값, 오늘 최종거래일이 도래한 종목 조회
+        $c.util.setButtonState("grpBtnBox", "insert", scwin.BTN_MAP);
+        scwin.setNewDefaults();
+        await scwin.searchLsttrdIsu();
+    } else {
+        // 수정 — 저장분 조회 후 상장폐지일이 지났으면 전부 비활성(error), 아니면 저장 외 활성(update)
+        await scwin.search();
+        $c.stf.setButtonSetWithDate(edt_DelistDd, false, "grpBtnBox", scwin.BTN_MAP);
+    }
+};
+
+///////// 3. 컴포넌트 이벤트 영역 /////////
+/**
+ * @method
+ * @name btn_Dscl_onclick
+ * @description 안내문작성 — 「안내문작성」 클릭 이벤트
+ * @param {Object} e 이벤트 객체
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.btn_Dscl_onclick = async function (e) {
+    try {
+        await scwin.dscl();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF08057.btn_Dscl_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_Update_onclick
+ * @description 수정 — 「수정」 클릭 이벤트
+ * @param {Object} e 이벤트 객체
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.btn_Update_onclick = async function (e) {
+    try {
+        await scwin.update();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF08057.btn_Update_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_Delete_onclick
+ * @description 삭제 — 「삭제」 클릭 이벤트
+ * @param {Object} e 이벤트 객체
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.btn_Delete_onclick = async function (e) {
+    try {
+        await scwin.remove();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF08057.btn_Delete_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_Save_onclick
+ * @description 저장 — 「저장」 클릭 이벤트
+ * @param {Object} e 이벤트 객체
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.btn_Save_onclick = async function (e) {
+    try {
+        await scwin.save();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF08057.btn_Save_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_Close_onclick
+ * @description 닫기 — 「닫기」 클릭 이벤트(팝업 닫기)
+ * @param {Object} e 이벤트 객체
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.btn_Close_onclick = async function (e) {
+    try {
+        $c.win.closePopup();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF08057.btn_Close_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name edt_DelistDd_onchange
+ * @description 상장폐지일 변경 — 기타(안내문구) 초기화
+ * @param {Object} info 이벤트 정보 객체
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.edt_DelistDd_onchange = async function (info) {
+    try {
+        dma_mst.set("remk", "");
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF08057.edt_DelistDd_onchange" });
+    }
+};
+
+/**
+ * @method
+ * @name MxGrid_2_oncellclick
+ * @description 상장폐지종목 그리드 셀 클릭 — 선택 행 보관(안내문작성 대상. AS-IS 는 그리드 RowPosition 을 그대로 썼다)
+ * @param {Number} rowIndex 행 인덱스
+ * @param {Number} columnIndex 열 인덱스
+ * @param {String} columnId 컬럼 id
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.MxGrid_2_oncellclick = async function (rowIndex, columnIndex, columnId) {
+    try {
+        scwin.selectGridRow(rowIndex);
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF08057.MxGrid_2_oncellclick" });
+    }
+};
+
+///////// 4. 서브미션 콜백 영역 /////////
+/**
+ * @method
+ * @name search
+ * @description 저장된 상장폐지 내용 조회(수정 모드·저장 후 재조회) — 마스터(dma_mst)·종목 목록(dlt_isu)을 업무처리번호로 조회
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.search = async function () {
+    // AS-IS fn_search: dts_Mst.DataID = "/Delisting.do?method=searchDelList&DIV_IDX=" + DIV_IDX_DELLIST_MST + "&BZ_PROCS_NO=" + fr_bz_procs_no + "&SCREN_ID=…&SCREN_PROCES_TP_CD=…"
+    //                  dts_Isu.DataID = "/etn/EtnMktAct.do?method=searchDelist&DIV_IDX=" + DIV_IDX_ETN_DELLIST_DTL + "&BZ_PROCS_NO=" + fr_bz_procs_no
+    // TODO Stage2: 상장폐지 조회 REST 엔드포인트·응답 키(mst/isuList) 확정 시 action·target 교체(저장 계열 /api/listing/lstproc/etn/delisting/detail/delisting/* 와 짝)
+    const requestMap = {
+        bzProcsNo : scwin.frBzProcsNo
+    };
+    const sbmOptions = {
+        id : "sbm_search",
+        action : "/api/listing/lstproc/etn/delisting/detail/delisting",
+        method : "get",
+        target : "dma_mst=body.mst,dlt_isu=body.isuList",
+        isProcessMsg : false
+    };
+    const res = await $c.sbm.executeDynamic(sbmOptions, requestMap);
+    if (res && res.skipped) return; // 중복 제출 skip 응답은 무시
+    // AS-IS 는 조회 후 행을 선택하지 않는다(안내문작성 대상은 사용자가 클릭해 선택, 미선택이면 첫 행)
+};
+
+/**
+ * @method
+ * @name searchLsttrdIsu
+ * @description 오늘 최종거래일이 도래한 ETN 종목 조회(신규작성) — 결과로 상장폐지종목 그리드를 채우고, 첫 종목의 발행회사코드를 보관하며 최종거래일 다음 날을 상장폐지일로 설정
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.searchLsttrdIsu = async function () {
+    // AS-IS fn_new_onload: dts_Isu.DataID = "/etn/EtnMktAct.do?method=searchDelist&DIV_IDX=" + DIV_IDX_ETN_DELLIST_DTL + "&TRS_IDX=" + TRS_IDX_NEWSEL + "&GUBUN_CD=" + cGetToday("yyyymmdd")
+    // TODO Stage2: 최종거래일 도래 종목 조회 REST 엔드포인트 확정 시 action 교체(저장 계열 /api/listing/lstproc/etn/delisting/detail/delisting/* 와 짝)
+    const requestMap = {
+        gubunCd : $c.date.getServerDateTime().substring(0, 8) // 조회 기준일(오늘)
+    };
+    const sbmOptions = {
+        id : "sbm_searchLsttrdIsu",
+        action : "/api/listing/lstproc/etn/delisting/detail/lsttrd-isu",
+        method : "get",
+        target : "dlt_isu",
+        isProcessMsg : false
+    };
+    const res = await $c.sbm.executeDynamic(sbmOptions, requestMap);
+    if (res && res.skipped) return; // 중복 제출 skip 응답은 무시
+    if (!res.responseJSON.success || dlt_isu.getRowCount() === 0) return;
+
+    // AS-IS dts_Isu_OnLoadCompleted: 첫 종목의 발행회사코드를 보관하고, 신규작성이면 최종거래일 + 1일을 상장폐지일로(조회 후 행 선택은 하지 않는다)
+    scwin.isurCd = dlt_isu.getCellData(0, "isurCd");
+    if ($c.util.isEmpty(scwin.frBzProcsNo)) {
+        dma_mst.set("delistDd", $c.date.addDate(dlt_isu.getCellData(0, "lsttrdDd"), 1));
+    }
+};
+
+/**
+ * @method
+ * @name checkDuplicate
+ * @description 중복 체크 — 그리드의 종목마다 같은 상장폐지일에 이미 상장폐지된 종목이 있는지 서버 확인(수정 시 자기 건은 제외). AS-IS 는 첫 종목만 검사했으나 전송 대상 전 종목을 검사한다
+ * @param {Boolean} isUpdate 수정 여부(true 면 업무처리번호를 함께 보내 자기 건 제외)
+ * @returns {Promise<Boolean>} 중복 없음 true, 중복 있음·통신 실패 false
+ * @hidden N
+ */
+scwin.checkDuplicate = async function (isUpdate) {
+    // AS-IS fn_dupCheck: dts_DupIsu.DataID = "/Delisting.do?method=searchDupDelist&ISU_CD=…&DELIST_DD=…[&BZ_PROCS_NO=…]"
+    const delistDd = edt_DelistDd.getValue();
+    const rowCount = dlt_isu.getRowCount();
+
+    for (let i = 0; i < rowCount; i++) {
+        const isuCd = dlt_isu.getCellData(i, "isuCd");
+        const requestMap = {
+            isuCd : isuCd,
+            delistDd : delistDd
+        };
+        if (isUpdate) {
+            requestMap.bzProcsNo = scwin.frBzProcsNo;
+        }
+        const sbmOptions = {
+            id : "sbm_checkDuplicate",
+            action : "/api/listing/lstproc/etn/delisting/detail/isDuplicate",
+            method : "get",
+            isProcessMsg : false
+        };
+        const res = await $c.sbm.executeDynamic(sbmOptions, requestMap);
+        if (res && res.skipped) return false; // 중복 제출 skip 응답은 무시
+        if (!res.responseJSON.success) return false;
+
+        // 응답 본문은 중복 종목 배열·중복 종목 객체({ isuCd })·중복 여부(true/false) 를 모두 허용한다(엔드포인트 미확정, AS-IS 는 행 집합)
+        const body = res.responseJSON.body;
+        let dupIsuCd = "";
+        if (Array.isArray(body)) {
+            dupIsuCd = body.length > 0 ? (body[0].isuCd || isuCd) : "";
+        } else if ($c.util.isPlainObject(body)) {
+            dupIsuCd = body.isuCd;
+        } else if (body === true) {
+            dupIsuCd = isuCd;
+        }
+        if ($c.util.isNotEmpty(dupIsuCd)) {
+            await $c.win.alert("동일한 날짜에 상장폐지 지정된 종목[" + dupIsuCd + "]이 존재합니다.");
+            return false;
+        }
+    }
+    return true;
+};
+
+/**
+ * @method
+ * @name saveTrs
+ * @description 저장/수정/삭제 전송(1회) — 종목 목록 전 행에 업무처리번호를 적고 마스터(dma_mst, 발행회사코드 "99999" 고정)와 종목 목록(dlt_isu)을 한 번에 전송
+ * @param {String} jobKey 처리구분(I: 저장, U: 수정, D: 삭제)
+ * @returns {Promise<Boolean>} 전송 성공 여부
+ * @hidden N
+ */
+scwin.saveTrs = async function (jobKey) {
+    // AS-IS fn_save_trs: dts_Isu 전 행 BZ_PROCS_NO 세팅 → trs.KeyValue = "JSP(I: dtsParm1= dts_Mst , I:dtsParm2= dts_Isu)", trs.Post()
+    const rowCount = dlt_isu.getRowCount();
+    dlt_isu.setBroadcast(false);
+    for (let i = 0; i < rowCount; i++) {
+        dlt_isu.setCellData(i, "bzProcsNo", scwin.frBzProcsNo);
+    }
+    dlt_isu.setBroadcast(true, true);
+    dma_mst.set("bzProcsNo", scwin.frBzProcsNo);
+    // 최종거래일 도래 상장폐지는 마스터 발행회사코드를 고정값("99999")으로, 적용대상은 항상 종목별(1: 종목별, 2: 법인별)로 전송한다(종목별 발행회사코드는 종목 목록에 있음)
+    dma_mst.set("isurCd", "99999");
+    dma_mst.set("mktactApplObjTpCd", "1");
+
+    // TODO Stage2: 요청 본문 키(mst/isuList)는 가정 — 단건형(마스터+종목 목록 1회 전송) 엔드포인트 확정 시 대조
+    const sbmOptions = {
+        id : "sbm_save",
+        action : scwin.JOB_INFO[jobKey].action,
+        method : "post",
+        ref : "dma_mst=mst,dlt_isu=isuList",
+        isProcessMsg : false
+    };
+    const res = await $c.sbm.executeDynamic(sbmOptions);
+    if (res && res.skipped) return false; // 중복 제출 skip 응답은 무시
+
+    return res.responseJSON.success === true;
+};
+
+///////// 5. 일반/업무 함수 영역 /////////
+/**
+ * @method
+ * @name finishJob
+ * @description 저장/수정/삭제 후처리(AS-IS trs_OnSuccess/trs_OnFail) — 실패면 MSG-A002, 성공이면 MSG-A001 후 삭제는 팝업 닫기, 저장·수정은 저장분 재조회와 날짜 규칙 버튼 상태. 부모 목록은 부모(jldstf08051 newpreCreateFrame3)가 팝업이 닫힌 뒤 스스로 재조회한다
+ * @param {String} jobKey 처리구분(I: 저장, U: 수정, D: 삭제)
+ * @param {Boolean} ok 전송 성공 여부
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.finishJob = async function (jobKey, ok) {
+    const jobNm = scwin.JOB_INFO[jobKey].name;
+
+    if (!ok) {
+        await $c.win.alert($c.stf.getMessageParam("MSG-A002", jobNm)); // "[처리명] 처리 실패하였습니다."
+        return;
+    }
+    await $c.win.alert($c.stf.getMessageParam("MSG-A001", jobNm)); // "[처리명] 처리 성공하였습니다."
+
+    if (jobKey === "D") {
+        $c.win.closePopup(); // 삭제 완료 시 팝업 닫기
+        return;
+    }
+    // AS-IS: 저장·수정 후 fn_search() 로 저장분 재조회(업무처리번호 1개) → dts_Mst_OnLoadCompleted 가 날짜 규칙으로 버튼 상태 결정
+    await scwin.search();
+    $c.stf.setButtonSetWithDate(edt_DelistDd, false, "grpBtnBox", scwin.BTN_MAP);
+};
+
+/**
+ * @method
+ * @name setNewDefaults
+ * @description 신규작성 기본값 설정 — 상장폐지사유코드·사유·근거규정을 최종거래일 도래 고정값으로 채운다(AS-IS dts_Mst_OnLoadCompleted)
+ * @returns {void}
+ * @hidden N
+ */
+scwin.setNewDefaults = function () {
+    dma_mst.set("delistRsnCd", scwin.NEW_DEFAULTS.delistRsnCd);
+    dma_mst.set("delistRsnDsc", scwin.NEW_DEFAULTS.delistRsnDsc);
+    dma_mst.set("grndRegulNm", scwin.NEW_DEFAULTS.grndRegulNm);
+};
+
+/**
+ * @method
+ * @name checkForm
+ * @description 유효성 체크 — 상장폐지종목 존재 여부 확인 후 상장폐지일(날짜)·상장폐지사유·근거규정(200byte)·기타(2000byte)를 validateDataCollect 로 검증
+ * @returns {Promise<Boolean>} 검증 통과 여부
+ * @hidden N
+ */
+scwin.checkForm = async function () {
+    if (dlt_isu.getRowCount() === 0) {
+        await $c.win.alert("[상장폐지종목]을 선택하세요.");
+        return false;
+    }
+
+    // AS-IS: checkDdTm("DD", 상장폐지일) → checkEmptyValue(근거규정) → checkMaxLength(근거규정 200) → checkMaxLength(기타 2000)
+    // 상장폐지사유(txb_Rsn_Cd)는 AS-IS 에 검사가 없었으나 필수 표시(req) 항목이라 필수 검사를 추가했다
+    // 길이 상한은 maxLengthB(UTF-8 byte, 한글 3byte) — AS-IS checkMaxLength 는 한글 2byte 였으므로 DB 컬럼 byte 기준 확인(TODO Stage2)
+    const options = {
+        validateType : "alert",
+        checkType : "single",
+        fields : {
+            edt_DelistDd : { required : true, format : "date", name : "상장폐지일" },
+            txb_Rsn_Cd : { required : true, name : "상장폐지사유" },
+            txb_GrndRegulNm : { required : true, maxLengthB : 200, name : "근거규정" },
+            txa_Remk : { maxLengthB : 2000, name : "기타" }
+        }
+    };
+    return await $c.validate.validateDataCollect(grp_table, options);
+};
+
+/**
+ * @method
+ * @name save
+ * @description 저장 — 유효성·중복 체크, 처리 확인, 업무처리번호 1회 채번 후 전송
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.save = async function () {
+    if (!await scwin.checkForm()) return;
+    if (!await scwin.checkDuplicate(false)) return;
+    if (!await $c.lc.isProcess("I")) return;
+
+    // 업무처리번호 채번(1건) — pcc getNewBzProcNo 는 responseJSON 을 그대로 돌려주므로 { body } 봉투면 body 를 꺼낸다
+    const newNo = await $c.stf.getNewBzProcNo();
+    const bzProcsNo = String(($c.util.isPlainObject(newNo) && newNo.body !== undefined) ? newNo.body : newNo);
+    if (bzProcsNo.length !== 14) {
+        await $c.win.alert($c.stf.getMessageParam("MSG-0010", "")); // 업무처리번호생성실패
+        return;
+    }
+    scwin.frBzProcsNo = bzProcsNo;
+
+    const ok = await scwin.saveTrs("I");
+    await scwin.finishJob("I", ok);
+};
+
+/**
+ * @method
+ * @name update
+ * @description 수정 — 유효성·중복 체크(자기 건 제외), 처리 확인 후 전송
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.update = async function () {
+    if (!await scwin.checkForm()) return;
+    if (!await scwin.checkDuplicate(true)) return;
+    if (!await $c.lc.isProcess("U")) return;
+
+    const ok = await scwin.saveTrs("U");
+    await scwin.finishJob("U", ok);
+};
+
+/**
+ * @method
+ * @name remove
+ * @description 삭제 — 처리 확인 후 전송(완료 시 팝업 닫힘)
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.remove = async function () {
+    if (!await $c.lc.isProcess("D")) return;
+
+    const ok = await scwin.saveTrs("D");
+    await scwin.finishJob("D", ok);
+};
+
+/**
+ * @method
+ * @name dscl
+ * @description 안내문작성 — 선택 종목(미선택이면 첫 행)의 회사명을 마스터에 두고 공시안내문작성 팝업(ULDSTF92024)을 연다. 팝업이 부모의 getPar(arr, 종목 DataList, 마스터 DataMap) 를 이름으로 불러 참조로 채워 가는 레거시 계약을 유지하고, 같은 내용을 openPopup data 로도 넘긴다
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.dscl = async function () {
+    if (dlt_isu.getRowCount() === 0) {
+        await $c.win.alert("종목을 선택해 주세요!");
+        return;
+    }
+    const row = scwin.selectedRow >= 0 ? scwin.selectedRow : 0; // AS-IS: dts_Isu.getRowPosition()(기본 첫 행)
+    const isuNm = dlt_isu.getCellData(row, "isuNm");
+    dma_mst.set("comNm", dlt_isu.getCellData(row, "comNm")); // AS-IS: dts_Mst.COM_NM = 선택 종목 회사명
+
+    // TODO Stage2: ULDSTF92024 전환본 확정 시 getPar/setPar 계약을 data 전달로 일원화
+    const oldGetPar = scwin.getPar;
+    const oldSetPar = scwin.setPar;
+    scwin.getPar = function (arr, paramDltIsu, paramDmaMst) {
+        arr[0] = "68351"; // 공시 서식코드
+        arr[1] = scwin.frBzProcsNo;
+        arr[2] = scwin.isurCd;
+        arr[3] = "1";
+        arr[5] = isuNm; // arr[4] 는 안내문 내용(ctnt) 자리 — 미사용
+
+        if (paramDltIsu && typeof paramDltIsu.setJSON === "function") {
+            paramDltIsu.setJSON(dlt_isu.getAllJSON());
+        }
+        if (paramDmaMst && typeof paramDmaMst.setJSON === "function") {
+            paramDmaMst.setJSON(dma_mst.getJSON());
+            paramDmaMst.set("delistRsnNm", dma_mst.get("delistRsnDsc"));
+        }
+        return arr.length;
+    };
+    scwin.setPar = function (arr) {
+        // 공시안내문작성 팝업은 반환값이 없다
+    };
+
+    const data = {
+        formCd : "68351",
+        bzProcsNo : scwin.frBzProcsNo,
+        isurCd : scwin.isurCd,
+        mktactApplObjTpCd : "1",
+        isuNm : isuNm,
+        delistRsnNm : dma_mst.get("delistRsnDsc"),
+        mst : dma_mst.getJSON(),
+        isuList : dlt_isu.getAllJSON()
+    };
+    const options = {
+        id : "ULDSTF92024",
+        title : "공시안내문작성",
+        type : "pageFramePopup",
+        width : 745,
+        height : 825
+    };
+    try {
+        // AS-IS: $c.frame.CreateDialogFrame("ULDSTF92024", "/listingcommon/ULDSTF92024.gfm", "공시안내문작성", pt.x, pt.y, 745, 825, "window")
+        await $c.win.openPopup("/ui/lst/common/ULDSTF92024.xml", options, data);
+    } finally {
+        scwin.getPar = oldGetPar;
+        scwin.setPar = oldSetPar;
+    }
+};
+
+/**
+ * @method
+ * @name selectGridRow
+ * @description 그리드 행 선택 — 안내문작성 대상 행 인덱스를 보관
+ * @param {Number} row 행 인덱스
+ * @returns {void}
+ * @hidden N
+ */
+scwin.selectGridRow = function (row) {
+    scwin.selectedRow = row;
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload">
+		<xf:group class="pop_contents" id="" meta_snippetCategory="00_화면시작" meta_snippetKeyComponent="true"
+			meta_snippetName="0_02 팝업페이지시작">
+			<xf:group class="tblbox" id="panel_3" meta_snippetCategory="05_입출력테이블" meta_snippetKeyComponent="true" meta_snippetName="5_01 1단테이블"
+				style="">
+				<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl" id="grp_table" style="" tagname="table">
+					<w2:attributes>
+						<w2:summary></w2:summary>
+					</w2:attributes>
+					<xf:group tagname="colgroup">
+						<xf:group style="width:150px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+					</xf:group>
+					<xf:group style="" tagname="tr">
+						<xf:group class="w2tb_th" style="" tagname="th">
+							<w2:textbox class="req" id="label_2" label="1. 상장폐지종목"
+								style="" userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" style="" tagname="td">
+							<xf:group class="gvwbox" id="" style="">
+								<w2:gridView class="gvw" dataList="data:dlt_isu" hierarchy="MxGrid_2" id="MxGrid_2" orgid="MxGrid_2"
+									style="height: 153px;"
+									userData2=" class:Grid_01; borderstyle:0; editable:False; focusrect:False; gtitleheight:0; headborder:4; headlinecolor:#C0C0C0; indwidth:0; linecolor:#C0C0C0; titleheight:18; xtitleheight:0; border-color:#C0C0C0;" autoFit="allColumn"
+									ev:oncellclick="scwin.MxGrid_2_oncellclick">
+									<w2:caption id="caption1" style="" value="최종거래일 도래 상장폐지종목 목록"></w2:caption>
+									<w2:header id="header1" style="">
+										<w2:row>
+											<w2:column displayMode="label" hidden="true" id="ISUR_CD" inputType="text" rowInfo="0"
+												textAlign="center"
+												userData2=" headbgcolor:#598fd5; headcolor:#FFFFFF; bgcolor:{decode(currow-tointeger(currow/2)*2,0,'#f2f5f9',1,'#ffffff')};"
+												value="발행회사코드" width="120">
+											</w2:column>
+											<w2:column displayMode="label" id="ISU_CD" inputType="text" rowInfo="0" textAlign="center"
+												userData2=" edit:none; headbgcolor:#598fd5; headcolor:#FFFFFF; bgcolor:{decode(currow-tointeger(currow/2)*2,0,'#f2f5f9',1,'#ffffff')};"
+												value="종목코드" width="120">
+											</w2:column>
+											<w2:column displayMode="label" id="COM_NM" inputType="text" rowInfo="0" textAlign="center"
+												userData2=" headbgcolor:#598fd5; headcolor:#FFFFFF; bgcolor:{decode(currow-tointeger(currow/2)*2,0,'#f2f5f9',1,'#ffffff')};"
+												value="발행회사" width="120">
+											</w2:column>
+											<w2:column displayMode="label" id="ISU_NM" inputType="text" rowInfo="0" textAlign="center"
+												userData2=" edit:none; headbgcolor:#598fd5; headcolor:#FFFFFF; bgcolor:{decode(currow-tointeger(currow/2)*2,0,'#f2f5f9',1,'#ffffff')};"
+												value="종목명" width="250">
+											</w2:column>
+											<w2:column displayMode="label" id="LSTTRD_DD" inputType="text" rowInfo="0" textAlign="center"
+												value="최종거래일" width="70">
+											</w2:column>
+										</w2:row>
+									</w2:header>
+									<w2:gBody id="gBody1" style="">
+										<w2:row id="" style="">
+											<w2:column displayMode="label" hidden="true" id="isurCd" inputType="text" textAlign="center" width="120"></w2:column>
+											<w2:column displayMode="label" id="isuCd" inputType="text" textAlign="center" width="120"></w2:column>
+											<w2:column displayMode="label" id="comNm" inputType="text" textAlign="center" width="120"></w2:column>
+											<w2:column displayMode="label" id="isuNm" inputType="text" textAlign="center" width="250"></w2:column>
+											<w2:column displayMode="label" id="lsttrdDd" inputType="text" textAlign="center" width="70"></w2:column>
+										</w2:row>
+									</w2:gBody>
+								</w2:gridView>
+							</xf:group>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox class="req" id="label_1" label="2. 상장폐지일"
+								style=""
+								userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<w2:inputCalendar id="edt_DelistDd" style="" calendarValueType="yearMonthDate" class="req" ref="data:dma_mst.delistDd" ev:onchange="scwin.edt_DelistDd_onchange"></w2:inputCalendar>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox class="req" id="label_11" label="3. 상장폐지사유"
+								style=""
+								userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input id="txb_Rsn_Cd" maxlength="1000"
+								style="width:565px;"
+								userData2=" class:TopCondition_01_write;" class="req" ref="data:dma_mst.delistRsnDsc">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox class="req" id="label_6" label="4. 근거규정"
+								style=""
+								userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input id="txb_GrndRegulNm" maxlength="1000"
+								style="width:565px;"
+								userData2=" class:TopCondition_01_write;" class="req" ref="data:dma_mst.grndRegulNm">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_7" label="5. 기타"
+								style=""
+								userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:textarea id="txa_Remk"
+								style="width:565px;"
+								userData2=" class:TextArea_01;" ref="data:dma_mst.remk">
+							</xf:textarea>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<xf:group class="btnbox" id="grpBtnBox" meta_snippetCategory="08_버튼" meta_snippetKeyComponent="true" meta_snippetName="8_04 전체제어버튼"
+				style="">
+				<xf:group class="rt" id="" style="">
+					<xf:trigger class="btn_cm" cursor="pointer" id="btn_Dscl" src="../img/btn_make_info.gif" style=""
+						userData2=" border-color:#C0C0C0;" ev:onclick="scwin.btn_Dscl_onclick">
+						<xf:label><![CDATA[안내문작성]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm" cursor="pointer" id="btn_Update" src="../img/btn_modify.gif" style="" text="수정"
+						userData2=" border-color:#C0C0C0;" ev:onclick="scwin.btn_Update_onclick">
+						<xf:label><![CDATA[수정]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm" cursor="pointer" id="btn_Delete" src="../img/btn_delete.gif" style="" text="삭제"
+						userData2=" border-color:#C0C0C0;" ev:onclick="scwin.btn_Delete_onclick">
+						<xf:label><![CDATA[삭제]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm pt" cursor="pointer" id="btn_Save" src="../img/btn_save.gif" style="" text="저장"
+						userData2=" border-color:#C0C0C0;" ev:onclick="scwin.btn_Save_onclick">
+						<xf:label><![CDATA[저장]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.btn_Close_onclick" id="btn_Close"
+						src="../img/btn_close.gif" style="" text="닫기">
+						<xf:label><![CDATA[닫기]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+		</xf:group>
+	</body>
+</html>

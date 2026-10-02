@@ -416,6 +416,25 @@ scwin.c = function () {
     assert out.count("setBroadcast") == 2               # DC 를 변경하지 않는 일반 루프는 무변환
 
 
+def test_rule28_skip_await_loop():
+    # 본문에 await 가 있는 루프(종목별 순차 통신) → 보류: reject 시 복원 누락 위험 + 통신 대기 중 그리드 갱신 차단 방지
+    script = '''
+scwin.processJob = async function () {
+    for (let i = 0; i < dlt_isu.getRowCount(); i++) {
+        const ok = await scwin.saveTrs(i);
+        if (ok) {
+            dlt_isu.setCellData(i, "bzProcsNo", scwin.frBzProcsNo);
+        }
+    }
+};
+'''
+    rep = {"judgment": []}
+    out = convert.rule28_broadcast_guard(script, "", rep)
+    assert "setBroadcast" not in out
+    assert any("규칙28" in j and "await" in j for j in rep["judgment"])
+    assert rep.get("rule28", []) == []
+
+
 def test_remove_wcraft_markers_and_block_include():
     # 2026-09-03 규칙: W-Craft 변환 확인 마커 라인 삭제(블록 주석 내부 포함) + 규칙 11 이
     # 블록 주석으로 감싼 include 도 삭제 → 빈 껍데기 블록 주석 제거 (ULDSTF30304 사례)

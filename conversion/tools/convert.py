@@ -2535,9 +2535,11 @@ def rule28_broadcast_guard(script, head, report):
 
     applied, edits = [], []
     for lp in loops:
-        if re.search(r'(?<![.\w$])(?:return|throw)(?![\w$])', lp["body"]):
+        # 본문에 return/throw 가 있으면 조기 이탈, await 가 있으면 reject(통신 실패 등)로 setBroadcast(true, true) 복원이
+        # 누락될 수 있고, 통신을 기다리는 동안 그리드 갱신을 막는 것도 바람직하지 않다 → 보류·리포트(2026-10-02 ULDSTF08052)
+        if re.search(r'(?<![.\w$])(?:return|throw|await)(?![\w$])', lp["body"]):
             report.setdefault("judgment", []).append(
-                "규칙28 setBroadcast 보류(%s — 본문 return/throw 로 복원 누락 위험, 수동 적용 검토)" % lp["label"])
+                "규칙28 setBroadcast 보류(%s — 본문 return/throw/await 로 복원 누락 위험, 수동 적용 검토)" % lp["label"])
             continue
         prev = "\n".join(script[:lp["start"]].split("\n")[-6:])   # 직전 줄들에서 기적용 여부 판정(멱등)
         dcs = [dc for dc in lp["dcs"] if not re.search(re.escape(dc) + r'\.setBroadcast\(\s*false\s*\)', prev)]
