@@ -36,7 +36,7 @@ JSP_TYPES = [
     ("행 복사 대상 부재", ("행 복사 대상",), "as-is 가 서버 렌더로 그리던 반복 행 — 응답 전문 확정 후 DataList 바인딩으로 재설계."),
     ("파라미터 수신 대상 없음", ("전환 파라미터 수신 대상",), "`dma_pageContext` 가 없는 화면에서 파라미터를 읽는 자리 — dataMap 추가 또는 `$c.data.getParameter()` 직접 사용."),
     ("컨텍스트 키 출처 미확인(A-3)", ("컨텍스트 키 출처",), "as-is EL 이 서버 렌더로 채우던 값 — 조회 전문/세션/상수 중 출처 회신 뒤 연결."),
-    ("공급사 pcc 의존($c.lc/$c.frame/미반입 $c.fil)", ("공급사 pcc 의존",), "저장소 pcc/fil 에 없는 함수 — 반입 또는 gcc 치환 판단(`fn_isProcess`→`confirmJob`(V24)·`fn_alertMsg`→`alertJobResult`(V25) 완료 · 다음 후보 `SCREN_PROCS_TP_CD_*` 상수·`CreateDialogFrame`·`fn_getMktId`)."),
+    ("공급사 pcc 의존($c.lc/$c.frame/미반입 $c.fil)", ("공급사 pcc 의존",), "저장소 pcc/fil 에 없는 함수 — 반입 또는 gcc 치환 판단(`fn_isProcess`→`confirmJob`(V24)·`fn_alertMsg`→`alertJobResult`(V25)·리터럴 상수→화면 선언(V26) 완료 · 다음 후보 `CreateDialogFrame`·`doLogSave`·`fn_getMktId`·`showObj`)."),
     ("$c.cm.fn_* 정의 없음", ("$c.cm.fn_",), "as-is 공통(정의 없음) — 치환 방향 결정(`fn_CheckDateGn`·`fn_ChkZipCd`·`fn_ClickPeriod` 등)."),
     ("fieldEl(DOM 요소 계약)", ("fieldEl",), "`$c.util.fieldEl` 호출 함수 몸통을 컴포넌트 getValue/setValue 계약으로 전환."),
     ("세션 키 실환경 확인", ("세션 키",), "`$c.session.getUserInfo(키)` 의 키 집합을 실환경에서 확인(회신 11항)."),

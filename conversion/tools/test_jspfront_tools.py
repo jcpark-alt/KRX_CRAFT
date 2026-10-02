@@ -173,6 +173,15 @@ scwin.trs_Save_onsuccess = async function () {
     await scwin.listSync();
 };
 
+scwin.logAndTrs = function () {
+    let url = "a.do?SCREN_PROCES_TP_CD=" + $c.fil.SCREN_PROCS_TP_CD_01;
+    $c.fil.doLogSave("X.gfm", $c.fil.SCREN_PROCS_TP_CD_07);
+    scwin.fn_trs($c.fil.TR_JOB_INSERT);
+    if (!url) { $c.win.alert($c.lc.NO_EXCEL_DATA); }
+    const s = "$c.fil.SCREN_PROCS_TP_CD_01";  // 문자열 안은 그대로
+    return url + $c.fil.SCREN_PROCS_TP_CD_01;
+};
+
 scwin.legacyPcc = function () {
     $c.fil.alert_error("x" + 1);
     const v = $c.fil.getObjectValue($c.util.getComponent('ipt_a')) + $c.fil.getObjectValue(ipt_b);
@@ -330,6 +339,22 @@ def test_alert_msg_to_alert_job_result():
     assert "scwin.trs_Save_onfail = async function" in s2 and "await scwin.alertJobResult('F');" in s2
 
 
+def test_vendor_consts_inlined():
+    head, script, body, log = _post()
+    assert log["V26_consts"] == {"refs": 4, "declared": 4}
+    assert "$c.win.alert(scwin.NO_EXCEL_DATA);" in script and 'scwin.NO_EXCEL_DATA = "해당데이터가 없습니다. 조회후 다운받으십시요.";' in script
+    assert '+ scwin.SCREN_PROCS_TP_CD_01;' in script and 'scwin.fn_trs(scwin.TR_JOB_INSERT);' in script
+    assert '$c.fil.doLogSave("X.gfm", scwin.SCREN_PROCS_TP_CD_07);' in script
+    assert 'const s = "$c.fil.SCREN_PROCS_TP_CD_01";' in script
+    sec1 = script.split("///////// 1. ")[1].split("///////// 2. ")[0]
+    assert 'scwin.SCREN_PROCS_TP_CD_01 = "01";  // 조회' in sec1 and 'scwin.SCREN_PROCS_TP_CD_07 = "07";  // 엑셀저장' in sec1
+    assert "scwin.TR_JOB_INSERT = 2;  // 입력" in sec1 and script.count("scwin.SCREN_PROCS_TP_CD_01 = ") == 1
+    # V23 의 TODO 는 상수를 더 이상 나열하지 않는다(doLogSave 만)
+    assert "— $c.fil.doLogSave\n" in script
+    _, s2, _, log2 = vp.apply_regions(head, script, body)
+    assert log2["V26_consts"] == {} and s2.count("scwin.SCREN_PROCS_TP_CD_01 = ") == 1
+
+
 def test_vendor_pcc_rules():
     head, script, body, log = _post()
     assert '$c.win.alert("x" + 1);' in script
@@ -338,7 +363,7 @@ def test_vendor_pcc_rules():
     assert "$c.fil.setFromToDate(a, b);" in script
     assert "if (!await scwin.confirmJob())" not in script and "$c.frame.CloseFrame()" in script and "$c.fil.showObj('x', true)" in script
     assert "// TODO Stage2: 공급사 pcc 의존(저장소 pcc/fil 에 없음 · 반입 또는 치환 판단) — $c.fil.showObj, $c.frame.CloseFrame\n" in script
-    assert log["V23_vendor_pcc"] == {"alert_error": 1, "getObjectValue": 2, "setObjectValue": 1, "fn_setFromToDate": 1, "todo_left": 2}
+    assert log["V23_vendor_pcc"] == {"alert_error": 1, "getObjectValue": 2, "setObjectValue": 1, "fn_setFromToDate": 1, "todo_left": 3}  # legacyPcc 2 + logAndTrs doLogSave 1
 
 
 def test_cm_helpers():

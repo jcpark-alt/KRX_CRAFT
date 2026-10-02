@@ -29,7 +29,7 @@
 | 목록↔상세 복귀 상태 복원 | 목록→상세 moveUrl/setPageFrameSrc 화면에 `{isHistory:true, dataInfo}` 스냅샷 + 상세 [목록] 버튼 `{restoreData:true}` 적용, 목록 onpageload 에 `_isHistoryRestore` 자동조회 skip 관례 적용. 가이드: `cm/docs/frame-history-guide.md` |
 | 페이징 전체보기/역순 순번 대체 | AS-IS 자체 구현(전체보기 토글·내림차순 순번 계산)을 `$c.sbm.setPagingInfo` 옵션(`maxRowNum:"all"`, `rowNumVisble:"{grid}|desc"`, `rowNumColumn`)으로 대체 |
 
-## jsp-front (공급사 r13 산출 전환본) — 유형별 집계  (5464건 / 1462화면)
+## jsp-front (공급사 r13 산출 전환본) — 유형별 집계  (5421건 / 1462화면)
 
 > 1,677화면 전량이라 파일별 행은 싣지 않는다. 화면별 수는 `python conversion/tools/jspfront_summary.py` 의 `--tsv`, 접두별 밀도와 기계 치환 불가 축(jQuery·`document.`·조건 래퍼·hidden 입력·lybox)은 `conversion/jsp-front/README.md`.
 
@@ -41,7 +41,7 @@
 | 행 복사 대상 부재 | 671 | 671 | as-is 가 서버 렌더로 그리던 반복 행 — 응답 전문 확정 후 DataList 바인딩으로 재설계. |
 | 파라미터 수신 대상 없음 | 528 | 528 | `dma_pageContext` 가 없는 화면에서 파라미터를 읽는 자리 — dataMap 추가 또는 `$c.data.getParameter()` 직접 사용. |
 | 컨텍스트 키 출처 미확인(A-3) | 509 | 509 | as-is EL 이 서버 렌더로 채우던 값 — 조회 전문/세션/상수 중 출처 회신 뒤 연결. |
-| 공급사 pcc 의존($c.lc/$c.frame/미반입 $c.fil) | 259 | 62 | 저장소 pcc/fil 에 없는 함수 — 반입 또는 gcc 치환 판단(`fn_isProcess`→`confirmJob`(V24)·`fn_alertMsg`→`alertJobResult`(V25) 완료 · 다음 후보 `SCREN_PROCS_TP_CD_*` 상수·`CreateDialogFrame`·`fn_getMktId`). |
+| 공급사 pcc 의존($c.lc/$c.frame/미반입 $c.fil) | 216 | 62 | 저장소 pcc/fil 에 없는 함수 — 반입 또는 gcc 치환 판단(`fn_isProcess`→`confirmJob`(V24)·`fn_alertMsg`→`alertJobResult`(V25)·리터럴 상수→화면 선언(V26) 완료 · 다음 후보 `CreateDialogFrame`·`doLogSave`·`fn_getMktId`·`showObj`). |
 | $c.cm.fn_* 정의 없음 | 83 | 38 | as-is 공통(정의 없음) — 치환 방향 결정(`fn_CheckDateGn`·`fn_ChkZipCd`·`fn_ClickPeriod` 등). |
 | fieldEl(DOM 요소 계약) | 39 | 32 | `$c.util.fieldEl` 호출 함수 몸통을 컴포넌트 getValue/setValue 계약으로 전환. |
 | 세션 키 실환경 확인 | 59 | 59 | `$c.session.getUserInfo(키)` 의 키 집합을 실환경에서 확인(회신 11항). |

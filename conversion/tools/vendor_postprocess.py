@@ -34,6 +34,7 @@
   V23 공급사 pcc 의존 — alert_error→win.alert · get/setObjectValue→getValue/setValue · fn_setFromToDate→setFromToDate · 나머지 TODO
   V24 `$c.lc.fn_isProcess(X)`(확인창) → 화면 로컬 `scwin.confirmJob(X)`(`$c.win.confirm`, as-is 문구 보존, `scwin.lastJob` 기록) — Stage 2 수작업 1축
   V25 `$c.lc.fn_alertMsg(X)`(결과 알림 MSG-A001/0001/A002) → 화면 로컬 `scwin.alertJobResult(X)` · as-is 전역 `LastJob` → `scwin.lastJob` — 2축
+  V26 `$c.fil.SCREN_PROCS_TP_CD_01~08`·`TR_JOB_*`·`$c.lc.NO_EXCEL_DATA` 등 메시지 상수(공급사 pcc 리터럴 상수) → `scwin.<상수>` + 1구역 선언(값·이름 보존) — 3축
 """
 import re
 import sys
@@ -738,6 +739,48 @@ def replace_is_process(script):
     return script, n
 
 
+# ---------------------------------------------------------------- V26 공급사 pcc 상수 → 화면 안 선언 (Stage 2 수작업 3축)
+VENDOR_CONSTS = {
+    # 화면처리구분코드(SCREN_PROCES_TP_CD — 접속 로그·URL 파라미터) : 공급사 tobe-pcc 번들 3966~3973행
+    "SCREN_PROCS_TP_CD_01": ('"01"', "조회"), "SCREN_PROCS_TP_CD_02": ('"02"', "입력"), "SCREN_PROCS_TP_CD_03": ('"03"', "수정"),
+    "SCREN_PROCS_TP_CD_04": ('"04"', "삭제"), "SCREN_PROCS_TP_CD_05": ('"05"', "인쇄"), "SCREN_PROCS_TP_CD_06": ('"06"', "화면출력"),
+    "SCREN_PROCS_TP_CD_07": ('"07"', "엑셀저장"), "SCREN_PROCS_TP_CD_08": ('"08"', "PC저장"),
+    # 트랜잭션 작업 구분(fn_trs 인자) : 번들 1906~1909행
+    "TR_JOB_NORMAL": ("1", "일반"), "TR_JOB_INSERT": ("2", "입력"), "TR_JOB_UPDATE": ("3", "수정"), "TR_JOB_DELETE": ("4", "삭제"),
+    # 메시지 상수($c.lc) : 번들 6730~6732행
+    "NO_EXCEL_DATA": ('"해당데이터가 없습니다. 조회후 다운받으십시요."', "엑셀 다운로드 데이터 없음"),
+    "NO_DATA_FOUND": ('"검색조건에 해당하는 자료가 없습니다."', "조회 결과 없음"),
+    "MSG_CND_ISR_REQ": ('"검색조건 중 법인코드(명) 입력되지 않아 조회할 수 없습니다."', "법인코드 조건 필수"),
+}
+
+
+def inline_vendor_consts(script):
+    """`$c.fil.<상수>`(공급사 pcc 번들의 리터럴 상수) → `scwin.<상수>` + 1구역 선언(공급사 README 부-2 ㉢ 「as-is 공용 상수는 화면 안에
+    선언」과 같은 처방). 값·이름은 번들 정의 그대로(이름 보존 — 다른 화면·pcc 와 대조 가능). 이미 선언된 이름은 선언을 더하지 않는다."""
+    used = set()
+    parts = []
+    for text, is_code in cv.segments(script):
+        if is_code:
+            def rep(m):
+                used.add(m.group(1))
+                return "scwin." + m.group(1)
+            text = re.sub(r'\$c\.(?:fil|lc)\.(%s)\b' % "|".join(VENDOR_CONSTS), rep, text)
+        parts.append(text)
+    script = "".join(parts)
+    if not used:
+        return script, {}
+    decls = []
+    for name in sorted(used, key=lambda n: list(VENDOR_CONSTS).index(n)):
+        if not re.search(r'(?m)^scwin\.%s\s*=' % name, script):
+            val, ko = VENDOR_CONSTS[name]
+            decls.append("scwin.%s = %s;  // %s — as-is 공용 상수(공급사 pcc 번들, 화면 안 선언)\n" % (name, val, ko))
+    if decls:
+        m1 = re.search(r'(?m)^///////// 1\. [^\n]*\n', script)
+        ins = "".join(decls)
+        script = (script[:m1.end()] + ins + script[m1.end():]) if m1 else ins + script
+    return script, {"refs": len(used), "declared": len(decls)}
+
+
 # ---------------------------------------------------------------- V23 공급사 pcc 번들($c.fil/$c.lc/$c.frame/$c.utils) 의존
 def _split_args(s):
     """최상위 쉼표로 인자 분리(문자열·괄호 안 쉼표 제외)."""
@@ -860,6 +903,7 @@ def apply_regions(head, script, body):
     script, log["V21_cm_fn"] = replace_cm_helpers(script)
     script, log["V24_isProcess"] = replace_is_process(script)   # V23 보다 먼저 — 남은 $c.lc 만 TODO 로 집계되게
     script, log["V25_alertMsg"] = replace_alert_msg(script)
+    script, log["V26_consts"] = inline_vendor_consts(script)
     script, log["V23_vendor_pcc"] = replace_vendor_pcc(script)
     return head, script, body, log
 
