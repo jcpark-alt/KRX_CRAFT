@@ -597,6 +597,8 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
 ### 파이프라인 — `jspfront_pipeline.py` (규칙 33 → convert → 컨벤션 → convert 수렴 → 규칙 34 → convert 수렴 → 게이트)
 
 * convert 는 결과가 안 바뀔 때까지(최대 3회) 돌린다 — 컨벤션 단계가 규칙 4 보류 원인을 치우면 다음 회차에서야 재정렬된다.
+* convert 는 `keep_nullish=True` 로 부른다 — 규칙 5a 가 `x != null` 을 `!== null` 로 바꾸면 `undefined` 가 가드를 통과해 페이징 건수
+  `NaN`·파일 검사 오작동 같은 의미 회귀가 난다(2026-10-02 리뷰). 화면 프로파일 기본값(변환)은 그대로다.
 * 파일럿 33화면(2026-10-01): 게이트 33/33 · `wsxml_lint` strict 0/0 · 수렴 1회 이내.
 * 전량 1,677화면(2026-10-02, 2단계): 게이트 1,677/1,677 · `wsxml_lint` strict 0 errors / 0 warnings · 수렴 실패 0 · 약 3.4초/화면.
   게이트가 실패로 치지 않고 집계만 하는 것: `todo_c`(공급사 확장·`$c.cm/lc/frame/utils/fil` 미정의), `refs_missing`(body 에 없는 id —

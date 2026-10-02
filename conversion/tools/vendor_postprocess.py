@@ -45,7 +45,8 @@ RENAME = {"fn_modifiyDate": "selectModifiyDate"}
 ATTR_REALS_BODY = '''    attrRealsList.forEach(function (a) {
         const comp = $c.util.getComponent(a.childId);
         if (!comp) { return; }
-        const v = a.fn();
+        let v;
+        try { v = a.fn(); } catch (e) { $c.exception.handleError(e, { notify: "none", context: "attrReal:" + a.childId }); return; }
         if (a.attr === "style") {
             String(v).split(";").forEach(function (decl) {
                 const kv = decl.split(":");
@@ -70,7 +71,9 @@ ATTR_REALS_BODY = '''    attrRealsList.forEach(function (a) {
 CONDS_BODY = '''    binds.forEach(function (b) {
         const comp = $c.util.getComponent(b.id);
         if (!comp) { return; }
-        const ok = !!b.fn();
+        let ok;
+        // 조건식이 미해결 값(unresolved throw)을 읽는 자리는 그 바인드만 건너뛴다 — 공급사 산출의 바인드별 격리 유지
+        try { ok = !!b.fn(); } catch (e) { $c.exception.handleError(e, { notify: "none", context: "conds:" + b.id }); return; }
         if (ok) { comp.show(); } else { comp.hide(); }
         if (ok && b.grids) {
             b.grids.forEach(function (gid) {
@@ -231,17 +234,20 @@ TX_RE = re.compile(
     r'[ \t]*let res = null;\n[ \t]*try \{ res = await \$c\.sbm\.executeDynamic\(sbmOptions\); \}\n'
     r'[ \t]*catch \(_e\) \{ await \$c\.exception\.handleError\(_e, \{ context: "[^"]*" \}\); return null; \}\n'
     r'([ \t]*)if \(!\(res && res\.responseJSON && res\.responseJSON\.success === true\)\) \{\n'
-    r'(?P<alert>(?:[ \t]*(?!\}|return res;)[^\n]*\n)*?)[ \t]*return res;\n[ \t]*\}\n\s*return res;\n')
+    r'(?P<alert>(?:[ \t]*(?!\}|return res;)[^\n]*\n)*?)[ \t]*return res;\n[ \t]*\}\n(?P<tail>\s*return res;\n)?')
 
 
 def simplify_tx(script):
+    """실패 알림 블록 뒤에 후처리(페이징 setCount 등)가 이어지는 변형 꼴도 같은 규칙으로 — 그때는 if 안의 `return res;` 를 남긴다."""
     def rep(m):
         ind = m.group(1)
         alert = m.group("alert")
-        return (ind + "const res = await $c.sbm.executeDynamic(sbmOptions);\n"
+        head = (ind + "const res = await $c.sbm.executeDynamic(sbmOptions);\n"
                 + ind + "if (res && res.skipped) { return res; }  // 중복 제출 skip\n"
-                + ind + "if (!(res && res.responseJSON && res.responseJSON.success === true)) {\n"
-                + alert + ind + "}\n" + ind + "return res;\n")
+                + ind + "if (!(res && res.responseJSON && res.responseJSON.success === true)) {\n" + alert)
+        if m.group("tail"):
+            return head + ind + "}\n" + ind + "return res;\n"
+        return head + ind + "    return res;\n" + ind + "}\n"
     return TX_RE.subn(rep, script)
 
 
@@ -540,7 +546,10 @@ def hoist_call_globals(script):
     mo = re.search(r'(?m)^scwin\.onpageload\s*=\s*(?:async\s+)?function\s*\([^)]*\)\s*\{\s*\n([ \t]*)try\s*\{\s*\n', script)
     ind = mo.group(1) + "    "
     ins = "".join(ind + stmt + "\n" for nm, stmt in reversed(names))
-    script = script[:mo.end()] + ins + script[mo.end():]
+    # 파라미터 수신(init_recvParam) 뒤에 둔다 — 컨텍스트 값을 읽는 전역(loadTp 등)이 수신 전에 평가되면 빈값이 된다(리뷰 2026-10-02)
+    rp = re.compile(r'[ \t]*(?:await\s+)?scwin\.init_recvParam\(\);[^\n]*\n').search(script, mo.end())
+    at = rp.end() if rp and rp.start() < st.match_brace(script, cv.code_mask(script), mo.end() - 1 if script[mo.end() - 1] == "{" else script.rfind("{", 0, mo.end())) else mo.end()
+    script = script[:at] + ins + script[at:]
     return script, [nm for nm, _ in reversed(names)]
 
 

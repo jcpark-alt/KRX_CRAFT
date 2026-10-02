@@ -81,7 +81,7 @@ ui/<name>.xml
 
 | 축 | 자리 / 화면 | 무엇 |
 |---|---|---|
-| `TODO Stage2` 주석 | 5,638 / 1,475 | 상위: 부모 화면 스코프 없음 1,154 · 전환 미완(공급사 bizMessage) 769 · 행 복사 대상 부재 671 · 미실현 set_focus 591 · 파라미터 수신 대상 없음 528 · 컨텍스트 키 출처(A-3) 515 · 공급사 pcc 의존 427 · `$c.cm.fn_*` 83 · 세션 키 59 · 폼 action 사문 37 |
+| `TODO Stage2` 주석 | 5,673 / 1,475 | 상위: 부모 화면 스코프 없음 1,154 · 전환 미완(공급사 bizMessage) 769 · 행 복사 대상 부재 671 · 미실현 set_focus 591 · 파라미터 수신 대상 없음 528 · 컨텍스트 키 출처(A-3) 515 · 공급사 pcc 의존 427 · `$c.cm.fn_*` 83 · 세션 키 59 · 폼 action 사문 37 |
 | jQuery `$(` | 7,322 / 516 | 규칙 19 — jldinf 2,470 · jldfil 1,828 · jlddst 1,559 · jldods 755 |
 | `document.` | 3,733 / 872 | 규칙 19 — jldfil 2,345 |
 | hidden `xf:input` | 4,485 / 833 | 스크립트가 DOM 으로 쥔 입력 → dataMap 접근 전환 후 삭제 |
@@ -94,6 +94,31 @@ ui/<name>.xml
 
 접두별 밀도: jldinf 가 jQuery 비중이 가장 높고(2,470), jldfil 이 `document.`·조건 래퍼·lybox·fieldEl 의 대부분, jldstf 는 공급사 pcc 의존(`$c.lc`·`$c.fil` 상수)이 집중된다.
 공급사 "드러냄" 표지는 전부 TODO 로 남아 있으며 화면 알림은 유지된다(삭제 0).
+
+## 3단계 검증·인계(2026-10-02)
+
+| 항목 | 결과 |
+|---|---|
+| `wsxml_lint` strict, `ui-tobe` 1,677본 | 0 errors / 0 warnings |
+| `pytest conversion/tools` · `pytest tools/wsxml_lint` | 107 passed · 28 passed |
+| CI 기준선(`cm/gcc` strict · `cm/as-is` 3규칙 무시) | 13 files 0/0 · 227 files 0/0 — 영향 없음 |
+| `ui/` 무변경 | 반입 커밋(48743b9) 대비 diff 0 |
+| 샘플 대비 스팟 체크 | jldfil25900 ↔ JLDFIL25900/정비본(1단계) · jldfil59400·jldfil25910 을 읽기 전용 리뷰 에이전트가 원본·정비본과 대조 — **파이프라인 회귀 4건** 발견 후 도구를 고쳐 전량 재생성(아래) |
+| 브라우저 표본 확인 | **보류** — 공급사 README 기준 489화면은 서버 렌더 값 없이는 비어 보이고, 저장소에는 서버가 없다. 실서버 연결 환경에서 `websquare.html?w2xPath=/shell/entry.xml&page=/<화면>/<화면>.xml` 로 유형별 대표 화면(25900·59400·25910·35700·52110·20000)부터 확인할 것 |
+| Stage 2 워크리스트 | `conversion/md/stage2_todo_worklist.md` 에 jsp-front 유형별 집계 절 추가(`gen_stage2_worklist.py` 가 블록 주석 TODO 도 센다) |
+
+**리뷰에서 잡힌 파이프라인 회귀와 처방(2026-10-02)**
+
+| # | 회귀 | 원인 | 처방 |
+|---|---|---|---|
+| 1 | 페이징 건수가 `NaN`(59400), 파일 미선택 저장 실패(25910) | convert 규칙 5a 가 `!= null` 을 `!== null` 로 바꿔 `undefined` 가 가드를 통과 | `convert(keep_nullish=True)` — 파이프라인은 `== null`/`!= null` 관용구를 보존(라이브러리 프로파일과 같은 처리). 게이트의 느슨 비교 토큰도 nullish 는 제외 |
+| 2 | `init_conds`/`init_attrReals` 의 바인드 하나가 throw 하면 onpageload 전체 중단 | V3/V4 가 바인드별 try/catch 를 걷어냄 | 표준 forEach 몸통에 바인드별 try/catch 복원(`handleError(notify:"none")`, 동기) |
+| 3 | 호이스팅한 컨텍스트 전역(`loadTp`)이 파라미터 수신 전에 빈값 | V20 이 onpageload try 선두에 삽입 | `scwin.init_recvParam();` 뒤에 삽입 |
+| 4 | 실패 블록 뒤에 후처리가 있는 tx(`tx_viewDetail`)는 옛 try/catch + skipped 가드 없음 | V6 정규식이 `return res;` 로 끝나는 꼴만 매칭 | 변형 꼴도 매칭(if 안 `return res;` 유지, 후처리 보존) |
+
+리뷰가 함께 적은 **원본 유래(공급사) 결함** — 우리 회귀가 아니라 Stage 2 명부: 25910 `init_conds` 의 `registerBtn/registerBtn_2` 중복 항목(뒤가 앞을 덮음), 59400 `slc_pageSize` 가 `dma_viewDetailReq` 에 바인딩됐는데 조회는 `dma_SearchReq` 로 나감, `setCount(…/10)` 이 선택한 페이지 크기를 무시, `editStatus` 실패가 호출부 `notify:'none'` 때문에 조용함.
+
+**인계 — 다음 사람이 할 일(권장 순서)**: ① 규칙 하나로 묶이는 축부터 — `$c.lc.fn_isProcess`(92화면, executeDynamic `skipped` 가드로 대체 후보)·폼 action 사문 주석 삭제·`$c.cm.fn_*` 치환 방향 결정 ② 회신 의존 축(컨텍스트 키 A-3·세션 키·bizMessage 목적지) ③ 화면별 재설계 축(jQuery/`document.`→규칙 19, 조건 래퍼→show/hide, hidden 입력→dataMap, lybox 표형 그리드, fieldEl 계약 전환). 변환 도구를 고쳐 전량 재생성하는 것이 원칙이며(`ui-tobe` 는 수기 보강 전까지 재생성 가능), 수기 보강을 시작한 화면은 `convert_all.py` 의 "기존 산출물 건너뜀" 규약대로 보호한다.
 
 **알아 둘 함정(1단계에서 확인)**: 규칙 13 이 `fn_modifiyDate→modifiyDate` 로 상태 변수를 덮는다(V13 선개명) · 공급사 `var` 중복 선언이 규칙 8 로
 `let` 중복이 된다(V16) · 최상위 `getComponent` 호출 전역이 규칙 4 를 보류시킨다(V20) · lxml 왕복은 `<x></x>`→`<x/>`·속성 `>`→`&gt;` 만 바꾼다 ·

@@ -245,8 +245,8 @@ scwin.pageSize = null;
  */
 scwin.onpageload = async function () {
     try {
-        scwin.pageSize = "" + dma_pageContext.get("pageSize") + "";
         scwin.init_recvParam();
+        scwin.pageSize = "" + dma_pageContext.get("pageSize") + "";
         await scwin.init_rowCopy();
         scwin.init_conds();
         scwin.init_sessionFill();
@@ -276,7 +276,9 @@ scwin.init_conds = function () {
     binds.forEach(function (b) {
         const comp = $c.util.getComponent(b.id);
         if (!comp) { return; }
-        const ok = !!b.fn();
+        let ok;
+        // 조건식이 미해결 값(unresolved throw)을 읽는 자리는 그 바인드만 건너뛴다 — 공급사 산출의 바인드별 격리 유지
+        try { ok = !!b.fn(); } catch (e) { $c.exception.handleError(e, { notify: "none", context: "conds:" + b.id }); return; }
         if (ok) { comp.show(); } else { comp.hide(); }
         if (ok && b.grids) {
             b.grids.forEach(function (gid) {
@@ -567,9 +569,8 @@ scwin.tx_load_list = async function () {
         target: "dlt_docPageList=body.content",
         isProcessMsg: false
     };
-    let res = null;
-    try { res = await $c.sbm.executeDynamic(sbmOptions); }
-    catch (_e) { await $c.exception.handleError(_e, { context: "jldfil00400.tx_load_list" }); return null; }
+    const res = await $c.sbm.executeDynamic(sbmOptions);
+    if (res && res.skipped) { return res; }  // 중복 제출 skip
     if (!(res && res.responseJSON && res.responseJSON.success === true)) {
         const m = (res && res.responseJSON && res.responseJSON.message) || $c.sbm.getStatusMessage(res) || ('서버 응답 오류 (' + $c.sbm.getResultCode(res) + ')');
         await $c.win.alert(m);
@@ -577,8 +578,8 @@ scwin.tx_load_list = async function () {
     }
 
     const rj = res && res.responseJSON;
-    const tot = rj && (rj["total"] !== null ? rj["total"] : (rj.body && rj.body["total"]));
-    if (tot !== null && tot !== "") {
+    const tot = rj && (rj["total"] != null ? rj["total"] : (rj.body && rj.body["total"]));
+    if (tot != null && tot !== "") {
         $c.util.getComponent("krxpage_pagenavigator_203").setCount(Math.ceil(Number(tot) / 10));
     }
     return res;
@@ -836,22 +837,22 @@ scwin.deleteDeleteReq = async function (applNo) {
  * @hidden N
  */
 scwin.goWrite = async function (applNo, disclsMaindocFormCd, disclsMaindocFormVer, currFormVer, currEngFormVer, beforeFormVer, beforeEngFormVer, oldFormVerUseYn, docNo, formCd, formVer, langTpCd, tgtIsurCd, tgtFssUnqNo, disclsAcptTpCd, wrtrptMaindocTpCd, disclsObjCorpIsurNm, subcomDisclsYn, formUpclssCd, tgtComEngNm, disclsObjRepIsuSrtCd, exmptObjDisclsYn, disclsObjIsuCd, disclsObjRepIsuSrtNm, engMandatory1Yn, eqtyoptIsuObjYn, eqtyoptIsuObjFormYn) {
-    if (engMandatory1Yn === "Y" && scwin.engMandatory1YnCnt === 0 && langTpCd === '0' && '11' === (String(($c.session.getUserInfo("dutyGrpTpCd")) === null ? '' : ($c.session.getUserInfo("dutyGrpTpCd"))).indexOf('$' + '{') >= 0 ? '' : String(($c.session.getUserInfo("dutyGrpTpCd")) === null ? '' : ($c.session.getUserInfo("dutyGrpTpCd"))))) {
+    if (engMandatory1Yn === "Y" && scwin.engMandatory1YnCnt === 0 && langTpCd === '0' && '11' === (String(($c.session.getUserInfo("dutyGrpTpCd")) == null ? '' : ($c.session.getUserInfo("dutyGrpTpCd"))).indexOf('$' + '{') >= 0 ? '' : String(($c.session.getUserInfo("dutyGrpTpCd")) == null ? '' : ($c.session.getUserInfo("dutyGrpTpCd"))))) {
         if (!await $c.win.confirm("영문공시 1단계 의무화 대상서식 안내 \n ㅇ 영문공시 1단계 의무화 대상법인은 본 서식에 대한 국문공시 제출 후 3영업일 이내에 반드시 영문공시를 제출하여야 합니다. \n ㅇ 자세한 내용은 거래소 공시규정 및 동 규정 시행세칙의 관련 조문과 거래소 안내사항을 참조하시기 바랍니다.")) {
             return;
         }
     }
-    if ('21' === (String(($c.session.getUserInfo("corpUsrTpCd")) === null ? '' : ($c.session.getUserInfo("corpUsrTpCd"))).indexOf('$' + '{') >= 0 ? '' : String(($c.session.getUserInfo("corpUsrTpCd")) === null ? '' : ($c.session.getUserInfo("corpUsrTpCd"))))) {
+    if ('21' === (String(($c.session.getUserInfo("corpUsrTpCd")) == null ? '' : ($c.session.getUserInfo("corpUsrTpCd"))).indexOf('$' + '{') >= 0 ? '' : String(($c.session.getUserInfo("corpUsrTpCd")) == null ? '' : ($c.session.getUserInfo("corpUsrTpCd"))))) {
         if ('71480' === formCd || '71492' === formCd || '71493' === formCd || '71572' === formCd || '71488' === formCd || '71489' === formCd || '71570' === formCd || '71571' === formCd || '70379' === formCd || '70380' === formCd || '71381' === formCd || '71382' === formCd || '71483' === formCd || '71484' === formCd || '71485' === formCd || '71486' === formCd || '71487' === formCd || '71575' === formCd) {
             await $c.win.alert('이 공시사항은 자본시장법상 주요사항보고서 제출사항에도\n해당될 수 있으므로, 해당여부를 검토하신 후 \n주요사항 보고서 제출이 누락되지 않도록 주의하시기 바랍니다.');
         }
     }
-    if ('11' === (String(($c.session.getUserInfo("corpUsrTpCd")) === null ? '' : ($c.session.getUserInfo("corpUsrTpCd"))).indexOf('$' + '{') >= 0 ? '' : String(($c.session.getUserInfo("corpUsrTpCd")) === null ? '' : ($c.session.getUserInfo("corpUsrTpCd"))))) {
+    if ('11' === (String(($c.session.getUserInfo("corpUsrTpCd")) == null ? '' : ($c.session.getUserInfo("corpUsrTpCd"))).indexOf('$' + '{') >= 0 ? '' : String(($c.session.getUserInfo("corpUsrTpCd")) == null ? '' : ($c.session.getUserInfo("corpUsrTpCd"))))) {
         if ('67480' === formCd || '61492' === formCd || '61493' === formCd || '61572' === formCd || '61488' === formCd || '61489' === formCd || '61570' === formCd || '61571' === formCd || '91379' === formCd || '91380' === formCd || '61381' === formCd || '61382' === formCd || '61483' === formCd || '61484' === formCd || '61485' === formCd || '61486' === formCd || '61487' === formCd || '61575' === formCd) {
             await $c.win.alert('이 공시사항은 자본시장법상 주요사항보고서 제출사항에도\n해당될 수 있으므로, 해당여부를 검토하신 후 \n주요사항 보고서 제출이 누락되지 않도록 주의하시기 바랍니다.');
         }
     }
-    if ('Y' === exmptObjDisclsYn && 'Y' === (String(($c.session.getUserInfo("exmptObjDisclsYn")) === null ? '' : ($c.session.getUserInfo("exmptObjDisclsYn"))).indexOf('$' + '{') >= 0 ? '' : String(($c.session.getUserInfo("exmptObjDisclsYn")) === null ? '' : ($c.session.getUserInfo("exmptObjDisclsYn"))))) {
+    if ('Y' === exmptObjDisclsYn && 'Y' === (String(($c.session.getUserInfo("exmptObjDisclsYn")) == null ? '' : ($c.session.getUserInfo("exmptObjDisclsYn"))).indexOf('$' + '{') >= 0 ? '' : String(($c.session.getUserInfo("exmptObjDisclsYn")) == null ? '' : ($c.session.getUserInfo("exmptObjDisclsYn"))))) {
         if (!await $c.win.confirm('귀 사는 사전확인절차 면제 대상법인에 해당됨에 따라,\n본 공시사항은 거래소의 공시내용 확인절차 없이 투자자에게 직접 \n배포됩니다.\n공시내용 작성을 진행하시겠습니까? ')) {
             return;
         }

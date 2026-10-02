@@ -2573,8 +2573,12 @@ def _new_report(profile="screen"):
             "async_marked": [], "wcraft": 0, "judgment": []}
 
 
-def convert(raw, filename, profile="screen"):
-    """단계 1 변환 진입점 — 규칙 파이프라인(_convert_once)을 고정점까지 반복 적용한다.
+def convert(raw, filename, profile="screen", keep_nullish=None):
+    """keep_nullish: 규칙 5a 에서 `x == null`/`x != null`(undefined 까지 거르는 관용구)을 보존할지. None 이면 프로파일 기본
+    (lib 만 보존). 공급사 r13 파이프라인(jspfront_pipeline)은 True 로 부른다 — `!== null` 로 바꾸면 응답 필드가 undefined 인 자리에서
+    가드가 뚫려 setCount(NaN)·파일 검사 오작동이 난다(2026-10-02 리뷰: jldfil59400·25910).
+
+    단계 1 변환 진입점 — 규칙 파이프라인(_convert_once)을 고정점까지 반복 적용한다.
     profile="screen"(기본, ui→ui-tobe 화면) 또는 "lib"(cm/pcc 업무공통 라이브러리 — LIB_PROFILE_RULES 화이트리스트).
     개별 규칙은 멱등이지만 재배치·헤더 삽입·공백 정리의 상호작용으로 1회차에 미세 공백이
     남는 사례가 있어, 출력이 더 이상 변하지 않을 때까지(최대 2회 추가) 재적용해 수렴시킨다.
@@ -2582,9 +2586,9 @@ def convert(raw, filename, profile="screen"):
     convert_all 의 IDEM 검사에 그대로 검출된다."""
     if profile not in PROFILES:
         raise ValueError("알 수 없는 profile: %s (screen|lib)" % profile)
-    result, report = _convert_once(raw, filename, profile)
+    result, report = _convert_once(raw, filename, profile, keep_nullish)
     for _ in range(2):
-        again, _rep = _convert_once(result, filename, profile)
+        again, _rep = _convert_once(result, filename, profile, keep_nullish)
         if again == result:
             break
         result = again
@@ -2623,7 +2627,7 @@ def _convert_once_lib(raw, filename):
     return result, report
 
 
-def _convert_once(raw, filename, profile="screen"):
+def _convert_once(raw, filename, profile="screen", keep_nullish=None):
     if profile == "lib":
         return _convert_once_lib(raw, filename)
     report = _new_report("screen")
@@ -2633,7 +2637,7 @@ def _convert_once(raw, filename, profile="screen"):
     s = reg["script"]
     s = rule1_vscrenid(s, filename, report)
     s = rule2_globals(s, report)
-    s = rule5a_strict_eq(s, report)
+    s = rule5a_strict_eq(s, report, keep_nullish=bool(keep_nullish))
     s = rule5e_neg_compare(s, report)   # !X === Y 우선순위 버그 교정(5a 로 === 통일 후)
     body_ids = set(re.findall(r'\bid="([^"]+)"', reg["body"]))
     s = rule5b_setvalue(s, report, body_ids)   # body 컴포넌트 수신만(DOM/form 필드 보류)

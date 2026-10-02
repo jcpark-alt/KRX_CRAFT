@@ -97,8 +97,10 @@ def gate_file(path, inventory=None, node=True):
     res["unused_globals"] = [g for g in sorted(set(globs)) if g not in KEEP_GLOBALS
                              and len(re.findall(r'scwin\.%s\b' % re.escape(g), code)) <= 1 and ("scwin." + g) not in body]
     tok = {}
+    # `x == null`/`x != null`(undefined 까지 거르는 관용구)은 파이프라인이 일부러 보존한다(convert keep_nullish) — 느슨 비교로 세지 않는다
+    code_nn = re.sub(r'(?<![=!<>])[!=]=(?!=)\s*(?:null|undefined)\b|\b(?:null|undefined)\s*(?<![=!<>])[!=]=(?!=)', ' ', code)
     for k, (pat, on_code) in TOKENS.items():
-        n = len(re.findall(pat, code if on_code else script, re.M))
+        n = len(re.findall(pat, code_nn if on_code else script, re.M))
         if n:
             tok[k] = n
     res["tokens"] = tok

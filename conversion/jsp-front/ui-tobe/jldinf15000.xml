@@ -202,11 +202,12 @@ scwin.dmenus = undefined;
  * @hidden N
  */
 scwin.init_attrReals = function () {
-    const attrRealsList = [{ childId: "ul_107", attr: "__html", fn: function () { return ([String(dma_page.get("total")), String(dma_page.get("currentPage")), String(dma_page.get("pageCount"))].some(function (v) { return String(v === null ? '' : v).trim() !== ''; }) ? ("<br/> 총 <strong id=\"totPage\">" + String(dma_page.get("total")) + "</strong>건 <span id=\"totPage1\">(" + String(dma_page.get("currentPage")) + "/" + String(dma_page.get("pageCount")) + ")</span>") : ''); } }];
+    const attrRealsList = [{ childId: "ul_107", attr: "__html", fn: function () { return ([String(dma_page.get("total")), String(dma_page.get("currentPage")), String(dma_page.get("pageCount"))].some(function (v) { return String(v == null ? '' : v).trim() !== ''; }) ? ("<br/> 총 <strong id=\"totPage\">" + String(dma_page.get("total")) + "</strong>건 <span id=\"totPage1\">(" + String(dma_page.get("currentPage")) + "/" + String(dma_page.get("pageCount")) + ")</span>") : ''); } }];
     attrRealsList.forEach(function (a) {
         const comp = $c.util.getComponent(a.childId);
         if (!comp) { return; }
-        const v = a.fn();
+        let v;
+        try { v = a.fn(); } catch (e) { $c.exception.handleError(e, { notify: "none", context: "attrReal:" + a.childId }); return; }
         if (a.attr === "style") {
             String(v).split(";").forEach(function (decl) {
                 const kv = decl.split(":");
@@ -237,11 +238,13 @@ scwin.init_attrReals = function () {
  * @hidden N
  */
 scwin.init_conds = function () {
-    const binds = [{ id: "if_resultList", fn: function(){ return (!(String(((dma_pageContext.get("resultList") ?? "")) === null ? '' : ((dma_pageContext.get("resultList") ?? ""))).length === 0)); } }];
+    const binds = [{ id: "if_resultList", fn: function(){ return (!(String(((dma_pageContext.get("resultList") ?? "")) == null ? '' : ((dma_pageContext.get("resultList") ?? ""))).length === 0)); } }];
     binds.forEach(function (b) {
         const comp = $c.util.getComponent(b.id);
         if (!comp) { return; }
-        const ok = !!b.fn();
+        let ok;
+        // 조건식이 미해결 값(unresolved throw)을 읽는 자리는 그 바인드만 건너뛴다 — 공급사 산출의 바인드별 격리 유지
+        try { ok = !!b.fn(); } catch (e) { $c.exception.handleError(e, { notify: "none", context: "conds:" + b.id }); return; }
         if (ok) { comp.show(); } else { comp.hide(); }
         if (ok && b.grids) {
             b.grids.forEach(function (gid) {
@@ -304,7 +307,7 @@ scwin.init_datefmt_cal_endDate = function () { $c.date.checkCalendarFormat("cal_
  */
 scwin.init_pageBody = function () {
     try {
-        const applProcsTpCd = (String(((dma_pageContext.get("applProcsTpCd") ?? "")) === null ? '' : ((dma_pageContext.get("applProcsTpCd") ?? ""))).indexOf('$' + '{') >= 0 ? '' : String(((dma_pageContext.get("applProcsTpCd") ?? "")) === null ? '' : ((dma_pageContext.get("applProcsTpCd") ?? ""))));
+        const applProcsTpCd = (String(((dma_pageContext.get("applProcsTpCd") ?? "")) == null ? '' : ((dma_pageContext.get("applProcsTpCd") ?? ""))).indexOf('$' + '{') >= 0 ? '' : String(((dma_pageContext.get("applProcsTpCd") ?? "")) == null ? '' : ((dma_pageContext.get("applProcsTpCd") ?? ""))));
         if (applProcsTpCd !== "") {
             $c.util.getComponent('slc_applProcsTpCd').setValue(applProcsTpCd);
         }
@@ -535,9 +538,8 @@ scwin.tx_load_list = async function () {
         target: "dlt_applProcsTpCdList=body.content",
         isProcessMsg: false
     };
-    let res = null;
-    try { res = await $c.sbm.executeDynamic(sbmOptions); }
-    catch (_e) { await $c.exception.handleError(_e, { context: "jldinf15000.tx_load_list" }); return null; }
+    const res = await $c.sbm.executeDynamic(sbmOptions);
+    if (res && res.skipped) { return res; }  // 중복 제출 skip
     if (!(res && res.responseJSON && res.responseJSON.success === true)) {
         const m = (res && res.responseJSON && res.responseJSON.message) || $c.sbm.getStatusMessage(res) || ('서버 응답 오류 (' + $c.sbm.getResultCode(res) + ')');
         await $c.win.alert(m);
@@ -545,8 +547,8 @@ scwin.tx_load_list = async function () {
     }
 
     const rj = res && res.responseJSON;
-    const tot = rj && (rj["total"] !== null ? rj["total"] : (rj.body && rj.body["total"]));
-    if (tot !== null && tot !== "") {
+    const tot = rj && (rj["total"] != null ? rj["total"] : (rj.body && rj.body["total"]));
+    if (tot != null && tot !== "") {
         $c.util.getComponent("krxpage_pagenavigator_216").setCount(Math.ceil(Number(tot) / 10));
     }
     return res;
@@ -748,7 +750,7 @@ scwin.search = async function (pageDiv) {
         await $c.win.alert('상품 구분을 선택하세요');
         return;
     }
-    if (($c.util.getComponent('cal_startDate').getValue() === null ? '' : String($c.util.getComponent('cal_startDate').getValue())) !== '' && ($c.util.getComponent('cal_endDate').getValue() === null ? '' : String($c.util.getComponent('cal_endDate').getValue())) !== '') {
+    if (($c.util.getComponent('cal_startDate').getValue() == null ? '' : String($c.util.getComponent('cal_startDate').getValue())) !== '' && ($c.util.getComponent('cal_endDate').getValue() == null ? '' : String($c.util.getComponent('cal_endDate').getValue())) !== '') {
         if ($c.util.getComponent('cal_startDate').getValue()> $c.util.getComponent('cal_endDate').getValue()) {
             await $c.win.alert('종료일은 시작일 이후로 입력하세요');
             $c.util.getComponent("cal_endDate").focus();
@@ -1029,7 +1031,7 @@ scwin.returnAppl = async function (std_cd_appl_contn_tp_cd, std_cd_appl_id, cp_b
  */
 scwin.print = async function (isu_nm, std_cd_appl_contn_tp_nm, appl_date, std_cd_grnt_fee, asum_acnt_no) {
     const form = (document.newReportForm || { elements: [] });
-    if (asum_acnt_no === "" || asum_acnt_no === null) {
+    if (asum_acnt_no === "" || asum_acnt_no == null) {
         asum_acnt_no = "";
     } else {
         asum_acnt_no = "신한은행 " + asum_acnt_no + " (한국거래소)";
@@ -1059,7 +1061,7 @@ scwin.printOld = function (isu_nm, std_cd_appl_contn_tp_nm, appl_date, std_cd_gr
     const rexName = "JLDINF96000";
     const dataType = "XML";
     const formName = (document.JLDINF15000 || { elements: [] });
-    if (asum_acnt_no === "" || asum_acnt_no === null) {
+    if (asum_acnt_no === "" || asum_acnt_no == null) {
         asum_acnt_no = "";
     } else {
         asum_acnt_no = "신한은행 " + asum_acnt_no + " (한국거래소)";

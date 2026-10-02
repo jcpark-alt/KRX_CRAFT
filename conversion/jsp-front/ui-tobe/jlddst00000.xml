@@ -124,7 +124,9 @@ scwin.init_conds = function () {
     binds.forEach(function (b) {
         const comp = $c.util.getComponent(b.id);
         if (!comp) { return; }
-        const ok = !!b.fn();
+        let ok;
+        // 조건식이 미해결 값(unresolved throw)을 읽는 자리는 그 바인드만 건너뛴다 — 공급사 산출의 바인드별 격리 유지
+        try { ok = !!b.fn(); } catch (e) { $c.exception.handleError(e, { notify: "none", context: "conds:" + b.id }); return; }
         if (ok) { comp.show(); } else { comp.hide(); }
         if (ok && b.grids) {
             b.grids.forEach(function (gid) {
@@ -232,7 +234,7 @@ scwin.init_rowCopy = async function () {
  */
 scwin.init_pageBody = async function () {
     try {
-        const marketType = (String(((dma_pageContext.get("marketType") ?? "")) === null ? '' : ((dma_pageContext.get("marketType") ?? ""))).indexOf('$' + '{') >= 0 ? '' : String(((dma_pageContext.get("marketType") ?? "")) === null ? '' : ((dma_pageContext.get("marketType") ?? ""))));
+        const marketType = (String(((dma_pageContext.get("marketType") ?? "")) == null ? '' : ((dma_pageContext.get("marketType") ?? ""))).indexOf('$' + '{') >= 0 ? '' : String(((dma_pageContext.get("marketType") ?? "")) == null ? '' : ((dma_pageContext.get("marketType") ?? ""))));
         const kosdaqSegment = $c.util.getComponent('ipt_kosdaqSegment').getValue();
         if ("" !== marketType) {
             await scwin.fnTabClick(marketType, kosdaqSegment);
@@ -263,9 +265,9 @@ scwin.init_recvParam = function () { dma_pageContext.setJSON($c.data.getParamete
  */
 scwin.onpageload = async function () {
     try {
+        scwin.init_recvParam();
         scwin.otherTabDay = $c.util.getComponent('otherTabDay');
         scwin.fnBookmarkSearch = fnBookmarkSearch;
-        scwin.init_recvParam();
         scwin.init_fillGen();
         await scwin.init_rowCopy();
         scwin.init_conds();
@@ -672,7 +674,7 @@ scwin.setCorpInfo = function (isurCd, kisComCd, repIsuSrtCd, comNm, comAbbrv, is
 scwin.fnSearchCorpName = async function (val) {
     $c.util.getComponent("dma_fnSearch1Req").set("chose", val);
     $c.util.getComponent("dma_fnSearch1Req").set("repIsuSrtCd", "");
-    let searchCorpName = $c.util.getComponent('AKCKwd').getValue(); if (searchCorpName === null) { searchCorpName = ''; }
+    let searchCorpName = $c.util.getComponent('AKCKwd').getValue(); if (searchCorpName == null) { searchCorpName = ''; }
     if (searchCorpName !== "") {
         $c.util.getComponent("dma_fnDownloadReq").set("searchCorpName", searchCorpName);
         Promise.resolve($c.win.openPopup('/jldfil00033/jldfil00033.xml', { id: "pop_corp_std" }, { method: "loadInitPage" })).then(function (r) { if (!r) return; let a = Array.isArray(r) ? r : [r]; if (a[0] && a[0].__sdd_rec) { const rec = a[0]; const nm = function (s) { return s.replace(/_/g, '').toLowerCase(); }; const ps = (String(scwin.setCorpInfo).match(/\(([^)]*)\)/) || ['', ''])[1].split(',').map(function (s) { return s.trim(); }).filter(Boolean); const nk = {}; for (let k in rec) nk[nm(k)] = rec[k]; a = ps.map(function (p) { return nk[nm(p)]; }); } try { scwin.setCorpInfo.apply(null, a); } catch (_e) { $c.exception.handleError(_e, { notify: 'none', context: 'popup-recv' }); } });
@@ -716,7 +718,7 @@ scwin.fnSearchCorpNameAllCallBack = async function (items) {
 scwin.fnSearchCorpCode = async function (val) {
     if (val === "") {
         $c.util.getComponent("dma_fnSearch1Req").set("repIsuSrtCd", "");
-        const val = ($c.util.getComponent("dma_fnSearch1Req").get("searchCodeType") || '');
+        val = ($c.util.getComponent("dma_fnSearch1Req").get("searchCodeType") || '');
         if (val === "number") {
             await $c.win.alert("조회한 종목코드가 존재하지 않습니다.");
         } else {
@@ -747,7 +749,7 @@ scwin.fnSearch = async function () {
         await $c.win.alert("일자 형식이 틀립니다");
         return;
     }
-    if (($c.util.getComponent('AKCKwd').getValue() === null ? '' : String($c.util.getComponent('AKCKwd').getValue())) === '') {
+    if (($c.util.getComponent('AKCKwd').getValue() == null ? '' : String($c.util.getComponent('AKCKwd').getValue())) === '') {
         $c.util.getComponent("dma_fnSearch1Req").set("searchCodeType", "");
     }
     const selectedDate = $c.util.getComponent('cal_selDate').getValue();
@@ -787,7 +789,7 @@ scwin.fnSearch = async function () {
             }
     });
     $c.util.getComponent("dma_fnDownloadReq").set("searchCorpName", $c.util.getComponent('AKCKwd').getValue());
-    if ($(document).find("select[id=ipt_currentPageSize]").val() !== null) {
+    if ($(document).find("select[id=ipt_currentPageSize]").val() != null) {
         $c.util.getComponent("dma_fnSearch1Req").set("currentPageSize", $(document).find("select[id=ipt_currentPageSize]").val());
     }
     $c.util.getComponent("dma_fnSearch1Req").set("method", "searchTodayDisclosureSub");
@@ -892,7 +894,7 @@ scwin.fnRssOpen = async function () {
         const valCurrentPageSize = ($c.util.getComponent("dma_fnSearch1Req").get("currentPageSize") || '');
         const wUrl = "/disclosure/rsstodaydistribute.do?method=searchRssTodayDistribute&repIsuSrtCd=" + valRepIsuSrtCd + "&mktTpCd=" + marketType + "&searchCorpName=" + valSearchCorpName + "&currentPageSize=" + valCurrentPageSize;
         // TODO Stage2: 전환 미완(공급사 드러냄 — 사유 알림 유지) "이 화면의 이동 목적지를 아직 정하지 못했습니다(전환 미완) — "
-        $c.win.openPopup((function (__u) { const __s = String(__u === null ? "" : __u); if (!/\.xml(\?|#|$)/.test(__s)) { throw { bizMessage: "이 화면의 이동 목적지를 아직 정하지 못했습니다(전환 미완) — " + __s, unresolved: "nav:" + __s }; } return __u; })(wUrl), { id: "오늘의공시RSS", width: "700", height: "700", scrollbars: true, resizable: true, type: "pageFramePopup" }, {});
+        $c.win.openPopup((function (__u) { const __s = String(__u == null ? "" : __u); if (!/\.xml(\?|#|$)/.test(__s)) { throw { bizMessage: "이 화면의 이동 목적지를 아직 정하지 못했습니다(전환 미완) — " + __s, unresolved: "nav:" + __s }; } return __u; })(wUrl), { id: "오늘의공시RSS", width: "700", height: "700", scrollbars: true, resizable: true, type: "pageFramePopup" }, {});
     }
 };
 
@@ -981,7 +983,7 @@ scwin.fnCopyClip = async function (wUrl) {
  * @hidden N
  */
 scwin.fnDownload = async function () {
-    if (($c.util.getComponent('AKCKwd').getValue() === null ? '' : String($c.util.getComponent('AKCKwd').getValue())) === '') {
+    if (($c.util.getComponent('AKCKwd').getValue() == null ? '' : String($c.util.getComponent('AKCKwd').getValue())) === '') {
         $c.util.getComponent("dma_fnSearch1Req").set("searchCodeType", "");
     }
     $c.util.getComponent("dma_fnSearch1Req").set("todayFlag", "N");
@@ -1089,7 +1091,7 @@ scwin.fnGetWeekday = function (sDate) {
 scwin.fnBookmark = function () {
     const cookieName = "krxComp";
     const cookies = $c.util.getSessionStorage(cookieName);
-    if (cookies !== null) {
+    if (cookies != null) {
         (($c.util.getComponent('txt_myBookmark')) && ($c.util.getComponent('txt_myBookmark')).removeAll ? ($c.util.getComponent('txt_myBookmark')).removeAll() : (($c.util.getComponent('txt_myBookmark')) && ($c.util.getComponent('txt_myBookmark')).setValue ? ($c.util.getComponent('txt_myBookmark')).setValue('') : void 0));
         const items = cookies.split("/");
         let max = 0;

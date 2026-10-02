@@ -39,7 +39,7 @@ def _converge(dst, name, max_passes=3):
     text = io.open(dst, "r", encoding="utf-8").read()
     changed = 0
     for _ in range(max_passes):
-        text2, _r = cv.convert(text, name + ".xml")
+        text2, _r = cv.convert(text, name + ".xml", keep_nullish=True)
         if text2 == text:
             io.open(dst, "w", encoding="utf-8", newline="").write(text)
             return changed, True
@@ -61,7 +61,7 @@ def run(name, publish=True, gate=True, inventory=None):
     rep["vendor"] = {k: v for k, v in vlog.items() if v}
     text = st.join_regions(reg, script=script, head=head, body=body)
     # 2 convert
-    text, crep = cv.convert(text, name + ".xml")
+    text, crep = cv.convert(text, name + ".xml", keep_nullish=True)
     rep["convert"] = {"r13": len(crep["rule13"]), "r8": crep["rule8"], "r5a": crep["rule5a"], "r4": crep["rule4"],
                       "judgment": len(crep["judgment"])}
     TOBE.mkdir(parents=True, exist_ok=True)

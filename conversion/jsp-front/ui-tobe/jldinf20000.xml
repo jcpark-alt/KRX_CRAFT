@@ -160,7 +160,7 @@ scwin.init_entryDefaults = function () {
     const pcGubunRadio = $c.util.getComponent('dma_DownloadReq');
     if (!pcGubunRadio || typeof pcGubunRadio.get !== 'function') {
         /* TODO Stage2: [sdd] entry_defaults 대상 부재: dma_DownloadReq */
-    } else if (($c.data.getParameter('gubunRadio') === null || $c.data.getParameter('gubunRadio') === '') && (pcGubunRadio.get('gubunRadio') === null || pcGubunRadio.get('gubunRadio') === '')) {
+    } else if (($c.data.getParameter('gubunRadio') == null || $c.data.getParameter('gubunRadio') === '') && (pcGubunRadio.get('gubunRadio') == null || pcGubunRadio.get('gubunRadio') === '')) {
         pcGubunRadio.set('gubunRadio', "1");
     }
 };
@@ -175,11 +175,12 @@ scwin.init_entryDefaults = function () {
  * @hidden N
  */
 scwin.init_attrReals = function () {
-    const attrRealsList = [{ childId: "ul_186", attr: "__html", fn: function () { return ([String(dma_page.get("total")), String(dma_page.get("currentPage")), String(dma_page.get("pageCount"))].some(function (v) { return String(v === null ? '' : v).trim() !== ''; }) ? ("총 <strong id=\"totPage\">" + String(dma_page.get("total")) + "</strong>건 <span id=\"totPage1\">(" + String(dma_page.get("currentPage")) + "/" + String(dma_page.get("pageCount")) + ")</span>") : ''); } }];
+    const attrRealsList = [{ childId: "ul_186", attr: "__html", fn: function () { return ([String(dma_page.get("total")), String(dma_page.get("currentPage")), String(dma_page.get("pageCount"))].some(function (v) { return String(v == null ? '' : v).trim() !== ''; }) ? ("총 <strong id=\"totPage\">" + String(dma_page.get("total")) + "</strong>건 <span id=\"totPage1\">(" + String(dma_page.get("currentPage")) + "/" + String(dma_page.get("pageCount")) + ")</span>") : ''); } }];
     attrRealsList.forEach(function (a) {
         const comp = $c.util.getComponent(a.childId);
         if (!comp) { return; }
-        const v = a.fn();
+        let v;
+        try { v = a.fn(); } catch (e) { $c.exception.handleError(e, { notify: "none", context: "attrReal:" + a.childId }); return; }
         if (a.attr === "style") {
             String(v).split(";").forEach(function (decl) {
                 const kv = decl.split(":");
@@ -210,11 +211,13 @@ scwin.init_attrReals = function () {
  * @hidden N
  */
 scwin.init_conds = function () {
-    const binds = [{ id: "c_otherwise_54", fn: function(){ return (!(((dma_pageContext.get("thisServer") ?? "") === 'dr1') || ((dma_pageContext.get("thisServer") ?? "") === 'dr2') || ((dma_pageContext.get("thisServer") ?? "") === 'real1') || ((dma_pageContext.get("thisServer") ?? "") === 'real2'))); } }, { id: "if_result", fn: function(){ return (!(String(((dma_pageContext.get("result") ?? "")) === null ? '' : ((dma_pageContext.get("result") ?? ""))).length === 0)); } }];
+    const binds = [{ id: "c_otherwise_54", fn: function(){ return (!(((dma_pageContext.get("thisServer") ?? "") === 'dr1') || ((dma_pageContext.get("thisServer") ?? "") === 'dr2') || ((dma_pageContext.get("thisServer") ?? "") === 'real1') || ((dma_pageContext.get("thisServer") ?? "") === 'real2'))); } }, { id: "if_result", fn: function(){ return (!(String(((dma_pageContext.get("result") ?? "")) == null ? '' : ((dma_pageContext.get("result") ?? ""))).length === 0)); } }];
     binds.forEach(function (b) {
         const comp = $c.util.getComponent(b.id);
         if (!comp) { return; }
-        const ok = !!b.fn();
+        let ok;
+        // 조건식이 미해결 값(unresolved throw)을 읽는 자리는 그 바인드만 건너뛴다 — 공급사 산출의 바인드별 격리 유지
+        try { ok = !!b.fn(); } catch (e) { $c.exception.handleError(e, { notify: "none", context: "conds:" + b.id }); return; }
         if (ok) { comp.show(); } else { comp.hide(); }
         if (ok && b.grids) {
             b.grids.forEach(function (gid) {
@@ -307,7 +310,7 @@ scwin.init_pageBody = function () {
                 $('.paging').append(resetPaging);
         });
         $c.util.getComponent("ipt_isurNm1").focus();
-        const gubunRadio = (String(((dma_pageContext.get("gubunRadio") ?? "")) === null ? '' : ((dma_pageContext.get("gubunRadio") ?? ""))).indexOf('$' + '{') >= 0 ? '' : String(((dma_pageContext.get("gubunRadio") ?? "")) === null ? '' : ((dma_pageContext.get("gubunRadio") ?? ""))));
+        const gubunRadio = (String(((dma_pageContext.get("gubunRadio") ?? "")) == null ? '' : ((dma_pageContext.get("gubunRadio") ?? ""))).indexOf('$' + '{') >= 0 ? '' : String(((dma_pageContext.get("gubunRadio") ?? "")) == null ? '' : ((dma_pageContext.get("gubunRadio") ?? ""))));
         if (gubunRadio === '') {
             scwin.appDate2('stdCdGrntStartDd', 'stdCdGrntEndDd', 12);
         }
@@ -954,9 +957,8 @@ scwin.tx_fn_search = async function () {
         target: "dlt_result=body.content",
         isProcessMsg: false
     };
-    let res = null;
-    try { res = await $c.sbm.executeDynamic(sbmOptions); }
-    catch (_e) { await $c.exception.handleError(_e, { context: "jldinf20000.tx_fn_search" }); return null; }
+    const res = await $c.sbm.executeDynamic(sbmOptions);
+    if (res && res.skipped) { return res; }  // 중복 제출 skip
     if (!(res && res.responseJSON && res.responseJSON.success === true)) {
         const m = (res && res.responseJSON && res.responseJSON.message) || $c.sbm.getStatusMessage(res) || ('서버 응답 오류 (' + $c.sbm.getResultCode(res) + ')');
         await $c.win.alert(m);
@@ -964,8 +966,8 @@ scwin.tx_fn_search = async function () {
     }
 
     const rj = res && res.responseJSON;
-    const tot = rj && (rj["total"] !== null ? rj["total"] : (rj.body && rj.body["total"]));
-    if (tot !== null && tot !== "") {
+    const tot = rj && (rj["total"] != null ? rj["total"] : (rj.body && rj.body["total"]));
+    if (tot != null && tot !== "") {
         $c.util.getComponent("krxpage_pagenavigator_263").setCount(Math.ceil(Number(tot) / 10));
     }
     return res;
@@ -1012,7 +1014,7 @@ scwin.dataTb_fmt_stdIndicTpNm = async function (data, formattedData, r, c) {
  * @hidden N
  */
 scwin.dateSetting = function () {
-    const curDate = (String(((dma_pageContext.get("curDate") ?? "")) === null ? '' : ((dma_pageContext.get("curDate") ?? ""))).indexOf('$' + '{') >= 0 ? '' : String(((dma_pageContext.get("curDate") ?? "")) === null ? '' : ((dma_pageContext.get("curDate") ?? ""))));
+    const curDate = (String(((dma_pageContext.get("curDate") ?? "")) == null ? '' : ((dma_pageContext.get("curDate") ?? ""))).indexOf('$' + '{') >= 0 ? '' : String(((dma_pageContext.get("curDate") ?? "")) == null ? '' : ((dma_pageContext.get("curDate") ?? ""))));
     const curYY = curDate.substring(0, 4);
     const curMM = curDate.substring(4, 6);
     const curDD = curDate.substring(6, 8);
@@ -1146,12 +1148,12 @@ scwin.viewDownloadBtn = function (div) {
 scwin.download = async function () {
     await $c.win.alert("조회 내용이 없습니다.");
     return;
-    if (($c.util.getComponent('cal_stdCdGrntStartDd').getValue() === null ? '' : String($c.util.getComponent('cal_stdCdGrntStartDd').getValue())) === '') {
+    if (($c.util.getComponent('cal_stdCdGrntStartDd').getValue() == null ? '' : String($c.util.getComponent('cal_stdCdGrntStartDd').getValue())) === '') {
         await $c.win.alert('다운로드는 일자를 1년 이내로 설정하여야\n\r사용이 가능합니다.');
         std_cd_grnt_start_dd.focus();
         return;
     } else {
-        if (($c.util.getComponent('cal_stdCdGrntEndDd').getValue() === null ? '' : String($c.util.getComponent('cal_stdCdGrntEndDd').getValue())) === '') {
+        if (($c.util.getComponent('cal_stdCdGrntEndDd').getValue() == null ? '' : String($c.util.getComponent('cal_stdCdGrntEndDd').getValue())) === '') {
             await $c.win.alert('다운로드는 일자를 1년 이내로 설정하여야\n\r사용이 가능합니다.');
             std_cd_grnt_end_dd.focus();
             return;
@@ -1199,14 +1201,14 @@ scwin.download = async function () {
  * @hidden N
  */
 scwin.searchData = function (idx) {
-    let std_cd_grnt_start_dd = (String(((dma_pageContext.get("std_cd_grnt_start_dd") ?? "")) === null ? '' : ((dma_pageContext.get("std_cd_grnt_start_dd") ?? ""))).indexOf('$' + '{') >= 0 ? '' : String(((dma_pageContext.get("std_cd_grnt_start_dd") ?? "")) === null ? '' : ((dma_pageContext.get("std_cd_grnt_start_dd") ?? ""))));
-    let std_cd_grnt_end_dd = (String(((dma_pageContext.get("std_cd_grnt_end_dd") ?? "")) === null ? '' : ((dma_pageContext.get("std_cd_grnt_end_dd") ?? ""))).indexOf('$' + '{') >= 0 ? '' : String(((dma_pageContext.get("std_cd_grnt_end_dd") ?? "")) === null ? '' : ((dma_pageContext.get("std_cd_grnt_end_dd") ?? ""))));
-    const searchRadio2 = (String(((dma_pageContext.get("searchRadio") ?? "")) === null ? '' : ((dma_pageContext.get("searchRadio") ?? ""))).indexOf('$' + '{') >= 0 ? '' : String(((dma_pageContext.get("searchRadio") ?? "")) === null ? '' : ((dma_pageContext.get("searchRadio") ?? ""))));
-    const searchRadio1 = (String(((dma_pageContext.get("searchRadio1") ?? "")) === null ? '' : ((dma_pageContext.get("searchRadio1") ?? ""))).indexOf('$' + '{') >= 0 ? '' : String(((dma_pageContext.get("searchRadio1") ?? "")) === null ? '' : ((dma_pageContext.get("searchRadio1") ?? ""))));
+    let std_cd_grnt_start_dd = (String(((dma_pageContext.get("std_cd_grnt_start_dd") ?? "")) == null ? '' : ((dma_pageContext.get("std_cd_grnt_start_dd") ?? ""))).indexOf('$' + '{') >= 0 ? '' : String(((dma_pageContext.get("std_cd_grnt_start_dd") ?? "")) == null ? '' : ((dma_pageContext.get("std_cd_grnt_start_dd") ?? ""))));
+    let std_cd_grnt_end_dd = (String(((dma_pageContext.get("std_cd_grnt_end_dd") ?? "")) == null ? '' : ((dma_pageContext.get("std_cd_grnt_end_dd") ?? ""))).indexOf('$' + '{') >= 0 ? '' : String(((dma_pageContext.get("std_cd_grnt_end_dd") ?? "")) == null ? '' : ((dma_pageContext.get("std_cd_grnt_end_dd") ?? ""))));
+    const searchRadio2 = (String(((dma_pageContext.get("searchRadio") ?? "")) == null ? '' : ((dma_pageContext.get("searchRadio") ?? ""))).indexOf('$' + '{') >= 0 ? '' : String(((dma_pageContext.get("searchRadio") ?? "")) == null ? '' : ((dma_pageContext.get("searchRadio") ?? ""))));
+    const searchRadio1 = (String(((dma_pageContext.get("searchRadio1") ?? "")) == null ? '' : ((dma_pageContext.get("searchRadio1") ?? ""))).indexOf('$' + '{') >= 0 ? '' : String(((dma_pageContext.get("searchRadio1") ?? "")) == null ? '' : ((dma_pageContext.get("searchRadio1") ?? ""))));
     const searchRadio = $c.util.getComponent('ipt_curSh').getValue();
-    const isur_cd = (String(((dma_pageContext.get("isur_cd") ?? "")) === null ? '' : ((dma_pageContext.get("isur_cd") ?? ""))).indexOf('$' + '{') >= 0 ? '' : String(((dma_pageContext.get("isur_cd") ?? "")) === null ? '' : ((dma_pageContext.get("isur_cd") ?? ""))));
-    const isur_nm = (String(((dma_pageContext.get("isur_nm") ?? "")) === null ? '' : ((dma_pageContext.get("isur_nm") ?? ""))).indexOf('$' + '{') >= 0 ? '' : String(((dma_pageContext.get("isur_nm") ?? "")) === null ? '' : ((dma_pageContext.get("isur_nm") ?? ""))));
-    const com_nm = (String(((dma_pageContext.get("com_nm") ?? "")) === null ? '' : ((dma_pageContext.get("com_nm") ?? ""))).indexOf('$' + '{') >= 0 ? '' : String(((dma_pageContext.get("com_nm") ?? "")) === null ? '' : ((dma_pageContext.get("com_nm") ?? ""))));
+    const isur_cd = (String(((dma_pageContext.get("isur_cd") ?? "")) == null ? '' : ((dma_pageContext.get("isur_cd") ?? ""))).indexOf('$' + '{') >= 0 ? '' : String(((dma_pageContext.get("isur_cd") ?? "")) == null ? '' : ((dma_pageContext.get("isur_cd") ?? ""))));
+    const isur_nm = (String(((dma_pageContext.get("isur_nm") ?? "")) == null ? '' : ((dma_pageContext.get("isur_nm") ?? ""))).indexOf('$' + '{') >= 0 ? '' : String(((dma_pageContext.get("isur_nm") ?? "")) == null ? '' : ((dma_pageContext.get("isur_nm") ?? ""))));
+    const com_nm = (String(((dma_pageContext.get("com_nm") ?? "")) == null ? '' : ((dma_pageContext.get("com_nm") ?? ""))).indexOf('$' + '{') >= 0 ? '' : String(((dma_pageContext.get("com_nm") ?? "")) == null ? '' : ((dma_pageContext.get("com_nm") ?? ""))));
     if (std_cd_grnt_start_dd === '11111111') {
         std_cd_grnt_start_dd = '';
     }
@@ -1389,7 +1391,7 @@ scwin.open_corp_cd = function (item_id, item_nm) {
 scwin.search = async function (idx) {
     const gubun = $c.util.getComponent("dma_DownloadReq").get("gubunRadio");
     if (gubun === '1') {
-        if (($c.util.getComponent('ipt_isurNm1').getValue() === null ? '' : String($c.util.getComponent('ipt_isurNm1').getValue())) === '') {
+        if (($c.util.getComponent('ipt_isurNm1').getValue() == null ? '' : String($c.util.getComponent('ipt_isurNm1').getValue())) === '') {
             await $c.win.alert("한글종목명 및 표준코드을 입력하세요.");
             $c.util.getComponent("ipt_isurNm1").focus();
             return;
@@ -1403,7 +1405,7 @@ scwin.search = async function (idx) {
         $c.util.getComponent('ipt_isurNm').setValue(($c.util.getComponent("ipt_isurNm1").getValue() || ''));
     } else {
         if (gubun === '2') {
-            if (($c.util.getComponent('ipt_comNm1').getValue() === null ? '' : String($c.util.getComponent('ipt_comNm1').getValue())) === '') {
+            if (($c.util.getComponent('ipt_comNm1').getValue() == null ? '' : String($c.util.getComponent('ipt_comNm1').getValue())) === '') {
                 await $c.win.alert("발행기관을 선택하세요.");
                 return;
             }

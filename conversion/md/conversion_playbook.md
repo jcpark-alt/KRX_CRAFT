@@ -45,6 +45,10 @@ python conversion/tools/convert_all.py --force <프로젝트명>-front
 
 > ⚠️ `--force` 는 `ui-tobe/` 의 **수기 단계 2 보강을 유실**시킨다. 재생성 전 반드시 git 상태·이력으로 수기 보강 유무를 확인한다.
 
+> **공급사 산출(editor-web generate) 입력 — `jsp-front`**: `convert_all.py` 대신 `python conversion/tools/jspfront_pipeline.py <name|폴더>` 를
+> 쓴다(공급사 후처리 규칙 33 → convert → 컨벤션 → convert 수렴 → 퍼블리싱 규칙 34 → convert 수렴 → 게이트). 배치 로그는
+> `jspfront_summary.py` 로 집계한다. 절차·기준선·잔여 명부는 `conversion/jsp-front/README.md`.
+
 ## 3. 단계 2 — 판단 보강 (Claude Code)
 
 [conversion_pipeline.md](conversion_pipeline.md) 단계 2 절차를 따른다. 요약:

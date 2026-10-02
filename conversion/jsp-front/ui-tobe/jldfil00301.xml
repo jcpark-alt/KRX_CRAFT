@@ -238,8 +238,8 @@ scwin.pageSize = null;
  */
 scwin.onpageload = async function () {
     try {
-        scwin.pageSize = "" + dma_pageContext.get("pageSize") + "";
         scwin.init_recvParam();
+        scwin.pageSize = "" + dma_pageContext.get("pageSize") + "";
         await scwin.init_rowCopy();
         scwin.init_conds();
         await scwin.init_loadList();
@@ -260,7 +260,9 @@ scwin.init_conds = function () {
     binds.forEach(function (b) {
         const comp = $c.util.getComponent(b.id);
         if (!comp) { return; }
-        const ok = !!b.fn();
+        let ok;
+        // 조건식이 미해결 값(unresolved throw)을 읽는 자리는 그 바인드만 건너뛴다 — 공급사 산출의 바인드별 격리 유지
+        try { ok = !!b.fn(); } catch (e) { $c.exception.handleError(e, { notify: "none", context: "conds:" + b.id }); return; }
         if (ok) { comp.show(); } else { comp.hide(); }
         if (ok && b.grids) {
             b.grids.forEach(function (gid) {
@@ -464,9 +466,8 @@ scwin.tx_fn_goWrite = async function () {
         target: "dlt_docPageList=body.content",
         isProcessMsg: false
     };
-    let res = null;
-    try { res = await $c.sbm.executeDynamic(sbmOptions); }
-    catch (_e) { await $c.exception.handleError(_e, { context: "jldfil00301.tx_fn_goWrite" }); return null; }
+    const res = await $c.sbm.executeDynamic(sbmOptions);
+    if (res && res.skipped) { return res; }  // 중복 제출 skip
     if (!(res && res.responseJSON && res.responseJSON.success === true)) {
         const m = (res && res.responseJSON && res.responseJSON.message) || $c.sbm.getStatusMessage(res) || ('서버 응답 오류 (' + $c.sbm.getResultCode(res) + ')');
         await $c.win.alert(m);
@@ -474,8 +475,8 @@ scwin.tx_fn_goWrite = async function () {
     }
 
     const rj = res && res.responseJSON;
-    const tot = rj && (rj["total"] !== null ? rj["total"] : (rj.body && rj.body["total"]));
-    if (tot !== null && tot !== "") {
+    const tot = rj && (rj["total"] != null ? rj["total"] : (rj.body && rj.body["total"]));
+    if (tot != null && tot !== "") {
         $c.util.getComponent("krxpage_pagenavigator_180").setCount(Math.ceil(Number(tot) / 10));
     }
     return res;
@@ -694,7 +695,7 @@ scwin.goWrite = async function (acptNo, formCd, formVer, currFormVer, currEngFor
  * @hidden N
  */
 scwin.viewOtherForm = function (divId, langTpCd) {
-    if (scwin.otherFormObj !== null && scwin.otherFormObj !== 'undefined') {
+    if (scwin.otherFormObj != null && scwin.otherFormObj !== 'undefined') {
         scwin.otherFormObj.style.display = 'none';
     }
     if ($c.util.getComponent(divId + '_otherForm').getStyle('display') === 'none') {

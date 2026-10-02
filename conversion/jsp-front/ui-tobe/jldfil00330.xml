@@ -290,8 +290,8 @@ scwin.pageSize = null;
  */
 scwin.onpageload = async function () {
     try {
-        scwin.pageSize = "" + dma_pageContext.get("pageSize") + "";
         scwin.init_recvParam();
+        scwin.pageSize = "" + dma_pageContext.get("pageSize") + "";
         await scwin.init_rowCopy();
         scwin.init_conds();
         await scwin.init_loadList();
@@ -312,7 +312,9 @@ scwin.init_conds = function () {
     binds.forEach(function (b) {
         const comp = $c.util.getComponent(b.id);
         if (!comp) { return; }
-        const ok = !!b.fn();
+        let ok;
+        // 조건식이 미해결 값(unresolved throw)을 읽는 자리는 그 바인드만 건너뛴다 — 공급사 산출의 바인드별 격리 유지
+        try { ok = !!b.fn(); } catch (e) { $c.exception.handleError(e, { notify: "none", context: "conds:" + b.id }); return; }
         if (ok) { comp.show(); } else { comp.hide(); }
         if (ok && b.grids) {
             b.grids.forEach(function (gid) {
@@ -561,9 +563,8 @@ scwin.tx_fn_searchList = async function () {
         target: "dlt_docPageList=body.content",
         isProcessMsg: false
     };
-    let res = null;
-    try { res = await $c.sbm.executeDynamic(sbmOptions); }
-    catch (_e) { await $c.exception.handleError(_e, { context: "jldfil00330.tx_fn_searchList" }); return null; }
+    const res = await $c.sbm.executeDynamic(sbmOptions);
+    if (res && res.skipped) { return res; }  // 중복 제출 skip
     if (!(res && res.responseJSON && res.responseJSON.success === true)) {
         const m = (res && res.responseJSON && res.responseJSON.message) || $c.sbm.getStatusMessage(res) || ('서버 응답 오류 (' + $c.sbm.getResultCode(res) + ')');
         await $c.win.alert(m);
@@ -571,8 +572,8 @@ scwin.tx_fn_searchList = async function () {
     }
 
     const rj = res && res.responseJSON;
-    const tot = rj && (rj["total"] !== null ? rj["total"] : (rj.body && rj.body["total"]));
-    if (tot !== null && tot !== "") {
+    const tot = rj && (rj["total"] != null ? rj["total"] : (rj.body && rj.body["total"]));
+    if (tot != null && tot !== "") {
         $c.util.getComponent("krxpage_pagenavigator_224").setCount(Math.ceil(Number(tot) / 10));
     }
     return res;
@@ -696,7 +697,7 @@ scwin.documentWrite = async function (reqObjDocAcpNo) {
 scwin.findCompany = function () {
     const corpSearchURL = '/jldfil00033/jldfil00033.xml?method=loadInitPage&ldMktTpCd=' + dma_disclosureVo.get("ldMktTpCd") + '';
     // TODO Stage2: 전환 미완(공급사 드러냄 — 사유 알림 유지) "이 화면의 이동 목적지를 아직 정하지 못했습니다(전환 미완) — "
-    (Promise.resolve($c.win.openPopup((function (__u) { const __s = String(__u === null ? "" : __u); if (!/\.xml(\?|#|$)/.test(__s)) { throw { bizMessage: "이 화면의 이동 목적지를 아직 정하지 못했습니다(전환 미완) — " + __s, unresolved: "nav:" + __s }; } return __u; })(corpSearchURL), { id: "corpWin", scrollbars: false, resizable: false, width: "600", height: "570", type: "pageFramePopup" }, {})).then(function (r) { if (!r) return; let a = Array.isArray(r) ? r : [r]; if (a[0] && a[0].__sdd_rec) { const rec = a[0]; const nm = function (s) { return s.replace(/_/g, '').toLowerCase(); }; const ps = (String(scwin.setCorpInfo).match(/\(([^)]*)\)/) || ['', ''])[1].split(',').map(function (s) { return s.trim(); }).filter(Boolean); const nk = {}; for (let k in rec) nk[nm(k)] = rec[k]; a = ps.map(function (p) { return nk[nm(p)]; }); } try { scwin.setCorpInfo.apply(null, a); } catch (_e) { $c.exception.handleError(_e, { notify: 'none', context: 'popup-recv' }); } }), { closed: false, focus: function () {}, close: function () { $c.win.getScope().closePopup("corpWin"); this.closed = true; } });
+    (Promise.resolve($c.win.openPopup((function (__u) { const __s = String(__u == null ? "" : __u); if (!/\.xml(\?|#|$)/.test(__s)) { throw { bizMessage: "이 화면의 이동 목적지를 아직 정하지 못했습니다(전환 미완) — " + __s, unresolved: "nav:" + __s }; } return __u; })(corpSearchURL), { id: "corpWin", scrollbars: false, resizable: false, width: "600", height: "570", type: "pageFramePopup" }, {})).then(function (r) { if (!r) return; let a = Array.isArray(r) ? r : [r]; if (a[0] && a[0].__sdd_rec) { const rec = a[0]; const nm = function (s) { return s.replace(/_/g, '').toLowerCase(); }; const ps = (String(scwin.setCorpInfo).match(/\(([^)]*)\)/) || ['', ''])[1].split(',').map(function (s) { return s.trim(); }).filter(Boolean); const nk = {}; for (let k in rec) nk[nm(k)] = rec[k]; a = ps.map(function (p) { return nk[nm(p)]; }); } try { scwin.setCorpInfo.apply(null, a); } catch (_e) { $c.exception.handleError(_e, { notify: 'none', context: 'popup-recv' }); } }), { closed: false, focus: function () {}, close: function () { $c.win.getScope().closePopup("corpWin"); this.closed = true; } });
 };
 
 /**
@@ -774,7 +775,7 @@ scwin.registerProcessExmpt = async function (applNo, docNo, formCd, formVer, wrt
  * @hidden N
  */
 scwin.register = async function (acptNo, formCd, formVer, currFormVer, currEngFormVer, oldFormVerUseYn, langTpCd, formUpclssCd, rsnClssCd, modOrgnDisclsAcptNo, inqOrgnDisclsAcptNo, engOrgnDisclsAcptNo, modAddSeq, applFormYn, ldMktTpCd, disclsAcptTpCd, subcomDisclsYn, disclsObjCorpIsurCd, disclsObjCorpIsurNm, disclsObjCorpFssUnqNo, disclsObjRepIsuSrtCd, formCdExmpt, formVerExmpt, comEngAbbrv, reqObjAcptDocNo) {
-    if (reqObjAcptDocNo === null || reqObjAcptDocNo === "") {
+    if (reqObjAcptDocNo == null || reqObjAcptDocNo === "") {
         $c.util.getComponent('dma_documentWriteReq').set('reqObjAcptDocNo', acptNo);
         await scwin.tx_fn_register();
     } else {
@@ -844,7 +845,7 @@ scwin.goWrite = function (acptNo, formCd, formVer, currFormVer, currEngFormVer, 
  * @hidden N
  */
 scwin.viewOtherForm = function (divId, langTpCd) {
-    if (scwin.otherFormObj !== null && scwin.otherFormObj !== 'undefined') {
+    if (scwin.otherFormObj != null && scwin.otherFormObj !== 'undefined') {
         scwin.otherFormObj.style.display = 'none';
     }
     if ($c.util.getComponent(divId + '_otherForm').getStyle('display') === 'none') {

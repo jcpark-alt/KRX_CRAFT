@@ -120,12 +120,12 @@ scwin.fn_useChkBubJohang = null;
  */
 scwin.onpageload = async function () {
     try {
+        scwin.init_recvParam();
         scwin.fn_searchBubJohang = scwin.tx_fn_searchBubJohang;
         scwin.fn_showDetail = scwin.tx_fn_showDetail;
         scwin.fn_chkDup = scwin.tx_fn_chkDup;
         scwin.fn_deleteBubJohang = scwin.tx_fn_deleteBubJohang;
         scwin.fn_useChkBubJohang = scwin.tx_fn_useChkBubJohang;
-        scwin.init_recvParam();
         scwin.init_ctxDefaults();
         await scwin.init_rowCopy();
         scwin.init_conds();
@@ -164,7 +164,9 @@ scwin.init_conds = function () {
     binds.forEach(function (b) {
         const comp = $c.util.getComponent(b.id);
         if (!comp) { return; }
-        const ok = !!b.fn();
+        let ok;
+        // 조건식이 미해결 값(unresolved throw)을 읽는 자리는 그 바인드만 건너뛴다 — 공급사 산출의 바인드별 격리 유지
+        try { ok = !!b.fn(); } catch (e) { $c.exception.handleError(e, { notify: "none", context: "conds:" + b.id }); return; }
         if (ok) { comp.show(); } else { comp.hide(); }
         if (ok && b.grids) {
             b.grids.forEach(function (gid) {
@@ -210,10 +212,10 @@ scwin.init_pageBody = async function () {
                 frame.Title = "관련법규조항 변경";
         });
         scwin.fn_searchBubJohang();
-        if ((String(((dma_pageContext.get("ipt_updateYn") ?? "")) === null ? '' : ((dma_pageContext.get("ipt_updateYn") ?? ""))).indexOf('$' + '{') >= 0 ? '' : String(((dma_pageContext.get("ipt_updateYn") ?? "")) === null ? '' : ((dma_pageContext.get("ipt_updateYn") ?? "")))) === 'Y') {
+        if ((String(((dma_pageContext.get("ipt_updateYn") ?? "")) == null ? '' : ((dma_pageContext.get("ipt_updateYn") ?? ""))).indexOf('$' + '{') >= 0 ? '' : String(((dma_pageContext.get("ipt_updateYn") ?? "")) == null ? '' : ((dma_pageContext.get("ipt_updateYn") ?? "")))) === 'Y') {
             await $c.win.alert("저장되었습니다.");
         } else {
-            if ((String(((dma_pageContext.get("insertYn") ?? "")) === null ? '' : ((dma_pageContext.get("insertYn") ?? ""))).indexOf('$' + '{') >= 0 ? '' : String(((dma_pageContext.get("insertYn") ?? "")) === null ? '' : ((dma_pageContext.get("insertYn") ?? "")))) === 'Y') {
+            if ((String(((dma_pageContext.get("insertYn") ?? "")) == null ? '' : ((dma_pageContext.get("insertYn") ?? ""))).indexOf('$' + '{') >= 0 ? '' : String(((dma_pageContext.get("insertYn") ?? "")) == null ? '' : ((dma_pageContext.get("insertYn") ?? "")))) === 'Y') {
                 await $c.win.alert("등록되었습니다.");
             }
         }
@@ -615,14 +617,15 @@ scwin.changeBubJohang = function () {
  * @hidden N
  */
 scwin.saveBubJohang = async function () {
+    // TODO Stage2: 공급사 pcc 의존(저장소 pcc/fil 에 없음 · 반입 또는 치환 판단) — $c.frame.Provider
     if ($c.util.getComponent('ipt_dupChkYn').getValue() === 'Y') {
         let sprtRoomNo = $('#junmoon option:selected').val();
         sprtRoomNo = sprtRoomNo.split("_")[0];
         let chrgInstId = $('#junmoon option:selected').val();
         chrgInstId = chrgInstId.split("_")[1];
         const relLawDtlNm = $c.util.getComponent('ipt_bubjohang').getValue();
-        let relLawDtlNo = $c.util.getComponent('ipt_relLawDtlNo').getValue(); if (relLawDtlNo === null) { relLawDtlNo = ''; }
-        let junmoon = $c.util.getComponent('slc_junmoon').getValue(); if (junmoon === null) { junmoon = ''; }
+        let relLawDtlNo = $c.util.getComponent('ipt_relLawDtlNo').getValue(); if (relLawDtlNo == null) { relLawDtlNo = ''; }
+        let junmoon = $c.util.getComponent('slc_junmoon').getValue(); if (junmoon == null) { junmoon = ''; }
         if (junmoon === '') {
             await $c.win.alert("법규전문을 선택해 주세요.");
             return;
@@ -652,6 +655,7 @@ scwin.saveBubJohang = async function () {
  * @hidden N
  */
 scwin.closeFrame = async function () {
+    // TODO Stage2: 공급사 pcc 의존(저장소 pcc/fil 에 없음 · 반입 또는 치환 판단) — $c.frame.CloseFrame
     if (scwin.statusChange) {
         if (!await $c.win.confirm("변경된 사항이 있습니다. 종료하시겠습니까?")) {
             return;

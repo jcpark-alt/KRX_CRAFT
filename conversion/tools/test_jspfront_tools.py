@@ -261,6 +261,33 @@ def test_redeclaration_and_duplicate_functions():
     assert "// TODO Stage2: 공급사 산출의 중복 정의" in script
 
 
+def test_review_regressions_2026_10_02():
+    """리뷰(jldfil59400·25910)에서 잡힌 파이프라인 회귀 4건의 재발 방지."""
+    import convert as cv
+    head, script, body, log = _post()
+    # 바인드별 격리: 조건식 throw 가 onpageload 를 끊지 않는다
+    assert 'try { ok = !!b.fn(); } catch (e) { $c.exception.handleError(e, { notify: "none", context: "conds:" + b.id }); return; }' in script
+    assert 'try { v = a.fn(); } catch (e) { $c.exception.handleError(e, { notify: "none", context: "attrReal:" + a.childId }); return; }' in script
+    # 호이스팅 전역은 init_recvParam 뒤
+    s2 = SCRIPT.replace("        await scwin.init_attrReals();", "        scwin.init_recvParam();\n        await scwin.init_attrReals();")
+    _, out, _, _ = vp.apply_regions(HEAD, s2, BODY)
+    assert "scwin.init_recvParam();\n        scwin.ex = $c.util.getComponent('ex');\n" in out
+    # tx 변형(실패 블록 뒤 후처리) — if 안 return 유지, 후처리 보존
+    tx = ('scwin.tx_v = async function () {\n    const sbmOptions = { id: "x" };\n    let res = null;\n'
+          '    try { res = await $c.sbm.executeDynamic(sbmOptions); }\n'
+          '    catch (_e) { await $c.exception.handleError(_e, { context: "a.tx_v" }); return null; }\n'
+          '    if (!(res && res.responseJSON && res.responseJSON.success === true)) {\n'
+          '        const m = "x";\n        await $c.win.alert(m);\n        return res;\n    }\n\n'
+          '    const tot = res.responseJSON.total;\n    return res;\n};\n')
+    out2, n = vp.simplify_tx(tx)
+    assert n == 1 and "if (res && res.skipped) { return res; }" in out2
+    assert "        await $c.win.alert(m);\n        return res;\n    }\n\n    const tot = res.responseJSON.total;\n    return res;\n" in out2
+    # 규칙 5a: 파이프라인은 nullish 비교를 보존
+    src = HEAD + '\t<script lazy="false" type="text/javascript"><![CDATA[\nscwin.f = function (a) { if (a != null && a.b == null) { return a == 1; } return false; };\n]]></script>\n</head>\n' + BODY
+    conv, rep = cv.convert(src, "jldfil00002.xml", keep_nullish=True)
+    assert "a != null && a.b == null" in conv and "a === 1" in conv and rep["rule5a_nullish_kept"] == 2
+
+
 def test_vendor_pcc_rules():
     head, script, body, log = _post()
     assert '$c.win.alert("x" + 1);' in script
