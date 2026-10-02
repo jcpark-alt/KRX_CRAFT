@@ -120,6 +120,12 @@ ui/<name>.xml
 
 **인계 — 다음 사람이 할 일(권장 순서)**: ① 규칙 하나로 묶이는 축부터 — `$c.lc.fn_isProcess`(92화면, executeDynamic `skipped` 가드로 대체 후보)·폼 action 사문 주석 삭제·`$c.cm.fn_*` 치환 방향 결정 ② 회신 의존 축(컨텍스트 키 A-3·세션 키·bizMessage 목적지) ③ 화면별 재설계 축(jQuery/`document.`→규칙 19, 조건 래퍼→show/hide, hidden 입력→dataMap, lybox 표형 그리드, fieldEl 계약 전환). 변환 도구를 고쳐 전량 재생성하는 것이 원칙이며(`ui-tobe` 는 수기 보강 전까지 재생성 가능), 수기 보강을 시작한 화면은 `convert_all.py` 의 "기존 산출물 건너뜀" 규약대로 보호한다.
 
+## Stage 2 수작업 이력
+
+| 날짜 | 축 | 처방 | 결과 |
+|---|---|---|---|
+| 2026-10-02 | `$c.lc.fn_isProcess` (92화면 · 188자리) | 공급사 pcc 정의를 보니 중복 제출 가드가 아니라 **확인창**(`window.confirm("[저장] 하시겠습니까?")`, 구분 I/U/D/S/R/DSCL)이었다. 규칙 V24: `scwin.confirmJob(gubun)` 화면 로컬 헬퍼(`$c.win.confirm`, as-is 문구 보존)로 치환, await·async 전파는 컨벤션 단계. 저장소 pcc/stf 에 같은 뜻의 `isProcess`(MSG-A006)가 있으나 jsp-front 는 pcc/fil 만 참조하므로 로컬 헬퍼(반입 후보) | 92화면 재생성 · 게이트 92/92 · await 누락 0 · lint 0/0 · 잔여 호출 0 |
+
 **알아 둘 함정(1단계에서 확인)**: 규칙 13 이 `fn_modifiyDate→modifiyDate` 로 상태 변수를 덮는다(V13 선개명) · 공급사 `var` 중복 선언이 규칙 8 로
 `let` 중복이 된다(V16) · 최상위 `getComponent` 호출 전역이 규칙 4 를 보류시킨다(V20) · lxml 왕복은 `<x></x>`→`<x/>`·속성 `>`→`&gt;` 만 바꾼다 ·
 PowerShell 5.1 `Out-File` 의 BOM 이 커밋 제목에 섞인다.

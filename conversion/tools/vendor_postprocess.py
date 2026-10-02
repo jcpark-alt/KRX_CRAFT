@@ -31,6 +31,8 @@
   V18 `$c.util.fieldEl` 호출 함수 머리 TODO · V19 `popupPrint/mainPrint`→`$c.win.print` · V20 최상위 호출식 전역 → 1구역 선언 + onpageload 선두
   V21 `$c.cm.fn_NullChk/IsNumber`→화면 로컬 헬퍼(checkRequired/isNumberInput) · `fn_IsNotNull`→`!isEmpty` · `fn_CheckEmail`→`$c.str.isEmail` · 나머지 TODO
   V22 같은 이름 함수 이중 정의 — 본문 동일이면 둘째 삭제, 다르면 `X_2` 개명 + TODO
+  V23 공급사 pcc 의존 — alert_error→win.alert · get/setObjectValue→getValue/setValue · fn_setFromToDate→setFromToDate · 나머지 TODO
+  V24 `$c.lc.fn_isProcess(X)`(확인창) → 화면 로컬 `scwin.confirmJob(X)`(`$c.win.confirm`, as-is 문구 보존) — Stage 2 수작업 1축
 """
 import re
 import sys
@@ -640,6 +642,43 @@ def replace_cm_helpers(script):
     return script, log
 
 
+# ---------------------------------------------------------------- V24 $c.lc.fn_isProcess (Stage 2 수작업 1축 · 2026-10-02)
+CONFIRM_JOB_HELPER = '''/**
+ * @method
+ * @name confirmJob
+ * @description 업무 처리 확인 — "[저장] 하시겠습니까?" 확인창(as-is 공통 fn_isProcess 의 의미 보존 · pcc/fil 반입 후보)
+ * @param {String} gubun 처리 구분(I 저장 · U 수정 · D 삭제 · S 제출 · R 해제 · DSCL 안내문작성)
+ * @returns {Promise<Boolean>} 확인이면 true
+ * @hidden N
+ */
+scwin.confirmJob = async function (gubun) {
+    const job = { I: "저장", U: "수정", D: "삭제", S: "제출", R: "해제", DSCL: "안내문작성" }[gubun] || gubun;
+    return $c.win.confirm("[" + job + "] 하시겠습니까?");
+};
+'''
+
+
+def replace_is_process(script):
+    """`$c.lc.fn_isProcess(X)`(공급사 pcc: window.confirm("[저장] 하시겠습니까?")) → `scwin.confirmJob(X)`.
+    await 부여·호출 함수 async 화는 컨벤션 단계(propagate_await)가 한다 — `if (!scwin.confirmJob('S'))` 는 `if (!await …)` 가 된다."""
+    n = 0
+    out, pos = [], 0
+    mask = cv.code_mask(script)
+    for m in re.finditer(r'\$c\.lc\.fn_isProcess\(', script):
+        if m.start() < pos or not mask[m.start()]:
+            continue
+        cl = _balanced(script, m.end() - 1)
+        if cl < 0:
+            continue
+        out.append(script[pos:m.start()]); out.append("scwin.confirmJob(%s)" % script[m.end():cl]); pos = cl + 1; n += 1
+    out.append(script[pos:])
+    script = "".join(out)
+    if n and not re.search(r'(?m)^scwin\.confirmJob\s*=', script):
+        m5 = re.search(r'(?m)^///////// 5\. [^\n]*\n', script)
+        script = script.rstrip("\n") + ("\n\n" if m5 else "\n\n///////// 5. 일반/업무 함수 영역 /////////\n\n") + CONFIRM_JOB_HELPER
+    return script, n
+
+
 # ---------------------------------------------------------------- V23 공급사 pcc 번들($c.fil/$c.lc/$c.frame/$c.utils) 의존
 def _split_args(s):
     """최상위 쉼표로 인자 분리(문자열·괄호 안 쉼표 제외)."""
@@ -760,6 +799,7 @@ def apply_regions(head, script, body):
     script, log["V12_flow"] = flow_globals(script)
     script, log["V20_hoisted"] = hoist_call_globals(script)
     script, log["V21_cm_fn"] = replace_cm_helpers(script)
+    script, log["V24_isProcess"] = replace_is_process(script)   # V23 보다 먼저 — 남은 $c.lc 만 TODO 로 집계되게
     script, log["V23_vendor_pcc"] = replace_vendor_pcc(script)
     return head, script, body, log
 

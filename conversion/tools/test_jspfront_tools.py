@@ -157,6 +157,12 @@ scwin.checkForm = function () {
     return true;
 };
 
+scwin.doSubmit = function () {
+    if (!$c.lc.fn_isProcess('S')) { return; }
+    if( !$c.lc.fn_isProcess(scwin.TR_JOB) )  return;
+    return 1;
+};
+
 scwin.legacyPcc = function () {
     $c.fil.alert_error("x" + 1);
     const v = $c.fil.getObjectValue($c.util.getComponent('ipt_a')) + $c.fil.getObjectValue(ipt_b);
@@ -288,15 +294,28 @@ def test_review_regressions_2026_10_02():
     assert "a != null && a.b == null" in conv and "a === 1" in conv and rep["rule5a_nullish_kept"] == 2
 
 
+def test_is_process_to_confirm_job():
+    import screen_convention as sc
+    head, script, body, log = _post()
+    assert log["V24_isProcess"] == 3  # doSubmit 2 + legacyPcc 1
+    assert "if (!scwin.confirmJob('S')) { return; }" in script and "!scwin.confirmJob(scwin.TR_JOB) )" in script
+    assert script.count("scwin.confirmJob = async function") == 1 and '$c.win.confirm("[" + job + "] 하시겠습니까?")' in script
+    # 실호출은 0 (헬퍼 JSDoc 의 "fn_isProcess" 언급만 남는다) · legacyPcc 의 TODO 도 더 이상 나열하지 않는다
+    assert "$c.lc.fn_isProcess" not in script
+    # 컨벤션 단계가 await 를 붙이고 호출 함수를 async 로 만든다
+    s2, _ = sc.propagate_await(script, set())
+    assert "if (!await scwin.confirmJob('S')) { return; }" in s2 and "scwin.doSubmit = async function" in s2
+
+
 def test_vendor_pcc_rules():
     head, script, body, log = _post()
     assert '$c.win.alert("x" + 1);' in script
     assert "const v = $c.util.getComponent('ipt_a').getValue() + ipt_b.getValue();" in script
     assert "$c.util.getComponent('ipt_a').setValue(fn(1, 2));" in script
     assert "$c.fil.setFromToDate(a, b);" in script
-    assert "$c.lc.fn_isProcess()" in script and "$c.frame.CloseFrame()" in script and "$c.fil.showObj('x', true)" in script
-    assert "// TODO Stage2: 공급사 pcc 의존(저장소 pcc/fil 에 없음 · 반입 또는 치환 판단) — $c.fil.showObj, $c.frame.CloseFrame, $c.lc.fn_isProcess" in script
-    assert log["V23_vendor_pcc"] == {"alert_error": 1, "getObjectValue": 2, "setObjectValue": 1, "fn_setFromToDate": 1, "todo_left": 3}
+    assert "if (!await scwin.confirmJob())" not in script and "$c.frame.CloseFrame()" in script and "$c.fil.showObj('x', true)" in script
+    assert "// TODO Stage2: 공급사 pcc 의존(저장소 pcc/fil 에 없음 · 반입 또는 치환 판단) — $c.fil.showObj, $c.frame.CloseFrame\n" in script
+    assert log["V23_vendor_pcc"] == {"alert_error": 1, "getObjectValue": 2, "setObjectValue": 1, "fn_setFromToDate": 1, "todo_left": 2}
 
 
 def test_cm_helpers():
