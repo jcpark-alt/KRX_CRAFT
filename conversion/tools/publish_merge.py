@@ -27,7 +27,8 @@ override 형식(화면 이름 → 객체; 항목 지정은 'kind:label' 또는 �
   {"jldfil00013": {"note": "왜", "pair": {"trigger:제출": "btn_submit"}, "keep": ["pageList:"], "drop": ["select:시장구분"],
                    "vendor_skip": ["grd_subEditCla"], "insert": [{"vendor": "ipt_hidden1", "at": "end|after:<spec>|before:<spec>|into:<spec>"}]}}
   pair = 퍼블리싱 요소 ← 공급사 요소 · keep = 대응 없이 둔다(공통 처리·디자인 추가분) · drop = 퍼블리싱 요소 삭제 · vendor_skip = 공급사 요소를 안 옮긴다(스크립트가
-  안 쓸 때만 닫힌다) · insert = 공급사 요소를 그대로 옮겨 넣는다(hidden 입력 등). override 로 닫힌 화면은 판정 `manual`.
+  안 쓸 때만 닫힌다) · insert = 공급사 요소를 그대로 옮겨 넣는다(hidden 입력 등) · accept = "이유": 정합 0 이어도 TODO 표지 결과를 받아들여 닫는다 ·
+  skip = "이유": 퍼블리싱 파일이 다른 화면/빈 자리표라 병합하지 않는다(판정 `mismatch`, ui-pub 미착지). override 로 닫힌 화면은 판정 `manual`.
 """
 import collections
 import copy
@@ -529,6 +530,9 @@ def tidy_mock(pbody, script, log):
 
 def merge_screen(name, pub_path, out_dir, report_only, overrides=None):
     ov = (overrides or {}).get(name) or {}
+    if ov.get("skip"):
+        return {"name": name, "verdict": "mismatch", "matched": 0, "pub_items": 0, "missing_refs": [], "unmatched_vendor": [], "todo": 0,
+                "log": ["override skip: " + ov["skip"]], "detail": {}}
     raw, eol, reg = st.read_xml(TOBE / (name + ".xml"))
     pub_text = io.open(pub_path, encoding="utf-8").read()
     proot, pbody = parse_body(pub_text)
@@ -559,7 +563,10 @@ def merge_screen(name, pub_path, out_dir, report_only, overrides=None):
         log.append("퍼블리싱 본문 비어 있음(자리표만)")
     # 닫힘: 정합이 하나라도 있거나, 공급사에 이을 것이 없거나, 퍼블리싱에 이을 것이 없고 공급사 것이 적어(5개 미만) 옮겨 넣어도 되는 경우.
     # 양쪽에 항목이 있는데 하나도 못 이으면(구조가 다른 디자인·잘못 짝지어진 퍼블리싱 파일) review.
-    closed = bool(pub_widgets) and not missing and (matched or not vitems or (not pitems and len(vitems) < 5))
+    pitems_eff = [k for k, el in pitems if not (k[0] == "trigger" and (k[1] in PUB_CHROME or canon(k) in ("print", "guide")))]
+    closed = bool(pub_widgets) and not missing and (matched or not vitems or (not pitems_eff and len(vitems) < 5) or bool(ov.get("accept")))
+    if ov.get("accept"):
+        log.append("override accept: " + ov["accept"])
     verdict = ("manual" if ov else ("todo" if todo else "auto")) if closed else "review"
     rep = {"name": name, "verdict": verdict, "matched": matched, "pub_items": len(pitems), "missing_refs": missing, "todo": todo,
            "unmatched_vendor": ["%s(%s)" % (sp, el.get("id") or "-") for sp, k, el in v_left][:8], "log": log[:8],
@@ -608,13 +615,13 @@ def main(argv=None):
         L.append("| %s%s | %s | %d/%d | %d | %s | %s | %s |" % (r["name"], " ⚠중복" if r["ambiguous"] else "", r["verdict"], r["matched"], r["pub_items"], r.get("todo", 0),
                                                            ", ".join(r["missing_refs"][:6]), "; ".join(r["unmatched_vendor"][:4]), "; ".join(r["log"][:4]).replace("|", "\\|")))
     c = collections.Counter(r["verdict"] for r in reps)
-    L.insert(4, "화면 %d · auto %d · todo %d(표지 %d건) · manual(override) %d · review %d · error %d" % (len(reps), c["auto"], c["todo"], sum(r.get("todo", 0) for r in reps), c["manual"], c["review"], c["error"]))
+    L.insert(4, "화면 %d · auto %d · todo %d(표지 %d건) · manual(override) %d · review %d · mismatch(override skip) %d · error %d" % (len(reps), c["auto"], c["todo"], sum(r.get("todo", 0) for r in reps), c["manual"], c["review"], c["mismatch"], c["error"]))
     L.insert(5, "")
     io.open(ROOT / "conversion" / "jsp-front" / "publish_merge_report.md", "w", encoding="utf-8", newline="\n").write("\n".join(L) + "\n")
     if detail_path:
         import json
         json.dump({r["name"]: dict(r["detail"], verdict=r["verdict"], todo=r.get("todo", 0), log=r["log"]) for r in reps if r["verdict"] in ("review", "todo")}, io.open(detail_path, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
-    print("\n화면 %d · auto %d · todo %d(표지 %d건) · manual %d · review %d · error %d → publish_merge_report.md" % (len(reps), c["auto"], c["todo"], sum(r.get("todo", 0) for r in reps), c["manual"], c["review"], c["error"]))
+    print("\n화면 %d · auto %d · todo %d(표지 %d건) · manual %d · review %d · mismatch %d · error %d → publish_merge_report.md" % (len(reps), c["auto"], c["todo"], sum(r.get("todo", 0) for r in reps), c["manual"], c["review"], c["mismatch"], c["error"]))
     return 0
 
 

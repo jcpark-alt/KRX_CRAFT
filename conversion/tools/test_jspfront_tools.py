@@ -710,3 +710,27 @@ def test_publish_merge_todo_placement_and_tidy():
     log2 = []
     matched2, p_left2, v_left2, _ = pm.match(pm.collect(pb2), pm.collect(vb2), {"pair": {"trigger:제출": "btn_modify"}}, log2)
     assert matched2 == 1 and not p_left2 and not v_left2 and pb2.find(".//" + pm.T(pm.XF, "trigger")).get("id") == "btn_modify"
+
+
+def test_publish_merge_override_skip_and_accept(tmp_path, monkeypatch):
+    """skip 은 병합하지 않고 mismatch, accept 는 정합 0 이어도 TODO 결과를 받아들여 manual."""
+    pub = tmp_path / "JLDTEST00001.xml"
+    pub.write_text('<?xml version="1.0"?><html><head/><body><xf:group class="pop_contents" id=""><xf:trigger id="" type="button"><xf:label><![CDATA[닫기]]></xf:label></xf:trigger>'
+                   '<w2:textbox id="" label="상세"/></xf:group></body></html>', encoding="utf-8")
+    tobe = tmp_path / "tobe"; tobe.mkdir()
+    (tobe / "jldtest00001.xml").write_text(
+        '<?xml version="1.0" encoding="UTF-8"?>\n<xf:xforms xmlns:xf="http://www.w3.org/2002/xforms" xmlns:w2="http://www.inswave.com/websquare" xmlns:ev="http://www.w3.org/2001/xml-events">\n<html>\n<head meta_screenId="jldtest00001" meta_screenName="t" meta_desc="t" meta_author="t">\n'
+        '  <xf:model><w2:dataCollection baseNode="map"><w2:dataMap baseNode="map" id="dma_pageContext"><w2:keyInfo/></w2:dataMap></w2:dataCollection></xf:model>\n'
+        '  <w2:publicInfo method="scwin.onpageload"></w2:publicInfo>\n  <script type="text/javascript"><![CDATA[\nscwin.onpageload = function(){};\n]]></script>\n</head>\n'
+        '<body ev:onpageload="scwin.onpageload">\n<xf:group class="sub_contents">\n<w2:gridView id="grd_list" dataList="data:dlt_list"><w2:header id="grd_list_hd"><w2:row id="row1"><w2:column id="h_a" value="가"/></w2:row></w2:header>'
+        '<w2:gBody id="grd_list_bd"><w2:row id="row2"><w2:column id="a" value=""/></w2:row></w2:gBody></w2:gridView>\n</xf:group>\n</body>\n</html>\n</xf:xforms>\n', encoding="utf-8")
+    monkeypatch.setattr(pm, "TOBE", tobe)
+    out = tmp_path / "out"
+    rep = pm.merge_screen("jldtest00001", str(pub), out, False, {"jldtest00001": {"skip": "다른 화면"}})
+    assert rep["verdict"] == "mismatch" and not out.exists()
+    rep = pm.merge_screen("jldtest00001", str(pub), out, False, {"jldtest00001": {"accept": "그리드는 끝에 TODO"}})
+    assert rep["verdict"] == "manual" and rep["todo"] == 1 and (out / "jldtest00001.xml").exists()
+    text = (out / "jldtest00001.xml").read_text(encoding="utf-8")
+    assert "TODO Stage2(퍼블리싱 병합)" in text and 'id="grd_list"' in text and "pfmContentHeader" not in text  # 팝업은 헤더 없음
+    rep = pm.merge_screen("jldtest00001", str(pub), out, True, {})
+    assert rep["verdict"] == "todo"  # 닫기는 공통 버튼이라 항목 수에서 제외 → 퍼블 0·공급사 1(<5) → override 없이도 TODO 로 닫힌다
