@@ -2,7 +2,7 @@
 
 > `python conversion/tools/publish_merge.py conversion/jsp-front/ui-tobe` 가 만든다. `auto` 는 `conversion/jsp-front/ui-pub/` 에 병합 결과를 썼다(스크립트 참조 전부 자리잡음·공급사 상호작용 컴포넌트 전부 대응). `todo` 는 닫혔지만 본문에 `TODO Stage2(퍼블리싱 병합)` 표지가 있는 것(공급사 요소를 옮겨 넣었거나 퍼블리싱 요소에 대응이 없음 — 자리·기능 확인). `manual` 은 `publish_merge_overrides.json` 의 화면별 지시(pair/keep/drop/vendor_skip/insert)로 닫은 것. `review` 는 스크립트 참조를 못 채웠거나 퍼블리싱 본문이 비어 있다.
 
-화면 260 · auto 79 · todo 155(표지 1576건) · manual(override) 3 · frozen(손작업 정본) 15 · review 0 · mismatch(override skip) 8 · error 0
+화면 260 · auto 79 · todo 151(표지 1576건) · manual(override) 3 · frozen(손작업 정본) 19 · review 0 · mismatch(override skip) 8 · error 0
 
 | 화면 | 판정 | 정합/퍼블리싱 항목 | TODO | 스크립트 참조 누락 | 공급사 미대응(옮겨 넣음) | 메모 |
 | --- | --- | ---: | ---: | --- | --- | --- |
@@ -48,7 +48,7 @@
 | jldfil10609 | todo | 3/3 | 1 |  | grid:(grd_resultVo) | 공급사 grid:(grd_resultVo) 옮겨 넣음(TODO) |
 | jldfil10610 | todo | 1/2 | 1 |  |  |  |
 | jldfil11000 | frozen | 0/0 | 1 |  |  | override frozen: 2026-10-06 jQuery 화면별 재작성(규칙 19) — jQuery 1건: keydown 바인딩 → ev:onkeydown 핸들러 |
-| jldfil11010 | todo | 8/9 | 6 |  | trigger:파일선택(btn_mpd_files_select); trigger:삭제#2(btn_mpd_files_del); grid:크기/파일명(grd_mpd_files); grid:삭제/첨부파일(attachFileList) | trigger:삭제 퍼블리싱 1개 ↔ 공급사 2개: 앞에서부터 1개 이음(나머지 TODO); 공급사 trigger:파일선택(btn_mpd_files_select) 옮겨 넣음(TODO); 공급사 trigger:삭제#2(btn_mpd_files_del) 옮겨 넣음(TODO); 공급사 grid:크기/파일명(grd_mpd_files) 옮겨 넣음(TODO) |
+| jldfil11010 | frozen | 0/0 | 6 |  |  | override frozen: 2026-10-06 jQuery 화면별 재작성 2차(규칙 19) — jQuery 4건: disclsChrg option:selected ×3 → slc_disclsChrg.getValue(), tooltip 사문 제거 |
 | jldfil11040 | todo | 1/1 | 1 |  | grid:첨부파일(attachFileList) | 공급사 grid:첨부파일(attachFileList) 옮겨 넣음(TODO); 참조 1개는 공급사 body 에도 없음(게이트 report-only): ipt_disclsConsultApplId; jQuery 잔여 2문장에 규칙 19 TODO |
 | jldfil11060 | todo | 1/3 | 9 |  | grid:삭제/첨부파일(attachFileList); trigger:일괄다운로드(btn_fileAllDown); trigger:삭제(btn_fileDel); select:메시지전송(slc_smsContn) | 공급사 grid:삭제/첨부파일(attachFileList) 옮겨 넣음(TODO); 공급사 trigger:일괄다운로드(btn_fileAllDown) 옮겨 넣음(TODO); 공급사 trigger:삭제(btn_fileDel) 옮겨 넣음(TODO); 공급사 select:메시지전송(slc_smsContn) 옮겨 넣음(TODO) |
 | jldfil15000 | auto | 6/6 | 0 |  |  | 버튼 'trigger:조회' ← 공급사 'trigger:검색'(btn_Search, 같은 뜻) |
@@ -100,7 +100,7 @@
 | jldfil21211 | auto | 1/1 | 0 |  |  |  |
 | jldfil21212 | todo | 2/6 | 6 |  | upload:#1(upd_attachFile0); upload:#2(upd_attachFile1) | 공급사 upload:#1(upd_attachFile0) 옮겨 넣음(TODO); 공급사 upload:#2(upd_attachFile1) 옮겨 넣음(TODO) |
 | jldfil22100 | auto | 4/4 | 0 |  |  | jQuery 잔여 2문장에 규칙 19 TODO |
-| jldfil22110 | todo | 6/6 | 3 |  | trigger:파일선택(btn_mpd_files_select); trigger:삭제#2(btn_mpd_files_del); grid:크기/파일명(grd_mpd_files) | trigger:삭제 퍼블리싱 1개 ↔ 공급사 2개: 앞에서부터 1개 이음(나머지 TODO); 공급사 trigger:파일선택(btn_mpd_files_select) 옮겨 넣음(TODO); 공급사 trigger:삭제#2(btn_mpd_files_del) 옮겨 넣음(TODO); 공급사 grid:크기/파일명(grd_mpd_files) 옮겨 넣음(TODO) |
+| jldfil22110 | frozen | 0/0 | 3 |  |  | override frozen: 2026-10-06 jQuery 화면별 재작성 2차(규칙 19) — jQuery 1건: tooltip 사문 제거 |
 | jldfil22120 | todo | 2/2 | 2 |  |  | 참조 ipt_attachFileNm 옮겨 넣음(TODO); 참조 ipt_contnAttachSeq 옮겨 넣음(TODO); jQuery 잔여 2문장에 규칙 19 TODO |
 | jldfil25000 | todo | 13/15 | 2 |  |  |  |
 | jldfil25003 | auto | 0/0 | 0 |  |  |  |
@@ -229,7 +229,7 @@
 | jldstf30319 | todo | 1/3 | 3 |  | grid:(grd_ques) | 버튼 'trigger:닫기' ← 공급사 'trigger:icon:close'(img_51, 같은 뜻); 공급사 grid:(grd_ques) 옮겨 넣음(TODO) |
 | jldstf31200 | todo | 4/281 | 278 |  | inputCalendar:취득/처분신고서제출일(이익소각신고일)(cal_decisionDate); trigger:icon:download(btn_ExcelDown); grid:거래일/누적체결수량/당일종가/대표종목(excelData1) | input:종목코드 퍼블리싱 9개 ↔ 공급사 1개: 앞에서부터 1개 이음(나머지 TODO); input:회사이름 퍼블리싱 9개 ↔ 공급사 1개: 앞에서부터 1개 이음(나머지 TODO); 퍼블리싱 전용 버튼 '인쇄'(공통 처리 대상); 퍼블리싱 전용 버튼 '인쇄'(공통 처리 대상) |
 | jldstf70000 | todo | 4/10 | 13 |  | input:(ipt_formatKeywrd); select:#1(slc_disclsTp); select:#2(slc_ldMktTpCd); select:#3(ipt_modYn) | 그리드 1:1(헤더 다름); 버튼 'trigger:Search' ← 공급사 'trigger:조회#1'(input_25, 같은 뜻); 버튼 'trigger:조회' ← 공급사 'trigger:조회#2'(input_27, 같은 뜻); 공급사 input:(ipt_formatKeywrd) 옮겨 넣음(TODO) |
-| jldstf70010 | todo | 11/41 | 44 |  | select:제출기한#2(ipt_modYn); trigger:저장#1(btn_regIntegSrchNm); trigger:저장#2(btn_regIntegSrchNm_2); trigger:삭제(btn_delIntegSrch) | select:제출기한 퍼블리싱 1개 ↔ 공급사 2개: 앞에서부터 1개 이음(나머지 TODO); 공급사 select:제출기한#2(ipt_modYn) 옮겨 넣음(TODO); 공급사 trigger:저장#1(btn_regIntegSrchNm) 옮겨 넣음(TODO); 공급사 trigger:저장#2(btn_regIntegSrchNm_2) 옮겨 넣음(TODO) |
+| jldstf70010 | frozen | 0/0 | 44 |  |  | override frozen: 2026-10-06 jQuery 화면별 재작성 2차(규칙 19) — jQuery 10건: as-is setBtnDisable/Enable(정의 없는 공통) + span 래퍼 → 버튼 컴포넌트 setDisabled, chargInstId option:selected → getValue |
 | jldstf71000 | todo | 1/22 | 26 |  | input:#1(ipt_keywrdNm); input:#2(ipt_newKeywrdNm); trigger:등록(input_72) | 공급사 input:#1(ipt_keywrdNm) 옮겨 넣음(TODO); 공급사 input:#2(ipt_newKeywrdNm) 옮겨 넣음(TODO); 공급사 trigger:등록(input_72) 옮겨 넣음(TODO); 참조 ipt_keywrdInit 옮겨 넣음(TODO) |
 | jldstf72000 | todo | 3/7 | 11 |  | select:(slc_junmoon); input:#1(ipt_searchText); input:#2(ipt_searchText2); trigger:관련법규조항등록#1(btn_regRelLaw) | 그리드 닮음 0.75: grid:관련법규조항/단위조항/법규전문 ← grd_resultList; 공급사 select:(slc_junmoon) 옮겨 넣음(TODO); 공급사 input:#1(ipt_searchText) 옮겨 넣음(TODO); 공급사 input:#2(ipt_searchText2) 옮겨 넣음(TODO) |
 | jldstf73000 | todo | 4/6 | 5 |  | input:(ipt_searchText); trigger:단위조항등록#1(btn_regRelLawDtl); trigger:단위조항등록#2(btn_regRelLawDtl_2) | 그리드 1:1(헤더 다름); 공급사 input:(ipt_searchText) 옮겨 넣음(TODO); 공급사 trigger:단위조항등록#1(btn_regRelLawDtl) 옮겨 넣음(TODO); 공급사 trigger:단위조항등록#2(btn_regRelLawDtl_2) 옮겨 넣음(TODO) |
@@ -265,4 +265,4 @@
 | uldmgt50322 | todo | 1/3 | 1 |  |  | 퍼블리싱 전용 버튼 '닫기'(공통 처리 대상) |
 | uldmgt50323 | todo | 2/3 | 1 |  |  | 버튼 'trigger:닫기' ← 공급사 'trigger:icon:close'(img_54, 같은 뜻); 버튼 'trigger:등록' ← 공급사 'trigger:icon:save'(img_53, 같은 뜻) |
 | uldmgt76100 | todo | 2/11 | 16 |  | select:#1(slc_notiObjSysTpCd); select:#2(ipt_periodFlag); inputCalendar:#1(cal_strtDdtm); inputCalendar:#2(cal_endDdtm) | 버튼 'trigger:닫기' ← 공급사 'trigger:icon:close'(img_90, 같은 뜻); 버튼 'trigger:등록' ← 공급사 'trigger:icon:save'(img_89, 같은 뜻); 공급사 select:#1(slc_notiObjSysTpCd) 옮겨 넣음(TODO); 공급사 select:#2(ipt_periodFlag) 옮겨 넣음(TODO) |
-| uldmgt76101 | todo | 2/16 | 30 |  | select:#1(slc_notiObjSysTpCd); input:#1(ipt_notiTp1); select:#2(slc_notiTp2); input:#2(input_66) | 버튼 'trigger:닫기' ← 공급사 'trigger:icon:close'(img_159, 같은 뜻); 버튼 'trigger:저장' ← 공급사 'trigger:icon:save'(img_158, 같은 뜻); 공급사 select:#1(slc_notiObjSysTpCd) 옮겨 넣음(TODO); 공급사 input:#1(ipt_notiTp1) 옮겨 넣음(TODO) |
+| uldmgt76101 | frozen | 0/0 | 30 |  |  | override frozen: 2026-10-06 jQuery 화면별 재작성 2차(규칙 19) — jQuery 2건: option disabled → 컴포넌트 setDisabled |
