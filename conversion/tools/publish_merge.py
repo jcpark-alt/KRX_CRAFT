@@ -28,7 +28,8 @@ override 형식(화면 이름 → 객체; 항목 지정은 'kind:label' 또는 �
                    "vendor_skip": ["grd_subEditCla"], "insert": [{"vendor": "ipt_hidden1", "at": "end|after:<spec>|before:<spec>|into:<spec>"}]}}
   pair = 퍼블리싱 요소 ← 공급사 요소 · keep = 대응 없이 둔다(공통 처리·디자인 추가분) · drop = 퍼블리싱 요소 삭제 · vendor_skip = 공급사 요소를 안 옮긴다(스크립트가
   안 쓸 때만 닫힌다) · insert = 공급사 요소를 그대로 옮겨 넣는다(hidden 입력 등) · accept = "이유": 정합 0 이어도 TODO 표지 결과를 받아들여 닫는다 ·
-  skip = "이유": 퍼블리싱 파일이 다른 화면/빈 자리표라 병합하지 않는다(판정 `mismatch`, ui-pub 미착지). override 로 닫힌 화면은 판정 `manual`.
+  skip = "이유": 퍼블리싱 파일이 다른 화면/빈 자리표라 병합하지 않는다(판정 `mismatch`, ui-pub 미착지) ·
+  frozen = "이유": ui-pub 파일을 손으로 재작성한 뒤(jQuery 화면별 전환 등) 재생성으로 덮지 않는다(판정 `frozen`, ui-pub 파일이 정본). override 로 닫힌 화면은 판정 `manual`.
 """
 import collections
 import copy
@@ -45,6 +46,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import screen_tools as st  # noqa: E402
 import gate_screen as g  # noqa: E402
 import publish_normalize as pn  # noqa: E402
+import convert as cv  # noqa: E402
 
 ROOT = st.ROOT
 PUB_DIR = ROOT / "conversion" / "jsp-front" / "publish"
@@ -528,11 +530,48 @@ def tidy_mock(pbody, script, log):
         log.append("퍼블리싱 목업 중복 id %d개 비움" % n_id)
 
 
+JQ_HINTS = (
+    (r'\.submit\(|attr\(\s*["\'](?:action|onsubmit)["\']|\$\.ajax|\.serialize\(', "폼 제출 → $c.sbm 서브미션(규칙 6, B-4 제출 주소 회신)"),
+    (r'type=\\?["\']?file|\.attachFile|\.files\[', "파일 입력 → w2:upload 컴포넌트 재설계(퍼블리싱 확인)"),
+    (r'\$\{', "서버 렌더 목록/값 → 조회 전문 응답으로(B-1 회신)"),
+    (r'\.ready\(', "문서 준비 → scwin.onpageload/init_*"),
+    (r':checked|:radio|:checkbox', "라디오/체크 그룹 → 퍼블리싱 그룹 컴포넌트 getValue/setValue"),
+    (r'\.(?:bind|on|click|change|keyup|keydown|focusout)\(', "스크립트 바인딩 → 컴포넌트 ev:on* 속성 + scwin 핸들러(규칙 3)"),
+    (r'\.(?:find|children|closest|parent|each|eq|index)\(', "DOM 탐색 → 대상 컴포넌트 직접 참조/DataList 루프"),
+    (r'\.(?:append|empty|html|remove|text)\(', "DOM 조립/삭제 → 컴포넌트 setValue/DataList/그리드"),
+    (r'\.(?:addClass|removeClass|hasClass|css|fadeIn|fadeOut|show|hide)\(', "표시/스타일 → show/hide/setStyle/addClass(컴포넌트 API)"),
+)
+JQ_TODO = "// TODO Stage2(규칙 19): jQuery — "
+
+
+def mark_jquery_todo(script):
+    """남은 jQuery 문장 앞에 재작성 힌트 TODO 한 줄(이미 있으면 그대로). 주석·문자열 안은 제외."""
+    lines = script.split("\n")
+    mask = cv.code_mask(script)
+    out, pos, n = [], 0, 0
+    for i, l in enumerate(lines):
+        start = pos; pos += len(l) + 1
+        hit = None
+        for m in re.finditer(r'(?<![\w$.])\$\(', l):
+            if mask[start + m.start()]:
+                hit = m; break
+        if hit is not None and not (out and out[-1].lstrip().startswith(JQ_TODO)) and not l.lstrip().startswith("//"):
+            hint = next((h for pat, h in JQ_HINTS if re.search(pat, l)), "퍼블리싱 컴포넌트 참조로 재작성(B-7)")
+            out.append(re.match(r'[ \t]*', l).group(0) + JQ_TODO + hint); n += 1
+        out.append(l)
+    return "\n".join(out), n
+
+
 def merge_screen(name, pub_path, out_dir, report_only, overrides=None):
     ov = (overrides or {}).get(name) or {}
     if ov.get("skip"):
         return {"name": name, "verdict": "mismatch", "matched": 0, "pub_items": 0, "missing_refs": [], "unmatched_vendor": [], "todo": 0,
                 "log": ["override skip: " + ov["skip"]], "detail": {}}
+    if ov.get("frozen") and (out_dir / (name + ".xml")).exists():
+        # 손으로 재작성한 ui-pub 본(jQuery 화면별 전환 등)은 재생성으로 덮지 않는다 — ui-pub 파일이 정본
+        t = io.open(out_dir / (name + ".xml"), encoding="utf-8").read()
+        return {"name": name, "verdict": "frozen", "matched": 0, "pub_items": 0, "missing_refs": [], "unmatched_vendor": [],
+                "todo": t.count("TODO Stage2(퍼블리싱 병합)"), "log": ["override frozen: " + ov["frozen"]], "detail": {}}
     raw, eol, reg = st.read_xml(TOBE / (name + ".xml"))
     pub_text = io.open(pub_path, encoding="utf-8").read()
     proot, pbody = parse_body(pub_text)
@@ -565,16 +604,19 @@ def merge_screen(name, pub_path, out_dir, report_only, overrides=None):
     # 양쪽에 항목이 있는데 하나도 못 이으면(구조가 다른 디자인·잘못 짝지어진 퍼블리싱 파일) review.
     pitems_eff = [k for k, el in pitems if not (k[0] == "trigger" and (k[1] in PUB_CHROME or canon(k) in ("print", "guide")))]
     closed = bool(pub_widgets) and not missing and (matched or not vitems or (not pitems_eff and len(vitems) < 5) or bool(ov.get("accept")))
+    script_out, rep_jq = mark_jquery_todo(reg["script"])
+    if rep_jq:
+        log.append("jQuery 잔여 %d문장에 규칙 19 TODO" % rep_jq)
     if ov.get("accept"):
         log.append("override accept: " + ov["accept"])
     verdict = ("manual" if ov else ("todo" if todo else "auto")) if closed else "review"
-    rep = {"name": name, "verdict": verdict, "matched": matched, "pub_items": len(pitems), "missing_refs": missing, "todo": todo,
+    rep = {"name": name, "verdict": verdict, "matched": matched, "pub_items": len(pitems), "missing_refs": missing, "todo": todo, "jquery": rep_jq,
            "unmatched_vendor": ["%s(%s)" % (sp, el.get("id") or "-") for sp, k, el in v_left][:8], "log": log[:8],
            "detail": {"pub_left": [sp for sp, k, el in p_left], "ven_left": [[sp, el.get("id") or "", {a.split("}")[1]: v for a, v in el.attrib.items() if a.startswith("{%s}" % EV)}] for sp, k, el in v_left],
                       "missing_refs": missing, "pub_items": [sp for sp, k, el in numbered(pitems)], "ven_items": [[sp, el.get("id") or ""] for sp, k, el in numbered(vitems)]}}
     if closed and not report_only:
         out_dir.mkdir(parents=True, exist_ok=True)
-        st.write_xml(out_dir / (name + ".xml"), reg["head"], reg["script_open"], reg["script"], reg["script_close"], body_text, eol)
+        st.write_xml(out_dir / (name + ".xml"), reg["head"], reg["script_open"], script_out, reg["script_close"], body_text, eol)
     return rep
 
 
@@ -615,13 +657,13 @@ def main(argv=None):
         L.append("| %s%s | %s | %d/%d | %d | %s | %s | %s |" % (r["name"], " ⚠중복" if r["ambiguous"] else "", r["verdict"], r["matched"], r["pub_items"], r.get("todo", 0),
                                                            ", ".join(r["missing_refs"][:6]), "; ".join(r["unmatched_vendor"][:4]), "; ".join(r["log"][:4]).replace("|", "\\|")))
     c = collections.Counter(r["verdict"] for r in reps)
-    L.insert(4, "화면 %d · auto %d · todo %d(표지 %d건) · manual(override) %d · review %d · mismatch(override skip) %d · error %d" % (len(reps), c["auto"], c["todo"], sum(r.get("todo", 0) for r in reps), c["manual"], c["review"], c["mismatch"], c["error"]))
+    L.insert(4, "화면 %d · auto %d · todo %d(표지 %d건) · manual(override) %d · frozen(손작업 정본) %d · review %d · mismatch(override skip) %d · error %d" % (len(reps), c["auto"], c["todo"], sum(r.get("todo", 0) for r in reps), c["manual"], c["frozen"], c["review"], c["mismatch"], c["error"]))
     L.insert(5, "")
     io.open(ROOT / "conversion" / "jsp-front" / "publish_merge_report.md", "w", encoding="utf-8", newline="\n").write("\n".join(L) + "\n")
     if detail_path:
         import json
         json.dump({r["name"]: dict(r["detail"], verdict=r["verdict"], todo=r.get("todo", 0), log=r["log"]) for r in reps if r["verdict"] in ("review", "todo")}, io.open(detail_path, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
-    print("\n화면 %d · auto %d · todo %d(표지 %d건) · manual %d · review %d · mismatch %d · error %d → publish_merge_report.md" % (len(reps), c["auto"], c["todo"], sum(r.get("todo", 0) for r in reps), c["manual"], c["review"], c["mismatch"], c["error"]))
+    print("\n화면 %d · auto %d · todo %d(표지 %d건) · manual %d · frozen %d · review %d · mismatch %d · error %d → publish_merge_report.md" % (len(reps), c["auto"], c["todo"], sum(r.get("todo", 0) for r in reps), c["manual"], c["frozen"], c["review"], c["mismatch"], c["error"]))
     return 0
 
 

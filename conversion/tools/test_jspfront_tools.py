@@ -775,3 +775,23 @@ fm.action = "/a.do";
     assert log == {"J_jquery": 9, "J3_document_find": 1, "D1_form_field": 2, "D1_byname": 1}
     out2, log2 = dr.apply(out, body)
     assert out2 == out and not log2  # 멱등
+
+
+def test_publish_merge_mark_jquery_todo():
+    """ui-pub 에 쓰기 전 남은 jQuery 문장마다 규칙 19 힌트 TODO 한 줄(멱등, 주석·문자열 제외)."""
+    src = '''scwin.a = function () {
+    $("#frm").attr("action", "x.do");
+    const f = $('[type=file]');
+    // $("#c").val()  주석
+    $("input[name=x]:checked").val();
+    const s = "$(not code)";
+};'''
+    out, n = pm.mark_jquery_todo(src)
+    assert n == 3
+    lines = out.split("\n")
+    assert lines[1].strip() == "// TODO Stage2(규칙 19): jQuery — 폼 제출 → $c.sbm 서브미션(규칙 6, B-4 제출 주소 회신)"
+    assert lines[3].strip().startswith("// TODO Stage2(규칙 19): jQuery — 파일 입력")
+    assert "라디오/체크 그룹" in lines[6]
+    assert out.count("TODO Stage2(규칙 19)") == 3 and '"$(not code)"' in out
+    out2, n2 = pm.mark_jquery_todo(out)
+    assert out2 == out and n2 == 0
