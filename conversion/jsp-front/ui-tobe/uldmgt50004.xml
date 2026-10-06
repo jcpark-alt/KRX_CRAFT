@@ -53,7 +53,7 @@
 
   </xf:model>
   <w2:layoutInfo></w2:layoutInfo>
-  <w2:publicInfo method="scwin.init_attrReals,scwin.init_rowCopy,scwin.init_recvParam,scwin.onpageload,scwin.img_82_onclick,scwin.img_83_onclick,scwin.tx_fn_Insert,scwin.completeUpdate,scwin.insert,scwin.validate"/>
+  <w2:publicInfo method="scwin.init_attrReals,scwin.init_rowCopy,scwin.init_recvParam,scwin.onpageload,scwin.img_82_onclick,scwin.img_83_onclick,scwin.tx_fn_Insert,scwin.completeUpdate,scwin.insert,scwin.validate,scwin.opener,scwin.openerScwin"/>
   <script lazy="false" type="text/javascript"><![CDATA[
 ///////// 1. 변수 및 선언 영역 /////////
 scwin.screenId = "uldmgt50004";
@@ -101,22 +101,18 @@ scwin.init_attrReals = function () {
  * @method
  * @name init_rowCopy
  * @description dataList 단건 표시 복사 — 진입점에서 1회. 데이터 재적재 시 ev:ondataload 가 다시 부른다.
- * @returns {Promise<void>}
+ * @returns {void}
  * @hidden N
  */
-scwin.init_rowCopy = async function () {
+scwin.init_rowCopy = function () {
     const rows = [{ childId: "__rb5", fn: function () { return String(((String(dma_form.get("repFormVerYn")) === "Y") ? "사용" : "미사용")); } }];
-    let copied = 0;
-    for (let i = 0; i < rows.length; i++) {
-        const it = rows[i];
+    rows.forEach(function (it) {
         const c = $c.util.getComponent(it.childId);
-        if (!c || typeof c.setValue !== "function") { /* TODO Stage2: [sdd] 행 복사 대상 부재:  it.childId */ continue; }
-        try {
-            const v = it.fn();
-            if (v !== undefined && v !== null && String(v).trim() !== "") { c.setValue(String(v)); copied++; }
-        } catch (e) { await $c.exception.handleError(e, { notify: "none", context: "rowCopy:" + it.childId }); }
-    }
-    return copied;
+        if (!c || typeof c.setValue !== "function") { return; }  // as-is 가 서버 렌더로 그리던 반복 행 — 산출에 없는 칸은 건너뛴다
+        let v;
+        try { v = it.fn(); } catch (e) { $c.exception.handleError(e, { notify: "none", context: "rowCopy:" + it.childId }); return; }
+        if (v !== undefined && v !== null && String(v).trim() !== "") { c.setValue(String(v)); }
+    });
 };
 
 /**
@@ -141,7 +137,7 @@ scwin.onpageload = async function () {
     try {
         scwin.init_recvParam();
         scwin.upd_formTxtfile = (typeof __krxFileControl === 'function') ? __krxFileControl('upd_formTxtfile') : ((typeof $c !== 'undefined' && $c.win && $c.win.getFrame && $c.win.getFrame() && $c.win.getFrame().render) ? $c.win.getFrame().render : document).querySelector('[id="upd_formTxtfile"]');
-        await scwin.init_rowCopy();
+        scwin.init_rowCopy();
         scwin.init_attrReals();
     } catch (e) {
         await $c.exception.handleError(e, { context: 'uldmgt50004.onpageload' });
@@ -213,7 +209,7 @@ scwin.tx_fn_Insert = async function () {
  * @hidden N
  */
 scwin.completeUpdate = function () {
-    const obj = ((($c.data.getParameter() && typeof $c.data.getParameter() === 'object' && Object.keys($c.data.getParameter()).length) ? $c.data.getParameter() : (((($c.win && $c.win.getOpenerScope) ? $c.win.getOpenerScope() : null) || {}).scwin || {})).Potential).Provider;
+    const obj = ((($c.data.getParameter() && typeof $c.data.getParameter() === 'object' && Object.keys($c.data.getParameter()).length) ? $c.data.getParameter() : scwin.openerScwin()).Potential).Provider;
     const frameId = obj.ActiveFrame.FrameID;
     const frame = obj.Provider(frameId).ActiveFrame;
     frame.findFormForm();
@@ -248,6 +244,28 @@ scwin.validate = function () {
     return true;
 };
 
+/**
+ * @method
+ * @name opener
+ * @description 부모 화면 scope(browserPopup/pageFramePopup 공통 — $c.win.getOpenerScope). 단독 진입이거나 부모가 닫혀 없으면
+ * @returns {Object} 부모 화면 scope 또는 빈 scope
+ * @hidden N
+ */
+scwin.opener = function () {
+    const scope = ($c.win && $c.win.getOpenerScope) ? $c.win.getOpenerScope() : null;
+    return scope || { getComponentById: function () { return null; }, scwin: {} };
+};
+
+/**
+ * @method
+ * @name openerScwin
+ * @description 부모 화면의 scwin(함수·전역 접근용). 부모가 없으면 빈 객체
+ * @returns {Object} 부모 scwin 또는 {}
+ * @hidden N
+ */
+scwin.openerScwin = function () {
+    return scwin.opener().scwin || {};
+};
 ]]></script>
 </head>
 <body ev:onpageload="scwin.onpageload">

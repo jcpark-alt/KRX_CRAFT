@@ -185,6 +185,42 @@ scwin.logAndTrs = function () {
 
 scwin.init_recvParam = function () { console.warn("[sdd] 전환 파라미터 수신 대상 없음: dma_pageContext — 읽는 자리 0"); }
 
+scwin.init_rowCopy = async function () {
+    const rows = [{ childId: "ipt_a", fn: function () { return String(dma_pageContext.get("a")); } }];
+    let copied = 0;
+    for (let i = 0; i < rows.length; i++) {
+        const it = rows[i];
+        const c = $c.util.getComponent(it.childId);
+        if (!c || typeof c.setValue !== "function") { console.warn("[sdd] 행 복사 대상 부재: " + it.childId); continue; }
+        try {
+            const v = it.fn();
+            if (v !== undefined && v !== null && String(v).trim() !== "") { c.setValue(String(v)); copied++; }
+        } catch (e) { await $c.exception.handleError(e, { notify: "none", context: "rowCopy:" + it.childId }); }
+    }
+    return copied;
+};
+
+scwin.checkCurr = async function () {
+    if ($c.util.isEmpty($c.util.getComponent('ipt_method').getValue())) {
+        await $c.win.alert("발행통화를 입력하십시오.");
+        console.error("[sdd] 미실현 동작: set_focus (대상 미해석) — 전환 미완"); /* unresolved-target intent:set_focus — {target}.focus({args}) */
+        return false;
+    }
+    if (ipt_method.getValue() === "" || $c.util.getComponent('btn_goWrite').getValue() === "") {
+        await $c.win.alert("둘 다 입력하십시오.");
+        console.error("[sdd] 미실현 동작: set_focus (대상 미해석) — 전환 미완"); /* unresolved-target intent:set_focus — {target}.focus({args}) */
+        return false;
+    }
+    await scwin.init_rowCopy();
+};
+
+scwin.sendToOpener = function () {
+    const v = ((($c.win && $c.win.getOpenerScope ? $c.win.getOpenerScope() : null) || { getComponentById: function (id) { console.error('[sdd] 부모 화면 스코프 없음 — ' + id + ' 를 못 읽는다(단독 진입이거나 부모가 닫혔다)'); return null; }, scwin: {} }).getComponentById("ipt_a") || {}).getValue ? (($c.win && $c.win.getOpenerScope ? $c.win.getOpenerScope() : null) || { getComponentById: function (id) { console.error('[sdd] 부모 화면 스코프 없음 — ' + id + ' 를 못 읽는다(단독 진입이거나 부모가 닫혔다)'); return null; }, scwin: {} }).getComponentById("ipt_a").getValue() : "";
+    ((($c.win && $c.win.getOpenerScope ? $c.win.getOpenerScope() : null) || { getComponentById: function (id) { console.error('[sdd] 부모 화면 스코프 없음 — ' + id + ' 를 못 읽는다(단독 진입이거나 부모가 닫혔다)'); return null; }, scwin: {} }).scwin || {}).setCorpInfo(v);
+    const p = ((($c.win && $c.win.getOpenerScope) ? $c.win.getOpenerScope() : null) || {});
+    const parentfm = (((($c.win && $c.win.getOpenerScope) ? $c.win.getOpenerScope() : null) || {}).scwin || {})["SendForm"] !== undefined ? 1 : 2;
+};
+
 scwin.goStatic = function () {
     let url = '/jldfil00033/jldfil00033.xml?method=loadInitPage&ldMktTpCd=' + dma_a.get("x");
     url += "&preKonex=Y";
@@ -393,6 +429,31 @@ def test_vendor_consts_inlined():
     assert "— $c.fil.doLogSave" not in script
     _, s2, _, log2 = vp.apply_regions(head, script, body)
     assert log2["V26_consts"] == {} and s2.count("scwin.SCREN_PROCS_TP_CD_01 = ") == 1
+
+
+def test_stage2_c_focus_and_rowcopy():
+    head, script, body, log = _post()
+    assert log["V34_focus"] == 1  # 후보 1개인 자리만
+    assert '$c.util.getComponent("ipt_method").focus();  // 포커스 대상' in script
+    assert script.count("미실현 동작: set_focus") == 1  # 후보 2개(ipt_method·ipt_status)는 TODO 유지
+    assert log["V35_rowcopy"] == 1
+    assert "scwin.init_rowCopy = function () {" in script and "rows.forEach(function (it) {" in script
+    assert "행 복사 대상 부재" not in script and "let copied" not in script
+    assert "    scwin.init_rowCopy();" in script and "await scwin.init_rowCopy" not in script
+
+
+def test_stage2_c_opener():
+    head, script, body, log = _post()
+    assert log["V33_opener"] == {"scope": 5, "scwin": 2, "comp": 1}
+    assert "부모 화면 스코프 없음" not in script and "getOpenerScope ?" not in script
+    assert 'const v = scwin.openerComp("ipt_a").getValue ? scwin.opener().getComponentById("ipt_a").getValue() : "";' in script
+    assert "\n    scwin.openerScwin().setCorpInfo(v);" in script and "const p = scwin.opener();" in script
+    assert 'const parentfm = scwin.openerScwin()["SendForm"] !== undefined ? 1 : 2;' in script
+    # 괄호 짝 보존(c1 배치에서 구문 오류 114화면을 낸 결함의 재발 방지)
+    fn = script[script.index("scwin.sendToOpener = "):script.index("scwin.goStatic = ")]
+    assert fn.count("(") == fn.count(")")
+    for h in ("opener", "openerScwin", "openerComp"):
+        assert script.count("scwin.%s = function" % h) == 1, h
 
 
 def test_stage2_b_rules():

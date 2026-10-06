@@ -591,6 +591,10 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
   **B 축(회신 의존, 2026-10-06)** — V32 이동 목적지 드러냄 IIFE 중 같은 함수에서 url 이 내부 `.xml` 리터럴로 정해지는 자리는 정적 확정이라 래퍼를 걷는다(`.do`·`.jsp`·외부·조립 전은 유지) ·
   V5 세션 래퍼 TODO 는 user-info 계약에 없는 키(`KNOWN_SESSION_KEYS` 밖)만 적는다 · 나머지(컨텍스트 키 A-3·세션 키 11항·`.do` 이동 목적지와 제출 주소 A-15·query_param)는
   `jspfront_reply_request.py` 가 `conversion/jsp-front/reply_request.md` 로 회신 요청 명부를 만든다(키·화면·화면 안 같은 이름 근거).
+  **C 축(화면별 재설계 중 기계 가능분, 2026-10-06)** — V33 공급사 인라인 폴백 `((($c.win && $c.win.getOpenerScope ? … : null) || { getComponentById: …console.error… }))` →
+  로컬 `scwin.opener()`(없으면 빈 scope) · `(….scwin || {})` → `openerScwin()` · `(….getComponentById(ID) || {})` → `openerComp(ID)`; 그 위 메서드 존재 검사(131가지 꼴)는 뜻이 같아 유지 ·
+  V34 미실현 `set_focus` 는 앞 4줄이 가리키는 body 컴포넌트가 **하나뿐**일 때만 그 컴포넌트의 `focus()`(추정 주석 동반, 나머지 TODO 유지) ·
+  V35 `init_rowCopy` 범용 루프 → 표준 forEach(동기 · 대상 부재 경고는 산출에 없는 칸 건너뛰기라 TODO 아님). jQuery 잔여는 `find/empty/attr/bind` 등 구조 조작이라 기계화하지 않는다(규칙 19 화면별).
 * **드러냄 표지 원칙**: 공급사가 전환 미완 자리에 남긴 `[sdd]` 콘솔·`bizMessage` throw·`unresolved` 는 결함이 아니라 표식이므로
   지우지 않고 `TODO Stage2` 로 바꿔 집계한다(화면 알림은 유지).
 

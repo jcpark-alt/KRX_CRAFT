@@ -99,7 +99,7 @@
 
   </xf:model>
   <w2:layoutInfo></w2:layoutInfo>
-  <w2:publicInfo method="scwin.onpageload,scwin.init_conds,scwin.init_rowCopy,scwin.init_pageBody,scwin.init_recvParam,scwin.btn_goModify_onclick,scwin.btn_goDelete_onclick,scwin.btn_print_onclick,scwin.btn_self_onclick,scwin.tx_fn_print,scwin.setComma,scwin.open_modify,scwin.open_delete,scwin.go_modify,scwin.go_delete,scwin.Cancel_form,scwin.print,scwin.printOld"/>
+  <w2:publicInfo method="scwin.onpageload,scwin.init_conds,scwin.init_rowCopy,scwin.init_pageBody,scwin.init_recvParam,scwin.btn_goModify_onclick,scwin.btn_goDelete_onclick,scwin.btn_print_onclick,scwin.btn_self_onclick,scwin.tx_fn_print,scwin.setComma,scwin.open_modify,scwin.open_delete,scwin.go_modify,scwin.go_delete,scwin.Cancel_form,scwin.print,scwin.printOld,scwin.opener,scwin.openerScwin"/>
   <script lazy="false" type="text/javascript"><![CDATA[
 ///////// 1. 변수 및 선언 영역 /////////
 scwin.screenId = "jldinf91400";
@@ -115,7 +115,7 @@ scwin.screenId = "jldinf91400";
 scwin.onpageload = async function () {
     try {
         scwin.init_recvParam();
-        await scwin.init_rowCopy();
+        scwin.init_rowCopy();
         scwin.init_conds();
         scwin.init_pageBody();
     } catch (e) {
@@ -152,23 +152,19 @@ scwin.init_conds = function () {
  * @method
  * @name init_rowCopy
  * @description dataList 단건 표시 복사 — 진입점에서 1회. 데이터 재적재 시 ev:ondataload 가 다시 부른다.
- * @returns {Promise<void>}
+ * @returns {void}
  * @hidden N
  */
-scwin.init_rowCopy = async function () {
+scwin.init_rowCopy = function () {
     const rows = [{ childId: "ipt_stdcdType", fn: function () { return String((dma_pageContext.get("stdcdType") ?? "")); } },
         { childId: "ipt_stdCd", fn: function () { return String((dma_pageContext.get("stdCd") ?? "")); } }];
-    let copied = 0;
-    for (let i = 0; i < rows.length; i++) {
-        const it = rows[i];
+    rows.forEach(function (it) {
         const c = $c.util.getComponent(it.childId);
-        if (!c || typeof c.setValue !== "function") { /* TODO Stage2: [sdd] 행 복사 대상 부재:  it.childId */ continue; }
-        try {
-            const v = it.fn();
-            if (v !== undefined && v !== null && String(v).trim() !== "") { c.setValue(String(v)); copied++; }
-        } catch (e) { await $c.exception.handleError(e, { notify: "none", context: "rowCopy:" + it.childId }); }
-    }
-    return copied;
+        if (!c || typeof c.setValue !== "function") { return; }  // as-is 가 서버 렌더로 그리던 반복 행 — 산출에 없는 칸은 건너뛴다
+        let v;
+        try { v = it.fn(); } catch (e) { $c.exception.handleError(e, { notify: "none", context: "rowCopy:" + it.childId }); return; }
+        if (v !== undefined && v !== null && String(v).trim() !== "") { c.setValue(String(v)); }
+    });
 };
 
 /**
@@ -349,7 +345,7 @@ scwin.go_delete = function () {
  * @hidden N
  */
 scwin.Cancel_form = function () {
-    ((($c.data.getParameter() && typeof $c.data.getParameter() === 'object' && Object.keys($c.data.getParameter()).length) ? $c.data.getParameter() : (((($c.win && $c.win.getOpenerScope) ? $c.win.getOpenerScope() : null) || {}).scwin || {})).parent)._popupWindow.close();
+    ((($c.data.getParameter() && typeof $c.data.getParameter() === 'object' && Object.keys($c.data.getParameter()).length) ? $c.data.getParameter() : scwin.openerScwin()).parent)._popupWindow.close();
 };
 
 /**
@@ -402,6 +398,29 @@ scwin.printOld = async function () {
         const mktGubun = "1";
         fn_PrintPreView_DB(rexName, dataType, dataLocation, dataXPath);
     }
+};
+
+/**
+ * @method
+ * @name opener
+ * @description 부모 화면 scope(browserPopup/pageFramePopup 공통 — $c.win.getOpenerScope). 단독 진입이거나 부모가 닫혀 없으면
+ * @returns {Object} 부모 화면 scope 또는 빈 scope
+ * @hidden N
+ */
+scwin.opener = function () {
+    const scope = ($c.win && $c.win.getOpenerScope) ? $c.win.getOpenerScope() : null;
+    return scope || { getComponentById: function () { return null; }, scwin: {} };
+};
+
+/**
+ * @method
+ * @name openerScwin
+ * @description 부모 화면의 scwin(함수·전역 접근용). 부모가 없으면 빈 객체
+ * @returns {Object} 부모 scwin 또는 {}
+ * @hidden N
+ */
+scwin.openerScwin = function () {
+    return scwin.opener().scwin || {};
 };
 ]]></script>
 </head>

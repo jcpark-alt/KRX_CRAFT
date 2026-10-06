@@ -34,7 +34,7 @@
 
   </xf:model>
   <w2:layoutInfo></w2:layoutInfo>
-  <w2:publicInfo method="scwin.onpageload,scwin.init_rowCopy,scwin.init_pageBody,scwin.init_recvParam,scwin.ipt_equivRedmptVal_onkeyup,scwin.btn_sendForm_onclick,scwin.btn_sendCancel_onclick,scwin.sendForm,scwin.sendCancel"/>
+  <w2:publicInfo method="scwin.onpageload,scwin.init_rowCopy,scwin.init_pageBody,scwin.init_recvParam,scwin.ipt_equivRedmptVal_onkeyup,scwin.btn_sendForm_onclick,scwin.btn_sendCancel_onclick,scwin.sendForm,scwin.sendCancel,scwin.opener"/>
   <script lazy="false" type="text/javascript"><![CDATA[
 ///////// 1. 변수 및 선언 영역 /////////
 scwin.screenId = "jldinf10106";
@@ -50,7 +50,7 @@ scwin.screenId = "jldinf10106";
 scwin.onpageload = async function () {
     try {
         scwin.init_recvParam();
-        await scwin.init_rowCopy();
+        scwin.init_rowCopy();
         scwin.init_pageBody();
     } catch (e) {
         await $c.exception.handleError(e, { context: 'jldinf10106.onpageload' });
@@ -61,24 +61,20 @@ scwin.onpageload = async function () {
  * @method
  * @name init_rowCopy
  * @description dataList 단건 표시 복사 — 진입점에서 1회. 데이터 재적재 시 ev:ondataload 가 다시 부른다.
- * @returns {Promise<void>}
+ * @returns {void}
  * @hidden N
  */
-scwin.init_rowCopy = async function () {
+scwin.init_rowCopy = function () {
     const rows = [{ childId: "ipt_equivRedmptVal", fn: function () { return String((dma_pageContext.get("equivRedmptVal") ?? "")); } },
         { childId: "ipt_defrMms", fn: function () { return String((dma_pageContext.get("defrMms") ?? "")); } },
         { childId: "ipt_splitRedmptCnt", fn: function () { return String((dma_pageContext.get("splitRedmptCnt") ?? "")); } }];
-    let copied = 0;
-    for (let i = 0; i < rows.length; i++) {
-        const it = rows[i];
+    rows.forEach(function (it) {
         const c = $c.util.getComponent(it.childId);
-        if (!c || typeof c.setValue !== "function") { /* TODO Stage2: [sdd] 행 복사 대상 부재:  it.childId */ continue; }
-        try {
-            const v = it.fn();
-            if (v !== undefined && v !== null && String(v).trim() !== "") { c.setValue(String(v)); copied++; }
-        } catch (e) { await $c.exception.handleError(e, { notify: "none", context: "rowCopy:" + it.childId }); }
-    }
-    return copied;
+        if (!c || typeof c.setValue !== "function") { return; }  // as-is 가 서버 렌더로 그리던 반복 행 — 산출에 없는 칸은 건너뛴다
+        let v;
+        try { v = it.fn(); } catch (e) { $c.exception.handleError(e, { notify: "none", context: "rowCopy:" + it.childId }); return; }
+        if (v !== undefined && v !== null && String(v).trim() !== "") { c.setValue(String(v)); }
+    });
 };
 
 /**
@@ -186,10 +182,10 @@ scwin.sendForm = async function (fm) {
         $c.util.getComponent("ipt_splitRedmptCnt").focus();
         return;
     }
-    (((($c.win && $c.win.getOpenerScope ? $c.win.getOpenerScope() : null) || { getComponentById: function (id) { /* TODO Stage2: [sdd] 부모 화면 스코프 없음 —  id  를 못 읽는다(단독 진입이거나 부모가 닫혔다) */ return null; }, scwin: {} }).getComponentById("ipt_equivRedmptVal")) || { setValue: function () {} }).setValue($c.util.getComponent('ipt_equivRedmptVal').getValue());
-    (((($c.win && $c.win.getOpenerScope ? $c.win.getOpenerScope() : null) || { getComponentById: function (id) { /* TODO Stage2: [sdd] 부모 화면 스코프 없음 —  id  를 못 읽는다(단독 진입이거나 부모가 닫혔다) */ return null; }, scwin: {} }).getComponentById("ipt_defrMms")) || { setValue: function () {} }).setValue($c.util.getComponent('ipt_defrMms').getValue());
-    (((($c.win && $c.win.getOpenerScope ? $c.win.getOpenerScope() : null) || { getComponentById: function (id) { /* TODO Stage2: [sdd] 부모 화면 스코프 없음 —  id  를 못 읽는다(단독 진입이거나 부모가 닫혔다) */ return null; }, scwin: {} }).getComponentById("slc_redmptPdIntTpCd")) || { setValue: function () {} }).setValue($c.util.getComponent('slc_redmptPdIntTpCd').getValue());
-    (((($c.win && $c.win.getOpenerScope ? $c.win.getOpenerScope() : null) || { getComponentById: function (id) { /* TODO Stage2: [sdd] 부모 화면 스코프 없음 —  id  를 못 읽는다(단독 진입이거나 부모가 닫혔다) */ return null; }, scwin: {} }).getComponentById("ipt_splitRedmptCnt")) || { setValue: function () {} }).setValue($c.util.getComponent('ipt_splitRedmptCnt').getValue());
+    ((scwin.opener().getComponentById("ipt_equivRedmptVal")) || { setValue: function () {} }).setValue($c.util.getComponent('ipt_equivRedmptVal').getValue());
+    ((scwin.opener().getComponentById("ipt_defrMms")) || { setValue: function () {} }).setValue($c.util.getComponent('ipt_defrMms').getValue());
+    ((scwin.opener().getComponentById("slc_redmptPdIntTpCd")) || { setValue: function () {} }).setValue($c.util.getComponent('slc_redmptPdIntTpCd').getValue());
+    ((scwin.opener().getComponentById("ipt_splitRedmptCnt")) || { setValue: function () {} }).setValue($c.util.getComponent('ipt_splitRedmptCnt').getValue());
     $c.win.closePopup();
 };
 
@@ -202,6 +198,18 @@ scwin.sendForm = async function (fm) {
  */
 scwin.sendCancel = function () {
     $c.win.closePopup();
+};
+
+/**
+ * @method
+ * @name opener
+ * @description 부모 화면 scope(browserPopup/pageFramePopup 공통 — $c.win.getOpenerScope). 단독 진입이거나 부모가 닫혀 없으면
+ * @returns {Object} 부모 화면 scope 또는 빈 scope
+ * @hidden N
+ */
+scwin.opener = function () {
+    const scope = ($c.win && $c.win.getOpenerScope) ? $c.win.getOpenerScope() : null;
+    return scope || { getComponentById: function () { return null; }, scwin: {} };
 };
 ]]></script>
 </head>

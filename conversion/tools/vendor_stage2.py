@@ -545,9 +545,126 @@ def resolve_static_nav(script):
     return script, n
 
 
+# ---------------------------------------------------------------- V33 (C 축) 부모 화면 스코프 — 공급사 인라인 폴백 → 로컬 헬퍼
+# 괄호 짝을 정확히 — 꼴 1 `(( cond ? x : null ) || { 폴백 })` 는 여는 괄호 2, 꼴 2 `((( cond ) ? x : null ) || {})` 는 3 (2026-10-06 c1 배치 114화면 구문 오류 교훈)
+OPENER_FALLBACK = re.compile(
+    r"\(\(\$c\.win && \$c\.win\.getOpenerScope \? \$c\.win\.getOpenerScope\(\) : null\) \|\| "
+    r"\{ getComponentById: function \((?:id|__id)\) \{ console\.error\('\[sdd\] 부모 화면 스코프 없음 — ' \+ (?:id|__id) \+ ' 를 못 읽는다\(단독 진입이거나 부모가 닫혔다\)'\); return null; \}, scwin: \{\} \}\)"
+    r"|\(\(\(\$c\.win && \$c\.win\.getOpenerScope\) \? \$c\.win\.getOpenerScope\(\) : null\) \|\| \{\}\)")
+OPENER_HELPER = '''/**
+ * @method
+ * @name opener
+ * @description 부모 화면 scope(browserPopup/pageFramePopup 공통 — $c.win.getOpenerScope). 단독 진입이거나 부모가 닫혀 없으면
+ *  빈 scope(getComponentById → null · scwin {})를 돌려 호출부가 null/빈 값으로 처리하게 한다(as-is 는 console.error 뒤 null)
+ * @returns {Object} 부모 화면 scope 또는 빈 scope
+ * @hidden N
+ */
+scwin.opener = function () {
+    const scope = ($c.win && $c.win.getOpenerScope) ? $c.win.getOpenerScope() : null;
+    return scope || { getComponentById: function () { return null; }, scwin: {} };
+};
+'''
+OPENER_SUB_HELPERS = {
+    "openerScwin": '''/**
+ * @method
+ * @name openerScwin
+ * @description 부모 화면의 scwin(함수·전역 접근용). 부모가 없으면 빈 객체
+ * @returns {Object} 부모 scwin 또는 {}
+ * @hidden N
+ */
+scwin.openerScwin = function () {
+    return scwin.opener().scwin || {};
+};
+''',
+    "openerComp": '''/**
+ * @method
+ * @name openerComp
+ * @description 부모 화면 컴포넌트(as-is opener.document.<폼>.<필드>). 부모·컴포넌트가 없으면 빈 객체(메서드 존재 검사로 건너뛴다)
+ * @param {String} id 부모 화면 컴포넌트 id
+ * @returns {Object} 컴포넌트 또는 {}
+ * @hidden N
+ */
+scwin.openerComp = function (id) {
+    return scwin.opener().getComponentById(id) || {};
+};
+''',
+}
+
+
+def simplify_opener(script):
+    """공급사 인라인 폴백 `((($c.win && $c.win.getOpenerScope ? … : null) || { getComponentById: …console.error… }))` → `scwin.opener()`
+    (TODO 는 폴백 안에 있어 함께 사라진다) · `(scwin.opener().scwin || {})` → `scwin.openerScwin()` · `(scwin.opener().getComponentById(ID) || {})`
+    → `scwin.openerComp(ID)`. 그 위의 메서드 존재 검사(`X.setValue ? X.setValue(v) : void("")` 류, 131가지 꼴)는 공급사가 as-is DOM 접근을
+    옮긴 보수적 가드라 뜻이 같으므로 그대로 둔다."""
+    script, n1 = OPENER_FALLBACK.subn("scwin.opener()", script)
+    if not n1:
+        return script, {}
+    script, n2 = re.subn(r'\(scwin\.opener\(\)\.scwin \|\| \{\}\)', "scwin.openerScwin()", script)
+    script, n3 = re.subn(r'''\(scwin\.opener\(\)\.getComponentById\((['"][^'"]*['"])\) \|\| \{\}\)''', r"scwin.openerComp(\1)", script)
+    helpers = dict(OPENER_SUB_HELPERS, opener=OPENER_HELPER)
+    want = ["opener"] + (["openerScwin"] if n2 else []) + (["openerComp"] if n3 else [])
+    script = _append_helpers(script, want, helpers)
+    return script, {"scope": n1, "scwin": n2, "comp": n3}
+
+
+# ---------------------------------------------------------------- V34 (C 축) 미실현 포커스 — 앞 문장이 가리키는 컴포넌트가 하나뿐이면 그 컴포넌트로
+FOCUS_MARK = re.compile(r'(?m)^([ \t]*)/\* TODO Stage2: \[sdd\] 미실현 동작: set_focus \(대상 미해석\) — 전환 미완 \*/ /\* unresolved-target intent:set_focus[^\n]*\*/[ \t]*$')
+FOCUS_MARK_RAW = re.compile(r'(?m)^([ \t]*)console\.error\("\[sdd\] 미실현 동작: set_focus \(대상 미해석\) — 전환 미완"\); /\* unresolved-target intent:set_focus[^\n]*\*/[ \t]*$')
+COMP_PREFIX = r'(?:ipt|txb|txt|cal|slc|cmb|rd|rdo|chk|txa|edt|sel|ibx|sbx|upl)_[A-Za-z0-9_]+'
+
+
+def resolve_focus(script, body_ids):
+    """as-is `form.<필드>.focus()` 를 공급사가 못 옮긴 자리. 바로 앞 4줄(같은 블록)에서 body 컴포넌트가 **하나만** 언급되면
+    그 컴포넌트를 대상으로 본다(검증 실패 알림 뒤 그 입력칸으로 커서 — as-is 관용). 둘 이상이거나 없으면 TODO 유지."""
+    n = 0
+    lines = script.split("\n")
+    for i, l in enumerate(lines):
+        m = FOCUS_MARK_RAW.match(l) or FOCUS_MARK.match(l)
+        if not m:
+            continue
+        ctx = "\n".join(lines[max(0, i - 4):i])
+        ids = set(re.findall(r"getComponent\(['\"]([^'\"]+)['\"]\)", ctx)) | set(re.findall(r'(?<![\w$.])(%s)' % COMP_PREFIX, ctx))
+        ids = {x for x in ids if x in body_ids}
+        if len(ids) == 1:
+            cid = ids.pop()
+            lines[i] = m.group(1) + "$c.util.getComponent(\"%s\").focus();  // 포커스 대상: 앞 문장이 가리키는 입력칸(as-is <폼>.<필드>.focus())" % cid
+            n += 1
+    return "\n".join(lines), n
+
+
+# ---------------------------------------------------------------- V35 (C 축) 행 복사 루프 표준화(init_rowCopy)
+ROWCOPY_RE = re.compile(
+    r'(?s)(    let copied = 0;\n    for \(let i = 0; i < rows\.length; i\+\+\) \{\n        const it = rows\[i\];\n        const c = \$c\.util\.getComponent\(it\.childId\);\n'
+    r'        if \(!c \|\| typeof c\.setValue !== "function"\) \{ console\.warn\("\[sdd\] 행 복사 대상 부재: " \+ it\.childId\); continue; \}\n'
+    r'        try \{\n            const v = it\.fn\(\);\n            if \(v !== undefined && v !== null && String\(v\)\.trim\(\) !== ""\) \{ c\.setValue\(String\(v\)\); copied\+\+; \}\n'
+    r'        \} catch \(e\) \{ await \$c\.exception\.handleError\(e, \{ notify: "none", context: "rowCopy:" \+ it\.childId \}\); \}\n    \}\n    return copied;\n)')
+ROWCOPY_BODY = '''    rows.forEach(function (it) {
+        const c = $c.util.getComponent(it.childId);
+        if (!c || typeof c.setValue !== "function") { return; }  // as-is 가 서버 렌더로 그리던 반복 행 — 산출에 없는 칸은 건너뛴다
+        let v;
+        try { v = it.fn(); } catch (e) { $c.exception.handleError(e, { notify: "none", context: "rowCopy:" + it.childId }); return; }
+        if (v !== undefined && v !== null && String(v).trim() !== "") { c.setValue(String(v)); }
+    });
+'''
+
+
+def standardize_rowcopy(script):
+    """공급사 `init_rowCopy` 의 범용 루프(대상 부재 경고·카운터·await) → 표준 forEach(동기). 경고 자리는 손실이 아니라 산출에 없는 칸의
+    건너뛰기이므로 TODO 로 남기지 않는다(V3/V4 와 같은 처방). 호출부 await 는 propagate 가 다루지 않으므로 여기서 같이 뗀다."""
+    script, n = ROWCOPY_RE.subn(ROWCOPY_BODY, script)
+    if n:
+        script = re.sub(r'scwin\.init_rowCopy = async function', 'scwin.init_rowCopy = function', script)
+        script = st.sub_code(script, r'await\s+(scwin\.init_rowCopy\s*\()', r'\1')
+    return script, n
+
+
 # ---------------------------------------------------------------- 진입
 def apply(head, script, body):
     log = {}
+    body_ids = set(re.findall(r'\sid="([^"]+)"', body))
+    script, log["V34_focus"] = resolve_focus(script, body_ids)
+    script, log["V35_rowcopy"] = standardize_rowcopy(script)
+    script, log["V33_opener"] = simplify_opener(script)
     script, log["V32_static_nav"] = resolve_static_nav(script)
     script, log["V27_dialog"] = create_dialog_frame(script)
     script, log["V28_logsave"] = hold_log_save(script)

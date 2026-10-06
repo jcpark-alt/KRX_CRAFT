@@ -30,8 +30,8 @@ TODO_RE = re.compile(r"//\s*(TODO Stage2\s*:?[^\n]*|TO\s*-\s*DO[^\n]*)")
 JSP_MOD = ("jsp", "jsp-front")
 JSP_TODO_RE = re.compile(r"(?://\s*|/\*\s*)(TODO Stage2[^\n]*?)(?:\*/|\n)")
 JSP_TYPES = [
-    ("부모 화면 스코프 없음(팝업·프레임)", ("부모 화면 스코프",), "팝업/프레임의 부모 접근 — `$c.win.getParent()`/`getOpenerScope()` 로 재작성(가이드 `cm/docs/popup-opener-guide.md`)."),
-    ("미실현 동작(포커스·표시·라벨)", ("미실현",), "대상 컴포넌트가 해석되지 않은 set_focus/set_visible/set_label — id 확정 후 `focus()`/`show()/hide()`/`setValue()`."),
+    ("부모 화면 스코프 없음(팝업·프레임)", ("부모 화면 스코프",), "팝업/프레임의 부모 접근 — V33 으로 `scwin.opener()` 헬퍼화 완료(남은 것은 신규 발생분)."),
+    ("미실현 동작(포커스·표시·라벨)", ("미실현",), "대상 컴포넌트가 해석되지 않은 set_focus/set_visible/set_label — 앞 문장에서 후보가 하나뿐인 set_focus 는 V34 가 해소; 남은 것은 id 확정 후 `focus()`/`show()/hide()`/`setValue()`."),
     ("공급사 전환 미완(bizMessage 드러냄)", ("전환 미완",), "공급사가 사유 알림으로 드러낸 자리(제출 주소·이동 목적지·입력값 미해결) — 회신(A-3/A-15) 또는 화면별 판단."),
     ("행 복사 대상 부재", ("행 복사 대상",), "as-is 가 서버 렌더로 그리던 반복 행 — 응답 전문 확정 후 DataList 바인딩으로 재설계."),
     ("파라미터 수신 대상 없음", ("전환 파라미터 수신 대상",), "`dma_pageContext` 가 없는 화면에서 파라미터를 읽는 자리 — dataMap 추가 또는 `$c.data.getParameter()` 직접 사용."),
