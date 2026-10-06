@@ -649,6 +649,32 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
 
 ---
 
+### 규칙 35: 퍼블리싱 병합 — `publish_merge.py` (퍼블리싱 XML body ← 공급사 전환본 id·이벤트·바인딩)
+
+* **왜**: 공급사(editor-web generate) body 는 as-is JSP 마크업을 그대로 옮긴 것이고, KRX 퍼블리싱 XML 은 새 디자인의 **시각 목업**(id 자동생성
+  `column8`·`row3`·`caption2`, select 항목 `new row`, 버튼은 글자 라벨)이다. 가이드 샘플 JLDFIL25900 은 퍼블리싱 body 에 공급사 의미 id 를 옮겨
+  만든 것이라, 같은 일을 기계로 한다. 퍼블리싱 쪽 id 는 스크립트 참조와 전혀 겹치지 않으므로(측정 0%) 공급사 id 를 **옮기는** 것 말고는 길이 없다.
+* **정합 키**(양쪽 모두 화면 안에서 유일할 때만 잇는다):
+  | 요소 | 키 | 비고 |
+  |---|---|---|
+  | `xf:trigger` | 라벨(`xf:label` CDATA 또는 `label`) 정규화 | 앞머리 `■`·`※`·`*`·`:`·「필수」·공백 제거. 동의어 조회↔검색·등록↔저장·닫기↔취소. 공급사 라벨 없는 아이콘 버튼 `class="btn_cm <icon> icon"` 은 `icon:<icon>` 키 → 글자 라벨 표(`ICON_OF`: 조회→search·도움말→guide·저장→save·삭제→delete·이전→prev …) |
+  | 입력류 `xf:input`/`select1`/`select`/`inputCalendar`/`textarea`/`upload` | (종류, 같은 tr 의 앞 th 라벨) | hidden 제외. 표 밖 컨트롤은 라벨 `''` 로 종류별 1:1 |
+  | `w2:gridView` | 헤더 라벨 집합(번호·선택·빈 컬럼 제외) | 양쪽에 하나씩이면 헤더가 달라도 1:1 |
+  | `w2:pageList` | 하나씩이면 1:1 | |
+  | 같은 라벨 여러 개 | 양쪽 **개수가 같으면 순서대로**(기간 from/to, 전화번호 3칸) | 다르면 `review` 사유 |
+* **옮기는 것**: `id`·`ev:*`·`ref`·`dataList`·`displayFormatter`·`customFormatter(+RealRowIndex)`·`allowChar`·`maxLength`·`maxByteLength`·`mandatory`·`readOnly`·`disabled`;
+  그리드는 헤더 컬럼을 `value` 로 짝지어 id, 본문 컬럼은 같은 자리로 id+`inputType`, header/gBody/row/caption id 도 공급사 것(없으면 목업 id 는 `""` — 퍼블리싱 파일 안에서
+  그리드마다 되풀이돼 WS120). 대응 없는 퍼블리싱 컬럼 id 가 복사해 온 id 와 겹치면 `_pub` 접미. select 는 목업 `choices` 를 버리고 공급사 `choices`/`itemset`.
+  **퍼블리싱의 class·style·폭·순서·모양 속성은 그대로**(디자인이 정답). 목업 캡션 문구는 공급사 값이 없으면 비운다(값을 지어내지 않음).
+* **판정**: 스크립트가 참조하는 body id(게이트 잣대)가 전부 병합 본문에 있고, 공급사 상호작용 컴포넌트와 퍼블리싱 상호작용 요소가 전부 대응되면 `auto` →
+  `ui-pub/<name>.xml`(head·script 는 ui-tobe 그대로 + 병합 body → 규칙 34 정규화). 아니면 `review`(사유를 `publish_merge_report.md` 에). `인쇄` 같은 퍼블리싱 전용
+  공통 버튼(`PUB_CHROME`)은 대응이 없어도 막지 않는다.
+* **알아 둘 것**: 퍼블리싱 헤더는 `pgtbox`+breadcrumb+즐겨찾기 꼴이고 sample-front 는 `pageFrame(contentHeader)` — 병합본은 P1 대로 pageFrame 으로 바꾸므로
+  표준 확정이 필요하다. `review` 의 큰 덩어리: 퍼블리싱에만 있는 버튼·select(새 디자인 추가분), 전화번호 3분할 입력 ↔ 공급사 1칸, 라벨 없는 컨트롤 여러 개,
+  EL `${…}` 라벨 버튼(공급사 미해결 표식), 공급사 보조 그리드(헤더 없는 `grd_sub…`). 같은 이름이 두 폴더에 있으면 `대외` 쪽을 고른다(⚠중복 표기).
+* **실행**: `python conversion/tools/publish_merge.py [--report-only] [--out conversion/jsp-front/ui-pub] conversion/jsp-front/ui-tobe` — 재실행 고정점.
+  기준(2026-10-06): 이름 일치 260화면 → auto 68 / review 192, `ui-pub` 게이트·lint 0/0. 테스트 `test_jspfront_tools.py::test_publish_merge_*`.
+
 ## 규칙 6 보충: Submission 변환 상세
 
 기존 가이드의 `gridview : "grd_main"`과 같은 고정 기본값 대신, 아래의 **역추적 매핑 규칙**을 적용합니다.

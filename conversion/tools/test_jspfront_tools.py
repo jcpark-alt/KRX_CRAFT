@@ -558,3 +558,78 @@ def test_publish_normalize_body():
     # 멱등
     again, plog2 = pn.normalize_body(new_body, script)
     assert again == new_body
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# publish_merge — 퍼블리싱 XML(목업 id) ← 공급사 전환본 정합
+# ---------------------------------------------------------------------------------------------------------------------
+import publish_merge as pm  # noqa: E402
+
+PUB_BODY = '''<body><xf:group class="sub_contents" id="">
+<xf:group class="titbox" id=""><xf:group class="rt" id="">
+<xf:trigger class="btn_cm" id="" type="button"><xf:label><![CDATA[조회]]></xf:label></xf:trigger>
+<xf:trigger class="btn_cm" id="" type="button"><xf:label><![CDATA[도움말]]></xf:label></xf:trigger>
+<xf:select1 id="" appearance="minimal"><xf:choices><xf:item><xf:label><![CDATA[new row]]></xf:label><xf:value><![CDATA[]]></xf:value></xf:item></xf:choices></xf:select1>
+</xf:group></xf:group>
+<xf:group id="" tagname="table" class="w2tbl"><xf:group id="" tagname="tbody"><xf:group id="" tagname="tr">
+<xf:group id="" tagname="th"><w2:textbox id="" label="■ 기간"/><w2:textbox id="" label="필수"/></xf:group>
+<xf:group id="" tagname="td"><w2:inputCalendar id="" /><w2:inputCalendar id="" /></xf:group>
+<xf:group id="" tagname="th"><w2:textbox id="" label="이 름"/></xf:group>
+<xf:group id="" tagname="td"><xf:input id="" /></xf:group>
+</xf:group></xf:group></xf:group>
+<w2:gridView id="gridView1" class="gvw"><w2:caption id="caption2" value="this is a grid caption."/>
+<w2:header id="header1"><w2:row id="row3"><w2:column id="column1" value="번호"/><w2:column id="column2" value="법인명"/><w2:column id="column8" value="비고"/></w2:row></w2:header>
+<w2:gBody id="gBody1"><w2:row id="row4"><w2:column id="column3" value=""/><w2:column id="column4" value=""/><w2:column id="column9" value=""/></w2:row></w2:gBody></w2:gridView>
+</xf:group></body>'''
+VEN_BODY = '''<body>
+<xf:trigger id="img_12" class="btn_cm search icon" ev:onclick="scwin.img_12_onclick" type="button"/>
+<xf:trigger id="img_13" class="btn_cm guide icon" ev:onclick="scwin.img_13_onclick" type="button"/>
+<xf:select1 id="slc_pageSize" ev:onchange="scwin.slc_pageSize_onchange" ref="data:dma_req.pageSize"><xf:choices><xf:item><xf:label><![CDATA[15개]]></xf:label><xf:value><![CDATA[15]]></xf:value></xf:item></xf:choices></xf:select1>
+<xf:group id="" tagname="table"><xf:group id="" tagname="tbody"><xf:group id="" tagname="tr">
+<xf:group id="" tagname="th"><w2:textbox id="" label="기간"/></xf:group>
+<xf:group id="" tagname="td"><w2:inputCalendar id="cal_from" ref="data:dma_req.from"/><w2:inputCalendar id="cal_to" ref="data:dma_req.to"/></xf:group>
+<xf:group id="" tagname="th"><w2:textbox id="" label="이름"/></xf:group>
+<xf:group id="" tagname="td"><xf:input id="ipt_name" ref="data:dma_req.name" maxLength="20"/></xf:group>
+</xf:group></xf:group></xf:group>
+<w2:gridView id="grd_list" dataList="data:dlt_list" ev:oncellclick="scwin.grd_list_oncellclick"><w2:header id="grd_list_hd"><w2:row id="row1"><w2:column id="column8" value="법인명"/><w2:column id="h_etc" value="기타"/></w2:row></w2:header>
+<w2:gBody id="grd_list_bd"><w2:row id="row2"><w2:column id="corpNm" value="" inputType="text"/><w2:column id="etc" value=""/></w2:row></w2:gBody></w2:gridView>
+</body>'''
+
+
+def test_publish_merge_labels_and_keys():
+    assert pm.norm_label("■ 제목") == "제목" and pm.norm_label("이 름") == "이름" and pm.norm_label("회사명 *") == "회사명"
+    _, pb = pm.parse_body(PUB_BODY)
+    _, vb = pm.parse_body(VEN_BODY)
+    pk = [k for k, _ in pm.collect(pb)]
+    vk = [k for k, _ in pm.collect(vb)]
+    assert ("trigger", "조회") in pk and ("trigger", "icon:search") in vk and ("trigger", "icon:guide") in vk
+    assert ("select", "") in pk and ("select", "") in vk  # 표 밖 컨트롤은 라벨 ''
+    assert pk.count(("inputCalendar", "기간")) == 2 and vk.count(("inputCalendar", "기간")) == 2  # '■ 기간'+'필수' → '기간'
+    assert ("input", "이름") in pk and ("input", "이름") in vk
+    # 그리드 키는 번호 컬럼을 뺀 헤더 집합
+    assert ("grid", ("법인명", "비고")) in pk and ("grid", ("기타", "법인명")) in vk
+
+
+def test_publish_merge_grid_unique_ids_and_select_choices():
+    _, pb = pm.parse_body(PUB_BODY)
+    _, vb = pm.parse_body(VEN_BODY)
+    pg = pb.find(".//" + pm.T(pm.W2, "gridView")); vg = vb.find(".//" + pm.T(pm.W2, "gridView"))
+    log = []
+    pm.merge_grid(pg, vg, log)
+    from lxml import etree
+    out = etree.tostring(pg, encoding="unicode")
+    ids = re.findall(r'\sid="([^"]*)"', out)
+    assert pg.get("id") == "grd_list" and pg.get("dataList") == "data:dlt_list" and pg.get("{%s}oncellclick" % pm.EV) == "scwin.grd_list_oncellclick"
+    assert ids.count("column8") == 1 and "corpNm" in ids              # 헤더는 value 로(공급사 id column8 복사), 본문은 같은 자리로
+    assert "column8_pub" in ids                                       # 대응 없는 퍼블리싱 column8 은 공급사 id 와 안 겹치게(WS120)
+    assert "grd_list_hd" in ids and "row1" in ids and "row2" in ids   # 헤더/본문/행 id 는 공급사 것
+    assert pg.find(pm.T(pm.W2, "caption")).get("value") == "" and pg.find(pm.T(pm.W2, "caption")).get("id") == ""  # 목업 캡션은 비움
+    assert any("'비고'" in l for l in log)
+    nonempty = [i for i in ids if i]
+    assert len(nonempty) == len(set(nonempty))
+    # select 는 목업 choices 를 버리고 공급사 choices 를 가져온다
+    ps = pb.find(".//" + pm.T(pm.XF, "select1")); vs = vb.find(".//" + pm.T(pm.XF, "select1"))
+    pm.copy_attrs(ps, vs)
+    s = etree.tostring(ps, encoding="unicode")
+    assert "new row" not in s and "15개" in s and ps.get("id") == "slc_pageSize" and ps.get("ref") == "data:dma_req.pageSize"
+    assert ps.get("appearance") == "minimal"  # 퍼블리싱 모양 속성은 그대로
