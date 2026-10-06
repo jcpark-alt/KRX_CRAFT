@@ -602,6 +602,7 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
 
 * **P1 확장(헤더 표준, 사용자 확정 2026-10-06)**: 본화면(`sub_contents`)은 `pfmContentHeader` pageFrame 을 첫 자식으로 보장(없으면 추가 `P1_pageframe_added`),
   팝업(`pop_contents`)은 pageFrame 제거(`P1_pageframe_removed`). 퍼블리싱 관례(본화면 pgtbox 658/648, 팝업 헤더 없음 607/5)와 sample-front 혼재를 하나로 묶은 결정. 멱등.
+  소급은 `publish_normalize.py <폴더>` 제자리 재실행(2026-10-06 jsp-front `ui-tobe` 966본 적용, 그 밖의 P 규칙 변경 0).
 
 * sample-front 가이드 골격으로 접는 1:1 구조 치환만 한다. P1 `pgtbox`(제목+breadcrumb) → `w2:pageFrame contentHeader` ·
   P2 순수 컨테이너(`#content` div·JSP form 이월 그룹) 해제 · P3 `meta_snippet*` 삭제 · P4 간격 표·`<br>` 삭제 ·
