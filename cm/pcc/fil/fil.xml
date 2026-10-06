@@ -3,7 +3,7 @@
 xmlns:ev="http://www.w3.org/2001/xml-events"
 xmlns:w2="http://www.inswave.com/websquare"
 xmlns:xf="http://www.w3.org/2002/xforms">
-	<head meta_screenId="$c.fil" meta_screenName="업무 공통 함수(fil)" meta_desc="fil 업무 모듈의 업무공통(KRX 고유) 함수를 작성한다. 단순 문자열/날짜/검증 함수는 gcc($c.str/$c.date/$c.util)를 직접 사용하고 본 파일에는 두지 않는다. 함수명은 camelCase 로 표준화하고 JSDoc 에 AS-IS 원본명을 병기한다.">
+	<head meta_screenId="$c.fil" meta_screenName="업무 공통 함수(fil)" meta_desc="fil 업무 모듈의 업무공통(KRX 고유) 함수를 작성한다. 단순 문자열·숫자·날짜 처리는 gcc($c.str/$c.num/$c.date)를 쓰고, 여기에는 업무 규약(메시지 문구·코드표·처리구분 상수·as-is 공용 함수의 의미)이 담긴 것만 둔다." meta_author="Inswave Systems">
 		<w2:type>COMMON</w2:type>
 		<w2:buildDate/>
 		<w2:MSA/>
@@ -17,7 +17,7 @@ xmlns:xf="http://www.w3.org/2002/xforms">
 		</w2:mfeSubmission>
 		<w2:layoutInfo>
 		</w2:layoutInfo>
-		<w2:publicInfo method="scwin.checkMaxLength,scwin.setFromToDate"/>
+		<w2:publicInfo method="scwin.checkMaxLength,scwin.setFromToDate,scwin.confirmJob,scwin.alertJobResult,scwin.setLastJob,scwin.getLastJob,scwin.checkRequired,scwin.isNumberInput,scwin.getFieldName,scwin.getSecuGrpNm,scwin.showObj,scwin.showTotalCount,scwin.getModalCenterPos,scwin.checkDateParts,scwin.isZipCodeInput,scwin.getByteLength2,scwin.truncateByBytes,scwin.checkByteLimit,scwin.isMinusNumber,scwin.checkNotOnlyNumber,scwin.checkAlphaNum,scwin.isGroupChecked"/>
 		<script type="text/javascript" lazy="false"><![CDATA[
 /**
  * @component
@@ -42,6 +42,31 @@ xmlns:xf="http://www.w3.org/2002/xforms">
 scwin.onpageload = function () {
 
 };
+
+// ---------------------------------------------------------------------------------------------------------------------
+// 상수 — as-is 공용 상수(공급사 r13 tobe-pcc 번들의 리터럴 그대로). $c.fil.SCREN_PROCS_TP_CD_01 처럼 읽는다(gcc $c.sbm.MESSAGE_CODE 와 같은 꼴).
+// ---------------------------------------------------------------------------------------------------------------------
+// 화면처리구분코드(SCREN_PROCES_TP_CD — 접속 로그·URL 파라미터)
+scwin.SCREN_PROCS_TP_CD_01 = "01";  // 조회
+scwin.SCREN_PROCS_TP_CD_02 = "02";  // 입력
+scwin.SCREN_PROCS_TP_CD_03 = "03";  // 수정
+scwin.SCREN_PROCS_TP_CD_04 = "04";  // 삭제
+scwin.SCREN_PROCS_TP_CD_05 = "05";  // 인쇄
+scwin.SCREN_PROCS_TP_CD_06 = "06";  // 화면출력
+scwin.SCREN_PROCS_TP_CD_07 = "07";  // 엑셀저장
+scwin.SCREN_PROCS_TP_CD_08 = "08";  // PC저장
+// 트랜잭션 작업 구분(as-is fn_trs 인자)
+scwin.TR_JOB_NORMAL = 1;  // 일반
+scwin.TR_JOB_INSERT = 2;  // 입력
+scwin.TR_JOB_UPDATE = 3;  // 수정
+scwin.TR_JOB_DELETE = 4;  // 삭제
+// 메시지 문구(as-is $c.lc)
+scwin.NO_EXCEL_DATA = "해당데이터가 없습니다. 조회후 다운받으십시요.";          // 엑셀 다운로드 데이터 없음
+scwin.NO_DATA_FOUND = "검색조건에 해당하는 자료가 없습니다.";                   // 조회 결과 없음
+scwin.MSG_CND_ISR_REQ = "검색조건 중 법인코드(명) 입력되지 않아 조회할 수 없습니다.";  // 법인코드 조건 필수
+
+// 업무 처리명(as-is 전역 LastJob) — confirmJob/setLastJob 이 채우고 alertJobResult/getLastJob 이 읽는다
+scwin.lastJob = "";
 
 /**
  * @method
@@ -113,6 +138,376 @@ scwin.setFromToDate = function (pTp, pObjFrom, pObjTo) {
 
     pObjFrom.setValue(vFrom);
     pObjTo.setValue(vTo);
+};
+
+/**
+ * @method
+ * @name confirmJob
+ * @description 업무 처리 확인창 — "[저장] 하시겠습니까?" (AS-IS: 공통 fn_isProcess, origin: 공급사 r13 tobe-pcc 번들. window.confirm → $c.win.confirm)
+ * 확인한 처리명은 lastJob 에 기록돼 alertJobResult 의 결과 문구에 쓰인다(as-is 전역 LastJob).
+ * @param {String} gubun 처리 구분 (I 저장 · U 수정 · D 삭제 · S 제출 · R 해제 · DSCL 안내문작성 — 그 밖의 값은 처리명 그대로)
+ * @returns {Promise<Boolean>} 확인이면 true
+ * @hidden N
+ * @exception
+ * @example
+if (!await $c.fil.confirmJob("S")) { return; }
+ */
+scwin.confirmJob = async function (gubun) {
+    const job = { I: "저장", U: "수정", D: "삭제", S: "제출", R: "해제", DSCL: "안내문작성" }[gubun] || gubun;
+    scwin.lastJob = job;
+    return $c.win.confirm("[" + job + "] 하시겠습니까?");
+};
+
+/**
+ * @method
+ * @name alertJobResult
+ * @description 업무 처리 결과 알림 — S "[처리명] 처리 성공하였습니다." · S1 "성공적으로 처리되었습니다." · F "[처리명] 처리 실패하였습니다."
+ * (AS-IS: 공통 fn_alertMsg · 메시지 MSG-A001/MSG-0001/MSG-A002, origin: 공급사 r13 tobe-pcc 번들. 처리명은 lastJob — confirmJob/setLastJob 이 채운다)
+ * @param {String} gubun 결과 구분 (S 성공 · S1 성공(처리명 없음) · F 실패)
+ * @returns {Promise<void>}
+ * @hidden N
+ * @exception
+ * @example await $c.fil.alertJobResult("S");
+ */
+scwin.alertJobResult = async function (gubun) {
+    const job = scwin.lastJob || "";
+    if (gubun === "S") { await $c.win.alert("[" + job + "] 처리 성공하였습니다."); }
+    else if (gubun === "S1") { await $c.win.alert("성공적으로 처리되었습니다."); }
+    else if (gubun === "F") { await $c.win.alert("[" + job + "] 처리 실패하였습니다."); }
+};
+
+/**
+ * @method
+ * @name setLastJob
+ * @description 업무 처리명을 직접 기록한다(as-is `LastJob = "승인";` — confirmJob 을 거치지 않는 처리에서 alertJobResult 문구를 맞출 때)
+ * @param {String} job 처리명
+ * @returns {void}
+ * @hidden N
+ * @exception
+ * @example $c.fil.setLastJob("승인");
+ */
+scwin.setLastJob = function (job) {
+    scwin.lastJob = String(job ?? "");
+};
+
+/**
+ * @method
+ * @name getLastJob
+ * @description 마지막으로 기록된 업무 처리명(as-is 전역 LastJob 읽기)
+ * @returns {String} 처리명(없으면 빈 문자열)
+ * @hidden N
+ * @exception
+ * @example const job = $c.fil.getLastJob();
+ */
+scwin.getLastJob = function () {
+    return scwin.lastJob || "";
+};
+
+/**
+ * @method
+ * @name checkRequired
+ * @description 필수 입력 검사 — 값이 비면 항목명으로 알리고 포커스를 준 뒤 true 를 돌려준다(AS-IS: fn_NullChk/fn_IsNull 의미 보존 — "비어 있으면 true")
+ * @param {Object} comp 입력 컴포넌트
+ * @param {String} fieldName 항목명(생략 시 컴포넌트 title → id)
+ * @returns {Promise<Boolean>} 비어 있으면 true
+ * @hidden N
+ * @exception
+ * @example
+if (await $c.fil.checkRequired(ipt_isurCd, "법인코드")) { return; }
+ */
+scwin.checkRequired = async function (comp, fieldName) {
+    if (!comp || !$c.util.isEmpty($c.str.trim(String(comp.getValue() ?? "")))) { return false; }
+    const name = fieldName || (typeof comp.getTitle === "function" && comp.getTitle()) || comp.getID();
+    await $c.win.alert("'" + name + "' 항목을 입력하세요");
+    comp.focus();
+    return true;
+};
+
+/**
+ * @method
+ * @name isNumberInput
+ * @description 숫자만 입력됐는지 검사 — 아니면 포커스를 주고 false(AS-IS: fn_IsNumber 의미 보존)
+ * @param {Object} comp 입력 컴포넌트
+ * @returns {Boolean} 숫자(공백 제외)만이면 true
+ * @hidden N
+ * @exception
+ * @example
+if (!$c.fil.isNumberInput(ipt_telNo)) { return; }
+ */
+scwin.isNumberInput = function (comp) {
+    const v = String(comp.getValue() ?? "").replace(/\s/g, "");
+    if (!/^\d*$/.test(v)) { comp.focus(); return false; }
+    return true;
+};
+
+/**
+ * @method
+ * @name getFieldName
+ * @description 알림 문구에 쓸 항목명 — 컴포넌트 title(as-is alt) 이 없으면 id
+ * @param {Object} comp 입력 컴포넌트
+ * @returns {String} 항목명
+ * @hidden N
+ * @exception
+ * @example const nm = $c.fil.getFieldName(ipt_isurCd);
+ */
+scwin.getFieldName = function (comp) {
+    return (comp && typeof comp.getTitle === "function" && comp.getTitle()) || (comp && comp.getID && comp.getID()) || "";
+};
+
+/**
+ * @method
+ * @name getSecuGrpNm
+ * @description 증권그룹 ID → 증권그룹명(AS-IS: 공통 fn_getSecuGrpNm 코드표)
+ * @param {String} sid 증권그룹 ID
+ * @returns {String} 증권그룹명(없으면 빈 문자열)
+ * @hidden N
+ * @exception
+ * @example const nm = $c.fil.getSecuGrpNm("ST");  // "주권"
+ */
+scwin.getSecuGrpNm = function (sid) {
+    const names = { ST: "주권", MF: "투자", RT: "부동산투자", SC: "선박투자", IF: "사회간접자본투융자회사", DR: "주식예탁증서",
+                    SW: "신주인수권증권", SR: "신주인수권증서", EW: "ELW", EF: "ETF", BC: "수익증권", FE: "외국ETF", FS: "외국주권" };
+    return names[sid] || "";
+};
+
+/**
+ * @method
+ * @name showObj
+ * @description 컴포넌트 표시/숨김(AS-IS: 공통 showObj — id 문자열 또는 컴포넌트)
+ * @param {String|Object} obj 컴포넌트 id 또는 컴포넌트
+ * @param {Boolean} flag true 표시 · false 숨김
+ * @returns {void}
+ * @hidden N
+ * @exception
+ * @example $c.fil.showObj("grp_detail", false);
+ */
+scwin.showObj = function (obj, flag) {
+    const comp = (typeof obj === "string") ? $c.util.getComponent(obj) : obj;
+    if (!comp) { return; }
+    if (flag) { comp.show(); } else { comp.hide(); }
+};
+
+/**
+ * @method
+ * @name showTotalCount
+ * @description 목록 총건수 표시(AS-IS: 공통 FillGridHeaderTotalCnt — 패널 안에 「총건수: N」)
+ * @param {Number|String} count 건수
+ * @param {String|Object} panel 표시할 그룹 id 또는 컴포넌트
+ * @returns {void}
+ * @hidden N
+ * @exception
+ * @example $c.fil.showTotalCount(dlt_list.getTotalRow(), "grp_total");
+ */
+scwin.showTotalCount = function (count, panel) {
+    const comp = (typeof panel === "string") ? $c.util.getComponent(panel) : panel;
+    if (comp && comp.render) {
+        comp.render.innerHTML = '<span class="count">총건수: <strong>' + $c.num.formatNumber(count) + "</strong></span>";
+    }
+};
+
+/**
+ * @method
+ * @name getModalCenterPos
+ * @description 모달 창을 화면 중앙에 놓을 좌표(AS-IS: 공통 fn_getModalCenterPos)
+ * @param {Object} opnFrm 여는 창(window)
+ * @param {Number} frmWth 창 너비
+ * @param {Number} frmHgt 창 높이
+ * @returns {Object} { x, y }
+ * @hidden N
+ * @exception
+ * @example const pos = $c.fil.getModalCenterPos(window, 640, 480);
+ */
+scwin.getModalCenterPos = function (opnFrm, frmWth, frmHgt) {
+    return { x: window.screen.width / 2 - opnFrm.screenLeft - frmWth / 2, y: window.screen.height / 2 - opnFrm.screenTop - frmHgt / 2 };
+};
+
+/**
+ * @method
+ * @name checkDateParts
+ * @description 년·월·일 입력칸 3개로 나뉜 날짜 검사(AS-IS: 공통 fn_CheckDateGn — 공백 제거·숫자·월/일 범위, 실패 시 알림+포커스)
+ * @param {Object} yyyy 년 입력 컴포넌트
+ * @param {Object} mm 월 입력 컴포넌트
+ * @param {Object} dd 일 입력 컴포넌트
+ * @param {Boolean} flag true 면 빈 값도 검사
+ * @returns {Promise<Boolean>} 유효하면 true(빈 값·flag 없음이면 undefined — as-is 동일)
+ * @hidden N
+ * @exception
+ * @example
+if (await $c.fil.checkDateParts(ipt_yyyy, ipt_mm, ipt_dd, true) === false) { return; }
+ */
+scwin.checkDateParts = async function (yyyy, mm, dd, flag) {
+    [yyyy, mm, dd].forEach(function (c) { c.setValue($c.str.trim(String(c.getValue() ?? ""))); });
+    const ymd = yyyy.getValue() + mm.getValue() + dd.getValue();
+    if (yyyy.getValue() === "" || yyyy.getValue().length < 4) { await $c.win.alert("년을 제대로 입력해주세요."); yyyy.focus(); return false; }
+    if (ymd === "" && !flag) { return; }
+    for (const c of [yyyy, mm, dd]) {
+        if (!/^\d*$/.test(String(c.getValue()).replace(/\s/g, ""))) { await $c.win.alert("숫자만 입력하셔야 합니다."); c.focus(); return false; }
+    }
+    const year = Number(yyyy.getValue()), month = Number(mm.getValue()), day = Number(dd.getValue());
+    if (month < 1 || month > 12) { await $c.win.alert("존재하지 않는 월입니다."); mm.focus(); return false; }
+    if (year <= 0) { await $c.win.alert("존재하지 않는 년도입니다."); dd.focus(); return false; }
+    if (day > new Date(year, month, 0).getDate()) { await $c.win.alert("존재하지 않는 날짜입니다."); dd.focus(); return false; }
+    return true;
+};
+
+/**
+ * @method
+ * @name isZipCodeInput
+ * @description 우편번호 입력 검사 — 공백·'-' 를 뺀 나머지가 숫자만인지(AS-IS: 공통 fn_ChkZipCd, 아니면 포커스)
+ * @param {Object} comp 입력 컴포넌트
+ * @returns {Boolean} 숫자만이면 true
+ * @hidden N
+ * @exception
+ * @example
+if (!$c.fil.isZipCodeInput(ipt_zipcd)) { return; }
+ */
+scwin.isZipCodeInput = function (comp) {
+    if (!comp || typeof comp.getValue !== "function") { return true; }
+    const v = String(comp.getValue() ?? "").replace(/\s/g, "").replace("-", "");
+    if (!/^\d*$/.test(v)) { comp.focus(); return false; }
+    return true;
+};
+
+/**
+ * @method
+ * @name getByteLength2
+ * @description as-is 계산 규약의 바이트 수(AS-IS: 공통 fn_GetByte — 한글 2byte · 줄바꿈 2byte · 그 밖 1byte). 표준 계산은 $c.str.getByteLength.
+ * @param {String} value 문자열
+ * @returns {Number} 바이트 수
+ * @hidden N
+ * @exception
+ * @example const n = $c.fil.getByteLength2(txa_contn.getValue());
+ */
+scwin.getByteLength2 = function (value) {
+    const s = String(value ?? "");
+    let n = 0;
+    for (let i = 0; i < s.length; i++) {
+        const ch = s.charAt(i);
+        n += (ch === "\n" || ch.charCodeAt(0) > 127) ? 2 : 1;
+    }
+    return n;
+};
+
+/**
+ * @method
+ * @name truncateByBytes
+ * @description 바이트 상한을 넘는 뒷부분을 잘라낸다(AS-IS: 공통 fn_CalcContn 계산 — 한글 2 · '<' '>' 4 · 줄바꿈 1)
+ * @param {String} value 문자열
+ * @param {Number} maximum 바이트 상한
+ * @returns {String} 잘린 문자열
+ * @hidden N
+ * @exception
+ * @example txa_contn.setValue($c.fil.truncateByBytes(txa_contn.getValue(), 4000));
+ */
+scwin.truncateByBytes = function (value, maximum) {
+    const s = String(value ?? "");
+    let out = "", bytes = 0;
+    for (let i = 0; i < s.length; i++) {
+        const ch = s.charAt(i);
+        let inc = 1;
+        if (ch === "\n") { inc = (s.charAt(i - 1) !== "\r") ? 1 : 0; }
+        else if (ch.charCodeAt(0) > 127) { inc = 2; }
+        else if (ch === "<" || ch === ">") { inc = 4; }
+        bytes += inc;
+        if (bytes > Number(maximum)) { break; }
+        out += ch;
+    }
+    return out;
+};
+
+/**
+ * @method
+ * @name checkByteLimit
+ * @description 입력 바이트 상한 검사 — 카운터 표시, 초과분은 알린 뒤 자동 삭제(AS-IS: 공통 fn_CheckByte). 초과를 거부만 하려면 checkMaxLength.
+ * @param {Object} comp 입력 컴포넌트
+ * @param {Number|String} standardByte 바이트 상한
+ * @param {String} counterId 카운터 표시 컴포넌트 id
+ * @returns {Promise<void>}
+ * @hidden N
+ * @exception
+ * @example await $c.fil.checkByteLimit(txa_contn, 4000, "txt_byteCnt");
+ */
+scwin.checkByteLimit = async function (comp, standardByte, counterId) {
+    const limit = Number(standardByte);
+    let bytes = scwin.getByteLength2(comp.getValue());
+    if (bytes > limit) {
+        await $c.win.alert((bytes - limit) + "바이트가 초과되었습니다. 초과된 내용은 자동삭제됩니다.");
+        comp.setValue(scwin.truncateByBytes(comp.getValue(), limit));
+        bytes = scwin.getByteLength2(comp.getValue());
+    }
+    const counter = $c.util.getComponent(counterId);
+    if (counter) { counter.setValue("(" + bytes + "/" + limit + " byte)"); }
+};
+
+/**
+ * @method
+ * @name isMinusNumber
+ * @description 음수를 포함한 숫자 문자열인지(AS-IS: 공통 isMinusNum — 첫 글자 숫자·'-'·'.', 나머지 숫자·'.')
+ * @param {String} value 문자열
+ * @returns {Boolean}
+ * @hidden N
+ * @exception
+ * @example if (!$c.fil.isMinusNumber(v)) { return; }
+ */
+scwin.isMinusNumber = function (value) {
+    return /^[-0-9.][0-9.]*$/.test(String(value ?? ""));
+};
+
+/**
+ * @method
+ * @name checkNotOnlyNumber
+ * @description 숫자만으로 된 입력을 거부(AS-IS: 공통 fn_ChkNoneNum — 알림·값 삭제·포커스)
+ * @param {Object} comp 입력 컴포넌트
+ * @returns {Promise<Boolean>} 통과면 true
+ * @hidden N
+ * @exception
+ * @example
+if (!await $c.fil.checkNotOnlyNumber(ipt_comNm)) { return; }
+ */
+scwin.checkNotOnlyNumber = async function (comp) {
+    if (/^\d+$/.test(String(comp.getValue() ?? ""))) {
+        await $c.win.alert("'" + scwin.getFieldName(comp) + "' 항목은 숫자만으로 구성할 수 없습니다.");
+        comp.setValue(""); comp.focus();
+        return false;
+    }
+    return true;
+};
+
+/**
+ * @method
+ * @name checkAlphaNum
+ * @description 영문·숫자 조합 자릿수 검사(AS-IS: 공통 fn_ChkAlphaNum — 실패 시 알림·값 삭제·포커스)
+ * @param {Object} comp 입력 컴포넌트
+ * @param {Number} minLen 최소 자릿수
+ * @param {Number} maxLen 최대 자릿수
+ * @returns {Promise<Boolean>} 통과면 true
+ * @hidden N
+ * @exception
+ * @example
+if (!await $c.fil.checkAlphaNum(ipt_userId, 6, 12)) { return; }
+ */
+scwin.checkAlphaNum = async function (comp, minLen, maxLen) {
+    const re = new RegExp("^[a-zA-Z0-9]{" + minLen + "," + maxLen + "}$");
+    if (!re.test(String(comp.getValue() ?? ""))) {
+        await $c.win.alert("'" + scwin.getFieldName(comp) + "' 항목은 영문과 숫자의 조합으로 " + minLen + "~" + maxLen + "자리내에서 입력하세요");
+        comp.setValue(""); comp.focus();
+        return false;
+    }
+    return true;
+};
+
+/**
+ * @method
+ * @name isGroupChecked
+ * @description 라디오·체크박스 그룹에 선택이 있는지(AS-IS: 공통 fn_IsChecked)
+ * @param {Object} comp 라디오/체크박스 그룹 컴포넌트
+ * @returns {Boolean}
+ * @hidden N
+ * @exception
+ * @example if (!$c.fil.isGroupChecked(rdo_tpCd)) { return; }
+ */
+scwin.isGroupChecked = function (comp) {
+    return !!comp && !$c.util.isEmpty(comp.getValue());
 };
 ]]></script>
 	</head>

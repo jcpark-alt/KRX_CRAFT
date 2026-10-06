@@ -606,7 +606,7 @@ scwin.isNumberInput = function (comp) {
 
 
 def replace_cm_helpers(script):
-    """`$c.cm.fn_NullChk(X)`→`scwin.checkRequired(X)`(await 는 컨벤션 단계가 전파) · `fn_IsNumber(X)`→`scwin.isNumberInput(X)` ·
+    """`$c.cm.fn_NullChk(X)`→`$c.fil.checkRequired(X)`(await 는 컨벤션 단계가 전파) · `fn_IsNumber(X)`→`$c.fil.isNumberInput(X)` (pcc/fil 반입) ·
     `fn_IsNotNull(X)`→`!$c.util.isEmpty(X.getValue())` · `fn_CheckEmail(S)`→`$c.str.isEmail(S)`. 쓰인 헬퍼는 5구역 끝에 정의를 넣는다.
     그 밖의 `$c.cm.fn_*` 는 그대로 두고(정의 없음 — 닿으면 오류로 드러남) 함수 머리에 TODO 1줄."""
     log = {}
@@ -623,9 +623,9 @@ def replace_cm_helpers(script):
         arg = script[m.end():cl]
         kind = m.group(1)
         if kind == "NullChk":
-            rep = "scwin.checkRequired(%s)" % arg; used.add("checkRequired")
+            rep = "$c.fil.checkRequired(%s)" % arg
         elif kind == "IsNumber":
-            rep = "scwin.isNumberInput(%s)" % arg; used.add("isNumberInput")
+            rep = "$c.fil.isNumberInput(%s)" % arg
         elif kind == "IsNotNull":
             rep = "!$c.util.isEmpty((%s).getValue())" % arg
         else:
@@ -634,13 +634,6 @@ def replace_cm_helpers(script):
         log[kind] = log.get(kind, 0) + 1
     out.append(script[pos:])
     script = "".join(out)
-    for h in sorted(used):
-        if not re.search(r'(?m)^scwin\.%s\s*=' % h, script):
-            m5 = re.search(r'(?m)^///////// 5\. [^\n]*\n', script)
-            if m5:
-                script = script.rstrip("\n") + "\n\n" + CM_HELPERS[h]
-            else:
-                script = script.rstrip("\n") + "\n\n///////// 5. 일반/업무 함수 영역 /////////\n\n" + CM_HELPERS[h]
     # 남은 $c.cm.fn_* → 함수 머리 TODO
     left = 0
     for name, s, b, e, _ in reversed(st.func_spans(script)):
@@ -698,8 +691,8 @@ def _append_helper(script, name, helper):
 
 
 def replace_alert_msg(script):
-    """V25 `$c.lc.fn_alertMsg(X)`(공급사 pcc: alert(getMessageParam(MSG-A001|0001|A002, LastJob))) → `scwin.alertJobResult(X)`.
-    as-is 전역 `LastJob` 참조(`LastJob = "승인";` 꼴)는 `scwin.lastJob` 로. await 부여는 컨벤션 단계."""
+    """V25 `$c.lc.fn_alertMsg(X)`(공급사 pcc: alert(getMessageParam(MSG-A001|0001|A002, LastJob))) → `$c.fil.alertJobResult(X)`(pcc/fil 반입).
+    as-is 전역 `LastJob` 참조는 `$c.fil.setLastJob(X)`/`$c.fil.getLastJob()` 로. await 부여는 컨벤션 단계."""
     n = 0
     out, pos = [], 0
     mask = cv.code_mask(script)
@@ -709,27 +702,30 @@ def replace_alert_msg(script):
         cl = _balanced(script, m.end() - 1)
         if cl < 0:
             continue
-        out.append(script[pos:m.start()]); out.append("scwin.alertJobResult(%s)" % script[m.end():cl]); pos = cl + 1; n += 1
+        out.append(script[pos:m.start()]); out.append("$c.fil.alertJobResult(%s)" % script[m.end():cl]); pos = cl + 1; n += 1
     out.append(script[pos:])
     script = "".join(out)
-    # 코드 영역에서만 LastJob → scwin.lastJob
-    parts, k = [], 0
-    for text, is_code in cv.segments(script):
-        if is_code:
-            text, c = re.subn(r'(?<![\w$.])(?:window\.)?LastJob\b', 'scwin.lastJob', text); k += c
-        parts.append(text)
-    script = "".join(parts)
-    if n:
-        script = _append_helper(script, "alertJobResult", ALERT_JOB_HELPER)
-    if (n or k) and not re.search(r'(?m)^scwin\.lastJob\s*=', script):
-        m1 = re.search(r'(?m)^///////// 1\. [^\n]*\n', script)
-        decl = 'scwin.lastJob = "";  // 업무 처리명(confirmJob 이 채우고 alertJobResult 가 읽는다 — as-is 전역 LastJob)\n'
-        script = (script[:m1.end()] + decl + script[m1.end():]) if m1 else decl + script
+    # 코드 영역에서만 as-is 전역 LastJob → $c.fil.setLastJob(X) / $c.fil.getLastJob() — 대입 우변이 문자열이라(segments 가 문자열을 쪼갬) 코드 마스크로 원문에서
+    mask = cv.code_mask(script)
+    out, pos, k = [], 0, 0
+    for m in re.finditer(r'(?<![\w$.])(?:window\.)?LastJob\b(\s*=(?!=)\s*)?', script):
+        if m.start() < pos or not mask[m.start()]:
+            continue
+        if m.group(1):
+            end = script.find(";", m.end())
+            if end < 0 or "\n" in script[m.end():end]:
+                continue
+            out.append(script[pos:m.start()]); out.append("$c.fil.setLastJob(%s);" % script[m.end():end].strip()); pos = end + 1
+        else:
+            out.append(script[pos:m.start()]); out.append("$c.fil.getLastJob()"); pos = m.end()
+        k += 1
+    out.append(script[pos:])
+    script = "".join(out)
     return script, {"calls": n, "lastJob_refs": k}
 
 
 def replace_is_process(script):
-    """`$c.lc.fn_isProcess(X)`(공급사 pcc: window.confirm("[저장] 하시겠습니까?")) → `scwin.confirmJob(X)`.
+    """`$c.lc.fn_isProcess(X)`(공급사 pcc: window.confirm("[저장] 하시겠습니까?")) → `$c.fil.confirmJob(X)`(pcc/fil 반입 2026-10-06).
     await 부여·호출 함수 async 화는 컨벤션 단계(propagate_await)가 한다 — `if (!scwin.confirmJob('S'))` 는 `if (!await …)` 가 된다."""
     n = 0
     out, pos = [], 0
@@ -740,15 +736,9 @@ def replace_is_process(script):
         cl = _balanced(script, m.end() - 1)
         if cl < 0:
             continue
-        out.append(script[pos:m.start()]); out.append("scwin.confirmJob(%s)" % script[m.end():cl]); pos = cl + 1; n += 1
+        out.append(script[pos:m.start()]); out.append("$c.fil.confirmJob(%s)" % script[m.end():cl]); pos = cl + 1; n += 1
     out.append(script[pos:])
     script = "".join(out)
-    if n:
-        script = _append_helper(script, "confirmJob", CONFIRM_JOB_HELPER)
-        if not re.search(r'(?m)^scwin\.lastJob\s*=', script):
-            m1 = re.search(r'(?m)^///////// 1\. [^\n]*\n', script)
-            decl = 'scwin.lastJob = "";  // 업무 처리명(confirmJob 이 채우고 alertJobResult 가 읽는다 — as-is 전역 LastJob)\n'
-            script = (script[:m1.end()] + decl + script[m1.end():]) if m1 else decl + script
     return script, n
 
 
@@ -768,7 +758,7 @@ VENDOR_CONSTS = {
 
 
 def inline_vendor_consts(script):
-    """`$c.fil.<상수>`(공급사 pcc 번들의 리터럴 상수) → `scwin.<상수>` + 1구역 선언(공급사 README 부-2 ㉢ 「as-is 공용 상수는 화면 안에
+    """`$c.lc.<상수>`·`$c.fil.<상수>`(공급사 pcc 번들의 리터럴 상수) → `$c.fil.<상수>`(pcc/fil 반입 2026-10-06 — cm/pcc/fil/fil.xml 에 같은 이름·값으로 선언). 종전엔 화면 안 선언(공급사 README 부-2 ㉢ 「as-is 공용 상수는 화면 안에
     선언」과 같은 처방). 값·이름은 번들 정의 그대로(이름 보존 — 다른 화면·pcc 와 대조 가능). 이미 선언된 이름은 선언을 더하지 않는다."""
     used = set()
     parts = []
@@ -776,22 +766,13 @@ def inline_vendor_consts(script):
         if is_code:
             def rep(m):
                 used.add(m.group(1))
-                return "scwin." + m.group(1)
-            text = re.sub(r'\$c\.(?:fil|lc)\.(%s)\b' % "|".join(VENDOR_CONSTS), rep, text)
+                return "$c.fil." + m.group(1)
+            text = re.sub(r'\$c\.lc\.(%s)\b' % "|".join(VENDOR_CONSTS), rep, text)  # $c.fil.<상수> 는 이미 pcc 의 것
         parts.append(text)
     script = "".join(parts)
     if not used:
         return script, {}
-    decls = []
-    for name in sorted(used, key=lambda n: list(VENDOR_CONSTS).index(n)):
-        if not re.search(r'(?m)^scwin\.%s\s*=' % name, script):
-            val, ko = VENDOR_CONSTS[name]
-            decls.append("scwin.%s = %s;  // %s — as-is 공용 상수(공급사 pcc 번들, 화면 안 선언)\n" % (name, val, ko))
-    if decls:
-        m1 = re.search(r'(?m)^///////// 1\. [^\n]*\n', script)
-        ins = "".join(decls)
-        script = (script[:m1.end()] + ins + script[m1.end():]) if m1 else ins + script
-    return script, {"refs": len(used), "declared": len(decls)}
+    return script, {"refs": len(used)}
 
 
 # ---------------------------------------------------------------- V23 공급사 pcc 번들($c.fil/$c.lc/$c.frame/$c.utils) 의존
@@ -856,7 +837,7 @@ def replace_vendor_pcc(script):
     for name, s, b, e, _ in reversed(st.func_spans(script)):
         body = st.code_only(script[b + 1:e])
         calls = sorted({x for x in re.findall(r'\$c\.(?:lc|frame|utils)\.[\w$]+', body)}
-                       | {x for x in re.findall(r'\$c\.fil\.[\w$]+', body) if x.split(".")[-1] not in known_fil})
+                       | {x for x in re.findall(r'\$c\.fil\.[\w$]+', body) if x.split(".")[-1] not in known_fil and x.split(".")[-1] not in VENDOR_CONSTS})
         if not calls or "TODO Stage2: 공급사 pcc 의존" in script[b + 1:e]:
             continue
         nl = script.find("\n", b) + 1

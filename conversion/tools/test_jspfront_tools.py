@@ -393,42 +393,41 @@ def test_is_process_to_confirm_job():
     import screen_convention as sc
     head, script, body, log = _post()
     assert log["V24_isProcess"] == 3  # doSubmit 2 + legacyPcc 1
-    assert "if (!scwin.confirmJob('S')) { return; }" in script and "!scwin.confirmJob(scwin.TR_JOB) )" in script
-    assert script.count("scwin.confirmJob = async function") == 1 and '$c.win.confirm("[" + job + "] 하시겠습니까?")' in script
+    assert "if (!$c.fil.confirmJob('S')) { return; }" in script and "!$c.fil.confirmJob(scwin.TR_JOB) )" in script
+    assert "scwin.confirmJob = " not in script  # pcc/fil 반입 — 로컬 헬퍼 없음
     # 실호출은 0 (헬퍼 JSDoc 의 "fn_isProcess" 언급만 남는다) · legacyPcc 의 TODO 도 더 이상 나열하지 않는다
     assert "$c.lc.fn_isProcess" not in script
     # 컨벤션 단계가 await 를 붙이고 호출 함수를 async 로 만든다
-    s2, _ = sc.propagate_await(script, set())
-    assert "if (!await scwin.confirmJob('S')) { return; }" in s2 and "scwin.doSubmit = async function" in s2
+    import screen_tools as st
+    s2, _ = sc.propagate_await(script, st.common_inventory("fil")[1])  # $c.fil.confirmJob 은 pcc 재고에서 async
+    assert "if (!await $c.fil.confirmJob('S')) { return; }" in s2 and "scwin.doSubmit = async function" in s2
 
 
 def test_alert_msg_to_alert_job_result():
     import screen_convention as sc
     head, script, body, log = _post()
     assert log["V25_alertMsg"] == {"calls": 2, "lastJob_refs": 1}
-    assert 'scwin.lastJob = "승인";' in script and "const s = \"LastJob = 'x'\";" in script
-    assert "scwin.alertJobResult('F');" in script and "scwin.alertJobResult('S1');" in script and "$c.lc.fn_alertMsg" not in script
-    assert script.count("scwin.alertJobResult = async function") == 1 and script.count('scwin.lastJob = "";') == 1
-    assert "scwin.lastJob = job;" in script  # confirmJob 이 처리명을 기록
-    assert script.index('scwin.lastJob = "";') < script.index("///////// 2. ")
-    s2, _ = sc.propagate_await(script, set())
-    assert "scwin.trs_Save_onfail = async function" in s2 and "await scwin.alertJobResult('F');" in s2
+    assert '$c.fil.setLastJob("승인");' in script and "const s = \"LastJob = 'x'\";" in script
+    assert "$c.fil.alertJobResult('F');" in script and "$c.fil.alertJobResult('S1');" in script and "$c.lc.fn_alertMsg" not in script
+    assert "scwin.alertJobResult = " not in script and "scwin.lastJob" not in script  # pcc/fil 반입
+    import screen_tools as st
+    s2, _ = sc.propagate_await(script, st.common_inventory("fil")[1])
+    assert "scwin.trs_Save_onfail = async function" in s2 and "await $c.fil.alertJobResult('F');" in s2
 
 
 def test_vendor_consts_inlined():
     head, script, body, log = _post()
-    # doLogSave 줄은 V28 이 먼저 주석으로 접으므로 그 안의 SCREN_PROCS_TP_CD_07 은 세지 않는다(코드 영역만)
-    assert log["V26_consts"] == {"refs": 3, "declared": 3}
-    assert "$c.win.alert(scwin.NO_EXCEL_DATA);" in script and 'scwin.NO_EXCEL_DATA = "해당데이터가 없습니다. 조회후 다운받으십시요.";' in script
-    assert '+ scwin.SCREN_PROCS_TP_CD_01;' in script and 'scwin.fn_trs(scwin.TR_JOB_INSERT);' in script
+    # doLogSave 줄은 V28 이 먼저 주석으로 접으므로 그 안의 SCREN_PROCS_TP_CD_07 은 세지 않는다(코드 영역만). 반입 뒤엔 $c.fil.<상수>(화면 선언 없음)
+    assert log["V26_consts"] == {"refs": 1}  # $c.lc.NO_EXCEL_DATA 만 바꾼다($c.fil.<상수> 2곳은 이미 pcc)
+    assert "$c.win.alert($c.fil.NO_EXCEL_DATA);" in script and "scwin.NO_EXCEL_DATA" not in script
+    assert '+ $c.fil.SCREN_PROCS_TP_CD_01;' in script and 'scwin.fn_trs($c.fil.TR_JOB_INSERT);' in script
     assert 'const s = "$c.fil.SCREN_PROCS_TP_CD_01";' in script
     sec1 = script.split("///////// 1. ")[1].split("///////// 2. ")[0]
-    assert 'scwin.SCREN_PROCS_TP_CD_01 = "01";  // 조회' in sec1 and "SCREN_PROCS_TP_CD_07 = " not in sec1
-    assert "scwin.TR_JOB_INSERT = 2;  // 입력" in sec1 and script.count("scwin.SCREN_PROCS_TP_CD_01 = ") == 1
+    assert "SCREN_PROCS_TP_CD" not in sec1 and "TR_JOB_INSERT = " not in sec1
     # V23 의 TODO 는 상수·보류된 doLogSave 를 나열하지 않는다
     assert "— $c.fil.doLogSave" not in script
     _, s2, _, log2 = vp.apply_regions(head, script, body)
-    assert log2["V26_consts"] == {} and s2.count("scwin.SCREN_PROCS_TP_CD_01 = ") == 1
+    assert log2["V26_consts"] == {} and s2 == script
 
 
 def test_stage2_c_focus_and_rowcopy():
@@ -483,23 +482,25 @@ def test_stage2_a_rules():
     assert log["V28_logsave"] == 2 and '/* TODO Stage2: 접속 로그 저장 보류(공급사 doLogSave — 운영 필요 여부 회신 ㉤ 뒤 결정) $c.fil.doLogSave("X.gfm", $c.fil.SCREN_PROCS_TP_CD_05); */' in script
     # V29 pcc 함수 → 로컬 헬퍼
     h = log["V29_30_helpers"]
-    assert "scwin.fr_MktId = scwin.getMktId();" in script and "scwin.getSecuGrpNm(scwin.fr_SecuGrpId)" in script
-    assert "scwin.showTotalCount(rowcount, scwin.panel_page);" in script and "scwin.getModalCenterPos(frame, wth, hgt)" in script
-    for hname in ("getMktId", "getSecuGrpNm", "showTotalCount", "getModalCenterPos", "showObj"):
-        assert script.count("scwin.%s = function" % hname) == 1, hname
+    assert "scwin.fr_MktId = scwin.getMktId();" in script and "$c.fil.getSecuGrpNm(scwin.fr_SecuGrpId)" in script
+    assert "$c.fil.showTotalCount(rowcount, scwin.panel_page);" in script and "$c.fil.getModalCenterPos(frame, wth, hgt)" in script
+    assert script.count("scwin.getMktId = function") == 1  # 화면 스코프(as-is 전역)라 로컬
+    for hname in ("getSecuGrpNm", "showTotalCount", "getModalCenterPos", "showObj"):
+        assert ("scwin.%s = function" % hname) not in script, hname  # pcc/fil 반입
     # V30 $c.cm.* → 로컬 헬퍼/인라인
     assert "scwin.setSearchPeriod(3);" in script and "scwin.setPeriodDates('20260101', '20260131');" in script
-    assert "!$c.cm.fn_CheckDateGn" not in script and "scwin.checkDateParts($c.util.getComponent('ipt_y'), $c.util.getComponent('ipt_m'), $c.util.getComponent('ipt_d'), true)" in script
-    assert 'scwin.checkByteLimit($c.util.getComponent("txa_contn"), \'100\', \'byteCnt\');' in script
-    assert "!scwin.isMinusNumber(v)" in script and "!scwin.checkNotOnlyNumber(usrIdObj) || !scwin.checkAlphaNum(usrIdObj, 6, 20)" in script
-    assert "!scwin.isGroupChecked($c.util.getComponent('rd_tp'))" in script
-    assert "scwin.checkRequired($c.util.getComponent('ipt_isurCd'), scwin.isurCdTitle)" in script
+    assert "!$c.cm.fn_CheckDateGn" not in script and "$c.fil.checkDateParts($c.util.getComponent('ipt_y'), $c.util.getComponent('ipt_m'), $c.util.getComponent('ipt_d'), true)" in script
+    assert '$c.fil.checkByteLimit($c.util.getComponent("txa_contn"), \'100\', \'byteCnt\');' in script
+    assert "!$c.fil.isMinusNumber(v)" in script and "!$c.fil.checkNotOnlyNumber(usrIdObj) || !$c.fil.checkAlphaNum(usrIdObj, 6, 20)" in script
+    assert "!$c.fil.isGroupChecked($c.util.getComponent('rd_tp'))" in script
+    assert "$c.fil.checkRequired($c.util.getComponent('ipt_isurCd'), scwin.isurCdTitle)" in script
     assert 'x.setValue(String(x.getValue()).replace(/\\s/g, ""));' in script and "if (/^[0-9-]*$/.test(y.getValue()) === false)" in script
-    assert "_obj.setValue(scwin.truncateByBytes(contnValue, standardByte));" in script
+    assert "_obj.setValue($c.fil.truncateByBytes(contnValue, standardByte));" in script
     assert "$c.cm.fn_getFileSize(fileFullNm)" in script and "— fn_getFileSize" in script  # 못 옮기는 것은 TODO 로 남는다
-    for hname in ("setSearchPeriod", "setPeriodDates", "checkDateParts", "isZipCodeInput", "checkByteLimit", "getByteLength2",
-                  "truncateByBytes", "isMinusNumber", "checkNotOnlyNumber", "checkAlphaNum", "isGroupChecked", "getFieldName"):
-        assert script.count("scwin.%s = " % hname) == 1, hname
+    for hname in ("setSearchPeriod", "setPeriodDates"):
+        assert script.count("scwin.%s = " % hname) == 1, hname  # 화면 스코프(cal_sdate/edate·search) 라 로컬
+    for hname in ("checkDateParts", "isZipCodeInput", "checkByteLimit", "getByteLength2", "truncateByBytes", "isMinusNumber", "checkNotOnlyNumber", "checkAlphaNum", "isGroupChecked", "getFieldName"):
+        assert ("scwin.%s = " % hname) not in script, hname  # pcc/fil 반입
     assert h["fn_ClickPeriod"] == 1 and h["fn_IgnoreSpaces"] == 1 and h["fn_ChkZipCd"] == 1
     # V31 공급사 스텁 → dma_pageContext 표준 수신
     assert log["V31_pagecontext"] == 1
@@ -511,7 +512,7 @@ def test_stage2_a_rules():
     assert n3 == 1 and h3.index('id="dma_pageContext"') < h3.index('id="dlt_list"') and "<w2:keyInfo/>" in h3
     # 멱등
     h2, s2, b2, log2 = vp.apply_regions(head, script, body)
-    assert s2.count("scwin.checkDateParts = ") == 1 and "V27_dialog" not in log2 and "V31_pagecontext" not in log2 and h2 == head
+    assert s2.count("scwin.checkDateParts = ") == 0 and "V27_dialog" not in log2 and "V31_pagecontext" not in log2 and h2 == head
 
 
 def test_vendor_pcc_rules():
@@ -520,7 +521,7 @@ def test_vendor_pcc_rules():
     assert "const v = $c.util.getComponent('ipt_a').getValue() + ipt_b.getValue();" in script
     assert "$c.util.getComponent('ipt_a').setValue(fn(1, 2));" in script
     assert "$c.fil.setFromToDate(a, b);" in script
-    assert "$c.frame.CloseFrame()" in script and "scwin.showObj('x', true)" in script and "$c.fil.showObj" not in script
+    assert "$c.frame.CloseFrame()" in script and "$c.fil.showObj('x', true)" in script and "scwin.showObj" not in script  # 반입된 pcc 함수
     assert "// TODO Stage2: 공급사 pcc 의존(저장소 pcc/fil 에 없음 · 반입 또는 치환 판단) — $c.frame.CloseFrame\n" in script
     assert log["V23_vendor_pcc"] == {"alert_error": 1, "getObjectValue": 2, "setObjectValue": 1, "fn_setFromToDate": 1, "todo_left": 1}  # CloseFrame 만(doLogSave 는 보류 주석)
 
@@ -528,15 +529,15 @@ def test_vendor_pcc_rules():
 def test_cm_helpers():
     head, script, body, log = _post()
     assert log["V21_cm_fn"] == {"NullChk": 2, "IsNumber": 1, "IsNotNull": 1, "CheckEmail": 1, "todo_left": 1}  # fn_getFileSize 만 남는다
-    assert "scwin.checkRequired($c.util.getComponent('ipt_method')) || scwin.checkRequired($c.util.getComponent([\"a\", \"b\"][0]))" in script
-    assert "!scwin.isNumberInput($c.util.getComponent('ipt_status'))" in script
+    assert "$c.fil.checkRequired($c.util.getComponent('ipt_method')) || $c.fil.checkRequired($c.util.getComponent([\"a\", \"b\"][0]))" in script
+    assert "!$c.fil.isNumberInput($c.util.getComponent('ipt_status'))" in script
     assert "!$c.util.isEmpty(($c.util.getComponent('ipt_status')).getValue()) && $c.str.isEmail($c.util.getComponent('ipt_status').getValue())" in script
-    assert script.count("scwin.checkRequired = async function") == 1 and script.count("scwin.isNumberInput = function") == 1
-    assert "if (scwin.isZipCodeInput($c.util.getComponent('ipt_status'))) { return true; }" in script and "$c.cm.fn_ChkZipCd" not in script
+    assert "scwin.checkRequired = " not in script and "scwin.isNumberInput = " not in script  # pcc/fil 반입
+    assert "if ($c.fil.isZipCodeInput($c.util.getComponent('ipt_status'))) { return true; }" in script and "$c.cm.fn_ChkZipCd" not in script
     assert "const z = [];" in script
     # 재실행 멱등(헬퍼 중복 삽입 없음)
     _, script2, _, log2 = vp.apply_regions(head, script, body)
-    assert script2.count("scwin.checkRequired = async function") == 1 and log2["V21_cm_fn"].get("NullChk") is None
+    assert script2 == script and log2["V21_cm_fn"].get("NullChk") is None
 
 
 def test_publish_normalize_body():

@@ -602,6 +602,11 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
 * **드러냄 표지 원칙**: 공급사가 전환 미완 자리에 남긴 `[sdd]` 콘솔·`bizMessage` throw·`unresolved` 는 결함이 아니라 표식이므로
   지우지 않고 `TODO Stage2` 로 바꿔 집계한다(화면 알림은 유지).
 
+* **pcc/fil 반입(2026-10-06)**: V21·V24·V25·V26·V29·V30 이 만들던 화면 로컬 헬퍼·상수는 `cm/pcc/fil/fil.xml`(`$c.fil`) 로 옮겼다 — 이제 처음부터 `$c.fil.confirmJob/alertJobResult/checkRequired/isNumberInput/
+  getFieldName/getSecuGrpNm/showObj/showTotalCount/getModalCenterPos/checkDateParts/isZipCodeInput/getByteLength2/truncateByBytes/checkByteLimit/isMinusNumber/checkNotOnlyNumber/checkAlphaNum/isGroupChecked` 를 부르고,
+  as-is `LastJob = X` 는 `$c.fil.setLastJob(X)`/읽기 `$c.fil.getLastJob()`, 상수는 `$c.fil.SCREN_PROCS_TP_CD_01` 처럼 읽는다(gcc `$c.sbm.MESSAGE_CODE` 와 같은 꼴). 로컬로 남는 것은 화면 스코프에 묶인
+  `getMktId`·`setSearchPeriod`·`setPeriodDates`·`opener*` 뿐. 이미 전환된 화면의 제자리 전환은 `pcc_fil_import.py`(멱등).
+
 ### 규칙 34: 퍼블리싱 정규화 — `publish_normalize.py` (P1~P11, lxml · body 만)
 
 * **P1 확장(헤더 표준, 사용자 확정 2026-10-06)**: 본화면(`sub_contents`)은 `pfmContentHeader` pageFrame 을 첫 자식으로 보장(없으면 추가 `P1_pageframe_added`),

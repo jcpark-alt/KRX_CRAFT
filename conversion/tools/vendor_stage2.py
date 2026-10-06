@@ -453,6 +453,9 @@ scwin.isGroupChecked = function (comp) {
 }
 HELPER_DEPS = {"setSearchPeriod": ["setPeriodDates"], "checkByteLimit": ["getByteLength2", "truncateByBytes"],
                "checkNotOnlyNumber": ["getFieldName"], "checkAlphaNum": ["getFieldName"]}
+# pcc/fil 반입(2026-10-06, cm/pcc/fil/fil.xml) — 이 이름들은 로컬 헬퍼를 넣지 않고 `$c.fil.<name>(` 를 부른다. 화면 스코프에 묶인 getMktId·setSearchPeriod·setPeriodDates 만 로컬.
+import pcc_fil_import  # noqa: E402
+IMPORTED_FIL = set(pcc_fil_import.IMPORTED)
 
 # (호출 패턴, 치환 생성기, 필요한 헬퍼)
 PCC_MAP = {
@@ -476,6 +479,9 @@ def replace_pcc_and_cm(script):
             new, argfn = table[name]
             if argfn:
                 args = argfn(args)
+            if new in IMPORTED_FIL:
+                log[name] = log.get(name, 0) + 1
+                return "$c.fil.%s(%s)" % (new, ", ".join(args))
             if new in HELPERS:
                 used.append(new)
             log[name] = log.get(name, 0) + 1
