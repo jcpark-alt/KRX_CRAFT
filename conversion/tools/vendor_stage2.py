@@ -517,9 +517,38 @@ def ensure_page_context(head, script):
     return head, script, 1
 
 
+# ---------------------------------------------------------------- V32 (B 축) 이동 목적지 정적 확정
+NAV_IIFE = re.compile(r'\(function \(__u\) \{ (?:let|const|var) __s = String\(__u == null \? "" : __u\);.*?unresolved: "nav:" \+ __s \}; \} return __u; \}\)\(([^()]*)\)')
+
+
+def resolve_static_nav(script):
+    """공급사 드러냄 IIFE(`(function (__u) { … if (!/\\.xml…/.test(__s)) throw … })(url)`)는 실행 시 url 이 .xml 이 아니면 던진다.
+    같은 함수 안에서 url 이 내부 `.xml` 리터럴(또는 그 리터럴로 시작하는 조립)로 정해지면 정적으로 통과가 확정이므로 래퍼를 걷고
+    인자만 남긴다(TODO 도 사라진다). `.do`·`.jsp`·외부 http·조립 전 빈 문자열은 그대로 둔다(회신 A-15 명부)."""
+    n = 0
+    for name, s, b, e, _ in reversed(st.func_spans(script)):
+        body = script[b:e]
+        out, pos, changed = [], 0, False
+        for m in NAV_IIFE.finditer(body):
+            arg = m.group(1).strip()
+            lit = re.fullmatch(r'''(["'])([^"']*)\1''', arg)
+            if lit:
+                v = lit.group(2)
+            else:
+                am = re.search(r'(?:let|const|var)?\s*%s\s*=\s*(["\'])([^"\']*)\1' % re.escape(arg), body) if re.fullmatch(r'[\w$.]+', arg) else None
+                v = am.group(2) if am else None
+            if v and v.startswith("/") and re.search(r'\.xml(\?|#|$)', v):
+                out.append(body[pos:m.start()]); out.append(arg); pos = m.end(); n += 1; changed = True
+        if changed:
+            out.append(body[pos:])
+            script = script[:b] + "".join(out) + script[e:]
+    return script, n
+
+
 # ---------------------------------------------------------------- 진입
 def apply(head, script, body):
     log = {}
+    script, log["V32_static_nav"] = resolve_static_nav(script)
     script, log["V27_dialog"] = create_dialog_frame(script)
     script, log["V28_logsave"] = hold_log_save(script)
     script, log["V29_30_helpers"] = replace_pcc_and_cm(script)

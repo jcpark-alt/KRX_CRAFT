@@ -48,6 +48,9 @@ import convert as cv  # noqa: E402
 import vendor_stage2  # noqa: E402
 
 RENAME = {"fn_modifiyDate": "selectModifiyDate"}
+# $c.session.getUserInfo(키) 중 저장소가 이미 쓰는 키(sample-front 21종·cm/pcc) — user-info 응답 계약에 있는 것으로 본다
+KNOWN_SESSION_KEYS = {"empNo", "market", "empNm", "integUsrId", "jobtitl", "dutyChrg", "duty", "depCd", "isurCd", "bondYn",
+                      "js_bond_yn", "listStatCd", "js_market", "accessTp"}
 
 ATTR_REALS_BODY = '''    attrRealsList.forEach(function (a) {
         const comp = $c.util.getComponent(a.childId);
@@ -222,8 +225,10 @@ def unwrap_values(script):
     todo = []
     if ctx:
         todo.append("// TODO Stage2: 컨텍스트 키 출처 미확인(as-is EL · 회신 A-3) — " + ", ".join(dict.fromkeys(ctx)))
-    if ses:
-        todo.append("// TODO Stage2: 세션 키 실환경 확인(회신 11항) — " + ", ".join(dict.fromkeys(ses)))
+    # 저장소(sample-front·pcc)가 이미 $c.session.getUserInfo 로 읽는 키는 user-info 계약에 있는 것으로 보고 TODO 에서 뺀다(B-2, 2026-10-06)
+    unknown = [k for k in dict.fromkeys(ses) if k.split(".")[-1] not in KNOWN_SESSION_KEYS]
+    if unknown:
+        todo.append("// TODO Stage2: 세션 키 실환경 확인(회신 11항 · user-info 계약에 없는 키) — " + ", ".join(unknown))
     if todo:
         # 컨텍스트/세션 값을 읽는 함수(init_conds·init_attrReals)가 있으면 그 정의 바로 위, 없으면 2구역 헤더 뒤
         anchor = re.search(r'(?m)^(?:/\*\*(?:(?!\*/).)*\*/\n)?scwin\.init_(?:conds|attrReals) = ', script, re.S)

@@ -185,6 +185,14 @@ scwin.logAndTrs = function () {
 
 scwin.init_recvParam = function () { console.warn("[sdd] 전환 파라미터 수신 대상 없음: dma_pageContext — 읽는 자리 0"); }
 
+scwin.goStatic = function () {
+    let url = '/jldfil00033/jldfil00033.xml?method=loadInitPage&ldMktTpCd=' + dma_a.get("x");
+    url += "&preKonex=Y";
+    $c.win.openPopup((function (__u) { const __s = String(__u == null ? "" : __u); if (!/\\.xml(\\?|#|$)/.test(__s)) { throw { bizMessage: "이 화면의 이동 목적지를 아직 정하지 못했습니다(전환 미완) — " + __s, unresolved: "nav:" + __s }; } return __u; })(url), { id: "p" }, {});
+    const doUrl = "/listbloc/blocListing.do?method=popupMonthIssuePlan";
+    $c.win.moveUrl((function (__u) { const __s = String(__u == null ? "" : __u); if (!/\\.xml(\\?|#|$)/.test(__s)) { throw { bizMessage: "이 화면의 이동 목적지를 아직 정하지 못했습니다(전환 미완) — " + __s, unresolved: "nav:" + __s }; } return __u; })(doUrl), {});
+};
+
 scwin.openGuides = function () {
     $c.frame.CreateDialogFrame('JLDFIL55330', "/jldfil55330/jldfil55330.xml", "종목명 입력안내", { width: 750, height: 300 }, {});
     $c.frame.CreateDialogFrame("", (function (__u) { let __s = String(__u == null ? "" : __u); if (!/\\.xml(\\?|#|$)/.test(__s)) { throw { bizMessage: "x — " + __s, unresolved: "nav:" + __s }; } return __u; })(url), "서식조회팝업", { width: 1000, height: 800 }, {});
@@ -385,6 +393,19 @@ def test_vendor_consts_inlined():
     assert "— $c.fil.doLogSave" not in script
     _, s2, _, log2 = vp.apply_regions(head, script, body)
     assert log2["V26_consts"] == {} and s2.count("scwin.SCREN_PROCS_TP_CD_01 = ") == 1
+
+
+def test_stage2_b_rules():
+    head, script, body, log = _post()
+    # V32 내부 .xml 리터럴로 정해지는 이동 목적지는 래퍼를 걷는다, .do 는 그대로(회신 A-15)
+    assert log["V32_static_nav"] == 1
+    assert '$c.win.openPopup(url, { id: "p" }, {});' in script
+    assert 'unresolved: "nav:" + __s }; } return __u; })(doUrl)' in script
+    # V5 세션 키 — 계약에 있는 키(repIdYn 은 없음)만 TODO
+    assert "// TODO Stage2: 세션 키 실환경 확인(회신 11항 · user-info 계약에 없는 키) — session.user.repIdYn" in script
+    s2 = SCRIPT.replace('"session.user.repIdYn"', '"session.user.empNo"').replace('getUserInfo("repIdYn")', 'getUserInfo("empNo")')
+    _, out, _, _ = vp.apply_regions(HEAD, s2, BODY)
+    assert "세션 키 실환경 확인" not in out and '$c.session.getUserInfo("empNo") === ' in out
 
 
 def test_stage2_a_rules():
