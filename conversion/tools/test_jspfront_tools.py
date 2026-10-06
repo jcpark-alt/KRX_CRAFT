@@ -650,3 +650,63 @@ def test_p1_header_standard():
            '<xf:group class="breadcrumb" id=""/></xf:group><xf:group class="tblbox" id=""/></xf:group></body>')
     out4, _ = pn.normalize_body(pgt, "")
     assert out4.count("pfmContentHeader") == 1 and "pgtbox" not in out4
+
+
+def test_publish_merge_match_canon_and_grid_similarity():
+    """뜻 토큰(조회↔icon:search)·그리드 닮음(번호 컬럼 차이)·같은 키 개수 다름(앞에서부터) 으로 잇는다."""
+    pub = ('<body><xf:group class="sub_contents" id=""><xf:group class="titbox" id=""><xf:group class="rt" id="">'
+           '<xf:trigger id="" type="button"><xf:label><![CDATA[조회]]></xf:label></xf:trigger></xf:group></xf:group>'
+           '<xf:group id="" tagname="table"><xf:group id="" tagname="tbody"><xf:group id="" tagname="tr">'
+           '<xf:group id="" tagname="th"><w2:textbox id="" label="유선전화번호"/></xf:group>'
+           '<xf:group id="" tagname="td"><xf:input id=""/><xf:input id=""/><xf:input id=""/></xf:group></xf:group></xf:group></xf:group>'
+           '<w2:gridView id="gridView1"><w2:header id="h1"><w2:row id="r1"><w2:column id="c1" value="번호"/><w2:column id="c2" value="법인명"/><w2:column id="c3" value="비고"/></w2:row></w2:header>'
+           '<w2:gBody id="b1"><w2:row id="r2"><w2:column id="c4" value=""/><w2:column id="c5" value=""/><w2:column id="c6" value=""/></w2:row></w2:gBody></w2:gridView>'
+           '<w2:gridView id="gridView2"><w2:header id="h2"><w2:row id="r3"><w2:column id="c7" value="파일명"/><w2:column id="c8" value="크기"/></w2:row></w2:header>'
+           '<w2:gBody id="b2"><w2:row id="r4"><w2:column id="c9" value=""/><w2:column id="c10" value=""/></w2:row></w2:gBody></w2:gridView>'
+           '</xf:group></body>')
+    ven = ('<body><xf:trigger id="img_1" class="btn_cm search icon" ev:onclick="scwin.img_1_onclick" type="button"/>'
+           '<xf:group id="" tagname="table"><xf:group id="" tagname="tbody"><xf:group id="" tagname="tr">'
+           '<xf:group id="" tagname="th"><w2:textbox id="" label="유선전화번호"/></xf:group>'
+           '<xf:group id="" tagname="td"><xf:input id="ipt_tel" ref="data:dma.tel"/></xf:group></xf:group></xf:group></xf:group>'
+           '<w2:gridView id="grd_list" dataList="data:dlt_list"><w2:header id="grd_list_hd"><w2:row id="row1"><w2:column id="h_corpNm" value="법인명"/><w2:column id="h_rmk" value="비고"/><w2:column id="h_etc" value="기타"/></w2:row></w2:header>'
+           '<w2:gBody id="grd_list_bd"><w2:row id="row2"><w2:column id="corpNm" value=""/><w2:column id="rmk" value=""/><w2:column id="etc" value=""/></w2:row></w2:gBody></w2:gridView>'
+           '</body>')
+    _, pb = pm.parse_body(pub); _, vb = pm.parse_body(ven)
+    log = []
+    matched, p_left, v_left, nonblock = pm.match(pm.collect(pb), pm.collect(vb), {}, log)
+    assert matched == 3 and not v_left                                  # 조회←icon:search · 전화 1칸 · 그리드 닮음(법인명·비고 공통 2/3, 번호 제외)
+    assert [sp for sp, k, el in p_left] == ["input:유선전화번호#2", "input:유선전화번호#3", "grid:크기/파일명"]
+    trig = pb.find(".//" + pm.T(pm.XF, "trigger"))
+    assert trig.get("id") == "img_1" and trig.get("{%s}onclick" % pm.EV) == "scwin.img_1_onclick"
+    assert pb.find(".//" + pm.T(pm.XF, "input")).get("id") == "ipt_tel"
+    assert pb.find(".//" + pm.T(pm.W2, "gridView")).get("id") == "grd_list"
+
+
+def test_publish_merge_todo_placement_and_tidy():
+    """남은 공급사 버튼은 버튼 자리에 TODO 표지와 함께, 남은 퍼블리싱 요소는 TODO 표지만; 목업 핸들러·중복 id 정리; override pair 는 manual."""
+    from lxml import etree
+    pub = ('<body><xf:group class="sub_contents" id="">\n  <xf:group class="btnbox" id="">\n    <xf:group class="rt" id="">\n'
+           '      <xf:trigger id="btn_Close" type="button" ev:onclick="scwin.btn_Close_onclick"><xf:label><![CDATA[제출]]></xf:label></xf:trigger>\n'
+           '    </xf:group>\n  </xf:group>\n  <xf:group id="panels1" tagname="div"/><xf:group id="panels1" tagname="div"/>\n</xf:group></body>')
+    ven = ('<body><xf:trigger id="btn_modify" class="btn_cm" ev:onclick="scwin.btn_modify_onclick" type="button"><xf:label><![CDATA[수정]]></xf:label></xf:trigger>'
+           '<xf:input id="ipt_hidden" style="display:none"/></body>')
+    _, pb = pm.parse_body(pub); _, vb = pm.parse_body(ven)
+    log = []
+    matched, p_left, v_left, nonblock = pm.match(pm.collect(pb), pm.collect(vb), {}, log)
+    assert matched == 0 and [sp for sp, k, el in p_left] == ["trigger:제출"] and [sp for sp, k, el in v_left] == ["trigger:수정"]
+    todo = pm.place_leftovers(pb, vb, p_left, v_left, {"ipt_hidden"}, log)
+    pm.tidy_mock(pb, "scwin.btn_modify_onclick = function(){};", log)
+    out = etree.tostring(pb, encoding="unicode")
+    assert todo == 3
+    rt = pb.find(".//" + pm.T(pm.XF, "group") + "[@class='rt']")
+    assert [etree.QName(e).localname if isinstance(e.tag, str) else "comment" for e in rt] == ["comment", "trigger", "comment", "trigger"]
+    assert rt[3].get("id") == "btn_modify"                                                 # 공급사 버튼은 버튼 자리로
+    assert "TODO Stage2(퍼블리싱 병합): 퍼블리싱 trigger:제출" in out and "스크립트가 쓰는 공급사 input#ipt_hidden" in out
+    assert pb.find(".//" + pm.T(pm.XF, "input")).get("id") == "ipt_hidden"                  # 참조 요소 옮겨 넣음
+    assert rt[1].get("{%s}onclick" % pm.EV) is None                                         # 목업 핸들러(정의 없음) 제거
+    assert [gq.get("id") for gq in pb.iter(pm.T(pm.XF, "group")) if gq.get("tagname") == "div"] == ["panels1", ""]  # 중복 id 비움
+    # override pair: 퍼블리싱 '제출' ← 공급사 btn_modify
+    _, pb2 = pm.parse_body(pub); _, vb2 = pm.parse_body(ven)
+    log2 = []
+    matched2, p_left2, v_left2, _ = pm.match(pm.collect(pb2), pm.collect(vb2), {"pair": {"trigger:제출": "btn_modify"}}, log2)
+    assert matched2 == 1 and not p_left2 and not v_left2 and pb2.find(".//" + pm.T(pm.XF, "trigger")).get("id") == "btn_modify"

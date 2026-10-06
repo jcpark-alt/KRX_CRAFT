@@ -670,15 +670,20 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
   그리드는 헤더 컬럼을 `value` 로 짝지어 id, 본문 컬럼은 같은 자리로 id+`inputType`, header/gBody/row/caption id 도 공급사 것(없으면 목업 id 는 `""` — 퍼블리싱 파일 안에서
   그리드마다 되풀이돼 WS120). 대응 없는 퍼블리싱 컬럼 id 가 복사해 온 id 와 겹치면 `_pub` 접미. select 는 목업 `choices` 를 버리고 공급사 `choices`/`itemset`.
   **퍼블리싱의 class·style·폭·순서·모양 속성은 그대로**(디자인이 정답). 목업 캡션 문구는 공급사 값이 없으면 비운다(값을 지어내지 않음).
-* **판정**: 스크립트가 참조하는 body id(게이트 잣대)가 전부 병합 본문에 있고, 공급사 상호작용 컴포넌트와 퍼블리싱 상호작용 요소가 전부 대응되면 `auto` →
-  `ui-pub/<name>.xml`(head·script 는 ui-tobe 그대로 + 병합 body → 규칙 34 정규화). 아니면 `review`(사유를 `publish_merge_report.md` 에). `인쇄` 같은 퍼블리싱 전용
-  공통 버튼(`PUB_CHROME`)은 대응이 없어도 막지 않는다.
+* **정합 순서(2026-10-06 재구성)**: ① 같은 키·같은 개수 → 순서대로 ② 그리드 1:1 ③ 버튼 뜻 토큰 `CANON`(조회↔검색↔icon:search, 등록↔저장↔icon:save, 엑셀다운↔엑셀다운로드↔icon:download,
+  도움말↔icon:guide …)·같은 개수 ④ 닫기 여럿(상단 X+하단)↔하나: 첫째 id+이벤트, 나머지 이벤트만 ④b 같은 키 개수 다름(라벨 있는 것) → 앞에서부터, 나머지 TODO ④c 그리드 개수 같음 → 순서대로
+  ④d 그리드 헤더 집합 자카드 ≥ 0.5(퍼블리싱 그룹 헤더·공급사 번호 컬럼 차이 흡수) ⑤ 화면별 override `conversion/jsp-front/publish_merge_overrides.json`(`pair`·`keep`·`drop`·`vendor_skip`·`insert`)
+  ⑥ 퍼블리싱 전용 공통 버튼(인쇄·도움말·닫기 — 공급사 대응이 없으면 공통 처리) ⑦ 스크립트가 쓰는 공급사 요소가 병합 본문에 없으면 옮겨 넣음 ⑧ 남은 공급사 요소 옮겨 넣음(버튼은 마지막
+  btnbox/titbox rt, 그 밖은 본문 끝) ⑨ 남은 퍼블리싱 요소는 둠. ⑦~⑨ 는 `<!-- TODO Stage2(퍼블리싱 병합): … -->` 표지를 단다 — **값·자리를 지어내지 않고 드러낸다**.
+* **정리**: 퍼블리싱 목업 핸들러(스크립트에 정의 없는 `ev:*="scwin.x"`) 제거 · 목업 중복 id 비움 · 같은 헤더 value 가 여럿이면 공급사 컬럼을 순서대로 소비.
+* **판정**: `auto`(전부 이음·TODO 0) · `todo`(닫혔지만 TODO 표지 있음) · `manual`(override 로 닫음) → `ui-pub/<name>.xml`(head·script 는 ui-tobe 그대로 + 병합 body → 규칙 34 정규화).
+  `review` = 퍼블리싱 본문이 자리표뿐 · 공급사 body 에 있던 참조를 못 채움 · 양쪽에 항목이 있는데 하나도 못 이음(다른 구조의 퍼블리싱 파일). 공급사 body 에도 없던 참조는 게이트처럼 report-only.
 * **헤더 표준(사용자 확정 2026-10-06)**: 퍼블리싱 헤더는 `pgtbox`+breadcrumb+즐겨찾기 꼴이지만 **pageFrame 으로 통일** — 본화면(`sub_contents`)은
   `pfmContentHeader` pageFrame 을 첫 자식으로 반드시, 팝업(`pop_contents`)은 헤더 없음(제목은 팝업 프레임). 규칙 34 P1 이 보장하므로 병합본에도 자동 적용된다.
   퍼블리싱 본문이 자리표뿐이면(위젯 없음) `review`. `review` 의 큰 덩어리: 퍼블리싱에만 있는 버튼·select(새 디자인 추가분), 전화번호 3분할 입력 ↔ 공급사 1칸, 라벨 없는 컨트롤 여러 개,
   EL `${…}` 라벨 버튼(공급사 미해결 표식), 공급사 보조 그리드(헤더 없는 `grd_sub…`). 같은 이름이 두 폴더에 있으면 `대외` 쪽을 고른다(⚠중복 표기).
 * **실행**: `python conversion/tools/publish_merge.py [--report-only] [--out conversion/jsp-front/ui-pub] conversion/jsp-front/ui-tobe` — 재실행 고정점.
-  기준(2026-10-06): 이름 일치 260화면 → auto 66 / review 194(헤더 표준 적용 뒤), `ui-pub` 게이트·lint 0/0. 테스트 `test_jspfront_tools.py::test_publish_merge_*`.
+  기준(2026-10-06): 이름 일치 260화면 → auto 89 · todo 160(표지 1,701) · manual 2 · review 9, `ui-pub` 251본 게이트·lint 0/0, 고정점. 테스트 `test_jspfront_tools.py::test_publish_merge_*`.
 
 ## 규칙 6 보충: Submission 변환 상세
 
