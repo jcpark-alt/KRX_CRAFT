@@ -689,7 +689,8 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
   EL `${…}` 라벨 버튼(공급사 미해결 표식), 공급사 보조 그리드(헤더 없는 `grd_sub…`). 같은 이름이 두 폴더에 있으면 `대외` 쪽을 고른다(⚠중복 표기).
 * **손작업 보호·jQuery 힌트(2026-10-06)**: 지시 `frozen`(ui-pub 파일을 손으로 고친 뒤 재생성에서 보호, 판정 `frozen`) · ui-pub 에 쓰기 전 남은 jQuery 문장마다 `// TODO Stage2(규칙 19): jQuery — 힌트`
   (폼 제출→B-4 · 파일 입력→upload 재설계 · 서버 렌더→B-1 · 라디오/체크 그룹 · 바인딩→ev:on* · DOM 탐색/조립 · 표시/스타일) 를 단다(멱등). 손작업 관용구: 체크박스 단일 항목 `getValue()==="Y"`/`setValue("Y"|"")`, 그리드 체크 컬럼 `getCheckedIndex(colId)`, 바인딩은 `ev:on*` + `scwin` 핸들러.
-* **실행**: `python conversion/tools/publish_merge.py [--report-only] [--out conversion/jsp-front/ui-pub] conversion/jsp-front/ui-tobe` — 재실행 고정점.
+* **승격(2026-10-06, 사용자 확정)**: 병합은 `jspfront_pipeline.py` **5b 단계**가 수행하고 결과는 `ui-tobe/` 에 바로 쓴다(별도 `ui-pub/` 없음). 닫힘(auto/todo/manual)이면 병합본 + convert 수렴, review/mismatch 면 병합 전 본 유지, `frozen` 은 파이프라인이 건너뜀(ui-tobe 파일이 정본). 리포트는 파이프라인이 행 단위로 갱신.
+* **실행**: 재생성은 `python conversion/tools/jspfront_pipeline.py <name|폴더>`; `publish_merge.py` CLI 단독은 `--vendor-dir <병합 전 본 폴더>` 가 있을 때만 의미 있다(`--out` 이 같은 폴더면 report-only 강제).
   기준(2026-10-06): 이름 일치 260화면 → auto 89 · todo 160(표지 1,576) · manual 3 · mismatch 8(override skip: 같은 이름에 다른 화면 6·퍼블리싱 빈 자리표 2) · review 0, `ui-pub` 252본 게이트·lint 0/0, 고정점. 테스트 `test_jspfront_tools.py::test_publish_merge_*`.
 
 ## 규칙 6 보충: Submission 변환 상세

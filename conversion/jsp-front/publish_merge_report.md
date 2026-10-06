@@ -1,6 +1,6 @@
-# 퍼블리싱 병합 리포트 (publish ↔ ui-tobe)
+# 퍼블리싱 병합 리포트 (publish ↔ 공급사 전환본)
 
-> `python conversion/tools/publish_merge.py conversion/jsp-front/ui-tobe` 가 만든다. `auto` 는 `conversion/jsp-front/ui-pub/` 에 병합 결과를 썼다(스크립트 참조 전부 자리잡음·공급사 상호작용 컴포넌트 전부 대응). `todo` 는 닫혔지만 본문에 `TODO Stage2(퍼블리싱 병합)` 표지가 있는 것(공급사 요소를 옮겨 넣었거나 퍼블리싱 요소에 대응이 없음 — 자리·기능 확인). `manual` 은 `publish_merge_overrides.json` 의 화면별 지시(pair/keep/drop/vendor_skip/insert)로 닫은 것. `review` 는 스크립트 참조를 못 채웠거나 퍼블리싱 본문이 비어 있다.
+> `jspfront_pipeline.py` 가 화면마다 병합(5b 단계)하며 행을 갱신한다(승격 2026-10-06 뒤 ui-tobe 가 병합 결과). `auto` 는 전부 이은 것, `todo` 는 본문에 `TODO Stage2(퍼블리싱 병합)` 표지가 있는 것, `manual` 은 `publish_merge_overrides.json` 지시로 닫은 것, `frozen` 은 손으로 고친 ui-tobe 파일(재생성 건너뜀), `review` 는 참조를 못 채웠거나 퍼블리싱 본문이 비어 있는 것, `mismatch` 는 지시 `skip`(다른 화면/빈 자리표).
 
 화면 260 · auto 79 · todo 151(표지 1576건) · manual(override) 3 · frozen(손작업 정본) 19 · review 0 · mismatch(override skip) 8 · error 0
 

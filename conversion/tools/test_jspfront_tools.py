@@ -724,7 +724,7 @@ def test_publish_merge_override_skip_and_accept(tmp_path, monkeypatch):
         '  <w2:publicInfo method="scwin.onpageload"></w2:publicInfo>\n  <script type="text/javascript"><![CDATA[\nscwin.onpageload = function(){};\n]]></script>\n</head>\n'
         '<body ev:onpageload="scwin.onpageload">\n<xf:group class="sub_contents">\n<w2:gridView id="grd_list" dataList="data:dlt_list"><w2:header id="grd_list_hd"><w2:row id="row1"><w2:column id="h_a" value="가"/></w2:row></w2:header>'
         '<w2:gBody id="grd_list_bd"><w2:row id="row2"><w2:column id="a" value=""/></w2:row></w2:gBody></w2:gridView>\n</xf:group>\n</body>\n</html>\n</xf:xforms>\n', encoding="utf-8")
-    monkeypatch.setattr(pm, "TOBE", tobe)
+    monkeypatch.setattr(pm, "TOBE", tobe); monkeypatch.setattr(pm, "VENDOR_DIR", tobe)
     out = tmp_path / "out"
     rep = pm.merge_screen("jldtest00001", str(pub), out, False, {"jldtest00001": {"skip": "다른 화면"}})
     assert rep["verdict"] == "mismatch" and not out.exists()
@@ -778,7 +778,7 @@ fm.action = "/a.do";
 
 
 def test_publish_merge_mark_jquery_todo():
-    """ui-pub 에 쓰기 전 남은 jQuery 문장마다 규칙 19 힌트 TODO 한 줄(멱등, 주석·문자열 제외)."""
+    """병합 결과를 쓰기 전 남은 jQuery 문장마다 규칙 19 힌트 TODO 한 줄(멱등, 주석·문자열 제외)."""
     src = '''scwin.a = function () {
     $("#frm").attr("action", "x.do");
     const f = $('[type=file]');

@@ -5,10 +5,9 @@ JSP 원본 화면을 WebSquare 로 옮기는 작업의 두 갈래가 한 폴더�
 | 폴더 | 무엇 | 상태 |
 |---|---|---|
 | `ui/` | **공급사 13차 최종 전달본(2026-09-30, `16bf420e194` · `dep20260930_095541`)의 원본** — `jld*`/`uld*` 접두 화면 1,677본. 내용 무수정(반입 커밋 그대로) | 원본. **손대지 않는다** |
-| `ui-tobe/` | `ui/` 를 우리 규칙(퍼블리싱·conversion·code convention)으로 전환한 산출 | 1,677본 전량(기계 단계 완료 2026-10-02, Stage 2 판단 보강 전) |
+| `ui-tobe/` | `ui/` 를 우리 규칙(퍼블리싱·conversion·code convention)으로 전환한 **단일 산출**. KRX 퍼블리싱 XML 이 있는 260화면은 파이프라인 5b 단계가 퍼블리싱 body 에 공급사 id·이벤트·바인딩을 옮겨 심은 병합본(규칙 35), 손으로 고친 화면(`frozen` 19본)은 재생성이 건너뜀 | 1,677본 전량(2026-10-06 승격: 병합 252본 포함, 게이트 전건·lint 0/0) |
 | `r13/` | 공급사 전달 문서 — `README.md`(13차 안내서) · `MD5SUMS.txt` · `_meta/`(치환 대응표 `krx-tobe.yaml`, `fn_*` 재고, 규약 계수표, forward 판별표) | 참고 자료 |
 | `krx_소스전환/` | 2026-09 초 공급사 자동 산출 33화면(옛 판) | 역사. 정비 기준 비교용 |
-| `ui-pub/` | **퍼블리싱 병합 산출**(`publish_merge.py` 판정 `auto`·`todo`·`manual`) — KRX 퍼블리싱 XML body 에 `ui-tobe/` 의 id·이벤트·바인딩을 옮겨 심은 것. head·script 는 `ui-tobe` 와 같다. `todo` 본은 body 에 `<!-- TODO Stage2(퍼블리싱 병합): … -->` 표지(자리·기능 확인 거리) | 252본(2026-10-06: auto 89 · todo 160 · manual 3; mismatch 8 은 override skip 으로 미착지). 리포트 `publish_merge_report.md`, 화면별 지시 `publish_merge_overrides.json` |
 | `publish/` | 사용자가 둔 **KRX 퍼블리싱 산출 XML** 1,934본(미추적 — 커밋하지 않는다). 시각 목업이라 id 는 자동생성(`column8`·`row3` …), 버튼 라벨은 글자 | 퍼블리싱 재설계 축의 정답지 |
 | `jsp_소스전환/` | 위 31화면을 우리가 손으로 정비한 **정비본 + 화면별 수정가이드 + conversion-report** | **파일럿 정답지** |
 
@@ -35,12 +34,13 @@ ui/<name>.xml
   4 convert 수렴            결과가 안 바뀔 때까지(최대 3회) — 3 이 규칙 4 보류를 풀면 다음 회차에 재정렬된다
   5 publish_normalize.py   body 퍼블리싱 정규화 P1~P11 (규칙 34, lxml)
      (1 안에서 vendor_stage2.py V27~V36 — V36 = dom_rules.py 규칙 19 기계 가능분)
+  5b publish_merge.py      KRX 퍼블리싱 XML 이 있으면 병합(규칙 35) → 판정 auto/todo/manual 만 쓰고 review/mismatch 는 병합 전 본 유지; frozen 화면은 run() 입구에서 건너뜀
   6 convert 수렴
   7 gate_screen.py         정적 게이트(node --check·publicInfo↔정의·ev:on↔정의·컴포넌트 참조↔id·미정의 $c·미사용 전역·레거시 토큰)
 → ui-tobe/<name>.xml
 ```
 
-보조 도구: `publish_merge.py`(퍼블리싱 XML ↔ ui-tobe 병합 → `ui-pub/`, 규칙 35) · `scan_mixed_compare.py`(규칙 5a 회귀 후보) · `init_restructure.py`(onpageload 인라인 초기화 분리 — 공급사 산출은 이미 init_* 구조라 대개 불필요) ·
+보조 도구: `publish_merge.py`(규칙 35 병합기 — 파이프라인 5b 가 호출; CLI 단독은 `--vendor-dir` 임시 폴더·보고용) · `scan_mixed_compare.py`(규칙 5a 회귀 후보) · `init_restructure.py`(onpageload 인라인 초기화 분리 — 공급사 산출은 이미 init_* 구조라 대개 불필요) ·
 `python -m wsxml_lint conversion/jsp-front/ui-tobe`(strict) · `pytest conversion/tools`. 규칙 본문은 각 도구의 머리 주석과
 `conversion/md/conversion_rules.md` 규칙 33·34·35.
 
@@ -141,6 +141,7 @@ ui/<name>.xml
 | 2026-10-06 | **jQuery·원시 폼 DOM 전환(규칙 19) 기계 가능분 — V36 `dom_rules.py`** | 집계: jQuery 호출 6,897자리/514화면, 원시 폼 DOM 430자리/144화면(`fm.action` 217·`target` 107 — 대부분 B-4 제출 주소 회신 대상). **body 의 입력 컴포넌트 하나로 확정되는 셀렉터만** 바꿨다(`#id`·`[id=X]`·`[name=X]` 접미 없음 → `.val()`/`.val(v)`/`.attr|prop('disabled'|'readonly', v)`/`.removeAttr`/`.show/.hide/.focus`, `$(document).find("select[id=X]").val()`, `fm.X.value`·`getElementsByName("X")[0].value`). **바꾸지 않은 이유**: 공급사가 라디오 한 칸마다 `select1` 을 따로 그려 같은 `name` 이 여럿(`:checked` 280자리는 병합 뒤 그룹 컴포넌트에서), body 에 없는 id(그리드 헤더 체크·서버 렌더), `.find/.each/.append/.empty/.bind/.submit` 구조 조작은 화면별 재작성. 잔여는 `reply_request.md` **B-7**(셀렉터 유형 × 메서드 × 처방) 명부로, 게이트에 report-only 토큰 `jQuery $(`·`form DOM` 추가 | 89화면 재생성(치환 949 = jQuery 734 + document.find 215) · 게이트 89/89 · lint 1,677본 0/0 · V36 dry 재실행 0(고정점) · 테스트 +1(총 123). 잔여 jQuery **5,948자리/510화면**, 원시 폼 DOM 430자리/144화면 — 화면별 손작업은 `ui-pub` 착지 화면부터 |
 | 2026-10-06 | **`ui-pub` jQuery 화면별 재작성 1차(손작업)** | 대상 `ui-pub` 56화면·261자리. 퍼블리싱 컴포넌트로 **확정되는 자리만** 손으로 고쳤다(15화면·26자리): ETN 선택 제출 7화면 `$("[name='checkSub']").is(':checked')` → `grd_pageList.getCheckedIndex("checkSub").length === 0`(sample-front 관용구), jldfil20500 체크박스 8개 `is/attr/removeAttr` → `getValue()==="Y"`/`setValue("Y"|"")`(항목 값 Y 확인), jldfil72100 체크 헬퍼 인자·판정 → 컴포넌트, jldfil25100 change 바인딩 → `ev:onchange`+핸들러, jldfil11000 엔터 keydown → `ev:onkeydown`+핸들러, jldinf35000 동적 id `$("#"+id).val()/[0]` → `getComponent(id)`, jldfil40300·40400 `attr(alt)`+DOM 인자 → `checkRequired(comp, name)`, jldinf92300 빈 `ready` 제거. **손본 ui-pub 파일은 override `frozen` 으로 재생성에서 보호**(ui-pub 파일이 정본). 전체선택 `#ipt_checkAll` 3화면은 병합본 그리드에 헤더 체크 컬럼이 없어 보류. 남은 자리에는 `publish_merge` 가 **규칙 19 힌트 TODO**(`// TODO Stage2(규칙 19): jQuery — …`, 폼 제출→B-4 · 파일 입력→upload 재설계 · 서버 렌더→B-1 · 라디오/체크 그룹 · 바인딩→ev:on* · DOM 탐색/조립 · 표시/스타일)를 문장마다 단다(재생성마다 같은 결과) | `ui-pub` 252본: auto 79 · todo 155 · manual 3 · **frozen 15** · mismatch 8 · 게이트 전건 · lint 0/0 · 고정점. jQuery 잔여 261 → **235자리/42화면**(힌트 230건: 참조 재작성 81 · 폼 제출 27 · 표시/스타일 25 · DOM 조립 25 · 파일 입력 20 · 라디오/체크 18 · DOM 탐색 17 · 바인딩 13 · 서버 렌더 4). 테스트 +1(총 124) |
 | 2026-10-06 | `ui-pub` jQuery 화면별 재작성 2차 | '퍼블리싱 컴포넌트 참조로 재작성' 힌트 81자리를 화면별 컴포넌트 목록과 대조해 **실재하는 자리만** 손작업(4화면·25자리): jldstf70010 as-is 공통 `setBtnDisable/Enable`(정의 없는 전역 — 호출 자체가 오류)+span 래퍼 id → 안의 버튼 컴포넌트 `setDisabled`(공급사 body 로 래퍼↔버튼 확인: duplChkSpan→ipt_duplChk · formDelSpan→input_44 · upBtn→input_209 · downBtn→input_211), `option:selected` → `getValue()`(jldstf70010 chargInstId · jldfil11010 disclsChrg ×3), jQuery UI tooltip 사문 제거(11010·22110), uldmgt76101 option disabled → `setDisabled`. 남은 56자리는 퍼블리싱에 없는 요소(as-is 숨은 입력 integSrchNm·동적 행 modBtn/chgKeywrdNm·읽기 전용 팝업의 입력 ipt_isuAmt 류·#koList·이메일 행 접미) | `ui-pub` frozen 15 → **19** · 게이트 전건 · lint 0/0 · 고정점. jQuery 잔여 235 → **210자리/42화면**(힌트: 참조 재작성 56 · 폼 제출 27 · 표시/스타일 25 · DOM 조립 25 · 파일 입력 20 · 라디오/체크 18 · DOM 탐색 17 · 바인딩 13 · 서버 렌더 4) |
+| 2026-10-06 | **`ui-pub` 승격 → `ui-tobe` 단일 산출**(사용자 확정) | 병합 결과를 별도 폴더에 두면 `ui/` 재생성이 언제든 덮는 구조라, **파이프라인 안에 병합을 넣는 방식**으로 승격했다. `jspfront_pipeline.run()` 5b: 퍼블리싱 XML 이 있는 화면은 5·6 뒤 공급사 전환본 영역을 메모리로 `publish_merge.merge_screen(vendor=…)` 에 넘겨 병합하고 닫힘(auto/todo/manual)이면 ui-tobe 에 쓴 뒤 convert 수렴(`idem_after_merge`); review/mismatch 면 병합 전 본 유지. `frozen` 화면은 run() 입구에서 통째로 건너뛴다(게이트만). 리포트는 파이프라인이 처리한 행만 갱신(`publish_merge.update_report`). `ui-pub/` 252본을 ui-tobe 에 복사하고 폴더 삭제 → 260화면 파이프라인 재생성 결과가 **스냅샷 252본과 바이트 단위 동일**(frozen 19 포함). CLI `publish_merge.py` 는 `--vendor-dir`(병합 전 본) 를 받고, `--out` 이 같은 폴더면 report-only 로 강제 | 260화면 재생성: auto 79 · todo 151 · manual 3 · frozen 19 · mismatch 8 · 게이트 260/260 · `idem_after_merge` 전건 True · ui-tobe 1,677본 게이트 전건 · lint 0/0 · 테스트 124 |
 | 2026-10-06 | 헤더 표준 **`ui-tobe` 전량 적용** | `python conversion/tools/publish_normalize.py conversion/jsp-front/ui-tobe` 제자리 재실행(P 규칙은 멱등이라 P1 추가 외 변경 0 — dry-run 으로 먼저 확인). 본화면 966본에 `pfmContentHeader` pageFrame 1줄씩 추가(989줄 추가·삭제 0), 팝업 79본·골격 없는 5본은 그대로 | 본화면 1,593/1,593 pageFrame · 게이트 1,677/1,677 · lint 0/0 · dry 재실행 변경 0(고정점) |
 
 **알아 둘 함정(1단계에서 확인)**: 규칙 13 이 `fn_modifiyDate→modifiyDate` 로 상태 변수를 덮는다(V13 선개명) · 공급사 `var` 중복 선언이 규칙 8 로
@@ -172,3 +173,4 @@ PowerShell 5.1 `Out-File` 의 BOM 이 커밋 제목에 섞인다.
 - 2026-10-06 규칙 19 기계 가능분 V36 `dom_rules.py` — jQuery·원시 폼 DOM 중 body 로 확정되는 949자리 컴포넌트 API 로(89화면 재생성), 잔여 B-7 명부.
 - 2026-10-06 `ui-pub` jQuery 화면별 재작성 1차 — 15화면 손작업(override `frozen`), 잔여 235자리에 규칙 19 힌트 TODO.
 - 2026-10-06 `ui-pub` jQuery 화면별 재작성 2차 — 4화면·25자리(frozen 19), 잔여 210자리/42화면.
+- 2026-10-06 `ui-pub` 승격 — 파이프라인 5b 병합 단계 신설, `ui-pub/` 삭제, `ui-tobe/` 단일 산출(병합 252본 포함, 스냅샷과 동일).

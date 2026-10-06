@@ -2,8 +2,11 @@
 """퍼블리싱 병합 — KRX 퍼블리싱 XML(`conversion/jsp-front/publish/**`, 시각 목업·id 자동생성)의 body 에 공급사 전환본(ui-tobe)의
 의미 id·이벤트·바인딩을 옮겨 심어 스크립트가 그대로 도는 화면을 만든다(가이드 샘플 JLDFIL25900 이 같은 방법으로 만들어졌다).
 
-    python conversion/tools/publish_merge.py [--report-only] [--out conversion/jsp-front/ui-pub] <name|폴더> ...
-    (폴더를 주면 그 안의 ui-tobe 화면 중 퍼블리싱 XML 이 있는 것만)
+    python conversion/tools/publish_merge.py [--report-only] [--vendor-dir <병합 전 전환본 폴더>] [--out <폴더>] <name|폴더> ...
+    (폴더를 주면 그 안의 화면 중 퍼블리싱 XML 이 있는 것만)
+
+**승격(2026-10-06)**: 병합은 `jspfront_pipeline.py` 의 5b 단계가 수행하고 결과는 `ui-tobe/` 에 바로 쓴다(ui-pub 폴더 없음). 이 CLI 는 파이프라인이
+넘기는 것과 같은 `merge_screen()` 을 쓰되 공급사 전환본을 `--vendor-dir`(기본 ui-tobe — 승격 뒤에는 이미 병합된 본이므로 임시 폴더를 줄 것) 에서 읽는다.
 
 정합 규칙(퍼블리싱 요소 ← 공급사 컴포넌트):
   · 버튼  xf:trigger            라벨(xf:label CDATA 또는 label 속성) 이 같은 것(화면 안에서 유일할 때)
@@ -29,7 +32,7 @@ override 형식(화면 이름 → 객체; 항목 지정은 'kind:label' 또는 �
   pair = 퍼블리싱 요소 ← 공급사 요소 · keep = 대응 없이 둔다(공통 처리·디자인 추가분) · drop = 퍼블리싱 요소 삭제 · vendor_skip = 공급사 요소를 안 옮긴다(스크립트가
   안 쓸 때만 닫힌다) · insert = 공급사 요소를 그대로 옮겨 넣는다(hidden 입력 등) · accept = "이유": 정합 0 이어도 TODO 표지 결과를 받아들여 닫는다 ·
   skip = "이유": 퍼블리싱 파일이 다른 화면/빈 자리표라 병합하지 않는다(판정 `mismatch`, ui-pub 미착지) ·
-  frozen = "이유": ui-pub 파일을 손으로 재작성한 뒤(jQuery 화면별 전환 등) 재생성으로 덮지 않는다(판정 `frozen`, ui-pub 파일이 정본). override 로 닫힌 화면은 판정 `manual`.
+  frozen = "이유": ui-tobe 파일을 손으로 재작성한 뒤(jQuery 화면별 전환 등) 파이프라인 재생성이 건너뛴다(판정 `frozen`, ui-tobe 파일이 정본). override 로 닫힌 화면은 판정 `manual`.
 """
 import collections
 import copy
@@ -51,6 +54,7 @@ import convert as cv  # noqa: E402
 ROOT = st.ROOT
 PUB_DIR = ROOT / "conversion" / "jsp-front" / "publish"
 TOBE = ROOT / "conversion" / "jsp-front" / "ui-tobe"
+VENDOR_DIR = TOBE  # CLI 단독 실행 때 공급사 전환본을 읽는 폴더(--vendor-dir). 승격(2026-10-06) 뒤 ui-tobe 는 병합 결과라 CLI 는 임시 폴더·보고용
 XF, W2, EV = pn.XF, pn.W2, pn.EV
 T = lambda ns, n: "{%s}%s" % (ns, n)  # noqa: E731
 CONTROLS = {T(XF, "input"), T(XF, "select1"), T(XF, "select"), T(W2, "inputCalendar"), T(W2, "textarea"), T(W2, "upload")}
@@ -562,17 +566,21 @@ def mark_jquery_todo(script):
     return "\n".join(out), n
 
 
-def merge_screen(name, pub_path, out_dir, report_only, overrides=None):
+def merge_screen(name, pub_path, out_dir, report_only, overrides=None, vendor=None):
+    """vendor = (reg, eol): 파이프라인이 넘기는 병합 전 공급사 전환본 영역(없으면 VENDOR_DIR 에서 읽는다)."""
     ov = (overrides or {}).get(name) or {}
     if ov.get("skip"):
         return {"name": name, "verdict": "mismatch", "matched": 0, "pub_items": 0, "missing_refs": [], "unmatched_vendor": [], "todo": 0,
                 "log": ["override skip: " + ov["skip"]], "detail": {}}
     if ov.get("frozen") and (out_dir / (name + ".xml")).exists():
-        # 손으로 재작성한 ui-pub 본(jQuery 화면별 전환 등)은 재생성으로 덮지 않는다 — ui-pub 파일이 정본
+        # 손으로 재작성한 본(jQuery 화면별 전환 등)은 재생성으로 덮지 않는다 — ui-tobe 파일이 정본(파이프라인은 run() 입구에서 건너뜀)
         t = io.open(out_dir / (name + ".xml"), encoding="utf-8").read()
         return {"name": name, "verdict": "frozen", "matched": 0, "pub_items": 0, "missing_refs": [], "unmatched_vendor": [],
                 "todo": t.count("TODO Stage2(퍼블리싱 병합)"), "log": ["override frozen: " + ov["frozen"]], "detail": {}}
-    raw, eol, reg = st.read_xml(TOBE / (name + ".xml"))
+    if vendor is not None:
+        reg, eol = vendor
+    else:
+        raw, eol, reg = st.read_xml(VENDOR_DIR / (name + ".xml"))
     pub_text = io.open(pub_path, encoding="utf-8").read()
     proot, pbody = parse_body(pub_text)
     vroot, vbody = parse_body(reg["body"])
@@ -620,20 +628,60 @@ def merge_screen(name, pub_path, out_dir, report_only, overrides=None):
     return rep
 
 
+REPORT = ROOT / "conversion" / "jsp-front" / "publish_merge_report.md"
+
+
+def report_lines(reps):
+    L = ["# 퍼블리싱 병합 리포트 (publish ↔ 공급사 전환본)", "", "> `jspfront_pipeline.py` 가 화면마다 병합(5b 단계)하며 행을 갱신한다(승격 2026-10-06 뒤 ui-tobe 가 병합 결과). "
+         "`auto` 는 전부 이은 것, `todo` 는 본문에 `TODO Stage2(퍼블리싱 병합)` 표지가 있는 것, `manual` 은 `publish_merge_overrides.json` 지시로 닫은 것, "
+         "`frozen` 은 손으로 고친 ui-tobe 파일(재생성 건너뜀), `review` 는 참조를 못 채웠거나 퍼블리싱 본문이 비어 있는 것, `mismatch` 는 지시 `skip`(다른 화면/빈 자리표).", "",
+         "| 화면 | 판정 | 정합/퍼블리싱 항목 | TODO | 스크립트 참조 누락 | 공급사 미대응(옮겨 넣음) | 메모 |", "| --- | --- | ---: | ---: | --- | --- | --- |"]
+    for r in reps:
+        L.append("| %s%s | %s | %d/%d | %d | %s | %s | %s |" % (r["name"], " ⚠중복" if r.get("ambiguous") else "", r["verdict"], r["matched"], r["pub_items"], r.get("todo", 0),
+                                                           ", ".join(r["missing_refs"][:6]), "; ".join(r["unmatched_vendor"][:4]), "; ".join(r["log"][:4]).replace("|", "\\|")))
+    c = collections.Counter(r["verdict"] for r in reps)
+    L.insert(4, "화면 %d · auto %d · todo %d(표지 %d건) · manual(override) %d · frozen(손작업 정본) %d · review %d · mismatch(override skip) %d · error %d" % (
+        len(reps), c["auto"], c["todo"], sum(r.get("todo", 0) for r in reps), c["manual"], c["frozen"], c["review"], c["mismatch"], c["error"]))
+    L.insert(5, "")
+    return L
+
+
+def update_report(reps):
+    """기존 리포트의 행을 화면 이름으로 갱신(없던 화면은 추가)해 다시 쓴다 — 파이프라인이 일부 화면만 돌려도 전체 표가 유지된다."""
+    rows = {}
+    if REPORT.exists():
+        for l in io.open(REPORT, encoding="utf-8"):
+            m = re.match(r'\| (\S+?)( ⚠중복)? \| (\w+) \| (\d+)/(\d+) \| (\d+) \| ([^|]*)\| ([^|]*)\| (.*) \|$', l.rstrip("\n"))
+            if m:
+                rows[m.group(1)] = {"name": m.group(1), "ambiguous": bool(m.group(2)), "verdict": m.group(3), "matched": int(m.group(4)), "pub_items": int(m.group(5)),
+                                    "todo": int(m.group(6)), "missing_refs": [x.strip() for x in m.group(7).split(",") if x.strip()],
+                                    "unmatched_vendor": [x.strip() for x in m.group(8).split(";") if x.strip()], "log": [x.strip().replace("\\|", "|") for x in m.group(9).split(";") if x.strip()]}
+    for r in reps:
+        rows[r["name"]] = r
+    io.open(REPORT, "w", encoding="utf-8", newline="\n").write("\n".join(report_lines([rows[k] for k in sorted(rows)])) + "\n")
+    return len(rows)
+
+
 def main(argv=None):
     sys.stdout.reconfigure(encoding="utf-8")
     args = argv if argv is not None else sys.argv[1:]
     report_only = "--report-only" in args
-    out_dir = ROOT / "conversion" / "jsp-front" / "ui-pub"
+    out_dir = TOBE
     if "--out" in args:
         out_dir = Path(args[args.index("--out") + 1])
     names = []
     for a in args:
-        if a.startswith("--") or (args.index(a) > 0 and args[args.index(a) - 1] in ("--out", "--detail")):
+        if a.startswith("--") or (args.index(a) > 0 and args[args.index(a) - 1] in ("--out", "--detail", "--vendor-dir")):
             continue
         p = Path(a)
         names += sorted(x.stem for x in p.glob("*.xml")) if p.is_dir() else [p.stem]
     detail_path = Path(args[args.index("--detail") + 1]) if "--detail" in args else None
+    global VENDOR_DIR
+    if "--vendor-dir" in args:
+        VENDOR_DIR = Path(args[args.index("--vendor-dir") + 1])
+    if Path(out_dir).resolve() == Path(VENDOR_DIR).resolve() and not report_only:
+        print("--out 과 --vendor-dir 가 같은 폴더(%s) — 병합 결과로 공급사 본을 덮을 수 없어 --report-only 로 돕니다. 재생성은 jspfront_pipeline.py 로." % out_dir)
+        report_only = True
     idx = publish_index()
     names = [n for n in names if n.lower() in idx]
     overrides = load_overrides()
@@ -647,18 +695,9 @@ def main(argv=None):
         rep["ambiguous"] = ambiguous; rep["pub"] = os.path.relpath(pub_path, ROOT).replace("\\", "/")
         reps.append(rep)
         print("%-16s %-6s 정합 %d/%d · 참조 누락 %d · 공급사 미대응 %d %s" % (n, rep["verdict"], rep["matched"], rep["pub_items"], len(rep["missing_refs"]), len(rep["unmatched_vendor"]), "(이름 중복)" if ambiguous else ""))
-    # 리포트
-    L = ["# 퍼블리싱 병합 리포트 (publish ↔ ui-tobe)", "", "> `python conversion/tools/publish_merge.py conversion/jsp-front/ui-tobe` 가 만든다. "
-         "`auto` 는 `conversion/jsp-front/ui-pub/` 에 병합 결과를 썼다(스크립트 참조 전부 자리잡음·공급사 상호작용 컴포넌트 전부 대응). "
-         "`todo` 는 닫혔지만 본문에 `TODO Stage2(퍼블리싱 병합)` 표지가 있는 것(공급사 요소를 옮겨 넣었거나 퍼블리싱 요소에 대응이 없음 — 자리·기능 확인). "
-         "`manual` 은 `publish_merge_overrides.json` 의 화면별 지시(pair/keep/drop/vendor_skip/insert)로 닫은 것. `review` 는 스크립트 참조를 못 채웠거나 퍼블리싱 본문이 비어 있다.", "",
-         "| 화면 | 판정 | 정합/퍼블리싱 항목 | TODO | 스크립트 참조 누락 | 공급사 미대응(옮겨 넣음) | 메모 |", "| --- | --- | ---: | ---: | --- | --- | --- |"]
-    for r in reps:
-        L.append("| %s%s | %s | %d/%d | %d | %s | %s | %s |" % (r["name"], " ⚠중복" if r["ambiguous"] else "", r["verdict"], r["matched"], r["pub_items"], r.get("todo", 0),
-                                                           ", ".join(r["missing_refs"][:6]), "; ".join(r["unmatched_vendor"][:4]), "; ".join(r["log"][:4]).replace("|", "\\|")))
+    # 리포트(전체 다시 쓰기)
+    L = report_lines(reps)
     c = collections.Counter(r["verdict"] for r in reps)
-    L.insert(4, "화면 %d · auto %d · todo %d(표지 %d건) · manual(override) %d · frozen(손작업 정본) %d · review %d · mismatch(override skip) %d · error %d" % (len(reps), c["auto"], c["todo"], sum(r.get("todo", 0) for r in reps), c["manual"], c["frozen"], c["review"], c["mismatch"], c["error"]))
-    L.insert(5, "")
     io.open(ROOT / "conversion" / "jsp-front" / "publish_merge_report.md", "w", encoding="utf-8", newline="\n").write("\n".join(L) + "\n")
     if detail_path:
         import json
