@@ -584,6 +584,10 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
   V24 `$c.lc.fn_isProcess(X)` → 화면 로컬 `scwin.confirmJob(X)`(`$c.win.confirm("[저장] 하시겠습니까?")`, as-is 의미 보존, 처리명을 `scwin.lastJob` 에 기록) — Stage 2 수작업 1축(2026-10-02).
   V25 `$c.lc.fn_alertMsg(X)` → 화면 로컬 `scwin.alertJobResult(X)`(S/S1/F → MSG-A001/0001/A002 문구, `scwin.lastJob` 사용) · as-is 전역 `LastJob` → `scwin.lastJob` — 2축(2026-10-02).
   V26 공급사 pcc 리터럴 상수(`$c.fil.SCREN_PROCS_TP_CD_01~08`·`TR_JOB_*`·`$c.lc.NO_EXCEL_DATA/NO_DATA_FOUND/MSG_CND_ISR_REQ`) → `scwin.<같은 이름>` + 1구역 선언(값·뜻 주석) — 3축(2026-10-02). 표는 `VENDOR_CONSTS`.
+  **V27~V31(`vendor_stage2.py`, Stage 2 A 축 2026-10-02)** — V27 `CreateDialogFrame(id, url, title, {width, height}, {})` 공급사 5인자 꼴 → `$c.win.openPopup(url, {id, type: "pageFramePopup", title, width, height}, {})`(규칙 17 은 8인자만) ·
+  V28 `$c.fil.doLogSave(…);` 접속 로그 문장 → 보류 블록 주석(운영 필요 여부 회신 ㉤) · V29 pcc 함수 5종(`fn_getMktId`·`fn_getSecuGrpNm`·`showObj`·`FillGridHeaderTotalCnt`·`fn_getModalCenterPos`) → 로컬 헬퍼 ·
+  V30 `$c.cm.*` 13종(`fn_ClickPeriod`·`fn_SetPeriod`·`fn_CheckDateGn`·`fn_ChkZipCd`·`fn_CheckByte`·`fn_CalcContn`·`isMinusNum`·`fn_ChkNoneNum`·`fn_ChkAlphaNum`·`fn_IsChecked`·`fn_IsNull`·`fn_IgnoreSpaces`·`fn_ChkContactpnt`) → 로컬 헬퍼/인라인(`fn_getFileSize` 는 IE ActiveX 전용이라 TODO) ·
+  V31 공급사 `init_recvParam` 스텁(「수신 대상 없음」) → head `dma_pageContext` 추가 + 표준 수신. 함께 교정: V11 은 사문 문장 삭제(A-5), V22 는 「마지막 정의가 이긴다」(앞 정의 `_1` + TODO, A-6).
 * **드러냄 표지 원칙**: 공급사가 전환 미완 자리에 남긴 `[sdd]` 콘솔·`bizMessage` throw·`unresolved` 는 결함이 아니라 표식이므로
   지우지 않고 `TODO Stage2` 로 바꿔 집계한다(화면 알림은 유지).
 

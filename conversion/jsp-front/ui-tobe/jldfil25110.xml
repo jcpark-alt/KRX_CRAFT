@@ -122,7 +122,7 @@
 
   </xf:model>
   <w2:layoutInfo></w2:layoutInfo>
-  <w2:publicInfo method="scwin.onpageload,scwin.init_conds,scwin.init_pageBody,scwin.init_recvParam,scwin.slc_selEmail_onchange,scwin.btn_Modify_onclick,scwin.btn_Modify_2_onclick,scwin.btn_Delete_onclick,scwin.slc_selEmail_r1_onchange,scwin.btn_Modify_r1_onclick,scwin.btn_Modify_2_r1_onclick,scwin.btn_Delete_r1_onclick,scwin.slc_selEmail_r2_onchange,scwin.btn_Modify_r2_onclick,scwin.btn_Modify_2_r2_onclick,scwin.btn_Delete_r2_onclick,scwin.tx_fn_Modify,scwin.tx_fn_Delete,scwin.modify,scwin.deleteModifyReq,scwin.goURL,scwin.initValue,scwin.chkChrgDesignReadonly,scwin.checkRequired,scwin.isNumberInput"/>
+  <w2:publicInfo method="scwin.onpageload,scwin.init_conds,scwin.init_pageBody,scwin.init_recvParam,scwin.slc_selEmail_onchange,scwin.btn_Modify_onclick,scwin.btn_Modify_2_onclick,scwin.btn_Delete_onclick,scwin.slc_selEmail_r1_onchange,scwin.btn_Modify_r1_onclick,scwin.btn_Modify_2_r1_onclick,scwin.btn_Delete_r1_onclick,scwin.slc_selEmail_r2_onchange,scwin.btn_Modify_r2_onclick,scwin.btn_Modify_2_r2_onclick,scwin.btn_Delete_r2_onclick,scwin.tx_fn_Modify,scwin.tx_fn_Delete,scwin.modify,scwin.deleteModifyReq,scwin.goURL,scwin.initValue,scwin.chkChrgDesignReadonly,scwin.checkDateParts,scwin.checkRequired,scwin.isNumberInput"/>
   <script lazy="false" type="text/javascript"><![CDATA[
 ///////// 1. 변수 및 선언 영역 /////////
 scwin.screenId = "jldfil25110";
@@ -435,7 +435,6 @@ scwin.tx_fn_Delete = async function () {
  * @hidden N
  */
 scwin.modify = async function (_doFlag, _tpCd) {
-    // TODO Stage2: $c.cm.fn_* 정의 없음(pcc/fil 미반입 · 치환 방향 미결) — fn_CheckDateGn
     const frm = $c.util.getComponent('etnCorpDisclsChrgForm' + _tpCd);
     if (_doFlag === 'insert') {
         if (await scwin.checkRequired($c.util.getComponent('ipt_chrgNm'))) {
@@ -489,7 +488,7 @@ scwin.modify = async function (_doFlag, _tpCd) {
         if (await scwin.checkRequired($c.util.getComponent('ipt_chrgDesignYear')) || await scwin.checkRequired($c.util.getComponent('ipt_chrgDesignMonth')) || await scwin.checkRequired($c.util.getComponent('ipt_chrgDesignDay'))) {
             return;
         }
-        if (!$c.cm.fn_CheckDateGn($c.util.getComponent('ipt_chrgDesignYear'), $c.util.getComponent('ipt_chrgDesignMonth'), $c.util.getComponent('ipt_chrgDesignDay'), false)) {
+        if (!await scwin.checkDateParts($c.util.getComponent('ipt_chrgDesignYear'), $c.util.getComponent('ipt_chrgDesignMonth'), $c.util.getComponent('ipt_chrgDesignDay'), false)) {
             return;
         }
     }
@@ -584,15 +583,42 @@ scwin.chkChrgDesignReadonly = function () {
 
 /**
  * @method
+ * @name checkDateParts
+ * @description 년·월·일 입력칸 3개로 나뉜 날짜 검사(as-is 공통 fn_CheckDateGn — 공백 제거·숫자·월/일 범위, 실패 시 알림+포커스)
+ * @param {*} yyyy 년 입력 컴포넌트
+ * @param {*} mm 월 입력 컴포넌트
+ * @param {*} dd 일 입력 컴포넌트
+ * @param {String} flag true 면 빈 값도 검사
+ * @returns {Promise<Boolean>} 유효하면 true(빈 값·flag 없음이면 undefined — as-is 동일)
+ * @hidden N
+ */
+scwin.checkDateParts = async function (yyyy, mm, dd, flag) {
+    [yyyy, mm, dd].forEach(function (c) { c.setValue($c.str.trim(String(c.getValue() ?? ""))); });
+    const ymd = yyyy.getValue() + mm.getValue() + dd.getValue();
+    if (yyyy.getValue() === "" || yyyy.getValue().length < 4) { await $c.win.alert("년을 제대로 입력해주세요."); yyyy.focus(); return false; }
+    if (ymd === "" && !flag) { return; }
+    for (const c of [yyyy, mm, dd]) {
+        if (!/^\d*$/.test(String(c.getValue()).replace(/\s/g, ""))) { await $c.win.alert("숫자만 입력하셔야 합니다."); c.focus(); return false; }
+    }
+    const year = Number(yyyy.getValue()), month = Number(mm.getValue()), day = Number(dd.getValue());
+    if (month < 1 || month > 12) { await $c.win.alert("존재하지 않는 월입니다."); mm.focus(); return false; }
+    if (year <= 0) { await $c.win.alert("존재하지 않는 년도입니다."); dd.focus(); return false; }
+    if (day > new Date(year, month, 0).getDate()) { await $c.win.alert("존재하지 않는 날짜입니다."); dd.focus(); return false; }
+    return true;
+};
+
+/**
+ * @method
  * @name checkRequired
- * @description 필수 입력 검사 — 값이 비면 항목명으로 알리고 포커스를 준 뒤 true(as-is fn_NullChk 의미 보존 · pcc/fil 반입 후보)
+ * @description 필수 입력 검사 — 값이 비면 항목명으로 알리고 포커스를 준 뒤 true(as-is fn_NullChk/fn_IsNull 의미 보존 · pcc/fil 반입 후보)
  * @param {Object} comp 입력 컴포넌트
+ * @param {*} fieldName 항목명(생략 시 컴포넌트 title → id)
  * @returns {Promise<Boolean>} 비어 있으면 true
  * @hidden N
  */
-scwin.checkRequired = async function (comp) {
+scwin.checkRequired = async function (comp, fieldName) {
     if (!comp || !$c.util.isEmpty($c.str.trim(String(comp.getValue() ?? "")))) { return false; }
-    const name = (typeof comp.getTitle === "function" && comp.getTitle()) || comp.getID();
+    const name = fieldName || (typeof comp.getTitle === "function" && comp.getTitle()) || comp.getID();
     await $c.win.alert("'" + name + "' 항목을 입력하세요");
     comp.focus();
     return true;

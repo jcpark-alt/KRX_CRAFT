@@ -30,7 +30,7 @@
 
   </xf:model>
   <w2:layoutInfo></w2:layoutInfo>
-  <w2:publicInfo method="scwin.onpageload,scwin.init_attrReals,scwin.init_rowCopy,scwin.init_pageBody,scwin.init_recvParam,scwin.btn_Confirm_onclick,scwin.__ev_2_btn_Confirm_onclick,scwin.btn_ChkDuplicate_onclick,scwin.btn_Close_onclick,scwin.tx_fn_ChkDuplicate,scwin.initValue,scwin.confirm,scwin.close,scwin.chkDuplicate,scwin.checkRequired"/>
+  <w2:publicInfo method="scwin.onpageload,scwin.init_attrReals,scwin.init_rowCopy,scwin.init_pageBody,scwin.init_recvParam,scwin.btn_Confirm_onclick,scwin.__ev_2_btn_Confirm_onclick,scwin.btn_ChkDuplicate_onclick,scwin.btn_Close_onclick,scwin.tx_fn_ChkDuplicate,scwin.initValue,scwin.confirm,scwin.close,scwin.chkDuplicate,scwin.getFieldName,scwin.checkNotOnlyNumber,scwin.checkAlphaNum,scwin.checkRequired"/>
   <script lazy="false" type="text/javascript"><![CDATA[
 ///////// 1. 변수 및 선언 영역 /////////
 scwin.screenId = "jldfil40211";
@@ -268,16 +268,15 @@ scwin.close = function () {
  * @hidden N
  */
 scwin.chkDuplicate = async function () {
-    // TODO Stage2: $c.cm.fn_* 정의 없음(pcc/fil 미반입 · 치환 방향 미결) — fn_ChkAlphaNum, fn_ChkNoneNum
     const frm = $c.util.getComponent('idForm');
     const usrIdObj = $c.util.getComponent('ipt_usrId');
     if (await scwin.checkRequired(usrIdObj)) {
         return;
     }
-    if (!$c.cm.fn_ChkNoneNum(usrIdObj)) {
+    if (!await scwin.checkNotOnlyNumber(usrIdObj)) {
         return;
     }
-    if (!$c.cm.fn_ChkAlphaNum(usrIdObj, 6, 20)) {
+    if (!await scwin.checkAlphaNum(usrIdObj, 6, 20)) {
         return;
     }
     $c.util.getComponent("ipt_usrId").setValue((usrIdObj.getValue()).toLowerCase());
@@ -287,15 +286,65 @@ scwin.chkDuplicate = async function () {
 
 /**
  * @method
- * @name checkRequired
- * @description 필수 입력 검사 — 값이 비면 항목명으로 알리고 포커스를 준 뒤 true(as-is fn_NullChk 의미 보존 · pcc/fil 반입 후보)
+ * @name getFieldName
+ * @description 알림 문구에 쓸 항목명 — 컴포넌트 title(as-is alt) 이 없으면 id
  * @param {Object} comp 입력 컴포넌트
+ * @returns {String} 항목명
+ * @hidden N
+ */
+scwin.getFieldName = function (comp) {
+    return (comp && typeof comp.getTitle === "function" && comp.getTitle()) || (comp && comp.getID && comp.getID()) || "";
+};
+
+/**
+ * @method
+ * @name checkNotOnlyNumber
+ * @description 숫자만으로 된 입력을 거부(as-is 공통 fn_ChkNoneNum — 알림·값 삭제·포커스)
+ * @param {Object} comp 입력 컴포넌트
+ * @returns {Promise<Boolean>} 통과면 true
+ * @hidden N
+ */
+scwin.checkNotOnlyNumber = async function (comp) {
+    if (/^\d+$/.test(String(comp.getValue() ?? ""))) {
+        await $c.win.alert("'" + scwin.getFieldName(comp) + "' 항목은 숫자만으로 구성할 수 없습니다.");
+        comp.setValue(""); comp.focus();
+        return false;
+    }
+    return true;
+};
+
+/**
+ * @method
+ * @name checkAlphaNum
+ * @description 영문·숫자 조합 자릿수 검사(as-is 공통 fn_ChkAlphaNum — 실패 시 알림·값 삭제·포커스)
+ * @param {Object} comp 입력 컴포넌트
+ * @param {*} minLen 최소 자릿수
+ * @param {*} maxLen 최대 자릿수
+ * @returns {Promise<Boolean>} 통과면 true
+ * @hidden N
+ */
+scwin.checkAlphaNum = async function (comp, minLen, maxLen) {
+    const re = new RegExp("^[a-zA-Z0-9]{" + minLen + "," + maxLen + "}$");
+    if (!re.test(String(comp.getValue() ?? ""))) {
+        await $c.win.alert("'" + scwin.getFieldName(comp) + "' 항목은 영문과 숫자의 조합으로 " + minLen + "~" + maxLen + "자리내에서 입력하세요");
+        comp.setValue(""); comp.focus();
+        return false;
+    }
+    return true;
+};
+
+/**
+ * @method
+ * @name checkRequired
+ * @description 필수 입력 검사 — 값이 비면 항목명으로 알리고 포커스를 준 뒤 true(as-is fn_NullChk/fn_IsNull 의미 보존 · pcc/fil 반입 후보)
+ * @param {Object} comp 입력 컴포넌트
+ * @param {*} fieldName 항목명(생략 시 컴포넌트 title → id)
  * @returns {Promise<Boolean>} 비어 있으면 true
  * @hidden N
  */
-scwin.checkRequired = async function (comp) {
+scwin.checkRequired = async function (comp, fieldName) {
     if (!comp || !$c.util.isEmpty($c.str.trim(String(comp.getValue() ?? "")))) { return false; }
-    const name = (typeof comp.getTitle === "function" && comp.getTitle()) || comp.getID();
+    const name = fieldName || (typeof comp.getTitle === "function" && comp.getTitle()) || comp.getID();
     await $c.win.alert("'" + name + "' 항목을 입력하세요");
     comp.focus();
     return true;

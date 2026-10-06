@@ -144,7 +144,7 @@
 
   </xf:model>
   <w2:layoutInfo></w2:layoutInfo>
-  <w2:publicInfo method="scwin.onpageload,scwin.init_ctxDefaults,scwin.init_conds,scwin.init_fillGen,scwin.init_rowCopy,scwin.init_recvParam,scwin.btn_bascomInfoModify_onclick,scwin.ipt_comNm_onchange,scwin.btn_subInfoModify_onclick,scwin.btn_subInfoDelete_onclick,scwin.slc_searchComTp_onchange,scwin.btn_searchSubCom_onclick,scwin.ipt_regComNm_onchange,scwin.btn_findCompany_onclick,scwin.btn_register_onclick,scwin.btn_cancle_onclick,scwin.tx_fn_bascomInfoModify,scwin.tx_fn_register,scwin.tx_fn_subInfoModify,scwin.tx_fn_subInfoDelete,scwin.bascomInfoModify,scwin.findCompany,scwin.setCorpInfo,scwin.cancle,scwin.searchSubCom,scwin.register,scwin.subInfoModify,scwin.subInfoDelete,scwin.chk_korean,scwin.checkByte,scwin.setCorpInfo_recv"/>
+  <w2:publicInfo method="scwin.onpageload,scwin.init_ctxDefaults,scwin.init_conds,scwin.init_fillGen,scwin.init_rowCopy,scwin.init_recvParam,scwin.btn_bascomInfoModify_onclick,scwin.ipt_comNm_onchange,scwin.btn_subInfoModify_onclick,scwin.btn_subInfoDelete_onclick,scwin.slc_searchComTp_onchange,scwin.btn_searchSubCom_onclick,scwin.ipt_regComNm_onchange,scwin.btn_findCompany_onclick,scwin.btn_register_onclick,scwin.btn_cancle_onclick,scwin.tx_fn_bascomInfoModify,scwin.tx_fn_register,scwin.tx_fn_subInfoModify,scwin.tx_fn_subInfoDelete,scwin.bascomInfoModify,scwin.findCompany,scwin.setCorpInfo,scwin.cancle,scwin.searchSubCom,scwin.register,scwin.subInfoModify,scwin.subInfoDelete,scwin.chk_korean,scwin.checkByte,scwin.setCorpInfo_recv,scwin.truncateByBytes"/>
   <script lazy="false" type="text/javascript"><![CDATA[
 ///////// 1. 변수 및 선언 영역 /////////
 scwin.screenId = "jldfil25800";
@@ -775,13 +775,12 @@ scwin.chk_korean = function (obj) {
  * @hidden N
  */
 scwin.checkByte = async function (_obj) {
-    // TODO Stage2: $c.cm.fn_* 정의 없음(pcc/fil 미반입 · 치환 방향 미결) — fn_CalcContn
     const standardByte = 80;
     const contnByte = $c.str.getByteLength(_obj);
     if (contnByte > standardByte) {
         await $c.win.alert(((contnByte - standardByte) / 2) + "자가 초과되었습니다. 초과된 내용은 자동삭제됩니다.\n");
         const contnValue = _obj.getValue();
-        _obj.setValue($c.cm.fn_CalcContn(contnValue, standardByte));
+        _obj.setValue(scwin.truncateByBytes(contnValue, standardByte));
         await scwin.checkByte(_obj);
     }
 };
@@ -795,6 +794,31 @@ scwin.checkByte = async function (_obj) {
  * @hidden N
  */
 scwin.setCorpInfo_recv = function (r) { if (!r) return; let a = Array.isArray(r) ? r : [r]; if (a[0] && a[0].__sdd_rec) { const rec = a[0]; const nm = function (s) { return s.replace(/_/g, '').toLowerCase(); }; const ps = (String(scwin.setCorpInfo).match(/\(([^)]*)\)/) || ['', ''])[1].split(',').map(function (s) { return s.trim(); }).filter(Boolean); const nk = {}; for (let k in rec) nk[nm(k)] = rec[k]; a = ps.map(function (p) { return nk[nm(p)]; }); } try { scwin.setCorpInfo.apply(null, a); } catch (_e) { $c.exception.handleError(_e, { notify: 'none', context: 'popup-recv' }); } };
+
+/**
+ * @method
+ * @name truncateByBytes
+ * @description 바이트 상한을 넘는 뒷부분을 잘라낸다(as-is 공통 fn_CalcContn 계산 — 한글 2 · '<' '>' 4 · 줄바꿈 1)
+ * @param {*} value 문자열
+ * @param {*} maximum 바이트 상한
+ * @returns {String} 잘린 문자열
+ * @hidden N
+ */
+scwin.truncateByBytes = function (value, maximum) {
+    const s = String(value ?? "");
+    let out = "", bytes = 0;
+    for (let i = 0; i < s.length; i++) {
+        const ch = s.charAt(i);
+        let inc = 1;
+        if (ch === "\n") { inc = (s.charAt(i - 1) !== "\r") ? 1 : 0; }
+        else if (ch.charCodeAt(0) > 127) { inc = 2; }
+        else if (ch === "<" || ch === ">") { inc = 4; }
+        bytes += inc;
+        if (bytes > Number(maximum)) { break; }
+        out += ch;
+    }
+    return out;
+};
 ]]></script>
 </head>
 <body ev:onpageload="scwin.onpageload">

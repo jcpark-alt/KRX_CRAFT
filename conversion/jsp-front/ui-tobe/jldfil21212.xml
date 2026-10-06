@@ -151,7 +151,7 @@
 
   </xf:model>
   <w2:layoutInfo></w2:layoutInfo>
-  <w2:publicInfo method="scwin.init_attrReals,scwin.init_rowCopy,scwin.init_pageBody,scwin.init_sessionFill,scwin.init_recvParam,scwin.onpageload,scwin.btn_FileDown_onclick,scwin.btn_deleteAttachFile_onclick,scwin.upd_attachFile0_onblur,scwin.btn_FileDown_2_onclick,scwin.btn_deleteAttachFile_2_onclick,scwin.upd_attachFile1_onblur,scwin.txa_resoroomContn_onkeyup,scwin.txa_resoroomContn_onchange,scwin.btn_Register_onclick,scwin.btn_Submission_onclick,scwin.btn_Search_onclick,scwin.tx_fn_Search,scwin.tx_fn_Register,scwin.tx_fn_FileDown,scwin.tx_fn_Submission,scwin.checkSave,scwin.searchDiscls,scwin.search,scwin.register,scwin.fileDown,scwin.deleteAttachFile,scwin.submission,scwin.checkRequired"/>
+  <w2:publicInfo method="scwin.init_attrReals,scwin.init_rowCopy,scwin.init_pageBody,scwin.init_sessionFill,scwin.init_recvParam,scwin.onpageload,scwin.btn_FileDown_onclick,scwin.btn_deleteAttachFile_onclick,scwin.upd_attachFile0_onblur,scwin.btn_FileDown_2_onclick,scwin.btn_deleteAttachFile_2_onclick,scwin.upd_attachFile1_onblur,scwin.txa_resoroomContn_onkeyup,scwin.txa_resoroomContn_onchange,scwin.btn_Register_onclick,scwin.btn_Submission_onclick,scwin.btn_Search_onclick,scwin.tx_fn_Search,scwin.tx_fn_Register,scwin.tx_fn_FileDown,scwin.tx_fn_Submission,scwin.checkSave,scwin.searchDiscls,scwin.search,scwin.register,scwin.fileDown,scwin.deleteAttachFile,scwin.submission,scwin.getByteLength2,scwin.truncateByBytes,scwin.checkByteLimit,scwin.checkRequired"/>
   <script lazy="false" type="text/javascript"><![CDATA[
 ///////// 1. 변수 및 선언 영역 /////////
 scwin.screenId = "jldfil21212";
@@ -402,10 +402,9 @@ scwin.upd_attachFile1_onblur = async function(e){
  * @returns {void}
  * @hidden N
  */
-scwin.txa_resoroomContn_onkeyup = function(e){
-    // TODO Stage2: $c.cm.fn_* 정의 없음(pcc/fil 미반입 · 치환 방향 미결) — fn_CheckByte
+scwin.txa_resoroomContn_onkeyup = async function(e){
     try {
-        $c.cm.fn_CheckByte($c.util.getComponent("txa_resoroomContn"), '100', 'byteCnt')
+        await scwin.checkByteLimit($c.util.getComponent("txa_resoroomContn"), '100', 'byteCnt')
 
     } catch (_ex) { $c.exception.handleError(_ex, { context: 'jldfil21212.txa_resoroomContn_onkeyup' }); }
 };
@@ -418,10 +417,9 @@ scwin.txa_resoroomContn_onkeyup = function(e){
  * @returns {void}
  * @hidden N
  */
-scwin.txa_resoroomContn_onchange = function(e){
-    // TODO Stage2: $c.cm.fn_* 정의 없음(pcc/fil 미반입 · 치환 방향 미결) — fn_CheckByte
+scwin.txa_resoroomContn_onchange = async function(e){
     try {
-        $c.cm.fn_CheckByte($c.util.getComponent("txa_resoroomContn"), '100', 'byteCnt')
+        await scwin.checkByteLimit($c.util.getComponent("txa_resoroomContn"), '100', 'byteCnt')
 
     } catch (_ex) { $c.exception.handleError(_ex, { context: 'jldfil21212.txa_resoroomContn_onchange' }); }
 };
@@ -733,15 +731,81 @@ scwin.submission = async function () {
 
 /**
  * @method
- * @name checkRequired
- * @description 필수 입력 검사 — 값이 비면 항목명으로 알리고 포커스를 준 뒤 true(as-is fn_NullChk 의미 보존 · pcc/fil 반입 후보)
+ * @name getByteLength2
+ * @description 바이트 수(as-is 공통 fn_GetByte 계산 — 한글 2byte · 줄바꿈 2byte · 그 밖 1byte)
+ * @param {*} value 문자열
+ * @returns {Number} 바이트 수
+ * @hidden N
+ */
+scwin.getByteLength2 = function (value) {
+    const s = String(value ?? "");
+    let n = 0;
+    for (let i = 0; i < s.length; i++) {
+        const ch = s.charAt(i);
+        n += (ch === "\n" || ch.charCodeAt(0) > 127) ? 2 : 1;
+    }
+    return n;
+};
+
+/**
+ * @method
+ * @name truncateByBytes
+ * @description 바이트 상한을 넘는 뒷부분을 잘라낸다(as-is 공통 fn_CalcContn 계산 — 한글 2 · '<' '>' 4 · 줄바꿈 1)
+ * @param {*} value 문자열
+ * @param {*} maximum 바이트 상한
+ * @returns {String} 잘린 문자열
+ * @hidden N
+ */
+scwin.truncateByBytes = function (value, maximum) {
+    const s = String(value ?? "");
+    let out = "", bytes = 0;
+    for (let i = 0; i < s.length; i++) {
+        const ch = s.charAt(i);
+        let inc = 1;
+        if (ch === "\n") { inc = (s.charAt(i - 1) !== "\r") ? 1 : 0; }
+        else if (ch.charCodeAt(0) > 127) { inc = 2; }
+        else if (ch === "<" || ch === ">") { inc = 4; }
+        bytes += inc;
+        if (bytes > Number(maximum)) { break; }
+        out += ch;
+    }
+    return out;
+};
+
+/**
+ * @method
+ * @name checkByteLimit
+ * @description 입력 바이트 상한 검사 — 카운터 표시, 초과분은 알린 뒤 자동 삭제(as-is 공통 fn_CheckByte)
  * @param {Object} comp 입력 컴포넌트
+ * @param {*} standardByte 바이트 상한
+ * @param {String} counterId 카운터 표시 컴포넌트 id
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.checkByteLimit = async function (comp, standardByte, counterId) {
+    const limit = Number(standardByte);
+    let bytes = scwin.getByteLength2(comp.getValue());
+    if (bytes > limit) {
+        await $c.win.alert((bytes - limit) + "바이트가 초과되었습니다. 초과된 내용은 자동삭제됩니다.");
+        comp.setValue(scwin.truncateByBytes(comp.getValue(), limit));
+        bytes = scwin.getByteLength2(comp.getValue());
+    }
+    const counter = $c.util.getComponent(counterId);
+    if (counter) { counter.setValue("(" + bytes + "/" + limit + " byte)"); }
+};
+
+/**
+ * @method
+ * @name checkRequired
+ * @description 필수 입력 검사 — 값이 비면 항목명으로 알리고 포커스를 준 뒤 true(as-is fn_NullChk/fn_IsNull 의미 보존 · pcc/fil 반입 후보)
+ * @param {Object} comp 입력 컴포넌트
+ * @param {*} fieldName 항목명(생략 시 컴포넌트 title → id)
  * @returns {Promise<Boolean>} 비어 있으면 true
  * @hidden N
  */
-scwin.checkRequired = async function (comp) {
+scwin.checkRequired = async function (comp, fieldName) {
     if (!comp || !$c.util.isEmpty($c.str.trim(String(comp.getValue() ?? "")))) { return false; }
-    const name = (typeof comp.getTitle === "function" && comp.getTitle()) || comp.getID();
+    const name = fieldName || (typeof comp.getTitle === "function" && comp.getTitle()) || comp.getID();
     await $c.win.alert("'" + name + "' 항목을 입력하세요");
     comp.focus();
     return true;

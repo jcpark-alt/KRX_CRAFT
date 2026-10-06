@@ -29,7 +29,7 @@
 | 목록↔상세 복귀 상태 복원 | 목록→상세 moveUrl/setPageFrameSrc 화면에 `{isHistory:true, dataInfo}` 스냅샷 + 상세 [목록] 버튼 `{restoreData:true}` 적용, 목록 onpageload 에 `_isHistoryRestore` 자동조회 skip 관례 적용. 가이드: `cm/docs/frame-history-guide.md` |
 | 페이징 전체보기/역순 순번 대체 | AS-IS 자체 구현(전체보기 토글·내림차순 순번 계산)을 `$c.sbm.setPagingInfo` 옵션(`maxRowNum:"all"`, `rowNumVisble:"{grid}|desc"`, `rowNumColumn`)으로 대체 |
 
-## jsp-front (공급사 r13 산출 전환본) — 유형별 집계  (5421건 / 1462화면)
+## jsp-front (공급사 r13 산출 전환본) — 유형별 집계  (4719건 / 1213화면)
 
 > 1,677화면 전량이라 파일별 행은 싣지 않는다. 화면별 수는 `python conversion/tools/jspfront_summary.py` 의 `--tsv`, 접두별 밀도와 기계 치환 불가 축(jQuery·`document.`·조건 래퍼·hidden 입력·lybox)은 `conversion/jsp-front/README.md`.
 
@@ -39,16 +39,13 @@
 | 미실현 동작(포커스·표시·라벨) | 843 | 245 | 대상 컴포넌트가 해석되지 않은 set_focus/set_visible/set_label — id 확정 후 `focus()`/`show()/hide()`/`setValue()`. |
 | 공급사 전환 미완(bizMessage 드러냄) | 777 | 362 | 공급사가 사유 알림으로 드러낸 자리(제출 주소·이동 목적지·입력값 미해결) — 회신(A-3/A-15) 또는 화면별 판단. |
 | 행 복사 대상 부재 | 671 | 671 | as-is 가 서버 렌더로 그리던 반복 행 — 응답 전문 확정 후 DataList 바인딩으로 재설계. |
-| 파라미터 수신 대상 없음 | 528 | 528 | `dma_pageContext` 가 없는 화면에서 파라미터를 읽는 자리 — dataMap 추가 또는 `$c.data.getParameter()` 직접 사용. |
-| 컨텍스트 키 출처 미확인(A-3) | 509 | 509 | as-is EL 이 서버 렌더로 채우던 값 — 조회 전문/세션/상수 중 출처 회신 뒤 연결. |
-| 공급사 pcc 의존($c.lc/$c.frame/미반입 $c.fil) | 216 | 62 | 저장소 pcc/fil 에 없는 함수 — 반입 또는 gcc 치환 판단(`fn_isProcess`→`confirmJob`(V24)·`fn_alertMsg`→`alertJobResult`(V25)·리터럴 상수→화면 선언(V26) 완료 · 다음 후보 `CreateDialogFrame`·`doLogSave`·`fn_getMktId`·`showObj`). |
-| $c.cm.fn_* 정의 없음 | 83 | 38 | as-is 공통(정의 없음) — 치환 방향 결정(`fn_CheckDateGn`·`fn_ChkZipCd`·`fn_ClickPeriod` 등). |
+| 컨텍스트 키 출처 미확인(A-3) | 516 | 516 | as-is EL 이 서버 렌더로 채우던 값 — 조회 전문/세션/상수 중 출처 회신 뒤 연결. |
+| 공급사 pcc 의존($c.lc/$c.frame/미반입 $c.fil) | 137 | 52 | 저장소 pcc/fil 에 없는 함수 — 반입 또는 gcc 치환 판단(V24~V30 으로 `fn_isProcess`·`fn_alertMsg`·상수·`CreateDialogFrame`·`fn_getMktId`·`showObj` 등 치환 완료 · 남은 것은 `$c.frame.Provider("../../"|"/top")`·`CloseFrame`·`srcUrl`·`SetWindowPos2` 류 프레임 재설계). |
 | fieldEl(DOM 요소 계약) | 39 | 32 | `$c.util.fieldEl` 호출 함수 몸통을 컴포넌트 getValue/setValue 계약으로 전환. |
 | 세션 키 실환경 확인 | 59 | 59 | `$c.session.getUserInfo(키)` 의 키 집합을 실환경에서 확인(회신 11항). |
 | 행 동작 대상/정의 미해결 | 383 | 313 | 그리드 행 클릭이 부르는 함수·목록 id 미해결 — 대상 확정 후 연결. |
-| 폼 action 사문(규칙 19) | 37 | 20 | tx 전환으로 사문화된 jQuery 폼 action 지정 — 주석 삭제. |
-| 공급사 중복 정의 | 13 | 13 | 같은 이름 핸들러의 둘째 본문(`_2`) — 어느 쪽이 맞는지 판단 후 하나로. |
-| 기타(개발필요) | 109 | 64 | 개별 확인 필요(원본 미구현 스텁 등). |
+| 공급사 중복 정의 | 13 | 13 | 같은 이름 함수의 앞 정의(`_1`, as-is 에서 뒤 정의에 덮여 호출되지 않던 본문) — 필요 없으면 삭제, 필요하면 호출부 연결. |
+| 기타(개발필요) | 127 | 70 | 개별 확인 필요(원본 미구현 스텁 등). |
 
 ## $c.frame 프레임 재설계(형제/절대)  (19)
 

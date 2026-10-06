@@ -15,6 +15,7 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _HERE)
 
 import vendor_postprocess as vp  # noqa: E402
+import vendor_stage2 as vs  # noqa: E402
 import publish_normalize as pn  # noqa: E402
 
 HEAD = ('<head meta_screenId="jldfil00002" meta_screenName="jldfil00002" meta_desc="x" meta_author="editor-web generate">\n'
@@ -182,6 +183,35 @@ scwin.logAndTrs = function () {
     return url + $c.fil.SCREN_PROCS_TP_CD_01;
 };
 
+scwin.init_recvParam = function () { console.warn("[sdd] 전환 파라미터 수신 대상 없음: dma_pageContext — 읽는 자리 0"); }
+
+scwin.openGuides = function () {
+    $c.frame.CreateDialogFrame('JLDFIL55330', "/jldfil55330/jldfil55330.xml", "종목명 입력안내", { width: 750, height: 300 }, {});
+    $c.frame.CreateDialogFrame("", (function (__u) { let __s = String(__u == null ? "" : __u); if (!/\\.xml(\\?|#|$)/.test(__s)) { throw { bizMessage: "x — " + __s, unresolved: "nav:" + __s }; } return __u; })(url), "서식조회팝업", { width: 1000, height: 800 }, {});
+    $c.fil.doLogSave("X.gfm", $c.fil.SCREN_PROCS_TP_CD_05);
+    $c.frame.Provider("/top").CreateDialogFrame("NEW_LISTING", url, winTitle, { width: 1400, height: 835 }, {});
+    $c.frame.CreateDialogFrame("STOCK_LISTING", (function (__u) { return __u; })(url), nm + " 관리", 220, 0, 1020, hight, "window");
+    scwin.fr_MktId = $c.lc.fn_getMktId();
+    const nm = $c.lc.fn_getSecuGrpNm(scwin.fr_SecuGrpId) + "x";
+    $c.fil.FillGridHeaderTotalCnt(rowcount, scwin.panel_page);
+    const pt = $c.fil.fn_getModalCenterPos(frame, wth, hgt);
+};
+
+scwin.periodAndChecks = function () {
+    $c.cm.fn_ClickPeriod('document.searchForm',3);
+    $c.cm.fn_SetPeriod('document.searchForm','20260101','20260131');
+    if (!$c.cm.fn_CheckDateGn($c.util.getComponent('ipt_y'), $c.util.getComponent('ipt_m'), $c.util.getComponent('ipt_d'), true)) { return false; }
+    $c.cm.fn_CheckByte($c.util.getComponent("txa_contn"), '100', 'byteCnt');
+    if (v !== '' && !$c.cm.isMinusNum(v)) { return false; }
+    if (!$c.cm.fn_ChkNoneNum(usrIdObj) || !$c.cm.fn_ChkAlphaNum(usrIdObj, 6, 20)) { return false; }
+    if (!$c.cm.fn_IsChecked($c.util.getComponent('rd_tp'))) { return false; }
+    if ($c.cm.fn_IsNull($c.util.getComponent('ipt_isurCd'), scwin.isurCdTitle)) { return false; }
+    x.setValue($c.cm.fn_IgnoreSpaces(x.getValue()));
+    if ($c.cm.fn_ChkContactpnt(y.getValue()) === false) { return false; }
+    _obj.setValue($c.cm.fn_CalcContn(contnValue, standardByte));
+    const fileSize = $c.cm.fn_getFileSize(fileFullNm);
+};
+
 scwin.legacyPcc = function () {
     $c.fil.alert_error("x" + 1);
     const v = $c.fil.getObjectValue($c.util.getComponent('ipt_a')) + $c.fil.getObjectValue(ipt_b);
@@ -251,7 +281,7 @@ def test_loops_wrappers_and_flow_globals():
     assert "attrRealsList.forEach(" in script and "binds.forEach(" in script and "applied" not in script
     assert 'String((dma_pageContext.get("sysYear") ?? ""))' in script           # cv 래퍼 → ?? "" · String(String()) 접힘
     assert '(dma_pageContext.get("listStatCd") ?? "") ===' in script           # 경고 래퍼 → ?? ""
-    assert '$c.session.getUserInfo("repIdYn") === ' in script and "bizMessage" not in script  # 세션 래퍼 → 호출만
+    assert '$c.session.getUserInfo("repIdYn") === ' in script and "세션 값을 읽지 못했습니다" not in script  # 세션 래퍼 → 호출만
     assert "TODO Stage2: 컨텍스트 키 출처 미확인" in script and "listStatCd" in script and "TODO Stage2: 세션 키" in script
     assert "scwin.init_attrReals();" in script and "await scwin.init_attrReals" not in script  # 동기화 + await 제거
     assert "// as-is 흐름 보존" not in script and "scwin.result = null;" in script and script.count("scwin.modifiyDate = ") == 1
@@ -267,7 +297,7 @@ def test_handlers_tx_typeof_sdd_and_literals():
     assert "/* TODO Stage2: 행 동작 미정의: scwin.nope (열 ?) */ await $c.win.alert('없음');" in script
     assert "if (!dl) { /* TODO Stage2: [sdd] 행 동작 대상 목록 없음: dlt_list */ return; }" in script
     assert 'const arr = ["a", "b"];' in script and "new Array(5)" in script
-    assert "TODO Stage2(규칙19): 폼 action 지정" in script and "$c.win.print();" in script
+    assert "form[name='f']" not in script and "폼 action" not in script and "$c.win.print();" in script  # 사문 문장 삭제(A-5)
     assert "const nr = await scwin.tx_fn_goWrite();\n    if (nr && nr.responseJSON && nr.responseJSON.success === true) {" in script
     assert log["V13_renamed"] == {"fn_modifiyDate": "selectModifiyDate"} and "scwin.fn_modifiyDate" not in script
     assert "var i = 1;\n    i = 2;" in script and script.count("for (var k") == 2             # 같은 함수 var 중복 → 대입, for 머리는 유지
@@ -282,8 +312,10 @@ def test_redeclaration_and_duplicate_functions():
     assert 'var kind = "";' in script and "var kind;" not in script       # 초기값 없는 중복 → 삭제
     assert "const isurCd = 1;\n    isurCd = 2;\n    if (fm) { const isurCd = 3; }" in script  # 최상위 const 중복만
     assert script.count("scwin.td_1_oncellclick = ") == 1 and log["V22_dup_fn"]["removed"] == ["td_1_oncellclick"]
-    assert "scwin.td_2_oncellclick_2 = async function" in script and log["V22_dup_fn"]["renamed"] == ["td_2_oncellclick_2"]
-    assert "// TODO Stage2: 공급사 산출의 중복 정의" in script
+    # 마지막 정의가 이긴다 — 앞의 것이 _1 로, 뒤의 것이 원이름(A-6)
+    assert "scwin.td_2_oncellclick_1 = async function (rowIndex) { await scwin.goView(rowIndex); };" in script
+    assert "scwin.td_2_oncellclick = async function (rowIndex) { await scwin.goView(rowIndex + 1); };" in script
+    assert log["V22_dup_fn"]["renamed"] == ["td_2_oncellclick_1"] and "뒤 정의에 덮여 호출되지 않던 본문" in script
 
 
 def test_review_regressions_2026_10_02():
@@ -341,18 +373,63 @@ def test_alert_msg_to_alert_job_result():
 
 def test_vendor_consts_inlined():
     head, script, body, log = _post()
-    assert log["V26_consts"] == {"refs": 4, "declared": 4}
+    # doLogSave 줄은 V28 이 먼저 주석으로 접으므로 그 안의 SCREN_PROCS_TP_CD_07 은 세지 않는다(코드 영역만)
+    assert log["V26_consts"] == {"refs": 3, "declared": 3}
     assert "$c.win.alert(scwin.NO_EXCEL_DATA);" in script and 'scwin.NO_EXCEL_DATA = "해당데이터가 없습니다. 조회후 다운받으십시요.";' in script
     assert '+ scwin.SCREN_PROCS_TP_CD_01;' in script and 'scwin.fn_trs(scwin.TR_JOB_INSERT);' in script
-    assert '$c.fil.doLogSave("X.gfm", scwin.SCREN_PROCS_TP_CD_07);' in script
     assert 'const s = "$c.fil.SCREN_PROCS_TP_CD_01";' in script
     sec1 = script.split("///////// 1. ")[1].split("///////// 2. ")[0]
-    assert 'scwin.SCREN_PROCS_TP_CD_01 = "01";  // 조회' in sec1 and 'scwin.SCREN_PROCS_TP_CD_07 = "07";  // 엑셀저장' in sec1
+    assert 'scwin.SCREN_PROCS_TP_CD_01 = "01";  // 조회' in sec1 and "SCREN_PROCS_TP_CD_07 = " not in sec1
     assert "scwin.TR_JOB_INSERT = 2;  // 입력" in sec1 and script.count("scwin.SCREN_PROCS_TP_CD_01 = ") == 1
-    # V23 의 TODO 는 상수를 더 이상 나열하지 않는다(doLogSave 만)
-    assert "— $c.fil.doLogSave\n" in script
+    # V23 의 TODO 는 상수·보류된 doLogSave 를 나열하지 않는다
+    assert "— $c.fil.doLogSave" not in script
     _, s2, _, log2 = vp.apply_regions(head, script, body)
     assert log2["V26_consts"] == {} and s2.count("scwin.SCREN_PROCS_TP_CD_01 = ") == 1
+
+
+def test_stage2_a_rules():
+    head, script, body, log = _post()
+    # V27 CreateDialogFrame 5인자 → openPopup(id 는 첫 인자, 없으면 url 파일명; IIFE url 은 그대로)
+    assert log["V27_dialog"] == 4 and "CreateDialogFrame" not in script
+    assert ('$c.win.openPopup((function (__u) { return __u; })(url), { id: "STOCK_LISTING", type: "browserPopup", title: nm + " 관리", width: "1020px", '
+            'height: hight, callbackFn: "scwin.popupCallback" });') in script and script.count("scwin.popupCallback = function") == 1
+    assert '$c.win.openPopup(url, { id: "NEW_LISTING", type: "pageFramePopup", title: winTitle, width: "1400px", height: "835px" }, {});' in script
+    assert ('$c.win.openPopup("/jldfil55330/jldfil55330.xml", { id: "JLDFIL55330", type: "pageFramePopup", title: "종목명 입력안내", '
+            'width: "750px", height: "300px" }, {});') in script
+    assert '})(url), { id: "popup", type: "pageFramePopup", title: "서식조회팝업", width: "1000px", height: "800px" }, {});' in script
+    # V28 doLogSave 보류 주석(상수는 V26 이 먼저 바꾸지 않는다 — stage2 가 앞서므로 원문 그대로 주석 안에)
+    assert log["V28_logsave"] == 2 and '/* TODO Stage2: 접속 로그 저장 보류(공급사 doLogSave — 운영 필요 여부 회신 ㉤ 뒤 결정) $c.fil.doLogSave("X.gfm", $c.fil.SCREN_PROCS_TP_CD_05); */' in script
+    # V29 pcc 함수 → 로컬 헬퍼
+    h = log["V29_30_helpers"]
+    assert "scwin.fr_MktId = scwin.getMktId();" in script and "scwin.getSecuGrpNm(scwin.fr_SecuGrpId)" in script
+    assert "scwin.showTotalCount(rowcount, scwin.panel_page);" in script and "scwin.getModalCenterPos(frame, wth, hgt)" in script
+    for hname in ("getMktId", "getSecuGrpNm", "showTotalCount", "getModalCenterPos", "showObj"):
+        assert script.count("scwin.%s = function" % hname) == 1, hname
+    # V30 $c.cm.* → 로컬 헬퍼/인라인
+    assert "scwin.setSearchPeriod(3);" in script and "scwin.setPeriodDates('20260101', '20260131');" in script
+    assert "!$c.cm.fn_CheckDateGn" not in script and "scwin.checkDateParts($c.util.getComponent('ipt_y'), $c.util.getComponent('ipt_m'), $c.util.getComponent('ipt_d'), true)" in script
+    assert 'scwin.checkByteLimit($c.util.getComponent("txa_contn"), \'100\', \'byteCnt\');' in script
+    assert "!scwin.isMinusNumber(v)" in script and "!scwin.checkNotOnlyNumber(usrIdObj) || !scwin.checkAlphaNum(usrIdObj, 6, 20)" in script
+    assert "!scwin.isGroupChecked($c.util.getComponent('rd_tp'))" in script
+    assert "scwin.checkRequired($c.util.getComponent('ipt_isurCd'), scwin.isurCdTitle)" in script
+    assert 'x.setValue(String(x.getValue()).replace(/\\s/g, ""));' in script and "if (/^[0-9-]*$/.test(y.getValue()) === false)" in script
+    assert "_obj.setValue(scwin.truncateByBytes(contnValue, standardByte));" in script
+    assert "$c.cm.fn_getFileSize(fileFullNm)" in script and "— fn_getFileSize" in script  # 못 옮기는 것은 TODO 로 남는다
+    for hname in ("setSearchPeriod", "setPeriodDates", "checkDateParts", "isZipCodeInput", "checkByteLimit", "getByteLength2",
+                  "truncateByBytes", "isMinusNumber", "checkNotOnlyNumber", "checkAlphaNum", "isGroupChecked", "getFieldName"):
+        assert script.count("scwin.%s = " % hname) == 1, hname
+    assert h["fn_ClickPeriod"] == 1 and h["fn_IgnoreSpaces"] == 1 and h["fn_ChkZipCd"] == 1
+    # V31 공급사 스텁 → dma_pageContext 표준 수신
+    assert log["V31_pagecontext"] == 1
+    assert head.count('id="dma_pageContext"') == 1  # 픽스처 head 에 이미 있으면 더하지 않는다
+    assert "scwin.init_recvParam = function () { dma_pageContext.setJSON($c.data.getParameter() ?? {}); }\n" in script  # `;` 는 뒤 단계가 붙인다
+    assert "전환 파라미터 수신 대상 없음" not in script
+    # head 에 없으면 dataCollection 첫머리에 넣는다
+    h3, s3, n3 = vs.ensure_page_context(HEAD.replace('<w2:dataMap baseNode="map" id="dma_pageContext"><w2:keyInfo/></w2:dataMap>', ""), SCRIPT)
+    assert n3 == 1 and h3.index('id="dma_pageContext"') < h3.index('id="dlt_list"') and "<w2:keyInfo/>" in h3
+    # 멱등
+    h2, s2, b2, log2 = vp.apply_regions(head, script, body)
+    assert s2.count("scwin.checkDateParts = ") == 1 and "V27_dialog" not in log2 and "V31_pagecontext" not in log2 and h2 == head
 
 
 def test_vendor_pcc_rules():
@@ -361,19 +438,19 @@ def test_vendor_pcc_rules():
     assert "const v = $c.util.getComponent('ipt_a').getValue() + ipt_b.getValue();" in script
     assert "$c.util.getComponent('ipt_a').setValue(fn(1, 2));" in script
     assert "$c.fil.setFromToDate(a, b);" in script
-    assert "if (!await scwin.confirmJob())" not in script and "$c.frame.CloseFrame()" in script and "$c.fil.showObj('x', true)" in script
-    assert "// TODO Stage2: 공급사 pcc 의존(저장소 pcc/fil 에 없음 · 반입 또는 치환 판단) — $c.fil.showObj, $c.frame.CloseFrame\n" in script
-    assert log["V23_vendor_pcc"] == {"alert_error": 1, "getObjectValue": 2, "setObjectValue": 1, "fn_setFromToDate": 1, "todo_left": 3}  # legacyPcc 2 + logAndTrs doLogSave 1
+    assert "$c.frame.CloseFrame()" in script and "scwin.showObj('x', true)" in script and "$c.fil.showObj" not in script
+    assert "// TODO Stage2: 공급사 pcc 의존(저장소 pcc/fil 에 없음 · 반입 또는 치환 판단) — $c.frame.CloseFrame\n" in script
+    assert log["V23_vendor_pcc"] == {"alert_error": 1, "getObjectValue": 2, "setObjectValue": 1, "fn_setFromToDate": 1, "todo_left": 1}  # CloseFrame 만(doLogSave 는 보류 주석)
 
 
 def test_cm_helpers():
     head, script, body, log = _post()
-    assert log["V21_cm_fn"] == {"NullChk": 2, "IsNumber": 1, "IsNotNull": 1, "CheckEmail": 1, "todo_left": 1}
+    assert log["V21_cm_fn"] == {"NullChk": 2, "IsNumber": 1, "IsNotNull": 1, "CheckEmail": 1, "todo_left": 1}  # fn_getFileSize 만 남는다
     assert "scwin.checkRequired($c.util.getComponent('ipt_method')) || scwin.checkRequired($c.util.getComponent([\"a\", \"b\"][0]))" in script
     assert "!scwin.isNumberInput($c.util.getComponent('ipt_status'))" in script
     assert "!$c.util.isEmpty(($c.util.getComponent('ipt_status')).getValue()) && $c.str.isEmail($c.util.getComponent('ipt_status').getValue())" in script
     assert script.count("scwin.checkRequired = async function") == 1 and script.count("scwin.isNumberInput = function") == 1
-    assert "// TODO Stage2: $c.cm.fn_* 정의 없음(pcc/fil 미반입 · 치환 방향 미결) — fn_ChkZipCd" in script
+    assert "if (scwin.isZipCodeInput($c.util.getComponent('ipt_status'))) { return true; }" in script and "$c.cm.fn_ChkZipCd" not in script
     assert "const z = [];" in script
     # 재실행 멱등(헬퍼 중복 삽입 없음)
     _, script2, _, log2 = vp.apply_regions(head, script, body)

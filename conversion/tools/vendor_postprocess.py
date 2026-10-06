@@ -35,6 +35,8 @@
   V24 `$c.lc.fn_isProcess(X)`(확인창) → 화면 로컬 `scwin.confirmJob(X)`(`$c.win.confirm`, as-is 문구 보존, `scwin.lastJob` 기록) — Stage 2 수작업 1축
   V25 `$c.lc.fn_alertMsg(X)`(결과 알림 MSG-A001/0001/A002) → 화면 로컬 `scwin.alertJobResult(X)` · as-is 전역 `LastJob` → `scwin.lastJob` — 2축
   V26 `$c.fil.SCREN_PROCS_TP_CD_01~08`·`TR_JOB_*`·`$c.lc.NO_EXCEL_DATA` 등 메시지 상수(공급사 pcc 리터럴 상수) → `scwin.<상수>` + 1구역 선언(값·이름 보존) — 3축
+  V27~V31 Stage 2 A 축(vendor_stage2.py) — CreateDialogFrame 5인자 → openPopup · doLogSave 보류 주석 · pcc 함수 5종/`$c.cm` 13종 → 로컬 헬퍼 ·
+      공급사 init_recvParam 스텁 → dma_pageContext 표준 수신. V11 은 사문 문장 삭제, V22 는 「마지막 정의가 이긴다」로 교정(A-5·A-6)
 """
 import re
 import sys
@@ -43,6 +45,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import screen_tools as st  # noqa: E402
 import convert as cv  # noqa: E402
+import vendor_stage2  # noqa: E402
 
 RENAME = {"fn_modifiyDate": "selectModifiyDate"}
 
@@ -352,8 +355,9 @@ def dedupe_var_in_function(script):
 
 
 def dedupe_function_defs(script):
-    """같은 이름의 최상위 함수가 두 번 정의된 꼴(공급사가 같은 id 의 표 둘에 핸들러를 각각 냄 — JS 는 마지막이 이긴다).
-    본문이 같으면 둘째를 지우고, 다르면 둘째를 `X_2` 로 개명하고 TODO 를 단다(어느 본문이 맞는지는 판단)."""
+    """같은 이름의 최상위 함수가 두 번 이상 정의된 꼴(공급사가 같은 id 의 표 둘에 핸들러를 각각 냄, 또는 as-is 자체의 중복).
+    JS 는 **마지막 정의가 이기므로** 마지막을 원이름으로 남기고, 앞의 것은 본문이 같으면 지우고 다르면 `X_1`(`X_2`…)로 개명해
+    「덮여서 호출되지 않던 본문」 TODO 를 단다(A-6, 2026-10-02 — 종전 「둘째를 _2 로」는 as-is 동작과 반대였다)."""
     spans = st.func_spans(script)
     by = {}
     for sp in spans:
@@ -362,9 +366,9 @@ def dedupe_function_defs(script):
     for nm, lst in by.items():
         if len(lst) < 2:
             continue
-        first = re.sub(r'\s+', ' ', script[lst[0][2]:lst[0][3] + 1])
-        for k, sp in enumerate(lst[1:], start=2):
-            if re.sub(r'\s+', ' ', script[sp[2]:sp[3] + 1]) == first:
+        last = re.sub(r'\s+', ' ', script[lst[-1][2]:lst[-1][3] + 1])
+        for k, sp in enumerate(lst[:-1], start=1):
+            if re.sub(r'\s+', ' ', script[sp[2]:sp[3] + 1]) == last:
                 cuts.append(sp)
             else:
                 renames.append((sp, "%s_%d" % (nm, k)))
@@ -383,7 +387,7 @@ def dedupe_function_defs(script):
             log["removed"].append(nm)
         else:
             head = script[s:b].replace("scwin.%s" % nm, "scwin.%s" % new, 1)
-            todo = "// TODO Stage2: 공급사 산출의 중복 정의(둘째 본문 — 첫째와 다름, 어느 쪽이 맞는지 판단) — 원이름 %s\n" % nm
+            todo = "// TODO Stage2: 중복 정의 — as-is 에서 뒤 정의에 덮여 호출되지 않던 본문(JS 는 마지막 정의가 이긴다). 필요 없으면 삭제 — 원이름 %s\n" % nm
             script = script[:s] + todo + head + script[b:]
             log["renamed"].append(new)
     log["removed"].reverse(); log["renamed"].reverse()
@@ -502,8 +506,11 @@ def bizmessage_todo(script):
 
 
 def jquery_form_action(script):
-    return re.subn(r'''(\$\("form\[name=['"][^'"]*['"]\]"\)\.attr\("action", "[^"]*"\));''',
-                   r'/* TODO Stage2(규칙19): 폼 action 지정은 tx 로 대체되어 사문 — \1 */', script)
+    """`$("form[name='F']").attr("action", "U");` — tx 전환으로 사문화된 문장. 줄에 그것만 있으면 줄째, 아니면 문장만 지운다(A-5, 2026-10-02)."""
+    pat = r'''[ \t]*\$\("form\[name=['"][^'"]*['"]\]"\)\.attr\("action", "[^"]*"\);[ \t]*\n'''
+    script, n1 = re.subn(r'(?m)^' + pat, '', script)
+    script, n2 = re.subn(r'''\$\("form\[name=['"][^'"]*['"]\]"\)\.attr\("action", "[^"]*"\);''', '', script)
+    return script, n1 + n2
 
 
 # ---------------------------------------------------------------- V12 flow globals
@@ -562,14 +569,15 @@ CM_HELPERS = {
     "checkRequired": '''/**
  * @method
  * @name checkRequired
- * @description 필수 입력 검사 — 값이 비면 항목명으로 알리고 포커스를 준 뒤 true(as-is fn_NullChk 의미 보존 · pcc/fil 반입 후보)
+ * @description 필수 입력 검사 — 값이 비면 항목명으로 알리고 포커스를 준 뒤 true(as-is fn_NullChk/fn_IsNull 의미 보존 · pcc/fil 반입 후보)
  * @param {Object} comp 입력 컴포넌트
+ * @param {String} fieldName 항목명(생략 시 컴포넌트 title → id)
  * @returns {Promise<Boolean>} 비어 있으면 true
  * @hidden N
  */
-scwin.checkRequired = async function (comp) {
+scwin.checkRequired = async function (comp, fieldName) {
     if (!comp || !$c.util.isEmpty($c.str.trim(String(comp.getValue() ?? "")))) { return false; }
-    const name = (typeof comp.getTitle === "function" && comp.getTitle()) || comp.getID();
+    const name = fieldName || (typeof comp.getTitle === "function" && comp.getTitle()) || comp.getID();
     await $c.win.alert("'" + name + "' 항목을 입력하세요");
     comp.focus();
     return true;
@@ -877,6 +885,9 @@ def rename_fn_collisions(script, head, body):
 # ---------------------------------------------------------------- driver
 def apply_regions(head, script, body):
     log = {}
+    # Stage 2 A 축(V27~V31)은 맨 앞 — V9 가 console.warn 을 TODO 로 바꾸기 전에 공급사 스텁을 봐야 하고, V23 TODO 집계보다 앞서야 한다
+    head, script, body, s2 = vendor_stage2.apply(head, script, body)
+    log.update(s2)
     head, log["V1_commons"] = strip_commons_scripts(head)
     head, log["V2_title"] = fill_screen_name(head, body)
     script, head, body, log["V13_renamed"] = rename_fn_collisions(script, head, body)

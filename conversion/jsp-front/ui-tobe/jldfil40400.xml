@@ -94,7 +94,7 @@
 
   </xf:model>
   <w2:layoutInfo></w2:layoutInfo>
-  <w2:publicInfo method="scwin.onpageload,scwin.init_recvParam,scwin.btn_PopZipCode_onclick,scwin.slc_selApctEmail_onchange,scwin.btn_Confirm_onclick,scwin.tx_fn_Confirm,scwin.tx_fn_Confirm_xhr,scwin.popZipCode,scwin.setZipCode,scwin.confirm,scwin.chgCorpUsrTpCd,scwin.setZipCode_recv,scwin.checkRequired,scwin.isNumberInput"/>
+  <w2:publicInfo method="scwin.onpageload,scwin.init_recvParam,scwin.btn_PopZipCode_onclick,scwin.slc_selApctEmail_onchange,scwin.btn_Confirm_onclick,scwin.tx_fn_Confirm,scwin.tx_fn_Confirm_xhr,scwin.popZipCode,scwin.setZipCode,scwin.confirm,scwin.chgCorpUsrTpCd,scwin.setZipCode_recv,scwin.isZipCodeInput,scwin.checkRequired,scwin.isNumberInput"/>
   <script lazy="false" type="text/javascript"><![CDATA[
 ///////// 1. 변수 및 선언 영역 /////////
 scwin.screenId = "jldfil40400";
@@ -248,7 +248,6 @@ scwin.setZipCode = function (_zipCode, _address) {
  * @hidden N
  */
 scwin.confirm = async function () {
-    // TODO Stage2: $c.cm.fn_* 정의 없음(pcc/fil 미반입 · 치환 방향 미결) — fn_ChkZipCd
     const frm = (document.reisuPwForm || { elements: [] });
     $("#slc_corpUsrTpCd").attr("alt", "사용자1");
     if (await scwin.checkRequired($("#slc_corpUsrTpCd").get(0))) {
@@ -330,7 +329,7 @@ scwin.confirm = async function () {
     if (!$c.util.isEmpty(($c.util.getComponent('ipt_apctFaxNo1')).getValue()) && !$c.util.isEmpty(($c.util.getComponent('ipt_apctFaxNo2')).getValue()) && !$c.util.isEmpty(($c.util.getComponent('ipt_apctFaxNo3')).getValue())) {
         $c.util.getComponent('dma_ConfirmReq').set('apctFaxNo', $c.util.getComponent('ipt_apctFaxNo1').getValue()+ '-' + $c.util.getComponent('ipt_apctFaxNo2').getValue()+ '-' + $c.util.getComponent('ipt_apctFaxNo3').getValue());
     }
-    if (!($c.cm.fn_ChkZipCd($c.util.getComponent('ipt_locZipcd')))) {
+    if (!(scwin.isZipCodeInput($c.util.getComponent('ipt_locZipcd')))) {
         await $c.win.alert('우편번호는 숫자만 입력하세요');
         return false;
     }
@@ -382,15 +381,31 @@ scwin.setZipCode_recv = function (r) { if (!r) return; let a = Array.isArray(r) 
 
 /**
  * @method
- * @name checkRequired
- * @description 필수 입력 검사 — 값이 비면 항목명으로 알리고 포커스를 준 뒤 true(as-is fn_NullChk 의미 보존 · pcc/fil 반입 후보)
+ * @name isZipCodeInput
+ * @description 우편번호 입력 검사 — 공백·'-' 를 뺀 나머지가 숫자만인지(as-is 공통 fn_ChkZipCd, 아니면 포커스)
  * @param {Object} comp 입력 컴포넌트
+ * @returns {Boolean} 숫자만이면 true
+ * @hidden N
+ */
+scwin.isZipCodeInput = function (comp) {
+    if (!comp || typeof comp.getValue !== "function") { return true; }
+    const v = String(comp.getValue() ?? "").replace(/\s/g, "").replace("-", "");
+    if (!/^\d*$/.test(v)) { comp.focus(); return false; }
+    return true;
+};
+
+/**
+ * @method
+ * @name checkRequired
+ * @description 필수 입력 검사 — 값이 비면 항목명으로 알리고 포커스를 준 뒤 true(as-is fn_NullChk/fn_IsNull 의미 보존 · pcc/fil 반입 후보)
+ * @param {Object} comp 입력 컴포넌트
+ * @param {*} fieldName 항목명(생략 시 컴포넌트 title → id)
  * @returns {Promise<Boolean>} 비어 있으면 true
  * @hidden N
  */
-scwin.checkRequired = async function (comp) {
+scwin.checkRequired = async function (comp, fieldName) {
     if (!comp || !$c.util.isEmpty($c.str.trim(String(comp.getValue() ?? "")))) { return false; }
-    const name = (typeof comp.getTitle === "function" && comp.getTitle()) || comp.getID();
+    const name = fieldName || (typeof comp.getTitle === "function" && comp.getTitle()) || comp.getID();
     await $c.win.alert("'" + name + "' 항목을 입력하세요");
     comp.focus();
     return true;
