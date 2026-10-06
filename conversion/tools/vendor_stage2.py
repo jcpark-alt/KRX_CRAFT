@@ -24,6 +24,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import screen_tools as st  # noqa: E402
 import convert as cv  # noqa: E402
+import dom_rules  # noqa: E402
 
 
 # ---------------------------------------------------------------- 공통
@@ -670,4 +671,5 @@ def apply(head, script, body):
     script, log["V28_logsave"] = hold_log_save(script)
     script, log["V29_30_helpers"] = replace_pcc_and_cm(script)
     head, script, log["V31_pagecontext"] = ensure_page_context(head, script)
+    script, log["V36_dom"] = dom_rules.apply(script, body)  # 규칙 19 기계 가능분(jQuery·원시 폼 → 컴포넌트 API, body 로 확정되는 것만)
     return head, script, body, {k: v for k, v in log.items() if v}

@@ -35,6 +35,7 @@ TOKENS = {
     "$c.frame": (r'\$c\.frame', False), "native alert(": (r'(?<![\w.])alert\(', True), "debugger": (r'debugger', True),
     "tab char": (r'\t', True), "trailing ws": (r'[ \t]+$', False), "new Object/Array": (r'new (Object|Array)\(', True),
     "TODO Stage2": (r'TODO Stage2', False), "backtick": (r'`', True), "/_commons script": (r'/_commons/', False),
+    "jQuery $(": (r'(?<![\w$.])\$\(', True), "form DOM": (r'(?<![\w$.])(?:fm|document\.[A-Za-z_]\w*)\.(?:\w+\.)?(?:value|checked|submit|action|target|elements)\b', True),
 }
 # 샘플 규약상 정의만 하고 안 읽어도 되는 전역 — scwin.screenId 는 1구역 표준 선언(샘플 18화면 정의 / 2화면 참조)
 KEEP_GLOBALS = {"screenId"}

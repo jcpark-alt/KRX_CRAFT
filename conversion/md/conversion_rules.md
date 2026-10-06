@@ -279,6 +279,10 @@
 * **날짜**: `new Date(…)`·수기 날짜연산(`getFullYear`/`substr` 포맷 등) → `$c.date.*`(`getServerDateTime`/`addDate`/`formatDate` 등 — 규칙 18 의 `date.xml` 소속).
 * **JSP/JSTL 서버 표현식**: `<c:out value='${x}'/>`·`${x}` 는 **서버 렌더링 시점에 주입되던 값**입니다. WebSquare 에는 JSP EL 이 없으므로 해당 값은 **submission 응답(DataMap/DataList) 또는 진입 파라미터(`$c.util.getParameter`)로 전달받도록 재설계**합니다. 단순 문자열 치환으로 옮길 수 없습니다.
 
+* **기계 가능분(V36 `dom_rules.py`, 2026-10-06, jsp-front)**: body 의 입력 컴포넌트(`xf:input`·`select1`·`select`·`inputCalendar`·`textarea`) **하나로 확정되는** 셀렉터만 자동 치환 —
+  `#id`·`[id=X]`·`input|select|textarea[name=X]`(접미 없음)의 `.val()`→`getValue()`, `.val(v)`→`setValue(v)`, `.attr|prop('disabled'|'readonly', v)`→`setDisabled/setReadOnly(b)`(리터럴은 불리언으로, 식별자는 `Boolean(v)`),
+  `.removeAttr(...)`→`set*(false)`, `.show/.hide/.focus()`, `$(document).find("select[id=X]").val()`, `fm.X.value`·`document.F.X.value`·`getElementsByName("X")[0].value`(읽기/대입). 그 밖은 손대지 않고
+  `reply_request.md` B-7 로 집계(공급사는 라디오 한 칸마다 `select1` 을 따로 그려 `:checked` 류는 퍼블리싱 병합 뒤 그룹 컴포넌트에서 푼다). 멱등·게이트 report-only 토큰 `jQuery $(`·`form DOM`.
 * **치환 시 유의사항**:
     * **선행조건**: 본 규칙은 HTML `<input>/<select>/<form>` 등이 WebSquare 컴포넌트(`<w2:*>`)로 재구성된 뒤에 적용 가능합니다. 마크업 재구성 없이 스크립트만 바꾸면 참조가 깨지므로 **마크업·스크립트를 함께** 변환합니다.
     * 결정적(Python) 자동 치환 대상이 **아니며 전 항목 단계 2(Claude) 판단**입니다. 규칙 1~18 의 표면 치환(`==`→`===`, `var`→`const/let` 등)은 이미 적용돼 있을 수 있으나 jQuery/DOM 블록은 그대로 남으므로 본 규칙으로 재작성합니다.

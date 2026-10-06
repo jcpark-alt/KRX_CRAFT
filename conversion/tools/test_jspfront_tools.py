@@ -734,3 +734,44 @@ def test_publish_merge_override_skip_and_accept(tmp_path, monkeypatch):
     assert "TODO Stage2(퍼블리싱 병합)" in text and 'id="grd_list"' in text and "pfmContentHeader" not in text  # 팝업은 헤더 없음
     rep = pm.merge_screen("jldtest00001", str(pub), out, True, {})
     assert rep["verdict"] == "todo"  # 닫기는 공통 버튼이라 항목 수에서 제외 → 퍼블 0·공급사 1(<5) → override 없이도 TODO 로 닫힌다
+
+
+def test_dom_rules_v36():
+    """규칙 19 기계 가능분: body 로 하나로 확정되는 jQuery·원시 폼 접근만 컴포넌트 API 로. 확정 안 되는 것(:checked·라디오 여러 칸·구조 조작)은 그대로."""
+    import dom_rules as dr
+    body = ('<body><xf:input id="ipt_name" name="corpNm" ref="data:dma.corpNm"/><w2:inputCalendar id="cal_from" name="pubofrDd"/>'
+            '<xf:select1 id="slc_curr" name="currTpCd"/><xf:select1 id="ipt_rd1" name="reqDivCd" appearance="full"/><xf:select1 id="ipt_rd2" name="reqDivCd" appearance="full"/>'
+            '<xf:group id="SendForm" tagname="div"/></body>')
+    src = '''
+const a = $("input[name=corpNm]").val();
+$('input[name="pubofrDd"]').val("20260101");
+const b = $("#slc_curr").val();
+$('#ipt_name').attr("disabled", true); $("input[name=corpNm]").prop('disabled', ''); $("#slc_curr").removeAttr("disabled");
+$("#ipt_name").attr("readonly", flag); $("#cal_from").show(); $("#ipt_name").focus();
+const c = $(document).find("select[id=slc_curr]").val();
+const d = $("input[name=reqDivCd]:checked").val();      // 라디오 여러 칸 — 그대로
+const e = $("input[name=reqDivCd]").val();              // name 이 둘 — 그대로
+$("#SendForm").find("input").val("");                   // 구조 조작 — 그대로
+$("#nope").val();                                       // body 에 없음 — 그대로
+const fm = (document.searchForm || { elements: [] });
+fm.corpNm.value = "x";
+if (fm.corpNm.value === "") {}
+const g = document.getElementsByName("currTpCd")[0].value;
+fm.action = "/a.do";
+// $("#ipt_name").val()  주석은 그대로
+'''
+    out, log = dr.apply(src, body)
+    assert 'const a = $c.util.getComponent("ipt_name").getValue();' in out
+    assert '$c.util.getComponent("cal_from").setValue("20260101");' in out
+    assert 'const b = $c.util.getComponent("slc_curr").getValue();' in out
+    assert '$c.util.getComponent("ipt_name").setDisabled(true); $c.util.getComponent("ipt_name").setDisabled(false); $c.util.getComponent("slc_curr").setDisabled(false);' in out
+    assert '$c.util.getComponent("ipt_name").setReadOnly(Boolean(flag)); $c.util.getComponent("cal_from").show(); $c.util.getComponent("ipt_name").focus();' in out
+    assert 'const c = $c.util.getComponent("slc_curr").getValue();' in out
+    assert 'const d = $("input[name=reqDivCd]:checked").val();' in out and 'const e = $("input[name=reqDivCd]").val();' in out
+    assert '$("#SendForm").find("input").val("");' in out and '$("#nope").val();' in out
+    assert '$c.util.getComponent("ipt_name").setValue("x");' in out and 'if ($c.util.getComponent("ipt_name").getValue() === "") {}' in out
+    assert 'const g = $c.util.getComponent("slc_curr").getValue();' in out and 'fm.action = "/a.do";' in out
+    assert '// $("#ipt_name").val()  주석은 그대로' in out
+    assert log == {"J_jquery": 9, "J3_document_find": 1, "D1_form_field": 2, "D1_byname": 1}
+    out2, log2 = dr.apply(out, body)
+    assert out2 == out and not log2  # 멱등

@@ -910,3 +910,52 @@
 | --- | --- | ---: | --- |
 | uldmgt50400 | `deleteAuthFormList` | 579 | `i--;` |
 
+## B-7 jQuery·원시 폼 DOM 잔여 — 규칙 19 화면별 손작업 명부(회신 아님, 작업 범위 확인용)
+
+> `dom_rules.py`(V36) 가 body 의 컴포넌트 하나로 확정되는 셀렉터(`#id`·`[id=X]`·`[name=X]`, 접미 없음)의 `.val/.attr·prop(disabled|readonly)/.show/.hide/.focus` 만 컴포넌트 API 로 바꿨다. 남은 것은 (1) 공급사가 라디오 한 칸마다 `select1` 을 따로 그려 `name` 이 여럿인 `:checked` 류, (2) body 에 없는 id(그리드 헤더 체크·서버 렌더), (3) `.find/.each/.append/.empty/.html/.css/.addClass/.bind/.submit` 같은 DOM 구조 조작 — 퍼블리싱 병합(ui-pub) 뒤 컴포넌트 설계에 맞춰 화면별로 다시 쓴다.
+
+잔여 jQuery 호출 5948 · 화면 510 / 원시 폼 DOM(`fm.*`·`document.<form>.*`) 430자리 · 화면 144 — action 217, target 107, value 85, elements 13, submit 4, checked 4
+
+| 셀렉터 유형 | 메서드 | 자리 | 화면 | 처방 |
+| --- | --- | ---: | ---: | --- |
+| #id | `.-` | 881 | 105 | 참조만(인자로 넘김·length·[0]) — 호출부를 보고 컴포넌트 참조로 |
+| 복합 셀렉터 | `.-` | 388 | 68 | 참조만(인자로 넘김·length·[0]) — 호출부를 보고 컴포넌트 참조로 |
+| :checked | `.val` | 280 | 50 | 라디오/체크 그룹 → 병합 뒤 그룹 컴포넌트 getValue/setValue |
+| [name] | `.attr` | 261 | 64 | 속성 조작 → set*(disabled/readOnly/style) 또는 삭제 |
+| #id | `.find` | 248 | 60 | 컨테이너 안 탐색 → 대상 컴포넌트 직접 참조 |
+| #id | `.attr` | 208 | 70 | 속성 조작 → set*(disabled/readOnly/style) 또는 삭제 |
+| 동적 결합 | `.-` | 186 | 59 | 참조만(인자로 넘김·length·[0]) — 호출부를 보고 컴포넌트 참조로 |
+| [name] | `.-` | 157 | 57 | 참조만(인자로 넘김·length·[0]) — 호출부를 보고 컴포넌트 참조로 |
+| #id | `.empty` | 153 | 102 | innerHTML 비우기 → 컴포넌트 setValue('')/removeAll |
+| [name] | `.val` | 150 | 35 | 라디오/체크 그룹 → 병합 뒤 그룹 컴포넌트 getValue/setValue |
+| 동적 결합 | `.val` | 113 | 25 | 라디오/체크 그룹 → 병합 뒤 그룹 컴포넌트 getValue/setValue |
+| $(this) | `.val` | 106 | 49 | 라디오/체크 그룹 → 병합 뒤 그룹 컴포넌트 getValue/setValue |
+| 복합 셀렉터 | `.addClass` | 93 | 84 | class 토글 → addClass/removeClass 는 컴포넌트 API 동일(확인 뒤 유지) |
+| 변수 | `.find` | 90 | 5 | 컨테이너 안 탐색 → 대상 컴포넌트 직접 참조 |
+| [name] | `.eq` | 88 | 8 | n번째 → 병합 뒤 단일 컴포넌트 |
+| :필터 | `.-` | 85 | 27 | 참조만(인자로 넘김·length·[0]) — 호출부를 보고 컴포넌트 참조로 |
+| 동적 결합 | `.attr` | 72 | 15 | 속성 조작 → set*(disabled/readOnly/style) 또는 삭제 |
+| [name] | `.prop` | 71 | 13 | checked/disabled → setValue/setDisabled |
+| :필터 | `.attr` | 67 | 19 | 속성 조작 → set*(disabled/readOnly/style) 또는 삭제 |
+| #id | `.bind` | 63 | 20 | 스크립트 바인딩 → ev:on* 속성(규칙 3) |
+| #id | `.is` | 59 | 32 | `:checked`/`:hidden` 판정 → getValue/getVisible |
+| 변수 | `.attr` | 59 | 38 | 속성 조작 → set*(disabled/readOnly/style) 또는 삭제 |
+| 복합 셀렉터 | `.val` | 58 | 40 | 라디오/체크 그룹 → 병합 뒤 그룹 컴포넌트 getValue/setValue |
+| 복합 셀렉터 | `.remove` | 56 | 14 | DOM 삭제 → 컴포넌트 hide/removeAll |
+| $(this) | `.attr` | 55 | 32 | 속성 조작 → set*(disabled/readOnly/style) 또는 삭제 |
+| $(document) | `.find` | 55 | 31 | 컨테이너 안 탐색 → 대상 컴포넌트 직접 참조 |
+| $(this) | `.find` | 51 | 13 | 컨테이너 안 탐색 → 대상 컴포넌트 직접 참조 |
+| [name] | `.is` | 51 | 44 | `:checked`/`:hidden` 판정 → getValue/getVisible |
+| #id | `.prop` | 48 | 7 | checked/disabled → setValue/setDisabled |
+| #id | `.submit` | 48 | 36 | 폼 제출 → $c.sbm(규칙 6, B-4 회신) |
+| #id | `.contents` | 46 | 5 | iframe 내부 → 프레임 재설계(B-3) |
+| 변수 | `.-` | 44 | 34 | 참조만(인자로 넘김·length·[0]) — 호출부를 보고 컴포넌트 참조로 |
+| 복합 셀렉터 | `.attr` | 41 | 22 | 속성 조작 → set*(disabled/readOnly/style) 또는 삭제 |
+| $(this) | `.removeClass` | 39 | 35 | addClass 와 같음 |
+| :checked | `.length` | 38 | 16 | 존재/개수 → getRowCount·null 검사 |
+| 복합 셀렉터 | `.removeClass` | 37 | 12 | addClass 와 같음 |
+| #id | `.select` | 37 | 25 | 화면별 |
+| 동적 결합 | `.append` | 36 | 1 | HTML 조립 → DataList·setItemSet/그리드 |
+| [name] | `.removeAttr` | 34 | 14 | 화면별 |
+| :checked | `.map` | 34 | 13 | 화면별 |
+

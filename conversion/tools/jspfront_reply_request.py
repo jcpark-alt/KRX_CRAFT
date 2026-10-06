@@ -14,6 +14,7 @@ B-4 제출 주소(action)·B-5 보낼 입력값(query_param) — `throw { bizMes
 import collections
 import glob
 import io
+import os
 import re
 import sys
 from pathlib import Path
@@ -96,7 +97,34 @@ def collect():
     return ctx, ctx_evidence, ses, nav, act, qp, unreal
 
 
-def render(ctx, ctx_evidence, ses, nav, act, qp, unreal):
+def jquery_shapes():
+    """B-7 — 규칙 19 잔여(jQuery·원시 폼 DOM) 를 셀렉터 유형 × 메서드로 집계. V36 이 body 로 확정되는 것만 바꾼 뒤 남은 것 = 화면별 손작업."""
+    import collections
+    import dom_rules as dr
+    shape = collections.Counter(); screens = collections.defaultdict(set); form = collections.Counter(); form_screens = set()
+    for f in sorted(glob.glob(str(ROOT / "conversion" / "jsp-front" / "ui-tobe" / "*.xml"))):
+        n = os.path.basename(f)[:-4]
+        raw, _e, reg = st.read_xml(f)
+        code = st.without_comments(reg["script"])
+        for m in re.finditer(r'(?<![\w$.])\$\(\s*([^)]{0,80}?)\s*\)\s*(?:\.\s*(\w+))?', code):
+            sel, meth = m.group(1), m.group(2) or "-"
+            if sel == "document": k = "$(document)"
+            elif sel == "this": k = "$(this)"
+            elif re.match(r'^[A-Za-z_$][\w$.]*$', sel): k = "변수"
+            elif ":checked" in sel: k = ":checked"
+            elif re.search(r':(eq|first|last|selected|radio|checkbox|visible|hidden)', sel): k = ":필터"
+            elif re.match(r'^.#[\w-]+.$', sel): k = "#id"
+            elif "[name" in sel: k = "[name]"
+            elif re.match(r'^.<', sel): k = "<elem>"
+            elif "+" in sel: k = "동적 결합"
+            else: k = "복합 셀렉터"
+            shape[(k, meth)] += 1; screens[(k, meth)].add(n)
+        for m in re.finditer(r'(?<![\w$.])(?:fm|document\.[A-Za-z_]\w*)\.(?:\w+\.)?(value|checked|submit|action|target|elements)\b', code):
+            form[m.group(1)] += 1; form_screens.add(n)
+    return shape, screens, form, form_screens
+
+
+def render(ctx, ctx_evidence, ses, nav, act, qp, unreal, jq=None):
     L = ["# jsp-front(r13 전환본) 회신 요청 명부 — B 축(회신 의존)", "",
          "> `python conversion/tools/jspfront_reply_request.py` 가 `ui-tobe` 를 읽어 만든다. 회신이 오면 규칙(convert/vendor_postprocess)에 반영해 전량 재생성한다.", ""]
     L += ["## B-1 컨텍스트 키 — as-is EL 이 서버 렌더로 채우던 값의 출처(회신 A-3)", "",
@@ -141,6 +169,23 @@ def render(ctx, ctx_evidence, ses, nav, act, qp, unreal):
         if len(shown) < len(rows):
             L.append("| … | (나머지 %d자리는 `jspfront_summary.py --tsv` 와 코드의 `미실현 동작: set_focus` 로 찾는다) | | |" % (len(rows) - len(shown)))
         L.append("")
+    if jq:
+        shape, screens, form, form_screens = jq
+        tot = sum(shape.values()); allscr = set().union(*screens.values()) if screens else set()
+        L += ["## B-7 jQuery·원시 폼 DOM 잔여 — 규칙 19 화면별 손작업 명부(회신 아님, 작업 범위 확인용)", "",
+              "> `dom_rules.py`(V36) 가 body 의 컴포넌트 하나로 확정되는 셀렉터(`#id`·`[id=X]`·`[name=X]`, 접미 없음)의 `.val/.attr·prop(disabled|readonly)/.show/.hide/.focus` 만 "
+              "컴포넌트 API 로 바꿨다. 남은 것은 (1) 공급사가 라디오 한 칸마다 `select1` 을 따로 그려 `name` 이 여럿인 `:checked` 류, (2) body 에 없는 id(그리드 헤더 체크·서버 렌더), "
+              "(3) `.find/.each/.append/.empty/.html/.css/.addClass/.bind/.submit` 같은 DOM 구조 조작 — 퍼블리싱 병합(ui-pub) 뒤 컴포넌트 설계에 맞춰 화면별로 다시 쓴다.", "",
+              "잔여 jQuery 호출 %d · 화면 %d / 원시 폼 DOM(`fm.*`·`document.<form>.*`) %d자리 · 화면 %d — %s" % (tot, len(allscr), sum(form.values()), len(form_screens), ", ".join("%s %d" % kv for kv in form.most_common())), "",
+              "| 셀렉터 유형 | 메서드 | 자리 | 화면 | 처방 |", "| --- | --- | ---: | ---: | --- |"]
+        how = {"-": "참조만(인자로 넘김·length·[0]) — 호출부를 보고 컴포넌트 참조로", "val": "라디오/체크 그룹 → 병합 뒤 그룹 컴포넌트 getValue/setValue", "find": "컨테이너 안 탐색 → 대상 컴포넌트 직접 참조",
+               "attr": "속성 조작 → set*(disabled/readOnly/style) 또는 삭제", "prop": "checked/disabled → setValue/setDisabled", "empty": "innerHTML 비우기 → 컴포넌트 setValue('')/removeAll",
+               "append": "HTML 조립 → DataList·setItemSet/그리드", "each": "DOM 순회 → DataList getRowCount 루프", "bind": "스크립트 바인딩 → ev:on* 속성(규칙 3)", "submit": "폼 제출 → $c.sbm(규칙 6, B-4 회신)",
+               "is": "`:checked`/`:hidden` 판정 → getValue/getVisible", "css": "스타일 → setStyle", "addClass": "class 토글 → addClass/removeClass 는 컴포넌트 API 동일(확인 뒤 유지)", "removeClass": "addClass 와 같음",
+               "contents": "iframe 내부 → 프레임 재설계(B-3)", "remove": "DOM 삭제 → 컴포넌트 hide/removeAll", "eq": "n번째 → 병합 뒤 단일 컴포넌트", "length": "존재/개수 → getRowCount·null 검사", "text": "출력 → setValue", "html": "출력 → setValue/escape"}
+        for (k, m), v in sorted(shape.items(), key=lambda kv: -kv[1])[:40]:
+            L.append("| %s | `.%s` | %d | %d | %s |" % (k, m, v, len(screens[(k, m)]), how.get(m, "화면별")))
+        L.append("")
     return "\n".join(L) + "\n"
 
 
@@ -151,7 +196,9 @@ def main(argv=None):
     if "--out" in args:
         out = Path(args[args.index("--out") + 1])
     ctx, ev, ses, nav, act, qp, unreal = collect()
-    io.open(out, "w", encoding="utf-8", newline="\n").write(render(ctx, ev, ses, nav, act, qp, unreal))
+    jq = jquery_shapes()
+    io.open(out, "w", encoding="utf-8", newline="\n").write(render(ctx, ev, ses, nav, act, qp, unreal, jq))
+    print("B-7 jQuery 잔여 %d자리 / 원시 폼 DOM %d자리" % (sum(jq[0].values()), sum(jq[2].values())))
     print("생성:", out)
     print("B-1 컨텍스트 키 %d종 · B-2 세션 키 %d종 · B-3 이동 목적지 %d자리 · B-4 action %d종 · B-5 query_param 키 %d종 · B-6 미실현 동작 %s"
           % (len(ctx), len(ses), sum(len(s) for l in nav.values() for s in l.values()), len(act), len(qp), {k: len(v) for k, v in unreal.items()}))
