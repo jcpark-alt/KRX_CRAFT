@@ -633,3 +633,20 @@ def test_publish_merge_grid_unique_ids_and_select_choices():
     s = etree.tostring(ps, encoding="unicode")
     assert "new row" not in s and "15개" in s and ps.get("id") == "slc_pageSize" and ps.get("ref") == "data:dma_req.pageSize"
     assert ps.get("appearance") == "minimal"  # 퍼블리싱 모양 속성은 그대로
+
+
+def test_p1_header_standard():
+    """헤더 표준(2026-10-06): 본화면 sub_contents 는 pageFrame 첫 자식 보장, 팝업 pop_contents 는 pageFrame 없음."""
+    main_no = '<body><xf:group class="sub_contents" id=""><xf:group class="step_list" id=""/></xf:group></body>'
+    out, log = pn.normalize_body(main_no, "")
+    assert out.index('<w2:pageFrame id="pfmContentHeader"') < out.index('class="step_list"') and log.get("P1_pageframe_added") == 1
+    out2, log2 = pn.normalize_body(out, "")
+    assert out2 == out and not log2.get("P1_pageframe_added")  # 멱등
+    pop_pf = ('<body><xf:group class="pop_contents" id=""><w2:pageFrame id="pfmContentHeader" src="/cm/xml/contentHeader.xml" style=""/>'
+              '<xf:group class="tblbox" id=""/></xf:group></body>')
+    out3, log3 = pn.normalize_body(pop_pf, "")
+    assert "pfmContentHeader" not in out3 and log3.get("P1_pageframe_removed") == 1
+    pgt = ('<body><xf:group class="sub_contents" id=""><xf:group class="pgtbox" id=""><w2:textbox class="pgt_tit" id="" label="제목"/>'
+           '<xf:group class="breadcrumb" id=""/></xf:group><xf:group class="tblbox" id=""/></xf:group></body>')
+    out4, _ = pn.normalize_body(pgt, "")
+    assert out4.count("pfmContentHeader") == 1 and "pgtbox" not in out4

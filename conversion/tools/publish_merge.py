@@ -284,7 +284,11 @@ def merge_screen(name, pub_path, out_dir, report_only):
     missing = sorted(refs - ids_new)
     pub_unmatched = [l for l in log if l.startswith("퍼블리싱") and "전용 버튼" not in l]
     # auto = 스크립트 참조 전부 자리잡음 · 공급사 상호작용 컴포넌트 전부 대응 · 퍼블리싱 상호작용 요소도 전부 대응(라벨 중복 없음)
-    verdict = "auto" if not missing and not unmatched_vendor and not pub_unmatched and (matched or not pitems) else "review"
+    # 퍼블리싱 본문이 자리표뿐(그룹 말고 위젯이 없음)이면 아직 안 그린 화면 — 병합할 게 없다
+    pub_widgets = re.findall(r'<(?:xf|w2):(?!group\b|attributes\b|summary\b|pageFrame\b)[A-Za-z]+', body_text)  # 정규화 뒤(간격 표·br 삭제 뒤) 기준
+    if not pub_widgets:
+        log.append("퍼블리싱 본문 비어 있음(자리표만)")
+    verdict = "auto" if pub_widgets and not missing and not unmatched_vendor and not pub_unmatched and (matched or not pitems) else "review"
     total = len(pitems)
     rep = {"name": name, "verdict": verdict, "matched": matched, "pub_items": total, "missing_refs": missing,
            "unmatched_vendor": ["%s '%s'" % (k[0], k[1] if k[0] != "grid" else "grid") for k in unmatched_vendor][:8], "log": log[:8]}

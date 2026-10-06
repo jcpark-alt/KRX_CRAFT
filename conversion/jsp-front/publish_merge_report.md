@@ -2,7 +2,7 @@
 
 > `python conversion/tools/publish_merge.py conversion/jsp-front/ui-tobe` 가 만든다. `auto` 는 `conversion/jsp-front/ui-pub/` 에 병합 결과를 썼다(스크립트 참조 전부 자리잡음·공급사 상호작용 컴포넌트 전부 대응). `review` 는 사유를 보고 손으로 잇는다.
 
-화면 260 · auto 68 · review 192 · error 0
+화면 260 · auto 66 · review 194 · error 0
 
 | 화면 | 판정 | 정합/퍼블리싱 항목 | 스크립트 참조 누락 | 공급사 미대응 | 메모 |
 | --- | --- | ---: | --- | --- | --- |
@@ -140,7 +140,7 @@
 | jldfil30602 | review | 10/19 |  | grid 'grid' | 퍼블리싱 select '신청자정보' ↔ 공급사 대응 없음; 퍼블리싱 inputCalendar '일시' 가 2개(라벨 중복); 퍼블리싱 select '일시' 가 4개(라벨 중복) |
 | jldfil30603 | review | 1/1 |  | grid 'grid'; trigger '수정' |  |
 | jldfil30604 | review | 10/11 |  | grid 'grid' | 퍼블리싱 select '신청자정보' ↔ 공급사 대응 없음 |
-| jldfil35200 | auto | 0/0 |  |  |  |
+| jldfil35200 | review | 0/0 |  |  | 퍼블리싱 본문 비어 있음(자리표만) |
 | jldfil35400 | review | 3/3 |  | trigger '목차'; trigger '즐겨찾기'; pageList '' | 버튼 '조회' ← 공급사 '검색'(동의어) |
 | jldfil35700 ⚠중복 | review | 0/47 |  |  | 퍼블리싱 select '시장구분' ↔ 공급사 대응 없음; 퍼블리싱 select '상장방식' ↔ 공급사 대응 없음; 퍼블리싱 grid '상장할신탁원본액/수수료/종목약명' ↔ 공급사 대응 없음 |
 | jldfil40100 | auto | 0/0 |  |  |  |
@@ -240,7 +240,7 @@
 | jldstf75600 | review | 0/9 |  | input ''; trigger '저장'; trigger '조회'; select '' | 퍼블리싱 input '키워드(검색어)' ↔ 공급사 대응 없음; 퍼블리싱 trigger 'Search' ↔ 공급사 대응 없음; 퍼블리싱 select '공시구분' ↔ 공급사 대응 없음 |
 | jldstf76200 | review | 1/1 |  | trigger '등록'; trigger '저장' |  |
 | uldmgt50002 | review | 0/8 |  | trigger 'icon:list_more'; trigger 'icon:close' | 퍼블리싱 select '시장구분' ↔ 공급사 대응 없음; 퍼블리싱 select '서식버전' ↔ 공급사 대응 없음; 퍼블리싱 input '엘리먼트명' ↔ 공급사 대응 없음 |
-| uldmgt50014 | auto | 0/0 |  |  |  |
+| uldmgt50014 | review | 0/0 |  |  | 퍼블리싱 본문 비어 있음(자리표만) |
 | uldmgt50300 | review | 1/3 |  |  | 퍼블리싱 grid 'On-line/법규번호/상장공시시장구분/원문/제목' ↔ 공급사 대응 없음; 퍼블리싱 trigger '뒤로' ↔ 공급사 대응 없음; 버튼 '등록' ← 공급사 아이콘 save(img_15) |
 | uldmgt50301 | review | 2/8 |  | inputCalendar ''; input ''; upload ''; select '' | 퍼블리싱 select '시장구분' ↔ 공급사 대응 없음; 퍼블리싱 inputCalendar '개정일자' ↔ 공급사 대응 없음; 퍼블리싱 input '제목' ↔ 공급사 대응 없음 |
 | uldmgt50302 | review | 0/2 |  |  | 퍼블리싱 trigger '분류등록' ↔ 공급사 대응 없음; 퍼블리싱 grid '분류ID/분류명/상위분류ID' ↔ 공급사 대응 없음 |

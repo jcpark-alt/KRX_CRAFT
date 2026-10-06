@@ -600,6 +600,9 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
 
 ### 규칙 34: 퍼블리싱 정규화 — `publish_normalize.py` (P1~P11, lxml · body 만)
 
+* **P1 확장(헤더 표준, 사용자 확정 2026-10-06)**: 본화면(`sub_contents`)은 `pfmContentHeader` pageFrame 을 첫 자식으로 보장(없으면 추가 `P1_pageframe_added`),
+  팝업(`pop_contents`)은 pageFrame 제거(`P1_pageframe_removed`). 퍼블리싱 관례(본화면 pgtbox 658/648, 팝업 헤더 없음 607/5)와 sample-front 혼재를 하나로 묶은 결정. 멱등.
+
 * sample-front 가이드 골격으로 접는 1:1 구조 치환만 한다. P1 `pgtbox`(제목+breadcrumb) → `w2:pageFrame contentHeader` ·
   P2 순수 컨테이너(`#content` div·JSP form 이월 그룹) 해제 · P3 `meta_snippet*` 삭제 · P4 간격 표·`<br>` 삭제 ·
   P5 버튼만 든 표 → `titbox/rt`(다음 형제가 그리드) 또는 `btnbox/rt` · P6 맨 `table.w2tb` → `tblbox` + `tbl` ·
@@ -669,11 +672,12 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
 * **판정**: 스크립트가 참조하는 body id(게이트 잣대)가 전부 병합 본문에 있고, 공급사 상호작용 컴포넌트와 퍼블리싱 상호작용 요소가 전부 대응되면 `auto` →
   `ui-pub/<name>.xml`(head·script 는 ui-tobe 그대로 + 병합 body → 규칙 34 정규화). 아니면 `review`(사유를 `publish_merge_report.md` 에). `인쇄` 같은 퍼블리싱 전용
   공통 버튼(`PUB_CHROME`)은 대응이 없어도 막지 않는다.
-* **알아 둘 것**: 퍼블리싱 헤더는 `pgtbox`+breadcrumb+즐겨찾기 꼴이고 sample-front 는 `pageFrame(contentHeader)` — 병합본은 P1 대로 pageFrame 으로 바꾸므로
-  표준 확정이 필요하다. `review` 의 큰 덩어리: 퍼블리싱에만 있는 버튼·select(새 디자인 추가분), 전화번호 3분할 입력 ↔ 공급사 1칸, 라벨 없는 컨트롤 여러 개,
+* **헤더 표준(사용자 확정 2026-10-06)**: 퍼블리싱 헤더는 `pgtbox`+breadcrumb+즐겨찾기 꼴이지만 **pageFrame 으로 통일** — 본화면(`sub_contents`)은
+  `pfmContentHeader` pageFrame 을 첫 자식으로 반드시, 팝업(`pop_contents`)은 헤더 없음(제목은 팝업 프레임). 규칙 34 P1 이 보장하므로 병합본에도 자동 적용된다.
+  퍼블리싱 본문이 자리표뿐이면(위젯 없음) `review`. `review` 의 큰 덩어리: 퍼블리싱에만 있는 버튼·select(새 디자인 추가분), 전화번호 3분할 입력 ↔ 공급사 1칸, 라벨 없는 컨트롤 여러 개,
   EL `${…}` 라벨 버튼(공급사 미해결 표식), 공급사 보조 그리드(헤더 없는 `grd_sub…`). 같은 이름이 두 폴더에 있으면 `대외` 쪽을 고른다(⚠중복 표기).
 * **실행**: `python conversion/tools/publish_merge.py [--report-only] [--out conversion/jsp-front/ui-pub] conversion/jsp-front/ui-tobe` — 재실행 고정점.
-  기준(2026-10-06): 이름 일치 260화면 → auto 68 / review 192, `ui-pub` 게이트·lint 0/0. 테스트 `test_jspfront_tools.py::test_publish_merge_*`.
+  기준(2026-10-06): 이름 일치 260화면 → auto 66 / review 194(헤더 표준 적용 뒤), `ui-pub` 게이트·lint 0/0. 테스트 `test_jspfront_tools.py::test_publish_merge_*`.
 
 ## 규칙 6 보충: Submission 변환 상세
 

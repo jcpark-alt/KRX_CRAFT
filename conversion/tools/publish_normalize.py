@@ -4,7 +4,8 @@
     python conversion/tools/publish_normalize.py [--dry] <xml|폴더> ...
 
 규칙(P = publish). 1:1 구조 치환만 하고, 판단이 필요한 자리(안내문 분해·조건 래퍼·표형 그리드·탭 본문 병합·레거시 lybox)는 건드리지 않는다.
-  P1  `xf:group.pgtbox`(제목 textbox + breadcrumb) → `<w2:pageFrame id="pfmContentHeader" src="/cm/xml/contentHeader.xml"/>`
+  P1  `xf:group.pgtbox`(제목 textbox + breadcrumb) → `<w2:pageFrame id="pfmContentHeader" src="/cm/xml/contentHeader.xml"/>`;
+      본화면(`sub_contents`)은 pageFrame 을 첫 자식으로 보장, 팝업(`pop_contents`)은 pageFrame 제거(헤더 표준, 사용자 확정 2026-10-06)
   P2  순수 컨테이너 해제 — `xf:group#content[tagname=div]`, JSP <form> 이월 `xf:group[name=…]`(class·style 없음) 는 자식만 남긴다.
       스크립트가 그 id 를 참조하면 해제하지 않는다.
   P3  `meta_snippetCategory`·`meta_snippetName` 속성 삭제(에디터 메타)
@@ -150,16 +151,37 @@ def _has_content(el):
 
 
 # ---------------------------------------------------------------- rules
+def _new_pageframe():
+    pf = etree.Element(PAGEFRAME)
+    pf.set("id", "pfmContentHeader"); pf.set("src", "/cm/xml/contentHeader.xml"); pf.set("style", "")
+    return pf
+
+
 def p1_pageframe(body, log):
     for g in body.iter(GROUP):
         if _has_class(g, "pgtbox") and (g.find(".//%s[@class='pgt_tit']" % TEXTBOX) is not None
                                         or g.find(".//%s[@class='breadcrumb']" % GROUP) is not None):
-            pf = etree.Element(PAGEFRAME)
-            pf.set("id", "pfmContentHeader"); pf.set("src", "/cm/xml/contentHeader.xml"); pf.set("style", "")
+            pf = _new_pageframe()
             pf.tail = g.tail
             g.getparent().replace(g, pf)
             log["P1_pageframe"] = 1
-            return
+            break
+    # 헤더 표준(사용자 확정 2026-10-06): 본화면(sub_contents)은 pageFrame 헤더를 첫 자식으로 반드시 갖고,
+    # 팝업(pop_contents)은 헤더 없음(퍼블리싱 607:5 관례 — 제목은 팝업 프레임이 그린다)
+    top = next((g for g in body.iter(GROUP) if _has_class(g, "sub_contents") or _has_class(g, "pop_contents")), None)
+    if top is None:
+        return
+    pfs = [e for e in body.iter(PAGEFRAME) if e.get("id") == "pfmContentHeader"]
+    if _has_class(top, "pop_contents"):
+        for pf in pfs:
+            _remove(pf)
+        if pfs:
+            log["P1_pageframe_removed"] = len(pfs)
+    elif not pfs:
+        pf = _new_pageframe()
+        pf.tail = top.text if (top.text or "").strip() == "" and top.text else top.tail
+        top.insert(0, pf)
+        log["P1_pageframe_added"] = 1
 
 
 def p2_unwrap_containers(body, script, log):
