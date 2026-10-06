@@ -729,3 +729,184 @@
 | `ipt_keyword` | 1 | jldmgt90400 |
 | `{P}BZ_PROCS_NO` | 1 | jldstf07401 |
 | `{P}V_BZ_PROCS_NO` | 1 | jldstf07181 |
+
+## B-6 미실현 동작 — 공급사 마커에 대상·인자가 없는 자리(as-is 원문 필요)
+
+공급사 마커는 `{target}.setStyle({args})`·`{target}.setLabel({args})`·`{target}.focus()` 처럼 **대상과 인자가 비어 있고** 저장소에 as-is JSP 가 없어 값을 지어낼 수 없다(V34 는 앞 문장에서 후보가 하나뿐인 포커스만 닫았다). 요청: ① as-is JSP 원문(해당 함수) 또는 ② 공급사 마커에 as-is 표현식을 함께 싣도록 요청. 아래는 자리별 명부(화면 · 함수 · 줄 · 바로 다음 문장 — 대상을 짐작할 단서).
+
+### set_visible — 70자리 / 18화면
+
+| 화면 | 함수 | 줄 | 다음 문장 |
+| --- | --- | ---: | --- |
+| jlddst00300 | `fnCloseAllDsclsLayer` | 1620 | `$("#searchForm").find("a[id=dsclsType" + scwin.discloureArr[i] + "]").removeClass("active");` |
+| jlddst00700 | `disclosure_window_all_close` | 675 | `const searchType = (String(((dma_pageContext.get("searchType") ?? "")) == null ? '' : ((dma_pageContext.get("s` |
+| jlddst00800 | `dial` | 194 | `$(".ui-widget-overlay").css("background-image", "none");` |
+| jlddst06000 | `fnDetailViewEtf` | 458 | `$c.util.getComponent("dma_fnDownloadReq").set("bzProcsNo", val);` |
+| jlddst06000 | `fnDetailView` | 475 | `$c.util.getComponent("dma_fnDownloadReq").set("bzProcsNo", val);` |
+| jlddst06000 | `fnCloseDetail` | 504 | `};` |
+| jlddst10000 | `init_pageBody` | 17 | `if (($c.util.getComponent('AKCKwd').getValue() == null ? '' : String($c.util.getComponent('AKCKwd').getValue()` |
+| jlddst10000 | `fnSearch` | 568 | `$c.util.getComponent("tabContents").setStyle("display", "");` |
+| jlddst10200 | `init_pageBody` | 61 | `if (($c.util.getComponent('AKCKwd').getValue() == null ? '' : String($c.util.getComponent('AKCKwd').getValue()` |
+| jlddst10200 | `fnSearch` | 340 | `$c.util.getComponent("tabContents").setStyle("display", "");` |
+| jlddst10400 | `init_pageBody` | 62 | `await scwin.initComNmSetting();` |
+| jlddst10400 | `initComNmSetting` | 231 | `}` |
+| jlddst10400 | `fnSearch` | 334 | `await scwin.fnSearchPresentPrice();` |
+| jlddst50000 | `init_disclosure_proc` | 230 | `$("section.main-important #main-today-all article").html($("div.temp-contents #main-today-all article").html()` |
+| jlddst50000 | `loadBatch` | 506 | `setTimeout(function() {` |
+| jlddst50000 | `loadJSP` | 533 | `setTimeout(function() {` |
+| jlddst50000 | `fnStart` | 614 | `scwin.timer = setInterval(function() {` |
+| jlddst50000 | `fnStart` | 615 | `scwin.timer = setInterval(function() {` |
+| jlddst50000 | `fnStop` | 629 | `clearInterval(scwin.timer);` |
+| jlddst50000 | `fnStop` | 630 | `clearInterval(scwin.timer);` |
+| jlddst60200 | `init` | 98 | `} else {` |
+| jlddst60200 | `init` | 100 | `}` |
+| jlddst60200 | `init_pageBody` | 143 | `}` |
+| jlddst60200 | `dial` | 370 | `$(".ui-widget-overlay").css("background-image", "none");` |
+| jlddst60200 | `fnChangeDoc` | 415 | `} else {` |
+| jlddst60200 | `fnChangeDoc` | 417 | `}` |
+| jlddst70000 | `fnMenuSetting` | 470 | `$("#slc_repMajAgntDesignAdvserComp option:first").attr("selected", "selected");` |
+| jlddst70000 | `fnMenuSetting` | 472 | `$("#slc_repMajAgntComp option:first").attr("selected", "selected");` |
+| jlddst70000 | `fnMenuSetting` | 474 | `if (flag) {` |
+| jlddst70000 | `fnMenuSetting` | 480 | `if (flag) {` |
+| jlddst70000 | `fnMenuSetting` | 484 | `$("#slc_repMajAgntComp option:first").attr("selected", "selected");` |
+| jlddst70000 | `fnMenuSetting` | 486 | `$("#slc_designAdvserComp option:first").attr("selected", "selected");` |
+| jlddst70000 | `fnMenuSetting` | 489 | `$("#slc_repMajAgntDesignAdvserComp option:first").attr("selected", "selected");` |
+| jlddst70000 | `fnMenuSetting` | 491 | `if (flag) {` |
+| jlddst70000 | `fnMenuSetting` | 495 | `$("#slc_designAdvserComp option:first").attr("selected", "selected");` |
+| jlddst70500 | `fnMenuSetting` | 470 | `$("#slc_repMajAgntDesignAdvserComp option:first").attr("selected", "selected");` |
+| jlddst70500 | `fnMenuSetting` | 472 | `$("#slc_repMajAgntComp option:first").attr("selected", "selected");` |
+| jlddst70500 | `fnMenuSetting` | 474 | `if (flag) {` |
+| jlddst70500 | `fnMenuSetting` | 480 | `if (flag) {` |
+| jlddst70500 | `fnMenuSetting` | 484 | `$("#slc_repMajAgntComp option:first").attr("selected", "selected");` |
+| jlddst70500 | `fnMenuSetting` | 486 | `$("#slc_designAdvserComp option:first").attr("selected", "selected");` |
+| jlddst70500 | `fnMenuSetting` | 489 | `$("#slc_repMajAgntDesignAdvserComp option:first").attr("selected", "selected");` |
+| jlddst70500 | `fnMenuSetting` | 491 | `if (flag) {` |
+| jlddst70500 | `fnMenuSetting` | 495 | `$("#slc_designAdvserComp option:first").attr("selected", "selected");` |
+| jlddst72100 | `fnMenuSetting` | 423 | `$("#slc_repMajAgntDesignAdvserComp option:first").attr("selected", "selected");` |
+| jlddst72100 | `fnMenuSetting` | 425 | `$("#slc_repMajAgntComp option:first").attr("selected", "selected");` |
+| jlddst72100 | `fnMenuSetting` | 427 | `if (flag) {` |
+| jlddst72100 | `fnMenuSetting` | 433 | `if (flag) {` |
+| jlddst72100 | `fnMenuSetting` | 437 | `$("#slc_repMajAgntComp option:first").attr("selected", "selected");` |
+| jlddst72100 | `fnMenuSetting` | 439 | `$("#slc_designAdvserComp option:first").attr("selected", "selected");` |
+| jlddst72100 | `fnMenuSetting` | 442 | `$("#slc_repMajAgntDesignAdvserComp option:first").attr("selected", "selected");` |
+| jlddst72100 | `fnMenuSetting` | 444 | `if (flag) {` |
+| jlddst72100 | `fnMenuSetting` | 448 | `$("#slc_designAdvserComp option:first").attr("selected", "selected");` |
+| jlddst90000 | `init_disclosure` | 220 | `$("section.main-important #main-today-1 article").html($("div.temp-contents #main-today-1 article").html());` |
+| jlddst90000 | `sitemap_init` | 1308 | `$('section.sitemap').addClass("chkon");` |
+| jlddst90000 | `sitemap_init` | 1309 | `$('section.sitemap').addClass("chkon");` |
+| jlddst90000 | `sitemap_init` | 1315 | `$('section.sitemap').removeClass("chkon");` |
+| jlddst90000 | `sitemap_init` | 1316 | `$('section.sitemap').removeClass("chkon");` |
+| jlddst90000 | `sitemap_init` | 1344 | `});` |
+| jlddst90000 | `sitemap_init` | 1347 | `});` |
+| jldfil16605 | `init_pageBody` | 168 | `scwin.filePlusMinus.setStyle("display", "none");` |
+| jldfil25910 | `init_pageBody` | 146 | `} else {` |
+| jldfil25910 | `init_pageBody` | 149 | `}` |
+| jldfil25910 | `basDRadio` | 734 | `} else {` |
+| jldfil25910 | `basDRadio` | 736 | `}` |
+| jldinf00003 | `viewMv` | 113 | `};` |
+| jldinf26300 | `toggleSearch` | 324 | `($c.util.getComponent('dma_hiddenStore') && $c.util.getComponent('dma_hiddenStore').set ? $c.util.getComponent` |
+| jldinf26300 | `toggleSearch` | 327 | `($c.util.getComponent('dma_hiddenStore') && $c.util.getComponent('dma_hiddenStore').set ? $c.util.getComponent` |
+| jldinf90400 | `send_form` | 308 | `}` |
+| jldinf90400 | `send_form` | 317 | `}` |
+
+### set_label — 24자리 / 10화면
+
+| 화면 | 함수 | 줄 | 다음 문장 |
+| --- | --- | ---: | --- |
+| jlddst10001 | `init_pageBody` | 33 | `$c.util.getComponent("ipt_method").setValue("searchTotalInfo");` |
+| jlddst15400 | `fnAddStock` | 599 | `scwin.addSearch.setStyle("display", "none");` |
+| jlddst60205 | `init_pageBody` | 84 | `await scwin.fnSearch();` |
+| jldfil40204 | `addRegisterPersonal` | 259 | `($c.util.getComponent('dma_hiddenStore') && $c.util.getComponent('dma_hiddenStore').set ? $c.util.getComponent` |
+| jldfil40204 | `addRegisterPersonal` | 269 | `$("#inputContents2").find("input").val("");` |
+| jldfil40204 | `addRegisterPersonal` | 282 | `($c.util.getComponent('dma_hiddenStore') && $c.util.getComponent('dma_hiddenStore').set ? $c.util.getComponent` |
+| jldfil40204 | `addRegisterPersonal` | 288 | `$("#inputContents3").find("input").val("");` |
+| jldfil40205 | `addRegisterPersonal` | 433 | `($c.util.getComponent('dma_hiddenStore') && $c.util.getComponent('dma_hiddenStore').set ? $c.util.getComponent` |
+| jldfil40205 | `addRegisterPersonal` | 443 | `$("#inputContents2").find("input").val("");` |
+| jldfil40205 | `addRegisterPersonal` | 456 | `($c.util.getComponent('dma_hiddenStore') && $c.util.getComponent('dma_hiddenStore').set ? $c.util.getComponent` |
+| jldfil40205 | `addRegisterPersonal` | 462 | `$("#inputContents3").find("input").val("");` |
+| jldfil40206 | `addRegisterPersonal` | 323 | `($c.util.getComponent('dma_hiddenStore') && $c.util.getComponent('dma_hiddenStore').set ? $c.util.getComponent` |
+| jldfil40206 | `addRegisterPersonal` | 329 | `$("#inputContents3").find("input").val("");` |
+| jldfil40206 | `addRegisterPersonal` | 342 | `($c.util.getComponent('dma_hiddenStore') && $c.util.getComponent('dma_hiddenStore').set ? $c.util.getComponent` |
+| jldfil40206 | `addRegisterPersonal` | 352 | `$("#inputContents4").find("input").val("");` |
+| jldfil40206 | `addRegisterPersonal` | 365 | `($c.util.getComponent('dma_hiddenStore') && $c.util.getComponent('dma_hiddenStore').set ? $c.util.getComponent` |
+| jldfil40206 | `addRegisterPersonal` | 371 | `$("#inputContents5").find("input").val("");` |
+| jldinf20000 | `cgSearch` | 947 | `$c.util.getComponent("ipt_isurNm1").focus();` |
+| jldinf20000 | `cgSearch` | 954 | `} else {` |
+| jldinf20000 | `cgSearch` | 963 | `} else {` |
+| jldinf20000 | `cgSearch` | 968 | `}` |
+| jldinf40000 | `cgSearch` | 681 | `$c.util.getComponent('ipt_dnldInstTpCd').setValue(scwin.LPAD(idx));` |
+| jldods70012 | `print` | 404 | `}` |
+| jldods70012_admin | `print` | 335 | `}` |
+
+### set_focus — 351자리 / 104화면
+
+| 화면 | 함수 | 줄 | 다음 문장 |
+| --- | --- | ---: | --- |
+| jldbnf00600 | `checkData` | 733 | `return false;` |
+| jldbnf05001 | `PopUp_FeeCal_appl` | 3895 | `return;` |
+| jldbnf05002 | `data_Chk` | 235 | `return false;` |
+| jldbnf05003 | `data_Chk` | 235 | `return false;` |
+| jldbnf05004 | `opt_send_form` | 578 | `return;` |
+| jldbnf05004 | `opt_send_form` | 628 | `return;` |
+| jldbnf05005 | `checkInput` | 838 | `return false;` |
+| jldbnf05005 | `checkSelect` | 860 | `return false;` |
+| jldbnf05006 | `stk_send_form` | 641 | `return;` |
+| jldbnf05006 | `stk_send_form` | 647 | `return;` |
+| jldbnf05006 | `calc_data_Chk` | 793 | `return false;` |
+| jldbnf05007 | `data_Chk` | 853 | `return false;` |
+| jldbnf05007 | `data_Chk` | 893 | `return false;` |
+| jldbnf05007 | `data_Chk` | 910 | `return;` |
+| jldbnf05007 | `data_Chk` | 915 | `return;` |
+| jldbnf05008 | `div_send_form` | 428 | `return;` |
+| jldbnf05008 | `div_send_form` | 434 | `return;` |
+| jldbnf05010 | `div_send_form` | 361 | `return;` |
+| jldbnf05010 | `div_send_form` | 367 | `return;` |
+| jldbnf05011 | `princint_send_form` | 445 | `return;` |
+| jldbnf05011 | `princint_send_form` | 450 | `return;` |
+| jldbnf10000 | `CheckValues` | 2034 | `return;` |
+| jldbnf10001 | `isu_check` | 2980 | `return false;` |
+| jldbnf10001 | `isu_check` | 2985 | `return false;` |
+| jldbnf10001 | `isu_check` | 2990 | `return false;` |
+| jldbnf10001 | `isu_check` | 2995 | `return false;` |
+| jldbnf10001 | `isu_check` | 3000 | `return false;` |
+| jldbnf10001 | `isu_check` | 3005 | `return false;` |
+| jldbnf10001 | `isu_check` | 3011 | `return false;` |
+| jldbnf10001 | `isu_check` | 3016 | `return false;` |
+| jldbnf10001 | `isu_check` | 3022 | `return false;` |
+| jldbnf15000 | `CheckChgIsuNm` | 540 | `isNull = true;` |
+| jldbnf15000 | `CheckChgIsuNm` | 545 | `isNull = true;` |
+| jldbnf15100 | `CheckChgIsuNm` | 462 | `isNull = true;` |
+| jldbnf15100 | `CheckChgIsuNm` | 467 | `isNull = true;` |
+| jldbnf20300 | `checkData` | 548 | `return false;` |
+| jldbnf20300 | `checkData` | 554 | `return false;` |
+| jldbnf20300 | `checkData` | 560 | `return false;` |
+| jldbnf20300 | `checkData` | 566 | `return false;` |
+| jldbnf25700 | `chkData` | 377 | `return false;` |
+| jldbnf30002 | `checkData` | 222 | `return false;` |
+| jldbnf30002 | `checkData` | 228 | `return false;` |
+| jldbnf30002 | `checkData` | 234 | `return false;` |
+| jldbnf35023 | `doSave` | 207 | `return;` |
+| jldbnf35023 | `doSave` | 212 | `return;` |
+| jldbnf40000 | `doSave` | 298 | `return;` |
+| jldbnf40000 | `doSave` | 303 | `return;` |
+| jldbnf45000 | `chkData` | 818 | `return false;` |
+| jldbnf50001 | `init_pageBody` | 79 | `} catch (_ex) { $c.exception.handleError(_ex, { context: 'jldbnf50001.onpageload' }); }` |
+| jldbnf55001 | `chkData` | 953 | `return false;` |
+| jldbnf55001 | `chkData` | 958 | `return false;` |
+| jldbnf55001 | `chkData` | 963 | `return false;` |
+| jldbnf55001 | `chkData` | 968 | `return false;` |
+| jldbnf55001 | `chkData` | 973 | `return false;` |
+| jldbnf55001 | `chkData` | 978 | `return false;` |
+| jldbnf55001 | `chkData` | 983 | `return false;` |
+| jldbnf55001 | `chkData` | 988 | `return false;` |
+| jldbnf55001 | `chkData` | 993 | `return false;` |
+| jldbnf55001 | `chkData` | 998 | `return false;` |
+| jldbnf55001 | `chkData` | 1003 | `return false;` |
+| … | (나머지 291자리는 `jspfront_summary.py --tsv` 와 코드의 `미실현 동작: set_focus` 로 찾는다) | | |
+
+### delete_row — 1자리 / 1화면
+
+| 화면 | 함수 | 줄 | 다음 문장 |
+| --- | --- | ---: | --- |
+| uldmgt50400 | `deleteAuthFormList` | 579 | `i--;` |
+

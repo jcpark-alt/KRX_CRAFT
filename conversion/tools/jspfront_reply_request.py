@@ -34,6 +34,7 @@ def collect():
     nav = collections.defaultdict(lambda: collections.defaultdict(set))   # kind -> literal -> screens
     act = collections.defaultdict(set)
     qp = collections.defaultdict(set)
+    unreal = collections.defaultdict(list)       # intent -> [(screen, fn, line, next_stmt)]
     for f in sorted(glob.glob(str(TOBE / "*.xml"))):
         name = Path(f).stem
         raw, _eol, reg = st.read_xml(f)
@@ -77,16 +78,25 @@ def collect():
                 else:
                     kind, lit_v = "기타", v
                 nav[kind][lit_v].add(name)
+        # B-6 미실현 동작(set_visible/set_label/set_focus 잔여) — 공급사 마커에 대상·인자가 없어 as-is 원문이 있어야 닫힌다
+        lines = sc.split("\n")
+        for i, l in enumerate(lines):
+            mm = re.search(r'미실현 동작: (set_visible|set_label|set_focus|delete_row) \(대상 미해석\)', l)
+            if not mm:
+                continue
+            fn = next((x for x in reversed(re.findall(r'(?m)^scwin\.([\w$]+)\s*=', "\n".join(lines[:i]))) ), "?")
+            nxt = next((x.strip() for x in lines[i + 1:i + 3] if x.strip() and "TODO Stage2" not in x), "")
+            unreal[mm.group(1)].append((name, fn, i + 1, nxt[:110]))
         for m in re.finditer(r'unresolved: "action:([^"]*)"', sc):
             act[m.group(1)].add(name)
         for m in re.finditer(r'unresolved: "query_param:([^"]*)"', sc):
             for k in m.group(1).split(","):
                 if k.strip():
                     qp[k.strip()].add(name)
-    return ctx, ctx_evidence, ses, nav, act, qp
+    return ctx, ctx_evidence, ses, nav, act, qp, unreal
 
 
-def render(ctx, ctx_evidence, ses, nav, act, qp):
+def render(ctx, ctx_evidence, ses, nav, act, qp, unreal):
     L = ["# jsp-front(r13 전환본) 회신 요청 명부 — B 축(회신 의존)", "",
          "> `python conversion/tools/jspfront_reply_request.py` 가 `ui-tobe` 를 읽어 만든다. 회신이 오면 규칙(convert/vendor_postprocess)에 반영해 전량 재생성한다.", ""]
     L += ["## B-1 컨텍스트 키 — as-is EL 이 서버 렌더로 채우던 값의 출처(회신 A-3)", "",
@@ -116,6 +126,21 @@ def render(ctx, ctx_evidence, ses, nav, act, qp):
           "| 키 | 화면 수 | 화면(최대 8) |", "| --- | ---: | --- |"]
     for k, screens in sorted(qp.items(), key=lambda kv: (-len(kv[1]), kv[0])):
         L.append("| `%s` | %d | %s |" % (k, len(screens), ", ".join(sorted(screens)[:8])))
+    L += ["", "## B-6 미실현 동작 — 공급사 마커에 대상·인자가 없는 자리(as-is 원문 필요)", "",
+          "공급사 마커는 `{target}.setStyle({args})`·`{target}.setLabel({args})`·`{target}.focus()` 처럼 **대상과 인자가 비어 있고** 저장소에 as-is JSP 가 없어 "
+          "값을 지어낼 수 없다(V34 는 앞 문장에서 후보가 하나뿐인 포커스만 닫았다). 요청: ① as-is JSP 원문(해당 함수) 또는 ② 공급사 마커에 as-is 표현식을 함께 싣도록 요청. "
+          "아래는 자리별 명부(화면 · 함수 · 줄 · 바로 다음 문장 — 대상을 짐작할 단서).", ""]
+    for intent in ("set_visible", "set_label", "set_focus", "delete_row"):
+        rows = unreal.get(intent) or []
+        if not rows:
+            continue
+        L += ["### %s — %d자리 / %d화면" % (intent, len(rows), len({r[0] for r in rows})), "", "| 화면 | 함수 | 줄 | 다음 문장 |", "| --- | --- | ---: | --- |"]
+        shown = rows if intent != "set_focus" else rows[:60]
+        for name, fn, ln, nxt in shown:
+            L.append("| %s | `%s` | %d | `%s` |" % (name, fn, ln, nxt.replace("|", "\\|")))
+        if len(shown) < len(rows):
+            L.append("| … | (나머지 %d자리는 `jspfront_summary.py --tsv` 와 코드의 `미실현 동작: set_focus` 로 찾는다) | | |" % (len(rows) - len(shown)))
+        L.append("")
     return "\n".join(L) + "\n"
 
 
@@ -125,11 +150,11 @@ def main(argv=None):
     out = ROOT / "conversion" / "jsp-front" / "reply_request.md"
     if "--out" in args:
         out = Path(args[args.index("--out") + 1])
-    ctx, ev, ses, nav, act, qp = collect()
-    io.open(out, "w", encoding="utf-8", newline="\n").write(render(ctx, ev, ses, nav, act, qp))
+    ctx, ev, ses, nav, act, qp, unreal = collect()
+    io.open(out, "w", encoding="utf-8", newline="\n").write(render(ctx, ev, ses, nav, act, qp, unreal))
     print("생성:", out)
-    print("B-1 컨텍스트 키 %d종 · B-2 세션 키 %d종 · B-3 이동 목적지 %d자리 · B-4 action %d종 · B-5 query_param 키 %d종"
-          % (len(ctx), len(ses), sum(len(s) for l in nav.values() for s in l.values()), len(act), len(qp)))
+    print("B-1 컨텍스트 키 %d종 · B-2 세션 키 %d종 · B-3 이동 목적지 %d자리 · B-4 action %d종 · B-5 query_param 키 %d종 · B-6 미실현 동작 %s"
+          % (len(ctx), len(ses), sum(len(s) for l in nav.values() for s in l.values()), len(act), len(qp), {k: len(v) for k, v in unreal.items()}))
     return 0
 
 
