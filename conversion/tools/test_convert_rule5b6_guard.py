@@ -114,7 +114,9 @@ def test_rule12_skips_dataid_inside_commented_out_function():
               "scwin.a = function () {\n    dts_y.DataID = encodeURI(\"/Prelisting.do?cmd=list\");\n    dts_y.reset();\n};\n")
     out, rep = convert.convert(_HEAD + script + _TAIL, "ULDTST00002.xml")
     assert "sbm_dts_y" in out and "sbm_dts_x" not in out           # 활성 함수 안은 변환, 주석 함수 안은 미변환
-    assert any("dts_x.DataID" in j and "함수 밖" in j for j in rep["judgment"])
+    # 규칙 0(2026-10-07): 주석 처리된 구문은 아예 변환 대상이 아니므로 리포트도 없이 원문 그대로 남는다(종전엔 '함수 밖' 보류 리포트)
+    assert '//     dts_x.DataID = encodeURI("/Prelisting.do?cmd=read");' in out
+    assert not any("dts_x" in j for j in rep["judgment"])
     assert not any("재정렬 보류" in j for j in rep["judgment"])
 
 

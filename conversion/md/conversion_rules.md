@@ -4,6 +4,19 @@
 
 ## 세부 변환 규칙 (Rules)
 
+### 규칙 0: 주석 처리된 구문은 변환하지 않는다 (2026-10-07 신설, 사용자 지시)
+
+* `//` 줄 주석과 `/* */` 블록 주석 안에 남은 옛 구문(`==`·`var`·`.value =`·`comFunc.*`·`CreateDialogFrame`·`eval`·`scwin.fn_*()` 호출 등)은
+  **문장 변환 규칙이 손대지 않는다**. 주석은 as-is 흔적·보류 설명이지 실행 코드가 아니므로 새 API 로 바꾸면 원래 뜻을 잃는다.
+* 구현: `convert.py` 의 `mask_comments()`/`restore_comments()`/`_masked()` — 문장 변환 규칙(1·5a·5b·5c·5d·5e·6·7·7m·7n·8·12·13·14·15·16·17·20·20b·21·23·25·31)을
+  주석을 자리표(`/*@CMTn@*/`)로 바꾼 스크립트 위에서 돌리고 끝나면 원문을 되돌린다(screen·lib 프로파일 공통). 같은 줄의 코드 부분은 문자 단위로 변환된다.
+* **보호하지 않는 주석**: 문서 주석 `/** */`(규칙 13 의 `@name` 동기화 등 규칙이 봐야 한다) · 섹션 헤더 `///////// n. …`(규칙 2/4/26) ·
+  W-Craft 검수 마커 `//----W-Craft …`(규칙 7m/12/30 이 삭제한다). 주석 자체를 다루는 규칙(9 흔적 삭제·11 include 삭제·30 마커 삭제·
+  `format_comment_space`·`format_script`)은 마스킹 밖에서 그대로 돈다.
+* 공급사 후처리(`vendor_postprocess`·`vendor_stage2`·`dom_rules`·`pcc_fil_import`)는 처음부터 `code_mask`/`segments` 로 주석을 제외해 왔다(실측 0건).
+* 테스트 `test_convert_rule0_comment_guard.py`.
+
+
 ### 규칙 1: vScrenID 관련 코드 삭제 (2026-09-02 변경 — 종전 "파일명 변수 삽입" 폐기)
 * `scwin.vScrenID` 관련 코드는 **사용하지 않으므로 삭제**합니다([code-convention.md](../../cm/docs/code-convention/code-convention.md) §5단계 구조).
 * 선언/대입문(`scwin.vScrenID = ...;`·`var vScrenID = ...;`, 함수 내부 포함)을 제거합니다.

@@ -125,6 +125,50 @@ def code_mask(code):
     return mask
 
 
+# ---------------------------------------------------------------- 규칙 0: 주석 처리된 구문은 변환하지 않는다 (2026-10-07)
+# `//` 줄 주석과 `/* */` 블록 주석(문서 주석 `/** */` 제외) 안의 옛 구문은 문장 변환 규칙(5a·5b·7·13·17·31 …)이 손대지 않는다 —
+# 주석은 as-is 흔적·보류 설명이지 실행 코드가 아니므로 새 API 로 바꾸면 뜻이 사라진다. 다만 W-Craft 검수 마커(`//----W-Craft …`)와
+# 섹션 헤더(`///////// n. …`)는 규칙 7m/12(마커 제거)·규칙 4/26(구역)이 봐야 하므로 마스킹하지 않는다. 주석 자체를 다루는 규칙
+# (9 흔적 삭제·11 include 삭제·30 W-Craft 마커 삭제·format_comment_space·format_script)은 마스킹 밖에서 그대로 돈다.
+_CMT_PLACEHOLDER = "/*@CMT%d@*/"
+_CMT_PLACEHOLDER_RE = re.compile(r'/\*@CMT(\d+)@\*/')
+
+
+def _is_protected_comment(txt):
+    if txt.startswith("/**"):            # 문서 주석(JSDoc) — @name 동기화 등 규칙이 봐야 한다
+        return False
+    if txt.startswith("///"):            # 섹션 헤더·구분선
+        return False
+    if "W-Craft" in txt or "Wcraft" in txt or "W-craft" in txt:   # W-Craft 검수 마커(규칙 7m/12/30 이 다룬다)
+        return False
+    return txt.startswith("//") or txt.startswith("/*")
+
+
+def mask_comments(code):
+    """주석(보호 대상)을 자리표로 바꾼다. returns (masked, store)."""
+    out, store = [], []
+    for txt, is_code in segments(code):
+        if not is_code and _is_protected_comment(txt):
+            store.append(txt)
+            out.append(_CMT_PLACEHOLDER % (len(store) - 1))
+        else:
+            out.append(txt)
+    return "".join(out), store
+
+
+def restore_comments(masked, store):
+    return _CMT_PLACEHOLDER_RE.sub(lambda m: store[int(m.group(1))], masked)
+
+
+def _masked(fn, script, *args, **kwargs):
+    """문장 변환 규칙을 주석 마스킹 아래에서 실행. fn(script, …) 가 문자열을 돌려주면 그 문자열을, 튜플을 돌려주면 첫 원소가 스크립트인 것으로 본다."""
+    masked, store = mask_comments(script)
+    res = fn(masked, *args, **kwargs)
+    if isinstance(res, tuple):
+        return (restore_comments(res[0], store),) + tuple(res[1:])
+    return restore_comments(res, store)
+
+
 def depth_array(code):
     """각 위치 직전의 괄호 중첩 깊이. (코드 영역만 카운트, 문자열/주석 무시)"""
     mask = code_mask(code)
@@ -2605,22 +2649,22 @@ def _convert_once_lib(raw, filename):
     if reg is None:
         raise ValueError("SCRIPT(CDATA) 영역을 찾지 못했습니다.")
     s = reg["script"]
-    s = rule5a_strict_eq(s, report, keep_nullish=True)
-    s = rule5e_neg_compare(s, report)
-    s = rule5d_method_rename(s, report)
+    s = _masked(rule5a_strict_eq, s, report, keep_nullish=True)   # 규칙 0: 주석 마스킹 아래에서
+    s = _masked(rule5e_neg_compare, s, report)
+    s = _masked(rule5d_method_rename, s, report)
     s = rule9_remove_obsolete(s, report)
     s = rule11_remove_include(s, report)
-    s = rule8_var(s, report)
-    s = rule7_gcc_substitute(s, report)
-    s = rule7m_method_substitute(s, report)
-    s = rule7n_normalize_module_fn(s, report)
-    s = rule14_component_method(s, report)
-    s = rule15_alert_error(s, report)
-    s = rule20_grid_excel_download(s, report)
-    s = rule20b_normalize_excel_positional(s, report)
-    s = rule21_frame_provider(s, report)
-    s = rule23_grid_visible_rownum_all(s, report)
-    s = rule31_remove_eval(s, report)
+    s = _masked(rule8_var, s, report)
+    s = _masked(rule7_gcc_substitute, s, report)
+    s = _masked(rule7m_method_substitute, s, report)
+    s = _masked(rule7n_normalize_module_fn, s, report)
+    s = _masked(rule14_component_method, s, report)
+    s = _masked(rule15_alert_error, s, report)
+    s = _masked(rule20_grid_excel_download, s, report)
+    s = _masked(rule20b_normalize_excel_positional, s, report)
+    s = _masked(rule21_frame_provider, s, report)
+    s = _masked(rule23_grid_visible_rownum_all, s, report)
+    s = _masked(rule31_remove_eval, s, report)
     s = remove_wcraft_markers(s, report)
     s = format_comment_space(s, report)
     s = collapse_blank_runs(s)
@@ -2637,34 +2681,35 @@ def _convert_once(raw, filename, profile="screen", keep_nullish=None):
     if reg is None:
         raise ValueError("SCRIPT(CDATA) 영역을 찾지 못했습니다.")
     s = reg["script"]
-    s = rule1_vscrenid(s, filename, report)
+    # 규칙 0: 문장 변환 규칙은 주석 마스킹 아래에서(_masked) — 주석 처리된 옛 구문은 그대로 둔다
+    s = _masked(rule1_vscrenid, s, filename, report)
     s = rule2_globals(s, report)
-    s = rule5a_strict_eq(s, report, keep_nullish=bool(keep_nullish))
-    s = rule5e_neg_compare(s, report)   # !X === Y 우선순위 버그 교정(5a 로 === 통일 후)
+    s = _masked(rule5a_strict_eq, s, report, keep_nullish=bool(keep_nullish))
+    s = _masked(rule5e_neg_compare, s, report)   # !X === Y 우선순위 버그 교정(5a 로 === 통일 후)
     body_ids = set(re.findall(r'\bid="([^"]+)"', reg["body"]))
-    s = rule5b_setvalue(s, report, body_ids)   # body 컴포넌트 수신만(DOM/form 필드 보류)
-    s = rule5c_setbgimage(s, report, body_ids)
-    s = rule5d_method_rename(s, report)
-    reg["head"], s = rule6_submission(reg["head"], reg["body"], s, report)
-    s = rule12_dynamic_submission(s, report)
-    s = rule16_trs_submission(s, report)
-    s = rule17_create_dialog_frame(s, report)
-    s = rule25_sequential_submission(s, report)   # submitDoneHandler 옵션형(수기 변환분) → 순차 스타일 정규화
+    s = _masked(rule5b_setvalue, s, report, body_ids)   # body 컴포넌트 수신만(DOM/form 필드 보류)
+    s = _masked(rule5c_setbgimage, s, report, body_ids)
+    s = _masked(rule5d_method_rename, s, report)
+    s, reg["head"] = _masked(lambda scr: tuple(reversed(rule6_submission(reg["head"], reg["body"], scr, report))), s)
+    s = _masked(rule12_dynamic_submission, s, report)
+    s = _masked(rule16_trs_submission, s, report)
+    s = _masked(rule17_create_dialog_frame, s, report)
+    s = _masked(rule25_sequential_submission, s, report)   # submitDoneHandler 옵션형(수기 변환분) → 순차 스타일 정규화
     s = mark_async_functions(s, report)   # 규칙 6/12/16/17/25 가 만든 await 의 소속 함수 async 부여
     s = rule9_remove_obsolete(s, report)
     s = rule11_remove_include(s, report)
-    s = rule8_var(s, report)
-    s = rule7_gcc_substitute(s, report)
-    s = rule7m_method_substitute(s, report)
-    s = rule7n_normalize_module_fn(s, report)
-    s = rule14_component_method(s, report)
-    s = rule15_alert_error(s, report)
-    s = rule20_grid_excel_download(s, report)
-    s = rule20b_normalize_excel_positional(s, report)
-    s = rule21_frame_provider(s, report)
-    s = rule23_grid_visible_rownum_all(s, report)
-    s = rule31_remove_eval(s, report)   # eval 제거 → Number/getComponentById/JSON.parse/속성 접근
-    reg["head"], s, reg["body"] = rule13_rename_scwin_fn(reg["head"], s, reg["body"], report)
+    s = _masked(rule8_var, s, report)
+    s = _masked(rule7_gcc_substitute, s, report)
+    s = _masked(rule7m_method_substitute, s, report)
+    s = _masked(rule7n_normalize_module_fn, s, report)
+    s = _masked(rule14_component_method, s, report)
+    s = _masked(rule15_alert_error, s, report)
+    s = _masked(rule20_grid_excel_download, s, report)
+    s = _masked(rule20b_normalize_excel_positional, s, report)
+    s = _masked(rule21_frame_provider, s, report)
+    s = _masked(rule23_grid_visible_rownum_all, s, report)
+    s = _masked(rule31_remove_eval, s, report)   # eval 제거 → Number/getComponentById/JSON.parse/속성 접근
+    s, reg["head"], reg["body"] = _masked(lambda scr: (lambda h, sc, b: (sc, h, b))(*rule13_rename_scwin_fn(reg["head"], scr, reg["body"], report)), s)
     s, reg["body"] = rule3_handlers(s, reg["body"], report)
     s, reg["body"] = rule4_structure(s, reg["body"], report)
     s = mark_async_functions(s, report)   # 규칙4 병합(gform_onload→onpageload)으로 이동한 await 재탐지
