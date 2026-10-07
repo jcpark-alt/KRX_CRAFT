@@ -36,15 +36,15 @@ OUT = ROOT / "conversion" / "jsp-front" / "scorecard.md"
 WEIGHTS = {
     "jquery": 3, "form_dom": 3, "raw_dom": 3, "eval": 3, "location": 3, "timer": 3, "innerHTML": 3, "long_fn": 3,
     "handler_notry": 1, "fn_def": 1, "console": 1, "native_alert": 1, "no_jsdoc": 1,
-    "todo_vendor": 2, "todo_merge": 2, "todo_rule19": 2, "console_sdd": 2, "innerHTML_tpl": 2,
+    "todo_vendor": 2, "todo_merge": 2, "todo_rule19": 2, "console_sdd": 2, "innerHTML_tpl": 2, "undefined_global": 2,
 }
 INFO = ("nullish", "getcomp")
 ORDER = ["jquery", "form_dom", "raw_dom", "eval", "location", "timer", "innerHTML", "long_fn",
-         "handler_notry", "fn_def", "console", "native_alert", "no_jsdoc", "todo_vendor", "todo_merge", "todo_rule19", "console_sdd", "innerHTML_tpl"]
+         "handler_notry", "fn_def", "console", "native_alert", "no_jsdoc", "todo_vendor", "todo_merge", "todo_rule19", "console_sdd", "innerHTML_tpl", "undefined_global"]
 LABEL = {"jquery": "jQuery", "form_dom": "폼 DOM", "raw_dom": "원시 DOM", "eval": "eval", "location": "location 이동", "timer": "타이머",
          "innerHTML": "innerHTML", "long_fn": "긴 함수", "handler_notry": "try 없는 핸들러", "fn_def": "fn_ 정의", "console": "console",
          "native_alert": "네이티브 alert", "no_jsdoc": "JSDoc 없음", "todo_vendor": "TODO(회신)", "todo_merge": "TODO(병합)", "todo_rule19": "TODO(규칙19)", "console_sdd": "[sdd] console(회신)", "innerHTML_tpl": "innerHTML(attrReals __html 실현)",
-         "nullish": "== null(정보)", "getcomp": "getComponent(정보)"}
+         "undefined_global": "미정의 as-is 공통(fn_)", "nullish": "== null(정보)", "getcomp": "getComponent(정보)"}
 
 RX = {
     "jquery": re.compile(r'(?<![\w$.])\$\('),
@@ -63,7 +63,9 @@ RX = {
     "getcomp": re.compile(r'\$c\.util\.getComponent\('),
 }
 HANDLER_NOTRY = re.compile(r'^scwin\.\w+_on\w+\s*=\s*(?:async\s+)?function[^\n]*\n(?![\s\S]{0,160}?\btry\s*\{)', re.M)
-TODO_VENDOR = re.compile(r'// TODO Stage2(?!\(규칙 ?19\))')
+TODO_VENDOR = re.compile(r'// TODO Stage2(?!\(규칙 ?19\)|\(pcc 반입 2차\))')     # pcc 반입 2차 표지는 undefined_global 로 센다
+GLOBAL_FN = re.compile(r'(?<![\w$.])(fn_[A-Za-z0-9_]+)\(')
+DEFINED_FN = re.compile(r'^(?:scwin\.(\w+) = (?:async )?function|\s*(?:async )?function (\w+)\(|\s*(?:const|let|var) (\w+) = (?:async )?function)', re.M)
 TODO_RULE19 = re.compile(r'// TODO Stage2\(규칙 ?19\)')
 TODO_MERGE = re.compile(r'TODO Stage2\(퍼블리싱 병합\)')
 
@@ -83,6 +85,8 @@ def measure(path):
                              and st.code_only(script[b + 1:e]).strip()
                              and not re.search(r'(?<![.\w$])try(?![\w$])', st.code_only(script[b + 1:e])))
     m["todo_vendor"] = len(TODO_VENDOR.findall(script))
+    defined = {x for g in DEFINED_FN.findall(script) for x in g if x}
+    m["undefined_global"] = sum(1 for x in GLOBAL_FN.findall(code) if x not in defined)
     m["todo_rule19"] = len(TODO_RULE19.findall(script))
     m["todo_merge"] = len(TODO_MERGE.findall(body))
     m["long_fn"] = sum(1 for _n, s, b, e, _ in spans if e - b > 4000)

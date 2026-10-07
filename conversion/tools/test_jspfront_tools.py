@@ -1211,3 +1211,35 @@ def test_v45_fix_format_number():
 '''
     out2, log2 = vs.fix_format_number(out, "", body)
     assert out2 == out and log2 == {}
+
+
+def test_v46_import_globals():
+    """V46: 미정의 as-is 전역 호출 → $c.fil(7종)·$c.win.print·같은 화면 scwin.<camel>; 나머지는 사유 TODO 표지(줄당 한 번); 화면 정의·주석·문자열은 그대로. 멱등."""
+    src = '''scwin.search = async function () {};
+scwin.a = function () {
+    fn_ObjValueSetComma($c.util.getComponent('ipt_parval')); // 액면가
+    fn_ObjValueResetRmComma2($c.util.getComponent(["ipt_cap", "ipt_cap_2"][i]));
+    if (fn_minusCheck($c.util.getComponent('ipt_coupnRt'), "표면이자율") === "N") { return; }
+    fn_print()
+    fn_Search();
+    fn_validate(frm); fn_validate(frm2);
+    fn_passwordWin(frm);
+    fn_ViewManualKeyWord(0200000015)
+    fn_local();
+    // fn_ObjValueSetComma(x)
+    const s = "fn_print()";
+};
+function fn_local() {}
+'''
+    out, log = vs.import_globals(src, "", "")
+    assert log == {"fil": 3, "gcc": 1, "local": 1, "todo": 3}
+    assert "    $c.fil.setComma($c.util.getComponent('ipt_parval')); // 액면가\n" in out
+    assert '    $c.fil.removeComma($c.util.getComponent(["ipt_cap", "ipt_cap_2"][i]));\n' in out
+    assert "if ($c.fil.confirmMinusValue($c.util.getComponent('ipt_coupnRt'), \"표면이자율\") === \"N\")" in out
+    assert "    $c.win.print()\n" in out and "    scwin.search();\n" in out
+    assert "    fn_validate(frm); fn_validate(frm2);  // TODO Stage2(pcc 반입 2차): as-is 공통 fn_validate — 폼·DOM 의존(B-7)\n" in out
+    assert "    fn_passwordWin(frm);  // TODO Stage2(pcc 반입 2차): as-is 공통 fn_passwordWin — JSP 팝업(window.open+폼 제출 — 회신)\n" in out
+    assert "    fn_ViewManualKeyWord(0200000015)  // TODO Stage2(pcc 반입 2차): as-is 공통 fn_ViewManualKeyWord — as-is 정의 없음(원본 JS 미제공 — 회신)\n" in out
+    assert "    fn_local();\n" in out and "    // fn_ObjValueSetComma(x)\n" in out and 'const s = "fn_print()";' in out
+    out2, log2 = vs.import_globals(out, "", "")
+    assert out2 == out and log2 == {}

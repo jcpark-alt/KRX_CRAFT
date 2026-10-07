@@ -1143,6 +1143,76 @@ def fix_format_number(script, head="", body=""):
     return script, ({"fixed": n} if n else {})
 
 
+# ---------------------------------------------------------------- V46 미정의 as-is 전역 함수 호출 (pcc/fil 반입 2차 · 2026-10-07)
+# 공급사가 전역 호출로 남긴 as-is 공통 `fn_X(…)`(화면에 정의 없음) 143종·1,360자리·311화면. ① 순수 헬퍼 7종은 pcc/fil `$c.fil.*` 로 반입했고 ② fn_print 는 gcc `$c.win.print()`,
+# ③ 같은 화면에 공급사가 개명해 둔 `scwin.<camel>` 이 있으면 그것을 부르고 ④ 나머지(폼/DOM 의존·JSP 팝업·키 입력 필터·외부 리포트·동기 ajax·as-is 정의 없음)는 그대로 두되
+# 줄 끝에 `// TODO Stage2(pcc 반입 2차): …` 사유 표지를 단다(한 번만). 화면 안에 같은 이름 정의가 있으면 손대지 않는다.
+IMPORT2_FIL = {"fn_ObjValueSetComma": "setComma", "fn_ObjValueResetRmComma2": "removeComma", "fn_boardCheck": "checkSearchWord", "fn_checkNum2": "stripNonDigits",
+               "fn_minusCheck": "confirmMinusValue", "fn_showMsgForRemind": "alertRemind", "fn_checkLength": "checkByteLength"}
+IMPORT2_GCC = {"fn_print": "$c.win.print"}
+IMPORT2_REASON = {
+    "폼·DOM 의존(B-7)": ("fn_validate", "fn_getFileNm", "fn_delRow", "fn_chkSaveElwPrc", "fn_IsValidDate", "fn_IsValidArrDate", "fn_IsValidArr", "fn_UserCheckValues",
+                        "fn_clearTransTbl", "fn_setMainPage", "fn_Edit56", "fn_UpdateLastPage", "fn_getFileNmCheck", "fn_DigitalSelectSub", "fn_DigitalExcelDownload",
+                        "fn_CalcOrdProfit", "fn_CalcCorpTaxDeductProfit", "fn_CalcAshInde", "fn_CalcBusiProfit", "fn_Over5Change", "fn_Over1Change", "fn_VcChange", "fn_InstInvstChange", "fn_chkElwPrc"),
+    "JSP 팝업(window.open+폼 제출 — 회신)": ("fn_passwordWin", "fn_popupCorpSearch", "fn_downInfoWin", "fn_stdCdDelWin", "fn_EtnExcelUploadPop", "fn_DigitalExcelUploadPop",
+                                        "fn_findCompany", "fn_OpenIndCodeWin", "fn_popupCorpUpdReq"),
+    "키 입력 필터(window.event — xf:input allowChar 속성 권장)": ("fn_numPointCheck_minus", "fn_etcNumNotCheck", "fn_etcNotCheck", "fn_telNoCheck", "fn_numPointCheck",
+                                                   "fn_engNumNotSpecCheck_ID", "fn_engNmCheck"),
+    "외부 리포트 도구(rexpert)": ("fn_PrintPreView_DB",),
+    "동기 ajax(tx 전환 필요)": ("fn_getBzDate",),
+    "타 모듈 as-is 공통(stf/ods·ins/hindr) — 반입 범위 밖": ("fn_newTextToString", "fn_delTextToString", "fn_condUrl2", "fn_connStratLog", "fn_connEndLog"),
+}
+IMPORT2_REASON["JSP 팝업(window.open+폼 제출 — 회신)"] += ("fn_popupCorpView", "fn_popupCorpSearch2", "fn_openNotice", "fn_openFAQ", "fn_openBondAppInfo", "fn_openBizForm", "fn_openFeeInfo")
+IMPORT2_SKIP = ("fn_SelEmail",)      # V44 몫
+IMPORT2_ABSENT = ("fn_ViewManualKeyWord", "fn_FileDown", "fn_Disclsviewer", "fn_Search", "fn_examViewer", "fn_search", "fn_goPrint", "fn_pubofrYn", "fn_NumberFormat2",
+                  "fn_varCondSatisfactYn", "fn_sum", "fn_dutyHdCmitYn", "fn_reload", "fn_isu_methd_onclick", "fn_searchList", "fn_setDocumentForm", "fn_preSubmit",
+                  "fn_publicFormList", "fn_selectStockDutyExer", "fn_openPopup", "fn_findCompany2", "fn_Register", "fn_toList", "fn_delete", "fn_cancel", "fn_close",
+                  "fn_register", "fn_lpContrtTrdYn", "fn_basExpYn", "fn_findKeywrd", "fn_popRelLawDtl")
+_REASON_BY_NAME = {n: r for r, names in IMPORT2_REASON.items() for n in names}
+IMPORT2_TODO = "// TODO Stage2(pcc 반입 2차): as-is 공통 %s — %s"
+GLOBAL_FN_CALL_RE = re.compile(r"(?<![\w$.])(fn_[A-Za-z0-9_]+)\(")
+
+
+def _camel(name):
+    base = name[3:] if name.startswith("fn_") else name
+    return base[:1].lower() + base[1:]
+
+
+def import_globals(script, head="", body=""):
+    defined = set(re.findall(r"^scwin\.(\w+) = (?:async )?function", script, re.M)) | set(re.findall(r"^\s*(?:async )?function (\w+)\(", script, re.M)) \
+        | set(re.findall(r"^\s*(?:const|let|var) (\w+) = (?:async )?function", script, re.M))
+    log = {}
+    mask = cv.code_mask(script)
+    out, pos = [], 0
+    todo_lines = set()
+    for m in GLOBAL_FN_CALL_RE.finditer(script):
+        if m.start() < pos or not mask[m.start()]:
+            continue
+        name = m.group(1)
+        if name in defined or name in IMPORT2_SKIP:
+            continue
+        if name in IMPORT2_FIL:
+            rep = "$c.fil.%s(" % IMPORT2_FIL[name]; key = "fil"
+        elif name in IMPORT2_GCC:
+            rep = IMPORT2_GCC[name] + "("; key = "gcc"
+        elif _camel(name) in defined:
+            rep = "scwin.%s(" % _camel(name); key = "local"
+        else:
+            eol = script.find("\n", m.end())
+            if eol < 0:
+                eol = len(script)
+            if eol in todo_lines or "TODO Stage2(pcc 반입 2차)" in script[m.end():eol]:
+                continue
+            reason = _REASON_BY_NAME.get(name) or ("as-is 정의 없음(원본 JS 미제공 — 회신)" if name in IMPORT2_ABSENT else "as-is 공통(폼 전역 의존) — 반입 보류")
+            out.append(script[pos:eol]); out.append("  " + IMPORT2_TODO % (name, reason)); pos = eol
+            todo_lines.add(eol); log["todo"] = log.get("todo", 0) + 1
+            continue
+        out.append(script[pos:m.start()]); out.append(rep); pos = m.end()
+        log[key] = log.get(key, 0) + 1
+    out.append(script[pos:])
+    return "".join(out), log
+
+
 def apply(head, script, body):
     log = {}
     body_ids = set(re.findall(r'\sid="([^"]+)"', body))
@@ -1159,11 +1229,11 @@ def apply(head, script, body):
 
 
 def main(argv=None):
-    """제자리 적용 CLI(frozen 화면 등): python conversion/tools/vendor_stage2.py --v37|--v38|--v39|--v40|--v41|--v42|--v43|--v44|--v45 [--dry] <xml|폴더> ..."""
+    """제자리 적용 CLI(frozen 화면 등): python conversion/tools/vendor_stage2.py --v37|--v38|--v39|--v40|--v41|--v42|--v43|--v44|--v45|--v46 [--dry] <xml|폴더> ..."""
     sys.stdout.reconfigure(encoding="utf-8")
     args = argv if argv is not None else sys.argv[1:]
-    files, fl, _ = st.parse_cli([a for a in args if a not in ("--v37", "--v38", "--v39", "--v40", "--v41", "--v42", "--v43", "--v44", "--v45")], flags=("--dry",), opts=())
-    which = next((w for w in ("--v45", "--v44", "--v43", "--v42", "--v41", "--v40", "--v39", "--v38", "--v37") if w in args), None)
+    files, fl, _ = st.parse_cli([a for a in args if a not in ("--v37", "--v38", "--v39", "--v40", "--v41", "--v42", "--v43", "--v44", "--v45", "--v46")], flags=("--dry",), opts=())
+    which = next((w for w in ("--v46", "--v45", "--v44", "--v43", "--v42", "--v41", "--v40", "--v39", "--v38", "--v37") if w in args), None)
     if not which or not files:
         print(main.__doc__); return 2
     changed = 0; tot = {}
@@ -1188,6 +1258,8 @@ def main(argv=None):
             new, log = sel_email(reg["script"], reg["head"], reg["body"])
         elif which == "--v45":
             new, log = fix_format_number(reg["script"], reg["head"], reg["body"])
+        elif which == "--v46":
+            new, log = import_globals(reg["script"], reg["head"], reg["body"])
         else:
             head, new, body, log = inline_fn_aliases(reg["head"], reg["script"], reg["body"])
         if new != reg["script"] or head != reg["head"] or body != reg["body"]:

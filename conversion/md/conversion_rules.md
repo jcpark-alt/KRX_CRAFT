@@ -662,6 +662,13 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
 * **V45 formatNumber DOM 인자(P3, 2026-10-07, `vendor_stage2.fix_format_number`, CLI `--v45`)**: as-is `fn_ObjValueSetComma(obj)`(입력값에 콤마를 넣어 되돌려 씀)를 공급사가
   `$c.num.formatNumber($('#id')[0]);` 로 옮겼다 — formatNumber 는 값을 받아 문자열을 돌려줄 뿐이라 결과가 버려진다(효과 없음). 실존 컴포넌트면 `comp.setValue($c.num.formatNumber(comp.getValue()));` 로 되돌리고
   바로 위 jQuery 힌트 줄을 걷는다. 결과: 27화면 31자리 복원.
+* **V46 미정의 as-is 전역 함수 호출 — pcc/fil 반입 2차(2026-10-07, `vendor_stage2.import_globals`, CLI `--v46`)**: 공급사가 전역 호출로 남긴 as-is 공통 `fn_X(…)`(화면에 정의 없음)
+  143종·1,360자리·311화면을 네 갈래로: ① 순수 헬퍼 7종은 pcc/fil 로 반입 — `fn_ObjValueSetComma`→`$c.fil.setComma`, `fn_ObjValueResetRmComma2`→`removeComma`, `fn_boardCheck`→`checkSearchWord`,
+  `fn_checkNum2`→`stripNonDigits`, `fn_minusCheck`→`confirmMinusValue`, `fn_showMsgForRemind`→`alertRemind`, `fn_checkLength`→`checkByteLength`(모두 `cm/pcc/fil/fil.xml`, 26함수);
+  ② `fn_print()`→gcc `$c.win.print()`; ③ 같은 화면에 공급사가 개명해 둔 `scwin.<camel>` 이 있으면 그것(`fn_Search()`→`scwin.search()`); ④ 나머지는 그대로 두고 줄 끝에
+  `// TODO Stage2(pcc 반입 2차): as-is 공통 fn_X — <사유>` — 사유: 폼·DOM 의존(B-7) / JSP 팝업(window.open+폼 제출, 회신) / 키 입력 필터(window.event — xf:input allowChar 권장) /
+  외부 리포트(rexpert) / 동기 ajax(tx 전환) / 타 모듈 as-is 공통(stf·ins) / as-is 정의 없음(원본 JS 미제공, 회신) / 폼 전역 의존(반입 보류). 화면 안에 같은 이름 정의가 있으면 손대지 않는다.
+  스코어카드에 `undefined_global`(회신 축 2, "미정의 as-is 공통(fn_)") 을 더했고 TODO(회신) 집계에서 이 표지는 뺀다. 결과: 358화면: 706호출 → $c.fil(7종)·26 → $c.win.print·8 → 같은 화면 scwin, 사유 표지 910(async 헬퍼 호출 45 전부 await).
 * **V42 eval 동적 멤버 접근(P3, 2026-10-07, `vendor_stage2.de_eval_member`, CLI `--v42`)**: `eval("document.all.span" + month)`·`eval('form.isurCd' + obj1)`·`eval('obj.x_' + idx + '.value')` 는
   이름을 문자열로 조립한 멤버 접근이라 대괄호 접근과 의미가 같다 → `document.all["span" + month]`·`form['isurCd' + obj1]`·`obj['x_' + idx].value`. eval 만 걷고 DOM 참조(document.all 등)는 그대로(B-7).
   첫 조각이 "경로.접두" 문자열이고 마지막 조각이 `.식별자` 꼬리면 속성 접근으로 잇는다; 조각에 `.`·`[`·`(` 가 든 문자열(옵션 색인 꼬리), 문장 eval(`eval("var r = " + d)`·대입), 주석 안은 손대지 않는다. 결과: 26화면 83자리 → 대괄호 접근, eval 148 → 65(27화면: 문장 eval·옵션 색인 꼬리·JSON eval).

@@ -206,19 +206,19 @@
 | jldinf35101 | auto | 0/1 | 0 |  |  | 퍼블리싱 전용 버튼 'Close'(공통 처리 대상); jQuery 잔여 4문장에 규칙 19 TODO |
 | jldinf91000 | todo | 0/2 | 1 |  |  | 퍼블리싱 전용 버튼 '인쇄'(공통 처리 대상); 퍼블리싱 전용 버튼 '닫기'(공통 처리 대상); 참조 ipt_type 옮겨 넣음(TODO) |
 | jldinf91100 | manual | 0/1 | 1 |  | grid:거치기간/상환금액/이자율/이자지급일/차수(id_redmpt_methd_tp_cd_list) | 퍼블리싱 전용 버튼 '닫기'(공통 처리 대상); 공급사 grid:거치기간/상환금액/이자율/이자지급일/차수(id_redmpt_methd_tp_cd_list) 옮겨 넣음(TODO); override accept: 채권 상세정보 팝업: 퍼블리싱은 읽기 전용 textbox 표, 공급사 상호작용 요소는 상환방법 그리드(id_redmpt_methd_tp_cd_list) 하나 — 본문 끝에 TODO 표지와 함께 옮겨 넣은 결과를 받아들임. 퍼블리셔가 '상환방법' 표 자리로 옮길 것. 숨은 입력(ipt_stdcdType·ipt_stdCd·ipt_modDelCd)은 스크립트 참조 규칙 ⑦ 로 옮겨짐 |
-| jldinf91200 | auto | 0/2 | 0 |  |  | 퍼블리싱 전용 버튼 '인쇄'(공통 처리 대상); 퍼블리싱 전용 버튼 '닫기'(공통 처리 대상); jQuery 잔여 1문장에 규칙 19 TODO |
+| jldinf91200 | auto | 0/2 | 0 |  |  | 퍼블리싱 전용 버튼 '인쇄'(공통 처리 대상); 퍼블리싱 전용 버튼 '닫기'(공통 처리 대상) |
 | jldinf91300 | auto | 0/2 | 0 |  |  | 퍼블리싱 전용 버튼 '인쇄'(공통 처리 대상); 퍼블리싱 전용 버튼 '닫기'(공통 처리 대상) |
-| jldinf91400 | auto | 0/2 | 0 |  |  | 퍼블리싱 전용 버튼 '인쇄'(공통 처리 대상); 퍼블리싱 전용 버튼 '닫기'(공통 처리 대상); jQuery 잔여 3문장에 규칙 19 TODO |
-| jldinf91500 | auto | 0/2 | 0 |  |  | 퍼블리싱 전용 버튼 '인쇄'(공통 처리 대상); 퍼블리싱 전용 버튼 '닫기'(공통 처리 대상); jQuery 잔여 3문장에 규칙 19 TODO |
-| jldinf91600 | auto | 0/2 | 0 |  |  | 퍼블리싱 전용 버튼 '인쇄'(공통 처리 대상); 퍼블리싱 전용 버튼 '닫기'(공통 처리 대상); jQuery 잔여 5문장에 규칙 19 TODO |
-| jldinf91700 | auto | 0/2 | 0 |  |  | 퍼블리싱 전용 버튼 '인쇄'(공통 처리 대상); 퍼블리싱 전용 버튼 '닫기'(공통 처리 대상); jQuery 잔여 2문장에 규칙 19 TODO |
-| jldinf91800 | auto | 0/2 | 0 |  |  | 퍼블리싱 전용 버튼 '인쇄'(공통 처리 대상); 퍼블리싱 전용 버튼 '닫기'(공통 처리 대상); jQuery 잔여 2문장에 규칙 19 TODO |
-| jldinf91900 | auto | 0/1 | 0 |  |  | 퍼블리싱 전용 버튼 '닫기'(공통 처리 대상); jQuery 잔여 2문장에 규칙 19 TODO |
-| jldinf92000 | auto | 0/1 | 0 |  |  | 퍼블리싱 전용 버튼 '닫기'(공통 처리 대상); jQuery 잔여 2문장에 규칙 19 TODO |
+| jldinf91400 | auto | 0/2 | 0 |  |  | 퍼블리싱 전용 버튼 '인쇄'(공통 처리 대상); 퍼블리싱 전용 버튼 '닫기'(공통 처리 대상) |
+| jldinf91500 | auto | 0/2 | 0 |  |  | 퍼블리싱 전용 버튼 '인쇄'(공통 처리 대상); 퍼블리싱 전용 버튼 '닫기'(공통 처리 대상) |
+| jldinf91600 | auto | 0/2 | 0 |  |  | 퍼블리싱 전용 버튼 '인쇄'(공통 처리 대상); 퍼블리싱 전용 버튼 '닫기'(공통 처리 대상); jQuery 잔여 2문장에 규칙 19 TODO |
+| jldinf91700 | auto | 0/2 | 0 |  |  | 퍼블리싱 전용 버튼 '인쇄'(공통 처리 대상); 퍼블리싱 전용 버튼 '닫기'(공통 처리 대상); jQuery 잔여 1문장에 규칙 19 TODO |
+| jldinf91800 | auto | 0/2 | 0 |  |  | 퍼블리싱 전용 버튼 '인쇄'(공통 처리 대상); 퍼블리싱 전용 버튼 '닫기'(공통 처리 대상) |
+| jldinf91900 | auto | 0/1 | 0 |  |  | 퍼블리싱 전용 버튼 '닫기'(공통 처리 대상); jQuery 잔여 1문장에 규칙 19 TODO |
+| jldinf92000 | auto | 0/1 | 0 |  |  | 퍼블리싱 전용 버튼 '닫기'(공통 처리 대상) |
 | jldinf92100 | auto | 0/2 | 0 |  |  | 퍼블리싱 전용 버튼 '인쇄'(공통 처리 대상); 퍼블리싱 전용 버튼 '닫기'(공통 처리 대상) |
 | jldinf92200 | auto | 0/2 | 0 |  |  | 퍼블리싱 전용 버튼 '인쇄'(공통 처리 대상); 퍼블리싱 전용 버튼 '닫기'(공통 처리 대상) |
 | jldinf92300 | frozen | 0/0 | 0 |  |  | override frozen: 2026-10-06 jQuery 화면별 재작성(규칙 19) — jQuery 1건: 빈 ready 블록 제거 |
-| jldinf92400 | auto | 0/2 | 0 |  |  | 퍼블리싱 전용 버튼 '인쇄'(공통 처리 대상); 퍼블리싱 전용 버튼 '닫기'(공통 처리 대상); jQuery 잔여 1문장에 규칙 19 TODO |
+| jldinf92400 | auto | 0/2 | 0 |  |  | 퍼블리싱 전용 버튼 '인쇄'(공통 처리 대상); 퍼블리싱 전용 버튼 '닫기'(공통 처리 대상) |
 | jldinf92500 | manual | 0/1 | 32 |  | input:발행금액(ipt_isuAmt); inputCalendar:발행일(cal_isuDd); select:발행통화(slc_currTpCd); inputCalendar:만기일(cal_expDd) | 퍼블리싱 전용 버튼 '닫기'(공통 처리 대상); 공급사 input:발행금액(ipt_isuAmt) 옮겨 넣음(TODO); 공급사 inputCalendar:발행일(cal_isuDd) 옮겨 넣음(TODO); 공급사 select:발행통화(slc_currTpCd) 옮겨 넣음(TODO) |
 | jldods20000 | todo | 1/2 | 6 |  | trigger:접기(foldBt); trigger:등록#1(input_46); trigger:등록#2(input_51); trigger:등록#3(input_55) | 그리드 헤더 '담당기관' 공급사 쪽 없음; 그리드 닮음 0.60: grid:공시구분/담당기관/업무및서식/제출시한#1 ← grd_integsrchList; 공급사 trigger:접기(foldBt) 옮겨 넣음(TODO); 공급사 trigger:등록#1(input_46) 옮겨 넣음(TODO) |
 | jldods20010 | manual | 0/3 | 21 |  | input:(ipt_keywrdNmInput); trigger:검색(ipt_searchBtn); trigger:ㄱ(btn_searchKeywrd); trigger:ㄴ(btn_searchKeywrd_2) | 퍼블리싱 전용 버튼 '인쇄'(공통 처리 대상); 공급사 input:(ipt_keywrdNmInput) 옮겨 넣음(TODO); 공급사 trigger:검색(ipt_searchBtn) 옮겨 넣음(TODO); 공급사 trigger:ㄱ(btn_searchKeywrd) 옮겨 넣음(TODO) |

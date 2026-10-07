@@ -17,7 +17,7 @@ xmlns:xf="http://www.w3.org/2002/xforms">
 		</w2:mfeSubmission>
 		<w2:layoutInfo>
 		</w2:layoutInfo>
-		<w2:publicInfo method="scwin.checkMaxLength,scwin.setFromToDate,scwin.confirmJob,scwin.alertJobResult,scwin.setLastJob,scwin.getLastJob,scwin.checkRequired,scwin.isNumberInput,scwin.getFieldName,scwin.getSecuGrpNm,scwin.showObj,scwin.showTotalCount,scwin.getModalCenterPos,scwin.checkDateParts,scwin.isZipCodeInput,scwin.getByteLength2,scwin.truncateByBytes,scwin.checkByteLimit,scwin.isMinusNumber,scwin.checkNotOnlyNumber,scwin.checkAlphaNum,scwin.isGroupChecked,scwin.selEmail"/>
+		<w2:publicInfo method="scwin.checkMaxLength,scwin.setFromToDate,scwin.confirmJob,scwin.alertJobResult,scwin.setLastJob,scwin.getLastJob,scwin.checkRequired,scwin.isNumberInput,scwin.getFieldName,scwin.getSecuGrpNm,scwin.showObj,scwin.showTotalCount,scwin.getModalCenterPos,scwin.checkDateParts,scwin.isZipCodeInput,scwin.getByteLength2,scwin.truncateByBytes,scwin.checkByteLimit,scwin.isMinusNumber,scwin.checkNotOnlyNumber,scwin.checkAlphaNum,scwin.isGroupChecked,scwin.selEmail,scwin.setComma,scwin.removeComma,scwin.checkSearchWord,scwin.stripNonDigits,scwin.confirmMinusValue,scwin.alertRemind,scwin.checkByteLength"/>
 		<script type="text/javascript" lazy="false"><![CDATA[
 /**
  * @component
@@ -526,6 +526,141 @@ scwin.selEmail = function (selComp, targetComp) {
     if (selComp.getSelectedIndex() === 0) {
         targetComp.focus();
     }
+};
+
+/**
+ * @method
+ * @name setComma
+ * @description 입력 컴포넌트의 값에 천 단위 콤마를 넣어 되돌려 쓴다(AS-IS: 공통 fn_ObjValueSetComma — '.'로 시작하면 '0'을 앞에 붙인다)
+ * @param {Object} comp 입력 컴포넌트
+ * @returns {void}
+ * @hidden N
+ * @example
+ * $c.fil.setComma($c.util.getComponent("ipt_parval"));
+ */
+scwin.setComma = function (comp) {
+    if (!comp) {
+        return;
+    }
+    let v = String(comp.getValue() ?? "");
+    if (v.charAt(0) === ".") {
+        v = "0" + v;
+    }
+    comp.setValue($c.num.formatNumber(v));
+};
+
+/**
+ * @method
+ * @name removeComma
+ * @description 입력 컴포넌트의 값에서 콤마를 걷어 되돌려 쓴다(AS-IS: 공통 fn_ObjValueResetRmComma2 — 빈 값은 그대로)
+ * @param {Object} comp 입력 컴포넌트
+ * @returns {void}
+ * @hidden N
+ * @example
+ * $c.fil.removeComma($c.util.getComponent("ipt_parval"));
+ */
+scwin.removeComma = function (comp) {
+    if (!comp) {
+        return;
+    }
+    const v = String(comp.getValue() ?? "");
+    if (v.length > 0) {
+        comp.setValue(v.replace(/,/g, ""));
+    }
+};
+
+/**
+ * @method
+ * @name checkSearchWord
+ * @description 검색어에 쓸 수 없는 문자(%)가 있으면 알리고 비운 뒤 false(AS-IS: 공통 fn_boardCheck)
+ * @param {Object} comp 검색어 입력 컴포넌트
+ * @returns {Promise<Boolean>}
+ * @hidden N
+ * @example
+ * if (!await $c.fil.checkSearchWord($c.util.getComponent("ipt_searchWord"))) { return; }
+ */
+scwin.checkSearchWord = async function (comp) {
+    const str = String(comp.getValue() ?? "");
+    if (/[%]/.test(str)) {
+        await $c.win.alert("검색어에 다음 문자를 사용할 수 없습니다.\n\n           %");
+        comp.setValue("");
+        comp.focus();
+        return false;
+    }
+    return true;
+};
+
+/**
+ * @method
+ * @name stripNonDigits
+ * @description 입력 컴포넌트의 값에서 숫자 아닌 문자를 걷되 맨 앞의 '-' 는 남긴다(AS-IS: 공통 fn_checkNum2)
+ * @param {Object} comp 입력 컴포넌트
+ * @returns {void}
+ * @hidden N
+ * @example
+ * $c.fil.stripNonDigits($c.util.getComponent("ipt_lossLimit"));
+ */
+scwin.stripNonDigits = function (comp) {
+    const v = String(comp.getValue() ?? "");
+    const pre = v.charAt(0) === "-" ? "-" : "";
+    comp.setValue(pre + v.replace(/[^0-9]/g, ""));
+};
+
+/**
+ * @method
+ * @name confirmMinusValue
+ * @description 값에 '-' 가 있으면 그대로 진행할지 확인 — 진행 "Y", 취소(포커스 이동) "N", 마이너스 아님 "X"(AS-IS: 공통 fn_minusCheck)
+ * @param {Object} comp 입력 컴포넌트
+ * @param {String} title 항목명(확인 문구에 표시)
+ * @returns {Promise<String>} "Y" | "N" | "X"
+ * @hidden N
+ * @example
+ * if (await $c.fil.confirmMinusValue($c.util.getComponent("ipt_coupnRt"), "표면이자율") === "N") { return; }
+ */
+scwin.confirmMinusValue = async function (comp, title) {
+    if (String(comp.getValue() ?? "").indexOf("-") === -1) {
+        return "X";
+    }
+    if (await $c.win.confirm("[" + title + "] 마이너스(-) 값을 입력하셨습니다. 이대로 진행하시겠습니까?")) {
+        return "Y";
+    }
+    comp.focus();
+    return "N";
+};
+
+/**
+ * @method
+ * @name alertRemind
+ * @description 입력값을 되짚어 알린다 — "<msg>  :  <value>  으로 입력하셨습니다."(AS-IS: 공통 fn_showMsgForRemind)
+ * @param {String} msg 항목 설명
+ * @param {String} value 입력값
+ * @returns {Promise<void>}
+ * @hidden N
+ * @example
+ * await $c.fil.alertRemind("행사가격", $c.util.getComponent("ipt_exerPrc").getValue());
+ */
+scwin.alertRemind = async function (msg, value) {
+    await $c.win.alert(msg + "  :  " + value + "  으로 입력하셨습니다.");
+};
+
+/**
+ * @method
+ * @name checkByteLength
+ * @description 입력값의 바이트 길이(한글 2바이트)가 상한을 넘으면 알리고 false(AS-IS: 공통 fn_checkLength — 자동 삭제 없음, checkByteLimit 과 다름)
+ * @param {Object} comp 입력 컴포넌트
+ * @param {Number} limitLength 바이트 상한
+ * @returns {Promise<Boolean>}
+ * @hidden N
+ * @example
+ * if (!await $c.fil.checkByteLength($c.util.getComponent("ipt_remark"), 100)) { return; }
+ */
+scwin.checkByteLength = async function (comp, limitLength) {
+    const length = scwin.getByteLength2(comp.getValue());
+    if (length > limitLength) {
+        await $c.win.alert("[" + scwin.getFieldName(comp) + "] 항목이 제한길이 " + limitLength + "Byte를 초과했습니다. (한글 1글자 2Byte, 영문 1글자 1Byte)");
+        return false;
+    }
+    return true;
 };
 ]]></script>
 	</head>
