@@ -902,6 +902,9 @@ def apply_regions(head, script, body):
     script, log["V25_alertMsg"] = replace_alert_msg(script)
     script, log["V26_consts"] = inline_vendor_consts(script)
     script, log["V23_vendor_pcc"] = replace_vendor_pcc(script)
+    # P2 V37 핸들러 try/catch 표준 래핑 — V22(중복 정의 `_1` 개명) 뒤에 둬야 죽은 `_1` 본문은 건드리지 않는다
+    script, v37 = vendor_stage2.wrap_handler_trycatch(script, head)
+    log["V37_trycatch"] = {k: v for k, v in v37.items() if v}
     return head, script, body, log
 
 

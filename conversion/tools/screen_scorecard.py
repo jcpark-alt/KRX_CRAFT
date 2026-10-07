@@ -74,11 +74,15 @@ def measure(path):
     code = st.without_comments(script)
     m = {k: len(rx.findall(code)) for k, rx in RX.items() if k != "fn_def"}
     m["fn_def"] = len(RX["fn_def"].findall(script))
-    m["handler_notry"] = len(HANDLER_NOTRY.findall(script))
+    # V37 과 같은 잣대: `_on<ev>` 로 끝나는 핸들러(tx_ 제외) 중 실행문이 있는데 본문 어디에도 try 가 없는 것
+    spans = st.func_spans(script)
+    m["handler_notry"] = sum(1 for n, s, b, e, _ in spans
+                             if re.match(r'^(?!tx_)\w+_on[a-z]+$', n)
+                             and st.code_only(script[b + 1:e]).strip()
+                             and not re.search(r'(?<![.\w$])try(?![\w$])', st.code_only(script[b + 1:e])))
     m["todo_vendor"] = len(TODO_VENDOR.findall(script))
     m["todo_rule19"] = len(TODO_RULE19.findall(script))
     m["todo_merge"] = len(TODO_MERGE.findall(body))
-    spans = st.func_spans(script)
     m["long_fn"] = sum(1 for _n, s, b, e, _ in spans if e - b > 4000)
     m["no_jsdoc"] = sum(1 for _n, s, b, e, _ in spans if not re.search(r'\*/\s*$', script[:s]))
     m["funcs"] = len(spans)

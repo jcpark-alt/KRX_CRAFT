@@ -359,7 +359,8 @@ def test_redeclaration_and_duplicate_functions():
     assert script.count("scwin.td_1_oncellclick = ") == 1 and log["V22_dup_fn"]["removed"] == ["td_1_oncellclick"]
     # 마지막 정의가 이긴다 — 앞의 것이 _1 로, 뒤의 것이 원이름(A-6)
     assert "scwin.td_2_oncellclick_1 = async function (rowIndex) { await scwin.goView(rowIndex); };" in script
-    assert "scwin.td_2_oncellclick = async function (rowIndex) { await scwin.goView(rowIndex + 1); };" in script
+    # 살아 있는 정의는 V37(V22 뒤) 이 try/catch 로 감싼다; 죽은 `_1` 본문은 그대로
+    assert "scwin.td_2_oncellclick = async function (rowIndex) {\n    try {\n        await scwin.goView(rowIndex + 1);\n    } catch (ex) {" in script
     assert log["V22_dup_fn"]["renamed"] == ["td_2_oncellclick_1"] and "뒤 정의에 덮여 호출되지 않던 본문" in script
 
 
@@ -797,3 +798,51 @@ def test_publish_merge_mark_jquery_todo():
     assert out.count("TODO Stage2(규칙 19)") == 3 and '"$(not code)"' in out
     out2, n2 = pm.mark_jquery_todo(out)
     assert out2 == out and n2 == 0
+
+
+def test_v37_handler_trycatch():
+    """P2 V37: 공급사 페이저 한 줄 핸들러 → 표준 try/catch 다중행, try 없는 핸들러 래핑, 이미 try 있음·빈 본문·tx_·주석만은 그대로. 멱등."""
+    head = '<head meta_screenId="jldfil00002">'
+    src = '''scwin.krxpage_pagenavigator_48_onclick = function (index) { const pi = (index && typeof index === 'object') ? index.newSelectedIndex : index; try { $c.util.getComponent('dma_req').set('pageIndex', pi); } catch (e) { $c.exception.handleError(e, { notify: 'none', context: 'krxpage_pagenavigator_48.page' }); } scwin.searchList(); };
+scwin.krxpage_pagenavigator_197_onclick = async function (index) { const pi = (index && typeof index === 'object') ? index.newSelectedIndex : index; await scwin.search(index); };
+scwin.btn_a_onclick = function (e) {
+    scwin.doA();
+    return false;
+};
+scwin.btn_b_onclick = async function (e) {
+    try {
+        await scwin.doB();
+    } catch (_ex) { await $c.exception.handleError(_ex, { context: 'x.btn_b_onclick' }); }
+};
+scwin.grd_x_oneditend = function (e) {
+};
+scwin.dts_y_onloadcompleted = function () {
+    // alert(1);
+};
+scwin.tx_onPopupCode = async function () {
+    const sbmOptions = { id: "tx_onPopupCode" };
+};
+scwin.btn_close_onclick = function () {
+    const id = 'p';
+    try { scwin.close(id); } catch (e) { scwin.fallback(); }
+};
+'''
+    out, log = vs.wrap_handler_trycatch(src, head)
+    assert log == {"pager": 2, "wrapped": 1}
+    assert ('scwin.krxpage_pagenavigator_48_onclick = function (index) {\n    try {\n'
+            "        const pi = (index && typeof index === 'object') ? index.newSelectedIndex : index;\n"
+            "        $c.util.getComponent('dma_req').set('pageIndex', pi);\n        scwin.searchList();\n"
+            '    } catch (ex) {\n        $c.exception.handleError(ex, { context : "jldfil00002.krxpage_pagenavigator_48_onclick" });\n    }\n};') in out
+    assert ('scwin.krxpage_pagenavigator_197_onclick = async function (index) {\n    try {\n'
+            "        const pi = (index && typeof index === 'object') ? index.newSelectedIndex : index;\n        await scwin.search(index);\n"
+            '    } catch (ex) {\n        await $c.exception.handleError(ex, { context : "jldfil00002.krxpage_pagenavigator_197_onclick" });\n    }\n};') in out
+    assert "notify: 'none'" not in out
+    assert ('scwin.btn_a_onclick = function (e) {\n    try {\n        scwin.doA();\n        return false;\n    } catch (ex) {\n'
+            '        $c.exception.handleError(ex, { context : "jldfil00002.btn_a_onclick" });\n    }\n};') in out
+    # 그대로인 것
+    for keep in ("scwin.btn_b_onclick = async function (e) {\n    try {\n        await scwin.doB();", "scwin.grd_x_oneditend = function (e) {\n};",
+                 "scwin.dts_y_onloadcompleted = function () {\n    // alert(1);\n};", 'scwin.tx_onPopupCode = async function () {\n    const sbmOptions',
+                 "scwin.btn_close_onclick = function () {\n    const id = 'p';\n    try { scwin.close(id); }"):
+        assert keep in out, keep[:40]
+    out2, log2 = vs.wrap_handler_trycatch(out, head)
+    assert out2 == out and log2 == {"pager": 0, "wrapped": 0}

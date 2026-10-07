@@ -37,7 +37,7 @@ TOKENS = {
     "TODO Stage2": (r'TODO Stage2', False), "backtick": (r'`', True), "/_commons script": (r'/_commons/', False),
     "jQuery $(": (r'(?<![\w$.])\$\(', True), "form DOM": (r'(?<![\w$.])(?:fm|document\.[A-Za-z_]\w*)\.(?:\w+\.)?(?:value|checked|submit|action|target|elements)\b', True),
     # P1 스코어카드 축(2026-10-07) — 보고만: 재발 감지용. 치환은 P2 기계 축(V37 try/catch·V38 fn_ 개명·V39 console·V40 innerHTML)에서
-    "handler no try": (r'^scwin\.\w+_on\w+\s*=\s*(?:async\s+)?function[^\n]*\n(?![\s\S]{0,160}?\btry\s*\{)', False),
+    "handler no try": (r'^scwin\.(?!tx_)\w+_on[a-z]+\s*=\s*(?:async\s+)?function[^\n]*\n(?![\s\S]{0,160}?\btry\s*\{)', False),   # 대략치(보고만) — 정확한 수는 screen_scorecard
     "eval/new Function": (r'(?<![\w$.])(?:eval|new Function)\(', True), "console.*": (r'console\.\w+\(', True),
     "setTimeout/Interval": (r'(?<![\w$.])set(?:Timeout|Interval)\(', True), "location.href": (r'location\.(?:href|replace)', True),
     "innerHTML": (r'\.innerHTML\b', True),

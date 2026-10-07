@@ -620,6 +620,12 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
   as-is `LastJob = X` 는 `$c.fil.setLastJob(X)`/읽기 `$c.fil.getLastJob()`, 상수는 `$c.fil.SCREN_PROCS_TP_CD_01` 처럼 읽는다(gcc `$c.sbm.MESSAGE_CODE` 와 같은 꼴). 로컬로 남는 것은 화면 스코프에 묶인
   `getMktId`·`setSearchPeriod`·`setPeriodDates`·`opener*` 뿐. 이미 전환된 화면의 제자리 전환은 `pcc_fil_import.py`(멱등).
 
+* **V37 핸들러 try/catch 표준 래핑(P2 기계 축, 2026-10-07, `vendor_stage2.wrap_handler_trycatch` — `apply_regions` 끝, V22 뒤)**: ① 공급사 페이저 한 줄 핸들러
+  `scwin.krxpage_pagenavigator_N_onclick = function (index) { const pi = …newSelectedIndex…; try { X.set('pageIndex', pi); } catch (e) { …notify:'none'… } scwin.F(); };` 를 규칙 26 꼴의
+  다중행 `try { const pi…; X.set(…); scwin.F(); } catch (ex) { $c.exception.handleError(ex, { context : "화면.핸들러" }); }` 로(안쪽 `notify:'none'` try 는 걷는다 — dataMap.set 은 던지지 않는다; `set` 없는 변형·convert 뒤 async/await 꼴 포함),
+  ② 그 밖의 `scwin.<id>_on<ev>` 핸들러 중 실행문이 있고 try 가 없는 본문을 같은 꼴로 감싼다. 본문에 try 가 어디든 있으면·실행문 없음(빈/주석만)·`tx_` 콜백·V22 의 `_1` 접미 중복 정의는 그대로. 멱등.
+  제자리 적용 CLI `python conversion/tools/vendor_stage2.py --v37 [--dry] <xml|폴더>`(frozen 화면용).
+
 ### 규칙 34: 퍼블리싱 정규화 — `publish_normalize.py` (P1~P11, lxml · body 만)
 
 * **P1 확장(헤더 표준, 사용자 확정 2026-10-06)**: 본화면(`sub_contents`)은 `pfmContentHeader` pageFrame 을 첫 자식으로 보장(없으면 추가 `P1_pageframe_added`),

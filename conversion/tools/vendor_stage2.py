@@ -671,6 +671,67 @@ def standardize_rowcopy(script):
 
 
 # ---------------------------------------------------------------- 진입
+# ---------------------------------------------------------------- V37 핸들러 try/catch 표준 래핑 (P2 기계 축 · 2026-10-07)
+# 공급사 페이저 한 줄 핸들러: `scwin.krxpage_pagenavigator_N_onclick = function (index) { const pi = (index && typeof index === 'object') ? index.newSelectedIndex : index;
+#   try { X.set('pageIndex', pi); } catch (e) { $c.exception.handleError(e, { notify: 'none', … }); } scwin.F(); };`  (set 이 없는 변형·convert 뒤 async/await 꼴 포함)
+PAGER_ONE_RE = re.compile(
+    r"^(?P<ind>[ \t]*)scwin\.(?P<name>\w+_on\w+)\s*=\s*(?P<asy>async\s+)?function\s*\((?P<args>[^)]*)\)\s*\{[ \t]*"
+    r"(?P<pi>const pi = \(index && typeof index === 'object'\) \? index\.newSelectedIndex : index;)[ \t]*"
+    r"(?:try \{[ \t]*(?P<set>[^{}]*?;)[ \t]*\} catch \(e\) \{(?:[^{}]|\{[^{}]*\})*\}[ \t]*)?"   # catch 안의 { notify: … } 한 단계 허용
+    r"(?P<call>(?:await )?scwin\.\w+\([^;]*\);)[ \t]*\};[ \t]*$", re.M)
+HANDLER_NAME_RE = re.compile(r'^(?!tx_)\w+_on[a-z]+$')   # `_on<이벤트>` 로 끝나는 것만 — V22 의 `_1` 접미 중복 정의·tx_ 콜백은 제외
+
+
+def _screen_id_of(head):
+    m = re.search(r'meta_screenId="([^"]*)"', head or "")
+    return (m.group(1) if m else "").lower()
+
+
+def _wrap_body(body, unit, is_async, screen_id, fname):
+    lines = body.strip("\n").split("\n")
+    if len(lines) == 1:                          # 한 줄 본문 `{ stmt; }` — 앞뒤 공백을 걷고 기본 들여쓰기 한 단을 준다
+        lines = [unit + lines[0].strip()]
+    inner = "\n".join(((unit + ln) if ln.strip() else ln) for ln in lines)
+    call = ("await " if is_async else "") + '$c.exception.handleError(ex, { context : "%s.%s" });' % (screen_id, fname)
+    return "\n" + unit + "try {\n" + inner + "\n" + unit + "} catch (ex) {\n" + unit + unit + call + "\n" + unit + "}\n"
+
+
+def wrap_handler_trycatch(script, head=""):
+    """V37. ① 공급사 페이저 한 줄 핸들러를 표준 다중행 try/catch 꼴로(안쪽 `notify:'none'` try 는 걷는다 — dataMap.set 은 던지지 않으므로 바깥 try 하나로 충분),
+    ② 그 밖의 이벤트 핸들러(`scwin.<id>_on<ev>`, `tx_` 제외) 중 실행문이 있는데 try 가 없는 본문을 규칙 26 꼴로 감싼다.
+    본문에 try 가 이미 있으면(어디든) 건너뛴다 — 수기 오류 처리 보존·멱등. 실행문 없는 본문(빈/주석만)도 건너뛴다."""
+    sid = _screen_id_of(head)
+    n_pager = 0
+    unit_default = "\t" if re.search(r'(?m)^\t+scwin\.', script) else "    "
+
+    def pager(m):
+        nonlocal n_pager
+        n_pager += 1
+        unit = unit_default
+        stmts = [m.group("pi")] + ([m.group("set").strip()] if m.group("set") else []) + [m.group("call").strip()]
+        body = "\n".join(unit + x for x in stmts)   # 본문 기본 들여쓰기(한 단) — _wrap_body 가 try 안으로 한 단 더 넣는다
+        is_async = bool(m.group("asy")) or m.group("call").startswith("await ")
+        return "%sscwin.%s = %sfunction (%s) {%s};" % (m.group("ind"), m.group("name"), "async " if is_async else "", m.group("args"),
+                                                    _wrap_body(body, unit, is_async, sid, m.group("name")))
+    script = PAGER_ONE_RE.sub(pager, script)
+    # ② 일반 핸들러
+    edits = []
+    for name, s, b, e, _ in st.func_spans(script):
+        if not HANDLER_NAME_RE.match(name):
+            continue
+        body = script[b + 1:e]
+        code = st.code_only(body)
+        if not code.strip() or re.search(r'(?<![.\w$])try(?![\w$])', code):
+            continue
+        header = script[script.rfind("\n", 0, s) + 1:b]
+        is_async = bool(re.search(r'=\s*async\s+function', header))
+        unit = "\t" if body.strip("\n").startswith("\t") else "    "
+        edits.append((b + 1, e, _wrap_body(body, unit, is_async, sid, name)))
+    for b1, e1, rep in sorted(edits, reverse=True):
+        script = script[:b1] + rep + script[e1:]
+    return script, {"pager": n_pager, "wrapped": len(edits)}
+
+
 def apply(head, script, body):
     log = {}
     body_ids = set(re.findall(r'\sid="([^"]+)"', body))
@@ -684,3 +745,29 @@ def apply(head, script, body):
     head, script, log["V31_pagecontext"] = ensure_page_context(head, script)
     script, log["V36_dom"] = dom_rules.apply(script, body)  # 규칙 19 기계 가능분(jQuery·원시 폼 → 컴포넌트 API, body 로 확정되는 것만)
     return head, script, body, {k: v for k, v in log.items() if v}
+
+
+def main(argv=None):
+    """제자리 적용 CLI(frozen 화면 등): python conversion/tools/vendor_stage2.py --v37 [--dry] <xml|폴더> ..."""
+    sys.stdout.reconfigure(encoding="utf-8")
+    args = argv if argv is not None else sys.argv[1:]
+    files, fl, _ = st.parse_cli([a for a in args if a != "--v37"], flags=("--dry",), opts=())
+    if "--v37" not in args or not files:
+        print(main.__doc__); return 2
+    tot = {"pager": 0, "wrapped": 0}; changed = 0
+    for f in files:
+        raw, eol, reg = st.read_xml(f)
+        if reg is None:
+            continue
+        new, log = wrap_handler_trycatch(reg["script"], reg["head"])
+        if new != reg["script"]:
+            changed += 1; tot["pager"] += log["pager"]; tot["wrapped"] += log["wrapped"]
+            print("%-18s %s" % (Path(f).stem, log))
+            if not fl["--dry"]:
+                st.write_xml(f, reg["head"], reg["script_open"], new, reg["script_close"], reg["body"], eol)
+    print("변경 화면 %d · %s" % (changed, tot))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
