@@ -36,6 +36,11 @@ TOKENS = {
     "tab char": (r'\t', True), "trailing ws": (r'[ \t]+$', False), "new Object/Array": (r'new (Object|Array)\(', True),
     "TODO Stage2": (r'TODO Stage2', False), "backtick": (r'`', True), "/_commons script": (r'/_commons/', False),
     "jQuery $(": (r'(?<![\w$.])\$\(', True), "form DOM": (r'(?<![\w$.])(?:fm|document\.[A-Za-z_]\w*)\.(?:\w+\.)?(?:value|checked|submit|action|target|elements)\b', True),
+    # P1 스코어카드 축(2026-10-07) — 보고만: 재발 감지용. 치환은 P2 기계 축(V37 try/catch·V38 fn_ 개명·V39 console·V40 innerHTML)에서
+    "handler no try": (r'^scwin\.\w+_on\w+\s*=\s*(?:async\s+)?function[^\n]*\n(?![\s\S]{0,160}?\btry\s*\{)', False),
+    "eval/new Function": (r'(?<![\w$.])(?:eval|new Function)\(', True), "console.*": (r'console\.\w+\(', True),
+    "setTimeout/Interval": (r'(?<![\w$.])set(?:Timeout|Interval)\(', True), "location.href": (r'location\.(?:href|replace)', True),
+    "innerHTML": (r'\.innerHTML\b', True),
 }
 # 샘플 규약상 정의만 하고 안 읽어도 되는 전역 — scwin.screenId 는 1구역 표준 선언(샘플 18화면 정의 / 2화면 참조)
 KEEP_GLOBALS = {"screenId"}

@@ -43,7 +43,7 @@ ui/<name>.xml
 → ui-tobe/<name>.xml
 ```
 
-보조 도구: `publish_merge.py`(규칙 35 병합기 — 파이프라인 5b 가 호출; CLI 단독은 `--vendor-dir` 임시 폴더·보고용) · `scan_mixed_compare.py`(규칙 5a 회귀 후보) · `init_restructure.py`(onpageload 인라인 초기화 분리 — 공급사 산출은 이미 init_* 구조라 대개 불필요) ·
+보조 도구: `screen_scorecard.py`(화면별 conversion·convention 잔여 편차 → `scorecard.md`, P1) · `publish_merge.py`(규칙 35 병합기 — 파이프라인 5b 가 호출; CLI 단독은 `--vendor-dir` 임시 폴더·보고용) · `scan_mixed_compare.py`(규칙 5a 회귀 후보) · `init_restructure.py`(onpageload 인라인 초기화 분리 — 공급사 산출은 이미 init_* 구조라 대개 불필요) ·
 `python -m wsxml_lint conversion/jsp-front/ui-tobe`(strict) · `pytest conversion/tools`. 규칙 본문은 각 도구의 머리 주석과
 `conversion/md/conversion_rules.md` 규칙 33·34·35.
 
@@ -150,6 +150,7 @@ ui/<name>.xml
 | 2026-10-07 | **`ui-tobe` 파일명 대문자화**(사용자 지시) | 1,677본을 `git mv` 로 줄기 대문자 + `.xml`(`jldfil25900.xml` → `JLDFIL25900.xml`, 접미 포함 `jldfil00007_eng` → `JLDFIL00007_ENG`). 화면 id 는 소문자 유지(리포트·`publish_merge_overrides.json` 키·`meta_screenId`·`scwin.screenId`). 도구는 `screen_tools.jsp_tobe_file(name)` 로 파일명을 조립(파이프라인 dst·frozen 확인, publish_merge vendor/out, convert_all jsp-front 분기)하고 이름 인자는 소문자로 정규화. `ui/` 원본은 그대로(소문자). **확인 필요**: 스크립트 안의 화면 경로 리터럴 1,477자리/550화면(`'/jldfil05011/jldfil05011.xml'` 류, V32 가 확정한 이동 목적지)은 소문자 그대로 — 배포 서버가 대소문자를 구분하면 배포 경로 규약(폴더/파일 대문자 여부)을 확정한 뒤 일괄 치환해야 한다. sample-front 는 `meta_screenId`·`scwin.screenId` 도 대문자(`JLDFIL25900`)라 내부 id 대문자화도 같은 결정에 묶인다 | 1,677본 rename · 게이트·lint·테스트는 아래 수치 |
 | 2026-10-07 | **publish 기준 전면 적용**(사용자 기준: ui-tobe 와 동일 파일명이 publish 에 있으면 publish 의 UI 구조가 기준) | 동일 파일명 260 전부가 리포트에 있음을 확인. 종전 '같은 이름에 다른 화면'으로 건너뛴 6본(jldfil21103·40200, jldinf92500, jldods20010, uldmgt50002·50316)을 override `skip` → `accept` 로 바꿔 publish body 를 기준으로 두고 공급사 상호작용 요소는 TODO 표지와 함께 옮겨 넣었다(종전 사유는 accept 문구에 보존). 퍼블리싱 본문이 빈 자리표인 2본(jldfil35200·uldmgt50014)은 기준으로 삼을 UI 가 없어 `skip` 유지 | 6본 재생성 게이트 6/6 · lint 0/0 · idem 전건 · 260화면: auto 79 · todo 151 · manual 9 · frozen 19 · mismatch 2(TODO 표지 1,701건) |
 | 2026-10-07 | **규칙 0 — 주석 처리된 구문은 변환하지 않는다**(사용자 지시) | `convert.py` 문장 변환 규칙 22종을 주석 마스킹(`mask_comments`·자리표 `/*@CMTn@*/`) 아래에서 돌린다. 문서 주석·섹션 헤더·W-Craft 마커는 보호 대상이 아니고, 주석 자체를 다루는 규칙(9·11·30·format)은 마스킹 밖. 공급사 후처리 단계는 원래 `code_mask`/`segments` 로 주석을 제외해 왔음을 실측으로 확인 | 테스트 신설(`test_convert_rule0_comment_guard.py`, 규칙 12 주석 함수 테스트 기대 갱신) · 도구 테스트 126 통과 · ui-tobe 전량 convert dry-run 고정점 확인은 별도 실행(결과는 다음 행) |
+| 2026-10-07 | **P1 스코어카드·게이트 강화**(conversion·code convention 진행 계획 1단계) | `screen_scorecard.py` 신설 — 화면마다 손작업 축(jQuery·폼 DOM·원시 DOM·eval·location·타이머·innerHTML·긴 함수, 가중 3)·기계 축(try 없는 핸들러·fn_ 정의·console·네이티브 alert·JSDoc 없음, 가중 1)·회신 축(TODO 회신/병합/규칙19, 가중 2)을 재서 `conversion/jsp-front/scorecard.md`(항목별 합계·업무군별 합계·상위 화면·**퍼블리싱 병합 화면 중 점수 순 배치 제안**)를 낸다(`--tsv` 로 화면별 전 수치). 게이트에 report-only 토큰 6종(handler no try·eval/new Function·console.*·setTimeout/Interval·location.href·innerHTML) 추가해 재발을 센다 | 1,677화면 점수 합 44,878 · 점수 0 화면 310 · 업무군 점수: jldfil 16,491 · jldinf 10,966 · jlddst 5,310 · jldbnf 3,843 · jldstf 3,824 · jldods 3,067 · uldmgt 1,332 · 게이트 전건(토큰은 보고만) · 테스트 +1 |
 | 2026-10-06 | 헤더 표준 **`ui-tobe` 전량 적용** | `python conversion/tools/publish_normalize.py conversion/jsp-front/ui-tobe` 제자리 재실행(P 규칙은 멱등이라 P1 추가 외 변경 0 — dry-run 으로 먼저 확인). 본화면 966본에 `pfmContentHeader` pageFrame 1줄씩 추가(989줄 추가·삭제 0), 팝업 79본·골격 없는 5본은 그대로 | 본화면 1,593/1,593 pageFrame · 게이트 1,677/1,677 · lint 0/0 · dry 재실행 변경 0(고정점) |
 
 **알아 둘 함정(1단계에서 확인)**: 규칙 13 이 `fn_modifiyDate→modifiyDate` 로 상태 변수를 덮는다(V13 선개명) · 공급사 `var` 중복 선언이 규칙 8 로
@@ -185,4 +186,5 @@ PowerShell 5.1 `Out-File` 의 BOM 이 커밋 제목에 섞인다.
 - 2026-10-06 pcc/fil 반입 — `cm/pcc/fil/fil.xml` 에 18함수+2+상수 15, 화면 166본 `$c.fil.*` 전환(`pcc_fil_import.py`), 주입기 V21·V24~V26·V29·V30 을 `$c.fil` 호출로.
 - 2026-10-06 `doLogSave` 제거(사용자 결정) — V28 보류 주석 → 문장 삭제, 9화면 17자리.
 - 2026-10-07 `ui-tobe` 파일명 대문자화 — 1,677본 `git mv`, 도구는 `jsp_tobe_file()` 로 조립; 스크립트 안 경로 리터럴(1,477자리)·내부 id 는 배포 규약 확정 뒤.
+- 2026-10-07 P1 스코어카드 — `screen_scorecard.py` → `scorecard.md`(점수 합 44,878·점수 0 화면 310), 게이트 report-only 토큰 6종.
 - 2026-10-07 publish 기준 전면 적용 — 동일 파일명 260 중 다른 화면 6본도 accept(publish body 기준 + TODO), 빈 자리표 2본만 skip.
