@@ -916,6 +916,8 @@ def apply_regions(head, script, body):
     script, log["V23_vendor_pcc"] = replace_vendor_pcc(script)
     # P2 V39 [sdd] 컴포넌트 가드 정리 — body/head 에 실존하는 컴포넌트의 `(G && G.m ? G.m(args) : console.warn('[sdd] …'))` → `G.m(args)`
     script, log["V39_sdd_guard"] = vendor_stage2.simplify_sdd_guards(script, head, body)
+    # P2 V40 innerHTML — setValue 가능한 실존 컴포넌트의 setValue/innerHTML 가드 → setValue, 그룹 대상 getComponent().innerHTML → .render.innerHTML
+    script, log["V40_innerhtml"] = vendor_stage2.simplify_innerhtml(script, head, body)
     # P2 V38 fn_ 별칭 인라인(충돌 없는 것만) — 전방 선언 null + onpageload 단일 대입 꼴
     head, script, body, v38 = vendor_stage2.inline_fn_aliases(head, script, body)
     log["V38_fn_alias"] = v38

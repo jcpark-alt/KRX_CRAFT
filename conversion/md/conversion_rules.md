@@ -637,6 +637,11 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
   ③ 나머지 — 없는/변수 id 의 가드, opener 부모 컴포넌트, 그리드 라벨 갈래 `(console.error('[sdd] 미실현 라벨 갈래 …'), String(data ?? ''))`, `hiddenStore 부재`(head 에 dma_hiddenStore 없을 때),
   jQuery `$("#titleValue")` 는 회신·설계 의존 표식이라 그대로 두고 스코어카드 `console_sdd`(회신 축)로 센다. 스코어카드 `console` 은 `[sdd]` 가 아닌 호출만.
 
+* **V40 innerHTML(P2, 2026-10-07, `vendor_stage2.simplify_innerhtml`, CLI `--v40`)**: 잔존 435자리 중 270 은 `init_attrReals` 템플릿의 `__html` 실현(`comp.render.innerHTML = v` — as-is EL 이 그리던 HTML 을
+  컨텍스트 값으로 넣는 설계상 자리, 스코어카드 `innerHTML_tpl` 로 분리). 기계로 닫은 것: ① setValue 를 가진 실존 컴포넌트(w2:textbox 등)의 `((G) && (G).setValue ? (G).setValue(EXPR) : ((G) ? ((G).innerHTML = …) : void …))`
+  → `G.setValue(EXPR)` ② 실존 컴포넌트의 `$c.util.getComponent('id').innerHTML`(컴포넌트 객체 프로퍼티라 효과 없던 as-is 이월) → `.render.innerHTML`(as-is 동작 실효화, 쓰기·읽기).
+  그대로 두는 것: 그룹 대상 가드(innerHTML 갈래가 실제 동작), `td.innerHTML`·`self.x.innerHTML`·`attachForm[i].innerHTML` 같은 DOM 조립(B-7 화면별).
+
 ### 규칙 34: 퍼블리싱 정규화 — `publish_normalize.py` (P1~P11, lxml · body 만)
 
 * **P1 확장(헤더 표준, 사용자 확정 2026-10-06)**: 본화면(`sub_contents`)은 `pfmContentHeader` pageFrame 을 첫 자식으로 보장(없으면 추가 `P1_pageframe_added`),

@@ -917,3 +917,25 @@ scwin.init_conds = function () {
     assert 'const a = (scwin.flag ?? "");' in s3 and 'const b = (scwin.keyword ?? "");' in s3 and "console.warn" not in s3
     assert keys["context"] == ["flag", "param.keyword"]
     assert "// TODO Stage2: 컨텍스트 키 출처 미확인(as-is EL · 회신 A-3) — flag, param.keyword" in s3
+
+
+def test_v40_innerhtml():
+    """P2 V40: textbox 대상의 setValue/innerHTML 가드 삼항 → setValue 직접; 그룹 대상 getComponent('id').innerHTML → .render.innerHTML; 그룹 대상 가드·없는 id·td.innerHTML 은 그대로. 멱등."""
+    body = '<body><w2:textbox id="txt_docs"/><xf:group id="isuList"/><xf:group id="attachForm"/></body>'
+    src = '''scwin.f = function () {
+    (($c.util.getComponent("txt_docs")) && ($c.util.getComponent("txt_docs")).setValue ? ($c.util.getComponent("txt_docs")).setValue(scwin.chkTitle.join("<br/>")) : (($c.util.getComponent("txt_docs")) ? (($c.util.getComponent("txt_docs")).innerHTML = scwin.chkTitle.join("<br/>")) : void (scwin.chkTitle.join("<br/>"))));
+    (($c.util.getComponent("attachForm")) && ($c.util.getComponent("attachForm")).setValue ? ($c.util.getComponent("attachForm")).setValue(h) : (($c.util.getComponent("attachForm")) ? (($c.util.getComponent("attachForm")).innerHTML = h) : void (h)));
+    $c.util.getComponent('isuList').innerHTML = returnVal;
+    const t = $c.util.getComponent('isuList').innerHTML + $c.util.getComponent('nope').innerHTML;
+    td.innerHTML = "x";
+};
+'''
+    out, log = vs.simplify_innerhtml(src, "", body)
+    assert log == {"guard": 1, "render": 2}
+    assert '''    $c.util.getComponent("txt_docs").setValue(scwin.chkTitle.join("<br/>"));\n''' in out
+    assert '(($c.util.getComponent("attachForm")) && ($c.util.getComponent("attachForm")).setValue ?' in out      # 그룹: innerHTML 갈래가 실제 동작 — 그대로
+    assert "$c.util.getComponent('isuList').render.innerHTML = returnVal;" in out
+    assert "const t = $c.util.getComponent('isuList').render.innerHTML + $c.util.getComponent('nope').innerHTML;" in out
+    assert 'td.innerHTML = "x";' in out
+    out2, log2 = vs.simplify_innerhtml(out, "", body)
+    assert out2 == out and log2 == {}

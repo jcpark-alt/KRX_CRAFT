@@ -817,6 +817,53 @@ def simplify_sdd_guards(script, head="", body=""):
     return script, {k: v for k, v in (("call", n_call), ("read", n_read)) if v}
 
 
+# ---------------------------------------------------------------- V40 innerHTML (P2 기계 축 · 2026-10-07)
+# (A) `((G) && (G).setValue ? (G).setValue(EXPR) : ((G) ? ((G).innerHTML = EXPR2) : void (EXPR3)))` — G 가 setValue 를 가진 컴포넌트(w2:textbox 등)로 실존하면
+#     늘 setValue 갈래이므로 `G.setValue(EXPR)` 로 줄인다. xf:group(setValue 없음) 대상은 innerHTML 갈래가 실제 동작이라 그대로(B-7 DOM 조립).
+# (B) `$c.util.getComponent('id').innerHTML`(쓰기/읽기) — 컴포넌트 객체의 프로퍼티라 아무 효과가 없던 as-is 이월. 실존 컴포넌트면 `.render.innerHTML` 로 DOM 에 닿게 한다.
+#     `init_attrReals` 템플릿의 `__html` 실현(comp.render.innerHTML)과 `td.innerHTML` 류 DOM 조립은 손대지 않는다(스코어카드 innerHTML_tpl / innerHTML).
+SETVALUE_TAGS = ("w2:textbox", "xf:input", "xf:output", "w2:textarea", "xf:select1", "xf:select", "w2:span")
+_GQ = r"\(\$c\.util\.getComponent\(\s*(?P<q>['\"])(?P<id>[^'\"]+)(?P=q)\s*\)\)"
+INNERHTML_GUARD_RE = re.compile(r"\(" + _GQ + r"\s*&&\s*\(\$c\.util\.getComponent\(\s*(?P=q)(?P=id)(?P=q)\s*\)\)\.setValue\s*\?\s*"
+                                r"\(\$c\.util\.getComponent\(\s*(?P=q)(?P=id)(?P=q)\s*\)\)\.setValue\(")
+DIRECT_INNERHTML_RE = re.compile(r"\$c\.util\.getComponent\(\s*(?P<q>['\"])(?P<id>[^'\"]+)(?P=q)\s*\)\.innerHTML\b")
+
+
+def simplify_innerhtml(script, head="", body=""):
+    tag = {m.group(2): m.group(1) for m in re.finditer(r'<(\w+:\w+)\b[^>]*\sid="([^"]+)"', body or "")}
+    n_guard = n_direct = 0
+    mask = cv.code_mask(script)
+    out, pos = [], 0
+    for m in INNERHTML_GUARD_RE.finditer(script):
+        if m.start() < pos or not mask[m.start()] or tag.get(m.group("id")) not in SETVALUE_TAGS:
+            continue
+        a_close = _balanced(script, m.end() - 1)
+        if a_close < 0:
+            continue
+        rest = script[a_close + 1:]
+        t = re.match(r"\s*:\s*\(", rest)
+        if not t:
+            continue
+        e_open = a_close + 1 + t.end() - 1
+        e_close = _balanced(script, e_open)
+        if e_close < 0 or script[e_close + 1:e_close + 2] != ")" or "innerHTML" not in script[e_open:e_close]:
+            continue
+        out.append(script[pos:m.start()])
+        out.append("$c.util.getComponent(%s%s%s).setValue(%s)" % (m.group("q"), m.group("id"), m.group("q"), script[m.end():a_close]))
+        pos = e_close + 2; n_guard += 1
+    out.append(script[pos:]); script = "".join(out)
+    mask = cv.code_mask(script)
+    out, pos = [], 0
+    for m in DIRECT_INNERHTML_RE.finditer(script):
+        if m.start() < pos or not mask[m.start()] or m.group("id") not in tag:
+            continue
+        out.append(script[pos:m.start()])
+        out.append("$c.util.getComponent(%s%s%s).render.innerHTML" % (m.group("q"), m.group("id"), m.group("q")))
+        pos = m.end(); n_direct += 1
+    out.append(script[pos:]); script = "".join(out)
+    return script, {k: v for k, v in (("guard", n_guard), ("render", n_direct)) if v}
+
+
 def apply(head, script, body):
     log = {}
     body_ids = set(re.findall(r'\sid="([^"]+)"', body))
@@ -833,11 +880,11 @@ def apply(head, script, body):
 
 
 def main(argv=None):
-    """제자리 적용 CLI(frozen 화면 등): python conversion/tools/vendor_stage2.py --v37|--v38|--v39 [--dry] <xml|폴더> ..."""
+    """제자리 적용 CLI(frozen 화면 등): python conversion/tools/vendor_stage2.py --v37|--v38|--v39|--v40 [--dry] <xml|폴더> ..."""
     sys.stdout.reconfigure(encoding="utf-8")
     args = argv if argv is not None else sys.argv[1:]
-    files, fl, _ = st.parse_cli([a for a in args if a not in ("--v37", "--v38", "--v39")], flags=("--dry",), opts=())
-    which = "--v39" if "--v39" in args else "--v38" if "--v38" in args else "--v37" if "--v37" in args else None
+    files, fl, _ = st.parse_cli([a for a in args if a not in ("--v37", "--v38", "--v39", "--v40")], flags=("--dry",), opts=())
+    which = next((w for w in ("--v40", "--v39", "--v38", "--v37") if w in args), None)
     if not which or not files:
         print(main.__doc__); return 2
     changed = 0; tot = {}
@@ -850,6 +897,8 @@ def main(argv=None):
             new, log = wrap_handler_trycatch(reg["script"], reg["head"])
         elif which == "--v39":
             new, log = simplify_sdd_guards(reg["script"], reg["head"], reg["body"])
+        elif which == "--v40":
+            new, log = simplify_innerhtml(reg["script"], reg["head"], reg["body"])
         else:
             head, new, body, log = inline_fn_aliases(reg["head"], reg["script"], reg["body"])
         if new != reg["script"] or head != reg["head"] or body != reg["body"]:
