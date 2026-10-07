@@ -630,6 +630,13 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
   scwin 함수일 때만 선언·대입 줄을 지우고 참조(문자열 리터럴 안의 `scwin.fn_X` 포함, head/body 도)를 타깃으로 바꾼다. 대입 둘 이상·타깃 정의 없음은 로그로 남기고 건드리지 않는다.
   숫자로 시작해 식별자가 안 되는 `fn_70000Table_*` 함수 2건은 규칙 13 과 같이 보류(이름 선택이 필요). CLI `--v38`. 멱등.
 
+* **V39 console 분류(P2, 2026-10-07)**: 잔존 `console.*` 2,368자리는 3건을 빼면 전부 공급사 `[sdd]` 드러냄 표식이었다(`warn` 2,234·`error` 134). 세 갈래로 다룬다.
+  ① **컨텍스트 키 가드 typeof 꼴** `(typeof scwin.X !== "undefined" && scwin.X !== null ? scwin.X : (console.warn("[sdd] 컨텍스트 키 미충전 — X …"), ""))` → V5 와 같이 `(scwin.X ?? "")` + 키를
+  `// TODO Stage2: 컨텍스트 키 출처 미확인(…)` 에 기록(`vendor_postprocess.TYPEOF_WARN`, 회신 B-1). ② **실존 컴포넌트 가드** `(G && G.m ? G.m(args) : console.warn('[sdd] …'))`(G = `$c.util.getComponent('id')`,
+  id 가 body/head 에 있을 때) → `G.m(args)`; `((!G || typeof G.getValue !== 'function') ? (console.warn(…), false) : (EXPR))` → `(EXPR)` (`vendor_stage2.simplify_sdd_guards`, `apply_regions` 끝, CLI `--v39`).
+  ③ 나머지 — 없는/변수 id 의 가드, opener 부모 컴포넌트, 그리드 라벨 갈래 `(console.error('[sdd] 미실현 라벨 갈래 …'), String(data ?? ''))`, `hiddenStore 부재`(head 에 dma_hiddenStore 없을 때),
+  jQuery `$("#titleValue")` 는 회신·설계 의존 표식이라 그대로 두고 스코어카드 `console_sdd`(회신 축)로 센다. 스코어카드 `console` 은 `[sdd]` 가 아닌 호출만.
+
 ### 규칙 34: 퍼블리싱 정규화 — `publish_normalize.py` (P1~P11, lxml · body 만)
 
 * **P1 확장(헤더 표준, 사용자 확정 2026-10-06)**: 본화면(`sub_contents`)은 `pfmContentHeader` pageFrame 을 첫 자식으로 보장(없으면 추가 `P1_pageframe_added`),

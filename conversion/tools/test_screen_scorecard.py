@@ -33,7 +33,7 @@ def test_measure_counts_and_weights(tmp_path):
     assert m["jquery"] == 1 and m["form_dom"] == 1 and m["raw_dom"] == 2 and m["eval"] == 1 and m["timer"] == 1 and m["location"] == 1 and m["innerHTML"] == 1
     assert m["console"] == 1 and m["native_alert"] == 1 and m["fn_def"] == 1 and m["handler_notry"] == 1   # btn_a_onclick 에 try 없음(onpageload 는 있음)
     assert m["no_jsdoc"] == 2 and m["funcs"] == 3 and m["long_fn"] == 0
-    assert m["todo_vendor"] == 1 and m["todo_rule19"] == 1 and m["todo_merge"] == 1
+    assert m["todo_vendor"] == 1 and m["todo_rule19"] == 1 and m["todo_merge"] == 1 and m["console_sdd"] == 0
     assert m["nullish"] == 1 and m["getcomp"] == 1
     expected = 3 * 8 + 1 * (1 + 1 + 1 + 1 + 2) + 2 * 3
     assert m["score"] == expected

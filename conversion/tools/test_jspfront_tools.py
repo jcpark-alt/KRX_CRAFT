@@ -882,3 +882,38 @@ scwin.tx_b = async function () {};
     assert s2.count("scwin.init_recvParam();\n        scwin.fn_two = scwin.tx_a;") == 1   # 삭제한 줄 자리가 깨끗이 닫힘
     h3, s3, b3, log3 = vs.inline_fn_aliases(h2, s2, b2)
     assert s3 == s2 and log3.get("inlined") is None
+
+
+def test_v39_sdd_guards_and_typeof_context():
+    """P2 V39: 실존 컴포넌트의 [sdd] 가드 삼항 → 직접 호출, checked-read 가드 → 본식; 없는 컴포넌트·변수 id 는 그대로. typeof 꼴 컨텍스트 키 가드 → (scwin.X ?? "") + TODO 키."""
+    head = '<head><xf:model><w2:dataCollection><w2:dataMap baseNode="map" id="dma_hiddenStore"/></w2:dataCollection></xf:model>'
+    body = '<body><xf:input id="ipt_a"/><xf:group id="layer1"/></body>'
+    src = '''scwin.f = function () {
+    ($c.util.getComponent('ipt_a') && $c.util.getComponent('ipt_a').setValue ? $c.util.getComponent('ipt_a').setValue(v, "x") : console.warn('[sdd] 값 쓰기 미지원 컴포넌트: ipt_a'));
+    (($c.util.getComponent('layer1')) && ($c.util.getComponent('layer1')).addClass ? ($c.util.getComponent('layer1')).addClass("active") : console.error('[sdd] addClass 미지원: layer1'));
+    ($c.util.getComponent('dma_hiddenStore') && $c.util.getComponent('dma_hiddenStore').set ? $c.util.getComponent('dma_hiddenStore').set('k', page) : console.warn('[sdd] hiddenStore 부재 (k)'));
+    ($c.util.getComponent('ipt_none') && $c.util.getComponent('ipt_none').hide ? $c.util.getComponent('ipt_none').hide() : console.warn('[sdd] hide 대상 미해결: ipt_none'));
+    ($c.util.getComponent(layer) && $c.util.getComponent(layer).show ? $c.util.getComponent(layer).show() : console.warn('[sdd] show 대상 미해결: ' + layer));
+    if (((!$c.util.getComponent('ipt_a') || typeof $c.util.getComponent('ipt_a').getValue !== 'function') ? (console.warn('[sdd] .checked 대상 미해결: ipt_a'), false) : ($c.util.getComponent('ipt_a').getValue() != null && String($c.util.getComponent('ipt_a').getValue()) === "Y"))) { x(); }
+};
+'''
+    out, log = vs.simplify_sdd_guards(src, head, body)
+    assert log == {"call": 3, "read": 1}
+    assert '''    $c.util.getComponent('ipt_a').setValue(v, "x");\n''' in out
+    assert '''    $c.util.getComponent('layer1').addClass("active");\n''' in out
+    assert '''    $c.util.getComponent('dma_hiddenStore').set('k', page);\n''' in out
+    assert "console.warn('[sdd] hide 대상 미해결: ipt_none')" in out and "console.warn('[sdd] show 대상 미해결: ' + layer)" in out
+    assert '''    if (($c.util.getComponent('ipt_a').getValue() != null && String($c.util.getComponent('ipt_a').getValue()) === "Y")) { x(); }''' in out
+    out2, log2 = vs.simplify_sdd_guards(out, head, body)
+    assert out2 == out and log2 == {}
+    # typeof 꼴 컨텍스트 키 가드(V5 확장)
+    src2 = '''///////// 2. 초기화 영역 /////////
+scwin.init_conds = function () {
+    const a = (typeof scwin.flag !== "undefined" && scwin.flag !== null ? scwin.flag : (console.warn("[sdd] 컨텍스트 키 미충전 — " + "flag" + " (as-is EL 부재 = 빈값이라 진행합니다)"), ""));
+    const b = (typeof scwin.keyword !== "undefined" && scwin.keyword !== null ? scwin.keyword : (console.warn("[sdd] 컨텍스트 키 미충전 — " + "param.keyword" + " (as-is EL 부재 = 빈값이라 진행합니다)"), ""));
+};
+'''
+    s3, keys = vp.unwrap_values(src2)
+    assert 'const a = (scwin.flag ?? "");' in s3 and 'const b = (scwin.keyword ?? "");' in s3 and "console.warn" not in s3
+    assert keys["context"] == ["flag", "param.keyword"]
+    assert "// TODO Stage2: 컨텍스트 키 출처 미확인(as-is EL · 회신 A-3) — flag, param.keyword" in s3

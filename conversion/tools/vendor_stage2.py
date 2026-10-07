@@ -764,6 +764,59 @@ def inline_fn_aliases(head, script, body):
     return head, script, body, {k: v for k, v in log.items() if v}
 
 
+# ---------------------------------------------------------------- V39 [sdd] 컴포넌트 가드 정리 (P2 기계 축 · 2026-10-07)
+# 공급사 드러냄 가드: `(G && G.m ? G.m(args) : console.warn('[sdd] m 대상 미해결: id'))` (G = $c.util.getComponent('id')) — 컴포넌트가 body/head 에
+# 실존하면 가드는 늘 참이라 `G.m(args)` 로 줄인다. `((!G || typeof G.getValue !== 'function') ? (console.warn(…), false) : (EXPR))` 도 `(EXPR)` 로.
+# 실존하지 않거나 id 가 변수인 가드, 컨텍스트 키·opener·라벨 갈래·hiddenStore 부재 등 회신 의존 표식은 그대로 둔다(스코어카드 console_sdd 로 집계).
+_G = r"\$c\.util\.getComponent\(\s*(?P<q>['\"])(?P<id>[^'\"]+)(?P=q)\s*\)"
+GUARD_HEAD_RE = re.compile(r"\(\(?" + _G + r"\)?\s*&&\s*\(?\$c\.util\.getComponent\(\s*(?P=q)(?P=id)(?P=q)\s*\)\)?\.(?P<m>\w+)\)?\s*\?\s*"
+                           r"\(?\$c\.util\.getComponent\(\s*(?P=q)(?P=id)(?P=q)\s*\)\)?\.(?P=m)\(")
+READ_HEAD_RE = re.compile(r"\(\(!" + _G + r"\s*\|\|\s*typeof \$c\.util\.getComponent\(\s*(?P=q)(?P=id)(?P=q)\s*\)\.getValue !== 'function'\)\s*\?\s*\(console\.warn\(")
+
+
+def simplify_sdd_guards(script, head="", body=""):
+    ids = set(re.findall(r'\sid="([^"]+)"', body or "")) | set(re.findall(r'<w2:(?:dataMap|dataList)[^>]*\sid="([^"]+)"', head or ""))
+    n_call = n_read = 0
+    mask = cv.code_mask(script)
+    out, pos = [], 0
+    for m in GUARD_HEAD_RE.finditer(script):
+        if m.start() < pos or not mask[m.start()] or m.group("id") not in ids:
+            continue
+        a_close = _balanced(script, m.end() - 1)                     # m(args) 의 ')'
+        if a_close < 0:
+            continue
+        tail = re.match(r"\s*:\s*console\.(?:warn|error)\(", script[a_close + 1:])
+        if not tail:
+            continue
+        w_open = a_close + 1 + tail.end() - 1
+        w_close = _balanced(script, w_open)
+        if w_close < 0 or script[w_close + 1:w_close + 2] != ")":
+            continue
+        args = script[m.end():a_close]
+        out.append(script[pos:m.start()])
+        out.append("$c.util.getComponent(%s%s%s).%s(%s)" % (m.group("q"), m.group("id"), m.group("q"), m.group("m"), args))
+        pos = w_close + 2; n_call += 1
+    out.append(script[pos:]); script = "".join(out)
+    mask = cv.code_mask(script)
+    out, pos = [], 0
+    for m in READ_HEAD_RE.finditer(script):
+        if m.start() < pos or not mask[m.start()] or m.group("id") not in ids:
+            continue
+        w_close = _balanced(script, m.end() - 1)                      # console.warn(...) 의 ')'
+        if w_close < 0:
+            continue
+        tail = re.match(r"\s*,\s*(?:false|''|\"\")\s*\)\s*:\s*\(", script[w_close + 1:])
+        if not tail:
+            continue
+        e_open = w_close + 1 + tail.end() - 1
+        e_close = _balanced(script, e_open)
+        if e_close < 0 or script[e_close + 1:e_close + 2] != ")":
+            continue
+        out.append(script[pos:m.start()]); out.append(script[e_open:e_close + 1]); pos = e_close + 2; n_read += 1
+    out.append(script[pos:]); script = "".join(out)
+    return script, {k: v for k, v in (("call", n_call), ("read", n_read)) if v}
+
+
 def apply(head, script, body):
     log = {}
     body_ids = set(re.findall(r'\sid="([^"]+)"', body))
@@ -780,11 +833,11 @@ def apply(head, script, body):
 
 
 def main(argv=None):
-    """제자리 적용 CLI(frozen 화면 등): python conversion/tools/vendor_stage2.py --v37|--v38 [--dry] <xml|폴더> ..."""
+    """제자리 적용 CLI(frozen 화면 등): python conversion/tools/vendor_stage2.py --v37|--v38|--v39 [--dry] <xml|폴더> ..."""
     sys.stdout.reconfigure(encoding="utf-8")
     args = argv if argv is not None else sys.argv[1:]
-    files, fl, _ = st.parse_cli([a for a in args if a not in ("--v37", "--v38")], flags=("--dry",), opts=())
-    which = "--v38" if "--v38" in args else "--v37" if "--v37" in args else None
+    files, fl, _ = st.parse_cli([a for a in args if a not in ("--v37", "--v38", "--v39")], flags=("--dry",), opts=())
+    which = "--v39" if "--v39" in args else "--v38" if "--v38" in args else "--v37" if "--v37" in args else None
     if not which or not files:
         print(main.__doc__); return 2
     changed = 0; tot = {}
@@ -795,6 +848,8 @@ def main(argv=None):
         head, body = reg["head"], reg["body"]
         if which == "--v37":
             new, log = wrap_handler_trycatch(reg["script"], reg["head"])
+        elif which == "--v39":
+            new, log = simplify_sdd_guards(reg["script"], reg["head"], reg["body"])
         else:
             head, new, body, log = inline_fn_aliases(reg["head"], reg["script"], reg["body"])
         if new != reg["script"] or head != reg["head"] or body != reg["body"]:

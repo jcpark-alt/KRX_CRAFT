@@ -211,11 +211,23 @@ SV_THROW = (r'\(\(sv\) => \(sv !== undefined && sv !== null\) \? sv : \(\(\) => 
             r'(?P<key>[^"]*)", unresolved: "session:" \+ "[^"]*" \}; \}\)\(\)\)\(')
 
 
+TYPEOF_WARN = re.compile(r'\(typeof scwin\.(?P<v>\w+) !== "undefined" && scwin\.(?P=v) !== null \? scwin\.(?P=v) : '
+                         r'\(console\.warn\("\[sdd\] 컨텍스트 키 미충전 — " \+ "(?P<key>[^"]*)" \+ " \(as-is EL 부재 = 빈값이라 진행합니다\)"\), ""\)\)')
+
+
 def unwrap_values(script):
     """returns (script, {"context": [keys], "session": [keys]})."""
     ctx, ses = [], []
     script = _replace_wrapper(script, CV_PLAIN, lambda x, m: "(%s ?? \"\")" % x, [])
     script = _replace_wrapper(script, CV_WARN, lambda x, m: "(%s ?? \"\")" % x, ctx, "key")
+    # V39(2026-10-07): 같은 뜻의 typeof 꼴 가드 `(typeof scwin.X !== "undefined" && scwin.X !== null ? scwin.X : (console.warn("[sdd] 컨텍스트 키 미충전 — X …"), ""))`
+    mask = cv.code_mask(script)
+    out, pos = [], 0
+    for m in TYPEOF_WARN.finditer(script):
+        if m.start() < pos or not mask[m.start()]:
+            continue
+        out.append(script[pos:m.start()]); out.append('(scwin.%s ?? "")' % m.group("v")); pos = m.end(); ctx.append(m.group("key"))
+    out.append(script[pos:]); script = "".join(out)
     script = _replace_wrapper(script, SV_THROW, lambda x, m: x, ses, "key")
     for _ in range(5):
         new = re.sub(r'String\(String\(([^()]*(?:\([^()]*\)[^()]*)*)\)\)', r'String(\1)', script)
@@ -902,6 +914,8 @@ def apply_regions(head, script, body):
     script, log["V25_alertMsg"] = replace_alert_msg(script)
     script, log["V26_consts"] = inline_vendor_consts(script)
     script, log["V23_vendor_pcc"] = replace_vendor_pcc(script)
+    # P2 V39 [sdd] 컴포넌트 가드 정리 — body/head 에 실존하는 컴포넌트의 `(G && G.m ? G.m(args) : console.warn('[sdd] …'))` → `G.m(args)`
+    script, log["V39_sdd_guard"] = vendor_stage2.simplify_sdd_guards(script, head, body)
     # P2 V38 fn_ 별칭 인라인(충돌 없는 것만) — 전방 선언 null + onpageload 단일 대입 꼴
     head, script, body, v38 = vendor_stage2.inline_fn_aliases(head, script, body)
     log["V38_fn_alias"] = v38

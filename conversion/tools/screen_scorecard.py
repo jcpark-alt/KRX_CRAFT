@@ -36,14 +36,14 @@ OUT = ROOT / "conversion" / "jsp-front" / "scorecard.md"
 WEIGHTS = {
     "jquery": 3, "form_dom": 3, "raw_dom": 3, "eval": 3, "location": 3, "timer": 3, "innerHTML": 3, "long_fn": 3,
     "handler_notry": 1, "fn_def": 1, "console": 1, "native_alert": 1, "no_jsdoc": 1,
-    "todo_vendor": 2, "todo_merge": 2, "todo_rule19": 2,
+    "todo_vendor": 2, "todo_merge": 2, "todo_rule19": 2, "console_sdd": 2,
 }
 INFO = ("nullish", "getcomp")
 ORDER = ["jquery", "form_dom", "raw_dom", "eval", "location", "timer", "innerHTML", "long_fn",
-         "handler_notry", "fn_def", "console", "native_alert", "no_jsdoc", "todo_vendor", "todo_merge", "todo_rule19"]
+         "handler_notry", "fn_def", "console", "native_alert", "no_jsdoc", "todo_vendor", "todo_merge", "todo_rule19", "console_sdd"]
 LABEL = {"jquery": "jQuery", "form_dom": "폼 DOM", "raw_dom": "원시 DOM", "eval": "eval", "location": "location 이동", "timer": "타이머",
          "innerHTML": "innerHTML", "long_fn": "긴 함수", "handler_notry": "try 없는 핸들러", "fn_def": "fn_ 정의", "console": "console",
-         "native_alert": "네이티브 alert", "no_jsdoc": "JSDoc 없음", "todo_vendor": "TODO(회신)", "todo_merge": "TODO(병합)", "todo_rule19": "TODO(규칙19)",
+         "native_alert": "네이티브 alert", "no_jsdoc": "JSDoc 없음", "todo_vendor": "TODO(회신)", "todo_merge": "TODO(병합)", "todo_rule19": "TODO(규칙19)", "console_sdd": "[sdd] console(회신)",
          "nullish": "== null(정보)", "getcomp": "getComponent(정보)"}
 
 RX = {
@@ -55,7 +55,8 @@ RX = {
     "timer": re.compile(r'(?<![\w$.])set(?:Timeout|Interval)\('),
     "innerHTML": re.compile(r'\.innerHTML\b'),
     "fn_def": re.compile(r'^scwin\.fn_\w+\s*=', re.M),
-    "console": re.compile(r'console\.\w+\('),
+    "console": re.compile(r'''console\.\w+\((?!\s*['"]\[sdd\])'''),       # [sdd] 표식은 console_sdd 로 따로(회신 축)
+    "console_sdd": re.compile(r'''console\.\w+\(\s*['"]\[sdd\]'''),
     "native_alert": re.compile(r'(?<![\w$.])(?:alert|confirm)\('),
     "nullish": re.compile(r'[!=]=\s*(?:null|undefined)\b'),
     "getcomp": re.compile(r'\$c\.util\.getComponent\('),
