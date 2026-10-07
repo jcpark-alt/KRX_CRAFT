@@ -864,6 +864,152 @@ def simplify_innerhtml(script, head="", body=""):
     return script, {k: v for k, v in (("guard", n_guard), ("render", n_direct)) if v}
 
 
+# ---------------------------------------------------------------- V41 폼 action → tx 인자 (P3 첫 배치에서 발견 · 2026-10-07)
+# as-is `form.action = URL; form.submit();` 를 공급사가 `(document.F || { elements: [] }).action = URL; await scwin.tx_X();` 로 옮기면서 tx_X 의 sbmOptions.action 은
+# 고정 리터럴 하나만 넣었다 — 분기마다 다른 URL 로 제출하던 화면(JLDFIL00000 goWrite 7갈래 등)은 전부 같은 주소로 가는 결함. 폼 문장을 걷고 URL 을 tx 인자로 넘긴다:
+#   `(document.F || …).action = U;` [`(document.F || …).target|method = …;` · `$c.util.getComponent('dma_…').set(…)` 몇 줄] `await scwin.tx_X();`
+#   → `await scwin.tx_X(U);` + `scwin.tx_X = async function (action) { … action: action ?? "<고정>", … }` (+ JSDoc @param).
+# tx 가 sbmOptions 꼴이거나 `$c.data.downFile("<고정>", …)` 꼴일 때만(그 밖의 꼴·⛔ 미해결 스텁은 그대로). 호출부 action 이 고정값과 같고 하나뿐이면 폼 문장만 지운다.
+FORM_ACTION_RE = re.compile(r"^(?P<ind>[ \t]*)\(document\.(?P<f>\w+) \|\| \{ elements: \[\] \}\)\.action = (?P<u>.+?);[ \t]*$")
+FORM_OTHER_RE = re.compile(r"^[ \t]*\(document\.(?P<f>\w+) \|\| \{ elements: \[\] \}\)\.(?:target|method|encoding|enctype) = .+?;[ \t]*$")
+DMA_SET_RE = re.compile(r"^[ \t]*\$c\.util\.getComponent\(['\"]dma_\w+['\"]\)\.set\(.*\);[ \t]*$")
+TX_CALL_RE = re.compile(r"^(?P<ind>[ \t]*)(?P<aw>await )?scwin\.(?P<tx>tx_\w+)\(\);[ \t]*$")
+# tx 정의의 고정 주소: sbmOptions.action 리터럴 또는 `$c.data.downFile("<고정>", …)` 첫 인자(같은 함수 안, `\n};` 전까지)
+TX_FIXED_RE = re.compile(r'(?m)^scwin\.(tx_\w+) = async function \(\) \{\n(?:(?!\n\};)[\s\S])*?(?:const sbmOptions = \{(?:(?!\n\};)[\s\S])*?\n[ \t]*action: |\$c\.data\.downFile\()(?P<a>"[^"\n]*"|\'[^\'\n]*\'),')
+
+
+def form_action_to_tx(script):
+    lines = script.split("\n")
+    tx_fixed = {}
+    for m in re.finditer(TX_FIXED_RE, script):
+        tx_fixed[m.group(1)] = m.group("a")
+    uses = {}        # tx → set(action 리터럴/식)
+    edits = []       # (start, end, replacement lines)
+    i = 0
+    while i < len(lines):
+        m = FORM_ACTION_RE.match(lines[i])
+        if not m:
+            i += 1; continue
+        j = i + 1; drop = [i]
+        while j < len(lines) and j <= i + 8:
+            t = lines[j]
+            if not t.strip():
+                j += 1; continue
+            if FORM_OTHER_RE.match(t):
+                drop.append(j); j += 1; continue
+            if DMA_SET_RE.match(t):
+                j += 1; continue
+            break
+        c = TX_CALL_RE.match(lines[j]) if j < len(lines) else None
+        if not c or c.group("tx") not in tx_fixed:
+            i += 1; continue
+        tx, u = c.group("tx"), m.group("u").strip()
+        uses.setdefault(tx, set()).add(u)
+        edits.append((drop, j, c, u))
+        i = j + 1
+    if not edits:
+        return script, {}
+    param_tx = set()
+    for drop, j, c, u in edits:
+        tx = c.group("tx")
+        if len(uses[tx]) > 1 or u != tx_fixed[tx]:
+            param_tx.add(tx)
+    for drop, j, c, u in edits:
+        tx = c.group("tx")
+        if tx in param_tx:
+            lines[j] = "%s%sscwin.%s(%s);" % (c.group("ind"), c.group("aw") or "", tx, u)
+        for d in drop:
+            lines[d] = None
+    script = "\n".join(l for l in lines if l is not None)
+    # tx 정의: 시그니처·action 폴백·JSDoc
+    for tx in sorted(param_tx):
+        fixed = tx_fixed[tx]
+        script = re.sub(r'(?m)^scwin\.%s = async function \(\) \{' % re.escape(tx), 'scwin.%s = async function (action) {' % tx, script, count=1)
+        pat = re.compile(r'(scwin\.%s = async function \(action\) \{\n(?:(?!\n\};)[\s\S])*?(?:const sbmOptions = \{(?:(?!\n\};)[\s\S])*?\n[ \t]*action: |\$c\.data\.downFile\())%s,' % (re.escape(tx), re.escape(fixed)))
+        script = pat.sub(lambda mm: mm.group(1) + "action ?? " + fixed + ",", script, count=1)
+        # JSDoc @param — @returns 바로 앞에
+        doc = re.search(r'(/\*\*(?:(?!\*/).)*?)(\n \* @returns[^\n]*\n(?:(?!\*/).)*\*/\nscwin\.%s = async function \(action\))' % re.escape(tx), script, re.S)
+        if doc and "@param {String} action" not in doc.group(1):
+            script = script[:doc.start()] + doc.group(1) + "\n * @param {String} action 제출 주소(호출부가 as-is form.action 으로 정하던 분기별 URL · 생략 시 기본 주소)" + doc.group(2) + script[doc.end():]
+    return script, {"calls": len(edits), "tx_param": len(param_tx), "form_lines": sum(len(d) for d, _j, _c, _u in edits)}
+
+
+# ---------------------------------------------------------------- V42 eval 동적 멤버 접근 (P3 첫 배치 · 2026-10-07)
+# as-is 의 `eval("document.all.span" + month)` · `eval('form.isurCd' + obj1)` · `eval('obj.x_' + idx + '.value')` 는 이름을 문자열로 조립한 멤버 접근이라
+# 대괄호 접근과 의미가 같다: `document.all["span" + month]` · `form['isurCd' + obj1]` · `obj['x_' + idx].value`. eval 만 걷고 DOM 참조(document.all 등)는 그대로 둔다(B-7).
+# 첫 조각이 "경로.접두" 꼴 문자열이고, 마지막 조각이 `.식별자(.식별자)*` 꼴 문자열이면 꼬리 속성, 그 밖의 조각에 `.`·`[`·`(` 가 든 문자열이 있으면 손대지 않는다.
+EVAL_CALL_RE = re.compile(r"(?<![\w.$])eval\(")
+_PATH_PREFIX_RE = re.compile(r"^(?P<path>[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)\.(?P<prefix>[A-Za-z_$]?[\w$]*)$")
+_TAIL_RE = re.compile(r"^(?:\.[A-Za-z_$][\w$]*)+$")
+_QUOTED_RE = re.compile(r"^(?P<q>['\"])(?P<v>.*)(?P=q)$", re.S)
+
+
+def _split_plus(expr):
+    """최상위 `+` 로 분할(괄호·문자열 안은 건너뜀)."""
+    parts, depth, q, cur = [], 0, None, []
+    i = 0
+    while i < len(expr):
+        ch = expr[i]
+        if q:
+            cur.append(ch)
+            if ch == "\\" and i + 1 < len(expr):
+                cur.append(expr[i + 1]); i += 2; continue
+            if ch == q:
+                q = None
+        elif ch in "'\"":
+            q = ch; cur.append(ch)
+        elif ch in "([{":
+            depth += 1; cur.append(ch)
+        elif ch in ")]}":
+            depth -= 1; cur.append(ch)
+        elif ch == "+" and depth == 0:
+            parts.append("".join(cur).strip()); cur = []
+        else:
+            cur.append(ch)
+        i += 1
+    parts.append("".join(cur).strip())
+    return parts
+
+
+def de_eval_member(script):
+    mask = cv.code_mask(script)
+    out, pos, n = [], 0, 0
+    for m in EVAL_CALL_RE.finditer(script):
+        if m.start() < pos or not mask[m.start()]:
+            continue
+        close = _balanced(script, m.end() - 1)
+        if close < 0:
+            continue
+        parts = _split_plus(script[m.end():close])
+        if len(parts) < 2:
+            continue
+        q0 = _QUOTED_RE.match(parts[0])
+        pp = q0 and _PATH_PREFIX_RE.match(q0.group("v"))
+        if not pp:
+            continue
+        tail = ""
+        qt = _QUOTED_RE.match(parts[-1])
+        if qt and _TAIL_RE.match(qt.group("v")):
+            tail = qt.group("v"); parts = parts[:-1]
+            if len(parts) < 2:
+                continue
+        bad = False
+        for part in parts[1:]:
+            qq = _QUOTED_RE.match(part)
+            if qq and re.search(r"[.\[(]", qq.group("v")):
+                bad = True; break
+        if bad:
+            continue
+        name = parts[1:]
+        if pp.group("prefix"):
+            name = [q0.group("q") + pp.group("prefix") + q0.group("q")] + name
+        out.append(script[pos:m.start()])
+        out.append("%s[%s]%s" % (pp.group("path"), " + ".join(name), tail))
+        pos = close + 1; n += 1
+    out.append(script[pos:])
+    return "".join(out), ({"member": n} if n else {})
+
+
 def apply(head, script, body):
     log = {}
     body_ids = set(re.findall(r'\sid="([^"]+)"', body))
@@ -880,11 +1026,11 @@ def apply(head, script, body):
 
 
 def main(argv=None):
-    """제자리 적용 CLI(frozen 화면 등): python conversion/tools/vendor_stage2.py --v37|--v38|--v39|--v40 [--dry] <xml|폴더> ..."""
+    """제자리 적용 CLI(frozen 화면 등): python conversion/tools/vendor_stage2.py --v37|--v38|--v39|--v40|--v41|--v42 [--dry] <xml|폴더> ..."""
     sys.stdout.reconfigure(encoding="utf-8")
     args = argv if argv is not None else sys.argv[1:]
-    files, fl, _ = st.parse_cli([a for a in args if a not in ("--v37", "--v38", "--v39", "--v40")], flags=("--dry",), opts=())
-    which = next((w for w in ("--v40", "--v39", "--v38", "--v37") if w in args), None)
+    files, fl, _ = st.parse_cli([a for a in args if a not in ("--v37", "--v38", "--v39", "--v40", "--v41", "--v42")], flags=("--dry",), opts=())
+    which = next((w for w in ("--v42", "--v41", "--v40", "--v39", "--v38", "--v37") if w in args), None)
     if not which or not files:
         print(main.__doc__); return 2
     changed = 0; tot = {}
@@ -899,6 +1045,10 @@ def main(argv=None):
             new, log = simplify_sdd_guards(reg["script"], reg["head"], reg["body"])
         elif which == "--v40":
             new, log = simplify_innerhtml(reg["script"], reg["head"], reg["body"])
+        elif which == "--v41":
+            new, log = form_action_to_tx(reg["script"])
+        elif which == "--v42":
+            new, log = de_eval_member(reg["script"])
         else:
             head, new, body, log = inline_fn_aliases(reg["head"], reg["script"], reg["body"])
         if new != reg["script"] or head != reg["head"] or body != reg["body"]:

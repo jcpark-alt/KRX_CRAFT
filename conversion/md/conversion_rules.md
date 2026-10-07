@@ -642,6 +642,16 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
   → `G.setValue(EXPR)` ② 실존 컴포넌트의 `$c.util.getComponent('id').innerHTML`(컴포넌트 객체 프로퍼티라 효과 없던 as-is 이월) → `.render.innerHTML`(as-is 동작 실효화, 쓰기·읽기).
   그대로 두는 것: 그룹 대상 가드(innerHTML 갈래가 실제 동작), `td.innerHTML`·`self.x.innerHTML`·`attachForm[i].innerHTML` 같은 DOM 조립(B-7 화면별).
 
+* **V41 폼 action → tx 인자(P3, 2026-10-07, `vendor_stage2.form_action_to_tx`, CLI `--v41`)**: as-is `form.action = URL; form.submit();` 를 공급사가
+  `(document.F || { elements: [] }).action = URL; await scwin.tx_X();` 로 옮기면서 `tx_X` 의 주소는 고정 리터럴 하나(sbmOptions.action 또는 `$c.data.downFile("…")` 첫 인자)만 남겼다 —
+  분기마다 다른 주소로 제출하던 화면(JLDFIL00000 goWrite 7갈래 등)이 전부 같은 주소로 가는 결함. 폼 문장(`.action`·`.target`·`.method`·`.encoding`)을 걷고 URL 을 tx 인자로 넘긴다:
+  `await scwin.tx_X(URL);` + `scwin.tx_X = async function (action) { … action: action ?? "<고정>" … }`(JSDoc `@param action`). 사이에 `$c.util.getComponent('dma_…').set(…)` 줄은 허용(8줄 안).
+  호출부 주소가 고정값과 같고 한 가지뿐이면 폼 문장만 지운다. 그대로 두는 것: 분기(if/else) 안에서 action 만 정하고 밖에서 tx 를 부르는 꼴, tx 가 ⛔ 미해결 스텁(주소 "null"·self_submit)인 것,
+  `window.open` 으로 이어지는 폼 — 스코어카드 `form_dom` 에 남아 화면별(B-7·회신). 결과: 폼 문장 441줄 삭제·호출 346(인자 전달 243)·tx 151 정의(98화면)이 action 인자, 폼 action 잔존 94(분기 안 대입·⛔ 스텁·window.open — 화면별/회신).
+* **V42 eval 동적 멤버 접근(P3, 2026-10-07, `vendor_stage2.de_eval_member`, CLI `--v42`)**: `eval("document.all.span" + month)`·`eval('form.isurCd' + obj1)`·`eval('obj.x_' + idx + '.value')` 는
+  이름을 문자열로 조립한 멤버 접근이라 대괄호 접근과 의미가 같다 → `document.all["span" + month]`·`form['isurCd' + obj1]`·`obj['x_' + idx].value`. eval 만 걷고 DOM 참조(document.all 등)는 그대로(B-7).
+  첫 조각이 "경로.접두" 문자열이고 마지막 조각이 `.식별자` 꼬리면 속성 접근으로 잇는다; 조각에 `.`·`[`·`(` 가 든 문자열(옵션 색인 꼬리), 문장 eval(`eval("var r = " + d)`·대입), 주석 안은 손대지 않는다. 결과: 26화면 83자리 → 대괄호 접근, eval 148 → 65(27화면: 문장 eval·옵션 색인 꼬리·JSON eval).
+
 ### 규칙 34: 퍼블리싱 정규화 — `publish_normalize.py` (P1~P11, lxml · body 만)
 
 * **P1 확장(헤더 표준, 사용자 확정 2026-10-06)**: 본화면(`sub_contents`)은 `pfmContentHeader` pageFrame 을 첫 자식으로 보장(없으면 추가 `P1_pageframe_added`),

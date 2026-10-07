@@ -916,6 +916,10 @@ def apply_regions(head, script, body):
     script, log["V23_vendor_pcc"] = replace_vendor_pcc(script)
     # P2 V39 [sdd] 컴포넌트 가드 정리 — body/head 에 실존하는 컴포넌트의 `(G && G.m ? G.m(args) : console.warn('[sdd] …'))` → `G.m(args)`
     script, log["V39_sdd_guard"] = vendor_stage2.simplify_sdd_guards(script, head, body)
+    # P3 V42 eval("경로.접두" + 식 [+ ".꼬리"]) 동적 멤버 접근 → 경로["접두" + 식].꼬리 (동일 의미 · eval 제거, DOM 참조는 그대로)
+    script, log["V42_eval_member"] = vendor_stage2.de_eval_member(script)
+    # P3 V41 폼 action 대입 + tx 호출 → tx(action) — 분기별 제출 주소 보존(공급사는 tx 의 고정 action 하나로 뭉갰다)
+    script, log["V41_form_action"] = vendor_stage2.form_action_to_tx(script)
     # P2 V40 innerHTML — setValue 가능한 실존 컴포넌트의 setValue/innerHTML 가드 → setValue, 그룹 대상 getComponent().innerHTML → .render.innerHTML
     script, log["V40_innerhtml"] = vendor_stage2.simplify_innerhtml(script, head, body)
     # P2 V38 fn_ 별칭 인라인(충돌 없는 것만) — 전방 선언 null + onpageload 단일 대입 꼴

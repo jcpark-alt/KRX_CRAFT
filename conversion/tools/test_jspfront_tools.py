@@ -939,3 +939,120 @@ def test_v40_innerhtml():
     assert 'td.innerHTML = "x";' in out
     out2, log2 = vs.simplify_innerhtml(out, "", body)
     assert out2 == out and log2 == {}
+
+
+def test_v41_form_action_to_tx():
+    """V41: 폼 action 대입(+target/method 줄) 뒤 tx 호출 → tx(action) 인자, tx 는 (action) 시그니처·action ?? 고정값·JSDoc @param; 같은 주소 하나뿐이면 폼 줄만 삭제; downFile 꼴 tx 도 인자. 멱등."""
+    src = '''scwin.a = async function () {
+    if (x) {
+        (document.writeForm || { elements: [] }).action = '/submission/disclosure.do?method=findDsclCorpIsuDigital&digitalType=2';
+        await scwin.tx_fn_goWrite_next();
+    } else {
+        (document.disclosureFrm || { elements: [] }).action = '/submission/disclosurereg.do?method=registerDisclosure';
+        (document.disclosureFrm || { elements: [] }).target = 'tempSaveFrame';
+        await scwin.tx_fn_goWrite_next();
+    }
+};
+scwin.b = async function () {
+    (document.editForm || { elements: [] }).action = "/submission/searchDisclosureForm.do";
+    $c.util.getComponent('dma_req').set('method', "search");
+    await scwin.tx_searchDisclosureForm();
+};
+scwin.c = async function () {
+    (document.attachFrm || { elements: [] }).action = '/submission/attachFileDown.do';
+    await scwin.tx_fn_attachPreview();
+};
+/**
+ * @method
+ * @name tx_fn_goWrite_next
+ * @description goWrite_next 서버 호출
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.tx_fn_goWrite_next = async function () {
+    const sbmOptions = {
+        id: "tx_fn_goWrite_next",
+        method: "post",
+        action: "/submission/disclosurereg.do?method=registerDisclosure",
+        ref: "dma_goWriteNextReq",
+        isProcessMsg: false
+    };
+    const res = await $c.sbm.executeDynamic(sbmOptions);
+};
+scwin.tx_searchDisclosureForm = async function () {
+    const sbmOptions = {
+        id: "tx_searchDisclosureForm",
+        action: "/submission/searchDisclosureForm.do",
+        ref: "dma_req"
+    };
+    const res = await $c.sbm.executeDynamic(sbmOptions);
+};
+scwin.tx_fn_attachPreview = async function () {
+    try { return await $c.data.downFile("/submission/attachFileDown.do?method=searchAttachFile", "", {}); } catch (e) { }
+};
+'''
+    out, log = vs.form_action_to_tx(src)
+    assert log == {"calls": 4, "tx_param": 2, "form_lines": 5}
+    assert "await scwin.tx_fn_goWrite_next('/submission/disclosure.do?method=findDsclCorpIsuDigital&digitalType=2');" in out
+    assert "await scwin.tx_fn_goWrite_next('/submission/disclosurereg.do?method=registerDisclosure');" in out
+    assert "tempSaveFrame" not in out and "(document.writeForm" not in out and "(document.disclosureFrm" not in out and "(document.editForm" not in out
+    assert "    $c.util.getComponent('dma_req').set('method', \"search\");\n    await scwin.tx_searchDisclosureForm();\n" in out   # 같은 주소 하나 → 폼 줄만 삭제
+    assert "scwin.tx_fn_goWrite_next = async function (action) {" in out and 'action: action ?? "/submission/disclosurereg.do?method=registerDisclosure",' in out
+    assert " * @param {String} action 제출 주소" in out and "scwin.tx_searchDisclosureForm = async function () {" in out
+    assert "await scwin.tx_fn_attachPreview('/submission/attachFileDown.do');" in out and 'downFile(action ?? "/submission/attachFileDown.do?method=searchAttachFile", "", {})' in out   # downFile 꼴 tx 도 인자
+    out2, log2 = vs.form_action_to_tx(out)
+    assert out2 == out and log2 == {}
+
+
+def test_v42_de_eval_member():
+    """V42: eval("경로.접두" + 식 [+ ".꼬리"]) → 경로["접두" + 식].꼬리; 빈 접두·여러 조각·꼬리 속성 지원; 문장 eval·옵션 색인 꼬리·주석 안은 그대로. 멱등."""
+    src = '''scwin.f = function (prefix, month, div, idx, data, i) {
+    const subobj = eval("document.all.subEditClass_" + prefix);
+    eval("document.all.span" + month).className = "thisMonth";
+    const divObj = eval("document.all." + div + "Div");
+    const v = eval('obj.wrtrptSubmitSchdlDd_' + idx + '.value');
+    eval("frm.sf_valu_yn" + type).disabled = true;
+    const o = eval('obj.wrtrptKindCd_' + idx + '.options[' + (parseInt(k)) + ']');
+    eval("var result = " + data);
+    eval("gParamObj.param" + i + " = argv[" + i + "]");
+    // eval("document.all.x" + i)
+    const n = eval(pageIndex) + 1;
+};
+'''
+    out, log = vs.de_eval_member(src)
+    assert log == {"member": 5}
+    assert 'const subobj = document.all["subEditClass_" + prefix];' in out
+    assert 'document.all["span" + month].className = "thisMonth";' in out
+    assert 'const divObj = document.all[div + "Div"];' in out
+    assert "const v = obj['wrtrptSubmitSchdlDd_' + idx].value;" in out
+    assert 'frm["sf_valu_yn" + type].disabled = true;' in out
+    assert "eval('obj.wrtrptKindCd_' + idx + '.options['" in out       # 색인 꼬리 — 그대로
+    assert 'eval("var result = " + data);' in out and 'eval("gParamObj.param" + i + " = argv[" + i + "]");' in out
+    assert '// eval("document.all.x" + i)' in out and "const n = eval(pageIndex) + 1;" in out
+    out2, log2 = vs.de_eval_member(out)
+    assert out2 == out and log2 == {}
+
+
+def test_v41_form_action_to_tx_downfile():
+    """V41 확장: downFile 꼴 tx 도 action 인자 — 호출부 주소가 고정값과 다르면 `downFile(action ?? "<고정>", …)`; ⛔ 스텁 tx 는 그대로."""
+    src = '''scwin.a = async function () {
+    (document.attachFrm || { elements: [] }).action = '/submission/attachFileDown.do?method=searchAttachFile&seq=' + seq;
+    await scwin.tx_fn_attachPreview();
+    (document.form1 || { elements: [] }).action = "null";
+    (document.form1 || { elements: [] }).method = "post";
+    await scwin.tx_request();
+};
+scwin.tx_fn_attachPreview = async function () {
+    try { return await $c.data.downFile("/submission/attachFileDown.do?method=searchAttachFile", "", {}); } catch (e) { }
+};
+scwin.tx_request = async function () {
+    throw { bizMessage: "제출 주소를 찾지 못했습니다(전환 미완) — null", unresolved: "action:null" };
+};
+'''
+    out, log = vs.form_action_to_tx(src)
+    assert log == {"calls": 1, "tx_param": 1, "form_lines": 1}
+    assert "    await scwin.tx_fn_attachPreview('/submission/attachFileDown.do?method=searchAttachFile&seq=' + seq);\n" in out
+    assert 'scwin.tx_fn_attachPreview = async function (action) {\n    try { return await $c.data.downFile(action ?? "/submission/attachFileDown.do?method=searchAttachFile", "", {}); }' in out
+    assert '(document.form1 || { elements: [] }).action = "null";' in out and "await scwin.tx_request();" in out
+    out2, log2 = vs.form_action_to_tx(out)
+    assert out2 == out and log2 == {}
