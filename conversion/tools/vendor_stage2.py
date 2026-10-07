@@ -872,14 +872,17 @@ def simplify_innerhtml(script, head="", body=""):
 # tx 가 sbmOptions 꼴이거나 `$c.data.downFile("<고정>", …)` 꼴일 때만(그 밖의 꼴·⛔ 미해결 스텁은 그대로). 호출부 action 이 고정값과 같고 하나뿐이면 폼 문장만 지운다.
 # 폼 참조: `(document.F || { elements: [] })` 직접 꼴, 또는 같은 스크립트에 `const V = (document.F || { elements: [] });` 로 선언된 지역 변수 V
 FORM_DECL_RE = re.compile(r"^(?P<ind>[ \t]*)(?:const|let|var) (?P<v>\w+) = \(document\.(?P<f>\w+) \|\| \{ elements: \[\] \}\);[ \t]*$", re.M)
-_FORM_REF = r"(?:\(document\.\w+ \|\| \{ elements: \[\] \}\)|(?P<v>\w+))"
+FORM_REASSIGN_RE = re.compile(r"^[ \t]*(?P<v>\w+) = \(document\.\w+ \|\| \{ elements: \[\] \}\);[ \t]*$")
+# 공급사가 as-is <form> 대신 둔 폼 객체: `scwin.form_X = { action: "", method: 'post', target: '' };` — 참조는 scwin.form_X.action/target/method 뿐
+FORM_OBJ_RE = re.compile(r"^scwin\.(?P<v>form_\w+) = \{ action: \"\", method: '\w+', target: '' \};[ \t]*$", re.M)
+_FORM_REF = r"(?:\(document\.\w+ \|\| \{ elements: \[\] \}\)|(?P<v>(?:scwin\.)?\w+))"
 FORM_ACTION_RE = re.compile(r"^(?P<ind>[ \t]*)" + _FORM_REF + r"\.action = (?P<u>.+?);[ \t]*$")
 FORM_OTHER_RE = re.compile(r"^[ \t]*" + _FORM_REF + r"\.(?:target|method|encoding|enctype) = .+?;[ \t]*$")
 DMA_SET_RE = re.compile(r"^[ \t]*\$c\.util\.getComponent\(['\"]dma_\w+['\"]\)\.set\(.*\);[ \t]*$")
 # tx 호출: `await scwin.tx_X();` · `const nr = await scwin.tx_X();` · `return await scwin.tx_X();` · `{ const __nr = await scwin.tx_X(); if (…) {…} };` (한 줄 블록)
 TX_CALL_RE = re.compile(r"^(?P<ind>[ \t]*)(?P<pre>(?:\{ )?(?:const \w+ = |return )?)(?P<aw>await )?scwin\.(?P<tx>tx_\w+)\(\)(?P<post>;.*)$")
 # tx 정의의 고정 주소: sbmOptions.action 리터럴 또는 `$c.data.downFile("<고정>", …)` 첫 인자(같은 함수 안, `\n};` 전까지)
-TX_FIXED_RE = re.compile(r'(?m)^scwin\.(tx_\w+) = async function \(\) \{\n(?:(?!\n\};)[\s\S])*?(?:const sbmOptions = \{(?:(?!\n\};)[\s\S])*?\n[ \t]*action: |\$c\.data\.downFile\()(?P<a>"[^"\n]*"|\'[^\'\n]*\'),')
+TX_FIXED_RE = re.compile(r'(?m)^scwin\.(tx_\w+) = async function \((?:action)?\) \{\n(?:(?!\n\};)[\s\S])*?(?:const sbmOptions = \{(?:(?!\n\};)[\s\S])*?\n[ \t]*action: |\$c\.data\.downFile\()(?:action \?\? )?(?P<a>"[^"\n]*"|\'[^\'\n]*\'),')
 
 
 def form_action_to_tx(script):
@@ -887,7 +890,7 @@ def form_action_to_tx(script):
     tx_fixed = {}
     for m in re.finditer(TX_FIXED_RE, script):
         tx_fixed[m.group(1)] = m.group("a")
-    form_vars = {m.group("v") for m in FORM_DECL_RE.finditer(script)}
+    form_vars = {m.group("v") for m in FORM_DECL_RE.finditer(script)} | {"scwin." + m.group("v") for m in FORM_OBJ_RE.finditer(script)}
 
     def _is_form(m):
         return m.group("v") is None or m.group("v") in form_vars
@@ -916,15 +919,40 @@ def form_action_to_tx(script):
         uses.setdefault(tx, set()).add(u)
         edits.append((drop, j, c, u))
         i = j + 1
+    # 둘째 패스: tx 가 8줄 안에 없는 폼 action 줄 — 같은 함수 안 뒤쪽의 tx 호출이 하나 이상이고 전부 그 주소를 고정 주소로 가지면(인자 없이도 같은 곳) 폼 줄만 지운다
+    far = 0
+    taken = {d for drop, _j, _c, _u in edits for d in drop}
+    for i, l in enumerate(lines):
+        if i in taken:
+            continue
+        m = FORM_ACTION_RE.match(l)
+        if not m or not _is_form(m):
+            continue
+        u = m.group("u").strip()
+        if not re.match(r"""^(?:"[^"]*"|'[^']*')$""", u):
+            continue
+        j = i + 1; called = []
+        while j < len(lines) and not re.match(r"^\};?\s*$", lines[j]) and not re.match(r"^scwin\.\w+ = ", lines[j]):
+            called += re.findall(r"(?<![\w$])scwin\.(tx_\w+)\(", lines[j]); j += 1
+        if called and all(tx in tx_fixed and tx_fixed[tx][1:-1] == u[1:-1] for tx in called):
+            drop = [i]; k = i + 1
+            while k < len(lines) and k <= i + 3:
+                mo = FORM_OTHER_RE.match(lines[k])
+                if mo and _is_form(mo) and (mo.group("v") or "") == (m.group("v") or ""):
+                    drop.append(k); k += 1; continue
+                break
+            edits.append((drop, None, None, u)); far += 1
     if not edits:
         return script, {}
     param_tx = set()
     for drop, j, c, u in edits:
+        if c is None:
+            continue
         tx = c.group("tx")
         if len(uses[tx]) > 1 or u != tx_fixed[tx]:
             param_tx.add(tx)
     for drop, j, c, u in edits:
-        tx = c.group("tx")
+        tx = c.group("tx") if c is not None else None
         if tx in param_tx:
             lines[j] = "%s%s%sscwin.%s(%s)%s" % (c.group("ind"), c.group("pre"), c.group("aw") or "", tx, u, c.group("post"))
         for d in drop:
@@ -938,9 +966,12 @@ def form_action_to_tx(script):
         script = pat.sub(lambda mm: mm.group(1) + "action ?? " + fixed + ",", script, count=1)
         # JSDoc @param — @returns 바로 앞에
         doc = re.search(r'(/\*\*(?:(?!\*/).)*?)(\n \* @returns[^\n]*\n(?:(?!\*/).)*\*/\nscwin\.%s = async function \(action\))' % re.escape(tx), script, re.S)
-        if doc and "@param {String} action" not in doc.group(1):
+        if doc and not re.search(r"@param \{[^}]*\} action\b", doc.group(1)):
             script = script[:doc.start()] + doc.group(1) + "\n * @param {String} action 제출 주소(호출부가 as-is form.action 으로 정하던 분기별 URL · 생략 시 기본 주소)" + doc.group(2) + script[doc.end():]
-    return script, {"calls": len(edits), "tx_param": len(param_tx), "form_lines": sum(len(d) for d, _j, _c, _u in edits)}
+    log = {"calls": len(edits) - far, "tx_param": len(param_tx), "form_lines": sum(len(d) for d, _j, _c, _u in edits)}
+    if far:
+        log["far"] = far
+    return script, {k: v for k, v in log.items() if v}
 
 
 # ---------------------------------------------------------------- V42 eval 동적 멤버 접근 (P3 첫 배치 · 2026-10-07)
@@ -1026,19 +1057,30 @@ def drop_unused_form_vars(script):
     lines = script.split("\n")
     n = 0
     for i, l in enumerate(lines):
-        m = FORM_DECL_RE.match(l)
+        m = FORM_DECL_RE.match(l) if l is not None else None
         if not m:
             continue
         ind = len(m.group("ind")); v = m.group("v")
         j = i + 1; body = []
         while j < len(lines):
-            t = lines[j]
+            t = lines[j] or ""
             if t.strip() and (len(t) - len(t.lstrip())) < ind and t.lstrip().startswith("}"):
                 break
             body.append(t); j += 1
-        if not re.search(r"(?<![\w$.])%s(?![\w$])" % re.escape(v), "\n".join(body)):
+        rest = [t for t in body if not (FORM_REASSIGN_RE.match(t) and FORM_REASSIGN_RE.match(t).group("v") == v)]
+        if not re.search(r"(?<![\w$.])%s(?![\w$])" % re.escape(v), "\n".join(rest)):
             lines[i] = None; n += 1
-    return "\n".join(l for l in lines if l is not None), ({"dropped": n} if n else {})
+            for k in range(i + 1, j):
+                mr = FORM_REASSIGN_RE.match(lines[k] or "")
+                if mr and mr.group("v") == v:
+                    lines[k] = None; n += 1
+    script = "\n".join(l for l in lines if l is not None)
+    # 공급사 폼 객체 선언 — 스크립트 어디서도 scwin.form_X 를 다시 쓰지 않으면 삭제
+    for m in list(FORM_OBJ_RE.finditer(script)):
+        v = m.group("v")
+        if len(re.findall(r"(?<![\w$])scwin\.%s(?![\w$])" % re.escape(v), script)) == 1:
+            script = script.replace(m.group(0) + "\n", "", 1); n += 1
+    return script, ({"dropped": n} if n else {})
 
 
 # ---------------------------------------------------------------- V44 as-is 공통 fn_SelEmail (P3 둘째 배치 · 2026-10-07)
@@ -1077,6 +1119,30 @@ def sel_email(script, head, body):
     return "".join(out), {k: v for k, v in (("calls", n), ("todo", todo)) if v}
 
 
+# ---------------------------------------------------------------- V45 formatNumber($('#id')[0]) (P3 셋째 배치 · 2026-10-07)
+# as-is `fn_ObjValueSetComma(obj)`(입력값에 콤마를 넣어 되돌려 쓴다)를 공급사가 `$c.num.formatNumber($('#id')[0]);` 로 옮겼다 — formatNumber 는 값을 받아 문자열을
+# 돌려줄 뿐이라 DOM 요소를 넘긴 결과는 버려진다(아무 효과 없음). 실존 컴포넌트면 `comp.setValue($c.num.formatNumber(comp.getValue()));` 로 되돌린다.
+FORMAT_NUMBER_DOM_RE = re.compile(r"^(?P<ind>[ \t]*)\$c\.num\.formatNumber\(\$\((?P<q>['\"])#(?P<id>[\w\-]+)(?P=q)\)\[0\]\);[ \t]*$", re.M)
+
+
+def fix_format_number(script, head="", body=""):
+    ids = set(re.findall(r'\sid="([^"]+)"', body or ""))
+    n = 0
+
+    def repl(m):
+        nonlocal n
+        if m.group("id") not in ids:
+            return m.group(0)
+        n += 1
+        g = "$c.util.getComponent(%s%s%s)" % (m.group("q"), m.group("id"), m.group("q"))
+        return "%s%s.setValue($c.num.formatNumber(%s.getValue()));" % (m.group("ind"), g, g)
+    script = FORMAT_NUMBER_DOM_RE.sub(repl, script)
+    if n:
+        # 바로 위의 jQuery 힌트 줄은 더는 맞지 않으니 걷는다
+        script = re.sub(r"(?m)^[ \t]*// TODO Stage2\(규칙 19\): jQuery[^\n]*\n(?=[ \t]*\$c\.util\.getComponent\([^\n]*\.setValue\(\$c\.num\.formatNumber\()", "", script)
+    return script, ({"fixed": n} if n else {})
+
+
 def apply(head, script, body):
     log = {}
     body_ids = set(re.findall(r'\sid="([^"]+)"', body))
@@ -1093,11 +1159,11 @@ def apply(head, script, body):
 
 
 def main(argv=None):
-    """제자리 적용 CLI(frozen 화면 등): python conversion/tools/vendor_stage2.py --v37|--v38|--v39|--v40|--v41|--v42|--v43|--v44 [--dry] <xml|폴더> ..."""
+    """제자리 적용 CLI(frozen 화면 등): python conversion/tools/vendor_stage2.py --v37|--v38|--v39|--v40|--v41|--v42|--v43|--v44|--v45 [--dry] <xml|폴더> ..."""
     sys.stdout.reconfigure(encoding="utf-8")
     args = argv if argv is not None else sys.argv[1:]
-    files, fl, _ = st.parse_cli([a for a in args if a not in ("--v37", "--v38", "--v39", "--v40", "--v41", "--v42", "--v43", "--v44")], flags=("--dry",), opts=())
-    which = next((w for w in ("--v44", "--v43", "--v42", "--v41", "--v40", "--v39", "--v38", "--v37") if w in args), None)
+    files, fl, _ = st.parse_cli([a for a in args if a not in ("--v37", "--v38", "--v39", "--v40", "--v41", "--v42", "--v43", "--v44", "--v45")], flags=("--dry",), opts=())
+    which = next((w for w in ("--v45", "--v44", "--v43", "--v42", "--v41", "--v40", "--v39", "--v38", "--v37") if w in args), None)
     if not which or not files:
         print(main.__doc__); return 2
     changed = 0; tot = {}
@@ -1120,6 +1186,8 @@ def main(argv=None):
             new, log = drop_unused_form_vars(reg["script"])
         elif which == "--v44":
             new, log = sel_email(reg["script"], reg["head"], reg["body"])
+        elif which == "--v45":
+            new, log = fix_format_number(reg["script"], reg["head"], reg["body"])
         else:
             head, new, body, log = inline_fn_aliases(reg["head"], reg["script"], reg["body"])
         if new != reg["script"] or head != reg["head"] or body != reg["body"]:

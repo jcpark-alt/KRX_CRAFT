@@ -916,6 +916,8 @@ def apply_regions(head, script, body):
     script, log["V23_vendor_pcc"] = replace_vendor_pcc(script)
     # P2 V39 [sdd] 컴포넌트 가드 정리 — body/head 에 실존하는 컴포넌트의 `(G && G.m ? G.m(args) : console.warn('[sdd] …'))` → `G.m(args)`
     script, log["V39_sdd_guard"] = vendor_stage2.simplify_sdd_guards(script, head, body)
+    # P3 V45 formatNumber($('#id')[0]) → comp.setValue($c.num.formatNumber(comp.getValue())) (공급사가 값 대신 DOM 요소를 넘겨 버려지던 결과 복원)
+    script, log["V45_formatNumber"] = vendor_stage2.fix_format_number(script, head, body)
     # P3 V44 as-is 공통 fn_SelEmail(select, form.email2) → $c.fil.selEmail(select, ipt_email2<sfx>) (없으면 B-7 표지)
     script, log["V44_selEmail"] = vendor_stage2.sel_email(script, head, body)
     # P3 V42 eval("경로.접두" + 식 [+ ".꼬리"]) 동적 멤버 접근 → 경로["접두" + 식].꼬리 (동일 의미 · eval 제거, DOM 참조는 그대로)

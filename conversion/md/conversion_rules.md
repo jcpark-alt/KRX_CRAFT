@@ -655,6 +655,13 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
 * **V44 as-is 공통 fn_SelEmail(P3, 2026-10-07, `vendor_stage2.sel_email`, CLI `--v44`)**: 공급사가 전역 호출로 남긴 `fn_SelEmail($c.util.getComponent("slc_selEmail<sfx>"), (document.F || …).email2)` 를
   pcc/fil 로 반입한 `$c.fil.selEmail(selComp, targetComp)` 호출로 바꾸고 둘째 인자는 같은 접미의 퍼블리싱 입력 `ipt_email2<sfx>` 로 잇는다(body 에 그 id 가 있을 때만; 없으면 그대로 + `TODO Stage2(B-7)`). 결과: 16화면 38호출 → $c.fil.selEmail, JLDFIL25101 5자리는 ipt_email2 없음(B-7 표지).
   같은 꼴의 **미정의 as-is 전역 함수 호출이 143종·1,406자리·326화면** 더 남아 있다(`fn_ObjValueSetComma` 498·`fn_ObjValueResetRmComma2` 152·`fn_validate` 52·`fn_getFileNm` 49 …, 정의는 `cm/as-is/fil/**`) — pcc/fil 반입 2차 후보(결정 대기).
+* **V41 셋째 확장(P3 셋째 배치, 2026-10-07)**: ① 공급사가 as-is `<form>` 대신 둔 폼 객체 `scwin.form_X = { action: "", method: 'post', target: '' };`(118화면)의 `scwin.form_X.action/target` 도 폼 참조로 본다.
+  ② 둘째 패스(far): tx 가 8줄 안에 없는 폼 action 줄이라도 같은 함수 안 뒤쪽의 tx 호출이 하나 이상이고 전부 그 주소를 고정 주소로 가지면(확인·분기 뒤에 부르는 꼴) 폼 줄(+바로 뒤 target/method)만 지운다 —
+  어느 tx 가 다른 주소면 그대로. ③ 이미 `(action)` 을 받는 tx 의 고정 주소도 읽어 잔여 호출부에 쓴다. 결과: 187화면 호출 103(인자)·far 101·폼 문장 253줄 삭제.
+* **V43 확장(2026-10-07)**: 재대입(`frm = (document.F || …);`)만 남은 변수는 선언·재대입 줄을 모두 지우고, 어디서도 다시 쓰지 않는 공급사 폼 객체 선언(`scwin.form_X = {…}`)도 지운다. 결과: 116 선언(재대입 포함)·폼 객체 선언 삭제.
+* **V45 formatNumber DOM 인자(P3, 2026-10-07, `vendor_stage2.fix_format_number`, CLI `--v45`)**: as-is `fn_ObjValueSetComma(obj)`(입력값에 콤마를 넣어 되돌려 씀)를 공급사가
+  `$c.num.formatNumber($('#id')[0]);` 로 옮겼다 — formatNumber 는 값을 받아 문자열을 돌려줄 뿐이라 결과가 버려진다(효과 없음). 실존 컴포넌트면 `comp.setValue($c.num.formatNumber(comp.getValue()));` 로 되돌리고
+  바로 위 jQuery 힌트 줄을 걷는다. 결과: 27화면 31자리 복원.
 * **V42 eval 동적 멤버 접근(P3, 2026-10-07, `vendor_stage2.de_eval_member`, CLI `--v42`)**: `eval("document.all.span" + month)`·`eval('form.isurCd' + obj1)`·`eval('obj.x_' + idx + '.value')` 는
   이름을 문자열로 조립한 멤버 접근이라 대괄호 접근과 의미가 같다 → `document.all["span" + month]`·`form['isurCd' + obj1]`·`obj['x_' + idx].value`. eval 만 걷고 DOM 참조(document.all 등)는 그대로(B-7).
   첫 조각이 "경로.접두" 문자열이고 마지막 조각이 `.식별자` 꼬리면 속성 접근으로 잇는다; 조각에 `.`·`[`·`(` 가 든 문자열(옵션 색인 꼬리), 문장 eval(`eval("var r = " + d)`·대입), 주석 안은 손대지 않는다. 결과: 26화면 83자리 → 대괄호 접근, eval 148 → 65(27화면: 문장 eval·옵션 색인 꼬리·JSON eval).

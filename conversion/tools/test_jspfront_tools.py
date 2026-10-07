@@ -1125,3 +1125,89 @@ def test_v44_sel_email():
     assert '    // fn_SelEmail($c.util.getComponent("slc_selEmail"), (document.corpForm1' in out
     out2, log2 = vs.sel_email(out, "", body)
     assert out2 == out and log2 == {}
+
+
+def test_v41_vendor_form_object_and_far_lines():
+    """V41: 공급사 폼 객체 `scwin.form_X = { action: "", … }` 참조도 폼; 8줄 밖 tx 라도 같은 함수 뒤쪽 tx 가 전부 같은 고정 주소면 폼 줄만 삭제(far). V43 은 쓰임 없는 폼 객체 선언·재대입만 남은 변수를 지운다."""
+    src = '''scwin.form_listForm = { action: "", method: 'post', target: '' };
+scwin.a = async function () {
+    scwin.form_listForm.action = "/list/a.do?method=x";
+    scwin.form_listForm.target = "_self";
+    await scwin.tx_fn_List();
+};
+scwin.b = async function () {
+    (document.irDataForm || { elements: [] }).action = '/company/irData.do';
+    $c.util.getComponent('dma_Req').set('method', 'registIRData');
+    let str = "저장";
+    if (str) {
+        if (await $c.win.confirm(str + "?")) {
+            await scwin.tx_fn_Register();
+        }
+    }
+};
+scwin.c = async function () {
+    (document.irDataForm || { elements: [] }).action = '/company/other.do';
+    let str = "x";
+    if (str) {
+        await scwin.tx_fn_Register();
+    }
+};
+scwin.d = async function (_submitYn) {
+    let frm = (document.eduForm || { elements: [] });
+    if (_submitYn) {
+        return;
+    }
+    frm = (document.eduForm || { elements: [] });
+    await scwin.tx_fn_Register('eduRspn.do');
+};
+scwin.tx_fn_List = async function () {
+    const sbmOptions = {
+        id: "tx_fn_List",
+        action: "/list/a.do?method=y",
+        ref: "dma_Req"
+    };
+    const res = await $c.sbm.executeDynamic(sbmOptions);
+};
+scwin.tx_fn_Register = async function (action) {
+    const sbmOptions = {
+        id: "tx_fn_Register",
+        action: action ?? "/company/irData.do",
+        ref: "dma_Req"
+    };
+    const res = await $c.sbm.executeDynamic(sbmOptions);
+};
+'''
+    out, log = vs.form_action_to_tx(src)
+    assert log == {"calls": 1, "tx_param": 1, "form_lines": 3, "far": 1}
+    assert '    await scwin.tx_fn_List("/list/a.do?method=x");\n' in out and "scwin.form_listForm.action" not in out and "scwin.form_listForm.target" not in out
+    assert 'action: action ?? "/list/a.do?method=y",' in out
+    assert "(document.irDataForm || { elements: [] }).action = '/company/irData.do';" not in out      # far: 뒤쪽 tx 고정 주소와 같음 → 삭제
+    assert "(document.irDataForm || { elements: [] }).action = '/company/other.do';" in out          # 다른 주소 → 보존
+    out2, log2 = vs.drop_unused_form_vars(out)
+    assert log2 == {"dropped": 3}
+    assert "scwin.form_listForm = {" not in out2 and "let frm = " not in out2 and "frm = (document.eduForm" not in out2
+    assert "    if (_submitYn) {\n        return;\n    }\n    await scwin.tx_fn_Register('eduRspn.do');\n" in out2
+    out3, log3 = vs.form_action_to_tx(out2)
+    assert out3 == out2 and log3 == {}
+
+
+def test_v45_fix_format_number():
+    """V45: $c.num.formatNumber($('#id')[0]); → comp.setValue($c.num.formatNumber(comp.getValue())); 실존 id 만, 바로 위 jQuery 힌트 줄 제거. 멱등."""
+    body = '<body><xf:input id="ipt_isuShrs"/></body>'
+    src = '''scwin.setComma = function () {
+    // TODO Stage2(규칙 19): jQuery — 퍼블리싱 컴포넌트 참조로 재작성(B-7)
+    $c.num.formatNumber($('#ipt_isuShrs')[0]);
+    // TODO Stage2(규칙 19): jQuery — 퍼블리싱 컴포넌트 참조로 재작성(B-7)
+    $c.num.formatNumber($('#ipt_nope')[0]);
+};
+'''
+    out, log = vs.fix_format_number(src, "", body)
+    assert log == {"fixed": 1}
+    assert out == '''scwin.setComma = function () {
+    $c.util.getComponent('ipt_isuShrs').setValue($c.num.formatNumber($c.util.getComponent('ipt_isuShrs').getValue()));
+    // TODO Stage2(규칙 19): jQuery — 퍼블리싱 컴포넌트 참조로 재작성(B-7)
+    $c.num.formatNumber($('#ipt_nope')[0]);
+};
+'''
+    out2, log2 = vs.fix_format_number(out, "", body)
+    assert out2 == out and log2 == {}

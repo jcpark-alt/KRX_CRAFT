@@ -39,13 +39,30 @@
 
   </xf:model>
   <w2:layoutInfo></w2:layoutInfo>
-  <w2:publicInfo method="scwin.init_pageBody,scwin.init_recvParam,scwin.onpageload,scwin.slc_mailDiv_onchange,scwin.btn_RegCertificate_onclick,scwin.btn_Close_onclick,scwin.tx_SignCallback,scwin.CheckSendForm,scwin.SignCallback,scwin.regCertificate,scwin.setMailDiv,scwin.close,scwin.checkPersonal"/>
+  <w2:publicInfo method="scwin.onpageload,scwin.init_pageBody,scwin.init_recvParam,scwin.slc_mailDiv_onchange,scwin.btn_RegCertificate_onclick,scwin.btn_Close_onclick,scwin.tx_SignCallback,scwin.SignCallback,scwin.CheckSendForm,scwin.regCertificate,scwin.setMailDiv,scwin.close,scwin.checkPersonal"/>
   <script lazy="false" type="text/javascript"><![CDATA[
 ///////// 1. 변수 및 선언 영역 /////////
 scwin.screenId = "jldfil25302";
 scwin.regForm = null;
 
 ///////// 2. 초기화 영역 /////////
+/**
+ * @method
+ * @name onpageload
+ * @description 화면 로딩 시 초기 처리 — init 순차 호출
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.onpageload = async function () {
+    try {
+        scwin.init_recvParam();
+        scwin.regForm = $c.util.getComponent('regForm');
+        await scwin.init_pageBody();
+    } catch (e) {
+        await $c.exception.handleError(e, { context: 'jldfil25302.onpageload' });
+    }
+};
+
 /**
  * @method
  * @name init_pageBody
@@ -68,25 +85,6 @@ scwin.init_pageBody = async function () {
  * @hidden N
  */
 scwin.init_recvParam = function () { dma_pageContext.setJSON($c.data.getParameter() ?? {}); };
-
-scwin.form_regForm = { action: "", method: 'post', target: '' };
-
-/**
- * @method
- * @name onpageload
- * @description 화면 로딩 시 초기 처리 — init 순차 호출
- * @returns {Promise<void>}
- * @hidden N
- */
-scwin.onpageload = async function () {
-    try {
-        scwin.init_recvParam();
-        scwin.regForm = $c.util.getComponent('regForm');
-        await scwin.init_pageBody();
-    } catch (e) {
-        await $c.exception.handleError(e, { context: 'jldfil25302.onpageload' });
-    }
-};
 
 ///////// 3. 컴포넌트 이벤트 영역 /////////
 /**
@@ -139,14 +137,15 @@ scwin.btn_Close_onclick = function(e){
  * @method
  * @name tx_SignCallback
  * @description Sign Callback 서버 호출
+ * @param {*} action 제출 주소(호출부가 as-is form.action 으로 정하던 분기별 URL · 생략 시 기본 주소)
  * @returns {Promise<void>}
  * @hidden N
  */
-scwin.tx_SignCallback = async function () {
+scwin.tx_SignCallback = async function (action) {
     const sbmOptions = {
         id: "tx_SignCallback",
         method: "post",
-        action: "/account/popCertificate.do?method=registerCertificate&againYN=${(regMod == ",
+        action: action ?? "/account/popCertificate.do?method=registerCertificate&againYN=${(regMod == ",
         ref: "dma_SignCallbackReq",
         isProcessMsg: false
     };
@@ -157,19 +156,6 @@ scwin.tx_SignCallback = async function () {
         await $c.win.alert(m);
     }
     return res;
-};
-
-///////// 5. 일반/업무 함수 영역 /////////
-/**
- * @method
- * @name CheckSendForm
- * @description Check Send Form 처리
- * @param {*} regForm regForm
- * @returns {void}
- * @hidden N
- */
-scwin.CheckSendForm = function (regForm) {
-    INIWEBEX.login({ loginType: "sign", data: "login", processCallback: "SignCallback", isHtml5: false, viewType: "NONE", iniCache: true, vid: true, langType: "KOR", filterCertByOIDAlias: { enable: false, list: "" }, filterCertByIssuer: { enable: true, list: realIssuerDN } });
 };
 
 /**
@@ -184,11 +170,23 @@ scwin.CheckSendForm = function (regForm) {
 scwin.SignCallback = async function (result, postData) {
     $c.util.getComponent('dma_SignCallbackReq').set('PKCS7SignedData', result);
     if (result) {
-        scwin.form_regForm.action = "/account/popCertificate.do?method=registerCertificate&againYN=${(regMod == 'MOD')?'Y':'N'}";
-        await scwin.tx_SignCallback();
+        await scwin.tx_SignCallback("/account/popCertificate.do?method=registerCertificate&againYN=${(regMod == 'MOD')?'Y':'N'}");
     } else {
         await $c.win.alert("전자서명에 실패하였습니다.");
     }
+};
+
+///////// 5. 일반/업무 함수 영역 /////////
+/**
+ * @method
+ * @name CheckSendForm
+ * @description Check Send Form 처리
+ * @param {*} regForm regForm
+ * @returns {void}
+ * @hidden N
+ */
+scwin.CheckSendForm = function (regForm) {
+    INIWEBEX.login({ loginType: "sign", data: "login", processCallback: "SignCallback", isHtml5: false, viewType: "NONE", iniCache: true, vid: true, langType: "KOR", filterCertByOIDAlias: { enable: false, list: "" }, filterCertByIssuer: { enable: true, list: realIssuerDN } });
 };
 
 /**
@@ -298,7 +296,6 @@ scwin.checkPersonal = async function () {
         }
     }
 };
-
 ]]></script>
 </head>
 <body ev:onpageload="scwin.onpageload">
