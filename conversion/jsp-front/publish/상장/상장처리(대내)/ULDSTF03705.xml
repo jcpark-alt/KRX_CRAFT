@@ -1,0 +1,702 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDSTF03705.gfm" meta_screenName="수수료납부현황관리">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<xf:model>
+			<w2:workflowCollection/>
+			<w2:dataCollection baseNode="map"/>
+			<xf:submission id="sbm_dts_List" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json" ev:submiterror="scwin.dts_List_OnLoadError" ev:submitdone="scwin.dts_List_OnLoadCompleted"/>
+			<xf:submission id="sbm_dts_Indp" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json" ev:submiterror="scwin.dts_Indp_OnLoadError" ev:submitdone="scwin.dts_Indp_OnLoadCompleted"/>
+			<xf:submission id="sbm_MxDataSet_com_isur" userData2=" onfilter:MxDataSet_com_isur_OnFilter;" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json"/>
+			<xf:submission id="sbm_dts_dep" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json" ev:submitdone="scwin.dts_dep_OnLoadCompleted"/>
+			<xf:submission id="sbm_dts_emp" userData2=" onfilter:dts_emp_OnFilter;" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json" ev:submitdone="scwin.dts_emp_OnLoadCompleted"/>
+			<xf:submission id="sbm_dts_parameter" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json"/>
+			<xf:submission id="sbm_trs_Save" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json"/>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+/* ★Wcraft guide★    
+스크립트 수작업 유의사항
+*/
+
+
+//★Wcraft guide★ include부분 주석처리 -> include("../js/libRoundPanel.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/stf.js");
+// showObj(ObjID, flag) SetWindowPos(ObjID, nTop, nLeft, nWidth, nHeight)
+//★Wcraft guide★ include부분 주석처리 -> include("../js/utils.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/PopupCalendar.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/common.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/session.js");
+// 세션정보를 얻기위한 함수사용
+
+scwin.vScrenID = "ULDSTF03705.xml";
+scwin.gDepCd;
+scwin.gIsurCd;
+scwin.onpageload = function() {
+    scwin.gform_onload();
+};
+scwin.onpageunload = function() {
+};
+scwin.fn_SetCode = function() {
+    scwin.gDepCd = js_dep_cd;
+
+    //  기간 from~ to  셋팅
+    var vCurDate = $c.ut.cGetToday("yyyymmdd");
+    edt_SDate.setValue($c.ut.cGetMinusDate2(vCurDate, 7));
+    edt_EDate.setValue($c.ut.cGetToday("yyyymmdd")); // 현재날짜
+
+    $c.stf.Combo_CBDataSetPeriod(cmb_PeriodTp);
+
+    // 팀 리스트 박스(소속부서와 같은 상위부서인 팀)
+    //dts_dep.DataID = "/CodeAction.do?method=listDepCdCode&For=R";
+    dts_dep.DataID = "/CodeAction.do?SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01 + "&method=getDepUpCode" + "&inputMessageId=CODE_EMPDEP_IN&outputMessageId=CODE_EMPDEP_OUT" + "&For=R&DEP_CD=" + scwin.gDepCd;
+    dts_dep.Reset();
+
+    //담당자 리스트 박스(소속부서와 같은 상위부서인 팀원)
+    dts_emp.DataID = "/CodeAction.do?method=getEmpNoDepCode" + "&inputMessageId=CODE_EMPDEP_IN&outputMessageId=CODE_EMPDEP_OUT" + "&For=R&DEP_CD=" + scwin.gDepCd;
+    dts_emp.Reset();
+    dts_Indp.DataID = "/ListedSearch.do?method=listMiddleIndustry&outputMessageId=LIST_MIDDLE_INDUSTRY";
+    dts_Indp.Reset();
+
+    //+"\n/"+
+    //alert("rdo_FEE_TP_CD"+"\n/"+InfoMenuID()+"\n/"+js_id+"\n/"+js_dep_cd+"\n/"+getObjectValue(rdo_FEE_TP_CD));
+
+    // 수수료구분코드 rdo_FEE_TP_CD
+    /*if (("999999" == js_id)) { // 시스템관리1
+    	setObjectValue(rdo_FEE_TP_CD, "A");
+    } else if (("2500" == js_dep_cd) || ("3300" == js_dep_cd)) { // 상장총괄
+    	setObjectValue(rdo_FEE_TP_CD, "1");
+    } else if (InfoMenuID() == "STF03705") { // 상장수수료화면
+    	setObjectValue(rdo_FEE_TP_CD, "2");
+    } else if (InfoMenuID() == "STF03706") { // 연부과금화면
+    } else if (InfoMenuID() == "STF03706") { // 연부과금화면
+    	setObjectValue(rdo_FEE_TP_CD, "3");
+    } else {
+    	setObjectValue(rdo_FEE_TP_CD, "A");
+    }*/
+
+    if (("999999" == js_id)) {
+        // 시스템관리1
+        if ($c.cm.InfoMenuID() == "STF03705") {
+            //상장수수료
+            $c.stf.setObjectValue(rdo_FEE_TP_CD, "A");
+        } else if ($c.cm.InfoMenuID() == "STF03706") {
+            //연부과금
+            $c.stf.setObjectValue(rdo_FEE_TP_CD, "A");
+        } else {
+
+        }
+    } else {
+        if ($c.cm.InfoMenuID() == "STF03705") {
+            //상장수수료
+            if (("25" == js_dep_cd.substr(0, 2)) || ("33" == js_dep_cd.substr(0, 2))) {
+                // 상장총괄
+                $c.stf.setObjectValue(rdo_FEE_TP_CD, "1");
+            } else {
+                $c.stf.setObjectValue(rdo_FEE_TP_CD, "2");
+            }
+        } else if ($c.cm.InfoMenuID() == "STF03706") {
+            //연부과금
+            $c.stf.setObjectValue(rdo_FEE_TP_CD, "3");
+        }
+    }
+};
+scwin.fn_list_sync = function() {
+    var feeTpCd;
+    if (("999999" == js_id)) {
+        // 시스템관리1
+        if ($c.cm.InfoMenuID() == "STF03705") {
+            //상장수수료
+            feeTpCd = "A5";
+        } else if ($c.cm.InfoMenuID() == "STF03706") {
+            //연부과금
+            feeTpCd = "A6";
+        }
+    } else {
+        feeTpCd = $c.stf.getObjectValue(rdo_FEE_TP_CD);
+    }
+    var url = "/ListFeeAnulFee.do?SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01 + "&method=listListFeeAnulFee&inputMessageId=LISTFEE_ANULFEE_OUT";
+    url += "&SDATE=" + $c.ut.cGetMinusDate2($c.stf.getObjectValue(edt_SDate), -1);
+    url += "&EDATE=" + $c.stf.getObjectValue(edt_EDate);
+    url += "&PAY_PROCS_STAT_CD=" + $c.stf.getObjectValue(rdo_PAY_PROCS_STAT_CD);
+    url += "&ISUR_CD=" + $c.stf.getObjectValue(txb_ISUR_CD);
+    url += "&TEAMLIST=" + cmb_TeamList.BindColVal;
+    url += "&EMPLIST=" + cmb_EmpList.BindColVal;
+    url += "&MARKET_TP_CD=" + $c.stf.getObjectValue(rdo_MARKET_TP_CD);
+    url += "&FEE_TP_CD=" + feeTpCd;
+    dts_List.DataID = encodeURI(url);
+    dts_List.reset();
+    $c.cm.ShowWin(grd_List);
+};
+scwin.fn_setContnId = function(obj) {
+    scwin.gIsurCd = dts_List.getCellData(eval(obj), "ISUR_CD");
+};
+scwin.fn_save_update = function(colid) {
+    var res = window.confirm("확인 저장 하겠습니까?");
+    if (res) {
+        var url = "/ListFeeAnulFee.do?method=saveListFeeAnulFeeUpdate";
+        url += "&ADJ_PAY_AMT=" + dts_List.getCellData(dts_List.getRowPosition(), 'ADJ_PAY_AMT');
+        url += "&LST_PAY_AMT=" + dts_List.getCellData(dts_List.getRowPosition(), 'LST_PAY_AMT');
+        url += "&PAY_PROCS_STAT_CD=" + dts_List.getCellData(dts_List.getRowPosition(), 'PAY_PROCS_STAT_CD');
+        url += "&TRANSTR_EMP_NO=" + js_id;
+        url += "&RCV_DD=" + dts_List.getCellData(dts_List.getRowPosition(), 'RCV_DD');
+        url += "&SEQ=" + dts_List.getCellData(dts_List.getRowPosition(), 'SEQ');
+        dts_parameter.DataID = encodeURI(url);
+        dts_parameter.reset();
+        scwin.fn_list_sync();
+    } else {
+        dts_List.undoRow(colid);
+    }
+};
+scwin.fn_save_batchupdate = function() {
+    if (dts_List.getTotalRow() == 0) {
+        $c.win.alert("수정대상이 없습니다.");
+        return;
+    }
+    var gStat;
+    var gStatCnt = 0;
+    for (var k = 1; k <= dts_List.getTotalRow(); k++) {
+        gStat = dts_List.getRowStatus(k);
+        if (gStat == TB_JOB_UPDATE) {
+            dts_List.setCellData(k, "TRANSTR_EMP_NO", js_id);
+            gStatCnt++;
+        }
+    }
+    if (gStatCnt == 0) {
+        $c.win.alert("수정대상이 없습니다.");
+        return;
+    }
+    if (!window.confirm($c.stf.getMessageParam("MSG-A006", '총 ' + gStatCnt + '건을 저장'))) return;
+    trs_Save.Action = "/ListFeeAnulFee.do?method=saveListFeeAnulFeeBatchUpdate";
+    trs_Save.KeyName = "toinb_dataid4";
+    trs_Save.KeyValue = "JSP(I:pInput=dts_List)";
+    trs_Save.Post();
+};
+scwin.fn_calculation = function() {
+    var vPAY_AMT = 0;
+    var vADJ_PAY_AMT = 0;
+    var vLST_PAY_AMT = 0;
+    vPAY_AMT = dts_List.getCellData(dts_List.getRowPosition(), 'PAY_AMT');
+    vADJ_PAY_AMT = dts_List.getCellData(dts_List.getRowPosition(), 'ADJ_PAY_AMT');
+
+    //alert("vPAY_AMT="+vPAY_AMT+"\n/"+vADJ_PAY_AMT+"\n/"+vADJ_PAY_AMT);
+    //alert("eval(vPAY_AMT)="+eval(vPAY_AMT)+"\n/"+eval(vADJ_PAY_AMT)+"\n/"+eval(vADJ_PAY_AMT));
+
+    vLST_PAY_AMT = eval(vPAY_AMT) + eval(vADJ_PAY_AMT);
+    dts_List.setCellData(dts_List.getRowPosition(), 'LST_PAY_AMT', vLST_PAY_AMT);
+};
+scwin.fn_calculation_rowid = function(rowid) {
+    var vPAY_AMT = 0;
+    var vADJ_PAY_AMT = 0;
+    var vLST_PAY_AMT = 0;
+    vPAY_AMT = dts_List.getCellData(rowid, 'PAY_AMT');
+    vADJ_PAY_AMT = dts_List.getCellData(rowid, 'ADJ_PAY_AMT');
+
+    //alert("vPAY_AMT="+vPAY_AMT+"\n/"+vADJ_PAY_AMT+"\n/"+vADJ_PAY_AMT);
+    //alert("eval(vPAY_AMT)="+eval(vPAY_AMT)+"\n/"+eval(vADJ_PAY_AMT)+"\n/"+eval(vADJ_PAY_AMT));
+
+    vLST_PAY_AMT = eval(vPAY_AMT) + eval(vADJ_PAY_AMT);
+    dts_List.setCellData(rowid, 'LST_PAY_AMT', vLST_PAY_AMT);
+};
+scwin.fn_allUpdate = function() {
+    var val = cmb_update.ValueOfIndex("VALUE", cmb_update.getSelectedIndex());
+    //alert("cmb_update="+val);
+
+    if (val != '') {
+        if (dts_List.getTotalRow() == 0) {
+            $c.win.alert("업데이트 대상이  없습니다.");
+            $c.stf.setObjectValue(cmb_update, '');
+            return;
+        }
+        dts_List.setBroadcast(false);
+        for (var k = 1; k <= dts_List.getTotalRow(); k++) {
+            if (dts_List.getCellData(k, 'PAY_PROCS_STAT_CD') == '2') {
+                dts_List.setCellData(k, "PAY_PROCS_STAT_CD", val);
+                scwin.fn_calculation_rowid(k);
+            }
+        }
+        dts_List.setBroadcast(true);
+    }
+};
+scwin.dts_dep_OnLoadCompleted = function(rowcount) {
+    $c.stf.setObjectValue(cmb_TeamList, js_dep_cd);
+};
+scwin.dts_emp_OnLoadCompleted = function(rowcount) {
+    $c.stf.setObjectValue(cmb_EmpList, js_emp_no);
+};
+scwin.cmb_TeamList_OnSelChange = function() {
+    scwin.gDepCd = $c.cp.valueOfIndex(cmb_TeamList, "VALUE", cmb_TeamList.getSelectedIndex());
+    if (scwin.gDepCd == '') {
+        $c.stf.setObjectValue(cmb_TeamList, '');
+    }
+    dts_emp.UseFilter = true;
+    dts_emp.Filter();
+    dts_emp.sort("DEP_CD", 0);
+    //dts_emp.sort(); // W-Craft 주석처리 
+
+};
+scwin.dts_emp_OnFilter = function(row) {
+    //  부서코드에  해당하는 사원을 가져온다.
+    if (scwin.gDepCd == "") {
+        // 전체일 경우 모두 보여준다.
+        return true;
+    } else {
+        if (dts_emp.getCellData(row, "dep_cd") == scwin.gDepCd || dts_emp.getCellData(row, "dep_cd") == "") {
+            return true;
+        } else {
+            return false;
+        }
+    }
+};
+scwin.grd_List_OnDblClick = function(row, colid) {
+    // 클릭된 값 변수에 셋팅
+    scwin.fn_setContnId(row);
+    if (colid == "COM_ABBRV") {
+        //fn_PopupCorpInfo();
+
+    }
+};
+scwin.MxDataSet_com_isur_OnFilter = function(row) {
+    if (skw != "" && foColum == "1") {
+        f1 = MxDataSet_com_isur.getCellData(row, "COM_ABBRV");
+        f2 = MxDataSet_com_isur.getCellData(row, "OLD_COM_ABBRV");
+        if (f1.indexOf(skw) != -1 || f2.indexOf(skw) != -1) return true;
+
+        else return false;
+    } else return true;
+};
+scwin.Grd_com_isur_OnKeyPress = function(kcode) {
+    if (kcode == '13') {
+        $c.cm.fn_com_Confirm_set();
+    }
+};
+scwin.Grd_com_isur_OnDblClick = function(row, colid) {
+    $c.cm.fn_com_Confirm_set();
+};
+scwin.Grd_com_isur_OnClick = function(row, colid) {
+    Grd_com_isur.style.display = "";
+};
+scwin.Grd_com_isur_OnSetFocus = function() {
+    stFocusGrid = true;
+};
+scwin.Grd_com_isur_OnKillFocus = function() {
+    stFocusGrid = false;
+    Grd_com_isur.style.display = "none";
+};
+scwin.dts_List_OnLoadError = function() {
+    $c.stf.alert_error(dts_List);
+};
+scwin.dts_Indp_OnLoadError = function() {
+    $c.stf.alert_error(dts_Indp);
+};
+scwin.dts_List_OnLoadCompleted = function(rowcount) {
+    $c.stf.FillGridHeaderTotalCnt(rowcount, panel_page_1);
+    $c.cm.CloseWin(rowcount, grd_List);
+};
+scwin.dts_Indp_OnLoadCompleted = function(rowcount) {
+    dts_Indp.insertRow(0);
+    dts_Indp.setCellData(1, "VALUE", "");
+    dts_Indp.setCellData(1, "TEXT", "전체");
+};
+scwin.grd_List_OnListSelect = function(row, colid) {
+    // alert("확정단계에서는 수정할 수 없습니다.");
+    // alert(dts_List.OrgNameString(dts_List.RowPosition,'PAY_PROCS_STAT_CD'));
+
+    // 확정이면수정불가
+    if (dts_List.OrgNameString(dts_List.getRowPosition(), 'PAY_PROCS_STAT_CD') == '1') {
+        $c.win.alert("확정단계에서는 수정할 수 없습니다.");
+        dts_List.undoRow(colid);
+        return;
+    }
+    if ((dts_List.getCellData(dts_List.getRowPosition(), 'ADJ_PAY_AMT') == '0') && (dts_List.getCellData(dts_List.getRowPosition(), 'LST_PAY_AMT') == '0')) {
+        /*
+        //alert("조정금액이나 최종입금액을 입력 하세요");
+        alert("조정금액을 입력 하세요");
+        //alert(dts_List.OrgNameString(dts_List.RowPosition,'PAY_PROCS_STAT_CD')+"\n/"+dts_List.NameString(dts_List.RowPosition,'PAY_PROCS_STAT_CD'));
+        dts_List.Undo(colid);
+        */
+
+        $c.win.alert("조정금액이 0원 입니다.\n입금액을 최종입금액으로 수정 합니다.");
+        scwin.fn_calculation();
+        //fn_save_update(colid);
+
+    } else {
+        //fn_save_update(colid);
+
+    }
+};
+scwin.grd_List_OnExit = function(row, colid, olddata) {
+    //alert("Occur OnExit Event :\r" + "<ROW :" + row +">"+ "<Colid :" + colid + ">" + "<Before Data :" + olddata + ">" );
+    //alert("fn_calculation");
+    scwin.fn_calculation();
+};
+scwin.btn_Search_onclick = function() {
+    if ($c.stf.compareFromToDate2(edt_SDate, edt_EDate)) {
+        scwin.fn_list_sync();
+    }
+};
+scwin.img_COM_NM_onclick = function() {
+    $c.cm.IsurcdSearch(txb_ISUR_CD, txb_COM_NM);
+};
+scwin.txb_ISUR_CD_onkeyup = function() {
+    if (txb_ISUR_CD.getValue() == "") {
+        Grd_com_isur.style.display = "none";
+    } else {
+        if (window.event.keyCode == 40) {
+            //아래화살표눌렀을때 그리드로 포커스
+            Grd_com_isur.focus();
+        } else {
+            $c.cm.fn_com_isur_nm(window.event.keyCode);
+        }
+    }
+};
+scwin.txb_ISUR_CD_onfocus = function() {
+    Grd_com_isur.style.display = "none";
+};
+scwin.txb_ISUR_CD_onblur = function() {
+    if (stFocusGrid == false) {
+        Grd_com_isur.style.display = "none";
+    }
+    if (txb_ISUR_CD.getValue() == "") {
+        txb_COM_NM.setValue("");
+    }
+};
+scwin.btn_EDate_onclick = function() {
+    popUpCalendar2(edt_EDate);
+};
+scwin.btn_SDate_onclick = function() {
+    popUpCalendar2(edt_SDate);
+};
+scwin.cmb_PeriodTp_OnSelChange = function() {
+    var vTp = $c.cp.valueOfIndex(cmb_PeriodTp, "VALUE", cmb_PeriodTp.getSelectedIndex());
+    $c.stf.fn_setFromToDate(vTp, edt_SDate, edt_EDate);
+};
+scwin.btn_Close_onclick = async function() {
+    await $c.frame.CloseFrame();
+};
+scwin.btn_Excel_onclick = function() {
+    //엑셀 로그 
+    $c.stf.doLogSave(scwin.vScrenID, SCREN_PROCS_TP_CD_07);
+    $c.data.downloadGridViewExcel(grd_List, "상장수수료납부현황관리", "", "8");
+};
+scwin.gform_onload = function() {
+    if (js_market == "1" || js_market == "2") {
+        $c.cm.setColumnProp(grd_List, "TR_MKT_NM", "Show", false);
+        $c.stf.setObjectValue(rdo_MARKET_TP_CD, js_market);
+        $c.stf.showObj(rdo_FEE_TP_CD, false);
+        $c.stf.showObj(panel_mkt_gubun, false);
+    } else {
+        $c.stf.showObj(rdo_FEE_TP_CD, false);
+        $c.stf.showObj(panel_mkt_gubun, true);
+    }
+    if (js_market == "2") {
+        $c.cm.setColumnProp(grd_List, "INPROSPCTS_EXST_STRT_DD", "Show", false);
+        $c.cm.setColumnProp(grd_List, "ISUR_SYMBL", "Show", false);
+    }
+    $c.cm.PanelToGroupBox(panel_Top);
+    scwin.fn_SetCode();
+    scwin.fn_list_sync();
+    $c.cm.fn_com_isur(txb_ISUR_CD, txb_COM_NM);
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+		<xf:group class="sub_contents" id="" meta_componentContainer="true" style="">
+			<xf:group class="schbox" id="" style="">
+				<xf:group class="schbox_inner" id="" style="">
+					<xf:group adaptive="layout" adaptiveThreshold="768" class="w2tb tbl " id="" style="" tagname="table">
+						<w2:attributes>
+							<w2:summary></w2:summary>
+						</w2:attributes>
+						<xf:group tagname="colgroup">
+							<xf:group style="width:100px;" tagname="col"></xf:group>
+							<xf:group tagname="col" style="width:170px;"></xf:group>
+							<xf:group tagname="col" style="width:70px;"></xf:group>
+							<xf:group style="width:100px;" tagname="col"></xf:group>
+							<xf:group style="width:100px;" tagname="col"></xf:group>
+							<xf:group style="" tagname="col"></xf:group>
+						</xf:group>
+						<xf:group class="" id="" style="" tagname="tr">
+							<xf:group class="w2tb_th" style="" tagname="th">
+								<w2:textbox hierarchy="label_4" id="label_4" label="처리구분 " orgid="label_4" style=""
+									userData2=" class:TopCondition_01;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group class="w2tb_td" style="" tagname="td">
+								<w2:attributes>
+									<w2:colspan>3</w2:colspan>
+									<w2:rowspan>1</w2:rowspan>
+								</w2:attributes>
+								<xf:select1 appearance="full" hierarchy="rdo_PAY_PROCS_STAT_CD" id="rdo_PAY_PROCS_STAT_CD" item="A^전체,1^확정"
+									orgid="rdo_PAY_PROCS_STAT_CD" renderType="radiogroup" selectedIndex="0" style="" tabIndex="0"
+									userData2=" class:TopCondition_Blue; automargin:True; cols:5; font-family:돋움;">
+									<xf:choices>
+										<xf:item>
+											<xf:label><![CDATA[전체]]></xf:label>
+											<xf:value><![CDATA[A]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[확정]]></xf:label>
+											<xf:value><![CDATA[1]]></xf:value>
+										</xf:item>
+									</xf:choices>
+								</xf:select1>
+							</xf:group>
+							<xf:group class="w2tb_th" style="" tagname="th">
+								<w2:textbox hierarchy="label_10" id="label_10" label="시장구분" orgid="label_10" style=""
+									userData2=" class:TopCondition_01; border-color:#0000FF;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group class="w2tb_td" id="" style="" tagname="td">
+								<xf:select1 appearance="full" hierarchy="rdo_MARKET_TP_CD" id="rdo_MARKET_TP_CD" item="A^전체,1^유가,2^코스닥"
+									orgid="rdo_MARKET_TP_CD" renderType="radiogroup" selectedIndex="0" style=""
+									userData2=" class:TopCondition_Blue; automargin:True; cols:4; font-family:돋움;">
+									<xf:choices>
+										<xf:item>
+											<xf:label><![CDATA[전체]]></xf:label>
+											<xf:value><![CDATA[A]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[유가]]></xf:label>
+											<xf:value><![CDATA[1]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[코스닥]]></xf:label>
+											<xf:value><![CDATA[2]]></xf:value>
+										</xf:item>
+									</xf:choices>
+								</xf:select1>
+							</xf:group>
+						</xf:group>
+						<xf:group tagname="tr" id="" style="">
+							<xf:group tagname="th" class="w2tb_th">
+								<w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes>
+								<w2:textbox hierarchy="label_1" id="label_1" label="회사코드(명)" orgid="label_1" style=""
+									userData2=" class:TopCondition_01; border-color:#0000FF;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group tagname="td" class="w2tb_td">
+								<w2:attributes>
+									<w2:colspan>3</w2:colspan>
+									<w2:rowspan>1</w2:rowspan>
+								</w2:attributes>
+								<xf:group id="" class="flex">
+									<w2:autoComplete maxlength="12" ev:onkeyup="scwin.txb_ISUR_CD_onkeyup" hierarchy="txb_ISUR_CD"
+										style="width:67px;" userData2=" class:TopCondition_01_write; onfocus:txb_ISUR_CD_onfocus; onblur:txb_ISUR_CD_onblur;"
+										id="txb_ISUR_CD" orgid="txb_ISUR_CD" class="flex_no">
+									</w2:autoComplete>
+									<xf:input maxlength="1000" hierarchy="txb_COM_NM" readOnly="true" style="width:210px;"
+										userData2=" class:TopCondition_01_read;" id="txb_COM_NM" orgid="txb_COM_NM">
+									</xf:input>
+									<xf:trigger cursor="pointer" src="../img/btn_search.gif" ev:onclick="scwin.img_COM_NM_onclick"
+										hierarchy="img_COM_NM" style="" id="img_COM_NM" class="btn_cm icon search" orgid="img_COM_NM">
+										<xf:label><![CDATA[]]></xf:label>
+									</xf:trigger>
+								</xf:group>
+							</xf:group>
+							<xf:group tagname="th" class="w2tb_th">
+								<w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes>
+								<w2:textbox hierarchy="label_12" id="label_12" label="전표생성일자" orgid="label_12" style=""
+									userData2=" class:TopCondition_01;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group tagname="td" id="" class="w2tb_td">
+								<w2:attributes></w2:attributes>
+								<w2:inputCalendar calendarValueType="yearMonthDate" focusOnDateSelect="false" footerDiv="true"
+									id="edt_SDate" renderDiv="true" renderType="" rightAlign="false" style="">
+								</w2:inputCalendar>
+								<w2:span id="" label="~" style=""></w2:span>
+								<w2:inputCalendar calendarValueType="yearMonthDate" focusOnDateSelect="false" footerDiv="true"
+									id="edt_EDate" renderDiv="true" renderType="" rightAlign="false" style="">
+								</w2:inputCalendar>
+								<xf:select1 appearance="minimal" cbdatacolumns="disp,value" disabledClass="w2selectbox_disabled"
+									ev:onchange="scwin.cmb_PeriodTp_OnSelChange" hierarchy="cmb_PeriodTp" id="cmb_PeriodTp" listexprformat="disp^0^70" maxlength="20"
+									orgid="cmb_PeriodTp" style="width:108px;"
+									userData2=" bindcolumn:disp; defaultstring:기간선택; inheritcolor:False; listcount:10; xpstyle:True; font-family:돋움;">
+									<xf:choices>
+										<xf:itemset nodeset="">
+											<xf:label ref=""></xf:label>
+											<xf:value ref=""></xf:value>
+										</xf:itemset>
+									</xf:choices>
+								</xf:select1>
+								<xf:select1 appearance="full" hierarchy="rdo_FEE_TP_CD" id="rdo_FEE_TP_CD" item="A^전체,1^상장총괄,2^상장수수료,3^연부과금"
+									orgid="rdo_FEE_TP_CD" renderType="radiogroup" selectedIndex="0" style=""
+									userData2=" class:TopCondition_Blue; automargin:True; cols:4; font-family:돋움;">
+									<xf:choices>
+										<xf:item>
+											<xf:label><![CDATA[전체]]></xf:label>
+											<xf:value><![CDATA[A]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[상장총괄]]></xf:label>
+											<xf:value><![CDATA[1]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[상장수수료]]></xf:label>
+											<xf:value><![CDATA[2]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[연부과금]]></xf:label>
+											<xf:value><![CDATA[3]]></xf:value>
+										</xf:item>
+									</xf:choices>
+								</xf:select1>
+							</xf:group>
+						</xf:group>
+						<xf:group tagname="tr" id="" style="">
+							<xf:group tagname="th" class="w2tb_th">
+								<w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes>
+								<w2:textbox hierarchy="label_9" id="label_9" label="담당팀 " orgid="label_9" style=""
+									userData2=" class:TopCondition_01;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group tagname="td" class="w2tb_td">
+								<w2:attributes></w2:attributes>
+								<xf:select1 appearance="minimal" cbdatacolumns="value,text" disabledClass="w2selectbox_disabled"
+									ev:onchange="scwin.cmb_TeamList_OnSelChange" hierarchy="cmb_TeamList" id="cmb_TeamList" listexprformat="TEXT^0^188"
+									orgid="cmb_TeamList" style="width:100%;"
+									userData2=" class:TopCondition_01; bindcolumn:VALUE; inheritcolor:False; listcount:10; searchcolumn:TEXT; xpstyle:True; border-color:#b9d4f7;">
+									<xf:choices>
+										<xf:itemset nodeset="data:dts_dep">
+											<xf:label ref=""></xf:label>
+											<xf:value ref=""></xf:value>
+										</xf:itemset>
+									</xf:choices>
+								</xf:select1>
+							</xf:group>
+							<xf:group tagname="th" class="w2tb_th">
+								<w2:attributes></w2:attributes>
+								<w2:textbox hierarchy="label_3" id="label_3" label="담당자 " orgid="label_3" style=""
+									userData2=" class:TopCondition_01;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group tagname="td" class="w2tb_td">
+								<w2:attributes></w2:attributes>
+								<xf:select1 appearance="minimal" cbdatacolumns="value,text" disabledClass="w2selectbox_disabled"
+									hierarchy="cmb_EmpList" id="cmb_EmpList" listexprformat="TEXT^0^70" orgid="cmb_EmpList" style="width:100%;"
+									userData2=" class:TopCondition_01; bindcolumn:VALUE; inheritcolor:False; listcount:10; searchcolumn:TEXT; xpstyle:True; font-family:돋움;">
+									<xf:choices>
+										<xf:itemset nodeset="data:dts_emp">
+											<xf:label ref=""></xf:label>
+											<xf:value ref=""></xf:value>
+										</xf:itemset>
+									</xf:choices>
+								</xf:select1>
+							</xf:group>
+							<xf:group tagname="th" class="w2tb_th">
+								<w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes>
+								<w2:textbox id="" label="계정과목" style="" userData2=" class:TopCondition_01;"></w2:textbox>
+							</xf:group>
+							<xf:group tagname="td" id="" class="w2tb_td">
+								<w2:attributes></w2:attributes>
+								<xf:select1 appearance="minimal" disabledClass="w2selectbox_disabled" displayMode="label" id="" ref=""
+									selectedData="true" style="width: 120px;" allOption="" chooseOption="">
+									<xf:choices></xf:choices>
+								</xf:select1>
+							</xf:group>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+				<xf:group class="btn_schbox" id="" style="">
+					<xf:trigger class="btn_cm sch" cursor="pointer" ev:onclick="scwin.btn_Search_1_onclick" id="btn_Search"
+						src="../img/btn_select.gif" style="">
+						<xf:label><![CDATA[조회]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+			<xf:group class="titbox" id="" style="">
+				<xf:group class="rt" id="" style="">
+					<xf:group class="count" id="" style="">
+						<w2:textbox class="" id="" label="총" style=""></w2:textbox>
+						<w2:textbox class="num" id="" label="0" style=""></w2:textbox>
+						<w2:textbox class="" id="" label="건" style=""></w2:textbox>
+					</xf:group>
+					<xf:trigger class="btn_cm download" cursor="pointer" ev:onclick="scwin.btn_Excel_onclick" hierarchy="btn_Excel"
+						id="btn_Excel" orgid="btn_Excel" src="../img/btn_excelsave.gif" style="" text="엑셀다운로드">
+						<xf:label><![CDATA[엑셀다운로드]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+			<xf:group class="gvwbox" id="" style="">
+				<w2:gridView class="gvw" dataList="dts_List" ev:onafteredit="scwin.grd_List_OnExit" hierarchy="grd_List" id="grd_List"
+					orgid="grd_List" readOnly="false" resize="true" style="height: 153px;"
+					userData2=" class:Grid_01; fillarea:True; fixsizing:True; gtitleheight:0; sortview:left; titleheight:34; tooltip:use=true;alt=true;createtime=300;color=#FFFFFF;backcolor=#808080;edgecolor=#333333;leftmargin=10;rightmargin=10;topmargin=10;bottommargin=10;; usingoneclick:1; xtitleheight:0; ondblclick:grd_List_OnDblClick;">
+					<w2:caption id="caption1" style="" value="this is a grid caption."></w2:caption>
+					<w2:header id="header1" style="">
+						<w2:row>
+							<w2:column displayMode="label" id="h_NO" inputType="text" textAlign="center"
+								userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; color:#343434; value:{CurRow},{ToString}; sumbgcolor:#fefaef; sumcolor:#343434; bgcolor:{decode(PAY_PROCS_STAT_CD,'1','#CCCCCC','99','#CCCCCC',decode(currow-tointeger(currow/2)*2,0,'#f2f5f9','#ffffff'))};"
+								value="번호" width="40">
+							</w2:column>
+							<w2:column displayMode="label" id="h_REP_ISU_SRT_CD" inputType="text" readOnly="true" textAlign="center"
+								userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; color:#343434; sumbgcolor:#fefaef; sumcolor:#343434; sort:True; bgcolor:{decode(PAY_PROCS_STAT_CD,'1','#CCCCCC','99','#CCCCCC',decode(currow-tointeger(currow/2)*2,0,'#f2f5f9','#ffffff'))};"
+								value="종목코드" width="93">
+							</w2:column>
+							<w2:column displayMode="label" id="h_COM_ABBRV" inputType="text" readOnly="true" textAlign="center"
+								userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; color:#343434; sumbgcolor:#fefaef; sumcolor:#343434; sort:True; bgcolor:{decode(PAY_PROCS_STAT_CD,'1','#CCCCCC','99','#CCCCCC',decode(currow-tointeger(currow/2)*2,0,'#f2f5f9','#ffffff'))};"
+								value="회사명" width="160">
+							</w2:column>
+							<w2:column displayMode="label" id="h_FEE_TP_NM" inputType="text" readOnly="true" textAlign="center"
+								userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; color:#343434; sumbgcolor:#fefaef; sumcolor:#343434; sort:True; bgcolor:{decode(PAY_PROCS_STAT_CD,'1','#CCCCCC','99','#CCCCCC',decode(currow-tointeger(currow/2)*2,0,'#f2f5f9','#ffffff'))};"
+								value="계정과목" width="134">
+							</w2:column>
+							<w2:column displayFormat="yyyy-MM-dd" displayMode="label" id="h_PAY_DD" inputType="text" inpytType="calendar"
+								readOnly="true" textAlign="center"
+								userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; color:#343434; sumbgcolor:#fefaef; sumcolor:#343434; sort:True; bgcolor:{decode(PAY_PROCS_STAT_CD,'1','#CCCCCC','99','#CCCCCC',decode(currow-tointeger(currow/2)*2,0,'#f2f5f9','#ffffff'))};"
+								value="입금일자" width="95">
+							</w2:column>
+							<w2:column displayFormat="yyyy-MM-dd" displayMode="label" id="h_INPUT_DD" inputType="text" inpytType="calendar"
+								readOnly="true" textAlign="center"
+								userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; color:#343434; sumbgcolor:#fefaef; sumcolor:#343434; sort:True; bgcolor:{decode(PAY_PROCS_STAT_CD,'1','#CCCCCC','99','#CCCCCC',decode(currow-tointeger(currow/2)*2,0,'#f2f5f9','#ffffff'))};"
+								value="전표생성일자" width="110">
+							</w2:column>
+							<w2:column displayFormat="yyyy-MM-dd" displayMode="label" id="h_RCV_DD" inputType="text" inpytType="calendar"
+								readOnly="true" textAlign="center"
+								userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; color:#343434; sumbgcolor:#fefaef; sumcolor:#343434; sort:True; bgcolor:{decode(PAY_PROCS_STAT_CD,'1','#CCCCCC','99','#CCCCCC',decode(currow-tointeger(currow/2)*2,0,'#f2f5f9','#ffffff'))};"
+								value="수신일자" width="95">
+							</w2:column>
+							<w2:column displayMode="label" id="h_LST_PAY_AMT" inputType="text" readOnly="true" textAlign="center"
+								userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; color:#343434; sumbgcolor:#fefaef; sumcolor:#343434; decao:3; bgcolor:{decode(PAY_PROCS_STAT_CD,'1','#CCCCCC','99','#CCCCCC',decode(currow-tointeger(currow/2)*2,0,'#f2f5f9','#ffffff'))};"
+								value="입금액" width="110">
+							</w2:column>
+						</w2:row>
+					</w2:header>
+					<w2:gBody id="gBody1" style="">
+						<w2:row id="" style="">
+							<w2:column displayMode="label" id="NO" inputType="text" textAlign="center" width="40"></w2:column>
+							<w2:column displayMode="label" id="REP_ISU_SRT_CD" inputType="text" textAlign="center" width="93"></w2:column>
+							<w2:column displayMode="label" id="COM_ABBRV" inputType="text" textAlign="left" width="160"></w2:column>
+							<w2:column displayMode="label" id="FEE_TP_NM" inputType="text" textAlign="center" width="134"></w2:column>
+							<w2:column displayMode="label" id="PAY_DD" inputType="text" textAlign="center" width="95"></w2:column>
+							<w2:column displayMode="label" id="INPUT_DD" inputType="text" textAlign="center" width="110"></w2:column>
+							<w2:column displayMode="label" id="RCV_DD" inputType="text" textAlign="center" width="95"></w2:column>
+							<w2:column displayMode="label" id="LST_PAY_AMT" inputType="text" textAlign="right" width="110"></w2:column>
+						</w2:row>
+					</w2:gBody>
+				</w2:gridView>
+			</xf:group>
+			<w2:textbox hierarchy="label_44" id="label_44"
+				label="*) 수수료 erp 데이타는 영업일 + 1로 생성 됩니다. **) 상장수수료 및 연부과금 관련데이터는 신규상장일 이후에 조회가 가능합니다." orgid="label_44" style=""
+				userData2=" class:Description_01; border-color:black;" class="txt_info">
+			</w2:textbox>
+			<xf:group class="btnbox" id="" style="">
+				<xf:group class="rt" id="">
+					<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.btn_Close_onclick" id="btn_Close"
+						src="../img/btn_close.gif" style="">
+						<xf:label><![CDATA[닫기]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+		</xf:group>
+		<xf:group id="" style="position: absolute;top: 700px;"></xf:group>
+	</body>
+</html>

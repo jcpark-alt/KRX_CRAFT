@@ -1,0 +1,539 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDFIS00600_P6.gfm" meta_screenName="재무 조건검색-팝업 재무계정검색">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<xf:model>
+			<w2:workflowCollection/>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+/* ★Wcraft guide★    
+스크립트 수작업 유의사항
+ ASIS에서 문법에 어긋난 문장이 발견되었습니다. 이는 WCRAFT에서 X 로 변환합니다.  
+ X 로 변환된 곳을 찾아 ASIS소스를 참고하여 문법에 맞도록 변환해주세요. 
+
+----------------------------------------------------
+[0] 기존 문법 오류
+----------------------------------------------------
+	> X 오류 확인 - 기존 소스 확인 필요
+
+*/
+
+
+//★Wcraft guide★ include부분 주석처리 -> include("../js/PopupCalendar.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/utils.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/libRoundPanel.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/common.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/list_common.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/session.js");
+
+//#include("../js/controlResize.js"); // 화면 리사이징
+//★Wcraft guide★ include부분 주석처리 -> include("../js/stf.js");
+scwin.vScrenID = "ULDFIS00600_P6.xml";
+scwin.vAxisType = "";
+scwin.vHorizLimitCnt = 0;
+window.onunload = function() {
+    opener.fn_getBeforeRadioBtn("ALL");
+};
+scwin.onpageload = function() {
+    scwin.gform_onload();
+};
+scwin.onpageunload = function() {
+};
+
+
+/**
+ *  화면 초기화
+ */
+scwin.fn_Init = function() {
+    $c.cm.PanelToGroupBox(panel_Top);
+    scwin.vAxisType = opener.scwin.vAxisType;
+    scwin.vHorizLimitCnt = opener.scwin.vHorizLimitCnt;
+    if (opener.scwin.vScrenID == "ULDFIS00600.gfm") {
+        txb_IND_PTTN.setValue($c.stf.getObjectValue(opener.cmb_IND_PTTN));
+        txb_ACNTG_BAS_TYP.setValue($c.stf.getObjectValue(opener.cmb_ACNTG_BAS_TYP));
+        txb_INDVDL_CONN_TP.setValue($c.stf.getObjectValue(opener.cmb_INDVDL_CONN_TP));
+    } else if (opener.scwin.vScrenID == "ULDFIS00600_P2.gfm" || opener.scwin.vScrenID == "ULDFIS00600_P5.gfm") {
+        txb_IND_PTTN.setValue($c.stf.getObjectValue(opener.txb_IND_PTTN));
+        txb_ACNTG_BAS_TYP.setValue($c.stf.getObjectValue(opener.txb_ACNTG_BAS_TYP));
+        txb_INDVDL_CONN_TP.setValue($c.stf.getObjectValue(opener.txb_INDVDL_CONN_TP));
+    }
+    scwin.fn_InitDs();
+
+    // 계정유형 조회
+    scwin.fn_GetDtsAccntPttn();
+
+    // 조회
+    scwin.fn_Search();
+
+    // 이전에 선택된 항목을 화면에 display
+    scwin.fn_DisplayBefItem();
+
+    // chb_COL_YEAR 체크박스 제어
+    scwin.fn_Ctrl_chb_COL_YEAR();
+};
+
+
+/**
+ *  이미 선택되어있는 항목을 화면이 open할때 화면에 display한다.
+ */
+scwin.fn_DisplayBefItem = function() {
+    trv_SelectedAcnt.ReDraw = false;
+    var tmpDs = opener.dts_Fz531;
+    for (var nRow = 1; nRow <= tmpDs.getTotalRow(); nRow++) {
+        // AXIS_TYP 2 가로, 3 세로 / ITEM_TYP  0 년도, 1 계정, 3 회사
+        //if( (tmpDs.NameString(nRow, "AXIS_TYP") == "2" || tmpDs.NameString(nRow, "AXIS_TYP") == "3") && tmpDs.NameString(nRow, "ITEM_TYP") == "1" ){
+        if (scwin.vAxisType == tmpDs.getCellData(nRow, "AXIS_TYP") && tmpDs.getCellData(nRow, "ITEM_TYP") == "1") {
+            dts_SelectAcnt.insertRow();
+            var nIdx = dts_SelectAcnt.getRowPosition();
+            dts_SelectAcnt.setCellData(nIdx, "LV", "2");
+            dts_SelectAcnt.setCellData(nIdx, "ACCNT_CD", tmpDs.getCellData(nRow, "ITEM_CD"));
+            dts_SelectAcnt.setCellData(nIdx, "ACCNT_NM", $c.stf.trim(tmpDs.getCellData(nRow, "ITEM_NM")));
+            dts_SelectAcnt.setCellData(nIdx, "COL_YEAR", tmpDs.getCellData(nRow, "COL_YEAR"));
+        }
+    } // end for
+
+    trv_SelectedAcnt.ReDraw = true;
+};
+
+
+/**
+ * 재무유형 조회
+ */
+scwin.fn_GetDtsAccntPttn = function() {
+    var url = "/listingCommon.do?SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01 + "&method=listGeneralForDynamic" + "&service=krx.lds.stf.listingcommon.services.ListingCommonApp" + "&queryId=krx.lds.stf.fis.select.accntPttn" + "&outputMessageId=FIS_ACNTCLS_DT" + "&param01=" + $c.stf.getObjectValue(txb_ACNTG_BAS_TYP) + "&param02=" + $c.stf.getObjectValue(txb_IND_PTTN);
+    dts_AccntPttn.DataID = encodeURI(url);
+    dts_AccntPttn.Reset();
+};
+
+
+/**
+ *  년도콤보 세팅. 년도구하기
+ */
+scwin.fn_GetYear = function() {
+    var url = "/listingCommon.do?SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01 + "&method=listGeneralForDynamic" + "&service=krx.lds.stf.listingcommon.services.ListingCommonApp" + "&queryId=krx.lds.stf.fis.select.year1" + "&outputMessageId=CODE_M_OUT";
+    dts_Year.DataID = encodeURI(url);
+    dts_Year.Reset();
+};
+
+
+/**
+ *  데이터셋 초기화.
+ */
+scwin.fn_InitDs = function() {
+
+    //dts_SelectAcnt.setDataHeader();
+    //dts_SelectAcnt.AddRow();
+    //var nRow = dts_SelectAcnt.RowPosition;
+    //dts_SelectAcnt.NameString(nRow, "LV") = "1";
+    //dts_SelectAcnt.NameString(nRow, "ACCNT_NM") = "선택된 계정"; // W-Craft 주석처리 및 필요시 asis 파라미터 확인 
+
+};
+
+
+
+
+
+
+/**
+ *  데이터셋 clear.
+ */
+scwin.fn_ClearDs = function() {
+    dts_Acnt.removeAll();
+};
+
+/**
+ *  조회조건 유효성 체크
+ */
+scwin.fn_ChkValid = function() {
+    return true;
+};
+
+
+/**
+ * 조회
+ */
+scwin.fn_Search = function() {
+    //데이터셋 초기화
+    scwin.fn_ClearDs();
+
+    // 조회조건 필수 체크.
+    if (!scwin.fn_ChkValid()) {
+        return;
+    }
+
+    // Lodaing~~~ 표시
+    $c.cm.ShowWin(panel_Top);
+    var url = "/listingCommon.do?SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01 + "&method=listGeneralForDynamic" + "&service=krx.lds.stf.listingcommon.services.ListingCommonApp" + "&queryId=krx.lds.stf.fis.select.acnt" + "&outputMessageId=FIS_ACNT_LIST" + "&param01=" + $c.stf.getObjectValue(txb_ACNTG_BAS_TYP) + "&param02=" + $c.stf.getObjectValue(txb_IND_PTTN) + "&param03=" + $c.stf.getObjectValue(txb_INDVDL_CONN_TP) + "&param04=" + $c.stf.getObjectValue(txb_ACCNT_NM) + "&param05=" + $c.stf.getObjectValue(cmb_ACCNT_PTTN);
+    dts_Acnt.DataID = encodeURI(url);
+    dts_Acnt.Reset();
+};
+
+
+/**
+ * 선택된 값을 오프너에 전달한다.
+ */
+scwin.fn_SetParam = async function() {
+    if (dts_SelectAcnt.getTotalRow() < 1) {
+        return;
+    }
+    var arrPar = new Array();
+    for (var nRow = 1; nRow <= dts_SelectAcnt.getTotalRow(); nRow++) {
+        var sItemCd = dts_SelectAcnt.getCellData(nRow, "ACCNT_CD");
+        var sItemNM = dts_SelectAcnt.getCellData(nRow, "ACCNT_NM");
+        var sItemTyp = "1"; // 0:년도, 1:계정, 3:회사
+        var sAxisTyp = scwin.vAxisType; // AXIS_TYP  1:기준, 2: 가로, 3:세로
+        var sColYear = dts_SelectAcnt.getCellData(nRow, "COL_YEAR"); // COL_YEAR
+
+        if (sItemCd != "") {
+            arrPar[nRow - 1] = {
+                ITEM_CD: sItemCd,
+                ITEM_NM: sItemNM,
+                ITEM_TYP: sItemTyp,
+                AXIS_TYP: sAxisTyp,
+                COL_YEAR: sColYear
+            };
+        }
+    }
+    $c.frame.path("../").fn_SetAxisInfo(arrPar);
+    await $c.frame.CloseFrame();
+};
+scwin.fn_Reset = function() {
+    trv_SelectedAcnt.ClearAll();
+    dts_SelectAcnt.removeAll();
+    scwin.fn_GetYear();
+    chb_COL_YEAR.setDisabled("");
+    chb_COL_YEAR.setValue(1);
+    cmb_COL_YEAR.setDisabled(false);
+    cmb_COL_YEAR.setSelectedIndex(0);
+    // fn_SelectAll();
+    // fn_RmSelected();
+
+};
+
+
+
+
+/**
+ * 선택제거
+ */
+scwin.fn_RmSelected = function() {
+    trv_SelectedAcnt.ReDraw = false;
+    for (var nRow = dts_SelectAcnt.getTotalRow(); nRow >= 1; nRow--) {
+        if (trv_SelectedAcnt.findNodeByIndex(nRow, false).checked) {
+            $c.cp.removeRow(dts_SelectAcnt, nRow);
+        }
+    }
+    if (dts_SelectAcnt.getTotalRow() == 0) {
+        scwin.fn_GetYear();
+        chb_COL_YEAR.setDisabled("");
+        chb_COL_YEAR.setValue(1);
+        cmb_COL_YEAR.setDisabled(false);
+        cmb_COL_YEAR.setSelectedIndex(0);
+    }
+    trv_SelectedAcnt.ReDraw = true;
+};
+
+
+/**
+ * 선택
+ */
+scwin.fn_Selected = function() {
+    //dts_SelectAcnt.ClearData();
+    trv_SelectedAcnt.ReDraw = false;
+
+    // 가로 세팅이면 갯수 체크 :  2 가로, 3 세로
+    if (scwin.vAxisType == "2") {
+        // 선택된것 갯수 
+        var nSelectCnt = dts_SelectAcnt.getTotalRow();
+        for (var nRow = 1; nRow <= dts_Acnt.getTotalRow(); nRow++) {
+            if (trv_Acnt.findNodeByIndex(nRow, false).checked) {
+                nSelectCnt++;
+            }
+        }
+        // 갯수체크
+        if (nSelectCnt > scwin.vHorizLimitCnt) {
+            $c.win.alert("선택된 가로항목이 10개를 초과합니다.");
+            return;
+        }
+    }
+    var chkYear = $c.stf.getObjectValue(chb_COL_YEAR);
+    var valYear = $c.stf.getObjectValue(cmb_COL_YEAR);
+    for (var nRow = 1; nRow <= dts_Acnt.getTotalRow(); nRow++) {
+        if (trv_Acnt.findNodeByIndex(nRow, false).checked) {
+            // 중복 체크.
+            if (chkYear == "Y") {
+                var bDup = false;
+                var sTmp1 = dts_Acnt.getCellData(nRow, "ACCNT_CD") + valYear;
+                for (var nIdx = 1; nIdx <= dts_SelectAcnt.getTotalRow(); nIdx++) {
+                    var sTmp2 = dts_SelectAcnt.getCellData(nIdx, "ACCNT_CD") + dts_SelectAcnt.getCellData(nIdx, "COL_YEAR");
+                    if (sTmp1 == sTmp2) {
+                        bDup = true;
+                        continue;
+                    }
+                }
+                if (bDup) {
+                    trv_Acnt.checkByIndex(nRow, false); // 체크박스 언체크
+                    continue;
+                }
+            } else {
+                var nTmpIdx1 = $c.cp.getNameValueRow(dts_SelectAcnt, "ACCNT_CD", dts_Acnt.getCellData(nRow, "ACCNT_CD"));
+                if (nTmpIdx1 >= 1) {
+                    trv_Acnt.checkByIndex(nRow, false); // 체크박스 언체크
+                    continue;
+                }
+
+                // ********************************************************************
+                // [WebSquare 전환 추가] 원본 소스와 비교 필요
+                // 
+                // ********************************************************************
+
+            }
+            dts_SelectAcnt.insertRow();
+            var nIdx = dts_SelectAcnt.getRowPosition();
+            dts_SelectAcnt.setCellData(nIdx, "LV", "2");
+            dts_SelectAcnt.setCellData(nIdx, "ACCNT_CD", dts_Acnt.getCellData(nRow, "ACCNT_PTTN") + dts_Acnt.getCellData(nRow, "ACCNT_CD")); /*ORG SRC: dts_SelectAcnt.NameString(nIdx, "ACCNT_NM") = chkYear == "Y" ? valYear + " " + dts_Acnt.NameString(nRow, "ACCNT_NM") : dts_Acnt.NameString(nRow, "ACCNT_NM");*/ X = chkYear == "Y" ? valYear + " " + dts_Acnt.getCellData(nRow, "ACCNT_NM") : dts_Acnt.getCellData(nRow, "ACCNT_NM"); /*ORG SRC: dts_SelectAcnt.NameString(nIdx, "COL_YEAR") = chkYear == "Y" ? valYear : "0000";*/ X = chkYear == "Y" ? valYear : "0000";
+            trv_Acnt.checkByIndex(nRow, false); // 체크박스 언체크
+
+        }
+    }
+    trv_SelectedAcnt.ReDraw = true;
+};
+
+
+/**
+ * 체크박스 온클릭
+ */
+scwin.fn_Chb_COL_YEAR_OnClick = function(pClearData) {
+    if (pClearData) {
+        dts_SelectAcnt.removeAll();
+    }
+    if ($c.stf.getObjectValue(chb_COL_YEAR) == "Y") {
+        cmb_COL_YEAR.setDisabled(false);
+        cmb_COL_YEAR.setSelectedIndex(0);
+    } else {
+        cmb_COL_YEAR.setDisabled(true);
+        cmb_COL_YEAR.setSelectedIndex(-1);
+    }
+};
+
+
+
+/**
+ *  가로항목인 경우만 선택 가능. 잘못봤다 세로도 선택가능.
+ */
+scwin.fn_Ctrl_chb_COL_YEAR = function() {
+    // 기준이 선택되어있다면 비활성. 
+    // 어딘가에서 년도가 선택되었다면 비활성.
+    // 어딘가에서 이미 체크가 되었다면 비활성. => COL_YEAR 이 0000이 아닌게 존재한다.
+    var tmpDs = opener.dts_Fz531;
+
+    // 어딘가에서 이미 체크가 되었다면 비활성. => COL_YEAR 이 0000이 아닌게 존재한다.
+    var bChecked = false;
+    for (var nRow = 1; nRow <= tmpDs.getTotalRow(); nRow++) {
+        if (tmpDs.getCellData(nRow, "COL_YEAR") != "0000") {
+            bChecked = true;
+            break;
+        }
+    }
+
+    // 기준이 선택되어있다면 비활성. 
+    // 어딘가에서 년도가 선택되었다면 비활성.
+    var nTmpIdx1 = tmpDs.NameValueRow("AXIS_TYP", "1");
+    var nTmpIdx2 = tmpDs.NameValueRow("ITEM_TYP", "0"); // ITEM_TYP  0 년도, 1 계정, 3 회사
+    if (nTmpIdx1 < 1 && nTmpIdx2 < 1 && !bChecked) {
+        // 년도콤보세팅
+        scwin.fn_GetYear();
+        chb_COL_YEAR.setDisabled("");
+        chb_COL_YEAR.setValue(1);
+        scwin.fn_Chb_COL_YEAR_OnClick();
+    }
+};
+scwin.dts_Acnt_OnLoadError = function() {
+    $c.stf.alert_error(dts_Acnt);
+};
+scwin.dts_Acnt_OnLoadCompleted = function(rowcount) {
+    if (dts_Acnt.errorMsg) {
+        $c.win.alert(dts_Acnt.errorMsg);
+    }
+    $c.cm.CloseWin(rowcount, panel_Top);
+};
+scwin.gform_onload = function() {
+    scwin.fn_Init();
+};
+scwin.img_Close_onclick = async function() {
+    // 닫기버튼 클릭	
+    await $c.frame.CloseFrame();
+};
+scwin.img_Confirm_onclick = function() {
+    // 확인버튼 클릭
+    scwin.fn_SetParam();
+};
+scwin.image_1_onclick = function() {
+    scwin.fn_Selected();
+};
+scwin.image_2_onclick = function() {
+    scwin.fn_RmSelected();
+};
+scwin.chb_COL_YEAR_onclick = function() {
+    scwin.fn_Chb_COL_YEAR_OnClick(true);
+};
+scwin.dts_Year_OnLoadError = function() {
+    $c.stf.alert_error(dts_Year);
+};
+scwin.dts_Year_OnLoadCompleted = function(rowcount) {
+    if (dts_Year.errorMsg) {
+        $c.win.alert(dts_Year.errorMsg);
+    }
+};
+scwin.txb_ACCNT_NM_onkeydown = function() {
+    // 기업집단검색 팝업 오픈
+    if (event.keyCode == 13) {
+        scwin.fn_Search();
+    }
+};
+scwin.btn_Search_onclick = function() {
+    // 조회 버튼 클릭
+    scwin.fn_Search();
+};
+scwin.cmb_ACCNT_PTTN_OnSelChange = function() {
+    scwin.fn_Search();
+};
+scwin.trv_Acnt_OnDblClick = function() {
+    var selLv = trv_Acnt.getSelectedNode().depth;
+    var selIndex = trv_Acnt.getSelectedIndex() + 1;
+    var selChecked = trv_Acnt.findNodeByIndex(trv_Acnt.getSelectedIndex(), false).checked;
+    for (var i = selIndex; i <= dts_Acnt.getTotalRow(); i++) {
+        var checkLv = dts_Acnt.getCellData(i, "LV");
+        if (checkLv <= selLv) return;
+        trv_Acnt.checkByIndex(i, (selChecked) ? true : false); // 체크박스 언체크
+
+    }
+};
+scwin.btn_init_onclick = function() {
+    scwin.fn_Reset();
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+		
+		<xf:group class="pop_contents" id="" meta_snippetCategory="00_화면시작" meta_snippetKeyComponent="true"
+			meta_snippetName="0_02 팝업페이지시작">
+			<xf:group class="lybox horizontal" id="panel_Top" meta_snippetCategory="01_화면분할" meta_snippetKeyComponent="true"
+				meta_snippetName="1_01 가변 2단 분할" style="">
+				<xf:group adaptiveThreshold="" class="" id="" style="">
+					<xf:group class="titbox" id="" meta_snippetCategory="02_타이틀" meta_snippetKeyComponent="true"
+						meta_snippetName="2_02 서브타이틀(h3)" style="">
+						<w2:textbox hierarchy="label_16" id="label_16" label="재무계정" orgid="label_16" style=""
+							userData2=" class:TopCondition_01; font-family:돋움; font-weight:bold;" tagname="h3">
+						</w2:textbox>
+					</xf:group>
+					<xf:group class="schbox" id="" meta_snippetCategory="03_조회영역" meta_snippetKeyComponent="true"
+						meta_snippetName="3_01 조회조건1행" style="">
+						<xf:group class="schbox_inner" id="" style="">
+							<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl " id="" style="" tagname="table">
+								<w2:attributes>
+									<w2:summary></w2:summary>
+								</w2:attributes>
+								<xf:group tagname="colgroup">
+									<xf:group style="width:100px;" tagname="col"></xf:group>
+									<xf:group style="" tagname="col"></xf:group>
+									<xf:group style="width:100px;" tagname="col"></xf:group>
+									<xf:group style="" tagname="col"></xf:group>
+								</xf:group>
+								<xf:group class="" id="" style="" tagname="tr">
+									<xf:group class="w2tb_td" style="" tagname="td">
+										<w2:attributes><w2:colspan>4</w2:colspan><w2:rowspan>1</w2:rowspan></w2:attributes><xf:select1 appearance="minimal" disabledClass="w2selectbox_disabled" displayMode="label"
+											ev:onchange="scwin.cmb_ACCNT_PTTN_OnSelChange" hierarchy="cmb_ACCNT_PTTN" id="cmb_ACCNT_PTTN" orgid="cmb_ACCNT_PTTN"
+											ref="data:dts_AccntPttn" selectedData="true" style="width:100px;" tabIndex="25"
+											userData2=" class:TopCondition_01; bindcolumn:VALUE; index:0; inheritcolor:False; listcount:10; listexprformat:TEXT^0^100; searchcolumn:TEXT; xpstyle:True; font-family:돋움;">
+										</xf:select1>
+										<xf:input ev:onkeydown="scwin.txb_ACCNT_NM_onkeydown" hierarchy="txb_ACCNT_NM" id="txb_ACCNT_NM"
+											maxlength="1000" orgid="txb_ACCNT_NM"
+											style="background-color:#ffffff;color:#343434;width:80px;border-width:1px;border-style:solid;" tabIndex="4"
+											userData2=" class:TopCondition_01_write; font-family:돋움; border-color:#92b1f1;">
+										</xf:input>
+									</xf:group>
+								</xf:group>
+							</xf:group>
+						</xf:group>
+						<xf:group class="btn_schbox" id="" style="">
+							<xf:trigger class="btn_cm sch" cursor="pointer" ev:onclick="scwin.btn_Search_onclick" hierarchy="btn_Search"
+								id="btn_Search" orgid="btn_Search" src="../img/btn_select.gif" style="" text="조회">
+								<xf:label><![CDATA[조회]]></xf:label>
+							</xf:trigger>
+						</xf:group>
+					</xf:group>
+					<xf:group class="titbox mt0" id="" meta_snippetCategory="02_타이틀" meta_snippetKeyComponent="true"
+						meta_snippetName="2_02 서브타이틀(h3)" style="">
+						<xf:group id="" class="lt">
+							<xf:select selectedData="true" hierarchy="chb_COL_YEAR" tabIndex="10" userData2=" class:CheckBox_01;" rows=""
+								displayMode="label" orgid="chb_COL_YEAR" ref="" appearance="full" disabledClass="w2selectbox_disabled"
+								ev:onclick="scwin.chb_COL_YEAR_onclick" name="chk" disabled="true" style="" id="chb_COL_YEAR" renderType="checkboxgroup" cols="">
+								<xf:choices>
+									<xf:item>
+										<xf:label><![CDATA[데이터조회기준년도]]></xf:label>
+										<xf:value><![CDATA[]]></xf:value>
+									</xf:item>
+								</xf:choices>
+							</xf:select>
+							<xf:select1 selectedData="true" ref="data:dts_Year" appearance="minimal" disabledClass="w2selectbox_disabled"
+								hierarchy="cmb_COL_YEAR" disabled="true" style="width:60px;" tabIndex="10"
+								userData2=" class:TopCondition_01; bindcolumn:VALUE; index:0; listcount:10; listexprformat:TEXT^0^60; searchcolumn:TEXT; synccombodata:True; border-color:#b9d4f7;"
+								id="cmb_COL_YEAR" displayMode="label" orgid="cmb_COL_YEAR">
+							</xf:select1>
+						</xf:group>
+					</xf:group>
+					<xf:group style="height: 200px;" id=""></xf:group>
+				</xf:group>
+				<xf:group class="ly_btn" id="" style="">
+					<xf:trigger class="btn_cm right icon" cursor="pointer" ev:onclick="scwin.image_1_onclick" hierarchy="image_1"
+						id="image_1" orgid="image_1" src="../img/btn_arrowR.gif" style="">
+						<xf:label><![CDATA[]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm left icon" cursor="pointer" ev:onclick="scwin.image_2_onclick" hierarchy="image_2"
+						id="image_2" orgid="image_2" src="../img/btn_arrowL.gif" style="">
+						<xf:label><![CDATA[]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+				<xf:group class="" id="" style="">
+					<xf:group class="titbox" id="" meta_snippetCategory="02_타이틀" meta_snippetKeyComponent="true"
+						meta_snippetName="2_02 서브타이틀(h3)" style="">
+						<w2:textbox hierarchy="label_1" id="label_1" label="선택된 계정" orgid="label_1" style=""
+							userData2=" class:TopCondition_01; font-family:돋움; font-weight:bold;" tagname="h3">
+						</w2:textbox>
+					</xf:group>
+					<xf:group class="titbox" id="" meta_snippetCategory="02_타이틀" meta_snippetKeyComponent="true"
+						meta_snippetName="2_02 서브타이틀(h3)" style="">
+						<xf:group class="rt" id="" style="">
+							<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.btn_init_onclick" hierarchy="btn_init"
+								id="btn_init" orgid="btn_init" src="../img/btn_03.gif" style="">
+								<xf:label><![CDATA[초기화]]></xf:label>
+							</xf:trigger>
+						</xf:group>
+					</xf:group>
+					<xf:group id="" style="height: 200px;"></xf:group>
+				</xf:group>
+			</xf:group>
+			<xf:group class="btnbox" id="" meta_snippetCategory="08_버튼" meta_snippetKeyComponent="true" meta_snippetName="8_05 팝업전체제어버튼"
+				style="">
+				<xf:group class="rt" id="" style="">
+					<xf:trigger class="btn_cm pt" id="img_Confirm" style="" type="button">
+						<xf:label><![CDATA[확인]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.img_Close_onclick" hierarchy="img_Close" id="img_Close"
+						orgid="img_Close" src="../img/btn_close.gif" style="">
+						<xf:label><![CDATA[닫기]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+		<xf:group id="" userData2=" class:TopCondition_01;" style="" orgid="panel_Top" hierarchy="panel_Top" class="hide">
+			<!-- Tag is Not matched with wCraft2 Rule :<mxtree id="trv_Acnt" left="5" top="52" width="300" height="390" borderstyle="0" enablecheckboxes="1" enablecheckboxref="VIEW_CHK" expandoneclick="True" hasbuttons="True" levelcolumn="LV" singleexpand="False" selectcolormode="True" textcolumn="ACCNT_NM" font-family="돋움" font-size="12" color="#333399" background-color="#FFFFFF" border-style="solid" border-width="1" border-color="#92b1f1" dataid="dts_Acnt" userData2=" ondblclick:trv_Acnt_OnDblClick;" orgid="trv_Acnt" hierarchy="trv_Acnt"/>-->
+			<xf:group id="panel_2" userData2=" class:TopCondition_01;" style="position:absolute; left:105px; top:447px; width:110px; height:20px; background-color:#d9e9fc; visibility:hidden;" orgid="panel_2" hierarchy="panel_2">
+				<xf:input id="txb_IND_PTTN" userData2=" class:TopCondition_01_write;" style="position:absolute; left:10px; top:0px; width:30px; height:20px; background-color:#b9d4f7;" maxlength="10" orgid="txb_IND_PTTN" hierarchy="txb_IND_PTTN" />
+				<xf:input id="txb_ACNTG_BAS_TYP" userData2=" class:TopCondition_01_write;" style="position:absolute; left:50px; top:0px; width:30px; height:20px; background-color:#b9d4f7;" maxlength="1000" orgid="txb_ACNTG_BAS_TYP" hierarchy="txb_ACNTG_BAS_TYP" />
+				<xf:input id="txb_INDVDL_CONN_TP" userData2=" class:TopCondition_01_write;" style="position:absolute; left:80px; top:0px; width:30px; height:20px; background-color:#b9d4f7;" maxlength="1000" orgid="txb_INDVDL_CONN_TP" hierarchy="txb_INDVDL_CONN_TP" />
+			</xf:group><!-- Tag is Not matched with wCraft2 Rule :<mxtree id="trv_SelectedAcnt" left="365" top="52" width="300" height="390" borderstyle="0" enablecheckboxes="1" expandoneclick="True" levelcolumn="LV" singleexpand="True" textcolumn="ACCNT_NM" font-family="돋움" font-size="12" color="#333399" background-color="#FFFFFF" border-style="solid" border-width="1" border-color="#92b1f1" dataid="dts_SelectAcnt" orgid="trv_SelectedAcnt" hierarchy="trv_SelectedAcnt"/>-->
+		</xf:group></xf:group>
+	</body>
+</html>

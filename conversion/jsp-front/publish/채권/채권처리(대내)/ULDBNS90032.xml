@@ -1,0 +1,462 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDBNS90032.gfm" meta_screenName="(팝업)이표계산기팝업">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<xf:model>
+			<w2:workflowCollection/>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+/* ★Wcraft guide★    
+스크립트 수작업 유의사항
+*/
+
+
+//★Wcraft guide★ include부분 주석처리 -> include("../js/libRoundPanel.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/session.js");
+// 세션정보를 얻기위한 함수사용
+//★Wcraft guide★ include부분 주석처리 -> include("../js/list_common.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/stf.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/utils.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/bns_common.js");
+scwin.vScrenID = "ULDBNS90032.xml";
+scwin.fn_GetPar, scwin.fn_SetPar;
+scwin.onpageload = function() {
+    scwin.gform_onload();
+};
+scwin.onpageunload = function() {
+};
+
+/********************************************** 
+ * 함수명   : btn_Calc
+ * 설명       : 이자지급액 계산버튼
+ * 계산로직 : (초일 산입, 말일 불산입)
+ * [CASE 최초] 상장금액 X 표면이자율 X (최초이자지급일 - 발행일) / 단수일이자기준
+ * [CASE 중간] 상장금액 X 표면이자율 X (이자계산주기 / 12)
+ * [CASE 최종] 상장금액 X 표면이자율 X (마지막차수 이자지급일 - 마지막 전회차 이자지급일) / 단수일이자기준
+ ***********************************************/
+scwin.btn_Calc = function() {
+    // 이자지급액 초기화
+    $c.stf.setObjectValue(edt_PrincPayAmt, "");
+
+    // 계산전 검증
+    if (!scwin.fn_CheckValidation()) {
+        return;
+    }
+    var bndOddllotddIntBas = 0;
+    // 단수일 이자기준 구하기, 코드를 값으로 변경
+    if ($c.stf.getObjectValue(txb_BndOddllotddIntBasTpCd) == "1") {
+        bndOddllotddIntBas = 360;
+    } else if ($c.stf.getObjectValue(txb_BndOddllotddIntBasTpCd) == "2") {
+        bndOddllotddIntBas = 365;
+    } else if ($c.stf.getObjectValue(txb_BndOddllotddIntBasTpCd) == "3") {
+        bndOddllotddIntBas = 366;
+    }
+    var rdoParam = $c.stf.getObjectValue(rdo_PARAM); //라디오 선택값
+    var listAmt = $c.stf.getObjectValue(edt_ListAmt); //상장금액
+    var coupnRt = $c.stf.getObjectValue(edt_CoupnRt); //표면이자율
+    var fstIntPayDd = $c.stf.getObjectValue(edt_FstIntPayDd); //최초이자지급일
+    var isuDd = $c.stf.getObjectValue(edt_IsuDd); //발행일
+    var intPayCalcMms = $c.stf.getObjectValue(edt_IntPayCalcMms); //이자계산주기
+
+    // 최초 이자계산
+    if (rdoParam == "F") {
+        //(최초이자지급일 - 발행일) 날짜 차이 계산 (일 단위)
+        var timeDiff = $c.ut.cGetDifTodayInputdayBnd(fstIntPayDd, isuDd);
+        calcIntPayAmt = (listAmt * (coupnRt * 100000) * (timeDiff / bndOddllotddIntBas)) / (100000 * 100);
+
+        // 중간 이자계산
+
+    } else if (rdoParam == "M") {
+        calcIntPayAmt = (listAmt * (coupnRt * 100000) * (intPayCalcMms / 12)) / (100000 * 100);
+    } else if (rdoParam == "L") {
+        var lastIntPayDd = dts_List.getCellData(dts_List.getTotalRow(), 'INT_PAY_DD');
+        var lastIntPayDd_1 = dts_List.getCellData(dts_List.getTotalRow() - 1, 'INT_PAY_DD');
+
+        //(마지막차수 이자지급일 - 마지막 전회차 이자지급일) 날짜 차이 계산 (일 단위)
+        var timeDiff = $c.ut.cGetDifTodayInputdayBnd(lastIntPayDd, lastIntPayDd_1);
+        calcIntPayAmt = (listAmt * (coupnRt * 100000) * (timeDiff / bndOddllotddIntBas)) / (100000 * 100);
+    }
+
+    // 이자원단위 미만처리에따라 이자 보정..
+    if ($c.stf.getObjectValue(txb_IntUdwonProcsCd) == "1") {
+        // 절사
+        calcIntPayAmt = Math.floor(calcIntPayAmt);
+    } else if ($c.stf.getObjectValue(txb_IntUdwonProcsCd) == "2") {
+        // 절상
+        calcIntPayAmt = Math.ceil(calcIntPayAmt);
+    } else if ($c.stf.getObjectValue(txb_IntUdwonProcsCd) == "3") {
+        // 사사오입
+        calcIntPayAmt = Math.round(calcIntPayAmt);
+    } else if ($c.stf.getObjectValue(txb_IntUdwonProcsCd) == "4") {
+        // 원미만인정
+
+    }
+
+    //결과값 표시
+    $c.stf.setObjectValue(edt_PrincPayAmt, calcIntPayAmt);
+};
+
+
+/********************************************** 
+ * 함수명   : fn_CheckValidation
+ * 설명      : 이자계산전 검증
+ ***********************************************/
+scwin.fn_CheckValidation = function() {
+    if ($c.stf.getObjectValue(rdo_PARAM) == "") {
+        $c.win.alert("계산기준을 선택하세요.");
+        rdo_PARAM.focus();
+        return false;
+    }
+
+    // 고정금리-이표채 and 단수일이자기준 is not null인 경우만 최초,중간,최종 이자계산 가능.
+    // else 중간만 계산 가능.
+    // 단수일이자기준 : 1 - 360일 / 2 - 365일 / 3 - 366일 
+    if ($c.stf.getObjectValue(rdo_PARAM) == "F" || $c.stf.getObjectValue(rdo_PARAM) == "L") {
+        // 이자지급방법 : 13(고정금리-이표채), 단수일이자기준 : 2(365일)
+        if ($c.stf.getObjectValue(txb_IntPayMethdCd) != "13") {
+            $c.win.alert("[고정금리형-이표채]만 최초/최종 이자계산이 가능합니다.");
+            return false;
+        }
+        if ($c.stf.getObjectValue(txb_BndOddllotddIntBasTpCd) == "") {
+            $c.win.alert("단수일이자기준값이 없습니다.\n최초/최종 이자계산이 불가합니다.");
+            return false;
+        }
+    }
+    var rdoParam = $c.stf.getObjectValue(rdo_PARAM); //라디오 선택값
+    var listAmt = $c.stf.getObjectValue(edt_ListAmt); //상장금액
+    var coupnRt = $c.stf.getObjectValue(edt_CoupnRt); //표면이자율
+    var fstIntPayDd = $c.stf.getObjectValue(edt_FstIntPayDd); //최초이자지급일
+    var isuDd = $c.stf.getObjectValue(edt_IsuDd); //발행일
+    var intPayCalcMms = $c.stf.getObjectValue(edt_IntPayCalcMms); //이자계산주기
+
+    // 필수값 체크
+    if (listAmt == "") {
+        $c.win.alert("상장금액이 없습니다.");
+        return false;
+    }
+    if (coupnRt == "") {
+        $c.win.alert("표면이자율이 없습니다.");
+        return false;
+    }
+
+    // 최초 이자계산
+    if (rdoParam == "F") {
+        if (isuDd == "") {
+            $c.win.alert("발행일이 없습니다.");
+            return false;
+        }
+        if (fstIntPayDd == "") {
+            $c.win.alert("최초이자지급일이 없습니다.");
+            return false;
+        }
+
+        // 중간 이자계산
+
+    } else if (rdoParam == "M") {
+        if (intPayCalcMms == "") {
+            $c.win.alert("이자계산주기값이 없습니다.");
+            return false;
+        }
+    } else if (rdoParam == "L") {
+        if (dts_List.getTotalRow() < 2) {
+            $c.win.alert("차수가 2개 미만인 경우 '최종' 이자계산이 불가합니다.");
+            return false;
+        }
+    }
+    return true;
+};
+
+
+/********************************************** 
+ * 함수명   : fn_Copy
+ * 설명       : 원리금 정보를 복사한다.
+ ***********************************************/
+scwin.fn_Copy = function() {
+    var prt = $c.frame.path("../");
+    //copy (fromDataSet, toDataSet)
+    $c.stf.CopyDataSet(prt.dts_Princint, dts_List);
+};
+
+
+/********************************************** 
+ * 함수명   : fn_SetParam
+ * 설명       : 부모창에서 받은 데이터를 설정한다.
+ ***********************************************/
+scwin.fn_SetParam = function() {
+    var prt = $c.frame.path("../");
+    if (prt != undefined) {
+        scwin.fn_GetPar = prt.scwin.fn_GetPar;
+    }
+    if (scwin.fn_GetPar != undefined) {
+        var arrPar = new Array();
+        scwin.fn_GetPar(arrPar);
+        $c.stf.setObjectValue(txb_BndMktactTpCd, arrPar[0].BND_MKTACT_TP_CD);
+        $c.stf.setObjectValue(edt_ListAmt, arrPar[0].LIST_AMT);
+        $c.stf.setObjectValue(edt_CoupnRt, arrPar[0].COUPN_RT);
+        $c.stf.setObjectValue(edt_FstIntPayDd, arrPar[0].FST_INT_PAY_DD);
+        $c.stf.setObjectValue(edt_IsuDd, arrPar[0].ISU_DD);
+        $c.stf.setObjectValue(edt_IntPayCalcMms, arrPar[0].INT_PAY_CALC_MMS);
+        $c.stf.setObjectValue(txb_IntPayMethdCd, arrPar[0].INT_PAY_METHD_CD);
+        $c.stf.setObjectValue(txb_BndOddllotddIntBasTpCd, arrPar[0].BND_ODDLLOTDD_INT_BAS_TP_CD);
+        $c.stf.setObjectValue(txb_IntUdwonProcsCd, arrPar[0].INT_UDWON_PROCS_CD);
+    }
+};
+scwin.gform_onload = function() {
+    //숨기기
+    $c.stf.showObj(txb_BndMktactTpCd, false);
+    $c.stf.showObj(edt_ListAmt, false);
+    $c.stf.showObj(edt_CoupnRt, false);
+    $c.stf.showObj(edt_FstIntPayDd, false);
+    $c.stf.showObj(edt_IsuDd, false);
+    $c.stf.showObj(edt_IntPayCalcMms, false);
+
+    //패널라운드처리
+    $c.bns.BnsPanelToGroupBox(pnl_Top);
+    $c.bns.BnsPanelToGroupBox(panel_1);
+    $c.bns.BnsPanelToGroupBox(panel_2);
+
+    //호출파라미터설정
+    scwin.fn_SetParam();
+
+    //목록복사
+    scwin.fn_Copy();
+
+    // 기본값은 최종
+    $c.stf.setObjectValue(rdo_PARAM, "L");
+};
+scwin.btn_Close_onclick = async function() {
+    await $c.frame.CloseFrame();
+};
+scwin.dts_List_OnLoadCompleted = function(rowcount) {
+
+};
+scwin.btn_Calc_onclick = function() {
+    scwin.btn_Calc();
+};
+scwin.edt_ListAmt_OnKeyUp = function(keycode, skeycode) {
+    $c.stf.setObjectValue(txb_AmtHan, $c.bns.fn_ChgAmtToHan($c.stf.getObjectValue(edt_ListAmt)));
+};
+scwin.edt_ListAmt_OnKillFocus = function() {
+    edt_ListAmt.RightMargin = 5;
+};
+scwin.edt_CoupnRt_OnKillFocus = function() {
+    edt_CoupnRt.RightMargin = 5;
+};
+scwin.edt_IntPayCalcMms_OnKillFocus = function() {
+    edt_IntPayCalcMms.RightMargin = 5;
+};
+scwin.edt_PrincPayAmt_OnKillFocus = function() {
+    edt_PrincPayAmt.RightMargin = 5;
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+		<xf:group class="pop_contents" id="" meta_componentContainer="true" style="">
+			<xf:group class="schbox" id="" style="">
+				<xf:group class="schbox_inner" id="" style="">
+					<xf:group adaptive="layout" adaptiveThreshold="768" class="w2tb tbl " id="" style="" tagname="table">
+						<w2:attributes>
+							<w2:summary></w2:summary>
+						</w2:attributes>
+						<xf:group tagname="colgroup">
+							<xf:group style="" tagname="col"></xf:group>
+						</xf:group>
+						<xf:group class="" id="" style="" tagname="tr">
+							<xf:group class="w2tb_td" style="" tagname="td">
+								<xf:group id="" class="flex">
+									<xf:group hierarchy="panel_mkt" style="" id="panel_mkt" orgid="panel_mkt" class="flex_no">
+										<xf:select1 item="F^최초   ,M^중간   ,L^최종   " appearance="full" hierarchy="rdo_PARAM" style=""
+											userData2=" class:TopCondition_BnsYellow; automargin:True; cols:3; font-family:돋움; font-weight:bold;" id="rdo_PARAM"
+											renderType="radiogroup" orgid="rdo_PARAM">
+											<xf:choices>
+												<xf:item>
+													<xf:label><![CDATA[최초   ]]></xf:label>
+													<xf:value><![CDATA[F]]></xf:value>
+												</xf:item>
+												<xf:item>
+													<xf:label><![CDATA[중간   ]]></xf:label>
+													<xf:value><![CDATA[M]]></xf:value>
+												</xf:item>
+												<xf:item>
+													<xf:label><![CDATA[최종   ]]></xf:label>
+													<xf:value><![CDATA[L]]></xf:value>
+												</xf:item>
+											</xf:choices>
+										</xf:select1>
+									</xf:group>
+								</xf:group>
+							</xf:group>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+				<xf:group class="btn_schbox" id="" style="">
+					<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.btn_Calc_onclick" hierarchy="btn_Calc" id="btn_Calc"
+						orgid="btn_Calc" src="../img/btn_calcul.gif" style="">
+						<xf:label><![CDATA[계산]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+			<xf:group class="lybox" id="" style="">
+				<xf:group class="" id="" meta_componentContainer="true" style="">
+					<xf:group class="gvwbox" id="" style="">
+						<w2:gridView class="gvw" dataList="data:dts_List" hierarchy="grd_Princ" id="grd_Princ" orgid="grd_Princ"
+							style="height: 253px;"
+							userData2=" class:Grid_01; allshowedit:False; borderstyle:0; colsizing:True; editable:False; fillarea:True; gtitleheight:0; headborder:4; indwidth:0; titleheight:25; useonecolumnscroll:False; usingoneclick:1; xtitleheight:0; font-family:돋움체; font-weight:normal; border-color:#c0c0c0;" autoFit="allColumn">
+							<w2:caption id="caption1" style="" value="this is a grid caption."></w2:caption>
+							<w2:header id="header1" style="">
+								<w2:row>
+									<w2:column displayMode="label" id="h_PRINCINT_INFO_REG_SEQ" inputType="text" readOnly="true"
+										textAlign="center"
+										userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; color:#343434; sumbgcolor:#fefaef; sumcolor:#343434; listalign:center;"
+										value="차수" width="60">
+									</w2:column>
+									<w2:column dataType="number" displayMode="label" id="h_INT_PAY_DD" inputType="text" textAlign="center"
+										userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; color:#343434; sumbgcolor:#fefaef; sumcolor:#343434; listalign:center; mask:XXXX-XX-XX;"
+										value="이자지급일" width="210">
+									</w2:column>
+									<w2:column dataType="number" displayMode="label" id="h_INT_PAY_AMT" inputType="text" textAlign="center"
+										userData2=" listalign:center; displayformat:#,##0;" value="이자지급액" width="250">
+									</w2:column>
+								</w2:row>
+							</w2:header>
+							<w2:gBody id="gBody1" style="">
+								<w2:row id="" style="">
+									<w2:column displayMode="label" id="PRINCINT_INFO_REG_SEQ" inputType="text" textAlign="center"
+										width="60">
+									</w2:column>
+									<w2:column displayMode="label" id="INT_PAY_DD" inputType="datecheck" textAlign="center" width="210"></w2:column>
+									<w2:column displayMode="label" id="INT_PAY_AMT" inputType="text" textAlign="right" width="250"></w2:column>
+								</w2:row>
+							</w2:gBody>
+						</w2:gridView>
+					</xf:group>
+				</xf:group>
+				<xf:group adaptiveThreshold="" class="col_fix" id="" meta_componentContainer="true" style="width:135px;">
+					<xf:group class="tblbox" id="" style="">
+						<xf:group class="w2tb tbl" id="" style="" tagname="table">
+							<w2:attributes>
+								<w2:summary></w2:summary>
+							</w2:attributes>
+							<xf:group tagname="colgroup">
+								<xf:group style="" tagname="col"></xf:group>
+							</xf:group>
+							<xf:group style="" tagname="tr">
+								<xf:group class="w2tb_th tac" style="" tagname="th"><w2:textbox hierarchy="txb_BndMktactTpCd" id="txb_BndMktactTpCd" label="시장조치구분코드" maxlength="80"
+										orgid="txb_BndMktactTpCd" readOnly="true" style="" userData2=" class:TopCondition_01_read;">
+									</w2:textbox></xf:group>
+							</xf:group>
+							<xf:group tagname="tr">
+								<xf:group class="w2tb_td" tagname="td">
+									<w2:attributes>
+										<w2:scope>row</w2:scope>
+									</w2:attributes>
+									<xf:input ev:onkeyup="scwin.edt_ListAmt_OnKeyUp" hierarchy="edt_ListAmt" id="edt_ListAmt" maxlength="15"
+										orgid="edt_ListAmt" readOnly="false" style="width:100%;" tabIndex="11"
+										userData2=" class:panel_maskedit_write_02; onkillfocus:edt_ListAmt_OnKillFocus; alignment:2; datemodify:True; generaledit:False; maxdecimalplace:3; numeric:True; rightmargin:5; selectall:True; showliteral:false; valign:1;">
+									</xf:input>
+								</xf:group>
+							</xf:group>
+							<xf:group tagname="tr">
+								<xf:group class="w2tb_td" tagname="td">
+									<w2:attributes>
+										<w2:scope>row</w2:scope>
+									</w2:attributes>
+									<xf:input hierarchy="edt_CoupnRt" id="edt_CoupnRt" maxlength="3" orgid="edt_CoupnRt"
+										style="width:100%;" tabIndex="11"
+										userData2=" class:panel_maskedit_write_02; onkillfocus:edt_CoupnRt_OnKillFocus; alignment:2; datemodify:True; generaledit:False; inputformat:YYYYMMDD; iscomma:True; maxdecimalplace:5; numeric:True; rightmargin:5; selectall:True; showliteral:false; valign:1;">
+									</xf:input>
+								</xf:group>
+							</xf:group>
+							<xf:group tagname="tr">
+								<xf:group tagname="td" class="w2tb_td">
+									<w2:attributes></w2:attributes>
+									<w2:inputCalendar displayFormat="yyyy-MM-dd" hierarchy="edt_FstIntPayDd" id="edt_FstIntPayDd"
+										maxlength="8" orgid="edt_FstIntPayDd" style="" tabIndex="4"
+										userData2=" class:panel_maskedit_write_01; alignment:1; generaledit:False; numeric:False; valign:1;">
+									</w2:inputCalendar>
+								</xf:group>
+							</xf:group>
+							<xf:group tagname="tr">
+								<xf:group tagname="td" class="w2tb_td">
+									<w2:attributes></w2:attributes>
+									<w2:inputCalendar displayFormat="yyyy-MM-dd" hierarchy="edt_IsuDd" id="edt_IsuDd" orgid="edt_IsuDd"
+										style="" tabIndex="4" userData2=" class:panel_maskedit_write_01; alignment:1; generaledit:False; numeric:False; valign:1;">
+									</w2:inputCalendar>
+								</xf:group>
+							</xf:group>
+							<xf:group tagname="tr">
+								<xf:group tagname="td" class="w2tb_td">
+									<w2:attributes></w2:attributes>
+									<xf:input hierarchy="edt_IntPayCalcMms" id="edt_IntPayCalcMms" maxlength="3" orgid="edt_IntPayCalcMms"
+										readOnly="false" style="width:100%;" tabIndex="11"
+										userData2=" class:panel_maskedit_write_02; onkillfocus:edt_IntPayCalcMms_OnKillFocus; alignment:2; datemodify:True; generaledit:False; maxdecimalplace:3; numeric:True; rightmargin:5; selectall:True; showliteral:false; valign:1;">
+									</xf:input>
+								</xf:group>
+							</xf:group>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<xf:group class="tblbox" id="" style="">
+				<xf:group adaptive="layout" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+					<w2:attributes>
+						<w2:summary></w2:summary>
+					</w2:attributes>
+					<xf:group tagname="colgroup">
+						<xf:group style="" tagname="col"></xf:group>
+						<xf:group style="width:125px;" tagname="col"></xf:group>
+					</xf:group>
+					<xf:group tagname="tr" style="">
+						<xf:group tagname="th" class="w2tb_th tar">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_75" id="label_75" label="이자지급액" orgid="label_75" style=""
+								userData2=" class:TopCondition_02; font-weight:bold;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input hierarchy="edt_PrincPayAmt" id="edt_PrincPayAmt" maxlength="18" orgid="edt_PrincPayAmt"
+								readOnly="false" style="width:100%;" tabIndex="11"
+								userData2=" class:panel_maskedit_write_02; onkillfocus:edt_PrincPayAmt_OnKillFocus; alignment:2; datemodify:True; generaledit:False; maxdecimalplace:3; numeric:True; rightmargin:5; selectall:True; showliteral:false; valign:1;">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<w2:textbox hierarchy="label_1" id="label_1" label="* 계산식 (초일 산입, 말일 불산입, '이자원단위 미만처리' 기준에 따라, 이자지급금액 소수점 금액 계산)"
+				orgid="label_1" style="" userData2=" class:Red_Bold; font-family:돋움; font-weight:normal;" class="txt_info">
+			</w2:textbox>
+			<w2:textbox hierarchy="label_10" id="label_10" label="[최초] 상장금액 X 표면이자율 X (최초이자지급일 - 발행일) / 단수일이자기준" orgid="label_10" style=""
+				userData2=" class:Red_Bold; font-family:돋움; font-weight:normal;" class="txt_info">
+			</w2:textbox>
+			<w2:textbox hierarchy="label_4" id="label_4" label="[중간] 상장금액 X 표면이자율 X (이자계산주기 / 12)" orgid="label_4" style=""
+				userData2=" class:Red_Bold; font-family:돋움; font-weight:normal;" class="txt_info">
+			</w2:textbox>
+			<w2:textbox hierarchy="label_5" id="label_5" label="[최종] 상장금액 X 표면이자율 X (마지막차수 이자지급일 - 마지막 전회차 이자지급일) / 단수일이자기준" orgid="label_5"
+				style="" userData2=" class:Red_Bold; font-family:돋움; font-weight:normal;" class="txt_info">
+			</w2:textbox>
+			<xf:group id="" class="flex flex_no mt10">
+				<xf:input maxlength="80" hierarchy="txb_IntPayMethdCd" readOnly="true" style="width:100px;"
+					userData2=" class:TopCondition_01_read; visibility:hidden;" id="txb_IntPayMethdCd" orgid="txb_IntPayMethdCd">
+				</xf:input>
+				<xf:input maxlength="80" hierarchy="txb_BndOddllotddIntBasTpCd" readOnly="true" style="width:100px;"
+					userData2=" class:TopCondition_01_read; visibility:hidden;" id="txb_BndOddllotddIntBasTpCd" orgid="txb_BndOddllotddIntBasTpCd">
+				</xf:input>
+				<xf:input maxlength="80" hierarchy="txb_IntUdwonProcsCd" readOnly="true" style="width:100px;"
+					userData2=" class:TopCondition_01_read; visibility:hidden;" id="txb_IntUdwonProcsCd" orgid="txb_IntUdwonProcsCd">
+				</xf:input>
+			</xf:group>
+			<xf:group class="btnbox" id="">
+				<xf:group class="rt" id="">
+					<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.btn_Close_onclick" id="btn_Close"
+						src="../img/btn_close.gif" style="" text="닫기">
+						<xf:label><![CDATA[닫기]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+		</xf:group>
+	</body>
+</html>

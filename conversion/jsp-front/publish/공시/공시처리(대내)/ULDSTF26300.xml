@@ -1,0 +1,1794 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDSTF26300.gfm" meta_screenName="(구)분/반기/사업보고서 재무자료 추출">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<xf:model>
+			<w2:workflowCollection/>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+/* ★Wcraft guide★    
+스크립트 수작업 유의사항
+*/
+
+
+//★Wcraft guide★ include부분 주석처리 -> include("../js/libRoundPanel.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/stf.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/utils.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/session.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/PopupCalendar.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/common.js");
+scwin.gDepCd;
+scwin.gEmpNo;
+scwin.gLdMktTp;
+scwin.gUpDepCd;
+scwin.gIsurCd;
+scwin.colorCnt = 0; //조회한 이후에만 컬럼에  color 변경하기 위한 변수 
+
+scwin.vScrenID = 'ULDSTF26300.xml';
+
+//컬럼 컬러 구분을 위한 변수
+scwin.check1, scwin.check2, scwin.check3, scwin.check4, scwin.check5, scwin.check6, scwin.check7, scwin.check8, scwin.check9, scwin.check10, scwin.check11, scwin.check12, scwin.check13, scwin.check14, scwin.check15, scwin.check16, scwin.check17;
+scwin.onpageload = function() {
+    scwin.gform_onload();
+};
+scwin.onpageunload = function() {
+};
+scwin.fn_SetCode = function() {
+    scwin.gDepCd = js_dep_cd;
+    scwin.gEmpNo = js_emp_no;
+    scwin.gLdMktTp = js_market;
+    //gUpDepCd = js_up_dep_cd;
+
+    // 팀 리스트 박스(소속부서와 같은 상위부서인 팀)	
+    //dts_dep.DataID = "/CodeAction.do?method=listDepCdCode&For=R";
+    dts_dep.DataID = "/CodeAction.do?method=getDepUpCode" + "&inputMessageId=CODE_EMPDEP_IN&outputMessageId=CODE_EMPDEP_OUT" + "&For=R&DEP_CD=" + scwin.gDepCd;
+    dts_dep.Reset();
+
+    //담당자 리스트 박스(소속부서와 같은 상위부서인 팀원)	
+    dts_emp.DataID = "/CodeAction.do?method=getEmpNoDepCode" + "&inputMessageId=CODE_EMPDEP_IN&outputMessageId=CODE_EMPDEP_OUT" + "&For=R&DEP_CD=" + scwin.gDepCd;
+    dts_emp.Reset();
+
+    // 업종 셋팅
+    dts_IndTp.DataID = "/CodeAction.do?method=listStdIndtpCB" + "&inputMessageId=CODEVALUE_INOUT&outputMessageId=CODE_OUT" + "&For=R";
+    dts_IndTp.Reset();
+
+    // 기업집단 셋팅
+    dts_com_grp.DataID = "/CodeAction.do?method=listComGrp" + "&inputMessageId=CODEVALUE_INOUT&outputMessageId=CODE_OUT" + "&For=R";
+    dts_com_grp.Reset();
+};
+scwin.fn_Init = function() {
+    var ToDay = new Date();
+    var yyyy = parseInt(ToDay.getYear(), 10);
+    var str = "";
+    for (var i = yyyy; i >= 1998; i--) {
+        str += i + "^" + i + ",";
+    }
+    str = str.substring(0, str.length - 1);
+    //alert(str);
+    cmb_FISCYY.CBData = str;
+    $c.stf.setObjectValue(rdo_MKT_ID, js_market);
+    if (js_market == "9") {
+        rdo_MKT_ID.setDisabled(false);
+        $c.stf.setObjectValue(rdo_MKT_ID, "1");
+    } else {
+        // 콘트롤 잠그기.
+        $c.cm.setColumnProp(grd_XBRL2, "MKT_NM", "Show", false);
+        rdo_MKT_ID.setDisabled(true);
+    }
+};
+
+
+
+// 법인명이 있고 특정 다른 조건을 선택할때 메세지
+scwin.fn_CheckComNmCond = function() {
+    var vIsurCd = $c.stf.getObjectValue(txb_isur_cd);
+    if (vIsurCd != '') {
+        $c.win.alert("해당항목 선택시 법인코드(명)의 조건값이  초기화 됩니다.");
+        $c.stf.setObjectValue(txb_isur_cd, '');
+        $c.stf.setObjectValue(txb_COM_NM, '');
+        return;
+    }
+};
+scwin.fn_listNewsflashFinance = function() {
+    scwin.colorCnt = 1; //조회를 클릭한 경우에만 컬럼 color 변경해줌
+
+    var flag = $c.stf.getObjectValue(rdo_MKT_ID);
+    var vFISCYY = $c.stf.getObjectValue(cmb_FISCYY);
+    var vISUR_CD = $c.stf.getObjectValue(txb_isur_cd);
+    if (flag == "9" || flag == "") {
+        $c.win.alert("[시장구분]을 선택하세요.");
+        rdo_MKT_ID.focus();
+        return;
+    } else {
+        scwin.gDepCd = $c.stf.getObjectValue(cmb_TeamList);
+        scwin.gEmpNo = $c.stf.getObjectValue(cmb_EmpList);
+
+
+        //alert("gDepCd: " + gDepCd);
+        //alert("gEmpNo: " + gEmpNo);
+        // alert("js_dep_cd: " + js_dep_cd);
+
+        /*
+        if (gDepCd == "UPTEAM" ) { //&&  js_dep_cd.substr(2,4) == '00') {		
+        	gUpDepCd = js_dep_cd;
+        	// gDepCd = '%';
+        }
+        */
+
+        if (scwin.gEmpNo == "") {
+            scwin.gEmpNo = '%';
+        }
+        if (scwin.gDepCd == "") {
+            scwin.gDepCd = 'all';
+        }
+
+        //		var url = "/DisclosureStatistics.do?method=listNewsflashFinance";
+        //			url += "&MKT_ID=" + getObjectValue(rdo_MKT_ID);
+        //			url += "&FISCYY=" + vFISCYY;
+        //			url += "&RPT_KIND=" + getObjectValue(cmb_RPT_KIND);
+        //		dts_TOBE.DataID = encodeURI(url);
+        //		dts_TOBE.Reset();
+
+
+        scwin.fn_changeHeader();
+        $c.cm.ShowWin(grd_XBRL2);
+        var url = "/DisclosureStatistics.do?method=listNewsflashXBRL";
+        url += "&MKT_ID=" + $c.stf.getObjectValue(rdo_MKT_ID);
+        url += "&FISCYY=" + vFISCYY;
+        url += "&MM=" + $c.stf.getObjectValue(cmb_MM);
+        url += "&RPT_KIND=" + $c.stf.getObjectValue(cmb_RPT_KIND);
+        url += "&ISUR_CD=" + vISUR_CD;
+        url += "&DEP_CD=" + scwin.gDepCd;
+        url += "&EMP_NO=" + scwin.gEmpNo;
+        url += "&UP_DEP_CD=" + js_belngdepcd;
+        url += "&IND_TP=" + $c.stf.getObjectValue(cmb_IndTp);
+        url += "&COM_GRP=" + $c.stf.getObjectValue(cmb_com_grp);
+        url += "&MON_UNIT=" + $c.stf.getObjectValue(cmb_mon_unit);
+        url += "&SCREN_ID=" + scwin.vScrenID;
+        url += "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01;
+        dts_XBRL.DataID = encodeURI(url);
+        var str = dts_XBRL.getCellData(1, 5);
+        //dts_XBRL.Text;
+        //.ColumnValue(1,2);
+        dts_XBRL.Reset();
+    }
+};
+
+
+
+// 공시팀 전체 목록에 추가
+scwin.fn_addDsclTeamAll = function(rowcount) {
+    dts_dep.setCellData(2, "VALUE", 'UPTEAM'); //
+    dts_dep.setCellData(2, "TEXT", '공시팀 전체');
+    dts_dep.setCellData(2, "DEP_CD", 'UPTEAM');
+    for (var i = 3; i <= rowcount; i++) {
+        dts_dep.setCellData(i, "VALUE", dts_dep1.getCellData(i - 1, "VALUE")); //
+        dts_dep.setCellData(i, "TEXT", dts_dep1.getCellData(i - 1, "TEXT"));
+        dts_dep.setCellData(i, "DEP_CD", dts_dep1.getCellData(i - 1, "DEP_CD"));
+    }
+    dts_dep.insertRow();
+    dts_dep.setCellData(rowcount + 1, "VALUE", dts_dep1.getCellData(rowcount, "VALUE")); //
+    dts_dep.setCellData(rowcount + 1, "TEXT", dts_dep1.getCellData(rowcount, "TEXT"));
+    dts_dep.setCellData(rowcount + 1, "DEP_CD", dts_dep1.getCellData(rowcount, "DEP_CD"));
+};
+scwin.fn_changeHeader = function() {
+    if ($c.stf.getObjectValue(cmb_RPT_KIND) == '4') {
+        $c.cm.setColumnProp(grd_XBRL2, 'SALESREVENUE1', 'Name', '당기');
+        $c.cm.setColumnProp(grd_XBRL2, 'SALESREVENUE2', 'Name', '전기');
+        $c.cm.setColumnProp(grd_XBRL2, 'SALESREVENUE3', 'Name', '전전기');
+        $c.cm.setColumnProp(grd_XBRL2, 'SALESREVENUE4', 'Name', '-');
+        $c.cm.setColumnProp(grd_XBRL2, 'COSTGOODSSOLD1', 'Name', '당기');
+        $c.cm.setColumnProp(grd_XBRL2, 'COSTGOODSSOLD2', 'Name', '전기');
+        $c.cm.setColumnProp(grd_XBRL2, 'COSTGOODSSOLD3', 'Name', '전전기');
+        $c.cm.setColumnProp(grd_XBRL2, 'COSTGOODSSOLD4', 'Name', '-');
+        $c.cm.setColumnProp(grd_XBRL2, 'GROSSPROFITLOSS1', 'Name', '당기');
+        $c.cm.setColumnProp(grd_XBRL2, 'GROSSPROFITLOSS2', 'Name', '전기');
+        $c.cm.setColumnProp(grd_XBRL2, 'GROSSPROFITLOSS3', 'Name', '전전기');
+        $c.cm.setColumnProp(grd_XBRL2, 'GROSSPROFITLOSS4', 'Name', '-');
+        $c.cm.setColumnProp(grd_XBRL2, 'SELLADMINEXPENSES1', 'Name', '당기');
+        $c.cm.setColumnProp(grd_XBRL2, 'SELLADMINEXPENSES2', 'Name', '전기');
+        $c.cm.setColumnProp(grd_XBRL2, 'SELLADMINEXPENSES3', 'Name', '전전기');
+        $c.cm.setColumnProp(grd_XBRL2, 'SELLADMINEXPENSES4', 'Name', '-');
+        $c.cm.setColumnProp(grd_XBRL2, 'OPERATINGINCOMELOSS1', 'Name', '당기');
+        $c.cm.setColumnProp(grd_XBRL2, 'OPERATINGINCOMELOSS2', 'Name', '전기');
+        $c.cm.setColumnProp(grd_XBRL2, 'OPERATINGINCOMELOSS3', 'Name', '전전기');
+        $c.cm.setColumnProp(grd_XBRL2, 'OPERATINGINCOMELOSS4', 'Name', '-');
+        $c.cm.setColumnProp(grd_XBRL2, 'NONOPERREVENUES1', 'Name', '당기');
+        $c.cm.setColumnProp(grd_XBRL2, 'NONOPERREVENUES2', 'Name', '전기');
+        $c.cm.setColumnProp(grd_XBRL2, 'NONOPERREVENUES3', 'Name', '전전기');
+        $c.cm.setColumnProp(grd_XBRL2, 'NONOPERREVENUES4', 'Name', '-');
+        $c.cm.setColumnProp(grd_XBRL2, 'NONOPEREXPENSES1', 'Name', '당기');
+        $c.cm.setColumnProp(grd_XBRL2, 'NONOPEREXPENSES2', 'Name', '전기');
+        $c.cm.setColumnProp(grd_XBRL2, 'NONOPEREXPENSES3', 'Name', '전전기');
+        $c.cm.setColumnProp(grd_XBRL2, 'NONOPEREXPENSES4', 'Name', '-');
+        $c.cm.setColumnProp(grd_XBRL2, 'ONGOINGBUSINESS1', 'Name', '당기');
+        $c.cm.setColumnProp(grd_XBRL2, 'ONGOINGBUSINESS2', 'Name', '전기');
+        $c.cm.setColumnProp(grd_XBRL2, 'ONGOINGBUSINESS3', 'Name', '전전기');
+        $c.cm.setColumnProp(grd_XBRL2, 'ONGOINGBUSINESS4', 'Name', '-');
+        $c.cm.setColumnProp(grd_XBRL2, 'INCOMETAXES1', 'Name', '당기');
+        $c.cm.setColumnProp(grd_XBRL2, 'INCOMETAXES2', 'Name', '전기');
+        $c.cm.setColumnProp(grd_XBRL2, 'INCOMETAXES3', 'Name', '전전기');
+        $c.cm.setColumnProp(grd_XBRL2, 'INCOMETAXES4', 'Name', '-');
+        $c.cm.setColumnProp(grd_XBRL2, 'ONGOINGINCOMELOSS1', 'Name', '당기');
+        $c.cm.setColumnProp(grd_XBRL2, 'ONGOINGINCOMELOSS2', 'Name', '전기');
+        $c.cm.setColumnProp(grd_XBRL2, 'ONGOINGINCOMELOSS3', 'Name', '전전기');
+        $c.cm.setColumnProp(grd_XBRL2, 'ONGOINGINCOMELOSS4', 'Name', '-');
+        $c.cm.setColumnProp(grd_XBRL2, 'DISOPERINCOMELOSS1', 'Name', '당기');
+        $c.cm.setColumnProp(grd_XBRL2, 'DISOPERINCOMELOSS2', 'Name', '전기');
+        $c.cm.setColumnProp(grd_XBRL2, 'DISOPERINCOMELOSS3', 'Name', '전전기');
+        $c.cm.setColumnProp(grd_XBRL2, 'DISOPERINCOMELOSS4', 'Name', '-');
+        $c.cm.setColumnProp(grd_XBRL2, 'INLSSBEFINCMTAXEX1', 'Name', '당기');
+        $c.cm.setColumnProp(grd_XBRL2, 'INLSSBEFINCMTAXEX2', 'Name', '전기');
+        $c.cm.setColumnProp(grd_XBRL2, 'INLSSBEFINCMTAXEX3', 'Name', '전전기');
+        $c.cm.setColumnProp(grd_XBRL2, 'INLSSBEFINCMTAXEX4', 'Name', '-');
+        $c.cm.setColumnProp(grd_XBRL2, 'INCOMETAXESEXPENSES1', 'Name', '당기');
+        $c.cm.setColumnProp(grd_XBRL2, 'INCOMETAXESEXPENSES2', 'Name', '전기');
+        $c.cm.setColumnProp(grd_XBRL2, 'INCOMETAXESEXPENSES3', 'Name', '전전기');
+        $c.cm.setColumnProp(grd_XBRL2, 'INCOMETAXESEXPENSES4', 'Name', '-');
+        $c.cm.setColumnProp(grd_XBRL2, 'NETINCOMELOSS1', 'Name', '당기');
+        $c.cm.setColumnProp(grd_XBRL2, 'NETINCOMELOSS2', 'Name', '전기');
+        $c.cm.setColumnProp(grd_XBRL2, 'NETINCOMELOSS3', 'Name', '전전기');
+        $c.cm.setColumnProp(grd_XBRL2, 'NETINCOMELOSS4', 'Name', '-');
+    } else {
+        $c.cm.setColumnProp(grd_XBRL2, 'SALESREVENUE1', 'Name', '당기3개월');
+        $c.cm.setColumnProp(grd_XBRL2, 'SALESREVENUE2', 'Name', '당기누적');
+        $c.cm.setColumnProp(grd_XBRL2, 'SALESREVENUE3', 'Name', '전기3개월');
+        $c.cm.setColumnProp(grd_XBRL2, 'SALESREVENUE4', 'Name', '전기누적');
+        $c.cm.setColumnProp(grd_XBRL2, 'COSTGOODSSOLD1', 'Name', '당기3개월');
+        $c.cm.setColumnProp(grd_XBRL2, 'COSTGOODSSOLD2', 'Name', '당기누적');
+        $c.cm.setColumnProp(grd_XBRL2, 'COSTGOODSSOLD3', 'Name', '전기3개월');
+        $c.cm.setColumnProp(grd_XBRL2, 'COSTGOODSSOLD4', 'Name', '전기누적');
+        $c.cm.setColumnProp(grd_XBRL2, 'GROSSPROFITLOSS1', 'Name', '당기3개월');
+        $c.cm.setColumnProp(grd_XBRL2, 'GROSSPROFITLOSS2', 'Name', '당기누적');
+        $c.cm.setColumnProp(grd_XBRL2, 'GROSSPROFITLOSS3', 'Name', '전기3개월');
+        $c.cm.setColumnProp(grd_XBRL2, 'GROSSPROFITLOSS4', 'Name', '전기누적');
+        $c.cm.setColumnProp(grd_XBRL2, 'SELLADMINEXPENSES1', 'Name', '당기3개월');
+        $c.cm.setColumnProp(grd_XBRL2, 'SELLADMINEXPENSES2', 'Name', '당기누적');
+        $c.cm.setColumnProp(grd_XBRL2, 'SELLADMINEXPENSES3', 'Name', '전기3개월');
+        $c.cm.setColumnProp(grd_XBRL2, 'SELLADMINEXPENSES4', 'Name', '전기누적');
+        $c.cm.setColumnProp(grd_XBRL2, 'OPERATINGINCOMELOSS1', 'Name', '당기3개월');
+        $c.cm.setColumnProp(grd_XBRL2, 'OPERATINGINCOMELOSS2', 'Name', '당기누적');
+        $c.cm.setColumnProp(grd_XBRL2, 'OPERATINGINCOMELOSS3', 'Name', '전기3개월');
+        $c.cm.setColumnProp(grd_XBRL2, 'OPERATINGINCOMELOSS4', 'Name', '전기누적');
+        $c.cm.setColumnProp(grd_XBRL2, 'NONOPERREVENUES1', 'Name', '당기3개월');
+        $c.cm.setColumnProp(grd_XBRL2, 'NONOPERREVENUES2', 'Name', '당기누적');
+        $c.cm.setColumnProp(grd_XBRL2, 'NONOPERREVENUES3', 'Name', '전기3개월');
+        $c.cm.setColumnProp(grd_XBRL2, 'NONOPERREVENUES4', 'Name', '전기누적');
+        $c.cm.setColumnProp(grd_XBRL2, 'NONOPEREXPENSES1', 'Name', '당기3개월');
+        $c.cm.setColumnProp(grd_XBRL2, 'NONOPEREXPENSES2', 'Name', '당기누적');
+        $c.cm.setColumnProp(grd_XBRL2, 'NONOPEREXPENSES3', 'Name', '전기3개월');
+        $c.cm.setColumnProp(grd_XBRL2, 'NONOPEREXPENSES4', 'Name', '전기누적');
+        $c.cm.setColumnProp(grd_XBRL2, 'ONGOINGBUSINESS1', 'Name', '당기3개월');
+        $c.cm.setColumnProp(grd_XBRL2, 'ONGOINGBUSINESS2', 'Name', '당기누적');
+        $c.cm.setColumnProp(grd_XBRL2, 'ONGOINGBUSINESS3', 'Name', '전기3개월');
+        $c.cm.setColumnProp(grd_XBRL2, 'ONGOINGBUSINESS4', 'Name', '전기누적');
+        $c.cm.setColumnProp(grd_XBRL2, 'INCOMETAXES1', 'Name', '당기3개월');
+        $c.cm.setColumnProp(grd_XBRL2, 'INCOMETAXES2', 'Name', '당기누적');
+        $c.cm.setColumnProp(grd_XBRL2, 'INCOMETAXES3', 'Name', '전기3개월');
+        $c.cm.setColumnProp(grd_XBRL2, 'INCOMETAXES4', 'Name', '전기누적');
+        $c.cm.setColumnProp(grd_XBRL2, 'ONGOINGINCOMELOSS1', 'Name', '당기3개월');
+        $c.cm.setColumnProp(grd_XBRL2, 'ONGOINGINCOMELOSS2', 'Name', '당기누적');
+        $c.cm.setColumnProp(grd_XBRL2, 'ONGOINGINCOMELOSS3', 'Name', '전기3개월');
+        $c.cm.setColumnProp(grd_XBRL2, 'ONGOINGINCOMELOSS4', 'Name', '전기누적');
+        $c.cm.setColumnProp(grd_XBRL2, 'DISOPERINCOMELOSS1', 'Name', '당기3개월');
+        $c.cm.setColumnProp(grd_XBRL2, 'DISOPERINCOMELOSS2', 'Name', '당기누적');
+        $c.cm.setColumnProp(grd_XBRL2, 'DISOPERINCOMELOSS3', 'Name', '전기3개월');
+        $c.cm.setColumnProp(grd_XBRL2, 'DISOPERINCOMELOSS4', 'Name', '전기누적');
+        $c.cm.setColumnProp(grd_XBRL2, 'INLSSBEFINCMTAXEX1', 'Name', '당기3개월');
+        $c.cm.setColumnProp(grd_XBRL2, 'INLSSBEFINCMTAXEX2', 'Name', '당기누적');
+        $c.cm.setColumnProp(grd_XBRL2, 'INLSSBEFINCMTAXEX3', 'Name', '전기3개월');
+        $c.cm.setColumnProp(grd_XBRL2, 'INLSSBEFINCMTAXEX4', 'Name', '전기누적');
+        $c.cm.setColumnProp(grd_XBRL2, 'INCOMETAXESEXPENSES1', 'Name', '당기3개월');
+        $c.cm.setColumnProp(grd_XBRL2, 'INCOMETAXESEXPENSES2', 'Name', '당기누적');
+        $c.cm.setColumnProp(grd_XBRL2, 'INCOMETAXESEXPENSES3', 'Name', '전기3개월');
+        $c.cm.setColumnProp(grd_XBRL2, 'INCOMETAXESEXPENSES4', 'Name', '전기누적');
+        $c.cm.setColumnProp(grd_XBRL2, 'NETINCOMELOSS1', 'Name', '당기3개월');
+        $c.cm.setColumnProp(grd_XBRL2, 'NETINCOMELOSS2', 'Name', '당기누적');
+        $c.cm.setColumnProp(grd_XBRL2, 'NETINCOMELOSS3', 'Name', '전기3개월');
+        $c.cm.setColumnProp(grd_XBRL2, 'NETINCOMELOSS4', 'Name', '전기누적');
+    }
+};
+scwin.fn_allDisCheck = function() {
+    //alert(eval('checkbox_'+num));
+
+    for (var i = 0; i < 21; i++) {
+        if (i == 0 || i == 1 || i == 2 || i == 7 || i == 8 || i == 12 || i == 15 || i == 20) {
+            continue;
+        }
+        eval('checkbox_' + i).setValue(0);
+    }
+};
+scwin.fn_allCheck = function() {
+    for (var i = 0; i < 21; i++) {
+        if (i == 0 || i == 1 || i == 2 || i == 7 || i == 8 || i == 12 || i == 15 || i == 20) {
+            continue;
+        }
+        eval('checkbox_' + i).setValue(1);
+    }
+};
+scwin.fn_showGridField = function(flag) {
+    var id = "";
+    if (flag == 'SHOW') {
+        //grd_XBRL2.ColumnProp('1','Show') = true;
+        //grd_XBRL2.ColumnProp('2','Show') = true;
+        for (var i = 0; i < 21; i++) {
+            id = i;
+            if (i == 0 || i == 1 || i == 2 || i == 7 || i == 8 || i == 12 || i == 15 || i == 20) {
+                continue;
+            }
+            $c.cm.setColumnProp(grd_XBRL2, i, 'Show', true);
+        }
+    } else {
+        //grd_XBRL2.ColumnProp('1','Show') = false;
+        //grd_XBRL2.ColumnProp('2','Show') = false;
+        for (var i = 0; i < 21; i++) {
+            id = i;
+            if (i == 0 || i == 1 || i == 2 || i == 7 || i == 8 || i == 12 || i == 15 || i == 20) {
+                continue;
+            }
+            $c.cm.setColumnProp(grd_XBRL2, i, 'Show', false);
+        }
+    }
+};
+scwin.fn_checkBox = function(i) {
+    if (eval('checkbox_' + i).checked) {
+        $c.cm.setColumnProp(grd_XBRL2, i, 'Show', true);
+    } else {
+        $c.cm.setColumnProp(grd_XBRL2, i, 'Show', false);
+    }
+};
+scwin.btn_Search_onclick = function() {
+    scwin.fn_listNewsflashFinance();
+};
+scwin.btn_ISUR_CD_onclick = function() {
+    $c.cm.IsurcdSearch(txb_isur_cd, txb_COM_NM);
+};
+scwin.dts_XBRL_OnLoadCompleted = function(rowcount) {
+    $c.stf.FillGridHeaderTotalCnt(rowcount, panel_page);
+    $c.cm.CloseWin(rowcount, grd_XBRL2);
+};
+scwin.dts_XBRL_OnLoadError = function() {
+    $c.stf.alert_error(dts_XBRL);
+};
+scwin.grd_XBRL2_OnDblClick = function(row, colid) {
+    scwin.gIsurCd = dts_XBRL.getCellData(row, "ISUR_CD");
+    var AcptNo = dts_XBRL.getCellData(row, "ACPT_NO");
+
+    //alert(dts_XBRL.NameValue(row,"NONOPERREVENUES1"));
+    //alert(dts_XBRL.NameValue(row,"NONOPEREXPENSES1"));
+    if (colid == "ACPT_NO") {
+        $c.stf.fn_OpenDisclViewer(AcptNo, "R");
+    } else if (colid == "COM_ABBRV") {
+        $c.stf.fn_PopupCorpInfo();
+    }
+};
+scwin.Grd_com_isur_OnKeyPress = function(kcode) {
+    if (kcode == '13') {
+        $c.cm.fn_com_Confirm_set();
+    }
+};
+scwin.Grd_com_isur_OnDblClick = function(row, colid) {
+    $c.cm.fn_com_Confirm_set();
+};
+scwin.Grd_com_isur_OnClick = function(row, colid) {
+    Grd_com_isur.style.display = "";
+};
+scwin.Grd_com_isur_OnSetFocus = function() {
+    stFocusGrid = true;
+};
+scwin.Grd_com_isur_OnKillFocus = function() {
+    stFocusGrid = false;
+    Grd_com_isur.style.display = "none";
+};
+scwin.txb_isur_cd_onblur = function() {
+    if (stFocusGrid == false) {
+        Grd_com_isur.style.display = "none";
+    }
+    if (txb_isur_cd.getValue() == "") {
+        txb_COM_NM.setValue("");
+    }
+};
+scwin.txb_isur_cd_onfocus = function() {
+    Grd_com_isur.style.display = "none";
+};
+scwin.MxDataSet_com_isur_OnFilter = function(row) {
+    if (skw != "" && foColum == "1") {
+        f1 = MxDataSet_com_isur.getCellData(row, "COM_ABBRV");
+        f2 = MxDataSet_com_isur.getCellData(row, "OLD_COM_ABBRV");
+        if (f1.indexOf(skw) != -1 || f2.indexOf(skw) != -1) return true;
+
+        else return false;
+    } else return true;
+};
+scwin.txb_isur_cd_onkeyup = function() {
+    if (txb_isur_cd.getValue() == "") {
+        Grd_com_isur.style.display = "none";
+    } else {
+        if (window.event.keyCode == 40) {
+            //아래화살표눌렀을때 그리드로 포커스
+            Grd_com_isur.focus();
+        } else {
+            $c.cm.fn_com_isur_nm(window.event.keyCode);
+        }
+    }
+};
+scwin.dts_emp_OnLoadCompleted = function(rowcount) {
+    //setObjectValue(cmb_EmpList, js_emp_no) ;	
+
+};
+scwin.dts_emp_OnFilter = function(row) {
+    //  부서코드에  해당하는 사원을 가져온다.
+    if (scwin.gDepCd == "" || scwin.gDepCd == "UPTEAM") {
+        // 전체일 경우 모두 보여준다.
+        return true;
+    } else {
+        if (dts_emp.getCellData(row, "dep_cd") == scwin.gDepCd ||
+            dts_emp.getCellData(row, "dep_cd") == "UPTEAM" ||
+            dts_emp.getCellData(row, "dep_cd") == "") {
+            return true;
+        } else {
+            return false;
+        }
+    }
+};
+scwin.dts_dep_OnLoadCompleted = function(rowcount) {
+    if (js_dep_cd.substring(0, 2) == '26' || js_dep_cd.substring(0, 2) == '34') {
+        $c.stf.CopyDataSet(dts_dep, dts_dep1);
+        scwin.fn_addDsclTeamAll(rowcount);
+        $c.stf.setObjectValue(cmb_TeamList, 'UPTEAM');
+    }
+};
+scwin.cmb_TeamList_OnSelChange = function() {
+    scwin.gDepCd = $c.cp.valueOfIndex(cmb_TeamList, "VALUE", cmb_TeamList.getSelectedIndex());
+    if (scwin.gDepCd == '' || scwin.gDepCd == 'UPTEAM') {
+        $c.stf.setObjectValue(cmb_EmpList, '');
+    }
+    dts_emp.UseFilter = true;
+    dts_emp.Filter();
+    dts_emp.sort("DEP_CD", 0);
+    //dts_emp.sort(); // W-Craft 주석처리 
+    if (scwin.gDepCd != '' && scwin.gDepCd != 'UPTEAM') {
+        cmb_EmpList.trigger("onclick");
+    }
+};
+scwin.grd_XBRL2_OnUserColor = function(row, colid) {
+    //var colorName = "#CBFF75";
+    var colorName = "#77FF88"; //11FF00";
+
+    // 2009.03.27 happyhan 추가
+    if (dts_XBRL.getCellData(row, "ACPT_NO") == null || dts_XBRL.getCellData(row, "ACPT_NO") == undefined) {
+        colorName = "#ffffff"; // 데이타가 없으면 흰색으로
+
+    }
+
+    // 2009.03.27 happyhan 추가 : 회사정보결산월과 xbrl 재무정보의 결산월 비교
+    if (colid == "acolor0") {
+        var mm1 = dts_XBRL.getCellData(row, "ACNTCLS_MM");
+        var mm2 = dts_XBRL.getCellData(row, "ACNTCLS_MMDD1");
+        if (scwin.colorCnt > 0 && mm1 != mm2) {
+            return colorName; // 연두색
+        } else {
+            //	return decode(row-tointeger(row/2)*2,0,'#f2f5f9',1,'#ffffff');
+            /*
+            if ( row - Math.int( row/2) *2 == 0 ) return "#f2f5f9"
+            else return "#ffffff";
+            */
+            return "#ffffff";
+        }
+    }
+    if (colid == "acolor1") {
+        scwin.check1 = dts_XBRL.getCellData(row, "AUDT_OPIN_TP_NM");
+        if (scwin.colorCnt > 0 && scwin.check1 != "적정" && scwin.check1 != "의견거절" && scwin.check1 != "한정" && scwin.check1 != "부적정") {
+            return colorName; // 연두색
+        } else {
+            //	return decode(row-tointeger(row/2)*2,0,'#f2f5f9',1,'#ffffff');
+            /*
+            if ( row - Math.int( row/2) *2 == 0 ) return "#f2f5f9"
+            else return "#ffffff";
+            */
+            return "#ffffff";
+        }
+    }
+    if (colid == "acolor2") {
+        //BS 당기
+        scwin.check2 = dts_XBRL.getCellData(row, "CURTRM_BS");
+        if (scwin.colorCnt > 0 && scwin.check2 != "" && scwin.check2 != "0") {
+            return colorName;
+        } else {
+            return "#ffffff";
+        }
+    }
+    if (colid == "acolor3") {
+        //BS 전기
+        scwin.check3 = dts_XBRL.getCellData(row, "FSTTRM_BS");
+        if (scwin.colorCnt > 0 && scwin.check3 != "" && scwin.check3 != "0") {
+            return colorName;
+        } else {
+            return "#ffffff";
+        }
+    }
+    if (colid == "acolor4") {
+        //자본금검증 당기
+        scwin.check4 = dts_XBRL.getCellData(row, "CURTRM_TOTALSTOCKEQUITY");
+        if (scwin.colorCnt > 0 && scwin.check4 != "" && scwin.check4 != "0") {
+            return colorName;
+        } else {
+            return "#ffffff";
+        }
+    }
+    if (colid == "acolor5") {
+        //자본금검증 전기
+        scwin.check5 = dts_XBRL.getCellData(row, "FSTTRM_TOTALSTOCKEQUITY");
+        if (scwin.colorCnt > 0 && scwin.check5 != "" && scwin.check5 != "0") {
+            return colorName;
+        } else {
+            return "#ffffff";
+        }
+    }
+    if (colid == "acolor6") {
+        //순손익검증 당기3개월
+        scwin.check6 = dts_XBRL.getCellData(row, "CURTRM_EARNLOSS1");
+        if (scwin.colorCnt > 0 && scwin.check6 != "" && scwin.check6 != "0") {
+            return colorName;
+        } else {
+            return "#ffffff";
+        }
+    }
+    if (colid == "acolor7") {
+        //순손익검증 당기누적
+        scwin.check7 = dts_XBRL.getCellData(row, "CURTRM_EARNLOSS2");
+        if (scwin.colorCnt > 0 && scwin.check7 != "" && scwin.check7 != "0") {
+            return colorName;
+        } else {
+            return "#ffffff";
+        }
+    }
+    if (colid == "acolor8") {
+        //순손익검증 전기3개월
+        scwin.check8 = dts_XBRL.getCellData(row, "FSTTRM_EARNLOSS1");
+        if (scwin.colorCnt > 0 && scwin.check8 != "" && scwin.check8 != "0") {
+            return colorName;
+        } else {
+            return "#ffffff";
+        }
+    }
+    if (colid == "acolor9") {
+        //순손익검증 전기 누적
+        scwin.check9 = dts_XBRL.getCellData(row, "FSTTRM_EARNLOSS2");
+        if (scwin.colorCnt > 0 && scwin.check9 != "" && scwin.check9 != "0") {
+            return colorName;
+        } else {
+            return "#ffffff";
+        }
+    }
+    if (colid == "acolor10") {
+        //법인세전손익검증 당기3개월
+        scwin.check10 = dts_XBRL.getCellData(row, "CURTRM_TAX1");
+        if (scwin.colorCnt > 0 && scwin.check10 != "" && scwin.check10 != "0") {
+            return colorName;
+        } else {
+            return "#ffffff";
+        }
+    }
+    if (colid == "acolor11") {
+        //법인세전손익검증 당기 누적
+        scwin.check11 = dts_XBRL.getCellData(row, "CURTRM_TAX2");
+        if (scwin.colorCnt > 0 && scwin.check11 != "" && scwin.check11 != "0") {
+            return colorName;
+        } else {
+            return "#ffffff";
+        }
+    }
+    if (colid == "acolor12") {
+        //법인세전손익검증 전기3개월
+        scwin.check12 = dts_XBRL.getCellData(row, "FSTTRM_TAX1");
+        if (scwin.colorCnt > 0 && scwin.check12 != "" && scwin.check12 != "0") {
+            return colorName;
+        } else {
+            return "#ffffff";
+        }
+    }
+    if (colid == "acolor13") {
+        //법인세전손익검증 전기 누적
+        scwin.check13 = dts_XBRL.getCellData(row, "FSTTRM_TAX2");
+        if (scwin.colorCnt > 0 && scwin.check13 != "" && scwin.check13 != "0") {
+            return colorName;
+        } else {
+            return "#ffffff";
+        }
+    }
+    if (colid == "acolor14") {
+        //순손익검증2차 당기3개월
+        scwin.check14 = dts_XBRL.getCellData(row, "CURTRM2_EARNLOSS1");
+        if (scwin.colorCnt > 0 && scwin.check14 != "" && scwin.check14 != "0") {
+            return colorName;
+        } else {
+            return "#ffffff";
+        }
+    }
+    if (colid == "acolor15") {
+        //순손익검증2차 당기 누적
+        scwin.check15 = dts_XBRL.getCellData(row, "CURTRM2_EARNLOSS2");
+        if (scwin.colorCnt > 0 && scwin.check15 != "" && scwin.check15 != "0") {
+            return colorName;
+        } else {
+            return "#ffffff";
+        }
+    }
+    if (colid == "acolor16") {
+        //순손익검증2차 전기3개월
+        scwin.check16 = dts_XBRL.getCellData(row, "FSTTRM2_EARNLOSS1");
+        if (scwin.colorCnt > 0 && scwin.check16 != "" && scwin.check16 != "0") {
+            return colorName;
+        } else {
+            return "#ffffff";
+        }
+    }
+    if (colid == "acolor17") {
+        //순손익검증2차 전기 누적
+        scwin.check17 = dts_XBRL.getCellData(row, "FSTTRM2_EARNLOSS2");
+        if (scwin.colorCnt > 0 && scwin.check17 != "" && scwin.check17 != "0") {
+            return colorName;
+        } else {
+            return "#ffffff";
+        }
+    }
+};
+scwin.cmb_IndTp_OnSelChange = function() {
+    var vValue = $c.cp.valueOfIndex(cmb_IndTp, "VALUE", cmb_IndTp.getSelectedIndex());
+    if (vValue != '') {
+        // 전체일때 제외한 나머지경우
+        scwin.fn_CheckComNmCond();
+    }
+};
+scwin.checkbox_3_onclick = function() {
+    scwin.fn_checkBox(this.getValue());
+};
+scwin.checkbox_4_onclick = function() {
+    scwin.fn_checkBox(this.getValue());
+};
+scwin.checkbox_5_onclick = function() {
+    scwin.fn_checkBox(this.getValue());
+};
+scwin.checkbox_6_onclick = function() {
+    scwin.fn_checkBox(this.getValue());
+};
+scwin.checkbox_9_onclick = function() {
+    scwin.fn_checkBox(this.getValue());
+};
+scwin.checkbox_10_onclick = function() {
+    scwin.fn_checkBox(this.getValue());
+};
+scwin.checkbox_11_onclick = function() {
+    scwin.fn_checkBox(this.getValue());
+};
+scwin.checkbox_13_onclick = function() {
+    scwin.fn_checkBox(this.getValue());
+};
+scwin.checkbox_14_onclick = function() {
+    scwin.fn_checkBox(this.getValue());
+};
+scwin.checkbox_16_onclick = function() {
+    scwin.fn_checkBox(this.getValue());
+};
+scwin.checkbox_17_onclick = function() {
+    scwin.fn_checkBox(this.getValue());
+};
+scwin.checkbox_18_onclick = function() {
+    scwin.fn_checkBox(this.getValue());
+};
+scwin.checkbox_19_onclick = function() {
+    scwin.fn_checkBox(this.getValue());
+};
+scwin.btn_all_onclick = function() {
+    scwin.fn_allCheck();
+    scwin.fn_showGridField('SHOW');
+};
+scwin.btn_disall_onclick = function() {
+    scwin.fn_allDisCheck();
+    scwin.fn_showGridField('HIDDEN');
+};
+scwin.btn_Excel_onclick = function() {
+    $c.stf.doLogSave(scwin.vScrenID, SCREN_PROCS_TP_CD_07);
+    $c.data.downloadGridViewExcel(grd_XBRL2, "재무속보", "", "2");
+};
+scwin.gform_onload = function() {
+    $c.cm.PanelToGroupBox(panel_1);
+    scwin.fn_SetCode();
+    scwin.fn_Init();
+    $c.cm.fn_com_isur(txb_isur_cd, txb_COM_NM);
+    scwin.fn_allDisCheck();
+    scwin.fn_showGridField('HIDDEN');
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+		<!-- Tag is Not matched with wCraft2 Rule :<style/>-->
+		<xf:model>
+			<!-- Tag is Not matched with wCraft2 Rule :<mxdataset id="dts_XBRL" onloaderror="dts_XBRL_OnLoadError" userData2=" onloadcompleted:dts_XBRL_OnLoadCompleted;" orgid="dts_XBRL" hierarchy="dts_XBRL"/>-->
+			<!-- Tag is Not matched with wCraft2 Rule :<mxdataset id="MxDataSet_com_isur" onfilter="MxDataSet_com_isur_OnFilter" orgid="MxDataSet_com_isur" hierarchy="MxDataSet_com_isur"/>-->
+			<!-- Tag is Not matched with wCraft2 Rule :<mxdataset id="dts_IndTp" orgid="dts_IndTp" hierarchy="dts_IndTp"/>-->
+			<!-- Tag is Not matched with wCraft2 Rule :<mxdataset id="dts_dep" syncload="False" userData2=" onloadcompleted:dts_dep_OnLoadCompleted;" orgid="dts_dep" hierarchy="dts_dep"/>-->
+			<!-- Tag is Not matched with wCraft2 Rule :<mxdataset id="dts_emp" onfilter="dts_emp_OnFilter" syncload="False" userData2=" onloadcompleted:dts_emp_OnLoadCompleted;" orgid="dts_emp" hierarchy="dts_emp"/>-->
+			<!-- Tag is Not matched with wCraft2 Rule :<mxdataset id="dts_com_grp" orgid="dts_com_grp" hierarchy="dts_com_grp"/>-->
+			<!-- Tag is Not matched with wCraft2 Rule :<mxdataset id="dts_dep1" orgid="dts_dep1" hierarchy="dts_dep1"/>-->
+		</xf:model>
+		<xf:group class="sub_contents" id="" meta_componentContainer="true" style="">
+			<xf:group class="schbox" id="" style="">
+				<xf:group class="schbox_inner" id="" style="">
+					<xf:group adaptive="layout" adaptiveThreshold="768" class="w2tb tbl " id="" style="" tagname="table">
+						<w2:attributes>
+							<w2:summary></w2:summary>
+						</w2:attributes>
+						<xf:group tagname="colgroup">
+							<xf:group style="width:80px;" tagname="col"></xf:group>
+							<xf:group style="" tagname="col"></xf:group>
+							<xf:group style="width:80px;" tagname="col"></xf:group>
+							<xf:group tagname="col"></xf:group>
+							<xf:group tagname="col" style="width:100px;"></xf:group>
+							<xf:group tagname="col"></xf:group>
+							<xf:group tagname="col" style="width:80px;"></xf:group>
+							<xf:group style="" tagname="col"></xf:group>
+						</xf:group>
+						<xf:group class="" id="" style="" tagname="tr">
+							<xf:group class="w2tb_th" style="" tagname="th">
+								<w2:textbox id="label_29" label="시장구분" style="" userData2=" class:TopCondition_01;"></w2:textbox>
+							</xf:group>
+							<xf:group class="w2tb_td" style="" tagname="td">
+								<xf:select1 appearance="full" disabled="true" id="rdo_MKT_ID" item="1^유가,2^코스닥" renderType="radiogroup"
+									selectedIndex="0" style="" userData2=" class:TopCondition_Blue; automargin:True; cols:3; font-family:돋움;">
+									<xf:choices>
+										<xf:item>
+											<xf:label><![CDATA[유가]]></xf:label>
+											<xf:value><![CDATA[1]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[코스닥]]></xf:label>
+											<xf:value><![CDATA[2]]></xf:value>
+										</xf:item>
+									</xf:choices>
+								</xf:select1>
+							</xf:group>
+							<xf:group class="w2tb_th" style="" tagname="th">
+								<w2:textbox id="label_3" label="회사명" style="" userData2=" class:TopCondition_01;"></w2:textbox>
+							</xf:group>
+							<xf:group class="w2tb_td" id="" style="" tagname="td">
+								<w2:attributes>
+									<w2:colspan>3</w2:colspan>
+									<w2:rowspan>1</w2:rowspan>
+								</w2:attributes>
+								<w2:autoComplete allOption="" chooseOption="" editType="select" id="txb_isur_cd" ref="" search="start"
+									style="width:110px;" submenuSize="auto" useKeywordHighlight="false">
+									<w2:choices>
+										<w2:item>
+											<w2:label><![CDATA[A]]></w2:label>
+											<w2:value></w2:value>
+										</w2:item>
+										<w2:item>
+											<w2:label><![CDATA[AB]]></w2:label>
+											<w2:value></w2:value>
+										</w2:item>
+										<w2:item>
+											<w2:label><![CDATA[ABC]]></w2:label>
+											<w2:value></w2:value>
+										</w2:item>
+										<w2:item>
+											<w2:label><![CDATA[ABCD]]></w2:label>
+											<w2:value></w2:value>
+										</w2:item>
+									</w2:choices>
+								</w2:autoComplete>
+								<xf:input id="txb_COM_NM" maxlength="1000" readOnly="true" style="width:210px;"
+									userData2=" class:TopCondition_01_read;">
+								</xf:input>
+								<xf:trigger class="btn_cm icon search" cursor="pointer" ev:onclick="scwin.btn_ISUR_CD_onclick"
+									id="btn_ISUR_CD" src="../img/btn_search.gif" style="">
+									<xf:label><![CDATA[]]></xf:label>
+								</xf:trigger>
+							</xf:group>
+							<xf:group tagname="th" id="" class="w2tb_th">
+								<w2:attributes></w2:attributes>
+								<w2:textbox id="label_9" label="업종" style="" userData2=" class:TopCondition_01;"></w2:textbox>
+							</xf:group>
+							<xf:group tagname="td" id="" class="w2tb_td">
+								<w2:attributes></w2:attributes>
+								<xf:select1 appearance="minimal" disabledClass="w2selectbox_disabled" displayMode="label" id="cmb_IndTp"
+									ref="data:dts_IndTp" selectedData="true" style="width:270px;"
+									userData2=" inheritcolor:True; listcount:15; listexprformat:text^0^409; searchcolumn:text; xpstyle:True; font-family:돋움;" ev:onchange="scwin.cmb_IndTp_OnSelChange">
+								</xf:select1>
+							</xf:group>
+						</xf:group>
+						<xf:group tagname="tr" id="" style="">
+							<xf:group tagname="th" class="w2tb_th"><w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes><w2:textbox id="label_6" label="팀" style="" userData2=" class:TopCondition_01;"></w2:textbox></xf:group>
+							<xf:group tagname="td" class="w2tb_td">
+								<w2:attributes></w2:attributes>
+								<xf:select1 appearance="minimal" disabledClass="w2selectbox_disabled" displayMode="label" id="cmb_TeamList"
+									ref="data:dts_dep" selectedData="true" style="width:165px;"
+									userData2=" bindcolumn:VALUE; inheritcolor:False; listcount:10; listexprformat:TEXT^0^189; searchcolumn:TEXT; xpstyle:True; font-family:돋움;" ev:onchange="scwin.cmb_TeamList_OnSelChange">
+								</xf:select1>
+							</xf:group>
+							<xf:group tagname="th" class="w2tb_th"><w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes><w2:textbox id="label_7" label="담당자" style="" userData2=" class:TopCondition_01;"></w2:textbox></xf:group>
+							<xf:group tagname="td" id="" class="w2tb_td">
+								<w2:attributes>
+									<w2:colspan>3</w2:colspan>
+									<w2:rowspan>1</w2:rowspan>
+								</w2:attributes>
+								<xf:select1 appearance="minimal" disabledClass="w2selectbox_disabled" displayMode="label" id="cmb_EmpList"
+									ref="data:dts_emp" selectedData="true" style="width:110px;"
+									userData2=" bindcolumn:VALUE; inheritcolor:False; listcount:10; listexprformat:TEXT^0^86; searchcolumn:TEXT; xpstyle:True; font-family:돋움;">
+								</xf:select1>
+							</xf:group>
+							<xf:group tagname="th" id="" class="w2tb_th">
+								<w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes>
+								<w2:textbox id="label_11" label="기업집단" style="" userData2=" class:TopCondition_01;"></w2:textbox>
+							</xf:group>
+							<xf:group tagname="td" id="" class="w2tb_td">
+								<w2:attributes></w2:attributes>
+								<xf:select1 appearance="minimal" disabledClass="w2selectbox_disabled" displayMode="label" id="cmb_com_grp"
+									ref="data:dts_com_grp" selectedData="true" style="width:110px;"
+									userData2=" bindcolumn:VALUE; index:0; inheritcolor:False; listcount:10; listexprformat:text^0^150; searchcolumn:TEXT; xpstyle:True; font-family:돋움;">
+								</xf:select1>
+							</xf:group>
+						</xf:group>
+						<xf:group tagname="tr" id="" style="">
+							<xf:group tagname="th" class="w2tb_th">
+								<w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes>
+								<w2:textbox id="label_1" label="결산년도" style="" userData2=" class:TopCondition_01;"></w2:textbox>
+							</xf:group>
+							<xf:group tagname="td" class="w2tb_td">
+								<w2:attributes></w2:attributes>
+								<xf:select1 appearance="minimal" disabledClass="w2selectbox_disabled" displayMode="label" id="cmb_FISCYY"
+									selectedData="true" style="width:110px;"
+									userData2=" bindcolumn:VALUE; index:0; inheritcolor:False; listcount:10; listexprformat:text^0^121; searchcolumn:TEXT; xpstyle:True;">
+								</xf:select1>
+							</xf:group>
+							<xf:group tagname="th" class="w2tb_th">
+								<w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes>
+								<w2:textbox id="label_5" label="결산월" style="" userData2=" class:TopCondition_01;"></w2:textbox>
+							</xf:group>
+							<xf:group tagname="td" id="" class="w2tb_td">
+								<w2:attributes></w2:attributes>
+								<xf:select1 appearance="minimal" disabledClass="w2selectbox_disabled" displayMode="label" id="cmb_MM"
+									item="12^12월,11^11월,10^10월,09^09월,08^08월,07^07월,06^06월,05^05월,04^04월,03^03월,02^02월,01^01월" selectedData="true" style="width:110px;"
+									userData2=" bindcolumn:VALUE; index:0; inheritcolor:False; listcount:10; listexprformat:text^0^121; searchcolumn:TEXT; xpstyle:True;">
+									<xf:choices>
+										<xf:item>
+											<xf:label><![CDATA[12월]]></xf:label>
+											<xf:value><![CDATA[12]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[11월]]></xf:label>
+											<xf:value><![CDATA[11]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[10월]]></xf:label>
+											<xf:value><![CDATA[10]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[09월]]></xf:label>
+											<xf:value><![CDATA[09]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[08월]]></xf:label>
+											<xf:value><![CDATA[08]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[07월]]></xf:label>
+											<xf:value><![CDATA[07]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[06월]]></xf:label>
+											<xf:value><![CDATA[06]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[05월]]></xf:label>
+											<xf:value><![CDATA[05]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[04월]]></xf:label>
+											<xf:value><![CDATA[04]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[03월]]></xf:label>
+											<xf:value><![CDATA[03]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[02월]]></xf:label>
+											<xf:value><![CDATA[02]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[01월]]></xf:label>
+											<xf:value><![CDATA[01]]></xf:value>
+										</xf:item>
+									</xf:choices>
+								</xf:select1>
+							</xf:group>
+							<xf:group tagname="th" id="" class="w2tb_th">
+								<w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes>
+								<w2:textbox id="label_2" label="보고서종류" style="" userData2=" class:TopCondition_01;"></w2:textbox>
+							</xf:group>
+							<xf:group tagname="td" id="" class="w2tb_td">
+								<w2:attributes></w2:attributes>
+								<xf:select1 appearance="minimal" disabledClass="w2selectbox_disabled" displayMode="label" id="cmb_RPT_KIND"
+									item="1^1/4분기보고서,2^반기보고서,3^3/4분기보고서,4^결산기" selectedData="true" style="width:120px;"
+									userData2=" bindcolumn:VALUE; index:0; inheritcolor:False; listcount:10; listexprformat:text^0^121; searchcolumn:TEXT; xpstyle:True;">
+									<xf:choices>
+										<xf:item>
+											<xf:label><![CDATA[1/4분기보고서]]></xf:label>
+											<xf:value><![CDATA[1]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[반기보고서]]></xf:label>
+											<xf:value><![CDATA[2]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[3/4분기보고서]]></xf:label>
+											<xf:value><![CDATA[3]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[결산기]]></xf:label>
+											<xf:value><![CDATA[4]]></xf:value>
+										</xf:item>
+									</xf:choices>
+								</xf:select1>
+							</xf:group>
+							<xf:group tagname="th" id="" class="w2tb_th"><w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes><w2:textbox id="label_10" label="단위" style="" userData2=" class:TopCondition_01;"></w2:textbox></xf:group>
+							<xf:group tagname="td" id="" class="w2tb_td">
+								<w2:attributes></w2:attributes>
+								<xf:select1 appearance="minimal" disabledClass="w2selectbox_disabled" displayMode="label" id="cmb_mon_unit"
+									item="1^원,1000^천원,1000000^백만원,100000000^억원" selectedData="true" style="width:110px;"
+									userData2=" bindcolumn:VALUE; index:0; inheritcolor:False; listcount:10; listexprformat:text^0^121; searchcolumn:TEXT; xpstyle:True;">
+									<xf:choices>
+										<xf:item>
+											<xf:label><![CDATA[원]]></xf:label>
+											<xf:value><![CDATA[1]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[천원]]></xf:label>
+											<xf:value><![CDATA[1000]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[백만원]]></xf:label>
+											<xf:value><![CDATA[1000000]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[억원]]></xf:label>
+											<xf:value><![CDATA[100000000]]></xf:value>
+										</xf:item>
+									</xf:choices>
+								</xf:select1>
+							</xf:group>
+						</xf:group>
+						<xf:group tagname="tr" id="">
+							<xf:group tagname="th" class="w2tb_th">
+								<w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes>
+								<w2:textbox id="label_34" label="재무항목" style="" userData2=" class:TopCondition_01;"></w2:textbox>
+								<xf:trigger class="btn_cm mt5" cursor="pointer" ev:onclick="scwin.btn_all_onclick" id="btn_all"
+									src="../img/btn_selectall.gif" style="width:100%;">
+									<xf:label><![CDATA[전체선택]]></xf:label>
+								</xf:trigger>
+								<xf:trigger class="btn_cm mt5" cursor="pointer" ev:onclick="scwin.btn_disall_onclick" id="btn_disall"
+									src="../img/btn_cancellation.gif" style="width:100%;">
+									<xf:label><![CDATA[전체해제]]></xf:label>
+								</xf:trigger>
+							</xf:group>
+							<xf:group tagname="td" class="w2tb_td">
+								<w2:attributes>
+									<w2:colspan>7</w2:colspan>
+									<w2:rowspan>1</w2:rowspan>
+								</w2:attributes>
+								<xf:group id="" class="flex">
+									<xf:select selectedData="true" item="1^"
+										userData2=" checked:checked; border-width:0; border-color:#1d507f;" rows="" displayMode="label" ref="" appearance="full"
+										disabledClass="w2selectbox_disabled" disabled="true" style="" id="checkbox_0" renderType="checkboxgroup" cols="">
+										<xf:choices>
+											<xf:item>
+												<xf:label><![CDATA[자산총계]]></xf:label>
+												<xf:value><![CDATA[1]]></xf:value>
+											</xf:item>
+										</xf:choices>
+									</xf:select>
+									<xf:select selectedData="true" item="1^"
+										userData2=" checked:checked; border-width:0; border-color:#1d507f;" rows="" displayMode="label" ref="" appearance="full"
+										disabledClass="w2selectbox_disabled" disabled="true" style="" id="checkbox_1" renderType="checkboxgroup" cols="">
+										<xf:choices>
+											<xf:item>
+												<xf:label><![CDATA[부채총계]]></xf:label>
+												<xf:value><![CDATA[1]]></xf:value>
+											</xf:item>
+										</xf:choices>
+									</xf:select>
+									<xf:select selectedData="true" item="1^"
+										userData2=" checked:checked; border-width:0; border-color:#1d507f;" rows="" displayMode="label" ref="" appearance="full"
+										disabledClass="w2selectbox_disabled" disabled="true" style="" id="checkbox_2" renderType="checkboxgroup" cols="">
+										<xf:choices>
+											<xf:item>
+												<xf:label><![CDATA[자본금]]></xf:label>
+												<xf:value><![CDATA[1]]></xf:value>
+											</xf:item>
+										</xf:choices>
+									</xf:select>
+									<xf:select selectedData="true" item="3^" ev:oncheckboxclick="scwin.checkbox_3_onclick"
+										userData2=" border-width:0; border-color:#1d507f;" rows="" displayMode="label" ref="" appearance="full"
+										disabledClass="w2selectbox_disabled" style="" id="checkbox_3" renderType="checkboxgroup" cols="">
+										<xf:choices>
+											<xf:item>
+												<xf:label><![CDATA[자본잉여금]]></xf:label>
+												<xf:value><![CDATA[3]]></xf:value>
+											</xf:item>
+										</xf:choices>
+									</xf:select>
+									<xf:select selectedData="true" item="4^" ev:oncheckboxclick="scwin.checkbox_4_onclick"
+										userData2=" border-width:0; border-color:#1d507f;" rows="" displayMode="label" ref="" appearance="full"
+										disabledClass="w2selectbox_disabled" style="" id="checkbox_4" renderType="checkboxgroup" cols="">
+										<xf:choices>
+											<xf:item>
+												<xf:label><![CDATA[자본조정]]></xf:label>
+												<xf:value><![CDATA[4]]></xf:value>
+											</xf:item>
+										</xf:choices>
+									</xf:select>
+									<xf:select selectedData="true" item="5^" ev:oncheckboxclick="scwin.checkbox_5_onclick"
+										userData2=" border-width:0; border-color:#1d507f;" rows="" displayMode="label" ref="" appearance="full"
+										disabledClass="w2selectbox_disabled" style="" id="checkbox_5" renderType="checkboxgroup" cols="">
+										<xf:choices>
+											<xf:item>
+												<xf:label><![CDATA[기타포괄손익누계액]]></xf:label>
+												<xf:value><![CDATA[5]]></xf:value>
+											</xf:item>
+										</xf:choices>
+									</xf:select>
+									<xf:select selectedData="true" item="6^" ev:oncheckboxclick="scwin.checkbox_6_onclick"
+										userData2=" border-width:0; border-color:#1d507f;" rows="" displayMode="label" ref="" appearance="full"
+										disabledClass="w2selectbox_disabled" style="" id="checkbox_6" renderType="checkboxgroup" cols="">
+										<xf:choices>
+											<xf:item>
+												<xf:label><![CDATA[이익잉여금]]></xf:label>
+												<xf:value><![CDATA[6]]></xf:value>
+											</xf:item>
+										</xf:choices>
+									</xf:select>
+								</xf:group>
+								<xf:group id="" class="flex mt5">
+									<xf:select selectedData="true" item="1^"
+										userData2=" checked:checked; border-width:0; border-color:#1d507f;" rows="" displayMode="label" ref="" appearance="full"
+										disabledClass="w2selectbox_disabled" disabled="true" style="" id="checkbox_7" renderType="checkboxgroup" cols="">
+										<xf:choices>
+											<xf:item>
+												<xf:label><![CDATA[자본총계]]></xf:label>
+												<xf:value><![CDATA[1]]></xf:value>
+											</xf:item>
+										</xf:choices>
+									</xf:select>
+									<xf:select selectedData="true" item="1^"
+										userData2=" checked:checked; border-width:0; border-color:#1d507f;" rows="" displayMode="label" ref="" appearance="full"
+										disabledClass="w2selectbox_disabled" disabled="true" style="" id="checkbox_8" renderType="checkboxgroup" cols="">
+										<xf:choices>
+											<xf:item>
+												<xf:label><![CDATA[매출액]]></xf:label>
+												<xf:value><![CDATA[1]]></xf:value>
+											</xf:item>
+										</xf:choices>
+									</xf:select>
+									<xf:select selectedData="true" item="9^" ev:oncheckboxclick="scwin.checkbox_9_onclick"
+										userData2=" border-width:0; border-color:#1d507f;" rows="" displayMode="label" ref="" appearance="full"
+										disabledClass="w2selectbox_disabled" style="" id="checkbox_9" renderType="checkboxgroup" cols="">
+										<xf:choices>
+											<xf:item>
+												<xf:label><![CDATA[매출원가]]></xf:label>
+												<xf:value><![CDATA[9]]></xf:value>
+											</xf:item>
+										</xf:choices>
+									</xf:select>
+									<xf:select selectedData="true" item="10^" ev:oncheckboxclick="scwin.checkbox_10_onclick"
+										userData2=" border-width:0; border-color:#1d507f;" rows="" displayMode="label" ref="" appearance="full"
+										disabledClass="w2selectbox_disabled" style="" id="checkbox_10" renderType="checkboxgroup" cols="">
+										<xf:choices>
+											<xf:item>
+												<xf:label><![CDATA[매출총이익(손실)]]></xf:label>
+												<xf:value><![CDATA[10]]></xf:value>
+											</xf:item>
+										</xf:choices>
+									</xf:select>
+									<xf:select selectedData="true" item="11^" ev:oncheckboxclick="scwin.checkbox_11_onclick"
+										userData2=" border-width:0; border-color:#1d507f;" rows="" displayMode="label" ref="" appearance="full"
+										disabledClass="w2selectbox_disabled" style="" id="checkbox_11" renderType="checkboxgroup" cols="">
+										<xf:choices>
+											<xf:item>
+												<xf:label><![CDATA[판매비와 관리비]]></xf:label>
+												<xf:value><![CDATA[11]]></xf:value>
+											</xf:item>
+										</xf:choices>
+									</xf:select>
+									<xf:select selectedData="true" item="1^"
+										userData2=" checked:checked; border-width:0; border-color:#1d507f;" rows="" displayMode="label" ref="" appearance="full"
+										disabledClass="w2selectbox_disabled" disabled="true" style="" id="checkbox_12" renderType="checkboxgroup" cols="">
+										<xf:choices>
+											<xf:item>
+												<xf:label><![CDATA[영업이익(손실)]]></xf:label>
+												<xf:value><![CDATA[1]]></xf:value>
+											</xf:item>
+										</xf:choices>
+									</xf:select>
+									<xf:select selectedData="true" item="13^" ev:oncheckboxclick="scwin.checkbox_13_onclick"
+										userData2=" border-width:0; border-color:#1d507f;" rows="" displayMode="label" ref="" appearance="full"
+										disabledClass="w2selectbox_disabled" style="" id="checkbox_13" renderType="checkboxgroup" cols="">
+										<xf:choices>
+											<xf:item>
+												<xf:label><![CDATA[영업외수익]]></xf:label>
+												<xf:value><![CDATA[13]]></xf:value>
+											</xf:item>
+										</xf:choices>
+									</xf:select>
+									<xf:select selectedData="true" item="14^" ev:oncheckboxclick="scwin.checkbox_14_onclick"
+										userData2=" border-width:0; border-color:#1d507f;" rows="" displayMode="label" ref="" appearance="full"
+										disabledClass="w2selectbox_disabled" style="" id="checkbox_14" renderType="checkboxgroup" cols="">
+										<xf:choices>
+											<xf:item>
+												<xf:label><![CDATA[영업외비용]]></xf:label>
+												<xf:value><![CDATA[14]]></xf:value>
+											</xf:item>
+										</xf:choices>
+									</xf:select>
+								</xf:group>
+								<xf:group id="" class="flex mt5">
+									<xf:select selectedData="true" item="1^"
+										userData2=" checked:checked; border-width:0; border-color:#1d507f;" rows="" displayMode="label" ref="" appearance="full"
+										disabledClass="w2selectbox_disabled" disabled="true" style="" id="checkbox_15" renderType="checkboxgroup" cols="">
+										<xf:choices>
+											<xf:item>
+												<xf:label><![CDATA[법인세비용차감전이익(손실)]]></xf:label>
+												<xf:value><![CDATA[1]]></xf:value>
+											</xf:item>
+										</xf:choices>
+									</xf:select>
+									<xf:select selectedData="true" item="16^" ev:oncheckboxclick="scwin.checkbox_16_onclick"
+										userData2=" border-width:0; border-color:#1d507f;" rows="" displayMode="label" ref="" appearance="full"
+										disabledClass="w2selectbox_disabled" style="" id="checkbox_16" renderType="checkboxgroup" cols="">
+										<xf:choices>
+											<xf:item>
+												<xf:label><![CDATA[계속사업손익법인세비용]]></xf:label>
+												<xf:value><![CDATA[16]]></xf:value>
+											</xf:item>
+										</xf:choices>
+									</xf:select>
+									<xf:select selectedData="true" item="17^" ev:oncheckboxclick="scwin.checkbox_17_onclick"
+										userData2=" border-width:0; border-color:#1d507f;" rows="" displayMode="label" ref="" appearance="full"
+										disabledClass="w2selectbox_disabled" style="" id="checkbox_17" renderType="checkboxgroup" cols="">
+										<xf:choices>
+											<xf:item>
+												<xf:label><![CDATA[계속사업이익(손실)]]></xf:label>
+												<xf:value><![CDATA[17]]></xf:value>
+											</xf:item>
+										</xf:choices>
+									</xf:select>
+									<xf:select selectedData="true" item="18^" ev:oncheckboxclick="scwin.checkbox_18_onclick"
+										userData2=" border-width:0; border-color:#1d507f;" rows="" displayMode="label" ref="" appearance="full"
+										disabledClass="w2selectbox_disabled" style="" id="checkbox_18" renderType="checkboxgroup" cols="">
+										<xf:choices>
+											<xf:item>
+												<xf:label><![CDATA[중단사업이익(손실)]]></xf:label>
+												<xf:value><![CDATA[18]]></xf:value>
+											</xf:item>
+										</xf:choices>
+									</xf:select>
+									<xf:select selectedData="true" item="19^" ev:oncheckboxclick="scwin.checkbox_19_onclick"
+										userData2=" border-width:0; border-color:#1d507f;" rows="" displayMode="label" ref="" appearance="full"
+										disabledClass="w2selectbox_disabled" style="" id="checkbox_19" renderType="checkboxgroup" cols="">
+										<xf:choices>
+											<xf:item>
+												<xf:label><![CDATA[법인세비용]]></xf:label>
+												<xf:value><![CDATA[19]]></xf:value>
+											</xf:item>
+										</xf:choices>
+									</xf:select>
+									<xf:select selectedData="true" item="1^"
+										userData2=" checked:checked; border-width:0; border-color:#1d507f;" rows="" displayMode="label" ref="" appearance="full"
+										disabledClass="w2selectbox_disabled" disabled="true" style="" id="checkbox_20" renderType="checkboxgroup" cols="">
+										<xf:choices>
+											<xf:item>
+												<xf:label><![CDATA[당기순이익(손실)]]></xf:label>
+												<xf:value><![CDATA[1]]></xf:value>
+											</xf:item>
+										</xf:choices>
+									</xf:select>
+								</xf:group>
+							</xf:group>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+				<xf:group class="btn_schbox" id="" style="">
+					<xf:trigger class="btn_cm sch" cursor="pointer" ev:onclick="scwin.btn_Search_1_onclick" id="trigger1"
+						src="../img/btn_select.gif" style="">
+						<xf:label><![CDATA[조회]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+			<xf:group class="titbox" id="" style="">
+				<xf:group class="rt" id="" style="">
+					<xf:group class="count" id="" style="">
+						<w2:textbox class="" id="" label="총" style=""></w2:textbox>
+						<w2:textbox class="num" id="" label="0" style=""></w2:textbox>
+						<w2:textbox class="" id="" label="건" style=""></w2:textbox>
+					</xf:group>
+					<xf:trigger class="btn_cm download" cursor="pointer" ev:onclick="scwin.btn_Excel_onclick" id="btn_Excel"
+						src="../img/btn_excelsave.gif" style="" text="엑셀다운로드">
+						<xf:label><![CDATA[엑셀다운로드]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+			<xf:group class="gvwbox" id="" style="">
+				<w2:gridView class="gvw" dataList="data:dts_XBRL" hierarchy="grd_XBRL2" id="grd_XBRL2" orgid="grd_XBRL2"
+					style="height: 153px;"
+					userData2=" class:Grid_01; onusercolor:grd_XBRL2_OnUserColor; autoresizing:True; autoresizingallcol:True; autoresizingwithheader:True; colsizing:True; fillarea:True; fixsizing:True; sortview:left; ondblclick:grd_XBRL2_OnDblClick;">
+					<w2:caption id="caption1" style="" value="this is a grid caption."></w2:caption>
+					<w2:header id="header1" style="">
+						<w2:row>
+							<w2:column displayMode="label" inputType="text" rowspan="2" textAlign="center"
+								userData2=" value:{ToString(CurRow)};" value="번호" width="43">
+							</w2:column>
+							<w2:column displayMode="label" id="ACPT_NO" inputType="text" rowspan="2"
+								style="color:{decode(discls_acpt_tp_cd, 'f','#343434','#ff0000')};" textAlign="center"
+								userData2=" cursor:hand; sort:True; bgcolor:#ffff99;" value="접수번호" width="110">
+							</w2:column>
+							<w2:column displayMode="label" id="MKT_NM" inputType="text" rowspan="2" textAlign="center"
+								userData2=" sort:True;" value="시장구분" width="75">
+							</w2:column>
+							<w2:column displayMode="label" id="LIST_STAT_NM" inputType="text" rowspan="2"
+								style="color:{decode(list_stat_cd,'y','#000000','d','#ff0033','n','#009933')};" textAlign="center" userData2=" sort:True;"
+								value="상장여부" width="75">
+							</w2:column>
+							<w2:column displayMode="label" id="COM_ABBRV" inputType="text" rowspan="2"
+								style="color:{decode(list_stat_cd,'y','#000000','d','#ff0033','n','#009933')};" textAlign="center"
+								userData2=" bgcolor:#ffff99; cursor:hand; sort:True;" value="회사명" width="120">
+							</w2:column>
+							<w2:column displayMode="label" id="ISU_SRT_CD" inputType="text" rowspan="2" textAlign="center"
+								userData2=" sort:True;" value="종목&lt;/br&gt;코드" width="70">
+							</w2:column>
+							<w2:column displayMode="label" id="STD_IND_CD" inputType="text" rowInfo="0" rowspan="2" textAlign="center"
+								userData2=" sort:True;" value="업종&lt;/br&gt;코드" width="60">
+							</w2:column>
+							<w2:column displayMode="label" id="IND_NM" inputType="text" rowInfo="0" rowspan="2" textAlign="center"
+								userData2=" sort:True;" value="업종" width="104">
+							</w2:column>
+							<w2:column displayMode="label" id="EMP_NM" inputType="text" rowInfo="0" rowspan="2" textAlign="center"
+								userData2=" sort:True;" value="담당자" width="65">
+							</w2:column>
+							<w2:column displayMode="label" id="DEP_NM" inputType="text" rowInfo="0" rowspan="2" textAlign="center"
+								userData2=" sort:True;" value="담당팀" width="70">
+							</w2:column>
+							<w2:column displayMode="label" id="ENTPR_GRP_NM" inputType="text" rowInfo="0" rowspan="2" textAlign="center"
+								userData2=" sort:True;" value="그룹별" width="76">
+							</w2:column>
+							<w2:column displayMode="label" id="COM_ATTR_TP_NM" inputType="text" rowInfo="0" rowspan="2" textAlign="center"
+								userData2=" sort:True;" value="회사&lt;/br&gt;속성" width="64">
+							</w2:column>
+							<w2:column displayMode="label" id="ACNTCLS_YY" inputType="text" rowInfo="0" rowspan="2" textAlign="center"
+								value="결산연도">
+							</w2:column>
+							<w2:column displayMode="label" id="ACNTCLS_MM" inputType="text" rowInfo="0" rowspan="2" textAlign="center"
+								userData2=" bgcolor:@acolor0;" value="결산월" width="44">
+							</w2:column>
+							<w2:column displayMode="label" hidden="true" id="FISCYY_TP_NM" inputType="text" rowInfo="0" rowspan="2"
+								textAlign="center" value="결산기구분" width="81">
+							</w2:column>
+							<w2:column displayMode="label" id="WRTRPT_KIND_NM" inputType="text" rowInfo="0" rowspan="2" textAlign="center"
+								value="보고서종류" width="68">
+							</w2:column>
+							<w2:column displayMode="label" id="AUDT_OPIN_TP_NM" inputType="text" rowInfo="0" rowspan="2" textAlign="center"
+								userData2=" bgcolor:@acolor1; sort:True;" value="감사의견" width="80">
+							</w2:column>
+							<w2:column displayMode="label" hidden="true" id="CURTRM_BS" inputType="text" rowInfo="0" rowspan="2"
+								textAlign="center" value="BS 당기" width="81">
+							</w2:column>
+							<w2:column displayMode="label" hidden="true" id="FSTTRM_BS" inputType="text" rowInfo="0" rowspan="2"
+								textAlign="center" value="BS 전기" width="81">
+							</w2:column>
+							<w2:column displayMode="label" hidden="true" id="CURTRM_TOTALSTOCKEQUITY" inputType="text" rowInfo="0"
+								rowspan="2" textAlign="center" value="자본금검증 당기" width="81">
+							</w2:column>
+							<w2:column displayMode="label" hidden="true" id="FSTTRM_TOTALSTOCKEQUITY" inputType="text" rowInfo="0"
+								rowspan="2" textAlign="center" value="자본금검증 전기" width="81">
+							</w2:column>
+							<w2:column displayMode="label" hidden="true" id="CURTRM_EARNLOSS1" inputType="text" rowInfo="0" rowspan="2"
+								textAlign="center" value="순손익검증 당기" width="81">
+							</w2:column>
+							<w2:column displayMode="label" hidden="true" id="CURTRM_EARNLOSS2" inputType="text" rowInfo="0" rowspan="2"
+								textAlign="center" value="순손익검증 당기누적" width="81">
+							</w2:column>
+							<w2:column displayMode="label" hidden="true" id="FSTTRM_EARNLOSS1" inputType="text" rowInfo="0" rowspan="2"
+								textAlign="center" value="순손익검증 전기" width="81">
+							</w2:column>
+							<w2:column displayMode="label" hidden="true" id="FSTTRM_EARNLOSS2" inputType="text" rowInfo="0" rowspan="2"
+								textAlign="center" value="순손익검증 전기누적" width="81">
+							</w2:column>
+							<w2:column displayMode="label" hidden="true" id="CURTRM_TAX1" inputType="text" rowInfo="0" rowspan="2"
+								textAlign="center" value="법인세전손익검증 당기" width="81">
+							</w2:column>
+							<w2:column displayMode="label" hidden="true" id="CURTRM_TAX2" inputType="text" rowInfo="0" rowspan="2"
+								textAlign="center" value="법인세전손익검증 당기누적" width="81">
+							</w2:column>
+							<w2:column displayMode="label" hidden="true" id="FSTTRM_TAX1" inputType="text" rowInfo="0" rowspan="2"
+								textAlign="center" value="법인세전손익검증 전기" width="81">
+							</w2:column>
+							<w2:column displayMode="label" hidden="true" id="FSTTRM_TAX2" inputType="text" rowInfo="0" rowspan="2"
+								textAlign="center" value="법인세전손익검증 전기누적" width="81">
+							</w2:column>
+							<w2:column displayMode="label" hidden="true" id="CURTRM2_EARNLOSS1" inputType="text" rowInfo="0" rowspan="2"
+								textAlign="center" value="순손익검증2차 당기" width="81">
+							</w2:column>
+							<w2:column displayMode="label" hidden="true" id="CURTRM2_EARNLOSS2" inputType="text" rowInfo="0" rowspan="2"
+								textAlign="center" value="순손익검증2차 당기누적" width="81">
+							</w2:column>
+							<w2:column displayMode="label" hidden="true" id="FSTTRM2_EARNLOSS1" inputType="text" rowInfo="0" rowspan="2"
+								textAlign="center" value="순손익검증2차 전기" width="81">
+							</w2:column>
+							<w2:column displayMode="label" hidden="true" id="FSTTRM2_EARNLOSS2" inputType="text" rowInfo="0" rowspan="2"
+								textAlign="center" value="순손익검증2차 전기누적" width="81">
+							</w2:column>
+							<w2:column colSpan="2" displayMode="label" id="0" inputType="text" multiheader="true" rowInfo="0"
+								textAlign="center" value="자산총계">
+							</w2:column>
+							<w2:column colSpan="2" displayMode="label" id="1" inputType="text" multiheader="true" rowInfo="0"
+								textAlign="center" value="부채총계">
+							</w2:column>
+							<w2:column colSpan="2" displayMode="label" id="2" inputType="text" multiheader="true" rowInfo="0"
+								textAlign="center" value="자본금">
+							</w2:column>
+							<w2:column colSpan="2" displayMode="label" id="3" inputType="text" multiheader="true" rowInfo="0"
+								textAlign="center" value="자본잉여금">
+							</w2:column>
+							<w2:column colSpan="2" displayMode="label" id="4" inputType="text" multiheader="true" rowInfo="0"
+								textAlign="center" value="자본조정">
+							</w2:column>
+							<w2:column colSpan="2" displayMode="label" id="5" inputType="text" multiheader="true" rowInfo="0"
+								textAlign="center" value="기타포괄손익누계액">
+							</w2:column>
+							<w2:column colSpan="2" displayMode="label" id="6" inputType="text" multiheader="true" rowInfo="0"
+								textAlign="center" value="이익잉여금(결손금)">
+							</w2:column>
+							<w2:column colSpan="2" displayMode="label" id="7" inputType="text" multiheader="true" rowInfo="0"
+								textAlign="center" value="자본총계">
+							</w2:column>
+							<w2:column colSpan="4" displayMode="label" id="8" inputType="text" multiheader="true" rowInfo="0"
+								textAlign="center" value="매출액(영업수익)">
+							</w2:column>
+							<w2:column colSpan="4" displayMode="label" id="9" inputType="text" multiheader="true" rowInfo="0"
+								textAlign="center" value="매출원가">
+							</w2:column>
+							<w2:column colSpan="4" displayMode="label" id="10" inputType="text" multiheader="true" rowInfo="0"
+								textAlign="center" value="매출총이익(손실)">
+							</w2:column>
+							<w2:column colSpan="4" displayMode="label" id="11" inputType="text" multiheader="true" rowInfo="0"
+								textAlign="center" value="판매비와관리비(영업비용)">
+							</w2:column>
+							<w2:column colSpan="4" displayMode="label" id="12" inputType="text" multiheader="true" rowInfo="0"
+								textAlign="center" value="영업이익(손실)">
+							</w2:column>
+							<w2:column colSpan="4" displayMode="label" id="13" inputType="text" multiheader="true" rowInfo="0"
+								textAlign="center" value="영업외수익">
+							</w2:column>
+							<w2:column colSpan="4" displayMode="label" id="14" inputType="text" multiheader="true" rowInfo="0"
+								textAlign="center" value="영업외비용">
+							</w2:column>
+							<w2:column colSpan="4" displayMode="label" id="15" inputType="text" multiheader="true" rowInfo="0"
+								textAlign="center" value="법인세비용차감전(계속사업)이익(손실)">
+							</w2:column>
+							<w2:column colSpan="4" displayMode="label" id="16" inputType="text" multiheader="true" rowInfo="0"
+								textAlign="center" value="계속사업손익법인세비용">
+							</w2:column>
+							<w2:column colSpan="4" displayMode="label" id="17" inputType="text" multiheader="true" rowInfo="0"
+								textAlign="center" value="계속사업이익(손실)">
+							</w2:column>
+							<w2:column colSpan="4" displayMode="label" id="18" inputType="text" multiheader="true" rowInfo="0"
+								textAlign="center" value="중단사업이익(손실)">
+							</w2:column>
+							<w2:column colSpan="4" displayMode="label" id="19" inputType="text" multiheader="true" rowInfo="0"
+								textAlign="center" value="법인세비용차감전순이익(손실)">
+							</w2:column>
+							<w2:column colSpan="4" displayMode="label" id="19" inputType="text" multiheader="true" rowInfo="0"
+								textAlign="center" value="법인세비용">
+							</w2:column>
+							<w2:column colSpan="4" displayMode="label" id="20" inputType="text" multiheader="true" rowInfo="0"
+								textAlign="center" value="당기순이익(손실)">
+							</w2:column>
+							<w2:column displayMode="label" hidden="true" id="VIEWER_URL" inputType="text" rowInfo="0" rowspan="2"
+								textAlign="center" value="공시뷰어 URL" width="98">
+							</w2:column>
+						</w2:row>
+						<w2:row id="" style="">
+							<w2:column displayMode="label" id="TOTALASSETS1" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor2;" value="당기">
+							</w2:column>
+							<w2:column displayMode="label" id="TOTALASSETS2" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor3;" value="전기">
+							</w2:column>
+							<w2:column displayMode="label" id="TOTALLIABILITIES1" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor2;" value="당기">
+							</w2:column>
+							<w2:column displayMode="label" id="TOTALLIABILITIES2" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor3;" value="전기">
+							</w2:column>
+							<w2:column displayMode="label" id="CAPITALSTOCK1" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor4;" value="당기">
+							</w2:column>
+							<w2:column displayMode="label" id="CAPITALSTOCK2" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor5;" value="전기">
+							</w2:column>
+							<w2:column displayMode="label" id="CAPITALSURPLUS1" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor4;" value="당기">
+							</w2:column>
+							<w2:column displayMode="label" id="CAPITALSURPLUS2" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor5;" value="전기">
+							</w2:column>
+							<w2:column displayMode="label" id="CAPITALADJUSTMENTS1" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor4;" value="당기">
+							</w2:column>
+							<w2:column displayMode="label" id="CAPITALADJUSTMENTS2" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor5;" value="전기">
+							</w2:column>
+							<w2:column displayMode="label" id="ACCOTHCOMINCOME1" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor4;" value="당기">
+							</w2:column>
+							<w2:column displayMode="label" id="ACCOTHCOMINCOME2" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor5;" value="전기">
+							</w2:column>
+							<w2:column displayMode="label" id="REEARNACCDEFICIT1" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor4;" value="당기">
+							</w2:column>
+							<w2:column displayMode="label" id="REEARNACCDEFICIT2" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor5;" value="전기">
+							</w2:column>
+							<w2:column displayMode="label" id="TOTALSTOCKEQUITY1" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor2;" value="당기">
+							</w2:column>
+							<w2:column displayMode="label" id="TOTALSTOCKEQUITY2" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor3;" value="전기">
+							</w2:column>
+							<w2:column displayMode="label" id="SALESREVENUE1" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor6;" value="당기3개월">
+							</w2:column>
+							<w2:column displayMode="label" id="SALESREVENUE2" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor7;" value="당기누적">
+							</w2:column>
+							<w2:column displayMode="label" id="SALESREVENUE3" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor8;" value="전기3개월">
+							</w2:column>
+							<w2:column displayMode="label" id="SALESREVENUE4" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor9;" value="전기누적">
+							</w2:column>
+							<w2:column displayMode="label" id="COSTGOODSSOLD1" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor6;" value="당기3개월">
+							</w2:column>
+							<w2:column displayMode="label" id="COSTGOODSSOLD2" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor7;" value="당기누적">
+							</w2:column>
+							<w2:column displayMode="label" id="COSTGOODSSOLD3" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor8;" value="전기3개월">
+							</w2:column>
+							<w2:column displayMode="label" id="COSTGOODSSOLD4" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor9;" value="전기누적">
+							</w2:column>
+							<w2:column displayMode="label" id="GROSSPROFITLOSS1" inputType="text" rowInfo="1" textAlign="center"
+								value="당기3개월">
+							</w2:column>
+							<w2:column displayMode="label" id="GROSSPROFITLOSS2" inputType="text" rowInfo="1" textAlign="center"
+								value="당기누적">
+							</w2:column>
+							<w2:column displayMode="label" id="GROSSPROFITLOSS3" inputType="text" rowInfo="1" textAlign="center"
+								value="전기3개월">
+							</w2:column>
+							<w2:column displayMode="label" id="GROSSPROFITLOSS4" inputType="text" rowInfo="1" textAlign="center"
+								value="전기누적">
+							</w2:column>
+							<w2:column displayMode="label" id="SELLADMINEXPENSES1" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor6;" value="당기3개월">
+							</w2:column>
+							<w2:column displayMode="label" id="SELLADMINEXPENSES2" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor7;" value="당기누적">
+							</w2:column>
+							<w2:column displayMode="label" id="SELLADMINEXPENSES3" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor8;" value="전기3개월">
+							</w2:column>
+							<w2:column displayMode="label" id="SELLADMINEXPENSES4" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor9;" value="전기누적">
+							</w2:column>
+							<w2:column displayMode="label" id="OPERATINGINCOMELOSS1" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor10;" value="당기3개월">
+							</w2:column>
+							<w2:column displayMode="label" id="OPERATINGINCOMELOSS2" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor11;" value="당기누적">
+							</w2:column>
+							<w2:column displayMode="label" id="OPERATINGINCOMELOSS3" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor12;" value="전기3개월">
+							</w2:column>
+							<w2:column displayMode="label" id="OPERATINGINCOMELOSS4" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor13;" value="전기누적">
+							</w2:column>
+							<w2:column displayMode="label" id="NONOPERREVENUES1" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor6;" value="당기3개월">
+							</w2:column>
+							<w2:column displayMode="label" id="NONOPERREVENUES2" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor7;" value="당기누적">
+							</w2:column>
+							<w2:column displayMode="label" id="NONOPERREVENUES3" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor8;" value="전기3개월">
+							</w2:column>
+							<w2:column displayMode="label" id="NONOPERREVENUES4" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor9;" value="전기누적">
+							</w2:column>
+							<w2:column displayMode="label" id="NONOPEREXPENSES1" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor6;" value="당기3개월">
+							</w2:column>
+							<w2:column displayMode="label" id="NONOPEREXPENSES2" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor7;" value="당기누적">
+							</w2:column>
+							<w2:column displayMode="label" id="NONOPEREXPENSES3" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor8;" value="전기3개월">
+							</w2:column>
+							<w2:column displayMode="label" id="NONOPEREXPENSES4" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor9;" value="전기누적">
+							</w2:column>
+							<w2:column displayMode="label" id="ONGOINGBUSINESS1" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor10;" value="당기3개월">
+							</w2:column>
+							<w2:column displayMode="label" id="ONGOINGBUSINESS2" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor11;" value="당기누적">
+							</w2:column>
+							<w2:column displayMode="label" id="ONGOINGBUSINESS3" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor12;" value="전기3개월">
+							</w2:column>
+							<w2:column displayMode="label" id="ONGOINGBUSINESS4" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor13;" value="전기누적">
+							</w2:column>
+							<w2:column displayMode="label" id="INCOMETAXES1" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor6;" value="당기3개월">
+							</w2:column>
+							<w2:column displayMode="label" id="INCOMETAXES2" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor7;" value="당기누적">
+							</w2:column>
+							<w2:column displayMode="label" id="INCOMETAXES3" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor8;" value="전기3개월">
+							</w2:column>
+							<w2:column displayMode="label" id="INCOMETAXES4" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor9;" value="전기누적">
+							</w2:column>
+							<w2:column displayMode="label" id="ONGOINGINCOMELOSS1" inputType="text" rowInfo="1" textAlign="center"
+								value="당기3개월">
+							</w2:column>
+							<w2:column displayMode="label" id="ONGOINGINCOMELOSS2" inputType="text" rowInfo="1" textAlign="center"
+								value="당기누적">
+							</w2:column>
+							<w2:column displayMode="label" id="ONGOINGINCOMELOSS3" inputType="text" rowInfo="1" textAlign="center"
+								value="전기3개월">
+							</w2:column>
+							<w2:column displayMode="label" id="ONGOINGINCOMELOSS4" inputType="text" rowInfo="1" textAlign="center"
+								value="전기누적">
+							</w2:column>
+							<w2:column displayMode="label" id="DISOPERINCOMELOSS1" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor6;" value="당기3개월">
+							</w2:column>
+							<w2:column displayMode="label" id="DISOPERINCOMELOSS2" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor7;" value="당기누적">
+							</w2:column>
+							<w2:column displayMode="label" id="DISOPERINCOMELOSS3" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor8;" value="전기3개월">
+							</w2:column>
+							<w2:column displayMode="label" id="DISOPERINCOMELOSS4" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor9;" value="전기누적">
+							</w2:column>
+							<w2:column displayMode="label" hidden="true" id="INLSSBEFINCMTAXEX1" inputType="text" rowInfo="1"
+								textAlign="center" value="당기3개월">
+							</w2:column>
+							<w2:column displayMode="label" hidden="true" id="INLSSBEFINCMTAXEX2" inputType="text" rowInfo="1"
+								textAlign="center" value="당기누적">
+							</w2:column>
+							<w2:column displayMode="label" hidden="true" id="INLSSBEFINCMTAXEX3" inputType="text" rowInfo="1"
+								textAlign="center" value="전기3개월">
+							</w2:column>
+							<w2:column displayMode="label" hidden="true" id="INLSSBEFINCMTAXEX4" inputType="text" rowInfo="1"
+								textAlign="center" value="전기누적">
+							</w2:column>
+							<w2:column displayMode="label" id="INCOMETAXESEXPENSES1" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor6;" value="당기3개월">
+							</w2:column>
+							<w2:column displayMode="label" id="INCOMETAXESEXPENSES2" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor7;" value="당기누적">
+							</w2:column>
+							<w2:column displayMode="label" id="INCOMETAXESEXPENSES3" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor8;" value="전기3개월">
+							</w2:column>
+							<w2:column displayMode="label" id="INCOMETAXESEXPENSES4" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor9;" value="전기누적">
+							</w2:column>
+							<w2:column displayMode="label" id="NETINCOMELOSS1" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor6;" value="당기3개월">
+							</w2:column>
+							<w2:column displayMode="label" id="NETINCOMELOSS2" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor7;" value="당기누적">
+							</w2:column>
+							<w2:column displayMode="label" id="NETINCOMELOSS3" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor8;" value="전기3개월">
+							</w2:column>
+							<w2:column displayMode="label" id="NETINCOMELOSS4" inputType="text" rowInfo="1" textAlign="center"
+								userData2=" bgcolor:@acolor9;" value="전기누적">
+							</w2:column>
+						</w2:row>
+					</w2:header>
+					<w2:gBody id="gBody1" style="">
+						<w2:row id="" style="">
+							<w2:column displayMode="label" id="undefined" inputType="text" textAlign="center" width="43"></w2:column>
+							<w2:column displayMode="label" id="ACPT_NO" inputType="text" textAlign="center" width="110"></w2:column>
+							<w2:column displayMode="label" id="MKT_NM" inputType="text" textAlign="center" width="75"></w2:column>
+							<w2:column displayMode="label" id="LIST_STAT_NM" inputType="text" textAlign="center" width="75"></w2:column>
+							<w2:column displayMode="label" id="COM_ABBRV" inputType="text" textAlign="center" width="120"></w2:column>
+							<w2:column displayMode="label" id="ISU_SRT_CD" inputType="text" textAlign="center" width="70"></w2:column>
+							<w2:column displayMode="label" id="STD_IND_CD" inputType="text" textAlign="center" width="60"></w2:column>
+							<w2:column displayMode="label" id="IND_NM" inputType="text" textAlign="center" width="104"></w2:column>
+							<w2:column displayMode="label" id="EMP_NM" inputType="text" textAlign="center" width="65"></w2:column>
+							<w2:column displayMode="label" id="DEP_NM" inputType="text" textAlign="center" width="70"></w2:column>
+							<w2:column displayMode="label" id="ENTPR_GRP_NM" inputType="text" textAlign="center" width="76"></w2:column>
+							<w2:column displayMode="label" id="COM_ATTR_TP_NM" inputType="text" textAlign="center" width="64"></w2:column>
+							<w2:column displayMode="label" id="ACNTCLS_YY" inputType="text" textAlign="center" width=""></w2:column>
+							<w2:column displayMode="label" id="ACNTCLS_MM" inputType="text" textAlign="center" width="44"></w2:column>
+							<w2:column displayMode="label" id="FISCYY_TP_NM" inputType="text" textAlign="center" width="81"></w2:column>
+							<w2:column displayMode="label" id="WRTRPT_KIND_NM" inputType="text" textAlign="center" width="68"></w2:column>
+							<w2:column displayMode="label" id="AUDT_OPIN_TP_NM" inputType="text" textAlign="center" width="80"></w2:column>
+							<w2:column displayMode="label" id="CURTRM_BS" inputType="text" textAlign="center" width="81"></w2:column>
+							<w2:column displayMode="label" id="FSTTRM_BS" inputType="text" textAlign="center" width="81"></w2:column>
+							<w2:column displayMode="label" id="CURTRM_TOTALSTOCKEQUITY" inputType="text" textAlign="center" width="81"></w2:column>
+							<w2:column displayMode="label" id="FSTTRM_TOTALSTOCKEQUITY" inputType="text" textAlign="center" width="81"></w2:column>
+							<w2:column displayMode="label" id="CURTRM_EARNLOSS1" inputType="text" textAlign="center" width="81"></w2:column>
+							<w2:column displayMode="label" id="CURTRM_EARNLOSS2" inputType="text" textAlign="center" width="81"></w2:column>
+							<w2:column displayMode="label" id="FSTTRM_EARNLOSS1" inputType="text" textAlign="center" width="81"></w2:column>
+							<w2:column displayMode="label" id="FSTTRM_EARNLOSS2" inputType="text" textAlign="center" width="81"></w2:column>
+							<w2:column displayMode="label" id="CURTRM_TAX1" inputType="text" textAlign="center" width="81"></w2:column>
+							<w2:column displayMode="label" id="CURTRM_TAX2" inputType="text" textAlign="center" width="81"></w2:column>
+							<w2:column displayMode="label" id="FSTTRM_TAX1" inputType="text" textAlign="center" width="81"></w2:column>
+							<w2:column displayMode="label" id="FSTTRM_TAX2" inputType="text" textAlign="center" width="81"></w2:column>
+							<w2:column displayMode="label" id="CURTRM2_EARNLOSS1" inputType="text" textAlign="center" width="81"></w2:column>
+							<w2:column displayMode="label" id="CURTRM2_EARNLOSS2" inputType="text" textAlign="center" width="81"></w2:column>
+							<w2:column displayMode="label" id="FSTTRM2_EARNLOSS1" inputType="text" textAlign="center" width="81"></w2:column>
+							<w2:column displayMode="label" id="FSTTRM2_EARNLOSS2" inputType="text" textAlign="center" width="81"></w2:column>
+							<w2:column displayMode="label" id="VIEWER_URL" inputType="text" textAlign="center" width="98"></w2:column>
+							<w2:column displayMode="label" id="TOTALASSETS1" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="TOTALASSETS2" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="TOTALLIABILITIES1" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="TOTALLIABILITIES2" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="CAPITALSTOCK1" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="CAPITALSTOCK2" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="CAPITALSURPLUS1" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="CAPITALSURPLUS2" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="CAPITALADJUSTMENTS1" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="CAPITALADJUSTMENTS2" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="ACCOTHCOMINCOME1" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="ACCOTHCOMINCOME2" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="REEARNACCDEFICIT1" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="REEARNACCDEFICIT2" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="TOTALSTOCKEQUITY1" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="TOTALSTOCKEQUITY2" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="SALESREVENUE1" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="SALESREVENUE2" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="SALESREVENUE3" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="SALESREVENUE4" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="COSTGOODSSOLD1" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="COSTGOODSSOLD2" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="COSTGOODSSOLD3" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="COSTGOODSSOLD4" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="GROSSPROFITLOSS1" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="GROSSPROFITLOSS2" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="GROSSPROFITLOSS3" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="GROSSPROFITLOSS4" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="SELLADMINEXPENSES1" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="SELLADMINEXPENSES2" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="SELLADMINEXPENSES3" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="SELLADMINEXPENSES4" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="OPERATINGINCOMELOSS1" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="OPERATINGINCOMELOSS2" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="OPERATINGINCOMELOSS3" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="OPERATINGINCOMELOSS4" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="NONOPERREVENUES1" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="NONOPERREVENUES2" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="NONOPERREVENUES3" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="NONOPERREVENUES4" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="NONOPEREXPENSES1" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="NONOPEREXPENSES2" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="NONOPEREXPENSES3" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="NONOPEREXPENSES4" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="ONGOINGBUSINESS1" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="ONGOINGBUSINESS2" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="ONGOINGBUSINESS3" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="ONGOINGBUSINESS4" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="INCOMETAXES1" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="INCOMETAXES2" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="INCOMETAXES3" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="INCOMETAXES4" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="ONGOINGINCOMELOSS1" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="ONGOINGINCOMELOSS2" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="ONGOINGINCOMELOSS3" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="ONGOINGINCOMELOSS4" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="DISOPERINCOMELOSS1" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="DISOPERINCOMELOSS2" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="DISOPERINCOMELOSS3" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="DISOPERINCOMELOSS4" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="INLSSBEFINCMTAXEX1" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="INLSSBEFINCMTAXEX2" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="INLSSBEFINCMTAXEX3" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="INLSSBEFINCMTAXEX4" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="INCOMETAXESEXPENSES1" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="INCOMETAXESEXPENSES2" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="INCOMETAXESEXPENSES3" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="INCOMETAXESEXPENSES4" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="NETINCOMELOSS1" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="NETINCOMELOSS2" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="NETINCOMELOSS3" inputType="text" textAlign="right" width=""></w2:column>
+							<w2:column displayMode="label" id="NETINCOMELOSS4" inputType="text" textAlign="right" width=""></w2:column>
+						</w2:row>
+					</w2:gBody>
+				</w2:gridView>
+			</xf:group>
+			<xf:group id="" class="txt_info flex flex_between">
+				<w2:textbox style="" userData2=" class:Blue_Bold;" id="label_8" label="※ 수치입력오류, 결산월입력오류, 항목입력을하지 않은경우 다른색으로 표시됨"
+					class="blue">
+				</w2:textbox>
+				<w2:textbox style="" userData2=" class:Blue_Bold;" id="label_4" label="출처 : XBRL" class="blue"></w2:textbox>
+			</xf:group>
+		</xf:group>
+		<xf:events>
+			<xf:event userData2=" for:btn_Search; eventname:onclick;" />
+			<xf:event userData2=" for:btn_ISUR_CD; eventname:onclick;" />
+			<xf:event userData2=" for:dts_XBRL; eventname:OnLoadCompleted(rowcount);" />
+			<xf:event userData2=" for:dts_XBRL; eventname:OnLoadError();" />
+			<xf:event userData2=" for:grd_XBRL2; eventname:OnDblClick(row, colid);" />
+			<xf:event userData2=" for:Grd_com_isur; eventname:OnKeyPress(kcode);" />
+			<xf:event userData2=" for:Grd_com_isur; eventname:OnDblClick(row, colid);" />
+			<xf:event userData2=" for:Grd_com_isur; eventname:OnClick(row, colid);" />
+			<xf:event userData2=" for:Grd_com_isur; eventname:OnSetFocus();" />
+			<xf:event userData2=" for:Grd_com_isur; eventname:OnKillFocus();" />
+			<xf:event userData2=" for:txb_isur_cd; eventname:onblur;" />
+			<xf:event userData2=" for:txb_isur_cd; eventname:onfocus;" />
+			<xf:event userData2=" for:MxDataSet_com_isur; eventname:OnFilter(row);" />
+			<xf:event userData2=" for:txb_isur_cd; eventname:onkeyup;" />
+			<xf:event userData2=" for:dts_emp; eventname:OnLoadCompleted(rowcount);" />
+			<xf:event userData2=" for:dts_emp; eventname:OnFilter(row);" />
+			<xf:event userData2=" for:dts_dep; eventname:OnLoadCompleted(rowcount);" />
+			<xf:event userData2=" for:cmb_TeamList; eventname:OnSelChange();" />
+			<xf:event userData2=" for:grd_XBRL2; eventname:OnUserColor(row, colid);" />
+			<xf:event userData2=" for:cmb_IndTp; eventname:OnSelChange();" />
+			<xf:event userData2=" for:checkbox_3; eventname:onclick;" />
+			<xf:event userData2=" for:checkbox_4; eventname:onclick;" />
+			<xf:event userData2=" for:checkbox_5; eventname:onclick;" />
+			<xf:event userData2=" for:checkbox_6; eventname:onclick;" />
+			<xf:event userData2=" for:checkbox_9; eventname:onclick;" />
+			<xf:event userData2=" for:checkbox_10; eventname:onclick;" />
+			<xf:event userData2=" for:checkbox_11; eventname:onclick;" />
+			<xf:event userData2=" for:checkbox_13; eventname:onclick;" />
+			<xf:event userData2=" for:checkbox_14; eventname:onclick;" />
+			<xf:event userData2=" for:checkbox_16; eventname:onclick;" />
+			<xf:event userData2=" for:checkbox_17; eventname:onclick;" />
+			<xf:event userData2=" for:checkbox_18; eventname:onclick;" />
+			<xf:event userData2=" for:checkbox_19; eventname:onclick;" />
+			<xf:event userData2=" for:btn_all; eventname:onclick;" />
+			<xf:event userData2=" for:btn_disall; eventname:onclick;" />
+			<xf:event userData2=" for:btn_Excel; eventname:onclick;" />
+			<xf:event userData2=" for:gform; eventname:onload;" />
+		</xf:events>
+	</body>
+</html>

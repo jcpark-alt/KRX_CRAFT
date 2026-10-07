@@ -1,0 +1,429 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDINS90300.gfm" meta_screenName="(팝업)반송처리">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<xf:model>
+			<w2:workflowCollection/>
+			<w2:dataCollection baseNode="map"/>
+			<xf:submission id="sbm_dts_return" userData2=" syncload:True;" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json"/>
+			<xf:submission id="sbm_trs_modify" userData2=" keyname:toinb_dataid4;" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json" ev:submitdone="scwin.trs_modify_OnSuccess" ev:submiterror="scwin.trs_modify_OnFail"/>
+			<xf:submission id="sbm_dts_Rst" userData2=" syncload:True;" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json" ev:submitdone="scwin.dts_Rst_OnLoadCompleted"/>
+			<xf:submission id="sbm_dts_TempRst" userData2=" syncload:False;" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json" ev:submitdone="scwin.dts_TempRst_OnLoadCompleted"/>
+			<xf:submission id="sbm_dts_detail" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json"/>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+/* ★Wcraft guide★    
+스크립트 수작업 유의사항
+*/
+
+
+//★Wcraft guide★ include부분 주석처리 -> include("../js/libRoundPanel.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/stf.js");
+
+//#include("../js/ins.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/utils.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/session.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/PopupCalendar.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/common.js");
+
+//반송처리
+scwin.vScrenID = "ULDINS90300.xml";
+scwin.onpageload = function() {
+    scwin.gform_onload();
+};
+scwin.onpageunload = function() {
+};
+
+/********************************************** 
+ * 함수명   : ins_register
+ * 설명       : 반송처리 한다.
+ ***********************************************/
+scwin.ins_register = function() {
+    //trs_modify.Action="/CmmInfoAction.do?method=processReturnInfo&inputMessageId=ULDINS90300_INPUT&SCREN_ID=" + vScrenID +"&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_03 ;
+
+
+    //alert(dts_UserList.text);
+
+    //dts_return.setDataHeader(); // W-Craft 주석처리 및 필요시 asis 파라미터 확인 
+    dts_return.insertRow();
+    dts_return.setCellData(1, "KEY_ID", $c.stf.getObjectValue(txb_KEY));
+    dts_return.setCellData(1, "RET_RSN", $c.stf.getObjectValue(txb_RET_RSN));
+    dts_return.setCellData(1, "RET_RSN_FLAG", $c.stf.getObjectValue(txb_RET_RSN_FLAG));
+    dts_return.setCellData(1, "RET_REQ_ID", $c.stf.getObjectValue(txb_REQ_ID));
+    trs_modify.Action = "/CmmInfoAction.do?method=processReturnInfo" + "&SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_03;
+    trs_modify.KeyName = "toinb_dataid4";
+    trs_modify.KeyValue = "JSP(O:pReturnOut=dts_Rst,I:pInput=dts_return)";
+    trs_modify.Parameters = "EMP_NO=" + js_emp_no + ",EMP_NM=" + js_emp_nm + ",EMAIL=" + js_email;
+    trs_modify.Post();
+};
+
+
+/********************************************** 
+ * 함수명   : ins_detail
+ * 설명       : 신청인 이름, 휴대전화번호, 이메일을 조회한다.
+ ***********************************************/
+scwin.ins_detail = function(KEY_ID) {
+    //데이터셋 초기화
+    dts_detail.removeAll();
+    var url = "/listingCommon.do?SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01 + "&method=listGeneralForDynamicName" + "&outputMessageId=ULDINS90300_VIEW_OUT" + "&service=krx.lds.ins.listingcommon.services.ListingCommonApp" + "&{P}KEY_ID=" + $c.stf.getObjectValue(txb_KEY);
+
+    //alert(getObjectValue(txb_RET_RSN_FLAG));
+
+    // 신청인 정보조회
+    if ($c.stf.getObjectValue(txb_RET_RSN_FLAG) == "3") {
+        // 표준코드 신청  반송 ret_rsn_flag = 3 
+        url += "&queryId=lds.ins.common.select.listReturnInfo3";
+    } else {
+        // 발행기관 신청, 변경  반송 ret_rsn_flag = 1 , 2
+        url += "&queryId=lds.ins.common.select.listReturnInfo12";
+    }
+    dts_detail.DataID = encodeURI(url);
+    dts_detail.reset();
+};
+
+
+
+/********************************************** 
+ * 함수명   : readTempCode
+ * 설명       : 발행기관신청 반송처리일때 임시코드로 발행한 표준코드가 있는지 확인
+ ***********************************************/
+scwin.readTempCode = function() {
+    var url = "/listingCommon.do?SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01 + "&method=listGeneralForDynamicName" + "&outputMessageId=ULDINS90300_LIST_OUT" + "&service=krx.lds.ins.listingcommon.services.ListingCommonApp" + "&queryId=lds.ins.common.select.listReturnInfo21" + "&{P}KEY_ID=" + $c.stf.getObjectValue(txb_KEY);
+
+    // alert(url);
+    dts_TempRst.DataID = encodeURI(url);
+    dts_TempRst.reset();
+};
+scwin.btn_confirm_onclick = function() {
+    /*
+    if(txb_ENCRYP_APCT_EMAIL.value =="" || txb_ENCRYP_APCT_EMAIL.value.indexOf(" ") == "" ) {
+    	alert( getMessageParam("MSG-A005", "이메일") );
+    	txb_RET_RSN.focus();
+    	return;
+    }
+    
+    if(txb_APCT_CELLPHONE_NO.value =="" || txb_APCT_CELLPHONE_NO.value.indexOf(" ") == "" ) {
+    	alert( getMessageParam("MSG-A005", "휴대번호") );
+    	txb_RET_RSN.focus();
+    	return;
+    }
+    */
+    if (txb_RET_RSN.getValue() == "" || txb_RET_RSN.getValue().indexOf(" ") == "") {
+        $c.win.alert($c.stf.getMessageParam("MSG-A005", "사유"));
+        txb_RET_RSN.focus();
+        return;
+    }
+    if (!$c.stf.checkMaxLength(txb_RET_RSN, 80, "사유")) {
+        //txb_RET_RSN.value = "";
+        txb_RET_RSN.focus();
+        return false;
+    }
+    var rtn = confirm('반송 하시겠습니까?');
+    if (rtn == 1) // [반송] 버튼이 눌려졌을 경우
+
+    {
+        scwin.ins_register();
+    }
+};
+scwin.gform_onload = function() {
+    $c.cm.PanelToGroupBox(panel_2);
+    var arrPar = new Array();
+    var parentWin = $c.frame.path("../");
+    var fn_GetPar = parentWin.fn_GetParam;
+    $c.stf.showObj(txb_mail_info, false);
+    if (fn_GetPar != undefined) {
+        fn_GetPar(arrPar);
+        // 발행기관일경우 발행기관신청ID(ISUR_APPL_ID) , 표준코드 표준코드신청ID(STD_CD_APPL_ID)
+        txb_KEY.setValue(((arrPar.length >= 1) && (arrPar[0] != undefined) ? arrPar[0] : ""));
+        // 발행기관 신청에서  반송 ret_rsn_flag = 1 
+        // 발행기관 변경신청 반송 ret_rsn_flag = 2
+        // 표준코드 신청  반송 ret_rsn_flag = 3 
+        txb_RET_RSN_FLAG.setValue(((arrPar.length >= 1) && (arrPar[1] != undefined) ? arrPar[1] : ""));
+        txb_RET_RSN.focus();
+        txb_flag.setValue("한글종목명");
+        txb_code.setValue("접수번호");
+        var sd = $c.frame.path("../").scwin.vScrenID;
+        if (sd == "ULDINS05500.gfm") //발행기관신규접수
+
+        {
+            txb_ISU_NM.setValue($c.stf.getObjectValue($c.frame.path("../").txb_COM_NM));
+            txb_APCT_NM.setValue($c.stf.getObjectValue($c.frame.path("../").txb_CHRG_NM));
+            txb_APCT_CELLPHONE_NO.setValue($c.stf.getObjectValue($c.frame.path("../").txb_APCT_CELLPHONE_NO));
+            txb_ENCRYP_APCT_EMAIL.setValue($c.stf.getObjectValue($c.frame.path("../").txb_ENCRYP_CHRG_EMAIL));
+            txb_REQ_ID.setValue($c.stf.getObjectValue($c.frame.path("../").txb_REQ_ID));
+            txb_flag.setValue("발행기관명");
+        } else if (sd == "ULDINS05600.gfm") //발행기관 변경접수
+
+        {
+            txb_ISU_NM.setValue($c.stf.getObjectValue($c.frame.path("../").txb_ISUR_NM));
+            txb_APCT_NM.setValue($c.stf.getObjectValue($c.frame.path("../").txb_CHRG_NM));
+            txb_APCT_CELLPHONE_NO.setValue($c.stf.getObjectValue($c.frame.path("../").txb_ENCRYP_CELLPHONE_NO));
+            txb_ENCRYP_APCT_EMAIL.setValue($c.stf.getObjectValue($c.frame.path("../").txb_ENCRYP_CHRG_EMAIL));
+            txb_REQ_ID.setValue($c.stf.getObjectValue($c.frame.path("../").txb_REQ_ID));
+            txb_flag.setValue("발행기관명");
+        } else if (sd == "ULDINS10000.gfm" || sd == "ULDINS11200.gfm") //주권접수, 투자계약증권
+
+        {
+            txb_ISU_NM.setValue($c.stf.getObjectValue($c.frame.path("../").txb_ISU_KOR_NM));
+            txb_APCT_NM.setValue($c.stf.getObjectValue($c.frame.path("../").txb_APCT_NM));
+            txb_APCT_CELLPHONE_NO.setValue($c.stf.getObjectValue($c.frame.path("../").txb_APCT_CELLPHONE_NO));
+            txb_ENCRYP_APCT_EMAIL.setValue($c.stf.getObjectValue($c.frame.path("../").txb_ENCRYP_APCT_EMAIL));
+        } else if (sd == "ULDINS10100.gfm" || sd == "ULDINS10900.gfm") //채권접수, 전자단기사채/CP접수
+
+        {
+            txb_ISU_NM.setValue($c.stf.getObjectValue($c.frame.path("../").txb_REQ_ISU_NM));
+            txb_APCT_NM.setValue($c.stf.getObjectValue($c.frame.path("../").txb_APCT_NM));
+            txb_APCT_CELLPHONE_NO.setValue($c.stf.getObjectValue($c.frame.path("../").txb_APCT_CELLPHONE_NO));
+            txb_ENCRYP_APCT_EMAIL.setValue($c.stf.getObjectValue($c.frame.path("../").txb_ENCRYP_APCT_EMAIL));
+            if (sd == "ULDINS10100.gfm") {
+                //채권접수
+                var stdCdReqEmpNm = $c.stf.getObjectValue($c.frame.path("../").txb_STD_CD_REQ_EMP_NM);
+                if (stdCdReqEmpNm != '') {
+                    txb_APCT_CELLPHONE_NO.setValue('');
+                    txb_ENCRYP_APCT_EMAIL.setValue('');
+                    $c.stf.showObj(txb_mail_info, true);
+                }
+            }
+        } else if (sd == "ULDINS10300.gfm" || sd == "ULDINS10400.gfm" || sd == "ULDINS10500.gfm" || sd == "ULDINS10600.gfm" || sd == "ULDINS11100.gfm") {
+            //주식워런트(ELW)접수, 수익증권접수, 예탁증서(DR)접수, 신주인수권증권/증서접수, 상장지수증권(ETN)접수
+            txb_ISU_NM.setValue($c.stf.getObjectValue($c.frame.path("../").txb_ISU_NM));
+            txb_APCT_NM.setValue($c.stf.getObjectValue($c.frame.path("../").txb_APCT_NM));
+            txb_APCT_CELLPHONE_NO.setValue($c.stf.getObjectValue($c.frame.path("../").txb_APCT_CELLPHONE_NO));
+            txb_ENCRYP_APCT_EMAIL.setValue($c.stf.getObjectValue($c.frame.path("../").txb_ENCRYP_APCT_EMAIL));
+        } else if (sd == "ULDINS10700.gfm") //스트립접수
+
+        {
+            txb_ISU_NM.setValue($c.stf.getObjectValue($c.frame.path("../").txb_OBJ_ISU_NM));
+            txb_APCT_NM.setValue($c.stf.getObjectValue($c.frame.path("../").txb_APCT_NM));
+            txb_APCT_CELLPHONE_NO.setValue($c.stf.getObjectValue($c.frame.path("../").txb_APCT_CELLPHONE_NO));
+            txb_ENCRYP_APCT_EMAIL.setValue($c.stf.getObjectValue($c.frame.path("../").txb_ENCRYP_APCT_EMAIL));
+        } else if (sd == "ULDINS10800.gfm") //양도성예금증서(CD) 표준코드접수
+
+        {
+            txb_ISU_NM.setValue($c.stf.getObjectValue($c.frame.path("../").txb_APPL_ISU_NM));
+            txb_APCT_NM.setValue($c.stf.getObjectValue($c.frame.path("../").txb_APCT_NM));
+            txb_APCT_CELLPHONE_NO.setValue($c.stf.getObjectValue($c.frame.path("../").txb_APCT_CELLPHONE_NO));
+            txb_ENCRYP_APCT_EMAIL.setValue($c.stf.getObjectValue($c.frame.path("../").txb_ENCRYP_APCT_EMAIL));
+        } else if (sd == "ULDINS10200.gfm") //ELS/DLS 접수
+
+        {
+            txb_ISU_NM.setValue($c.stf.getObjectValue($c.frame.path("../").txb_ISU_NM) + " " + $c.stf.getObjectValue($c.frame.path("../").txb_UNQ_ISU_NM));
+            txb_APCT_NM.setValue($c.stf.getObjectValue($c.frame.path("../").txb_APCT_NM));
+            txb_APCT_CELLPHONE_NO.setValue($c.stf.getObjectValue($c.frame.path("../").txb_APCT_CELLPHONE_NO));
+            txb_ENCRYP_APCT_EMAIL.setValue($c.stf.getObjectValue($c.frame.path("../").txb_ENCRYP_APCT_EMAIL));
+        }
+        txb_KEYVALUE.setValue(txb_KEY.getValue());
+
+        //alert(arrPar[0] + " " + arrPar[1]);
+
+        //showObj(txb_KEY,false);
+        //showObj(txb_RET_RSN_FLAG,false);
+
+        //setObjectValue(rdo_PARAM,"중복신청");
+        //setObjectValue(txb_RET_RSN,"중복신청");
+
+    }
+
+    //발행기관신청 반송처리일때 임시코드로 발행한 표준코드가 있는지 확인
+    if ($c.stf.getObjectValue(txb_RET_RSN_FLAG) == "1") {
+        //발행기관신청 반송시
+        scwin.readTempCode();
+    }
+    //2016.09.21 신청인 이름, 휴대전화번호, 이메일을 조회한다. (전화면에서 가져오는 방법으로 변경)
+
+    //alert(txb_KEY.value);
+
+    //ins_detail(txb_KEY.value);
+
+};
+scwin.trs_modify_OnSuccess = function() {
+    // 메시지는 pReturnOut 을이용 dts_Rst - OnLoadCompleted 에서 한다. 
+
+};
+scwin.trs_modify_OnFail = function() {
+    alert_tr_error(trs_modify);
+};
+scwin.btn_close_onclick = async function() {
+    await $c.frame.CloseFrame();
+};
+scwin.dts_Rst_OnLoadCompleted = async function(rowcount) {
+    var RESULT_CONTN = dts_Rst.getCellData(0, "RESULT_CONTN");
+    if (RESULT_CONTN == "ERROR1") {
+        $c.win.alert("표준코드 신청자가 없습니다.확인부탁드립니다.");
+    } else if (RESULT_CONTN == "ERROR2") {
+        $c.win.alert("발행기관 신청자가 없습니다.확인부탁드립니다.");
+    } else if (RESULT_CONTN == "SUCCESS") {
+        $c.win.alert("정상적으로 반송처리 되었습니다.");
+        $c.frame.path("../").ins_return();
+        await $c.frame.CloseFrame();
+    }
+};
+scwin.txb_RET_RSN_onkeyup = function() {
+    fn_DelChar5(this);
+};
+scwin.rdo_PARAM_OnClick = function() {
+    txb_RET_RSN.setValue($c.stf.getObjectValue(rdo_PARAM));
+};
+scwin.dts_TempRst_OnLoadCompleted = function(rowcount) {
+    if (rowcount > 0) {
+        var tempMsg = "현재 임시 발행기관코드로 발행한 표준코드가 같이 반송됩니다.\n";
+        for (var i = 1; i <= rowcount; i++) {
+            var std_cd_appl_id = dts_TempRst.getCellData(i, "STD_CD_APPL_ID");
+            var std_cd_appl_contn_tp_nm = dts_TempRst.getCellData(i, "STD_CD_APPL_CONTN_TP_NM");
+            var isu_nm = dts_TempRst.getCellData(i, "ISU_NM");
+            tempMsg += std_cd_appl_contn_tp_nm + "(" + std_cd_appl_id + ") " + isu_nm + "\n";
+        }
+        $c.win.alert(tempMsg);
+    }
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+		
+		
+		<xf:group id="" class="pop_contents"><xf:group id="" class="titbox mt0">
+			<xf:group id="" class="rt">
+				<xf:trigger cursor="pointer" src="../img/btn_Ret.gif" ev:onclick="scwin.btn_confirm_onclick" hierarchy="btn_confirm" style="" id="btn_confirm" class="btn_cm" orgid="btn_confirm">
+					<xf:label><![CDATA[반송]]></xf:label>
+				</xf:trigger>
+			</xf:group>
+		</xf:group><xf:group meta_snippetCategory="05_입출력테이블" meta_snippetName="5_02 2단테이블" meta_snippetKeyComponent="true" style="" id="panel_2" class="tblbox">
+			<xf:group adaptive="" adaptiveThreshold="768" tagname="table" style="" id="" class="w2tb tbl">
+				<w2:attributes>
+					<w2:summary></w2:summary>
+				</w2:attributes>
+				<xf:group tagname="colgroup">
+					<xf:group tagname="col" style="width:100px;"></xf:group>
+					<xf:group tagname="col" style=""></xf:group>
+					<xf:group tagname="col" style="width:80px;"></xf:group>
+					<xf:group tagname="col" style=""></xf:group>
+				</xf:group>
+				<xf:group tagname="tr" style="">
+					<xf:group tagname="th" style="" class="w2tb_th">
+						<w2:textbox id="txb_code" label="" style=""></w2:textbox>
+					</xf:group>
+					<xf:group tagname="td" style="" class="w2tb_td">
+						<w2:attributes>
+							<w2:colspan>3</w2:colspan>
+							<w2:rowspan>1</w2:rowspan>
+						</w2:attributes>
+						<xf:input maxlength="40" hierarchy="txb_KEYVALUE" readOnly="true" style="width:150px;" userData2=" class:TopCondition_01_write; font-weight:bold; border-color:#92b1f1;" id="txb_KEYVALUE" orgid="txb_KEYVALUE">
+						</xf:input>
+					</xf:group>
+				</xf:group>
+				<xf:group tagname="tr">
+					<xf:group tagname="th" class="w2tb_th">
+						<w2:attributes>
+							<w2:scope>row</w2:scope>
+						</w2:attributes>
+						<w2:textbox id="txb_flag" label="" style=""></w2:textbox>
+					</xf:group>
+					<xf:group tagname="td" class="w2tb_td">
+						<w2:attributes>
+							<w2:colspan>3</w2:colspan>
+							<w2:rowspan>1</w2:rowspan>
+						</w2:attributes>
+						<xf:input maxlength="40" hierarchy="txb_ISU_NM" readOnly="true" style="width:100%" userData2=" class:TopCondition_01_write; font-weight:bold; border-color:#92b1f1;" id="txb_ISU_NM" orgid="txb_ISU_NM">
+						</xf:input>
+					</xf:group>
+				</xf:group>
+				<xf:group tagname="tr" style="">
+					<xf:group tagname="th" class="w2tb_th"><w2:attributes>
+							<w2:scope>row</w2:scope>
+						</w2:attributes><w2:textbox hierarchy="label_1" style="" userData2=" class:TopCondition_01;" id="label_1" label="신청인" orgid="label_1">
+						</w2:textbox></xf:group>
+					<xf:group tagname="td" class="w2tb_td">
+						<w2:attributes>
+							<w2:colspan>3</w2:colspan>
+							<w2:rowspan>1</w2:rowspan>
+						</w2:attributes>
+						<xf:input maxlength="40" hierarchy="txb_APCT_NM" readOnly="true" style="width:150px;" userData2=" class:TopCondition_01_write; font-weight:bold; border-color:#92b1f1;" id="txb_APCT_NM" orgid="txb_APCT_NM">
+						</xf:input>
+					</xf:group>
+				</xf:group>
+				<xf:group tagname="tr" style="">
+					<xf:group tagname="th" class="w2tb_th">
+						<w2:attributes>
+							<w2:scope>row</w2:scope>
+						</w2:attributes>
+						<w2:textbox hierarchy="label_3" style="" userData2=" class:TopCondition_01;" id="label_3" label="이메일" orgid="label_3">
+						</w2:textbox>
+					</xf:group>
+					<xf:group tagname="td" class="w2tb_td">
+						<w2:attributes></w2:attributes>
+						<xf:input maxlength="40" hierarchy="txb_ENCRYP_APCT_EMAIL" readOnly="true" style="width:100%" userData2=" class:TopCondition_01_write; font-weight:bold; border-color:#92b1f1;" id="txb_ENCRYP_APCT_EMAIL" orgid="txb_ENCRYP_APCT_EMAIL">
+						</xf:input>
+					</xf:group>
+					<xf:group tagname="th" class="w2tb_th "><w2:attributes>
+							<w2:scope>row</w2:scope>
+						</w2:attributes><w2:textbox hierarchy="label_2" style="" userData2=" class:TopCondition_01;" id="label_2" label="휴대번호" orgid="label_2">
+						</w2:textbox></xf:group>
+					<xf:group tagname="td" class="w2tb_td">
+						<w2:attributes></w2:attributes>
+						<xf:input maxlength="40" hierarchy="txb_APCT_CELLPHONE_NO" readOnly="true" style="width:100%" userData2=" class:TopCondition_01_write; font-weight:bold; border-color:#92b1f1;" id="txb_APCT_CELLPHONE_NO" orgid="txb_APCT_CELLPHONE_NO">
+						</xf:input>
+					</xf:group>
+				</xf:group>
+				<xf:group tagname="tr">
+					<xf:group tagname="th" class="w2tb_th">
+						<w2:attributes>
+							<w2:scope>row</w2:scope>
+						</w2:attributes>
+					</xf:group>
+					<xf:group tagname="td" class="w2tb_td">
+						<w2:attributes><w2:colspan>3</w2:colspan><w2:rowspan>1</w2:rowspan></w2:attributes>
+						<xf:select1 item="중복신청^중복신청,신청자요청^신청자요청,기재내용 오류^기재내용 오류,코드기부여^코드기부여" appearance="full" hierarchy="rdo_PARAM" ev:onradioclick="scwin.rdo_PARAM_OnClick" style="" userData2=" class:TopCondition_Blue; automargin:True; cols:15; font-family:돋움;" id="rdo_PARAM" renderType="radiogroup" orgid="rdo_PARAM">
+							<xf:choices>
+								<xf:item>
+									<xf:label><![CDATA[중복신청]]></xf:label>
+									<xf:value><![CDATA[중복신청]]></xf:value>
+								</xf:item>
+								<xf:item>
+									<xf:label><![CDATA[신청자요청]]></xf:label>
+									<xf:value><![CDATA[신청자요청]]></xf:value>
+								</xf:item>
+								<xf:item>
+									<xf:label><![CDATA[기재내용 오류]]></xf:label>
+									<xf:value><![CDATA[기재내용 오류]]></xf:value>
+								</xf:item>
+								<xf:item>
+									<xf:label><![CDATA[코드기부여]]></xf:label>
+									<xf:value><![CDATA[코드기부여]]></xf:value>
+								</xf:item>
+							</xf:choices>
+						</xf:select1>
+					</xf:group>
+				</xf:group>
+			<xf:group tagname="tr">
+				<xf:group tagname="th" class="w2tb_th">
+					<w2:attributes>
+						<w2:scope>row</w2:scope>
+					</w2:attributes>
+					<w2:textbox hierarchy="lbl_tmp_1" style="" userData2=" class:TopCondition_01;" id="lbl_tmp_1" label="반송사유" orgid="lbl_tmp_1">
+					</w2:textbox>
+				</xf:group>
+				<xf:group tagname="td" class="w2tb_td">
+					<w2:attributes>
+						<w2:colspan>3</w2:colspan>
+						<w2:rowspan>1</w2:rowspan>
+					</w2:attributes>
+					<xf:input maxlength="40" ev:onkeyup="scwin.txb_RET_RSN_onkeyup" hierarchy="txb_RET_RSN" style="width:100%" userData2=" class:TopCondition_01_write;" id="txb_RET_RSN" orgid="txb_RET_RSN">
+					</xf:input>
+				</xf:group></xf:group></xf:group>
+		</xf:group><xf:group tagname="ul" id="" class="txt_list"><xf:group tagname="li" id=""><w2:textbox maxlength="1000" hierarchy="txb_cls_tm2" style="" readOnly="true" userData2=" type:text; font-family:돋움; border-color:#EAEAEA;" id="txb_cls_tm2" label="반송사유를 한글40자 영문80자 이내로 작성해주세요." orgid="txb_cls_tm2"></w2:textbox></xf:group><xf:group tagname="li" id=""><w2:textbox maxlength="1000" hierarchy="txb_mail_info" style="" readOnly="true" userData2=" type:text; font-family:돋움; border-color:#EAEAEA;" id="txb_mail_info" label="채권상장팀의 표준코드요청건은 신청인에 메일, SMS발송을 하지 않습니다." orgid="txb_mail_info"></w2:textbox></xf:group></xf:group><xf:group id="" class="btnbox">
+			<xf:group id="" class="rt">
+				<xf:trigger cursor="pointer" src="../img/btn_close.gif" ev:onclick="scwin.btn_close_onclick" hierarchy="btn_close" style="" id="btn_close" class="btn_cm" orgid="btn_close">
+					<xf:label><![CDATA[닫기]]></xf:label>
+				</xf:trigger>
+			</xf:group>
+		</xf:group></xf:group><xf:group id="panel_1" userData2=" class:TopCondition_01;" style="" orgid="panel_1" hierarchy="panel_1" class="hide">
+			<xf:input id="txb_KEY" userData2=" class:TopCondition_01_write;" style="width:50px;" maxlength="1000" orgid="txb_KEY"
+				hierarchy="txb_KEY" />
+			<xf:input id="txb_RET_RSN_FLAG" userData2=" class:TopCondition_01_write;" style="width:50px;" maxlength="1000"
+				orgid="txb_RET_RSN_FLAG" hierarchy="txb_RET_RSN_FLAG" />
+			<xf:input id="txb_REQ_ID" userData2=" class:TopCondition_01_write;" style="width:50px;" maxlength="1000" orgid="txb_REQ_ID"
+				hierarchy="txb_REQ_ID" />
+		</xf:group>
+	</body>
+</html>

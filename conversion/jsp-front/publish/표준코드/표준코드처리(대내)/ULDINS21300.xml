@@ -1,0 +1,546 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDINS21300.gfm" meta_screenName="선납금관리">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<xf:model>
+			<w2:workflowCollection/>
+			<w2:dataCollection baseNode="map"/>
+			<xf:submission id="sbm_dts_PassList" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json" ev:submitdone="scwin.dts_PassList_OnLoadCompleted" ev:submiterror="scwin.dts_PassList_OnLoadError"/>
+			<xf:submission id="sbm_dts_CORP_USR_TP_CD" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json"/>
+			<xf:submission id="sbm_MxDataSet_com_isur" userData2=" onfilter:MxDataSet_com_isur_OnFilter;" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json"/>
+			<xf:submission id="sbm_dts_ApplRsltCd" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json"/>
+			<xf:submission id="sbm_dts_detail" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json" ev:submiterror="scwin.dts_detail_OnLoadError"/>
+			<xf:submission id="sbm_dts_PassList2" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json" ev:submitdone="scwin.dts_PassList2_OnLoadCompleted"/>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+/* ★Wcraft guide★    
+스크립트 수작업 유의사항
+*/
+
+
+//★Wcraft guide★ include부분 주석처리 -> include("../js/libRoundPanel.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/stf.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/utils.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/session.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/PopupCalendar.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/common.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/bns_common.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/list_common.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/controlResize.js");
+// 화면 리사이징
+
+scwin.gDepCd = js_dep_cd;
+scwin.gEmpNo = js_emp_no;
+scwin.gLdMktTp = js_market;
+scwin.gIsurCd;
+scwin.pageSize = 10; //페이지 size
+scwin.totalCnt = 0; //전체 row
+scwin.pageNoCnt = 10; //page 번호 개수
+scwin.vCurrPageNo = 0; //현재 선택된 페이지번호
+
+scwin.vPAGENO = 0;
+scwin.vScrenID = "ULDINS21300.xml";
+
+// 발행기관 조회처리 추가
+scwin.fn_GetPar, scwin.fn_SetPar;
+scwin.vsCoPopGb = "SCH";
+scwin.vSelObj;
+scwin.vRowCount = 0;
+scwin.onpageload = function() {
+    scwin.gform_onload();
+};
+scwin.onpageunload = function() {
+};
+scwin.fn_Init = function() {
+    vCurDate = $c.ut.cGetToday("yyyymmdd");
+    $c.stf.setObjectValue(edt_SDATE, vCurDate.substring(0, 4) + "0101"); // 연초날짜
+    $c.stf.setObjectValue(edt_EDATE, $c.ut.cGetToday2());
+
+    //setObjectValue(rdo_MKT_ID, js_market);
+    //js_market = "6"
+
+};
+
+
+
+
+
+/********************************************
+ * 선납잔액 조회(발행기관별)
+ *********************************************/
+scwin.fn_readPrepayChg = function() {
+    //선납잔액 조회
+    var url = "/PrepayInfoAction.do?method=readPrepayChg";
+    url += "&SCREN_ID=" + scwin.vScrenID;
+    url += "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01;
+    url += "&ISUR_CD=" + $c.stf.getObjectValue(txb_ISUR_CD);
+    dts_detail.DataID = encodeURI(url);
+    dts_detail.reset();
+};
+
+
+/********************************************** 
+ * 함수명   : fn_readAllPrepayChg
+ * 설명       : 선납잔액전체 조회
+ ***********************************************/
+scwin.fn_readAllPrepayChg = function() {
+    var url = "/listingCommon.do?SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01 + "&method=listGeneralForDynamicName" + "&outputMessageId=PREPAYINFO_21300_INOUT" + "&service=krx.lds.ins.listingcommon.services.ListingCommonApp" + "&queryId=lds.ins.etc.select.prepaysum.hist";
+    dts_detail.DataID = encodeURI(url);
+    dts_detail.reset();
+};
+
+
+/********************************************
+ * 선납금 리스트 조회 - 입출금현황
+ *********************************************/
+scwin.fn_listPrepayChg = function() {
+    //var argv = fn_listPrepayChg.arguments;
+    //var argc = fn_listPrepayChg.arguments.length;
+    //vPAGENO = (argc == 0) ? 0 : vPAGENO = argv[0];
+
+    $c.cm.ShowWin(grd_Grid);
+    var url = "/PrepayInfoAction.do?method=listPrepayChg";
+    url += "&ISUR_CD=" + $c.stf.getObjectValue(txb_ISUR_CD);
+    url += "&SDATE=" + $c.stf.getObjectValue(edt_SDATE);
+    url += "&EDATE=" + $c.stf.getObjectValue(edt_EDATE);
+    url += "&SCREN_ID=" + scwin.vScrenID;
+    url += "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01;
+
+    //alert(url);
+    dts_PassList.DataID = encodeURI(url);
+    dts_PassList.Reset();
+};
+
+
+/********************************************** 
+ * 함수명   : fn_listBalanceByIsurCd
+ * 설명       : 회사별잔고현황
+ ***********************************************/
+scwin.fn_listBalanceByIsurCd = function() {
+    var url = "/listingCommon.do?SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01 + "&method=listGeneralForDynamicName" + "&outputMessageId=PREPAYINFO_21300_INOUT" + "&service=krx.lds.ins.listingcommon.services.ListingCommonApp" + "&queryId=lds.ins.etc.select.balanceByIsurCd" + "&{P}ISUR_CD=" + $c.stf.getObjectValue(txb_ISUR_CD) + "&{P}SDATE=" + $c.stf.getObjectValue(edt_SDATE) + "&{P}EDATE=" + $c.stf.getObjectValue(edt_EDATE);
+    dts_PassList2.DataID = encodeURI(url);
+    dts_PassList2.reset();
+};
+scwin.arrPar = new Array();
+/********************************************** 
+ * 함수명   : fn_GetParam
+ * 설명       : 전달값을 설정한다.
+ ***********************************************/
+scwin.fn_GetParam = function(arrPar) {
+    scwin.arrPar[0] = txb_param1.getValue(); // 발행기관코드  
+    scwin.arrPar[1] = txb_param2.getValue(); // 발행기관코드명     
+
+    return
+    // ********************************************************************
+    // [WebSquare 전환 추가] 원본 소스와 비교 필요
+    // 
+    // ********************************************************************
+    scwin.arrPar, length;
+};
+
+
+/********************************************** 
+ * 함수명   : fn_popupPrepayChg
+ * 설명       : 발행기관별 선납금을 조회한다.
+ ***********************************************/
+scwin.fn_popupPrepayChg = async function(row, colid) {
+    if (colid == "COM_NM") {
+        var vISUR_CD = dts_PassList.getCellData(row, "ISUR_CD"); // ISUR_CD
+        await $c.frame.CreateDialogFrame("NEWPASS_READ|ISUR_CD=" + vISUR_CD, "/etc/ULDINS21301.gfm", "선납금 조회", 10, 10, 820, 580, "window");
+    }
+};
+scwin.grd_Grid_OnDblClick = function(row, colid) {
+    scwin.fn_popupPrepayChg(row, colid);
+};
+scwin.btn_New_onclick = async function() {
+    await $c.frame.CreateDialogFrame("NEWPASS_READ|ISUR_CD=" + "", "/etc/ULDINS21302.gfm", "선납금 등록", 10, 10, 820, 690, "window");
+};
+scwin.btn_SDATE_onclick = function() {
+    popUpCalendar2(edt_SDATE);
+};
+scwin.btn_EDATE_onclick = function() {
+    popUpCalendar2(edt_EDATE);
+};
+scwin.cmb_PeriodTp_OnSelChange = function() {
+    scwin.fn_Init();
+    var vTp = $c.stf.getObjectValue(cmb_PeriodTp);
+    if (vTp == 7) {
+        //전체
+        $c.stf.setObjectValue(edt_SDATE, '00010101');
+        $c.stf.setObjectValue(edt_EDATE, '99991231');
+    } else {
+        $c.stf.fn_setFromToDate(vTp, edt_SDATE, edt_EDATE);
+    }
+};
+scwin.btn_Excel_onclick = function() {
+    $c.stf.doLogSave(scwin.vScrenID, SCREN_PROCS_TP_CD_07, '');
+    if (tab_IsurInfo.getSelectedTabIndex() == "1") {
+        $c.data.downloadGridViewExcel(grd_Grid, "입출금현황", "", "8");
+    } else if (tab_IsurInfo.getSelectedTabIndex() == "2") {
+        $c.data.downloadGridViewExcel(grd_Grid2, "회사별잔고현황", "", "8");
+    }
+};
+scwin.dts_PassList_OnLoadCompleted = function(rowcount) {
+    if (dts_PassList.errorMsg) {
+        $c.win.alert(dts_PassList.errorMsg);
+    } else {
+        txb_TotalCnt.setValue("총 " + rowcount + "건");
+    }
+    if (txb_ISUR_CD.getValue() == "") {
+        scwin.fn_readAllPrepayChg(); //발행기관 전체 총선납액,잔액 조회
+
+    } else {
+        scwin.fn_readPrepayChg(); //발행기관별 조회 시 총선납액,잔액 조회
+
+    }
+    $c.cm.CloseWin(rowcount, grd_Grid); //데이터 로딩중닫기 및 조회없음 처리	
+
+};
+scwin.dts_PassList2_OnLoadCompleted = function(rowcount) {
+    if (dts_PassList2.errorMsg) {
+        $c.win.alert(dts_PassList2.errorMsg);
+    } else {
+        txb_TotalCnt.setValue("총 " + rowcount + "건");
+    }
+    if (txb_ISUR_CD.getValue() == "") {
+        scwin.fn_readAllPrepayChg(); //발행기관 전체 총선납액,잔액 조회
+
+    } else {
+        scwin.fn_readPrepayChg(); //발행기관별 조회 시 총선납액,잔액 조회
+
+    }
+    $c.cm.CloseWin(rowcount, grd_Grid); //데이터 로딩중닫기 및 조회없음 처리	
+
+};
+scwin.dts_PassList_OnLoadError = function() {
+    $c.stf.alert_error(dts_PassList);
+};
+scwin.MxDataSet_com_isur_OnFilter = function(row) {
+    if (skw != "" && foColum == "1") {
+        f1 = MxDataSet_com_isur.getCellData(row, "COM_ABBRV");
+        f2 = MxDataSet_com_isur.getCellData(row, "OLD_COM_ABBRV");
+        if (f1.indexOf(skw) != -1 || f2.indexOf(skw) != -1) return true;
+
+        else return false;
+    } else {
+        return true;
+    }
+};
+scwin.gform_onload = function() {
+    $c.stf.showObj(txb_param1, false);
+    $c.stf.showObj(txb_param2, false);
+    $c.stf.showObj(txb_COM_NM2, false);
+    $c.cm.PanelToGroupBox(panel_1);
+    scwin.fn_Init();
+    scwin.fn_listPrepayChg();
+};
+scwin.btn_Search_onclick = function() {
+    if (tab_IsurInfo.getSelectedTabIndex() == "1") {
+        scwin.fn_listPrepayChg();
+    } else if (tab_IsurInfo.getSelectedTabIndex() == "2") {
+        scwin.fn_listBalanceByIsurCd();
+    }
+};
+scwin.img_SRCH_ISUR_CD_onclick = function() {
+    ins_popupOpen(txb_ISUR_CD, txb_SRCH_ISUR_NM, "ULDINS90400", "발행기관 코드", "460", "430");
+};
+scwin.img_SRCH_ISUR_CD2_onclick = function() {
+    txb_ISUR_CD.setValue("");
+    txb_SRCH_ISUR_NM.setValue("");
+    txb_TOT_PREPAY_AMT.setValue("");
+    txb_PREPAY_BAL.setValue("");
+};
+scwin.dts_detail_OnLoadError = function() {
+    $c.stf.alert_error(dts_detail);
+};
+scwin.tab_IsurInfo_OnSelChanged = function(nIndex) {
+    if (nIndex == "1") {
+        $c.stf.showObj(btn_New, true);
+        scwin.fn_listPrepayChg();
+    } else if (nIndex == "2") {
+        $c.stf.showObj(btn_New, false);
+        scwin.fn_listBalanceByIsurCd();
+    }
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+	<xf:group id="" class="sub_contents">
+		<xf:group class="schbox" id="panel_1" meta_snippetCategory="03_조회영역" meta_snippetKeyComponent="true" meta_snippetName="3_02 조회조건2행"
+			style="">
+			<xf:group class="schbox_inner" id="" style="">
+				<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl " id="" style="" tagname="table">
+					<w2:attributes>
+						<w2:summary></w2:summary>
+					</w2:attributes>
+					<xf:group tagname="colgroup">
+						<xf:group style="width:120px;" tagname="col"></xf:group>
+						<xf:group tagname="col"></xf:group><xf:group tagname="col" style="width:100px;"></xf:group><xf:group style="" tagname="col"></xf:group>
+						<xf:group style="width:100px;" tagname="col"></xf:group>
+						<xf:group tagname="col"></xf:group><xf:group tagname="col" style="width:90px;"></xf:group><xf:group style="" tagname="col"></xf:group>
+					</xf:group>
+					<xf:group class="" id="" style="" tagname="tr">
+						<xf:group class="w2tb_th" style="" tagname="th"><w2:textbox hierarchy="label_7" id="label_7" label="발행기관코드(명)" orgid="label_7"
+								style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox></xf:group>
+						<xf:group class="w2tb_td" style="" tagname="td">
+							<w2:attributes>
+								<w2:colspan>3</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+						<xf:group id="" class="flex"><w2:autoComplete maxlength="1000" hierarchy="txb_ISUR_CD" readOnly="true" style="width:90px;" userData2=" class:TopCondition_01_read;" id="txb_ISUR_CD" orgid="txb_ISUR_CD" class="flex_no">
+							</w2:autoComplete><xf:trigger cursor="pointer" src="../img/btn_search.gif" ev:onclick="scwin.img_SRCH_ISUR_CD_onclick" hierarchy="img_SRCH_ISUR_CD" style="" id="img_SRCH_ISUR_CD" class="btn_cm icon search" orgid="img_SRCH_ISUR_CD">
+								<xf:label><![CDATA[]]></xf:label>
+							</xf:trigger><xf:input maxlength="3" hierarchy="txb_SRCH_ISUR_NM" readOnly="true" style="" tabIndex="2" userData2=" class:TopCondition_01_read;" id="txb_SRCH_ISUR_NM" orgid="txb_SRCH_ISUR_NM">
+							</xf:input><xf:trigger cursor="pointer" src="../img/ins/btn_eraser.gif" ev:onclick="scwin.img_SRCH_ISUR_CD2_onclick" hierarchy="img_SRCH_ISUR_CD2" style="" id="img_SRCH_ISUR_CD2" class="btn_cm icon eraser" orgid="img_SRCH_ISUR_CD2">
+								<xf:label><![CDATA[]]></xf:label>
+							</xf:trigger></xf:group></xf:group>
+						<xf:group class="w2tb_th" style="" tagname="th">
+							<w2:textbox hierarchy="label_5" id="label_5" label="선납일자" orgid="label_5"
+								style="" userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" id="" style="" tagname="td">
+							<w2:attributes>
+								<w2:colspan>3</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+						<xf:group id="" class="flex flex_no"><w2:inputCalendar hierarchy="edt_SDATE" displayFormat="yyyy-MM-dd" style="" userData2=" class:panel_maskedit_write_01; border:False; numeric:False; valign:1;" id="edt_SDATE" orgid="edt_SDATE">
+							</w2:inputCalendar><w2:textbox hierarchy="label_6" style="" userData2=" class:TopCondition_01;" id="label_6" label="~" orgid="label_6">
+							</w2:textbox><w2:inputCalendar hierarchy="edt_EDATE" displayFormat="yyyy-MM-dd" style="" userData2=" class:panel_maskedit_write_01; border:False; numeric:False; valign:1;" id="edt_EDATE" orgid="edt_EDATE">
+							</w2:inputCalendar><xf:select1 selectedData="true" item="1주일^1,1개월^2,3개월^3,6개월^4,1년^5,2년^6,전체^7" appearance="minimal" ev:onchange="scwin.cmb_PeriodTp_OnSelChange" disabledClass="w2selectbox_disabled" maxlength="20" hierarchy="cmb_PeriodTp" style="width:120px" userData2=" bindcolumn:disp; defaultstring:기간선택; inheritcolor:False; listcount:10; listexprformat:disp^0^70; xpstyle:True; font-family:돋움;" id="cmb_PeriodTp" displayMode="label" orgid="cmb_PeriodTp">
+								<xf:choices>
+									<xf:item>
+										<xf:label><![CDATA[1]]></xf:label>
+										<xf:value><![CDATA[1주일]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[2]]></xf:label>
+										<xf:value><![CDATA[1개월]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[3]]></xf:label>
+										<xf:value><![CDATA[3개월]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[4]]></xf:label>
+										<xf:value><![CDATA[6개월]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[5]]></xf:label>
+										<xf:value><![CDATA[1년]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[6]]></xf:label>
+										<xf:value><![CDATA[2년]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[7]]></xf:label>
+										<xf:value><![CDATA[전체]]></xf:value>
+									</xf:item>
+								</xf:choices>
+							</xf:select1></xf:group></xf:group></xf:group>
+					<xf:group class="" id="" style="" tagname="tr">
+						<xf:group class="w2tb_th" style="" tagname="th">
+							<w2:textbox hierarchy="label_2" id="label_2" label="총 선납액(원)" orgid="label_2" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" style="" tagname="td">
+							<xf:input hierarchy="txb_TOT_PREPAY_AMT" id="txb_TOT_PREPAY_AMT" maxlength="15" orgid="txb_TOT_PREPAY_AMT"
+								readOnly="true" style="width:100%;"
+								tabIndex="19"
+								userData2=" class:panel_maskedit_read_02; alignment:2; datemodify:True; generaledit:False; maxdecimalplace:0; numeric:True; readonlybackcolor:#b9d4f7; selectall:True; showliteral:false; valign:1;" class="tar">
+							</xf:input>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th"><w2:attributes></w2:attributes><w2:textbox hierarchy="label_1" id="label_1" label="총 환급액(원)" orgid="label_1"
+								style="" userData2=" class:TopCondition_01;">
+							</w2:textbox></xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input hierarchy="txb_TOT_RETURN_PAY" id="txb_TOT_RETURN_PAY" maxlength="15" orgid="txb_TOT_RETURN_PAY"
+								readOnly="true" style="width:100%;"
+								tabIndex="19"
+								userData2=" class:panel_maskedit_read_02; alignment:2; datemodify:True; generaledit:False; maxdecimalplace:0; numeric:True; readonlybackcolor:#b9d4f7; selectall:True; showliteral:false; valign:1;" class="tar">
+							</xf:input>
+						</xf:group>
+						<xf:group class="w2tb_th" style="" tagname="th">
+							<w2:textbox hierarchy="label_3" id="label_3" label="총 사용액(원)" orgid="label_3" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" id="" style="" tagname="td">
+							<xf:input hierarchy="txb_TOT_USE_PAY" id="txb_TOT_USE_PAY" maxlength="15" orgid="txb_TOT_USE_PAY"
+								readOnly="true" style="width:100%;"
+								tabIndex="19"
+								userData2=" class:panel_maskedit_read_02; alignment:2; datemodify:True; generaledit:False; maxdecimalplace:0; numeric:True; readonlybackcolor:#b9d4f7; selectall:True; showliteral:false; valign:1;" class="tar">
+							</xf:input>
+						</xf:group>
+						<xf:group tagname="th" id="" class="w2tb_th"><w2:attributes></w2:attributes><w2:textbox hierarchy="label_12" id="label_12" label="총 잔액(원)" orgid="label_12" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox></xf:group>
+						<xf:group tagname="td" id="" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input hierarchy="txb_PREPAY_BAL" id="txb_PREPAY_BAL" maxlength="15" orgid="txb_PREPAY_BAL" readOnly="true"
+								style="width:100%;" tabIndex="19"
+								userData2=" class:panel_maskedit_read_02; alignment:2; datemodify:True; generaledit:False; maxdecimalplace:0; numeric:True; readonlybackcolor:#b9d4f7; selectall:True; showliteral:false; valign:1;" class="tar">
+							</xf:input>
+						</xf:group></xf:group>
+				</xf:group>
+			</xf:group>
+			<xf:group class="btn_schbox" id="" style="">
+				<xf:trigger class="btn_cm sch" cursor="pointer" ev:onclick="scwin.btn_Search_onclick" hierarchy="btn_Search" id="btn_Search"
+					orgid="btn_Search" src="../img/btn_select.gif" style="" text="조회">
+					<xf:label><![CDATA[조회]]></xf:label>
+				</xf:trigger>
+			</xf:group>
+		</xf:group>
+		<xf:group id="" class="tbcbox">
+			<xf:group id="" class="tbc_btnbox">
+				<xf:group id="" class="rt">
+					<xf:group class="count" id="" meta_snippetCategory="02_타이틀" meta_snippetKeyComponent="true" meta_snippetName="총건수">
+						<w2:span id="" label="총" style=""></w2:span>
+						<w2:textbox maxlength="1000" hierarchy="txb_TotalCnt" style="" id="txb_TotalCnt" label="" orgid="txb_TotalCnt"
+							class="num" tagname="span">
+						</w2:textbox>
+						<w2:span id="" label="건" style=""></w2:span>
+					</xf:group>
+					<xf:trigger cursor="pointer" src="../img/btn_excelsave.gif" ev:onclick="scwin.btn_Excel_onclick" hierarchy="btn_Excel"
+						style="" id="btn_Excel" text="엑셀다운로드" class="btn_cm download" orgid="btn_Excel">
+						<xf:label><![CDATA[엑셀다운로드]]></xf:label>
+					</xf:trigger>
+
+					<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.btn_New_onclick" hierarchy="btn_New" id="btn_New"
+						orgid="btn_New" src="../img/btn_new.gif" style="" text="신규">
+						<xf:label><![CDATA[신규]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+			<w2:tabControl confirmTrueAction="exist" confirmFalseAction="new" useMoveNextTabFocus="false" hierarchy="tab_IsurInfo"
+				useConfirmMessage="false"
+				userData2=" class:Tab_01; onselchanged:tab_IsurInfo_OnSelChanged; backcolor:#598fd5; enable:True; textcolor:#ffffff; font-family:돋움체; font-weight:bold;"
+				style="" id="tab_IsurInfo" class="tbc" orgid="tab_IsurInfo" selectedIndex="0">
+				<w2:tabs hierarchy="tab_IsurInfo.panel_3" style="" label="입출금현황" id="panel_3" orgid="panel_3"></w2:tabs>
+				<w2:tabs hierarchy="tab_IsurInfo.panel_2" style="" label="회사별잔고현황" id="panel_2" orgid="panel_2"></w2:tabs>
+				<w2:content hierarchy="tab_IsurInfo.panel_3" userData2=" class:Tab_01; left:6; top:112; border-color:#808080;"
+					style="" id="panel_3_01" orgid="panel_3">
+					<xf:group id="" class="gvwbox">
+						<w2:gridView dataList="data:dts_PassList" hierarchy="tab_IsurInfo.grd_Grid"
+							userData2=" class:Grid_01; autoresizing:True; autoresizingallcol:True; autoresizingwithheader:True; colsizing:True; fillarea:True; fixsizing:True; sortview:left; tooltip:use=true;alt=true;createtime=300;color=#FFFFFF;backcolor=#808080;edgecolor=#333333;leftmargin=10;rightmargin=10;topmargin=10;bottommargin=10;; xtitleheight:0; ondblclick:grd_Grid_OnDblClick;"
+							style="height:153px;" id="grd_Grid" class="gvw" orgid="grd_Grid" autoFit="allColumn" autoFitMinWidth="1290">
+							<w2:caption style="" id="caption1" value="this is a grid caption."></w2:caption>
+							<w2:header style="" id="header1">
+								<w2:row>
+									<w2:column textAlign="center" width="40"
+										userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; color:#343434; value:{CurRow},{ToString}; sumbgcolor:#fefaef; sumcolor:#343434;"
+										inputType="text" id="h_NO" value="번호" displayMode="label">
+									</w2:column>
+									<w2:column hidden="true" textAlign="center" inputType="text" id="h_MKT_ID" value="MKT_ID"
+										displayMode="label">
+									</w2:column>
+									<w2:column textAlign="center" width="106" userData2=" sort:True; mask:XXXX-XX-XX;" inputType="text"
+										id="h_IO_OCCR_DD" value="선납/환급일" displayMode="label">
+									</w2:column>
+									<w2:column textAlign="center" width="108" userData2=" sort:True;" inputType="text" id="h_ISUR_CD"
+										value="발행기관코드" displayMode="label">
+									</w2:column>
+									<w2:column textAlign="center" width="186" userData2=" sort:True; bgcolor:#FFFF99;" inputType="text"
+										id="h_COM_NM" value="발행기관명" displayMode="label">
+									</w2:column>
+									<w2:column hidden="true" textAlign="center" width="58" inputType="text" id="h_PREPAY_IO_TP_CD"
+										value="구분코드" displayMode="label">
+									</w2:column>
+									<w2:column textAlign="center" width="86" userData2=" sort:True;" inputType="text" id="h_PREPAY_IO_TP_NM"
+										value="구분" displayMode="label">
+									</w2:column>
+									<w2:column textAlign="center" width="120" userData2=" sort:True; value:{ADD_PREPAY_BAL*(1)};"
+										inputType="text" id="h_ADD_PREPAY_BAL" value="선납금액(원)" displayMode="label">
+									</w2:column>
+									<w2:column textAlign="center" width="120"
+										userData2=" sort:True; color:{IF(PREPAY_IO_TP_CD='R', 'RED', '#343434')}; value:{IF(PREPAY_IO_TP_CD='R',RET_PREPAY_BAL*(-1),RET_PREPAY_BAL*(1))};"
+										inputType="text" id="h_RET_PREPAY_BAL" value="환급금액(원)" displayMode="label">
+									</w2:column>
+									<w2:column textAlign="center" width="120" userData2=" sort:True; value:{BAK_PREPAY_BAL*(1)};"
+										inputType="text" id="h_BAK_PREPAY_BAL" value="잔액(원)" displayMode="label">
+									</w2:column>
+									<w2:column textAlign="center" width="210" userData2=" sort:True;" inputType="text" id="h_MEMO_CONTN"
+										value="비고" displayMode="label">
+									</w2:column>
+									<w2:column textAlign="center" width="136" userData2=" sort:True;" inputType="text" id="h_REG_DDTM"
+										value="등록일시" displayMode="label">
+									</w2:column>
+								</w2:row>
+							</w2:header>
+							<w2:gBody style="" id="gBody1">
+								<w2:row style="" id="">
+									<w2:column textAlign="center" width="40" inputType="text" id="NO" displayMode="label"></w2:column>
+									<w2:column textAlign="center" width="" inputType="text" id="MKT_ID" displayMode="label"></w2:column>
+									<w2:column textAlign="center" width="106" inputType="text" id="IO_OCCR_DD" displayMode="label"></w2:column>
+									<w2:column textAlign="center" width="108" inputType="text" id="ISUR_CD" displayMode="label"></w2:column>
+									<w2:column textAlign="center" width="186" inputType="text" id="COM_NM" displayMode="label"></w2:column>
+									<w2:column textAlign="center" width="58" inputType="text" id="PREPAY_IO_TP_CD" displayMode="label"></w2:column>
+									<w2:column textAlign="center" width="86" inputType="text" id="PREPAY_IO_TP_NM" displayMode="label"></w2:column>
+									<w2:column textAlign="right" width="120" inputType="text" id="ADD_PREPAY_BAL" displayMode="label"></w2:column>
+									<w2:column textAlign="right" width="120" inputType="text" id="RET_PREPAY_BAL" displayMode="label"></w2:column>
+									<w2:column textAlign="right" width="120" inputType="text" id="BAK_PREPAY_BAL" displayMode="label"></w2:column>
+									<w2:column textAlign="default" width="210" inputType="text" id="MEMO_CONTN" displayMode="label"></w2:column>
+									<w2:column textAlign="center" width="136" inputType="text" id="REG_DDTM" displayMode="label"></w2:column>
+								</w2:row>
+							</w2:gBody>
+						</w2:gridView>
+					</xf:group>
+				</w2:content>
+				<w2:content hierarchy="tab_IsurInfo.panel_2" userData2=" class:Tab_01; left:6; top:112; border-color:#808080;"
+					style="" id="panel_2_01" orgid="panel_2">
+					<xf:group id="" class="gvwbox">
+						<w2:gridView dataList="data:dts_PassList2" hierarchy="tab_IsurInfo.grd_Grid2"
+							userData2=" class:Grid_01; autoresizing:True; autoresizingallcol:True; autoresizingwithheader:True; colsizing:True; fillarea:True; fixsizing:True; sortview:left; tooltip:use=true;alt=true;createtime=300;color=#FFFFFF;backcolor=#808080;edgecolor=#333333;leftmargin=10;rightmargin=10;topmargin=10;bottommargin=10;; xtitleheight:0;"
+							style="height:153px;" id="grd_Grid2" class="gvw" orgid="grd_Grid2" autoFit="allColumn" autoFitMinWidth="820">
+							<w2:caption style="" id="caption1" value="this is a grid caption."></w2:caption>
+							<w2:header style="" id="header1">
+								<w2:row>
+									<w2:column textAlign="center" width="40"
+										userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; color:#343434; value:{CurRow},{ToString}; sumbgcolor:#fefaef; sumcolor:#343434;"
+										inputType="text" id="h_NO" value="번호" displayMode="label">
+									</w2:column>
+									<w2:column textAlign="center" width="108" userData2=" sort:True;" inputType="text" id="h_ISUR_CD"
+										value="발행기관코드" displayMode="label">
+									</w2:column>
+									<w2:column textAlign="center" width="186" userData2=" sort:True;" inputType="text" id="h_COM_NM"
+										value="발행기관명" displayMode="label">
+									</w2:column>
+									<w2:column textAlign="center" width="120" userData2=" sort:True; value:{TOT_PREPAY_AMT*(1)};"
+										inputType="text" id="h_TOT_PREPAY_AMT" value="총선납액(A)" displayMode="label">
+									</w2:column>
+									<w2:column textAlign="center" width="120" userData2=" sort:True; value:{RET_PREPAY_AMT*(1)};"
+										inputType="text" id="h_RET_PREPAY_AMT" value="환급액(B)" displayMode="label">
+									</w2:column>
+									<w2:column textAlign="center" width="120" userData2=" sort:True; value:{USE_PREPAY_AMT*(1)};"
+										inputType="text" id="h_USE_PREPAY_AMT" value="사용액(C)" displayMode="label">
+									</w2:column>
+									<w2:column textAlign="center" width="120" userData2=" sort:True; value:{BAL_PREPAY_AMT*(1)};"
+										inputType="text" id="h_BAL_PREPAY_AMT" value="잔액(A-B-C)" displayMode="label">
+									</w2:column>
+								</w2:row>
+							</w2:header>
+							<w2:gBody style="" id="gBody1">
+								<w2:row style="" id="">
+									<w2:column textAlign="center" width="40" inputType="text" id="NO" displayMode="label"></w2:column>
+									<w2:column textAlign="center" width="108" inputType="text" id="ISUR_CD" displayMode="label"></w2:column>
+									<w2:column textAlign="center" width="186" inputType="text" id="COM_NM" displayMode="label"></w2:column>
+									<w2:column textAlign="right" width="120" inputType="text" id="TOT_PREPAY_AMT" displayMode="label"></w2:column>
+									<w2:column textAlign="right" width="120" inputType="text" id="RET_PREPAY_AMT" displayMode="label"></w2:column>
+									<w2:column textAlign="right" width="120" inputType="text" id="USE_PREPAY_AMT" displayMode="label"></w2:column>
+									<w2:column textAlign="right" width="120" inputType="text" id="BAL_PREPAY_AMT" displayMode="label"></w2:column>
+								</w2:row>
+							</w2:gBody>
+						</w2:gridView>
+					</xf:group>
+				</w2:content>
+			</w2:tabControl>
+		</xf:group>
+	</xf:group>
+	<xf:group id="" class="hide"><xf:input maxlength="1000" hierarchy="txb_COM_NM2" userData2=" class:TopCondition_01_read;" style="position:absolute; left:950px; top:782px; width:60px; height:20px;" id="txb_COM_NM2" orgid="txb_COM_NM2"></xf:input><xf:input maxlength="1000" hierarchy="txb_param1" userData2=" class:TopCondition_01_write;" style="position:absolute; left:1014px; top:780px; width:70px; height:20px;" tabIndex="4" id="txb_param1" orgid="txb_param1"></xf:input><xf:input maxlength="1000" hierarchy="txb_param2" userData2=" class:TopCondition_01_write;" style="position:absolute; left:1084px; top:780px; width:70px; height:20px;" tabIndex="4" id="txb_param2" orgid="txb_param2"></xf:input></xf:group></body>
+</html>

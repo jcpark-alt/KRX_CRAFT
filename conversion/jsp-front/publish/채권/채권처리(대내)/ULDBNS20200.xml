@@ -1,0 +1,492 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDBNS20200.gfm" meta_screenName="수입/환급결의조회">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<xf:model>
+			<w2:workflowCollection/>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+/* ★Wcraft guide★    
+스크립트 수작업 유의사항
+*/
+
+
+//★Wcraft guide★ include부분 주석처리 -> include("../js/libRoundPanel.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/stf.js");
+// showObj(ObjID, flag) SetWindowPos(ObjID, nTop, nLeft, nWidth, nHeight)
+//★Wcraft guide★ include부분 주석처리 -> include("../js/list_common.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/bns_common.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/PopupCalendar.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/utils.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/common.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/session.js");
+scwin.vScrenID = "ULDBNS20200.xml";
+// grid resize 시작부
+//frame.SetEvent("onwinstat", OnWinStat);
+
+scwin.iTimer = 0;
+scwin.maxval = 0;
+scwin.gOldWidthSize = frame.width;
+scwin.gNewWidthSize = 0;
+scwin.isCtrl = false;
+scwin.onpageload = function() {
+    scwin.gform_onload();
+};
+scwin.onpageunload = function() {
+};
+scwin.sleep = function(numberMillis) {
+    var now = new Date();
+    var exitTime = now.getTime() + numberMillis;
+    while (true) {
+        now = new Date();
+        if (now.getTime() > exitTime) return;
+    }
+
+};
+scwin.OnSized = function(winID) {
+    if (scwin.iTimer > 0) window.clearInterval(scwin.iTimer);
+    scwin.iTimer = 0;
+    scwin.gNewWidthSize = frame.width;
+    //GauceObjResize(frame.width,frame.height);
+
+};
+scwin.OnSizedMax = function(winID) {
+    if (scwin.iTimer > 0) window.clearInterval(scwin.iTimer);
+    scwin.iTimer = 0;
+    scwin.maxval = 0;
+    //GauceObjResize(frame.Provider("/").width,frame.height);
+
+};
+scwin.OnWinStat = function(winID, statmsg) {
+    if (statmsg == "activate" && winID.substring(0, 6) == "Child_") {
+        $c.frame.path("/").WinActive(winID, statmsg);
+    }
+    if (statmsg == "maximize") {
+        scwin.maxval = 1;
+    } else if (statmsg == "size") {
+        if (scwin.maxval == 0) {
+            var strFnc = "OnSized('" + winID + "')";
+            if (scwin.iTimer > 0) {
+                window.clearInterval(scwin.iTimer);
+                scwin.iTimer = 0;
+            }
+            scwin.iTimer = window.setInterval(strFnc, 300);
+        } else if (scwin.maxval == 1) {
+            scwin.OnSizedMax(winID);
+            scwin.gOldWidthSize = $c.frame.path("/").width - 10;
+        }
+    }
+};
+scwin.GauceObjResize = function(a, b) {
+    // 그리드메인
+
+    /*
+    var gw = (a-parseInt(grd_List.style.width)-30);
+    grd_List.ReDraw = "false";
+    grd_List.style.width = parseInt(grd_List.style.width) + gw;
+    grd_List.ReDraw = "true";
+    gOldWidthSize = frame.width;
+
+    // 탭패널
+    var pnl_main_grp = document.all("__GROUPBOX_BACKGROUND__"+"panel_Top");
+    pnl_main_grp.style.width = parseInt(pnl_main_grp.style.width.replace("px","")) + gw; // 상단패널
+    panel_Top.style.width = parseInt(panel_Top.style.width.replace("px","")) + gw;
+    //버튼
+    btn_Search.style.left = parseInt(btn_Search.style.left.replace("px","")) + gw;	
+    btn_Close.style.left = parseInt(btn_Close.style.left.replace("px","")) + gw;
+    btn_Excel.style.left = parseInt(btn_Excel.style.left.replace("px","")) + gw;
+    */
+};
+// grid resize 종료부
+
+/********************************************** 
+ * 설명       : 직전영업일 가져옴
+ ***********************************************/
+scwin.fn_getDate = function() {
+    var url = "/listingCommon.do?method=listGeneral&outputMessageId=ULDSTF41001_INOUT" + "&service=krx.lds.stf.listingcommon.services.ListingCommonApp" + "&queryId=lds.stf.lstmgt.elwko.select.getPrevBusiDt";
+    dts_getDate.DataID = encodeURI(url);
+    dts_getDate.reset();
+};
+
+
+/********************************************** 
+ * 설명       : 수입/환급결의조회
+ ***********************************************/
+scwin.fn_list_sync = function() {
+    var url = "/listingCommon.do?method=listGeneralForDynamicName";
+    url += "&service=krx.lds.stf.listingcommon.services.ListingCommonApp";
+    url += "&outputMessageId=BNS_IMPORT_REFND_LIST";
+    url += "&queryId=lds.stf.bnsimport_refnd.select.list";
+    url += "&SCREN_ID=" + scwin.vScrenID;
+    url += "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01;
+    url += "&{P}V_CHK_1=" + scwin.getChkValue(chb_View1);
+    url += "&{P}V_CHK_2=" + scwin.getChkValue(chb_View2);
+    url += "&{P}V_CHK_3=" + scwin.getChkValue(chb_View3);
+    url += "&{P}V_CHK_4=" + scwin.getChkValue(chb_View4);
+    url += "&{P}V_CHK_5=" + scwin.getChkValue(chb_View5);
+    url += "&{P}V_CHK_6=" + scwin.getChkValue(chb_View6);
+    url += "&{P}V_CHK_7=" + scwin.getChkValue(chb_View7);
+    url += "&{P}V_STRT_DD=" + $c.stf.getObjectValue(edt_SDate);
+    url += "&{P}V_END_DD=" + $c.stf.getObjectValue(edt_EDate);
+    dts_List.DataID = encodeURI(url);
+    dts_List.Reset();
+    $c.cm.ShowWin(grd_List);
+};
+scwin.getChkValue = function(obj) {
+    return (obj.checked) ? "Y" : "N";
+};
+scwin.fn_CheckAll = function() {
+    chb_View1.setValue(chb_ViewAll.checked);
+    chb_View2.setValue(chb_ViewAll.checked);
+    chb_View3.setValue(chb_ViewAll.checked);
+    chb_View4.setValue(chb_ViewAll.checked);
+    chb_View5.setValue(chb_ViewAll.checked);
+    chb_View6.setValue(chb_ViewAll.checked);
+    chb_View7.setValue(chb_ViewAll.checked);
+};
+scwin.gform_onload = function() {
+    /********************************************** 
+     * Event   : gform > onload
+     * 설명    : 화면 OnLoad
+     ***********************************************/
+
+    $c.bns.BnsPanelToGroupBox(panel_Top);
+    var vCurDate = $c.ut.cGetToday("yyyymmdd");
+    scwin.fn_getDate();
+    $c.stf.setObjectValue(edt_SDate, dts_getDate.getCellData(3, "CALND_DD"));
+    edt_EDate.setValue($c.ut.cGetMinusDate2($c.ut.cGetToday("yyyymmdd"), 0));
+    edt_SDate.setValue($c.ut.cGetMinusDate2($c.ut.cGetToday("yyyymmdd"), 0));
+    scwin.fn_CheckAll();
+};
+scwin.btn_Search_onclick = function() {
+    /********************************************** 
+     * Event   : btn_Search > onclick
+     * 설명    : 조회버튼 클릭
+     ***********************************************/
+    if ($c.stf.compareFromToDate2(edt_SDate, edt_EDate)) {
+        scwin.fn_list_sync();
+    }
+};
+scwin.btn_Excel_onclick = function() {
+    /********************************************** 
+     * Event   : btn_Excel > onclick
+     * 설명    : 엑셀버튼 클릭
+     ***********************************************/
+    //엑셀 로그 
+    //doLogSave(vScrenID, SCREN_PROCS_TP_CD_07);
+    var fileNm = $c.session.getExcelDownPath() + $c.ut.cGetToday("yyyymmddhhmmss") + "_수입환급결의조회.xls";
+    $c.data.downloadGridViewExcel(grd_List, "수입환급결의조회", "", "8");
+};
+scwin.dts_List_OnLoadError = function() {
+    /********************************************** 
+     * Event   : dts_List > OnLoadError
+     * 설명    : 데이터셋 onLoad실패
+     ***********************************************/
+    $c.win.alert($c.stf.getMessageParam("MSG-0002"));
+};
+scwin.dts_List_OnLoadCompleted = function(rowcount) {
+    /********************************************** 
+     * Event   : dts_List > OnLoadCompleted
+     * 설명    : 데이터셋 onLoad성공
+     ***********************************************/
+    $c.stf.FillGridHeaderTotalCnt(rowcount, panel_page);
+    $c.cm.CloseWin(rowcount, grd_List);
+    if (rowcount < 1) {
+        tbx_Tot_Sum.innerText = "";
+    } else {
+        var vsTotSum = 0;
+        for (var i = 1; i <= rowcount; i++) {
+            vsTotSum += Number(dts_List.getCellData(i, "DEFCT_AMT").replace(/,/g, ""));
+        }
+        vsTotSum = vsTotSum + "";
+        for (var i = vsTotSum.length - 3; i >= 0; i--) {
+            if (!((i == 1) && (vsTotSum.substring(0, 1) == "-"))) {
+                vsTotSum = vsTotSum.substring(0, i) + "," + vsTotSum.substring(i, vsTotSum.length);
+            }
+            i = i - 2;
+        }
+        if (vsTotSum.substring(0, 1) == "-") {
+            if (vsTotSum.substring(1, 2) == ",") {
+                vsTotSum = "-" + vsTotSum.substring(2, vsTotSum.length);
+            }
+        } else if (vsTotSum.substring(0, 1) == ",") {
+            vsTotSum = vsTotSum.substring(1, vsTotSum.length);
+        }
+        tbx_Tot_Sum.setValue(vsTotSum);
+    }
+};
+scwin.img_SDate_onclick = function() {
+    /********************************************** 
+     * Event   : img_SDate > onclick
+     * 설명    : 시작일자 달력 클릭
+     ***********************************************/
+    popUpCalendar2(edt_SDate);
+};
+scwin.img_EDate_onclick = function() {
+    /********************************************** 
+     * Event   : img_EDate > onclick
+     * 설명    : 종료일자 달력 클릭
+     ***********************************************/
+    popUpCalendar2(edt_EDate);
+};
+scwin.chb_ViewAll_onclick = function() {
+    /********************************************** 
+     * Event   : chb_ViewAll > onclick
+     * 설명    : 체크박스 전체 선택
+     ***********************************************/
+    scwin.fn_CheckAll();
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+		<xf:group class="sub_contents" id="" meta_snippetCategory="00_화면시작" meta_snippetKeyComponent="true" meta_snippetName="0_01 페이지시작"
+			style="">
+			<xf:group class="pgtbox" id="" meta_snippetCategory="02_타이틀" meta_snippetKeyComponent="true" meta_snippetName="2_01 페이지타이틀"
+				style="">
+				<w2:textbox class="pgt_tit" id="" label="수입/환급결의조회" style="" tagname=""></w2:textbox>
+				<xf:group class="breadcrumb" id="" style="">
+					<xf:group id="" style="" tagname="ul">
+						<xf:group class="home" id="" style="" tagname="li">
+							<w2:anchor id="" outerDiv="false" style="">
+								<xf:label><![CDATA[Home]]></xf:label>
+							</w2:anchor>
+						</xf:group>
+						<xf:group id="" style="" tagname="li">
+							<w2:anchor id="" outerDiv="false" style="">
+								<xf:label><![CDATA[1Depth Menu]]></xf:label>
+							</w2:anchor>
+						</xf:group>
+						<xf:group id="" style="" tagname="li">
+							<w2:anchor id="" outerDiv="false" style="">
+								<xf:label><![CDATA[2Depth Menu]]></xf:label>
+							</w2:anchor>
+						</xf:group>
+						<xf:group id="" style="" tagname="li">
+							<w2:span id="" label="3Depth Menu" style=""></w2:span>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+				<xf:trigger class="btn_fav" id="" style="" type="button">
+					<xf:label></xf:label>
+				</xf:trigger>
+			</xf:group>
+			<xf:group class="schbox" id="panel_Top" meta_snippetCategory="03_조회영역" meta_snippetKeyComponent="true"
+				meta_snippetName="3_01 조회조건1행" style="">
+				<xf:group class="schbox_inner" id="" style="">
+					<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl " id="" style="" tagname="table">
+						<w2:attributes>
+							<w2:summary></w2:summary>
+						</w2:attributes>
+						<xf:group tagname="colgroup">
+							<xf:group style="width:100px;" tagname="col"></xf:group>
+							<xf:group style="" tagname="col"></xf:group>
+							<xf:group style="width:80px;" tagname="col"></xf:group>
+							<xf:group style="" tagname="col"></xf:group>
+						</xf:group>
+						<xf:group class="" id="" style="" tagname="tr">
+							<xf:group class="w2tb_td" style="" tagname="td">
+								<w2:attributes>
+									<w2:colspan>2</w2:colspan>
+									<w2:rowspan>1</w2:rowspan>
+								</w2:attributes>
+								<xf:select appearance="full" cols="" disabledClass="w2selectbox_disabled" displayMode="label"
+									ev:onclick="scwin.chb_ViewAll_onclick" hierarchy="chb_ViewAll" id="chb_ViewAll" orgid="chb_ViewAll" ref=""
+									renderType="checkboxgroup" rows="" selectedData="true" style="" tabIndex="1" userData2=" class:CheckBox_01; checked:checked;">
+									<xf:choices>
+										<xf:item>
+											<xf:label><![CDATA[전체]]></xf:label>
+											<xf:value><![CDATA[]]></xf:value>
+										</xf:item>
+									</xf:choices>
+								</xf:select>
+								<xf:select appearance="full" cols="" disabledClass="w2selectbox_disabled" displayMode="label"
+									hierarchy="chb_View1" id="chb_View1" orgid="chb_View1" ref="" renderType="checkboxgroup" rows="" selectedData="true" style=""
+									tabIndex="2" userData2=" class:CheckBox_01;">
+									<xf:choices>
+										<xf:item>
+											<xf:label><![CDATA[상장수수료 수입결의]]></xf:label>
+											<xf:value><![CDATA[]]></xf:value>
+										</xf:item>
+									</xf:choices>
+								</xf:select>
+								<xf:select appearance="full" cols="" disabledClass="w2selectbox_disabled" displayMode="label"
+									hierarchy="chb_View2" id="chb_View2" orgid="chb_View2" ref="" renderType="checkboxgroup" rows="" selectedData="true" style=""
+									tabIndex="3" userData2=" class:CheckBox_01;">
+									<xf:choices>
+										<xf:item>
+											<xf:label><![CDATA[상장수수료 환급결의]]></xf:label>
+											<xf:value><![CDATA[]]></xf:value>
+										</xf:item>
+									</xf:choices>
+								</xf:select>
+								<xf:select appearance="full" cols="" disabledClass="w2selectbox_disabled" displayMode="label"
+									hierarchy="chb_View3" id="chb_View3" orgid="chb_View3" ref="" renderType="checkboxgroup" rows="" selectedData="true" style=""
+									tabIndex="4" userData2=" class:CheckBox_01;">
+									<xf:choices>
+										<xf:item>
+											<xf:label><![CDATA[변경상장수수료 수입결의]]></xf:label>
+											<xf:value><![CDATA[]]></xf:value>
+										</xf:item>
+									</xf:choices>
+								</xf:select>
+							</xf:group>
+							<xf:group class="w2tb_th tar" style="" tagname="th">
+								<w2:textbox hierarchy="label_3" id="label_3" label="결의일자" orgid="label_3" style=""
+									userData2=" class:TopCondition_01; border-color:#0000FF;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group class="w2tb_td" id="" style="" tagname="td">
+								<w2:inputCalendar displayFormat="yyyy-MM-dd" hierarchy="edt_SDate" id="edt_SDate" orgid="edt_SDate" style=""
+									tabIndex="9" userData2=" class:panel_maskedit_write_01; alignment:1; generaledit:False; numeric:False; valign:1;">
+								</w2:inputCalendar>
+								<w2:textbox hierarchy="label_6" id="label_6" label="~" orgid="label_6" style=""
+									userData2=" class:TopCondition_01; border-color:#0000FF;">
+								</w2:textbox>
+								<w2:inputCalendar displayFormat="yyyy-MM-dd" hierarchy="edt_EDate" id="edt_EDate" orgid="edt_EDate" style=""
+									tabIndex="10" userData2=" class:panel_maskedit_write_01; alignment:1; generaledit:False; numeric:False; valign:1;">
+								</w2:inputCalendar>
+							</xf:group>
+						</xf:group>
+						<xf:group tagname="tr" id="">
+							<xf:group tagname="td" class="w2tb_td">
+								<w2:attributes>
+									<w2:scope>row</w2:scope>
+									<w2:colspan>2</w2:colspan>
+									<w2:rowspan>1</w2:rowspan>
+								</w2:attributes>
+								<xf:select appearance="full" cols="" disabledClass="w2selectbox_disabled" displayMode="label"
+									hierarchy="chb_View4" id="chb_View4" orgid="chb_View4" ref="" renderType="checkboxgroup" rows="" selectedData="true" style=""
+									tabIndex="5" userData2=" class:CheckBox_01;">
+									<xf:choices>
+										<xf:item>
+											<xf:label><![CDATA[연부과금 수입결의]]></xf:label>
+											<xf:value><![CDATA[]]></xf:value>
+										</xf:item>
+									</xf:choices>
+								</xf:select>
+								<xf:select appearance="full" cols="" disabledClass="w2selectbox_disabled" displayMode="label"
+									hierarchy="chb_View5" id="chb_View5" orgid="chb_View5" ref="" renderType="checkboxgroup" rows="" selectedData="true" style=""
+									tabIndex="6" userData2=" class:CheckBox_01;">
+									<xf:choices>
+										<xf:item>
+											<xf:label><![CDATA[연부과금 환급결의]]></xf:label>
+											<xf:value><![CDATA[]]></xf:value>
+										</xf:item>
+									</xf:choices>
+								</xf:select>
+								<xf:select appearance="full" cols="" disabledClass="w2selectbox_disabled" displayMode="label"
+									hierarchy="chb_View6" id="chb_View6" orgid="chb_View6" ref="" renderType="checkboxgroup" rows="" selectedData="true" style=""
+									tabIndex="7" userData2=" class:CheckBox_01;">
+									<xf:choices>
+										<xf:item>
+											<xf:label><![CDATA[기타 수입결의]]></xf:label>
+											<xf:value><![CDATA[]]></xf:value>
+										</xf:item>
+									</xf:choices>
+								</xf:select>
+								<xf:select appearance="full" cols="" disabledClass="w2selectbox_disabled" displayMode="label"
+									hierarchy="chb_View7" id="chb_View7" orgid="chb_View7" ref="" renderType="checkboxgroup" rows="" selectedData="true" style=""
+									tabIndex="8" userData2=" class:CheckBox_01;">
+									<xf:choices>
+										<xf:item>
+											<xf:label><![CDATA[기타 환급 결의]]></xf:label>
+											<xf:value><![CDATA[]]></xf:value>
+										</xf:item>
+									</xf:choices>
+								</xf:select>
+							</xf:group>
+							<xf:group tagname="th" class="w2tb_th tar">
+								<w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes>
+								<w2:textbox hierarchy="label_8" id="label_8" label="합계" orgid="label_8" style=""
+									userData2=" class:TopCondition_01; border-color:#0000FF;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group tagname="td" id="" class="w2tb_td">
+								<w2:attributes></w2:attributes>
+								<xf:input hierarchy="tbx_Tot_Sum" id="tbx_Tot_Sum" maxlength="1000" orgid="tbx_Tot_Sum" style="width:160px;"
+									userData2=" class:TopCondition_01_read;">
+								</xf:input>
+								<w2:textbox hierarchy="label_9" id="label_9" label="원" orgid="label_9" style=""
+									userData2=" class:TopCondition_01; border-color:#0000FF;">
+								</w2:textbox>
+							</xf:group>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+				<xf:group class="btn_schbox" id="" style="">
+					<xf:trigger class="btn_cm sch" cursor="pointer" ev:onclick="scwin.btn_Search_onclick" hierarchy="btn_Search"
+						id="btn_Search" orgid="btn_Search" src="../img/bns/btn_select_n.gif" style="" text="조회">
+						<xf:label><![CDATA[조회]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+			<xf:group class="titbox" id="" meta_snippetCategory="02_타이틀" meta_snippetKeyComponent="true" meta_snippetName="2_02 서브타이틀(h3)"
+				style="">
+				<xf:group class="rt" id="" style="">
+					<xf:group class="count" id="" style="">
+						<w2:textbox class="" id="" label="총" style=""></w2:textbox>
+						<w2:textbox class="num" id="panel_page" label="0" style=""></w2:textbox>
+						<w2:textbox class="" id="" label="건" style=""></w2:textbox>
+					</xf:group>
+					<xf:trigger class="btn_cm download" cursor="pointer" ev:onclick="scwin.btn_Excel_onclick" hierarchy="btn_Excel"
+						id="btn_Excel" orgid="btn_Excel" src="../img/bns/btn_excelsave_n.gif" style="" text="엑셀다운로드">
+						<xf:label><![CDATA[엑셀다운로드]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+			<xf:group class="gvwbox" id="" style="">
+				<w2:gridView class="gvw" dataList="data:dts_List" hierarchy="grd_List" id="grd_List" orgid="grd_List"
+					style="height: 153px;"
+					userData2=" class:Grid_01; borderstyle:0; colsizing:True; fillarea:True; fixsizing:True; gtitleheight:0; headborder:4; indwidth:0; sortview:left; titleheight:25; xtitleheight:0; font-family:돋움체; font-weight:normal; border-color:#c0c0c0;" autoFit="allColumn" autoFitMinWidth="1200">
+					<w2:caption id="caption1" style="" value="this is a grid caption."></w2:caption>
+					<w2:header id="header1" style="">
+						<w2:row>
+							<w2:column displayMode="label" id="h_NO" inputType="text" textAlign="center"
+								userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; color:#343434; value:{CurRow},{ToString}; sumbgcolor:#fefaef; sumcolor:#343434;"
+								value="번호" width="50" fixColumnWidth="true">
+							</w2:column>
+							<w2:column displayMode="label" id="h_ACNT_NM" inputType="text" textAlign="center"
+								userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; color:#343434; sumbgcolor:#fefaef; sumcolor:#343434; sort:True;"
+								value="계정" width="150">
+							</w2:column>
+							<w2:column displayMode="label" id="h_TITLE" inputType="text" textAlign="center"
+								userData2=" sort:True; headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; color:#343434; sumbgcolor:#fefaef; sumcolor:#343434;"
+								value="제목" width="205">
+							</w2:column>
+							<w2:column displayMode="label" id="h_DEFCT_YN" inputType="text" textAlign="center"
+								userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; color:#343434; sumbgcolor:#fefaef; sumcolor:#343434; sort:True;"
+								value="구분" width="120">
+							</w2:column>
+							<w2:column displayMode="label" id="h_SUM_CNT" inputType="text" textAlign="center"
+								userData2=" sort:True; headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; color:#343434; sumbgcolor:#fefaef; sumcolor:#343434;"
+								value="적요" width="405">
+							</w2:column>
+							<w2:column displayMode="label" id="h_FEE_DEPO_DD" inputType="text" textAlign="center"
+								userData2=" sort:True; headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; color:#343434; sumbgcolor:#fefaef; sumcolor:#343434;"
+								value="입금(환급)일자" width="130">
+							</w2:column>
+							<w2:column displayMode="label" id="h_DEFCT_AMT" inputType="text" textAlign="center"
+								userData2=" sort:True; headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; color:#343434; sumbgcolor:#fefaef; sumcolor:#343434;"
+								value="금액(원)" width="150">
+							</w2:column>
+						</w2:row>
+					</w2:header>
+					<w2:gBody id="gBody1" style="">
+						<w2:row id="" style="">
+							<w2:column displayMode="label" id="NO" inputType="text" textAlign="center" width="50"></w2:column>
+							<w2:column displayMode="label" id="ACNT_NM" inputType="text" textAlign="left" width="150"></w2:column>
+							<w2:column displayMode="label" id="TITLE" inputType="text" textAlign="left" width="205"></w2:column>
+							<w2:column displayMode="label" id="DEFCT_YN" inputType="text" textAlign="center" width="120"></w2:column>
+							<w2:column displayMode="label" id="SUM_CNT" inputType="text" textAlign="left" width="405"></w2:column>
+							<w2:column displayMode="label" id="FEE_DEPO_DD" inputType="text" textAlign="center" width="130"></w2:column>
+							<w2:column displayMode="label" id="DEFCT_AMT" inputType="text" textAlign="right" width="150"></w2:column>
+						</w2:row>
+					</w2:gBody>
+				</w2:gridView>
+			</xf:group>
+		</xf:group>
+	</body>
+</html>

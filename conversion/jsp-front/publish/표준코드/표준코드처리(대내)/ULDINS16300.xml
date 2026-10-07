@@ -1,0 +1,273 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDINS16300.gfm" meta_screenName="일반상품(금)관리">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<xf:model>
+			<w2:workflowCollection/>
+			<w2:dataCollection baseNode="map"/>
+			<xf:submission id="sbm_dts_List" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json" ev:submitdone="scwin.dts_List_OnLoadCompleted" ev:submiterror="scwin.dts_List_OnLoadError"/>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+/* ★Wcraft guide★    
+스크립트 수작업 유의사항
+*/
+
+
+//★Wcraft guide★ include부분 주석처리 -> include("../js/PopupCalendar.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/utils.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/libRoundPanel.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/common.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/list_common.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/session.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/stf.js");
+
+//#include("../js/controlResize.js"); // 화면 리사이징
+
+scwin.vScrenID = "ULDINS16300.xml";
+scwin.onpageload = function() {
+    scwin.gform_onload();
+};
+scwin.onpageunload = function() {
+};
+
+/********************************************** 
+ * 함수명   : ins_search
+ * 설명       : 일반 상품(금) 조회한다.
+ ***********************************************/
+scwin.ins_search = function() {
+    /**
+     * SrM-000243255 
+     */
+    if (!scwin.checkSearchCondition()) {
+        return false;
+    }
+
+    // 검색일 체크
+    if ($c.stf.compareFromToDate2(edt_SDATE, edt_EDATE) == false) {
+        return false;
+    }
+
+    // 조회 버튼 클릭 후 바로 버튼 클릭 안되게 처리 20220922
+    fn_SetDisableSelectBtn(btn_search, true);
+    var url = "/listingCommon.do?SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01 + "&method=listGeneralForDynamicName" + "&outputMessageId=ULDINS16300_LIST_OUT" + "&service=krx.lds.ins.listingcommon.services.ListingCommonApp" + "&queryId=lds.ins.prod.select.listStdCdGoldInfoInquiry" + "&{P}SDATE=" + edt_SDATE.getValue() + "&{P}EDATE=" + edt_EDATE.getValue() + "&{P}HALT_YN=" + $c.stf.getObjectValue(cmb_HALT_YN) + "&{P}ISU_KOR_NM=" + txb_pISU_KOR_NM.getValue() + "&{P}ISU_CD=" + txb_pISU_CD.getValue();
+    dts_List.DataID = encodeURI(url);
+    dts_List.reset();
+    $c.cm.ShowWin(grd_Grid); // 그리드명을 표기
+
+};
+
+
+/********************************************** 
+ * 함수명   : checkSearchCondition
+ * 설명      : SrM-000243255  조회조건을 체크
+ *                표준코드, 한글종목명, 발행기관코드에 값이 입력 안되었을 경우 
+ *                날짜 조건은 필수로 입력되도록.. 날짜 입력가능 범위는 5년..
+ ***********************************************/
+scwin.checkSearchCondition = function() {
+    var sStdCd = $c.stf.getObjectValue(txb_pISU_CD);
+    var sIsuKorNm = $c.stf.getObjectValue(txb_pISU_KOR_NM);
+    var sSDateFrom = $c.stf.getObjectValue(edt_SDATE); //코드부여일(from)
+    var sSDateTo = $c.stf.getObjectValue(edt_EDATE); //코드부여일(to)
+
+    if (sStdCd == "" && sIsuKorNm == "") {
+        if (sSDateFrom == "" && sSDateTo == "") {
+            var msg = "조회조건을 최소 1개 이상 입력하세요.\n\n" + "[표준코드, 한글종목명] 중 1개 이상의 조건을 입력하거나, \n" + "[영업일]의 검색기간을 1년 이내로 입력하세요.";
+            $c.win.alert(msg);
+            return false;
+        }
+
+        // 코드부여일 체크
+        if (sSDateFrom != "" && sSDateTo != "") {
+            if (eval($c.ut.cGetPlusYear(sSDateFrom, 1)) < eval(sSDateTo)) {
+                $c.win.alert("영업일의 검색기간은 1년 이내로 입력하세요.");
+                edt_SDATE.focus();
+                return false;
+            }
+        } else if (sSDateFrom != "" || sSDateTo != "") {
+            $c.win.alert("영업일의 검색기간은 1년 이내로 입력하세요.");
+            if (sSDateFrom == "") {
+                edt_SDATE.focus();
+            } else {
+                edt_EDATE.focus();
+            }
+            return false;
+        }
+    }
+    return true;
+};
+scwin.gform_onload = function() {
+    $c.cm.PanelToGroupBox(panel_2);
+    txb_pISU_CD.focus();
+};
+scwin.dts_List_OnLoadCompleted = function(rowcount) {
+    if (dts_List.errorMsg) {
+        $c.win.alert(dts_List.errorMsg);
+    } else {
+        txb_TotalCnt.setValue("총 " + rowcount + "건");
+    }
+    $c.cm.CloseWin(rowcount, grd_Grid); //데이터 로딩중닫기 및 조회없음 처리	
+
+    // 조회버튼 활성.
+    fn_SetDisableSelectBtn(btn_search, false);
+};
+scwin.dts_List_OnLoadError = function() {
+    $c.stf.alert_error(dts_List);
+    $c.cm.CloseWin(0, grd_Grid); //데이터 로딩중닫기 및 조회없음 처리	
+
+    // 조회버튼 활성.
+    fn_SetDisableSelectBtn(btn_search, false);
+};
+scwin.img_SDATE_onclick = function() {
+    popUpCalendar2(edt_SDATE);
+};
+scwin.img_EDATE_onclick = function() {
+    popUpCalendar2(edt_EDATE);
+};
+scwin.btn_search_onclick = function() {
+    scwin.ins_search();
+};
+scwin.cmb_HALT_YN_OnSelChange = function() {
+    scwin.ins_search();
+};
+scwin.txb_pISU_CD_onkeyup = function() {
+    fn_DelChar(this);
+    if (txb_pISU_CD.getValue() == "") {
+
+    } else {
+        if (window.event.keyCode == 13) {
+            scwin.ins_search();
+        } else {
+
+        }
+    }
+};
+scwin.txb_pISU_KOR_NM_onkeyup = function() {
+    fn_DelChar3(this);
+    if (txb_pISU_KOR_NM.getValue() == "") {
+
+    } else {
+        if (window.event.keyCode == 13) {
+            scwin.ins_search();
+        } else {
+
+        }
+    }
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+
+	<xf:group id="" class="sub_contents"><xf:group meta_snippetCategory="03_조회영역" meta_snippetName="3_01 조회조건1행" meta_snippetKeyComponent="true" style="" id="panel_2" class="schbox">
+			<xf:group style="" id="" class="schbox_inner">
+				<xf:group adaptive="" adaptiveThreshold="768" tagname="table" style="" id="" class="w2tb tbl ">
+					<w2:attributes>
+						<w2:summary></w2:summary>
+					</w2:attributes>
+					<xf:group tagname="colgroup">
+						<xf:group tagname="col" style="width:60px;"></xf:group>
+						<xf:group tagname="col" style="width:300px"></xf:group><xf:group tagname="col" style="width:80px;"></xf:group><xf:group tagname="col"></xf:group><xf:group tagname="col" style="width:90px;"></xf:group><xf:group tagname="col" style=""></xf:group>
+						<xf:group tagname="col" style="width:100px;"></xf:group>
+						<xf:group tagname="col" style="width:120px"></xf:group>
+					</xf:group>
+					<xf:group tagname="tr" style="" id="" class="">
+						<xf:group tagname="th" style="" class="w2tb_th"><w2:textbox hierarchy="lbl_tmp_1" style="" userData2=" class:TopCondition_01;" id="lbl_tmp_1" label="영업일" orgid="lbl_tmp_1">
+							</w2:textbox></xf:group>
+						<xf:group tagname="td" style="" class="w2tb_td">
+						<xf:group id="" class="flex flex_no"><w2:inputCalendar hierarchy="edt_SDATE" displayFormat="yyyy-MM-dd" style="" tabIndex="1" userData2=" class:panel_maskedit_write_01; border:False; numeric:False; valign:1;" id="edt_SDATE" orgid="edt_SDATE">
+							</w2:inputCalendar><w2:textbox hierarchy="label_6" style="text-align:center;" userData2=" class:TopCondition_01;" id="label_6" label="~" orgid="label_6">
+							</w2:textbox><w2:inputCalendar hierarchy="edt_EDATE" displayFormat="yyyy-MM-dd" style="" tabIndex="2" userData2=" class:panel_maskedit_write_01; border:False; numeric:False; valign:1;" id="edt_EDATE" orgid="edt_EDATE">
+							</w2:inputCalendar></xf:group></xf:group>
+						<xf:group tagname="th" class="w2tb_th">
+							<w2:attributes></w2:attributes>
+							<w2:textbox hierarchy="label_1" style="" userData2=" class:TopCondition_01;" id="label_1" label="표준코드" orgid="label_1">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input maxlength="1000" ev:onkeyup="scwin.txb_pISU_CD_onkeyup" hierarchy="txb_pISU_CD" style="width:100%;" tabIndex="3" userData2=" class:TopCondition_01_write;" id="txb_pISU_CD" orgid="txb_pISU_CD">
+							</xf:input>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th"><w2:attributes></w2:attributes><w2:textbox hierarchy="label_4" style="" userData2=" class:TopCondition_01;" id="label_4" label="한글종목명" orgid="label_4">
+							</w2:textbox></xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input maxlength="1000" ev:onkeyup="scwin.txb_pISU_KOR_NM_onkeyup" hierarchy="txb_pISU_KOR_NM" style="width:100%;" tabIndex="4" userData2=" class:TopCondition_01_write;" id="txb_pISU_KOR_NM" orgid="txb_pISU_KOR_NM">
+							</xf:input>
+						</xf:group>
+						<xf:group tagname="th" style="" class="w2tb_th">
+							<w2:textbox hierarchy="label_2" style="" userData2=" class:TopCondition_01;" id="label_2" label="거래정지여부" orgid="label_2">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" style="" id="" class="w2tb_td">
+							<xf:select1 selectedData="true" item="^,^전체,Y^Y,N^N" ev:onchange="scwin.cmb_HALT_YN_OnSelChange" hierarchy="cmb_HALT_YN" tabIndex="6" userData2=" class:TopCondition_01; bindcolumn:VALUE; listcount:10; listexprformat:TEXT^0^50; searchcolumn:TEXT; synccombodata:False;" displayMode="label" orgid="cmb_HALT_YN" appearance="minimal" disabledClass="w2selectbox_disabled" disabled="false" style="" id="cmb_HALT_YN">
+								<xf:choices>
+									<xf:item>
+										<xf:label><![CDATA[]]></xf:label>
+										<xf:value><![CDATA[]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[전체]]></xf:label>
+										<xf:value><![CDATA[]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[Y]]></xf:label>
+										<xf:value><![CDATA[Y]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[N]]></xf:label>
+										<xf:value><![CDATA[N]]></xf:value>
+									</xf:item>
+								</xf:choices>
+							</xf:select1>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<xf:group style="" id="" class="btn_schbox">
+				<xf:trigger cursor="pointer" src="../img/ins/btn_select.gif" ev:onclick="scwin.btn_search_onclick" hierarchy="btn_search" style="" id="btn_search" class="btn_cm sch" orgid="btn_search">
+					<xf:label><![CDATA[조회]]></xf:label>
+				</xf:trigger>
+			</xf:group>
+		</xf:group><xf:group id="" class="titbox"><xf:group id="" class="rt"><xf:group meta_snippetCategory="02_타이틀" meta_snippetName="총건수" meta_snippetKeyComponent="true" id="" class="count">
+			<w2:span style="" id="" label="총"></w2:span>
+			<w2:textbox tagname="span" maxlength="1000" hierarchy="txb_TotalCnt" style="" id="txb_TotalCnt" label="" class="num" orgid="txb_TotalCnt"></w2:textbox>
+			<w2:span style="" id="" label="건"></w2:span>
+		</xf:group></xf:group></xf:group><xf:group id="" class="gvwbox">
+			<w2:gridView dataList="data:dts_List" hierarchy="grd_Grid" userData2=" class:Grid_01; autoresizing:True; autoresizingallcol:True; autoresizingwithheader:True; colselect:True; colsizing:True; editable:False; fillarea:True; gtitleheight:0; headborder:0; sortview:right; tooltip:use=true;alt=true;leftmargin=10;rightmargin=10;topmargin=10;bottommargin=10;; xtitleheight:0; font-weight:normal;" style="height:153px;" id="grd_Grid" autoFit="allColumn" class="gvw" orgid="grd_Grid" autoFitMinWidth="1390">
+				<w2:caption style="" id="caption1" value="this is a grid caption."></w2:caption>
+				<w2:header style="" id="header1">
+					<w2:row>
+						<w2:column hidden="false" textAlign="center" width="80" userData2=" mask:XXXX-XX-XX; sort:TRUE;" inputType="text" id="h_BZ_DD" value="영업일" displayMode="label"></w2:column>
+						<w2:column hidden="false" textAlign="center" width="80" userData2=" mask:XXXX-XX-XX; sort:TRUE;" inputType="text" id="h_LIST_DD" value="상장일" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="95" userData2=" sort:True;" inputType="text" id="h_ISU_CD" value="표준코드" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="95" userData2=" sort:True;" inputType="text" id="h_ISU_SRT_CD" value="단축코드" displayMode="label"></w2:column>
+						<w2:column hidden="false" textAlign="center" width="185" userData2=" sort:TRUE;" inputType="text" id="h_ISU_KOR_NM" value="한글종목명" displayMode="label"></w2:column>
+						<w2:column hidden="false" textAlign="center" width="185" userData2=" sort:TRUE;" inputType="text" id="h_ISU_ENG_NM" value="영문종목명" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="75" userData2=" sort:True;" inputType="text" id="h_CFI_CD" value="CFI" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="200" userData2=" sort:True;" inputType="text" id="h_FISN_VAL" value="FISN" displayMode="label"></w2:column>
+						<w2:column hidden="false" textAlign="center" width="95" userData2=" sort:TRUE;" inputType="text" id="h_PURITY" value="순도" displayMode="label"></w2:column>
+						<w2:column hidden="false" textAlign="center" width="95" userData2=" sort:TRUE;" inputType="text" id="h_WEIGHT" value="중량" displayMode="label"></w2:column>
+						<w2:column hidden="false" textAlign="center" width="100" userData2=" sort:TRUE; mask:XXXX-XX-XX;" inputType="text" id="h_DELIST_DD" value="상장폐지일" displayMode="label"></w2:column>
+						<w2:column hidden="false" textAlign="center" width="100" userData2=" sort:TRUE;" inputType="text" id="h_HALT_YN" value="거래정지여부" displayMode="label"></w2:column>
+					</w2:row>
+				</w2:header>
+				<w2:gBody style="" id="gBody1">
+					<w2:row style="" id="">
+						<w2:column textAlign="center" width="80" inputType="text" id="BZ_DD" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="80" inputType="text" id="LIST_DD" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="95" inputType="text" id="ISU_CD" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="95" inputType="text" id="ISU_SRT_CD" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="185" inputType="text" id="ISU_KOR_NM" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="185" inputType="text" id="ISU_ENG_NM" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="75" inputType="text" id="CFI_CD" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="200" inputType="text" id="FISN_VAL" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="95" inputType="text" id="PURITY" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="95" inputType="text" id="WEIGHT" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="100" inputType="text" id="DELIST_DD" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="100" inputType="text" id="HALT_YN" displayMode="label"></w2:column>
+					</w2:row>
+				</w2:gBody>
+			</w2:gridView>
+		</xf:group></xf:group></body>
+</html>

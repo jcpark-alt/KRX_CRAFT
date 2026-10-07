@@ -1,0 +1,830 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDFIS00100.gfm" meta_screenName="기업개황 조회창">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<xf:model>
+			<w2:workflowCollection/>
+			<w2:dataCollection baseNode="map"/>
+			<xf:submission id="sbm_dts_ComOutLook" userData2=" syncload:True;" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json"/>
+			<xf:submission id="sbm_dts_FncInfo" userData2=" syncload:True;" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json"/>
+			<xf:submission id="sbm_dts_ComInfo" userData2=" syncload:True;" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json"/>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+/* ★Wcraft guide★    
+스크립트 수작업 유의사항
+*/
+
+
+//★Wcraft guide★ include부분 주석처리 -> include("../js/common.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/libRoundPanel.js");
+
+//#include("../js/PopupCalendar.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/stf.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/utils.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/list_common.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/pre_newlisting.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/session.js");
+// 세션정보를 얻기위한 함수사용
+//★Wcraft guide★ include부분 주석처리 -> include("../js/buttonSet.js");
+scwin.vScrenID = "ULDFIS00100.xml";
+scwin.onpageload = function() {
+    scwin.gform_onload();
+};
+scwin.onpageunload = function() {
+};
+//var vCurDate = cGetToday("yyyymmdd");
+//var pMenuID = InfoMenuID();
+
+/**
+ *  화면 초기화
+ */
+scwin.fn_Init = function() {
+    // 패널 라운드 처리
+    $c.cm.PanelToGroupBox(panel_Top);
+    $c.libRoundPanel.PanelToGroupBox(panel_Mid);
+    $c.cm.PanelToGroupBox(panel_Bot);
+};
+
+
+/**
+ *  데이터셋 초기화.
+ */
+scwin.fn_InitDs = function(pWorkFg) {
+    if (pWorkFg == "1") {
+        dts_ComOutLook.removeAll();
+        dts_FncInfo.removeAll();
+    } else if (pWorkFg == "2") {
+        dts_ComInfo.removeAll();
+    }
+};
+
+
+
+/**
+ *  기본값 세팅
+ */
+scwin.fn_SetDefaultVal = function() {
+
+};
+
+/**
+ * 팝업으로 값을 넘김.
+ */
+scwin.fn_GetParKisCd = function() {
+    var arrPar = new Array();
+    arrPar[0] = txb_CoSnm.getValue(); // 기업명
+    return arrPar;
+};
+
+
+/**
+ * 팝업에서 넘어온 값 세팅.
+ */
+scwin.fn_SetParKisCd = function(arrPar) {
+    txb_CoSnm.setValue(arrPar[0].CO_SNM); //기업명
+    txb_KisCd.setValue(arrPar[0].KIS_CD); //기업코드
+    txb_IndPttn.setValue(arrPar[0].IND_PTTN); //업종유형
+
+    if ($c.stf.getObjectValue(txb_KisCd) != "") {
+        scwin.fn_Search();
+    }
+};
+
+
+
+/**
+ * 기업정보 조회(명으로 조회)
+ */
+scwin.fn_ComInfoSrch = function() {
+    //데이터셋 초기화
+    scwin.fn_InitDs("2");
+    var url = "/listingCommon.do?SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01 + "&method=listGeneralForDynamic" + "&service=krx.lds.stf.listingcommon.services.ListingCommonApp" + "&queryId=krx.lds.stf.fis.select.comInfo" + "&outputMessageId=FIS_COM_INFO" + "&param01=" + $c.stf.getObjectValue(txb_CoSnm);
+    dts_ComInfo.DataID = encodeURI(url);
+    dts_ComInfo.Reset();
+
+    // 조회결과가 1개이면 기업개황 조회 아니면 기업팝업 오픈.
+    if (dts_ComInfo.getTotalRow() == 1) {
+        // 조회조건에 값을 세팅하고..
+        txb_KisCd.setValue(dts_ComInfo.getCellData(0, "KIS_CD"));
+        txb_IndPttn.setValue(dts_ComInfo.getCellData(0, "IND_PTTN"));
+        scwin.fn_Search(); // 기업개황 조회
+
+    } else {
+        scwin.fn_ComSrchOpen(); //기업검색 팝업 오픈
+
+    }
+};
+
+
+
+/**
+ * 기업검색 팝업
+ */
+scwin.fn_ComSrchOpen = async function() {
+    await $c.frame.CreateDialogFrame("KIS_CD", "./ULDFIS00100_P1.gfm", "기업 검색", 100, 100, 640 + 20, 445 + 45, "window");
+};
+
+
+/**
+ *  조회조건 유효성 체크
+ */
+scwin.fn_ChkValid = function() {
+    //필수항목 체크.
+    if ($c.stf.getObjectValue(txb_CoSnm) == "") {
+        $c.win.alert("기업명을 입력하세요.");
+        txb_CoSnm.focus();
+        return false;
+    }
+
+    // 기업명은 있는데 기업코드가 없는 경우
+    if ($c.stf.getObjectValue(txb_CoSnm) != "" && $c.stf.getObjectValue(txb_KisCd) == "") {
+        scwin.fn_ComInfoSrch();
+        return false;
+    }
+    return true;
+};
+
+
+/**
+ * 기업개황 조회
+ */
+scwin.fn_Search = function() {
+    //데이터셋 초기화
+    scwin.fn_InitDs("1");
+
+    // 조회조건 필수 체크.
+    if (!scwin.fn_ChkValid()) {
+        return;
+    }
+    var url = "/listingCommon.do?SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01 + "&method=listGeneralForDynamic" + "&service=krx.lds.stf.listingcommon.services.ListingCommonApp" + "&queryId=krx.lds.stf.fis.select.comOutLook" + "&outputMessageId=FIS_COM_OUT_LOOK" + "&param01=" + $c.stf.getObjectValue(txb_KisCd);
+    dts_ComOutLook.DataID = encodeURI(url);
+    dts_ComOutLook.Reset();
+
+    //재무정보 조회
+    if (dts_ComOutLook.getTotalRow() > 0) {
+        scwin.fn_SearchFncInfo();
+    }
+};
+
+
+
+/**
+ * 기업개황_재무정보 조회
+ */
+scwin.fn_SearchFncInfo = function() {
+    var url = "/listingCommon.do?SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01 + "&method=listGeneralForDynamic" + "&service=krx.lds.stf.listingcommon.services.ListingCommonApp" + "&queryId=krx.lds.stf.fis.select.fncInfo" + "&outputMessageId=FIS_FNC_INFO" + "&param01=" + $c.stf.getObjectValue(txb_KisCd) + "&param02=" + $c.stf.getObjectValue(txb_IndPttn);
+    dts_FncInfo.DataID = encodeURI(url);
+    dts_FncInfo.Reset();
+};
+scwin.gform_onload = function() {
+    // 화면 초기화.
+    scwin.fn_Init();
+
+    // 기본값 세팅
+    scwin.fn_SetDefaultVal();
+};
+scwin.btn_Search_onclick = function() {
+    // 조회버튼 클릭
+    scwin.fn_Search();
+};
+scwin.img_CoSearch_onclick = function() {
+    // 기업검색팝업 오픈
+    scwin.fn_ComSrchOpen();
+};
+scwin.txb_CoSnm_onkeydown = function() {
+    // 기업명 키다운.
+    if (event.keyCode == 13) {
+        if ($c.stf.getObjectValue(txb_CoSnm) == "") {
+            // 기업검색팝업 오픈
+            scwin.fn_ComSrchOpen();
+        } else {
+            // 기업정보 조회
+            scwin.fn_ComInfoSrch();
+        }
+    }
+};
+scwin.txb_CoSnm_onchange = function() {
+    // 조회조건이 변경된 경우 초기화.
+    txb_KisCd.setValue("");
+    txb_IndPttn.setValue("");
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+		<xf:group class="sub_contents" id="" meta_snippetCategory="00_화면시작" meta_snippetKeyComponent="true" meta_snippetName="0_01 페이지시작"
+			style="">
+			<xf:group class="pgtbox" id="" meta_snippetCategory="02_타이틀" meta_snippetKeyComponent="true" meta_snippetName="2_01 페이지타이틀"
+				style="">
+				<w2:textbox class="pgt_tit" id="" label="기업개황" style="" tagname=""></w2:textbox>
+				<xf:group class="breadcrumb" id="" style="">
+					<xf:group id="" style="" tagname="ul">
+						<xf:group class="home" id="" style="" tagname="li">
+							<w2:anchor id="" outerDiv="false" style="">
+								<xf:label><![CDATA[Home]]></xf:label>
+							</w2:anchor>
+						</xf:group>
+						<xf:group id="" style="" tagname="li">
+							<w2:anchor id="" outerDiv="false" style="">
+								<xf:label><![CDATA[1Depth Menu]]></xf:label>
+							</w2:anchor>
+						</xf:group>
+						<xf:group id="" style="" tagname="li">
+							<w2:anchor id="" outerDiv="false" style="">
+								<xf:label><![CDATA[2Depth Menu]]></xf:label>
+							</w2:anchor>
+						</xf:group>
+						<xf:group id="" style="" tagname="li">
+							<w2:span id="" label="3Depth Menu" style=""></w2:span>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+				<xf:trigger class="btn_fav" id="" style="" type="button">
+					<xf:label></xf:label>
+				</xf:trigger>
+			</xf:group>
+			<xf:group class="schbox" id="panel_Top" meta_snippetCategory="03_조회영역" meta_snippetKeyComponent="true"
+				meta_snippetName="3_01 조회조건1행" style="">
+				<xf:group class="schbox_inner" id="" style="">
+					<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl " id="" style="" tagname="table">
+						<w2:attributes>
+							<w2:summary></w2:summary>
+						</w2:attributes>
+						<xf:group tagname="colgroup">
+							<xf:group style="width:100px;" tagname="col"></xf:group>
+							<xf:group style="" tagname="col"></xf:group>
+							<xf:group style="width:100px;" tagname="col"></xf:group>
+							<xf:group style="" tagname="col"></xf:group>
+						</xf:group>
+						<xf:group tagname="tr" id="">
+							<xf:group tagname="th" class="w2tb_th">
+								<w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes>
+								<w2:textbox hierarchy="label_82" id="label_82" label="기업명" orgid="label_82" style=""
+									userData2=" class:TopCondition_01; font-family:돋움;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group tagname="td" class="w2tb_td">
+								<w2:attributes>
+									<w2:colspan>3</w2:colspan>
+									<w2:rowspan>1</w2:rowspan>
+								</w2:attributes>
+								<xf:input ev:onkeydown="scwin.txb_CoSnm_onkeydown" hierarchy="txb_CoSnm" id="txb_CoSnm" maxlength="1000"
+									orgid="txb_CoSnm" style="width:185px;"
+									userData2=" class:TopCondition_01_write; font-family:돋움; border-color:#92b1f1; onchange:txb_CoSnm_onchange;">
+								</xf:input>
+								<xf:trigger class="btn_cm icon search" cursor="pointer" ev:onclick="scwin.img_CoSearch_onclick"
+									hierarchy="img_CoSearch" id="img_CoSearch" orgid="img_CoSearch" src="../img/btn_search.gif" style="">
+									<xf:label><![CDATA[]]></xf:label>
+								</xf:trigger>
+							</xf:group>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+				<xf:group class="btn_schbox" id="" style="">
+					<xf:trigger class="btn_cm sch" cursor="pointer" ev:onclick="scwin.btn_Search_onclick" hierarchy="btn_Search"
+						id="btn_Search" orgid="btn_Search" src="../img/btn_select.gif" style="" text="조회">
+						<xf:label><![CDATA[조회]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+			<xf:group class="titbox" id="" meta_snippetCategory="02_타이틀" meta_snippetKeyComponent="true" meta_snippetName="2_02 서브타이틀(h3)"
+				style="">
+				<w2:textbox hierarchy="label_58" id="label_58" label="기업개황" orgid="label_58" style=""
+					userData2=" class:TopCondition_03; font-family:돋움체; font-weight:bold; border-color:#32649f;" tagname="h3">
+				</w2:textbox>
+			</xf:group>
+			<xf:group class="tblbox" id="panel_Mid" meta_snippetCategory="05_입출력테이블" meta_snippetKeyComponent="true"
+				meta_snippetName="5_03 3단테이블" style="">
+				<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+					<w2:attributes>
+						<w2:summary></w2:summary>
+					</w2:attributes>
+					<xf:group tagname="colgroup">
+						<xf:group style="width:120px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+						<xf:group style="width:120px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+						<xf:group style="width:120px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_8" id="label_8" label="기업명" orgid="label_8" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:colspan>3</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:input hierarchy="txb_CoNm" id="txb_CoNm" maxlength="40" orgid="txb_CoNm" style="width:396px;" tabIndex="2"
+								userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_2" id="label_2" label="종목코드" orgid="label_2" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input hierarchy="txb_RepIsuSrtCd" id="txb_RepIsuSrtCd" maxlength="80" orgid="txb_RepIsuSrtCd"
+								style="width:100px;" tabIndex="4" userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_10" id="label_10" label="기업명(영문)" orgid="label_10" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:colspan>5</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:input hierarchy="txb_EngCoNm" id="txb_EngCoNm" maxlength="40" orgid="txb_EngCoNm" style="width:396px;"
+								tabIndex="5" userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr" style="">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_33" id="label_33" label="법인등록번호" orgid="label_33" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input displayFormat="######-########" hierarchy="edt_CorpRegNo" id="edt_CorpRegNo" maxlength="10"
+								orgid="edt_CorpRegNo" readOnly="false" style="width:100px;" tabIndex="8"
+								userData2=" class:panel_maskedit_write_02; alignment:0; datemodify:True; generaledit:False; iscomma:False; showliteral:false; upperflag:1; valign:1;">
+							</xf:input>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_42" id="label_42" label="사업자등록번호" orgid="label_42" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input displayFormat="###-##-#####" hierarchy="edt_BizRegNo" id="edt_BizRegNo" maxlength="10"
+								orgid="edt_BizRegNo" readOnly="false" style="width:100px;" tabIndex="9"
+								userData2=" class:panel_maskedit_write_02; alignment:0; datemodify:True; generaledit:False; iscomma:False; readonlybackcolor:white; showliteral:false; upperflag:1; valign:1;">
+							</xf:input>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_11" id="label_11" label="설립일" orgid="label_11" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<w2:inputCalendar displayFormat="yyyy-MM-dd" hierarchy="edt_EstbDt" id="edt_EstbDt" orgid="edt_EstbDt" style=""
+								tabIndex="10" userData2=" class:panel_maskedit_write_01; generaledit:False;">
+							</w2:inputCalendar>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_51" id="label_51" label="업종" orgid="label_51" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:colspan>5</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:input hierarchy="txb_StdIndNm" id="txb_StdIndNm" maxlength="40" orgid="txb_StdIndNm" style="width:687px;"
+								tabIndex="5" userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_7" id="label_7" label="그룹명" orgid="label_7" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:colspan>5</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:input hierarchy="txb_EntprGrpNm" id="txb_EntprGrpNm" maxlength="40" orgid="txb_EntprGrpNm"
+								style="width:687px;" tabIndex="5" userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_9" id="label_9" label="법인유형" orgid="label_9" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input hierarchy="txb_CorpRegTyp" id="txb_CorpRegTyp" maxlength="40" orgid="txb_CorpRegTyp"
+								style="width:102px;" tabIndex="17" userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_13" id="label_13" label="기업규모" orgid="label_13" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input hierarchy="txb_EntprScl" id="txb_EntprScl" maxlength="40" orgid="txb_EntprScl" style="width:102px;"
+								tabIndex="17" userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_15" id="label_15" label="벤처여부" orgid="label_15" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input hierarchy="txb_VentrYn" id="txb_VentrYn" maxlength="40" orgid="txb_VentrYn" style="width:100px;"
+								tabIndex="17" userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr" style="">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_19" id="label_19" label="결산월" orgid="label_19" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input hierarchy="txb_FiscalMm" id="txb_FiscalMm" maxlength="40" orgid="txb_FiscalMm" style="width:102px;"
+								tabIndex="17" userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_22" id="label_22" label="주거래은행" orgid="label_22" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input hierarchy="txb_MainTrBankNm" id="txb_MainTrBankNm" maxlength="40" orgid="txb_MainTrBankNm"
+								style="width:102px;" tabIndex="17" userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_34" id="label_34" label="대표이사" orgid="label_34" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input hierarchy="txb_ReprDrct" id="txb_ReprDrct" maxlength="50" orgid="txb_ReprDrct" style="width:100px;"
+								tabIndex="7" userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_46" id="label_46" label="주권상장일자" orgid="label_46" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<w2:inputCalendar displayFormat="yyyy-MM-dd" hierarchy="edt_LstDt" id="edt_LstDt" orgid="edt_LstDt" style=""
+								tabIndex="12" userData2=" class:panel_maskedit_write_01; generaledit:False;">
+							</w2:inputCalendar>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_27" id="label_27" label="외감등록일자" orgid="label_27" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<w2:inputCalendar displayFormat="yyyy-MM-dd" hierarchy="edt_ExtAdtRegDt" id="edt_ExtAdtRegDt"
+								orgid="edt_ExtAdtRegDt" style="" tabIndex="11" userData2=" class:panel_maskedit_write_01; generaledit:False;">
+							</w2:inputCalendar>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_45" id="label_45" label="코스닥상장일자" orgid="label_45" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<w2:inputCalendar displayFormat="yyyy-MM-dd" hierarchy="edt_AssoRegDt" id="edt_AssoRegDt" orgid="edt_AssoRegDt"
+								style="" tabIndex="11" userData2=" class:panel_maskedit_write_01; generaledit:False;">
+							</w2:inputCalendar>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_1" id="label_1" label="주소" orgid="label_1" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:colspan>5</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:input hierarchy="txb_Addr" id="txb_Addr" maxlength="40" orgid="txb_Addr" style="width:687px;" tabIndex="17"
+								userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_36" id="label_36" label="전화번호" orgid="label_36" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input hierarchy="txb_TelNo" id="txb_TelNo" maxlength="40" orgid="txb_TelNo" style="width:102px;"
+								tabIndex="17" userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_35" id="label_35" label="팩스번호" orgid="label_35" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes><w2:colspan>3</w2:colspan><w2:rowspan>1</w2:rowspan></w2:attributes>
+							<xf:input hierarchy="txb_FaxNo" id="txb_FaxNo" maxlength="20" orgid="txb_FaxNo" style="width:102px;"
+								tabIndex="19" userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_47" id="label_47" label="공장위치" orgid="label_47" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:colspan>5</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:input hierarchy="txb_FctAdr" id="txb_FctAdr" maxlength="50" orgid="txb_FctAdr" style="width:687px;"
+								tabIndex="7" userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_5" id="label_5" label="주력상품" orgid="label_5" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:colspan>5</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:input hierarchy="txb_MainPdt" id="txb_MainPdt" maxlength="50" orgid="txb_MainPdt" style="width:687px;"
+								tabIndex="7" userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<xf:group class="titbox" id="" meta_snippetCategory="02_타이틀" meta_snippetKeyComponent="true" meta_snippetName="2_02 서브타이틀(h3)"
+				style="">
+				<xf:group class="rt" id="" style="">
+					<xf:input hierarchy="txb_AcntclsBas" id="txb_AcntclsBas" maxlength="40" orgid="txb_AcntclsBas" style="width:245px;"
+						tabIndex="17" userData2=" class:TopCondition_01_write;">
+					</xf:input>
+					<w2:textbox hierarchy="label_21" id="label_21" label="(단위 : 천원)" orgid="label_21" style=""
+						userData2=" class:TopCondition_01;">
+					</w2:textbox>
+				</xf:group>
+			</xf:group>
+			<xf:group class="tblbox" id="panel_Bot" meta_snippetCategory="05_입출력테이블" meta_snippetKeyComponent="true" meta_snippetName="5_03 3단테이블"
+				style="">
+				<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+					<w2:attributes>
+						<w2:summary></w2:summary>
+					</w2:attributes>
+					<xf:group tagname="colgroup">
+						<xf:group style="width:120px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+						<xf:group style="width:120px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+						<xf:group style="width:120px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+					</xf:group>
+				<xf:group tagname="tr">
+					<xf:group tagname="th" class="w2tb_th ">
+						<w2:attributes>
+							<w2:scope>row</w2:scope>
+						</w2:attributes>
+						<w2:textbox hierarchy="label_3" id="label_3" label="자산총계" orgid="label_3"
+							style=""
+							userData2=" class:TopCondition_01;">
+						</w2:textbox>
+					</xf:group>
+					<xf:group tagname="td" class="w2tb_td">
+						<w2:attributes></w2:attributes>
+						<xf:input dataType="number" hierarchy="edt_AssTotAmt" id="edt_AssTotAmt" orgid="edt_AssTotAmt" readOnly="true"
+							style="width:100px;"
+							userData2=" class:panel_maskedit_write_02; alignment:2; datemodify:True; generaledit:False; readonlybackcolor:#b9d4f7; showliteral:false; valign:1;">
+						</xf:input>
+					</xf:group>
+					<xf:group tagname="th" class="w2tb_th ">
+						<w2:attributes>
+							<w2:scope>row</w2:scope>
+						</w2:attributes>
+						<w2:textbox hierarchy="label_17" id="label_17" label="자본금" orgid="label_17"
+							style=""
+							userData2=" class:TopCondition_01;">
+						</w2:textbox>
+					</xf:group>
+					<xf:group tagname="td" class="w2tb_td">
+						<w2:attributes></w2:attributes>
+						<xf:input dataType="number" hierarchy="edt_CptAmt" id="edt_CptAmt" orgid="edt_CptAmt" readOnly="true"
+							style="width:100px;"
+							userData2=" class:panel_maskedit_write_02; alignment:2; datemodify:True; generaledit:False; readonlybackcolor:#b9d4f7; showliteral:false; valign:1;">
+						</xf:input>
+					</xf:group>
+					<xf:group tagname="th" class="w2tb_th ">
+						<w2:attributes>
+							<w2:scope>row</w2:scope>
+						</w2:attributes>
+						<w2:textbox hierarchy="label_18" id="label_18" label="자기자본" orgid="label_18"
+							style=""
+							userData2=" class:TopCondition_01;">
+						</w2:textbox>
+					</xf:group>
+					<xf:group tagname="td" class="w2tb_td">
+						<w2:attributes></w2:attributes>
+						<xf:input dataType="number" hierarchy="edt_SelfCapVal" id="edt_SelfCapVal" orgid="edt_SelfCapVal" readOnly="true"
+							style="width:100px;"
+							userData2=" class:panel_maskedit_write_02; alignment:2; datemodify:True; generaledit:False; readonlybackcolor:#b9d4f7; showliteral:false; valign:1;">
+						</xf:input>
+					</xf:group></xf:group><xf:group tagname="tr">
+	<xf:group tagname="th" class="w2tb_th ">
+		<w2:attributes>
+			<w2:scope>row</w2:scope>
+		</w2:attributes>
+		<w2:textbox hierarchy="label_4" id="label_4" label="매출금액" orgid="label_4"
+			style="" userData2=" class:TopCondition_01;">
+		</w2:textbox>
+	</xf:group>
+	<xf:group tagname="td" class="w2tb_td">
+		<w2:attributes></w2:attributes>
+		<xf:input dataType="number" hierarchy="edt_SaleAccnt" id="edt_SaleAccnt" orgid="edt_SaleAccnt" readOnly="true"
+			style="width:100px;"
+			userData2=" class:panel_maskedit_write_02; alignment:2; datemodify:True; generaledit:False; readonlybackcolor:#b9d4f7; showliteral:false; valign:1;">
+		</xf:input>
+	</xf:group>
+	<xf:group tagname="th" class="w2tb_th ">
+		<w2:attributes>
+			<w2:scope>row</w2:scope>
+		</w2:attributes>
+		<w2:textbox hierarchy="label_16" id="label_16" label="당기순이익" orgid="label_16"
+			style=""
+			userData2=" class:TopCondition_01;">
+		</w2:textbox>
+	</xf:group>
+	<xf:group tagname="td" class="w2tb_td">
+		<w2:attributes></w2:attributes>
+		<xf:input dataType="number" hierarchy="edt_NetIncPrf" id="edt_NetIncPrf" orgid="edt_NetIncPrf" readOnly="true"
+			style="width:100px;"
+			userData2=" class:panel_maskedit_write_02; alignment:2; datemodify:True; generaledit:False; readonlybackcolor:#b9d4f7; showliteral:false; valign:1;">
+		</xf:input>
+	</xf:group>
+	<xf:group tagname="th" class="w2tb_th ">
+		<w2:attributes>
+			<w2:scope>row</w2:scope>
+		</w2:attributes>
+		<w2:textbox hierarchy="label_20" id="label_20" label="종업원수" orgid="label_20"
+			style=""
+			userData2=" class:TopCondition_01;">
+		</w2:textbox>
+	</xf:group>
+	<xf:group tagname="td" class="w2tb_td">
+		<w2:attributes></w2:attributes>
+		<xf:input dataType="number" hierarchy="edt_EmpCnt" id="edt_EmpCnt" orgid="edt_EmpCnt" readOnly="true"
+			style="width:100px;"
+			userData2=" class:panel_maskedit_write_02; alignment:2; datemodify:True; generaledit:False; readonlybackcolor:#b9d4f7; showliteral:false; valign:1;">
+		</xf:input>
+	</xf:group></xf:group><xf:group tagname="tr">
+	<xf:group tagname="th" class="w2tb_th ">
+		<w2:attributes>
+			<w2:scope>row</w2:scope>
+		</w2:attributes>
+		<w2:textbox hierarchy="label_12" id="label_12" label="감사의견" orgid="label_12"
+			style="" userData2=" class:TopCondition_01;">
+		</w2:textbox>
+	</xf:group>
+	<xf:group tagname="td" class="w2tb_td">
+		<w2:attributes></w2:attributes>
+		<xf:input hierarchy="txb_AudtOpin" id="txb_AudtOpin" maxlength="40" orgid="txb_AudtOpin"
+			style="width:102px;"
+			tabIndex="17" userData2=" class:TopCondition_01_write;">
+		</xf:input>
+	</xf:group>
+	<xf:group tagname="th" class="w2tb_th ">
+		<w2:attributes>
+			<w2:scope>row</w2:scope>
+		</w2:attributes>
+		<w2:textbox hierarchy="label_14" id="label_14" label="감사인" orgid="label_14"
+			style=""
+			userData2=" class:TopCondition_01;">
+		</w2:textbox>
+	</xf:group>
+	<xf:group tagname="td" class="w2tb_td">
+		<w2:attributes></w2:attributes>
+		<xf:input hierarchy="txb_AudtCorpNm" id="txb_AudtCorpNm" maxlength="40" orgid="txb_AudtCorpNm"
+			style="width:102px;" tabIndex="17"
+			userData2=" class:TopCondition_01_write;">
+		</xf:input>
+	</xf:group>
+	<xf:group tagname="th" class="w2tb_th "><w2:attributes><w2:scope>row</w2:scope></w2:attributes></xf:group><xf:group tagname="td" class="w2tb_td"><w2:attributes></w2:attributes></xf:group></xf:group></xf:group>
+			</xf:group>
+		</xf:group>
+		<xf:group id="" class="hide"><xf:group hierarchy="panel_1" style="position:absolute;left:422px;top:219px;width:120px;height:30px;background-color:#d9e9fc;visibility:hidden;" userData2=" class:TopCondition_01;" id="panel_1" orgid="panel_1">
+			<xf:input maxlength="10" hierarchy="txb_KisCd" readOnly="true" style="position:absolute; left:10px; top:7px; width:45px; height:20px; background-color:#b9d4f7;" userData2=" class:TopCondition_01_write;" id="txb_KisCd" orgid="txb_KisCd">
+			</xf:input>
+			<xf:input maxlength="10" hierarchy="txb_IndPttn" readOnly="true" style="position:absolute; left:60px; top:7px; width:45px; height:20px; background-color:#b9d4f7;" userData2=" class:TopCondition_01_write;" id="txb_IndPttn" orgid="txb_IndPttn">
+			</xf:input>
+		</xf:group></xf:group></body>
+</html>

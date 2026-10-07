@@ -1,0 +1,1633 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDBNS15100.gfm" meta_screenName="FRN변동금리변경">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<xf:model>
+			<w2:workflowCollection/>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+/* ★Wcraft guide★    
+스크립트 수작업 유의사항
+*/
+
+
+//★Wcraft guide★ include부분 주석처리 -> include("../js/libRoundPanel.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/utils.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/session.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/PopupCalendar.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/stf.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/bns_common.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/list_common.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/common.js");
+scwin.vScrenID = 'ULDBNS15100.xml';
+scwin.vMktactCd = '309'; //채권시장조치구분코드	
+scwin.vIsuCd = '', scwin.hasAttachDoc = '';
+scwin.gBndApplId, scwin.gProcsStat = '';
+scwin.vBndListProcsTpCd = 1; //채권처리구분(1:신청,2:접수)
+scwin.vDtlInfoRowCount = 0;
+scwin.fn_GetPar, scwin.fn_SetPar;
+scwin.processGp; //접수 1, 반송 2, 처리완료 3, 수정 4, 팀장확인 6, 표준코드요청 9
+scwin.btnStat = new Object();
+scwin.vViewYN = 'N';
+scwin.vRowPos = 0;
+scwin.received_std_cd = ""; // 타화면에서 이 화면 오픈 시 건넨 표준코드
+scwin.received_procs_tp = "";
+scwin.onpageload = function() {
+    scwin.gform_onload();
+};
+scwin.onpageunload = function() {
+}; // 타화면에서 이 화면 오픈 시 건넨 처리현황(A:미신고,B:대용납입확인필요,C:신고완료,D:접수완료,E:처리완료)
+
+/********************************************** 
+ * 함수명  	 : fn_list_sync
+ * 설명       : 목록조회
+ ***********************************************/
+scwin.fn_list_sync = function() {
+    $c.cm.setColumnProp(grd_List2, "CHK", "headcheck", false);
+    var dsNm = 'BNS_APPL_ACPT_LIST';
+    var qryId = 'lds.stf.bnscommon.select.listApplAndAcpt';
+    var param = '&{P}V_BND_LIST_PROCS_TP_CD=' + scwin.vBndListProcsTpCd;
+    param += '&{P}V_MKTACT_CD=' + scwin.vMktactCd;
+    $c.bns.fn_SearchBns(scwin.vScrenID, dts_List, dsNm, qryId, param);
+    if (scwin.vBndListProcsTpCd == 1) {
+        $c.cm.ShowWin(grd_List1);
+    } else {
+        $c.cm.ShowWin(grd_List2);
+    }
+};
+
+
+
+/********************************************** 
+ * 함수명  	 : fn_dtl_sync
+ * 설명       : 상세조회
+ ***********************************************/
+scwin.fn_dtl_sync = function() {
+    var std_cd = dts_List.getCellData(dts_List.getRowPosition(), "STD_CD");
+    var bnd_appl_id = dts_List.getCellData(dts_List.getRowPosition(), "BND_APPL_ID");
+    var dsNm = 'BNS_FRN_ISU_CHG_INFO';
+    var qryId = 'lds.stf.bnsisuchg.select.readIsuChgInfoCPnRtFrn';
+    var param = '&{P}V_BND_LIST_PROCS_TP_CD=' + scwin.vBndListProcsTpCd;
+    param += '&{P}V_BND_APPL_ID=' + bnd_appl_id;
+    param += '&{P}V_STD_CD=' + std_cd;
+    $c.bns.fn_SearchBns(scwin.vScrenID, dts_DtlInfo, dsNm, qryId, param);
+};
+
+
+/********************************************** 
+ * 함수명    : fn_SelectBdchrgList
+ * 설명       : 신고담당자 목록 조회
+ ***********************************************/
+scwin.fn_SelectBdchrgList = function() {
+    if (dts_List.getRowPosition() < 1) return;
+    var isur_cd = dts_List.getCellData(dts_List.getRowPosition(), "ISUR_CD");
+    var dsNm = 'BNS_BND_DECL_CHRG_LIST';
+    var qryId = 'lds.stf.bnsdecl_mgr.select.selectBndDeclChrgList';
+    var param = '&{P}V_ISUR_CD=' + isur_cd;
+    $c.bns.fn_SearchBns(scwin.vScrenID, dts_BdchrgList, dsNm, qryId, param);
+};
+
+
+/********************************************** 
+ * 함수명   : fn_InputCheck
+ * 설명      : 필수 입력 값을 체크한다. 
+ ***********************************************/
+scwin.fn_InputCheck = function() {
+    if ($c.stf.getObjectValue(edt_StrtDd) == '') {
+        $c.win.alert("[적용일]을 입력하십시오.");
+        edt_StrtDd.focus();
+        return false;
+    }
+    if ($c.bns.fn_CheckDateObj(edt_StrtDd, "적용일")) {
+        return false;
+    }
+    if ($c.stf.getObjectValue(edt_AfchgCpnIntRt) == '') {
+        $c.win.alert("[변경후 이자율]을 입력하십시오.");
+        edt_AfchgCpnIntRt.focus();
+        return false;
+    }
+    return true;
+};
+
+
+/********************************************** 
+ * 함수명   : fn_MinusGumriOK
+ * JACKAL_191129
+ * 설명       : 개별 체크한다.
+ ***********************************************/
+scwin.fn_MinusGumriOK = function(obj, msg) {
+    var obj_rt = $c.stf.getObjectValue(obj);
+    if (obj_rt < 0) {
+        if (!window.confirm('[' + msg + '] 마이너스(-) 값을 입력하셨습니다.\n이대로 처리하시겠습니까?')) {
+            //setObjectValue(obj, obj_rt*(-1));
+            obj.focus();
+            return 1;
+        }
+    }
+};
+
+
+
+
+/********************************************** 
+* 함수명   : fn_MinusGumriCheck
+* JACKAL_191129
+* 설명       : 개별 체크한다.
+edt_AfchgCpnIntRt AFCHG_COUPN_INT_RT
+***********************************************/
+scwin.fn_MinusGumriCheck = function() {
+    if (!scwin.fn_MinusGumriOK(edt_AfchgCpnIntRt, '변경후 표면이자율') &&
+        !scwin.fn_MinusGumriOK(edt_NxtrdBasInt, '낙찰금리')) return 1;
+
+    else return 0;
+};
+
+
+/********************************************** 
+ * 함수명   : fn_AcptProcsCheck
+ * 설명      : 접수, 처리완료시 공통 체크 구문
+ ***********************************************/
+scwin.fn_AcptProcsCheck = function() {
+    //필수입력값 체크
+    if (scwin.fn_InputCheck() == false) return 1;
+    scwin.vIsuCd = dts_DtlInfo.getCellData(1, "ISU_CD");
+    scwin.hasAttachDoc = dts_DtlInfo.getCellData(1, "HAS_ATTACH_DOC");
+
+    //적용일,매매일,마감일,채권마감 체크		
+    if ($c.bns.fn_CheckCmData(scwin.vScrenID, dts_CheckCmData, $c.stf.getObjectValue(edt_StrtDd), scwin.gBndApplId) > 0) return 1;
+    var param1 = '';
+    param1 += "&{P}V_STD_CD=" + scwin.vIsuCd; //
+
+    //종목정보
+    var dsNm = 'BNS_ISU_INFO';
+    var qryId = 'lds.stf.bnscommon.select.readBndIsuInfo';
+    $c.bns.fn_SearchBns(scwin.vScrenID, dts_IsuInfo, dsNm, qryId, param1);
+    var msg1 = "";
+    var vSameYn = 'Y';
+    var j = 1;
+    var orgBasIntCd = dts_IsuInfo.getCellData(1, "INT_RT_DECSN_MISC_BAS_INT_CD");
+    //var frnBasIntNm = getObjectText(cmb_IntRtDecsnMiscBasIntCd);
+    var orgBasIntNm = "";
+    //for (j = 1; j <= dts_CoupntRtCd.CountRow; j++) 
+    //{
+    //	if ( orgBasIntCd == dts_CoupntRtCd.NameValue(j, "VALUE") )
+    //	{
+    //	//strCbd = dts_CoupntRtCd.NameValue(j, "VALUE") + "^" + dts_CoupntRtCd.NameValue(j, "TEXT");
+    //	orgBasIntNm = dts_CoupntRtCd.NameValue(j, "TEXT");
+    //	}
+    //}
+    //if ( dts_DtlInfo.NameValue(1, "COUPN_RT_DECSN_BAS_INT_CD") != dts_IsuInfo.NameValue(1, "INT_RT_DECSN_MISC_BAS_INT_CD") )
+    //{
+    //	msg1 += " [기준금리] ";
+    //	msg1 += "\n";
+    //	//msg1 += " [상장채권정보]=[" + dts_IsuInfo.NameValue(1, "INT_RT_DECSN_MISC_BAS_INT_CD") + "] [변동금리정보]=" + dts_DtlInfo.NameValue(1, "COUPN_RT_DECSN_BAS_INT_CD") + "]";
+    //	msg1 += " [상장채권]=[" + orgBasIntNm + "]";
+    //	msg1 += "\n";
+    //	msg1 += " [변동금리]=[" + frnBasIntNm + "]";
+    //	msg1 += "\n";
+    //	vSameYn = 'N';
+    //}	
+    if (dts_DtlInfo.getCellData(1, "SPD") != dts_IsuInfo.getCellData(1, "SPD")) {
+        msg1 += " [가산금리] ";
+        msg1 += "\n";
+        msg1 += " [상장채권]=[" + dts_IsuInfo.getCellData(1, "SPD") + "]";
+        msg1 += "\n";
+        msg1 += " [변동금리]=[" + dts_DtlInfo.getCellData(1, "SPD") + "]";
+        msg1 += "\n";
+        vSameYn = 'N';
+    }
+    if (dts_DtlInfo.getCellData(1, "SPD_SGN") != dts_IsuInfo.getCellData(1, "SPD_SGN")) {
+        msg1 += " [가산금리부호] ";
+        msg1 += "\n";
+        msg1 += " [상장채권]=[" + dts_IsuInfo.getCellData(1, "SPD_SGN") + "]";
+        msg1 += "\n";
+        msg1 += " [변동금리]=[" + dts_DtlInfo.getCellData(1, "SPD_SGN") + "]";
+        msg1 += "\n";
+        vSameYn = 'N';
+    }
+    if (vSameYn == 'N') {
+        var msg2 = "기준금리항목 및 가산금리값이 상장채권정보와 다릅니다.";
+        msg2 += "\n";
+        msg2 += msg1;
+        msg2 += "\n";
+        msg2 += "발행기관에 확인 후 필요 시 종목정보를 수정하시기 바랍니다.";
+        msg2 += "\n그래도 작업을 계속하시겠습니까?";
+        if (!window.confirm(msg2)) return 1;
+    }
+    // 기준금리와 가산금리의 합이 변경후 표면이자율과 비교
+    var vAfchgCoupnIntRt = parseFloat(dts_DtlInfo.getCellData(1, "AFCHG_COUPN_INT_RT"));
+    var vSpdSgn = dts_DtlInfo.getCellData(1, "SPD_SGN");
+    var vSpd = parseFloat(dts_DtlInfo.getCellData(1, "SPD"));
+    var vNxtpdBasInt = parseFloat(dts_DtlInfo.getCellData(1, "NXTPD_BAS_INT"));
+    if (vSpdSgn == '-') vSpd = -vSpd;
+
+    // 값이 없는 경우 0 으로 셋팅
+    if (dts_DtlInfo.getCellData(1, "AFCHG_COUPN_INT_RT") == '') {
+        vAfchgCoupnIntRt = 0;
+    }
+    if (dts_DtlInfo.getCellData(1, "SPD") == '') {
+        vSpd = 0;
+    }
+    if (dts_DtlInfo.getCellData(1, "NXTPD_BAS_INT") == '') {
+        vNxtpdBasInt = 0;
+    }
+    if (Number(vAfchgCoupnIntRt.toFixed(6)) != Number((vSpd + vNxtpdBasInt).toFixed(6))) {
+        var msg1 = "" + "기준금리와 가산금리의 합이 변경후 표면이자율과 다릅니다." + "\n" + "\n그래도 작업을 계속하시겠습니까?";
+        if (!window.confirm(msg1)) return 1;
+    }
+
+    //변경된 데이터가 없더라도 데이터셋 전송
+    dts_DtlInfo.UseChangeInfo = "False";
+    return 0;
+};
+
+
+/********************************************** 
+ * 함수명   : fn_Acpt
+ * 설명       : 신청데이터를 접수 처리한다.
+ ***********************************************/
+scwin.fn_Acpt = function() {
+    //접수, 처리완료 공통 체크
+    if (scwin.fn_AcptProcsCheck() > 0) return;
+
+    //복수조치 체크
+    if ($c.bns.fn_CheckMultActImpsblRule(scwin.vScrenID, dts_Temp, scwin.vIsuCd, scwin.vMktactCd, $c.stf.getObjectValue(edt_StrtDd)) > 0) return;
+
+    //첨부문서 체크
+    if (!$c.bns.fn_EndConfirm(scwin.hasAttachDoc, '접수')) return;
+    var url = "/bns/IsuChgEtc.do?method=processApplAcpt";
+    url += "&SCREN_ID=" + scwin.vScrenID;
+    url += "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_02;
+    url += "&MKTACT_TP_CD=" + scwin.vMktactCd;
+    url += "&REG_YN=" + 'N';
+    trs_Save.Action = $c.lc.fn_encodeNSession(url);
+    trs_Save.KeyName = "toinb_dataid4";
+    trs_Save.KeyValue = "JSP(I:pInput=dts_DtlInfo)";
+    trs_Save.Post();
+};
+
+
+/********************************************** 
+ * 함수명   : fn_ProcsComplt
+ * 설명       : 처리완료 및 수정을 처리한다.
+ ***********************************************/
+scwin.fn_ProcsComplt = function() {
+    // 마이너스 금리 체크 (처리완료 및 수정만 체크토록 수정)
+    if (!scwin.fn_MinusGumriCheck()) return 1; // JACKAL_191129
+
+    //접수, 처리완료 공통 체크
+    if (scwin.fn_AcptProcsCheck() > 0) return;
+
+    //복수조치 체크
+    if ($c.bns.fn_CheckMultActImpsblRuleProcEnd(scwin.vScrenID, dts_Temp, scwin.vIsuCd, scwin.vMktactCd, $c.stf.getObjectValue(edt_StrtDd)) > 0) return;
+    var url;
+    if (scwin.processGp == '4') {
+        //접수 후 수정 및 반송시 체크한다.			
+        if ($c.bns.fn_CheckModAndRet(scwin.vScrenID, dts_CheckCmData, scwin.gBndApplId) > 0) return;
+        if (!confirm("수정처리 하시겠습니까?")) return;
+        url = "/bns/IsuChgEtc.do?method=updateAcpt";
+    } else {
+        if (!$c.bns.fn_EndConfirm(scwin.hasAttachDoc, '처리완료')) return;
+        url = "/bns/IsuChgEtc.do?method=processAcptProcessComplt";
+    }
+    url += "&SCREN_ID=" + scwin.vScrenID;
+    url += "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_03;
+    url += "&MKTACT_TP_CD=" + scwin.vMktactCd;
+    trs_Save.Action = $c.lc.fn_encodeNSession(url);
+    trs_Save.KeyName = "toinb_dataid4";
+    trs_Save.KeyValue = "JSP(I:pInput=dts_DtlInfo)";
+    trs_Save.Post();
+};
+
+
+/********************************************** 
+ * 함수명   : fn_GetCommonKey
+ * 설명       : 첨부파일 팝업에 넘길 키데이터를 정의한다.
+ ***********************************************/
+scwin.fn_GetCommonKey = function(arrPar) {
+    arrPar[0] = {
+        //첨부문서 목록 팝업	
+        BND_APPL_ID: dts_DtlInfo.getCellData(1, "BND_APPL_ID"),
+        BND_LIST_PROCS_TP_CD: dts_DtlInfo.getCellData(1, "BND_LIST_PROCS_TP_CD"),
+        ISU_CD: dts_DtlInfo.getCellData(1, "ISU_CD")
+    };
+    return
+    // ********************************************************************
+    // [WebSquare 전환 추가] 원본 소스와 비교 필요
+    // 
+    // ********************************************************************
+    arrPar, length;
+};
+
+
+/********************************************** 
+ * 함수명   : fn_GetCommonKey
+ * 설명       : 상장신청시 첨부 팝업에 넘길 키데이터를 정의한다.
+ ***********************************************/
+scwin.fn_GetCommonKeyForList = function(arrPar) {
+    arrPar[0] = {
+        //상장신청시 첨부문서 목록 팝업
+        //BND_APPL_ID						: dts_DtlInfo.NameValue(1, "BND_APPL_ID_FOR_LIST")	
+        BND_APPL_ID: dts_DtlInfo.getCellData(1, "INT_RT_DECSN_MISC_BAS_INT_NM"),
+        BND_LIST_PROCS_TP_CD: dts_DtlInfo.getCellData(1, "BND_LIST_PROCS_TP_CD"),
+        ISU_CD: dts_DtlInfo.getCellData(1, "ISU_CD")
+    };
+    return
+    // ********************************************************************
+    // [WebSquare 전환 추가] 원본 소스와 비교 필요
+    // 
+    // ********************************************************************
+    arrPar, length;
+};
+
+
+/********************************************** 
+ * 함수명   : fn_GetReturn
+ * 설명       : 반송 팝업에 넘길 데이터를 정의한다.
+ ***********************************************/
+scwin.fn_GetReturn = function(arrPar) {
+    arrPar[0] = {
+        BND_APPL_ID: dts_DtlInfo.getCellData(1, "BND_APPL_ID"),
+        BND_LIST_PROCS_TP_CD: dts_DtlInfo.getCellData(1, "BND_LIST_PROCS_TP_CD"),
+        ISUR_NM: dts_DtlInfo.getCellData(1, "ISUR_NM"),
+        ISU_NM: dts_DtlInfo.getCellData(1, "ISU_NM")
+    };
+    return
+    // ********************************************************************
+    // [WebSquare 전환 추가] 원본 소스와 비교 필요
+    // 
+    // ********************************************************************
+    arrPar, length;
+};
+
+/********************************************** 
+ * 함수명   : fn_SetReturn
+ * 설명       : 팝업에서 받은 데이터를 설정한다.
+ ***********************************************/
+scwin.fn_SetReturn = function(arrPar) {
+    if ("Y" == arrPar[0].SUCCESS_YN) {
+        scwin.fn_list_sync();
+    }
+};
+
+
+
+/********************************************** 
+ * 함수명   : fn_GetParIsuDelInfo
+ * 설명       : 종목상세 목록 팝업에 넘길 데이터를 정의한다.
+ ***********************************************/
+scwin.fn_GetParIsuDelInfo = function(arrPar) {
+    arrPar[0] = {
+        STD_CD: dts_DtlInfo.getCellData(1, "ISU_CD"),
+        BND_LIST_PROCS_TP_CD: scwin.vBndListProcsTpCd
+    };
+    return
+    // ********************************************************************
+    // [WebSquare 전환 추가] 원본 소스와 비교 필요
+    // 
+    // ********************************************************************
+    arrPar, length;
+};
+
+
+/********************************************** 
+ * 함수명   : fn_GetParApprovFileWrt
+ * 설명       : 결재파일생성 팝업에 넘길 데이터를 정의한다.
+ ***********************************************/
+scwin.fn_GetParApprovFileWrt = function(arrPar) {
+    arrPar[0] = {
+        BND_APPL_ID: scwin.gBndApplId,
+        BND_LIST_PROCS_TP_CD: scwin.vBndListProcsTpCd,
+        BND_MKTACT_TP_CD: scwin.vMktactCd
+    };
+    return
+    // ********************************************************************
+    // [WebSquare 전환 추가] 원본 소스와 비교 필요
+    // 
+    // ********************************************************************
+    arrPar, length;
+};
+
+
+/********************************************** 
+ * 함수명   : fn_ProcBtnStat
+ * 설명       : 처리 상태가 처리완료일 경우, 처리완료 버튼 비활성화
+ ***********************************************/
+scwin.fn_ProcBtnStat = function() {
+    if (scwin.gProcsStat == "처리완료") {
+        btn_Proc.src = "../img/bns/btn_20_d.gif";
+        scwin.btnStat.Proc = "dis";
+    } else {
+        btn_Proc.src = "../img/bns/btn_20.gif";
+        scwin.btnStat.Proc = "en";
+    }
+};
+
+
+
+/********************************************** 
+ * 함수명  	 : fn_ChgTab_Act
+ * 설명       : 필드 ReadOnly 속성 제거/부여
+ ***********************************************/
+scwin.fn_ChgTab_Act = function(vBndListProcsTpCd) {
+    //변경후 이자율, 사유발생일
+    if (scwin.vBndListProcsTpCd == 1) {
+        edt_AfchgCpnIntRt.setReadOnly(true);
+        edt_IntRtDecsnBasDd.setReadOnly(true);
+        //cmb_IntRtDecsnMiscBasIntCd.ReadOnly = true;
+        //cmb_IntRtDecsnMiscBasIntCd.Enable2 = false;
+        edt_NxtrdBasInt.setReadOnly(true);
+        //txb_IntRtDecsnMiscBasIntNm.disabled = true;
+        edt_AfchgCpnIntRt.setReadOnly(true);
+        edt_IntPayDd.setReadOnly(true);
+        cmb_SpdSgn.setDisabled(true);
+        cmb_SpdSgn.setReadOnly(true);
+        edt_Spd.setReadOnly(true);
+
+        //달력가리기
+        $c.stf.showObj(img_BasDd, false);
+        $c.stf.showObj(img_PayDd, false);
+
+        //txb_IntRtDecsnMiscBasIntNm.style.backgroundColor = "#b9d4f7";
+
+    } else if (scwin.vBndListProcsTpCd == 2) {
+        edt_AfchgCpnIntRt.setReadOnly(false);
+        edt_IntRtDecsnBasDd.setReadOnly(false);
+        //cmb_IntRtDecsnMiscBasIntCd.Enable2 = true;
+        //cmb_IntRtDecsnMiscBasIntCd.ReadOnly = false;
+        edt_NxtrdBasInt.setReadOnly(false);
+        //txb_IntRtDecsnMiscBasIntNm.disabled = false;
+        edt_AfchgCpnIntRt.setReadOnly(false);
+        edt_IntPayDd.setReadOnly(false);
+        cmb_SpdSgn.setDisabled(false);
+        cmb_SpdSgn.setReadOnly(false);
+        edt_Spd.setReadOnly(false);
+
+        //달력보이기
+        $c.stf.showObj(img_BasDd, true);
+        $c.stf.showObj(img_PayDd, true);
+
+        //txb_IntRtDecsnMiscBasIntNm.style.backgroundColor = "#ffffff";
+
+    }
+};
+
+
+
+
+
+
+/********************************************** 
+ * 함수명   : fn_SetComboCode
+ * 설명       : 콤보데이터를 정의한다.
+ ***********************************************/
+scwin.fn_SetComboCode = function() {
+    $c.bns.fn_SetBnsCombo(scwin.vScrenID, dts_CoupntRtCd, '03050'); //표면이자율결정 기준금리
+
+};
+
+
+/********************************************** 
+ * 함수명   : fn_setCheckBoxALL
+ * 설명       : 그리드 체크박스 전체선택 또는 전체선택 해제
+ ***********************************************/
+scwin.fn_setCheckBoxALL = function(grdObj, dtsObj, bCheck) {
+    var vcd = "";
+    if (bCheck == '1') {
+        vcd = "T";
+    } else {
+        vcd = "F";
+    }
+    grdObj.setBroadcast(false);
+    for (var i = 1; i <= dtsObj.getTotalRow(); i++) {
+        //if (dtsObj.NameString(i, "PROCS_STAT") != '처리완료') { //처리완료만 팀장확인 대상임
+        if (dtsObj.getCellData(i, "PROCS_STAT") != '처리완료' || (dtsObj.getCellData(i, "TEAMLEADER_CONFRM_DD") != "undefined" && dtsObj.getCellData(i, "TEAMLEADER_CONFRM_DD") != '-' && dtsObj.getCellData(i, "TEAMLEADER_CONFRM_DD") != '')) {
+            //처리완료만 팀장확인 대상임
+            dtsObj.setCellData(i, "CHK", "F");
+        } else {
+            dtsObj.setCellData(i, "CHK", vcd);
+        }
+    }
+    grdObj.setBroadcast(true);
+};
+
+
+/**
+ * 선택된 row의 값을 강제로 변경.. 이렇게 하면 변경된 row만 서버로 전송될것 같아서..
+ */
+scwin.fn_SetTransData = function() {
+    var nRow = dts_List.getRowPosition();
+    dts_List.setCellData(nRow, "CHK", "T");
+};
+scwin.fn_CompareRt = function() {
+    var aftRt = dts_DtlInfo.getCellData(1, "AFCHG_COUPN_INT_RT"); // 변경후 표면이자율
+    var aftBasInt = dts_DtlInfo.getCellData(1, "NXTPD_BAS_INT"); // 변경후 기준금리
+    var aftSpd = dts_DtlInfo.getCellData(1, "SPD_SGN") + dts_DtlInfo.getCellData(1, "SPD"); // 변경후 기준금리
+
+    var kscRt = dts_DtlInfo.getCellData(1, "KSC_FACE_INT"); // 코스콤 표면이자율
+    var kscBasInt = dts_DtlInfo.getCellData(1, "KSC_BAS_INT"); // 코스콤 기준금리
+    var kscSpd = dts_DtlInfo.getCellData(1, "KSC_SPD"); // 코스콤 가산금리
+
+    if (Number(kscSpd) > 0) {
+        kscSpd = "+" + kscSpd;
+    }
+    var different1 = false;
+    var different2 = false;
+    var different3 = false;
+
+    // #15549c : readonly 기본 글자색
+    // #343434 : 일반적인 글자색
+    // #FF0000 : 빨간색
+    // 코스콤 표면이자율과 변경후 표면이자율을 비교.. 다르면 색깔 표시
+    if (kscRt != "" && kscRt != aftRt) {
+        different1 = true;
+        if (edt_AfchgCpnIntRt.ReadOnly) {
+            edt_AfchgCpnIntRt.readonlyforecolor = "#FF0000";
+        } else {
+            edt_AfchgCpnIntRt.style.color = "#FF0000";
+        }
+    } else {
+        different1 = false;
+        if (edt_AfchgCpnIntRt.ReadOnly) {
+            edt_AfchgCpnIntRt.readonlyforecolor = "#15549c";
+        } else {
+            edt_AfchgCpnIntRt.style.color = "#343434";
+        }
+    }
+
+    // 기준금리 비교
+    if (kscBasInt != "" && kscBasInt != aftBasInt) {
+        different2 = true;
+        if (edt_NxtrdBasInt.ReadOnly) {
+            edt_NxtrdBasInt.readonlyforecolor = "#FF0000";
+        } else {
+            edt_NxtrdBasInt.style.color = "#FF0000";
+        }
+    } else {
+        different2 = false;
+        if (edt_NxtrdBasInt.ReadOnly) {
+            edt_NxtrdBasInt.readonlyforecolor = "#15549c";
+        } else {
+            edt_NxtrdBasInt.style.color = "#343434";
+        }
+    }
+
+    // 가산금리 비교
+    if (kscSpd != "" && kscSpd != aftSpd) {
+        different3 = true;
+        if (edt_Spd.ReadOnly) {
+            edt_Spd.readonlyforecolor = "#FF0000";
+            //cmb_SpdSgn.style.color = "#FF0000";
+
+        } else {
+            edt_Spd.style.color = "#FF0000";
+        }
+    } else {
+        different3 = false;
+        if (edt_Spd.ReadOnly) {
+            edt_Spd.readonlyforecolor = "#15549c";
+        } else {
+            edt_Spd.style.color = "#343434";
+        }
+    }
+    if (different1 || different2 || different3) {
+        $c.win.alert("상장법인이 제출한 FRN 변동금리 신청내역과 코스콤 데이터값이 상이합니다.\n확인 후 처리 바랍니다.");
+    }
+};
+scwin.gform_onload = function() {
+    $c.bns.BnsPanelToGroupBox(pnl_Req); //패널라운드처리(신청)
+    $c.bns.BnsPanelToGroupBox(pnl_DtlInfo); //패널라운드처리(상세)
+    $c.bns.BnsPanelToGroupBox(pnl_Acpt); //패널라운드처리(접수)
+
+    $c.stf.showObj(btn_Excel, false);
+    scwin.fn_SetComboCode();
+
+    // 타화면에서 이 화면 오픈 시 건넨 값 저장
+    scwin.received_std_cd = $c.stf.getQuery(frame.srcUrl, "STD_CD");
+    scwin.received_procs_tp = $c.stf.getQuery(frame.srcUrl, "PROCS_TP"); // (A:미신고,B:대용납입확인필요,C:신고완료,D:접수완료,E:처리완료)
+
+    // 접수완료, 처리완료 인 경우 tab2로 이동.
+    if (scwin.received_procs_tp == "F" || scwin.received_procs_tp == "G") {
+        tab_List.setSelectedTabIndex(2);
+    } else {
+        tab_List.setSelectedTabIndex(1);
+    }
+    scwin.vBndListProcsTpCd = tab_List.getSelectedTabIndex();
+
+    //tab_List.ActiveIndex = 1;
+    scwin.fn_list_sync(); //목록 조회
+
+    //팀장확인데이터셋설정	
+
+    //dts_Temp.setDataHeader(); // W-Craft 주석처리 및 필요시 asis 파라미터 확인 
+    dts_Temp.insertRow();
+    //필드 ReadOnly 속성 제거/부여
+    scwin.fn_ChgTab_Act(scwin.vBndListProcsTpCd);
+};
+scwin.tab_List_OnSelChanged = function(nIndex) {
+    scwin.vBndListProcsTpCd = nIndex;
+    if (scwin.vBndListProcsTpCd == 2) {
+        $c.stf.showObj(btn_Excel, true);
+    } else {
+        $c.stf.showObj(btn_Excel, false);
+    }
+    scwin.fn_list_sync(); //목록 조회
+    //필드 ReadOnly 속성 제거/부여
+    scwin.fn_ChgTab_Act(scwin.vBndListProcsTpCd);
+};
+scwin.dts_List_OnLoadError = function() {
+    $c.win.alert($c.stf.getMessageParam("MSG-0002"));
+};
+scwin.dts_List_OnLoadCompleted = function(rowcount) {
+    if (scwin.vBndListProcsTpCd == 2) {
+        $c.cm.CloseWin(rowcount, grd_List2);
+        //접수,수정,처리완료,팀장확인 시 해당 ROW로 이동
+        $c.bns.fn_RowPos(dts_List, scwin.vRowPos);
+    } else {
+        $c.cm.CloseWin(rowcount, grd_List1);
+    }
+
+    // 타화면에서 건네받은 표준코드가 존재하면 그 건을 선택
+    if (scwin.received_std_cd != "") {
+        for (var i = 1; i <= dts_List.getTotalRow(); i++) {
+            if (scwin.received_std_cd == dts_List.getCellData(i, "STD_CD")) {
+                dts_List.setRowPosition(i, 0);
+                scwin.received_std_cd = ""; // 한번쓰고 초기화한다.
+                scwin.received_procs_tp = "";
+            }
+        }
+    }
+};
+scwin.dts_List_OnRowPosChanged = function(row) {
+    if (row > 0) {
+        scwin.gBndApplId = dts_List.getCellData(row, "BND_APPL_ID");
+        scwin.fn_dtl_sync();
+        scwin.gProcsStat = dts_List.getCellData(row, "PROCS_STAT");
+        scwin.fn_ProcBtnStat();
+        scwin.fn_SelectBdchrgList();
+    } else {
+        dts_DtlInfo.removeAll();
+        scwin.vDtlInfoRowCount = 0;
+    }
+};
+scwin.grd_List2_OnHeadCheckClick = function(col, colid, bCheck) {
+    scwin.fn_setCheckBoxALL(grd_List2, dts_List, bCheck);
+};
+scwin.dts_DtlInfo_OnLoadError = function() {
+    $c.win.alert($c.stf.getMessageParam("MSG-0002"));
+};
+scwin.dts_DtlInfo_OnLoadCompleted = function(rowcount) {
+    scwin.vDtlInfoRowCount = rowcount;
+
+    // 코스콤 금리와 변경후 금리 비교..
+    // [FRN금리변경] 신고화면 中 액셀첨부가 가능하도록 되어있는 주택금융공사에 한해 경고팝업이 접수, 처리완료, 팀장확인에서 뜨지 않도록 요청 25.02.17
+    // 일괄신청 가능한 발행기관 모두 제외(중소기업은행(02411), 한국산업은행(04725), 한국주택금융공사(07915))
+    var isur_cd = dts_DtlInfo.getCellData(1, "ISUR_CD");
+    if (isur_cd != "02411" && isur_cd != "04725" && isur_cd != "07915") {
+        scwin.fn_CompareRt();
+    }
+    edt_BfchgCpnIntRt.RightMargin = 5;
+    edt_AfchgCpnIntRt.RightMargin = 5;
+};
+scwin.img_StrtDd_onclick = function() {
+    if (scwin.vDtlInfoRowCount == 0) return;
+    popUpCalendar2(edt_StrtDd);
+};
+scwin.img_BasDd_onclick = function() {
+    if (scwin.vDtlInfoRowCount == 0) return;
+    popUpCalendar2(edt_IntRtDecsnBasDd);
+};
+scwin.img_PayDd_onclick = function() {
+    if (scwin.vDtlInfoRowCount == 0) return;
+    popUpCalendar2(edt_IntPayDd);
+};
+scwin.btn_Acpt_onclick = function() {
+    if (scwin.vDtlInfoRowCount == 0) return;
+    scwin.processGp = '1';
+    scwin.fn_Acpt();
+};
+scwin.btn_Ret_onclick = function() {
+    if (scwin.vDtlInfoRowCount == 0) return;
+    scwin.processGp = '2';
+    scwin.fn_GetPar = fn_GetReturn;
+    scwin.fn_SetPar = fn_SetReturn;
+    $c.bns.fn_PopReturn(grd_List1);
+};
+scwin.btn_Ret2_onclick = function() {
+    if (scwin.vDtlInfoRowCount == 0) return;
+    //접수 후 수정 및 반송시 체크한다.			
+    if ($c.bns.fn_CheckModAndRet(scwin.vScrenID, dts_CheckCmData, scwin.gBndApplId) > 0) return;
+    scwin.processGp = '2';
+    scwin.fn_GetPar = fn_GetReturn;
+    scwin.fn_SetPar = fn_SetReturn;
+    $c.bns.fn_PopReturn(grd_List1);
+};
+scwin.btn_Attach_onclick = function() {
+    if (scwin.vDtlInfoRowCount == 0) return;
+    if ("N" == dts_DtlInfo.getCellData(1, "HAS_ATTACH_DOC")) {
+        $c.win.alert("연결된 팩스/첨부문서가 없습니다.");
+        return;
+    }
+    scwin.fn_GetPar = fn_GetCommonKey;
+    $c.bns.fn_PopAttachDocSearch(grd_List1);
+};
+scwin.btn_Attach_List_onclick = function() {
+    if (scwin.vDtlInfoRowCount == 0) return;
+    if ("N" == dts_DtlInfo.getCellData(1, "HAS_ATTACH_DOC_FOR_LIST")) {
+        $c.win.alert("연결된 첨부문서가 없습니다.");
+        return;
+    }
+    scwin.fn_GetPar = fn_GetCommonKeyForList;
+    $c.bns.fn_PopAttachDocSearch(grd_List1);
+};
+scwin.btn_Dtl_onclick = function() {
+    if (scwin.vDtlInfoRowCount == 0) return;
+    scwin.fn_GetPar = fn_GetParIsuDelInfo;
+    $c.bns.fn_PopIsuDetail(grd_List1);
+};
+scwin.btn_ApprovFileCreat_onclick = function() {
+    if (scwin.vDtlInfoRowCount == 0) return;
+    scwin.fn_GetPar = fn_GetParApprovFileWrt;
+    $c.bns.fn_PopApprovFileWrt(grd_List1);
+};
+scwin.btn_Proc_onclick = function() {
+    if (scwin.vDtlInfoRowCount == 0) return;
+    if (scwin.btnStat.Proc == "dis") return;
+    scwin.vRowPos = dts_List.getRowPosition();
+    scwin.processGp = '3';
+    scwin.fn_ProcsComplt();
+};
+scwin.btn_Mod_onclick = function() {
+    if (scwin.vDtlInfoRowCount == 0) return;
+    scwin.vRowPos = dts_List.getRowPosition();
+    scwin.processGp = '4';
+    scwin.fn_ProcsComplt();
+};
+scwin.btn_TeamleadrConfrm_onclick = function() {
+    if (scwin.vDtlInfoRowCount == 0) return;
+    scwin.processGp = "6";
+
+    //체크된 것 카운팅
+    var nTrueCnt = 0;
+    for (var nRow = 1; nRow <= dts_List.getTotalRow(); nRow++) {
+        if (dts_List.getCellData(nRow, "CHK") == "T") {
+            nTrueCnt++;
+        }
+    }
+    if (nTrueCnt == 0) {
+        $c.win.alert("선택된 정보가 없습니다.");
+        return false;
+    }
+    $c.bns.fn_TeamleadrConfrmAll(scwin.vScrenID, trs_Save, dts_List, scwin.vBndListProcsTpCd, nTrueCnt);
+};
+scwin.trs_Save_OnFail = function() {
+    if (scwin.processGp == '1') {
+        $c.win.alert($c.stf.getMessageParam("MSG-A002", "접수"));
+    }
+    if (scwin.processGp == '3') {
+        $c.win.alert($c.stf.getMessageParam("MSG-A002", "처리완료"));
+    }
+    if (scwin.processGp == '4') {
+        $c.win.alert($c.stf.getMessageParam("MSG-A002", "수정"));
+    }
+    if (scwin.processGp == '6') {
+        $c.win.alert($c.stf.getMessageParam("MSG-A002", "팀장확인"));
+    }
+};
+scwin.trs_Save_OnSuccess = function() {
+    if (scwin.processGp == '1') {
+        $c.win.alert($c.stf.getMessageParam("MSG-A001", "접수"));
+    }
+    if (scwin.processGp == '3') {
+        $c.win.alert($c.stf.getMessageParam("MSG-0001"));
+    }
+    if (scwin.processGp == '4') {
+        $c.win.alert($c.stf.getMessageParam("MSG-A001", "수정"));
+    }
+    if (scwin.processGp == '6') {
+        $c.win.alert($c.stf.getMessageParam("MSG-A001", "팀장확인"));
+    }
+    scwin.fn_list_sync();
+};
+scwin.edt_BfchgCpnIntRt_OnKillFocus = function() {
+    edt_BfchgCpnIntRt.RightMargin = 5;
+};
+scwin.edt_AfchgCpnIntRt_OnKillFocus = function() {
+    edt_AfchgCpnIntRt.RightMargin = 5;
+};
+scwin.edt_Spd_OnKillFocus = function() {
+    edt_Spd.RightMargin = 5;
+};
+scwin.btn_Excel_onclick = function() {
+    /********************************************** 
+     * Event   : btn_Excel > onclick
+     * 설명    : 엑셀버튼클릭
+     ***********************************************/
+    //엑셀 로그 
+    $c.stf.doLogSave(scwin.vScrenID, SCREN_PROCS_TP_CD_07);
+    var fileNm = $c.session.getExcelDownPath() + $c.ut.cGetToday("yyyymmddhhmmss") + "_FRN변동금리 접수내역.xls";
+    $c.data.downloadGridViewExcel(grd_List2, "접수내역", "", "8");
+};
+scwin.btn_Search_onclick = function() {
+    scwin.fn_list_sync();
+};
+scwin.btn_Search2_onclick = function() {
+    scwin.fn_list_sync();
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+		<!-- Tag is Not matched with wCraft2 Rule :<style/>-->
+		<xf:model>
+			<!-- Tag is Not matched with wCraft2 Rule :<mxdataset id="dts_List" onloaderror="dts_List_OnLoadError" userData2=" onloadcompleted:dts_List_OnLoadCompleted; onrowposchanged:dts_List_OnRowPosChanged;" orgid="dts_List" hierarchy="dts_List"/>-->
+			<!-- Tag is Not matched with wCraft2 Rule :<mxdataset id="dts_DtlInfo" onloaderror="dts_DtlInfo_OnLoadError" userData2=" onloadcompleted:dts_DtlInfo_OnLoadCompleted;" orgid="dts_DtlInfo" hierarchy="dts_DtlInfo"/>-->
+			<w2:dataMap id="bnd_DtlInfo" userData2=" activebind:true; dataid:dts_DtlInfo;" baseNode="map">
+				<w2:keyInfo>
+					<w2:multicolumn userData2=" col:STRT_DD; ctrl:edt_StrtDd; param:text;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:BND_APPL_ID; ctrl:txb_BndApplNo; param:value;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:ISUR_NM; ctrl:txb_IsurNm; param:value;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:ISU_CD; ctrl:txb_IsuCd; param:value;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:ISU_NM; ctrl:txb_IsuNm; param:value;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:BND_APCT_TP_CD; ctrl:txb_ApctIpAddr; param:value;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:APCT_NM; ctrl:txb_ApctNm; param:value;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:ENCRYP_APCT_EMAIL; ctrl:txb_ApctEmail; param:value;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:APCT_TEL_NO; ctrl:txb_ApctTelNo; param:value;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:APCT_FAX_NO; ctrl:txb_ApctFaxNo; param:value;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:ENCRYP_CELLPHONE_NO; ctrl:txb_CellPhoneNo; param:value;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:ISU_DD; ctrl:edt_IsuDd; param:text;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:REDMPT_DD; ctrl:edt_RedmptDd; param:text;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:BFCHG_COUPN_INT_RT; ctrl:edt_BfchgCpnIntRt; param:text;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:AFCHG_COUPN_INT_RT; ctrl:edt_AfchgCpnIntRt; param:text;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:APCT_INNR_NO; ctrl:txb_ApctinnrNo; param:value;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:INT_RT_DECSN_BAS_DD; ctrl:edt_IntRtDecsnBasDd; param:text;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:INT_PAY_DD; ctrl:edt_IntPayDd; param:text;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:COUPN_RT_DECSN_BAS_INT_CD; ctrl:cmb_IntRtDecsnMiscBasIntCd; param:BindColVal;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:INT_RT_DECSN_MISC_BAS_INT_NM; ctrl:txb_IntRtDecsnMiscBasIntNm; param:value;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:SPD_SGN; ctrl:cmb_SpdSgn; param:BindColVal;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:SPD; ctrl:edt_Spd; param:text;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:NXTPD_BAS_INT; ctrl:edt_NxtrdBasInt; param:text;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:ISU_AMT; ctrl:edt_IsuAmt; param:text;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:FRN_BAS_INT_TP1; ctrl:txb_FrnBasIntTp1; param:value;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:FRN_BAS_INT_TP2; ctrl:txb_FrnBasIntTp2; param:value;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:FRN_BAS_INT_TP3; ctrl:txb_FrnBasIntTp3; param:value;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:FRN_BAS_INT_TP4; ctrl:txb_FrnBasIntTp4; param:value;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:FRN_BAS_INT_MISC; ctrl:txb_FrnBasIntMisc; param:value;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:SPD_SGN_SPD; ctrl:txb_SpdSgnSpd; param:value;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:LIST_DD; ctrl:edt_ListDd; param:text;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:BEF_SPD_SGN_SPD; ctrl:txb_BefSpd; param:value;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:BEF_DECSN_BAS_DD; ctrl:edt_BefDecsnBasDd; param:text;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:BEF_INT_PAY_DD; ctrl:edt_BefIntPayDd; param:text;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:BEF_STRT_DD; ctrl:edt_BefStrtDd; param:text;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:BEF_BAS_INT; ctrl:edt_BefBasInt; param:text;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:DECL_SEQ; ctrl:txb_IntRtChgSeq; param:value;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:KSC_FACE_INT; ctrl:edt_KscFaceInt; param:text;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:KSC_BAS_INT; ctrl:edt_KscBasInt; param:text;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:KSC_SPD; ctrl:txb_KscSpd; param:value;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:KSC_INT_PAY_DD; ctrl:edt_KscIntPayDd; param:text;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:KSC_RCV_DD; ctrl:edt_KscRcvDd; param:text;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:KSC_INT_DECSN_BAS_DD; ctrl:edt_KscDecsnBasDd; param:text;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+					<w2:multicolumn userData2=" col:KSC_INT_TP_VAL; ctrl:txb_IntTpVal; param:value;" readOnly="false" displayMode="label" inputType="text" rowInfo="1"/>
+				</w2:keyInfo>
+			</w2:dataMap>
+			<!-- Tag is Not matched with wCraft2 Rule :<mxdataset id="dts_MagamInfo" orgid="dts_MagamInfo" hierarchy="dts_MagamInfo"/>-->
+			<!-- Tag is Not matched with wCraft2 Rule :<mxdataset id="dts_Temp" orgid="dts_Temp" hierarchy="dts_Temp"/>-->
+			<!-- Tag is Not matched with wCraft2 Rule :<mxdataset id="dts_CheckCmData" syncload="True" orgid="dts_CheckCmData" hierarchy="dts_CheckCmData"/>-->
+			<!-- Tag is Not matched with wCraft2 Rule :<mxlogicaltr id="trs_Save" onfail="trs_Save_OnFail" onsuccess="trs_Save_OnSuccess" keyname="toinb_dataid4" orgid="trs_Save" hierarchy="trs_Save"/>-->
+			<!-- Tag is Not matched with wCraft2 Rule :<mxdataset id="dts_CoupntRtCd" orgid="dts_CoupntRtCd" hierarchy="dts_CoupntRtCd"/>-->
+			<!-- Tag is Not matched with wCraft2 Rule :<mxdataset id="dts_IsuInfo" syncload="True" orgid="dts_IsuInfo" hierarchy="dts_IsuInfo"/>-->
+			<!-- Tag is Not matched with wCraft2 Rule :<mxdataset id="dts_BdchrgList" orgid="dts_BdchrgList" hierarchy="dts_BdchrgList"/>-->
+		</xf:model>
+		<xf:group class="sub_contents">
+			<xf:group id="" class="tbcbox">
+				<w2:tabControl id="tab_List" userData2=" class:Tab_01; onselchanged:tab_List_OnSelChanged;" style="" selectedIndex="0" class="tbc" useMoveNextTabFocus="false" confirmTrueAction="exist" useConfirmMessage="false" confirmFalseAction="new">
+					<w2:tabs label="신청내역" id="pnl_Req" style=""/>
+					<w2:tabs label="접수내역" id="pnl_Acpt" style=""/>
+					<w2:content id="pnl_Req_01" userData2=" class:TopCondition_01; left:10; top:30;" style="">
+						<xf:group id="" class="titbox mt0">
+							<xf:group id="" class="rt">
+								<xf:trigger cursor="pointer" src="../img/bns/btn_select_n.gif" ev:onclick="scwin.btn_Search_onclick"
+									style="" id="btn_Search" text="조회" class="btn_cm">
+									<xf:label><![CDATA[조회]]></xf:label>
+								</xf:trigger>
+								<xf:trigger cursor="pointer" src="../img/bns/btn_Acpt_n.gif" ev:onclick="scwin.btn_Acpt_onclick" style=""
+									id="btn_Acpt" class="btn_cm">
+									<xf:label><![CDATA[접수]]></xf:label>
+								</xf:trigger>
+								<xf:trigger cursor="pointer" src="../img/bns/btn_Ret_n.gif" ev:onclick="scwin.btn_Ret_onclick" style=""
+									id="btn_Ret" class="btn_cm">
+									<xf:label><![CDATA[반송]]></xf:label>
+								</xf:trigger>
+								<xf:trigger cursor="pointer" src="../img/bns/btn_excelsave_n.gif" ev:onclick="scwin.btn_Excel_onclick"
+									style="" id="btn_Excel" text="엑셀다운로드" class="btn_cm download">
+									<xf:label><![CDATA[엑셀다운로드]]></xf:label>
+								</xf:trigger>
+							</xf:group>
+						</xf:group>
+						<xf:group id="" class="gvwbox">
+							<w2:gridView id="grd_List1"
+								userData2=" class:Grid_01; colsizing:True; editable:False; fillarea:True; fixsizing:True; gtitleheight:0; headborder:4; indwidth:0; rowheight:20; sortview:left; suppressoption:1; titleheight:30; tooltip:use=true;alt=true;createtime=300;color=#FFFFFF;backcolor=#808080;edgecolor=#333333;leftmargin=10;rightmargin=10;topmargin=10;bottommargin=10;; xtitleheight:0; font-family:돋움;"
+								style="height:153px;" dataList="data:dts_List" class="gvw" orgid="grd_List1" hierarchy="tab_List.grd_List1" autoFit="allColumn">
+								<w2:caption id="caption1" style="" value="this is a grid caption." />
+								<w2:header id="header1" style="">
+									<w2:row>
+										<w2:column id="RNUM" width="50" value="번호" textAlign="center"
+											userData2=" suppress:1; value:{CurRow},{ToString};" displayMode="label" inputType="text" rowspan="2" rowInfo="0" fixColumnWidth="true"/>
+										<w2:column id="BND_APPL_ID" width="95" value="접수번호" textAlign="center"
+											userData2=" suppress:1; sort:True;" displayMode="label" inputType="text" rowspan="2" rowInfo="0" />
+										<w2:column id="ISU_NM" width="250" value="한글종목명" textAlign="center" style="color:#343434;"
+											userData2=" suppress:0; bgcolor:{decode(currow-tointeger(currow/2)*2,0,'#f2f5f9',1,'#ffffff')}; sort:True;" displayMode="label"
+											inputType="text" rowspan="2" rowInfo="0" />
+										<w2:column value="신청내용 (단위: %)" width="475" id="APPL_CONTN" textAlign="center"
+											userData2=" sort:True;" displayMode="label" inputType="text" rowspan="2" rowInfo="0" />
+										<w2:column value="적용희망일" width="100" id="PROCS_REQ_DD" textAlign="center"
+											userData2=" sort:True; mask:XXXX-XX-XX;" displayMode="label" inputType="text" rowspan="2" rowInfo="0" />
+										<w2:column value="신청자명" width="80" id="APCT_NM" textAlign="center" userData2=" sort:True;"
+											displayMode="label" inputType="text" rowspan="2" rowInfo="0" />
+									</w2:row>
+								</w2:header>
+								<w2:gBody id="gBody1" style="">
+									<w2:row id="" style="">
+										<w2:column id="RNUM" textAlign="center" width="50" inputType="text" displayMode="label" />
+										<w2:column id="BND_APPL_ID" textAlign="center" width="95" inputType="text" displayMode="label" />
+										<w2:column id="ISU_NM" textAlign="default" width="250" inputType="text" displayMode="label" />
+										<w2:column id="APPL_CONTN" textAlign="default" width="475" inputType="text" displayMode="label" />
+										<w2:column id="PROCS_REQ_DD" textAlign="center" width="100" inputType="text" displayMode="label" />
+										<w2:column id="APCT_NM" textAlign="center" width="80" inputType="text" displayMode="label" />
+									</w2:row>
+								</w2:gBody>
+							</w2:gridView>
+						</xf:group></w2:content>
+					<w2:content id="pnl_Acpt_01" userData2=" left:10; top:30; class:TopCondition_01; visibility:hidden;" style="">
+						<xf:group id="" class="titbox mt0">
+							<xf:group id="" class="rt">
+								<xf:trigger cursor="pointer" src="../img/bns/btn_select_n.gif" ev:onclick="scwin.btn_Search2_onclick"
+									style="" id="btn_Search2" class="btn_cm">
+									<xf:label><![CDATA[조회]]></xf:label>
+								</xf:trigger>
+								<xf:trigger cursor="pointer" src="../img/bns/btn_19.gif" ev:onclick="scwin.btn_ApprovFileCreat_onclick"
+									style="" id="btn_ApprovFileCreat" class="btn_cm">
+									<xf:label><![CDATA[결재파일생성]]></xf:label>
+								</xf:trigger>
+								<xf:trigger cursor="pointer" src="../img/bns/btn_20.gif" ev:onclick="scwin.btn_Proc_onclick" style=""
+									id="btn_Proc" class="btn_cm">
+									<xf:label><![CDATA[처리완료]]></xf:label>
+								</xf:trigger>
+								<xf:trigger cursor="pointer" src="../img/bns/btn_modify_n.gif" ev:onclick="scwin.btn_Mod_onclick" style=""
+									id="btn_Mod" class="btn_cm">
+									<xf:label><![CDATA[수정]]></xf:label>
+								</xf:trigger>
+								<xf:trigger cursor="pointer" src="../img/bns/btn_21.gif" ev:onclick="scwin.btn_TeamleadrConfrm_onclick"
+									style="" id="btn_TeamleadrConfrm" class="btn_cm">
+									<xf:label><![CDATA[팀장확인]]></xf:label>
+								</xf:trigger>
+								<xf:trigger cursor="pointer" src="../img/bns/btn_Ret_n.gif" ev:onclick="scwin.btn_Ret2_onclick" style=""
+									id="btn_Ret2" class="btn_cm">
+									<xf:label><![CDATA[반송]]></xf:label>
+								</xf:trigger>
+								<xf:trigger class="btn_cm download" cursor="pointer" ev:onclick="scwin.btn_Excel_onclick" id=""
+									src="../img/bns/btn_excelsave_n.gif" style="" text="엑셀다운로드">
+									<xf:label><![CDATA[엑셀다운로드]]></xf:label>
+								</xf:trigger>
+							</xf:group>
+						</xf:group>
+						<xf:group id="" class="gvwbox">
+							<w2:gridView id="grd_List2"
+								userData2=" class:Grid_01; colsizing:True; editable:True; fillarea:True; fixsizing:True; gtitleheight:0; headborder:4; indwidth:0; rowheight:20; sortview:left; suppressoption:1; titleheight:34; tooltip:use=true; usingoneclick:1; xtitleheight:0; font-family:돋움;"
+								style="height:153px;" dataList="data:dts_List" class="gvw" orgid="grd_List2" hierarchy="tab_List.grd_List2" autoFit="allColumn" ev:onheaderclick="scwin.grd_List2_OnHeadCheckClick">
+								<w2:caption id="caption1" style="" value="this is a grid caption." />
+								<w2:header id="header1" style="">
+									<w2:row>
+										<w2:column id="RNUM" width="50" value="번호" textAlign="center"
+											userData2=" suppress:1; value:{CurRow},{ToString};" displayMode="label" inputType="text" rowspan="2" rowInfo="0" fixColumnWidth="true"/>
+										<w2:column id="CHK" width="50" value="선택"
+											userData2=" editstyle:checkbox; headcheck:False; headcheckshow:True;"
+											hidden="{decode(procs_stat,'처리완료', decode(teamleader_confrm_dd,'-', 'true','false'),'false')}" textAlign="center"
+											displayMode="label" inputType="text" rowspan="2" />
+										<w2:column id="BND_APPL_ID" width="95" value="접수번호" textAlign="center"
+											userData2=" suppress:1; sort:True; edit:none;" displayMode="label" inputType="text" rowspan="2" rowInfo="0" />
+										<w2:column id="ISU_NM" width="186" value="한글종목명" textAlign="center" style="color:#343434;"
+											userData2=" suppress:0; bgcolor:{decode(currow-tointeger(currow/2)*2,0,'#f2f5f9',1,'#ffffff')}; sort:True; edit:none;"
+											displayMode="label" inputType="text" rowspan="2" rowInfo="0" />
+										<w2:column value="표준코드" width="108" id="STD_CD" textAlign="center"
+											userData2=" sort:True; edit:none;" displayMode="label" inputType="text" rowspan="2" rowInfo="0" />
+										<w2:column value="신청내용&lt;/br&gt;(단위: %)" width="190" id="APPL_CONTN" textAlign="center"
+											userData2=" sort:True; edit:none;" displayMode="label" inputType="text" rowspan="2" rowInfo="0" />
+										<w2:column value="금리결정&lt;/br&gt;기준일" width="85" id="INT_RT_DECSN_BAS_DD" textAlign="center"
+											userData2=" sort:True; mask:XXXX-XX-XX; edit:none;" displayMode="label" inputType="text" rowspan="2" rowInfo="0" />
+										<w2:column value="적용&lt;/br&gt;희망일" width="85" id="PROCS_REQ_DD" textAlign="center"
+											userData2=" sort:True; mask:XXXX-XX-XX; edit:none;" displayMode="label" inputType="text" rowspan="2" rowInfo="0" />
+										<w2:column value="처리상태" width="79" id="PROCS_STAT" textAlign="center"
+											userData2=" sort:True; edit:none;" displayMode="label" inputType="text" rowspan="2" rowInfo="0" />
+										<w2:column value="팀장확인" width="128" id="TEAMLEADER_CONFRM_DD" textAlign="center" hidden="false"
+											userData2=" sort:True; edit:none;" displayMode="label" inputType="text" rowspan="2" rowInfo="0" />
+										<w2:column value="신청자&lt;/br&gt;구분" width="85" id="BND_APCT_TP_NM" textAlign="center"
+											userData2=" sort:True; edit:none;" displayMode="label" inputType="text" rowspan="2" rowInfo="0" />
+									</w2:row>
+								</w2:header>
+								<w2:gBody id="gBody1" style="">
+									<w2:row id="" style="">
+										<w2:column id="RNUM" textAlign="center" width="50" inputType="text" displayMode="label" />
+										<w2:column id="CHK" textAlign="center" width="50" inputType="text" displayMode="label" />
+										<w2:column id="BND_APPL_ID" textAlign="center" width="95" inputType="text" displayMode="label" />
+										<w2:column id="ISU_NM" textAlign="default" width="186" inputType="text" displayMode="label" />
+										<w2:column id="STD_CD" textAlign="default" width="108" inputType="text" displayMode="label" />
+										<w2:column id="APPL_CONTN" textAlign="default" width="190" inputType="text" displayMode="label" />
+										<w2:column id="INT_RT_DECSN_BAS_DD" textAlign="center" width="85" inputType="text"
+											displayMode="label" />
+										<w2:column id="PROCS_REQ_DD" textAlign="center" width="85" inputType="text" displayMode="label" />
+										<w2:column id="PROCS_STAT" textAlign="center" width="79" inputType="text" displayMode="label" />
+										<w2:column id="TEAMLEADER_CONFRM_DD" textAlign="center" width="128" inputType="text"
+											displayMode="label" />
+										<w2:column id="BND_APCT_TP_NM" textAlign="center" width="85" inputType="text" displayMode="label" />
+									</w2:row>
+								</w2:gBody>
+							</w2:gridView>
+						</xf:group></w2:content>
+				</w2:tabControl>
+			</xf:group>
+			<xf:group id="pnl_DtlInfo" userData2=" class:TopCondition_01; border-color:black;" style="">
+				<xf:group id="" class="titbox">
+					<xf:group id="" class="rt">
+						<xf:trigger cursor="pointer" src="../img/bns/btn_50.png" ev:onclick="scwin.btn_Attach_List_onclick" style=""
+							id="btn_Attach_List" class="btn_cm">
+							<xf:label><![CDATA[상장신청시 첨부]]></xf:label>
+						</xf:trigger>
+						<xf:trigger cursor="pointer" src="../img/bns/btn_07.gif" ev:onclick="scwin.btn_Attach_onclick" style=""
+							id="btn_Attach" class="btn_cm">
+							<xf:label><![CDATA[첨부파일확인]]></xf:label>
+						</xf:trigger>
+						<xf:trigger cursor="pointer" src="../img/bns/btn_23.gif" ev:onclick="scwin.btn_Dtl_onclick" style="" id="btn_Dtl"
+							class="btn_cm">
+							<xf:label><![CDATA[종목상세내역]]></xf:label>
+						</xf:trigger>
+					</xf:group>
+				</xf:group>
+				<xf:group class="tblbox" id="" meta_snippetCategory="05_입출력테이블" meta_snippetKeyComponent="true"
+					meta_snippetName="5_03 3단테이블" style="">
+					<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+						<w2:attributes>
+							<w2:summary></w2:summary>
+						</w2:attributes>
+						<xf:group tagname="colgroup">
+							<xf:group style="width:120px;" tagname="col"></xf:group>
+							<xf:group style="" tagname="col"></xf:group>
+							<xf:group style="width:120px;" tagname="col"></xf:group>
+							<xf:group style="" tagname="col"></xf:group>
+							<xf:group style="width:120px;" tagname="col"></xf:group>
+							<xf:group style="" tagname="col"></xf:group>
+						</xf:group>
+						<xf:group style="" tagname="tr">
+							<xf:group class="w2tb_th" style="" tagname="th">
+								<w2:textbox id="label_6" label="접수번호" style="" userData2=" class:TopCondition_01;"></w2:textbox>
+							</xf:group>
+							<xf:group class="w2tb_td" style="" tagname="td">
+								<xf:input id="txb_BndApplNo" maxlength="12" readOnly="true" style="width:150px;" tabIndex="2"
+									userData2=" class:TopCondition_01_read;">
+								</xf:input>
+							</xf:group>
+							<xf:group class="w2tb_th " tagname="th">
+								<w2:attributes></w2:attributes>
+								<w2:textbox id="label_3" label="발행기관명" style=""
+									userData2=" class:TopCondition_01; vertical-align:middle;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group class="w2tb_td" tagname="td">
+								<w2:attributes>
+									<w2:colspan>3</w2:colspan>
+									<w2:rowspan>1</w2:rowspan>
+								</w2:attributes>
+								<xf:input id="txb_IsurNm" maxlength="90" readOnly="true" style="width:280px;" tabIndex="3"
+									userData2=" class:TopCondition_01_read;">
+								</xf:input>
+							</xf:group>
+						</xf:group>
+						<xf:group tagname="tr">
+							<xf:group class="w2tb_th " tagname="th">
+								<w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes>
+								<w2:textbox id="label_7" label="표준코드" style="" userData2=" class:TopCondition_01;"></w2:textbox>
+							</xf:group>
+							<xf:group class="w2tb_td" tagname="td">
+								<w2:attributes></w2:attributes>
+								<xf:input id="txb_IsuCd" maxlength="12" readOnly="true" style="width:150px;" tabIndex="4"
+									userData2=" class:TopCondition_01_read;">
+								</xf:input>
+							</xf:group>
+							<xf:group class="w2tb_th " tagname="th">
+								<w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes>
+								<w2:textbox id="label_4" label="한글종목명" style=""
+									userData2=" class:TopCondition_01; vertical-align:middle;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group class="w2tb_td" tagname="td">
+								<w2:attributes>
+									<w2:colspan>3</w2:colspan>
+									<w2:rowspan>1</w2:rowspan>
+								</w2:attributes>
+								<xf:input id="txb_IsuNm" maxlength="80" readOnly="true" style="width:280px;" tabIndex="5"
+									userData2=" class:TopCondition_01_read;">
+								</xf:input>
+							</xf:group>
+						</xf:group>
+						<xf:group tagname="tr">
+							<xf:group class="w2tb_th " tagname="th">
+								<w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes>
+								<w2:textbox id="label_8" label="발행일" style="" userData2=" class:TopCondition_01;"></w2:textbox>
+							</xf:group>
+							<xf:group class="w2tb_td" tagname="td">
+								<w2:attributes></w2:attributes>
+								<w2:inputCalendar displayFormat="yyyy-MM-dd" id="edt_IsuDd" maxlength="8" readOnly="true"
+									style="width:120px;" tabIndex="6"
+									userData2=" class:panel_maskedit_read_02; alignment:1; generaledit:False; leftmargin:0; maxdecimalplace:3; numeric:False; readonlybackcolor:#b9d4f7; readonlyforecolor:#15549c; showliteral:true;">
+								</w2:inputCalendar>
+							</xf:group>
+							<xf:group class="w2tb_th " tagname="th">
+								<w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes>
+								<w2:textbox id="label_5" label="상환일" style="" userData2=" class:TopCondition_01; vertical-align:middle;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group class="w2tb_td" tagname="td">
+								<w2:attributes>
+									<w2:colspan>3</w2:colspan>
+									<w2:rowspan>1</w2:rowspan>
+								</w2:attributes>
+								<w2:inputCalendar displayFormat="yyyy-MM-dd" id="edt_RedmptDd" maxlength="8" readOnly="true"
+									style="width:120px;" tabIndex="7"
+									userData2=" class:panel_maskedit_read_02; alignment:1; generaledit:False; leftmargin:0; maxdecimalplace:3; numeric:False; readonlybackcolor:#b9d4f7; readonlyforecolor:#15549c; showliteral:true;">
+								</w2:inputCalendar>
+							</xf:group>
+						</xf:group>
+						<xf:group tagname="tr">
+							<xf:group tagname="th" class="w2tb_th ">
+								<w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes>
+								<w2:textbox id="label_33" label="발행금액" style="" userData2=" class:TopCondition_01;"></w2:textbox>
+							</xf:group>
+							<xf:group tagname="td" class="w2tb_td">
+								<w2:attributes></w2:attributes>
+								<xf:input id="edt_IsuAmt" maxlength="18" readOnly="true" style="width:150px;" tabIndex="10"
+									userData2=" class:panel_maskedit_read_02; alignment:2; datemodify:True; generaledit:False; maxdecimalplace:0; movecaret:True; numeric:True; readonlybackcolor:#b9d4f7; readonlyforecolor:#15549c; rightmargin:5; selectall:True; showliteral:false; valign:1;"
+									class="tar">
+								</xf:input>
+							</xf:group>
+							<xf:group tagname="th" class="w2tb_th ">
+								<w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes>
+								<w2:textbox id="label_30" label="상장일" style="" userData2=" class:TopCondition_01; vertical-align:middle;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group tagname="td" class="w2tb_td">
+								<w2:attributes>
+									<w2:colspan>3</w2:colspan>
+									<w2:rowspan>1</w2:rowspan>
+								</w2:attributes>
+								<w2:inputCalendar displayFormat="yyyy-MM-dd" id="edt_ListDd" maxlength="8" readOnly="true"
+									style="width:120px;" tabIndex="7"
+									userData2=" class:panel_maskedit_read_02; alignment:1; generaledit:False; leftmargin:0; maxdecimalplace:3; numeric:False; readonlybackcolor:#b9d4f7; readonlyforecolor:#15549c; showliteral:true;">
+								</w2:inputCalendar>
+							</xf:group>
+						</xf:group>
+						<xf:group tagname="tr">
+							<xf:group tagname="th" class="w2tb_th ">
+								<w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes>
+								<w2:textbox id="label_25" label="기준금리" style="" userData2=" class:TopCondition_01;"></w2:textbox>
+							</xf:group>
+							<xf:group tagname="td" class="w2tb_td">
+								<w2:attributes>
+									<w2:colspan>3</w2:colspan>
+									<w2:rowspan>1</w2:rowspan>
+								</w2:attributes>
+								<xf:input id="txb_FrnBasIntTp1" maxlength="12" readOnly="true" style="width:170px;" tabIndex="2"
+									userData2=" class:TopCondition_01_read;">
+								</xf:input>
+								<xf:input id="txb_FrnBasIntTp2" maxlength="12" readOnly="true" style="width:150px;" tabIndex="2"
+									userData2=" class:TopCondition_01_read;">
+								</xf:input>
+								<xf:input id="txb_FrnBasIntTp3" maxlength="12" readOnly="true" style="width:80px;" tabIndex="2"
+									userData2=" class:TopCondition_01_read;">
+								</xf:input>
+								<xf:input id="txb_FrnBasIntTp4" maxlength="12" readOnly="true" style="width:80px;" tabIndex="2"
+									userData2=" class:TopCondition_01_read;">
+								</xf:input>
+								<xf:input id="txb_FrnBasIntMisc" maxlength="12" readOnly="true" style="width:150px;" tabIndex="2"
+									userData2=" class:TopCondition_01_read;">
+								</xf:input>
+							</xf:group>
+							<xf:group tagname="th" class="w2tb_th ">
+								<w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes>
+								<w2:textbox id="label_24" label="가산금리(%)" style="" userData2=" class:TopCondition_01;"></w2:textbox>
+							</xf:group>
+							<xf:group tagname="td" class="w2tb_td">
+								<w2:attributes></w2:attributes>
+								<xf:input id="txb_SpdSgnSpd" maxlength="12" readOnly="true" style="width:100px;" tabIndex="2"
+									userData2=" class:TopCondition_01_read;" class="tar">
+								</xf:input>
+							</xf:group>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+				<xf:group id="" class="titbox">
+					<w2:textbox style="" userData2=" class:TopCondition_01; font-weight:bold;" id="label_26" label="[FRN 변동금리 신청내역]"
+						tagname="h4">
+					</w2:textbox>
+				</xf:group>
+				<xf:group class="tblbox" id="" meta_snippetCategory="05_입출력테이블" meta_snippetKeyComponent="true"
+					meta_snippetName="5_01 1단테이블" style="">
+					<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+						<w2:attributes>
+							<w2:summary></w2:summary>
+						</w2:attributes>
+						<xf:group tagname="colgroup">
+							<xf:group style="width:120px;" tagname="col"></xf:group>
+							<xf:group tagname="col"></xf:group>
+							<xf:group tagname="col"></xf:group>
+							<xf:group tagname="col"></xf:group>
+							<xf:group tagname="col"></xf:group>
+							<xf:group tagname="col"></xf:group>
+							<xf:group tagname="col"></xf:group>
+							<xf:group style="" tagname="col"></xf:group>
+						</xf:group>
+						<xf:group style="" tagname="tr">
+							<xf:group class="w2tb_th" style="" tagname="th"></xf:group>
+							<xf:group class="w2tb_th tac" style="" tagname="th">
+								<w2:textbox id="label_23" label="신고회차" style="" userData2=" class:TopCondition_01; border-color:#000000;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group tagname="th" class="w2tb_th tac">
+								<w2:attributes></w2:attributes>
+								<w2:textbox id="label_1" label="표면이자율(%)" style=""
+									userData2=" class:TopCondition_01; border-color:#000000;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group tagname="th" class="w2tb_th tac">
+								<w2:attributes></w2:attributes>
+								<w2:textbox id="label_10" label="기준금리(%)" style=""
+									userData2=" class:TopCondition_01; border-color:#000000;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group tagname="th" class="w2tb_th tac">
+								<w2:attributes></w2:attributes>
+								<w2:textbox id="label_20" label="가산금리(%)" style=""
+									userData2=" class:TopCondition_01; border-color:#000000;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group tagname="th" class="w2tb_th tac">
+								<w2:attributes></w2:attributes>
+								<w2:textbox id="label_9" label="금리결정기준일" style=""
+									userData2=" class:TopCondition_01; border-color:#000000;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group tagname="th" class="w2tb_th tac">
+								<w2:attributes></w2:attributes>
+								<w2:textbox id="label_19" label="이자지급일" style=""
+									userData2=" class:TopCondition_01; border-color:#000000;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group tagname="th" class="w2tb_th tac">
+								<w2:attributes></w2:attributes>
+								<w2:textbox id="label_2" label="적용일" style="" userData2=" class:TopCondition_01; border-color:#000000;"
+									class="red">
+								</w2:textbox>
+							</xf:group>
+						</xf:group>
+						<xf:group tagname="tr">
+							<xf:group class="w2tb_th " tagname="th">
+								<w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes>
+								<w2:textbox id="label_11" label="변경 전" style="" userData2=" class:TopCondition_01; font-weight:bold;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group class="w2tb_td tac" tagname="td">
+								<w2:attributes>
+									<w2:colspan>1</w2:colspan>
+									<w2:rowspan>1</w2:rowspan>
+								</w2:attributes>
+								<xf:input id="textbox_1" maxlength="12" readOnly="true" style="width:100%;" tabIndex="12"
+									userData2=" class:TopCondition_01_read;" class="tar">
+								</xf:input>
+							</xf:group>
+							<xf:group tagname="td" class="w2tb_td tac">
+								<w2:attributes></w2:attributes>
+								<xf:input ev:onblur="scwin.edt_BfchgCpnIntRt_OnKillFocus" id="edt_BfchgCpnIntRt" maxlength="3"
+									readOnly="true" style="width:100%;" tabIndex="8"
+									userData2=" class:panel_maskedit_read_02; alignment:2; generaledit:False; iscomma:False; leftmargin:0; maxdecimalplace:5; numeric:True; readonlybackcolor:#b9d4f7; readonlyforecolor:#15549c; rightmargin:5;"
+									class="tar">
+								</xf:input>
+							</xf:group>
+							<xf:group tagname="td" class="w2tb_td tac">
+								<w2:attributes></w2:attributes>
+								<xf:input id="edt_BefBasInt" maxlength="3" readOnly="true" style="width:100%;" tabIndex="8"
+									userData2=" class:panel_maskedit_read_02; alignment:2; generaledit:False; iscomma:False; leftmargin:0; maxdecimalplace:5; numeric:True; readonlybackcolor:#b9d4f7; readonlyforecolor:#15549c; rightmargin:5;"
+									class="tar">
+								</xf:input>
+							</xf:group>
+							<xf:group tagname="td" class="w2tb_td tac">
+								<w2:attributes></w2:attributes>
+								<xf:input id="txb_BefSpd" maxlength="12" readOnly="true" style="width:100%;" tabIndex="12"
+									userData2=" class:TopCondition_01_read;" class="tar">
+								</xf:input>
+							</xf:group>
+							<xf:group tagname="td" class="w2tb_td tac">
+								<w2:attributes></w2:attributes>
+								<w2:inputCalendar displayFormat="yyyy-MM-dd" id="edt_BefDecsnBasDd" maxlength="8" readOnly="true"
+									style="width:120px;" tabIndex="7"
+									userData2=" class:panel_maskedit_read_02; alignment:1; generaledit:False; leftmargin:0; maxdecimalplace:3; numeric:False; readonlybackcolor:#b9d4f7; readonlyforecolor:#15549c; showliteral:true;">
+								</w2:inputCalendar>
+							</xf:group>
+							<xf:group tagname="td" class="w2tb_td tac">
+								<w2:attributes></w2:attributes>
+								<w2:inputCalendar displayFormat="yyyy-MM-dd" id="edt_BefIntPayDd" maxlength="8" readOnly="true"
+									style="width:120px;" tabIndex="7"
+									userData2=" class:panel_maskedit_read_02; alignment:1; generaledit:False; leftmargin:0; maxdecimalplace:3; numeric:False; readonlybackcolor:#b9d4f7; readonlyforecolor:#15549c; showliteral:true;">
+								</w2:inputCalendar>
+							</xf:group>
+							<xf:group tagname="td" class="w2tb_td tac">
+								<w2:attributes></w2:attributes>
+								<w2:inputCalendar displayFormat="yyyy-MM-dd" id="edt_BefStrtDd" maxlength="8" readOnly="true"
+									style="width:120px;" tabIndex="7"
+									userData2=" class:panel_maskedit_read_02; alignment:1; generaledit:False; leftmargin:0; maxdecimalplace:3; numeric:False; readonlybackcolor:#b9d4f7; readonlyforecolor:#15549c; showliteral:true;">
+								</w2:inputCalendar>
+							</xf:group>
+						</xf:group>
+						<xf:group tagname="tr">
+							<xf:group class="w2tb_th " tagname="th">
+								<w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes>
+								<w2:textbox id="label_12" label="변경 후" style=""
+									userData2=" class:TopCondition_01; font-weight:bold; border-color:#000000;" class="blue">
+								</w2:textbox>
+							</xf:group>
+							<xf:group class="w2tb_td tac" tagname="td">
+								<w2:attributes></w2:attributes>
+								<xf:input id="txb_IntRtChgSeq" maxlength="12" readOnly="true" style="width:100%;" tabIndex="12"
+									userData2=" class:TopCondition_01_read;" class="tar">
+								</xf:input>
+							</xf:group>
+							<xf:group tagname="td" class="w2tb_td tac">
+								<w2:attributes></w2:attributes>
+								<xf:input ev:onblur="scwin.edt_AfchgCpnIntRt_OnKillFocus" id="edt_AfchgCpnIntRt" maxlength="3"
+									readOnly="false" style="width:100%;" tabIndex="9"
+									userData2=" class:panel_maskedit_write_02; alignment:2; datemodify:True; generaledit:False; inheritcolor:True; iscomma:False; maxdecimalplace:5; numeric:True; readonlybackcolor:#b9d4f7; readonlyforecolor:#15549c; rightmargin:5; selectall:True; showliteral:false; valign:1;"
+									class="tar">
+								</xf:input>
+							</xf:group>
+							<xf:group tagname="td" class="w2tb_td tac">
+								<w2:attributes></w2:attributes>
+								<xf:input id="edt_NxtrdBasInt" maxlength="3" readOnly="false" style="width:100%;" tabIndex="9"
+									userData2=" class:panel_maskedit_write_02; alignment:2; datemodify:True; generaledit:False; iscomma:False; maxdecimalplace:5; numeric:True; readonlybackcolor:#b9d4f7; readonlyforecolor:#15549c; rightmargin:5; selectall:True; showliteral:false; valign:1;"
+									class="tar">
+								</xf:input>
+							</xf:group>
+							<xf:group tagname="td" class="w2tb_td tac">
+								<w2:attributes></w2:attributes>
+								<xf:group id="" class="flex">
+									<xf:select1 selectedData="true" item="^ ,+^+,-^-" appearance="minimal"
+										disabledClass="w2selectbox_disabled" disabled="false" style="width:50px;"
+										userData2=" class:TopCondition_01; bindcolumn:VALUE; listcount:10; listexprformat:TEXT^0^60; searchcolumn:TEXT; synccombodata:False; border-color:#b9d4f7;"
+										id="cmb_SpdSgn" displayMode="label" class="flex_no">
+										<xf:choices>
+											<xf:item>
+												<xf:label><![CDATA[ ]]></xf:label>
+												<xf:value><![CDATA[]]></xf:value>
+											</xf:item>
+											<xf:item>
+												<xf:label><![CDATA[+]]></xf:label>
+												<xf:value><![CDATA[+]]></xf:value>
+											</xf:item>
+											<xf:item>
+												<xf:label><![CDATA[-]]></xf:label>
+												<xf:value><![CDATA[-]]></xf:value>
+											</xf:item>
+										</xf:choices>
+									</xf:select1>
+									<xf:input ev:onblur="scwin.edt_Spd_OnKillFocus" maxlength="3" readOnly="false" style="" tabIndex="11"
+										userData2=" class:panel_maskedit_write_02; alignment:2; datemodify:True; generaledit:False; maxdecimalplace:5; numeric:True; readonlybackcolor:#b9d4f7; readonlyforecolor:#15549c; rightmargin:5; selectall:True; showliteral:false; valign:1;"
+										id="edt_Spd" class="tar">
+									</xf:input>
+								</xf:group>
+							</xf:group>
+							<xf:group tagname="td" class="w2tb_td tac">
+								<w2:attributes></w2:attributes>
+								<w2:inputCalendar displayFormat="yyyy-MM-dd" id="edt_IntRtDecsnBasDd" maxlength="8" style="width:120px;"
+									tabIndex="4"
+									userData2=" class:panel_maskedit_write_01; alignment:1; generaledit:False; numeric:False; readonlybackcolor:#b9d4f7; readonlyforecolor:#15549c; valign:1;">
+								</w2:inputCalendar>
+							</xf:group>
+							<xf:group tagname="td" class="w2tb_td tac">
+								<w2:attributes></w2:attributes>
+								<w2:inputCalendar displayFormat="yyyy-MM-dd" id="edt_IntPayDd" maxlength="8" style="width:120px;"
+									tabIndex="4"
+									userData2=" class:panel_maskedit_write_01; alignment:1; generaledit:False; numeric:False; readonlybackcolor:#b9d4f7; readonlyforecolor:#15549c; valign:1;">
+								</w2:inputCalendar>
+							</xf:group>
+							<xf:group tagname="td" class="w2tb_td tac">
+								<w2:attributes></w2:attributes>
+								<w2:inputCalendar displayFormat="yyyy-MM-dd" id="edt_StrtDd" maxlength="8" style="width:120px;" tabIndex="1"
+									userData2=" class:panel_maskedit_write_01; alignment:1; generaledit:False; leftmargin:0; numeric:False; readonlybackcolor:#b9d4f7;">
+								</w2:inputCalendar>
+							</xf:group>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+				<xf:group id="" class="titbox">
+					<w2:textbox style="" userData2=" class:TopCondition_01; font-weight:bold; cursor:auto;" id="label_13"
+						label="[※ 참조(코스콤 데이터)]" tagname="h4" class="blue">
+					</w2:textbox>
+				</xf:group>
+				<xf:group class="tblbox" id="" meta_snippetCategory="05_입출력테이블" meta_snippetKeyComponent="true"
+					meta_snippetName="5_01 1단테이블" style="">
+					<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+						<w2:attributes>
+							<w2:summary></w2:summary>
+						</w2:attributes>
+						<xf:group tagname="colgroup">
+							<xf:group style="" tagname="col"></xf:group>
+							<xf:group tagname="col"></xf:group>
+							<xf:group tagname="col"></xf:group>
+							<xf:group tagname="col"></xf:group>
+							<xf:group tagname="col"></xf:group>
+							<xf:group tagname="col"></xf:group>
+							<xf:group style="" tagname="col"></xf:group>
+						</xf:group>
+						<xf:group style="" tagname="tr">
+							<xf:group class="w2tb_th tac" style="" tagname="th">
+								<w2:textbox id="label_27" label="기준일" style="" userData2=" class:TopCondition_01; border-color:#000000;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group class="w2tb_th tac" style="" tagname="th">
+								<w2:textbox id="label_18" label="표면이자율(%)" style=""
+									userData2=" class:TopCondition_01; border-color:#000000;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group tagname="th" class="w2tb_th tac">
+								<w2:attributes></w2:attributes>
+								<w2:textbox id="label_21" label="기준금리(%)" style=""
+									userData2=" class:TopCondition_01; border-color:#000000;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group tagname="th" class="w2tb_th tac">
+								<w2:attributes></w2:attributes>
+								<w2:textbox id="label_16" label="가산금리(%)" style=""
+									userData2=" class:TopCondition_01; border-color:#000000;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group tagname="th" class="w2tb_th tac">
+								<w2:attributes></w2:attributes>
+								<w2:textbox id="label_17" label="금리결정기준일" style=""
+									userData2=" class:TopCondition_01; border-color:#000000;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group tagname="th" class="w2tb_th tac">
+								<w2:attributes></w2:attributes>
+								<w2:textbox id="label_15" label="이자지급일" style=""
+									userData2=" class:TopCondition_01; border-color:#000000;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group tagname="th" class="w2tb_th tac">
+								<w2:attributes></w2:attributes>
+								<w2:textbox id="label_14" label="기준금리명" style=""
+									userData2=" class:TopCondition_01; border-color:#000000;">
+								</w2:textbox>
+							</xf:group>
+						</xf:group>
+						<xf:group tagname="tr">
+							<xf:group class="w2tb_td tac" tagname="td">
+								<w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes>
+								<w2:inputCalendar displayFormat="yyyy-MM-dd" id="edt_KscRcvDd" maxlength="8" readOnly="true"
+									style="width:120px;" tabIndex="7"
+									userData2=" class:panel_maskedit_read_02; alignment:1; generaledit:False; leftmargin:0; maxdecimalplace:3; numeric:False; readonlybackcolor:#b9d4f7; readonlyforecolor:#15549c; showliteral:true;">
+								</w2:inputCalendar>
+							</xf:group>
+							<xf:group class="w2tb_td tac" tagname="td">
+								<w2:attributes>
+									<w2:colspan>1</w2:colspan>
+									<w2:rowspan>1</w2:rowspan>
+								</w2:attributes>
+								<xf:input id="edt_KscFaceInt" maxlength="3" readOnly="true" style="width:100%;" tabIndex="8"
+									userData2=" class:panel_maskedit_read_02; alignment:2; generaledit:False; inheritcolor:True; iscomma:False; leftmargin:0; maxdecimalplace:5; numeric:True; readonlybackcolor:#b9d4f7; readonlyforecolor:#15549c; rightmargin:5;"
+									class="tar">
+								</xf:input>
+							</xf:group>
+							<xf:group tagname="td" class="w2tb_td tac">
+								<w2:attributes></w2:attributes>
+								<xf:input id="edt_KscBasInt" maxlength="3" readOnly="true" style="width:100%;" tabIndex="8"
+									userData2=" class:panel_maskedit_read_02; alignment:2; generaledit:False; iscomma:False; leftmargin:0; maxdecimalplace:5; numeric:True; readonlybackcolor:#b9d4f7; readonlyforecolor:#15549c; rightmargin:5;"
+									class="tar">
+								</xf:input>
+							</xf:group>
+							<xf:group tagname="td" class="w2tb_td tac">
+								<w2:attributes></w2:attributes>
+								<xf:input id="txb_KscSpd" maxlength="12" readOnly="true" style="width:100%;" tabIndex="12"
+									userData2=" class:TopCondition_01_read;" class="tar">
+								</xf:input>
+							</xf:group>
+							<xf:group tagname="td" class="w2tb_td tac">
+								<w2:attributes></w2:attributes>
+								<w2:inputCalendar displayFormat="yyyy-MM-dd" id="edt_KscDecsnBasDd" maxlength="8" readOnly="true"
+									style="width:120px;" tabIndex="7"
+									userData2=" class:panel_maskedit_read_02; alignment:1; generaledit:False; leftmargin:0; maxdecimalplace:3; numeric:False; readonlybackcolor:#b9d4f7; readonlyforecolor:#15549c; showliteral:true;">
+								</w2:inputCalendar>
+							</xf:group>
+							<xf:group tagname="td" class="w2tb_td tac">
+								<w2:attributes></w2:attributes>
+								<w2:inputCalendar displayFormat="yyyy-MM-dd" id="edt_KscIntPayDd" maxlength="8" readOnly="true"
+									style="width:120px;" tabIndex="7"
+									userData2=" class:panel_maskedit_read_02; alignment:1; generaledit:False; leftmargin:0; maxdecimalplace:3; numeric:False; readonlybackcolor:#b9d4f7; readonlyforecolor:#15549c; showliteral:true;">
+								</w2:inputCalendar>
+							</xf:group>
+							<xf:group tagname="td" class="w2tb_td tac">
+								<w2:attributes></w2:attributes>
+								<xf:input id="txb_IntTpVal" maxlength="12" readOnly="true" style="width:100%;" tabIndex="2"
+									userData2=" class:TopCondition_01_read;">
+								</xf:input>
+							</xf:group>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+				<xf:group id="" class="titbox"><w2:textbox style="" userData2=" class:TopCondition_01; font-weight:bold;" id="label_22" label="[상장법인 신고 담당자]" tagname="h4">
+				</w2:textbox></xf:group><xf:group id="" class="gvwbox">
+					<w2:gridView id="grd_List3"
+						userData2=" class:Grid_01; borderstyle:0; colsizing:True; editable:False; fillarea:True; fixsizing:True; gtitleheight:0; headborder:4; hiddenhscroll:False; hiddenvscroll:True; indwidth:0; sortview:left; titleheight:32; useonecolumnscroll:False; usingoneclick:1; xtitleheight:0; font-family:돋움체; font-weight:normal; border-color:#c0c0c0;"
+						style="height:153px;" dataList="data:dts_BdchrgList" class="gvw" orgid="grd_List3" hierarchy="grd_List3" autoFit="allColumn">
+						<w2:caption id="caption1" style="" value="this is a grid caption." />
+						<w2:header id="header1" style="">
+							<w2:row>
+								<w2:column id="ISUR_NM" value="상장법인" textAlign="center" width="195" userData2=" edit:none;"
+									displayMode="label" inputType="text" rowspan="2" rowInfo="0" />
+								<w2:column id="BDCHRG_TP_NM" value="구분" textAlign="center" width="192" userData2=" edit:none;"
+									displayMode="label" inputType="text" rowspan="2" rowInfo="0" />
+								<w2:column id="CHRG_NM" value="이름" textAlign="center" width="195" userData2=" edit:none;"
+									displayMode="label" inputType="text" rowspan="2" rowInfo="0" />
+								<w2:column id="JOBPOS_NM" value="직책" textAlign="center" width="195" userData2=" edit:none;"
+									displayMode="label" inputType="text" rowspan="2" rowInfo="0" />
+								<w2:column id="TEL_NO" value="전화번호" textAlign="center" width="195" userData2=" edit:none;"
+									displayMode="label" inputType="text" rowspan="2" rowInfo="0" />
+								<w2:column id="CELLPHONE_NO" value="휴대전화번호" textAlign="center" width="195" userData2=" edit:none;"
+									displayMode="label" inputType="text" rowspan="2" rowInfo="0" />
+							</w2:row>
+						</w2:header>
+						<w2:gBody id="gBody1" style="">
+							<w2:row id="" style="">
+								<w2:column id="ISUR_NM" textAlign="center" width="195" inputType="text" displayMode="label" />
+								<w2:column id="BDCHRG_TP_NM" textAlign="center" width="192" inputType="text" displayMode="label" />
+								<w2:column id="CHRG_NM" textAlign="center" width="195" inputType="text" displayMode="label" />
+								<w2:column id="JOBPOS_NM" textAlign="center" width="195" inputType="text" displayMode="label" />
+								<w2:column id="TEL_NO" textAlign="center" width="195" inputType="text" displayMode="label" />
+								<w2:column id="CELLPHONE_NO" textAlign="center" width="195" inputType="text" displayMode="label" />
+							</w2:row>
+						</w2:gBody>
+					</w2:gridView>
+				</xf:group>
+			</xf:group>
+		</xf:group>
+		<xf:events>
+			<xf:event userData2=" for:gform; eventname:onload;"/>
+			<xf:event userData2=" for:tab_List; eventname:OnSelChanged(nIndex);"/>
+			<xf:event userData2=" for:dts_List; eventname:OnLoadError();"/>
+			<xf:event userData2=" for:dts_List; eventname:OnLoadCompleted(rowcount);"/>
+			<xf:event userData2=" for:dts_List; eventname:OnRowPosChanged(row);"/>
+			<xf:event userData2=" for:grd_List2; eventname:OnHeadCheckClick(col, colid, bCheck);"/>
+			<xf:event userData2=" for:dts_DtlInfo; eventname:OnLoadError();"/>
+			<xf:event userData2=" for:dts_DtlInfo; eventname:OnLoadCompleted(rowcount);"/>
+			<xf:event userData2=" for:img_StrtDd; eventname:onclick;"/>
+			<xf:event userData2=" for:img_BasDd; eventname:onclick;"/>
+			<xf:event userData2=" for:img_PayDd; eventname:onclick;"/>
+			<xf:event userData2=" for:btn_Acpt; eventname:onclick;"/>
+			<xf:event userData2=" for:btn_Ret; eventname:onclick;"/>
+			<xf:event userData2=" for:btn_Ret2; eventname:onclick;"/>
+			<xf:event userData2=" for:btn_Attach; eventname:onclick;"/>
+			<xf:event userData2=" for:btn_Attach_List; eventname:onclick;"/>
+			<xf:event userData2=" for:btn_Dtl; eventname:onclick;"/>
+			<xf:event userData2=" for:btn_ApprovFileCreat; eventname:onclick;"/>
+			<xf:event userData2=" for:btn_Proc; eventname:onclick;"/>
+			<xf:event userData2=" for:btn_Mod; eventname:onclick;"/>
+			<xf:event userData2=" for:btn_TeamleadrConfrm; eventname:onclick;"/>
+			<xf:event userData2=" for:trs_Save; eventname:OnFail();"/>
+			<xf:event userData2=" for:trs_Save; eventname:OnSuccess();"/>
+			<xf:event userData2=" for:edt_BfchgCpnIntRt; eventname:OnKillFocus();"/>
+			<xf:event userData2=" for:edt_AfchgCpnIntRt; eventname:OnKillFocus();"/>
+			<xf:event userData2=" for:edt_Spd; eventname:OnKillFocus();"/>
+			<xf:event userData2=" for:btn_Excel; eventname:onclick;"/>
+			<xf:event userData2=" for:btn_Search; eventname:onclick;"/>
+			<xf:event userData2=" for:btn_Search2; eventname:onclick;"/>
+		</xf:events>
+	</body>
+</html>

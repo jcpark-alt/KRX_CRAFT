@@ -1,0 +1,574 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDSTF05814.gfm" meta_screenName="(팝업)세그먼트 관리상세(신규상장)A">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<xf:model>
+			<w2:workflowCollection/>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+/* ★Wcraft guide★    
+스크립트 수작업 유의사항
+*/
+
+
+//★Wcraft guide★ include부분 주석처리 -> include("../js/libRoundPanel.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/stf.js");
+// showObj(ObjID, flag) SetWindowPos(ObjID, nTop, nLeft, nWidth, nHeight)
+//★Wcraft guide★ include부분 주석처리 -> include("../js/utils.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/session.js");
+// 세션정보를 얻기위한 함수사용
+//★Wcraft guide★ include부분 주석처리 -> include("../js/list_common.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/common.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/buttonSet.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/PopupCalendar.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/json2.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/report.js");
+scwin.vScrenID = "ULDSTF05814.xml";
+scwin.vBzProcsNo;
+scwin.TR_JOB;
+scwin.isExist = false;
+scwin.vSEG_CHG_TP_CD = "04";
+scwin.chbArr = ["1_1_1", "1_1_2", "1_2_1", "1_2_2", "1_2_3", "1_2_4", "2_1"];
+scwin.onpageload = function() {
+    scwin.gform_onload();
+};
+scwin.onpageunload = function() {
+};
+scwin.fn_cond_read_sync = function() {
+    var url = "/SegmentChange.do?SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01 + "&method=readSegmentCond&inputMessageId=SEG_COND_INOUT";
+    url += "&BZ_PROCS_NO=" + scwin.vBzProcsNo;
+    dts_Condition.DataID = encodeURI(url);
+    dts_Condition.Reset();
+    if (dts_Condition.getTotalRow() > 0) {
+        scwin.isExist = true;
+    }
+    scwin.readCondDataSet();
+};
+scwin.fn_save = function() {
+    scwin.TR_JOB = 'I';
+    if (!$c.lc.fn_isProcess(scwin.TR_JOB)) return;
+    scwin.fn_trs(TR_JOB_INSERT);
+};
+scwin.fn_delete = function() {
+    if (scwin.isExist) {
+        scwin.TR_JOB = 'D';
+        if (!$c.lc.fn_isProcess(scwin.TR_JOB)) return;
+        buttonSet.setDeleteStatus();
+        scwin.fn_trs(TR_JOB_DELETE);
+    } else {
+        $c.win.alert("삭제할 데이터가 없습니다.");
+    }
+};
+scwin.fn_trs = function(jobType) {
+    var vScrenProcTpCd;
+    if (scwin.TR_JOB == "I") {
+        vScrenProcTpCd = SCREN_PROCS_TP_CD_02;
+    } else if (scwin.TR_JOB == "U") {
+        vScrenProcTpCd = SCREN_PROCS_TP_CD_03;
+    } else if (scwin.TR_JOB == "D") {
+        vScrenProcTpCd = SCREN_PROCS_TP_CD_04;
+    }
+    scwin.setCondition(jobType);
+    trs_Save.Action = $c.lc.fn_encodeNSession("/SegmentChange.do?SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + vScrenProcTpCd + "&method=saveCondSegment");
+    trs_Save.KeyName = "toinb_dataid4";
+    trs_Save.KeyValue = "JSP(I:pCond=dts_newCondition)";
+    trs_Save.Post();
+};
+
+
+/*
+ * 충족 해당/미해당 체크박스 처리
+ */
+scwin.fn_clickCheck = function(chkObj) {
+    var chkId = chkObj.id;
+    var childChkId, repChildChkId;
+    if (chkObj.checked == true) {
+        //체크되었을때만			
+        var repChkId;
+        var repChkObj;
+        if (chkId.indexOf("Y") > 1) {
+            repChkId = chkId.replace("Y", "N");
+        } else {
+            repChkId = chkId.replace("N", "Y");
+        }
+        repChkObj = eval(repChkId);
+        repChkObj.setValue("");
+    }
+};
+
+
+
+/*
+ * 충족요건 데이터셋 셋팅 처리
+ */
+scwin.setCondition = function(jobType) {
+    var chkYId, chkNId = "";
+    var chkYObj, chkNObj;
+    var condArr;
+    var satisYn = "Y";
+    //dts_newCondition.setDataHeader(); // W-Craft 주석처리 및 필요시 asis 파라미터 확인 
+    for (var i = 0, j = scwin.chbArr.length; i < j; i++) {
+        chkYId = "chb_Y_" + scwin.chbArr[i];
+        chkNId = "chb_N_" + scwin.chbArr[i];
+        chkYObj = eval(chkYId);
+        chkNObj = eval(chkNId);
+        if (chkYObj.checked) {
+            condArr = (chkYId.replace("chb_Y_", "")).split("_");
+            scwin.setCondDataset(dts_newCondition, condArr, "Y");
+        } else {
+            condArr = (chkNId.replace("chb_N_", "")).split("_");
+            scwin.setCondDataset(dts_newCondition, condArr, "N");
+        }
+        dts_newCondition.setCellData(i, "JOB_TYPE", jobType);
+    }
+};
+
+
+
+/*
+ * 충족요건 데이터셋 설정
+ */
+scwin.setCondDataset = function(dataSet, condArr, satisYn) {
+    dataSet.AddRow();
+    dataSet.setCellData(dataSet.getTotalRow(), "BZ_PROCS_NO", scwin.vBzProcsNo);
+    dataSet.setCellData(dataSet.getTotalRow(), "SEQ", dataSet.getTotalRow());
+    dataSet.setCellData(dataSet.getTotalRow(), "SEG_CHG_TP_CD", scwin.vSEG_CHG_TP_CD);
+    dataSet.setCellData(dataSet.getTotalRow(), "COND_SATISFACT_YN", satisYn);
+    if (condArr.length == 2) {
+        dataSet.setCellData(dataSet.getTotalRow(), "UPCLSS_ID", condArr[0]);
+        dataSet.setCellData(dataSet.getTotalRow(), "MIDCLSS_ID", condArr[1]);
+    } else {
+        dataSet.setCellData(dataSet.getTotalRow(), "UPCLSS_ID", condArr[0]);
+        dataSet.setCellData(dataSet.getTotalRow(), "MIDCLSS_ID", condArr[1]);
+        dataSet.setCellData(dataSet.getTotalRow(), "LWCLSS_ID", condArr[2]);
+    }
+};
+scwin.readCondDataSet = function() {
+    var upclssId, midclssId, lwClssId, satisYn;
+    var chbId, chbObj;
+    if (dts_Condition.getTotalRow() > 0) {
+        for (var i = 1, j = dts_Condition.getTotalRow(); i <= j; i++) {
+            upclssId = dts_Condition.getCellData(i, "UPCLSS_ID");
+            midclssId = dts_Condition.getCellData(i, "MIDCLSS_ID");
+            lwClssId = dts_Condition.getCellData(i, "LWCLSS_ID");
+            satisYn = dts_Condition.getCellData(i, "COND_SATISFACT_YN");
+            chbId = "chb_" + satisYn + "_" + upclssId + "_" + midclssId;
+            if (lwClssId.length > 0) {
+                chbId = chbId + "_" + lwClssId;
+            }
+            chbObj = eval(chbId);
+            chbObj.setValue(1);
+            if (satisYn == "Y") {
+                chbObj = eval(chbId.replace("Y", "N"));
+                chbObj.setValue("");
+            } else {
+                chbObj = eval(chbId.replace("N", "Y"));
+                chbObj.setValue("");
+            }
+        }
+    }
+};
+scwin.trs_Save_OnFail = function() {
+    $c.lc.fn_alertMsg('F');
+};
+scwin.trs_Save_OnSuccess = async function() {
+    $c.lc.fn_alertMsg('S');
+    if (buttonSet.status == "D") {
+        // 삭제처리의 응답인 경우
+        await $c.frame.CloseFrame();
+    } else {
+        scwin.fn_cond_read_sync();
+    }
+};
+scwin.gform_onload = function() {
+    var parentWin = $c.frame.path("../");
+    if (parentWin.scwin.vScrenID == "ULDSTF05006.gfm" || parentWin.scwin.vScrenID == "ULDSTF05007.gfm") {
+        //신규상장에서 호출
+        scwin.vBzProcsNo = parentWin.scwin.vBzProcsNo;
+    } else {
+        $c.stf.showObj(btn_Save, false);
+        $c.stf.showObj(btn_Delete, false);
+        var dstObj = parentWin.dts_List_2;
+        var row = dstObj.getFocusedRowIndex();
+        scwin.vBzProcsNo = dstObj.getCellData(row, "PRELM_INVSTG_BZ_PROCS_NO");
+    }
+    /* buttonSet의 초기화를 수행한다.  각 용도에 맞게 이미지ID와 onclick event시 수행할 function을 지정한다. */
+    buttonSet.setSaveInfo(btn_Save, fn_save); // 저장
+    buttonSet.setDeleteInfo(btn_Delete, fn_delete); // 삭제
+
+    scwin.fn_cond_read_sync();
+};
+scwin.chb_Y_1_1_1_onclick = function() {
+    scwin.fn_clickCheck(chb_Y_1_1_1);
+};
+scwin.chb_Y_1_1_2_onclick = function() {
+    scwin.fn_clickCheck(chb_Y_1_1_2);
+};
+scwin.chb_N_1_1_2_onclick = function() {
+    scwin.fn_clickCheck(chb_N_1_1_2);
+};
+scwin.chb_Y_1_2_1_onclick = function() {
+    scwin.fn_clickCheck(chb_Y_1_2_1);
+};
+scwin.chb_N_1_2_1_onclick = function() {
+    scwin.fn_clickCheck(chb_N_1_2_1);
+};
+scwin.chb_Y_1_2_3_onclick = function() {
+    scwin.fn_clickCheck(chb_Y_1_2_3);
+};
+scwin.chb_N_1_2_3_onclick = function() {
+    scwin.fn_clickCheck(chb_N_1_2_3);
+};
+scwin.chb_Y_1_2_4_onclick = function() {
+    scwin.fn_clickCheck(chb_Y_1_2_4);
+};
+scwin.chb_N_1_2_4_onclick = function() {
+    scwin.fn_clickCheck(chb_N_1_2_4);
+};
+scwin.chb_Y_2_1_onclick = function() {
+    scwin.fn_clickCheck(chb_Y_2_1);
+};
+scwin.chb_N_2_1_onclick = function() {
+    scwin.fn_clickCheck(chb_Y_2_2);
+};
+scwin.chb_N_1_1_1_onclick = function() {
+    scwin.fn_clickCheck(chb_N_1_1_1);
+};
+scwin.chb_Y_1_2_2_onclick = function() {
+    scwin.fn_clickCheck(chb_Y_1_2_2);
+};
+scwin.chb_N_1_2_2_onclick = function() {
+    scwin.fn_clickCheck(chb_N_1_2_2);
+};
+scwin.btn_Close_onclick = async function() {
+    await $c.frame.CloseFrame();
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+		<xf:group class="sub_contents" id="" meta_componentContainer="true" style="">
+			<xf:group class="tblbox" id="" style="">
+				<xf:group adaptive="layout" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+					<w2:attributes>
+						<w2:summary></w2:summary>
+					</w2:attributes>
+					<xf:group tagname="colgroup">
+						<xf:group tagname="col" style="width:100.00px;"></xf:group>
+						<xf:group style="width:110px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+						<xf:group style="width:145px;" tagname="col"></xf:group>
+					</xf:group>
+					<xf:group tagname="tr" style="">
+						<xf:group tagname="th" class="w2tb_th  tac">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_2" id="label_2" label="구분" orgid="label_2" style=""
+								userData2=" class:TopCondition_01; border-color:#ece9d8;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th  tac">
+							<w2:attributes>
+								<w2:colspan>2</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_1" id="label_1" label="요건" orgid="label_1" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th  tac">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_3" id="label_3" label="충족" orgid="label_3" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="td" class="w2tb_td  tac">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+								<w2:colspan>1</w2:colspan>
+								<w2:rowspan>6</w2:rowspan>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_5" id="label_5" label="시장평가&lt;br/&gt;및&lt;br/&gt;경영실적&lt;br/&gt;(① OR ②)"
+								orgid="label_5" style="" userData2=" class:TopCondition_01; border-color:#FFFFFF;" escape="false">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td  tac">
+							<w2:attributes>
+								<w2:colspan>1</w2:colspan>
+								<w2:rowspan>2</w2:rowspan>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_10" id="label_10" label="① 기준시총&lt;br/&gt;5,000억원 이상" orgid="label_10" style=""
+								userData2=" class:TopCondition_01; border-color:#FFFFFF;" escape="false">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<xf:group id="">
+								<w2:textbox hierarchy="label_12" style="" userData2=" class:TopCondition_01; border-color:#C0C0C0;"
+									id="label_12" label=" 1) 매출 3,000억원 이상" orgid="label_12">
+								</w2:textbox>
+							</xf:group>
+							<xf:group id="">
+								<w2:textbox hierarchy="label_13" style="" userData2=" class:TopCondition_01; border-color:#C0C0C0;"
+									id="label_13" label="  * 최근 및 최근 3사업연도 평균 모두 충족" orgid="label_13">
+								</w2:textbox>
+							</xf:group>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+						<xf:group id="" class="flex"><xf:select selectedData="true" item="1^" hierarchy="chb_Y_1_1_1" userData2=" border-width:0; border-color:#1d507f;" rows="" displayMode="label" orgid="chb_Y_1_1_1" ref="" appearance="full" disabledClass="w2selectbox_disabled" ev:onclick="scwin.chb_Y_1_1_1_onclick" style="" id="chb_Y_1_1_1" renderType="checkboxgroup" cols="">
+								<xf:choices>
+									<xf:item>
+										<xf:label><![CDATA[해당]]></xf:label>
+										<xf:value><![CDATA[1]]></xf:value>
+									</xf:item>
+								</xf:choices>
+							</xf:select><w2:textbox hierarchy="label_65" style="" userData2=" class:Blue_Normal; font-family:돋움체; border-color:#C0C0C0;" id="" label="/" orgid="label_65">
+							</w2:textbox><xf:select selectedData="true" item="1^" appearance="full" disabledClass="w2selectbox_disabled" ev:onclick="scwin.chb_N_1_1_1_onclick" hierarchy="chb_N_1_1_1" style="" userData2=" checked:checked; border-width:0; border-color:#1d507f;" id="chb_N_1_1_1" renderType="checkboxgroup" displayMode="label" orgid="chb_N_1_1_1">
+								<xf:choices>
+									<xf:item>
+										<xf:label><![CDATA[미해당]]></xf:label>
+										<xf:value><![CDATA[1]]></xf:value>
+									</xf:item>
+								</xf:choices>
+							</xf:select></xf:group></xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<xf:group id="">
+								<w2:textbox hierarchy="label_14" style="" userData2=" class:TopCondition_01; border-color:#C0C0C0;"
+									id="label_14" label=" 2) 영업이익 300억원 이상* &amp; 최근년도 법인세비용차감전계속이익 시현" orgid="label_14">
+								</w2:textbox>
+							</xf:group>
+							<xf:group id="">
+								<w2:textbox hierarchy="label_15" style="" userData2=" class:TopCondition_01; border-color:#C0C0C0;"
+									id="label_15" label="  * 최근 및 최근 3사업연도 평균 모두 충족" orgid="label_15">
+								</w2:textbox>
+							</xf:group>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+						<xf:group id="" class="flex"><xf:select selectedData="true" item="1^" appearance="full" disabledClass="w2selectbox_disabled" ev:onclick="scwin.chb_Y_1_1_2_onclick" hierarchy="chb_Y_1_1_2" style="" userData2=" border-width:0; border-color:#1d507f;" id="chb_Y_1_1_2" renderType="checkboxgroup" displayMode="label" orgid="chb_Y_1_1_2">
+								<xf:choices>
+									<xf:item>
+										<xf:label><![CDATA[해당]]></xf:label>
+										<xf:value><![CDATA[1]]></xf:value>
+									</xf:item>
+								</xf:choices>
+							</xf:select><w2:textbox hierarchy="label_65" style="" userData2=" class:Blue_Normal; font-family:돋움체; border-color:#C0C0C0;" id="" label="/" orgid="label_65">
+							</w2:textbox><xf:select selectedData="true" item="1^" appearance="full" disabledClass="w2selectbox_disabled" ev:onclick="scwin.chb_N_1_1_2_onclick" hierarchy="chb_N_1_1_2" style="" userData2=" checked:checked; border-width:0; border-color:#1d507f;" id="chb_N_1_1_2" renderType="checkboxgroup" displayMode="label" orgid="chb_N_1_1_2">
+								<xf:choices>
+									<xf:item>
+										<xf:label><![CDATA[미해당]]></xf:label>
+										<xf:value><![CDATA[1]]></xf:value>
+									</xf:item>
+								</xf:choices>
+							</xf:select></xf:group></xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="td" class="w2tb_td  tac">
+							<w2:attributes></w2:attributes>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_25" id="label_25" label=" 임상 1상 이상 복수 후보물질 보유" orgid="label_25" style=""
+								userData2=" class:TopCondition_01; border-color:#C0C0C0;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+						<xf:group id="" class="flex"><xf:select selectedData="true" item="1^" appearance="full" disabledClass="w2selectbox_disabled" ev:onclick="scwin.chb_Y_1_2_1_onclick" hierarchy="chb_Y_1_2_1" style="" userData2=" border-width:0; border-color:#1d507f;" id="chb_Y_1_2_1" renderType="checkboxgroup" displayMode="label" orgid="chb_Y_1_2_1">
+								<xf:choices>
+									<xf:item>
+										<xf:label><![CDATA[해당]]></xf:label>
+										<xf:value><![CDATA[1]]></xf:value>
+									</xf:item>
+								</xf:choices>
+							</xf:select><w2:textbox hierarchy="label_65" style="" userData2=" class:Blue_Normal; font-family:돋움체; border-color:#C0C0C0;" id="" label="/" orgid="label_65">
+							</w2:textbox><xf:select selectedData="true" item="1^" appearance="full" disabledClass="w2selectbox_disabled" ev:onclick="scwin.chb_N_1_2_1_onclick" hierarchy="chb_N_1_2_1" style="" userData2=" checked:checked; border-width:0; border-color:#1d507f;" id="chb_N_1_2_1" renderType="checkboxgroup" displayMode="label" orgid="chb_N_1_2_1">
+								<xf:choices>
+									<xf:item>
+										<xf:label><![CDATA[미해당]]></xf:label>
+										<xf:value><![CDATA[1]]></xf:value>
+									</xf:item>
+								</xf:choices>
+							</xf:select></xf:group></xf:group>
+					</xf:group>
+					<xf:group tagname="tr" style="">
+						<xf:group tagname="td" class="w2tb_td  tac">
+							<w2:attributes>
+								<w2:colspan>1</w2:colspan>
+								<w2:rowspan>3</w2:rowspan>
+							</w2:attributes>
+							<w2:textbox escape="false" hierarchy="label_17" id="label_17"
+								label="② 기준시총&lt;br/&gt;1조원 &amp;&lt;br/&gt;자기자본&lt;br/&gt;1,000억원 이상" orgid="label_17" style=""
+								userData2=" class:TopCondition_01; border-color:#FFFFFF;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<w2:textbox hierarchy="label_26" id="label_26" label=" 1) 10년 국내·외 신약허가(개량제외)" orgid="label_26" style=""
+								userData2=" class:TopCondition_01; border-color:#C0C0C0;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+						<xf:group id="" class="flex"><xf:select selectedData="true" item="1^" appearance="full" disabledClass="w2selectbox_disabled" ev:onclick="scwin.chb_Y_1_2_2_onclick" hierarchy="chb_Y_1_2_2" style="" userData2=" border-width:0; border-color:#1d507f;" id="chb_Y_1_2_2" renderType="checkboxgroup" displayMode="label" orgid="chb_Y_1_2_2">
+								<xf:choices>
+									<xf:item>
+										<xf:label><![CDATA[해당]]></xf:label>
+										<xf:value><![CDATA[1]]></xf:value>
+									</xf:item>
+								</xf:choices>
+							</xf:select><w2:textbox hierarchy="label_32" style="" userData2=" class:Blue_Normal; font-family:돋움체; border-color:#C0C0C0;" id="" label="/" orgid="label_32">
+							</w2:textbox><xf:select selectedData="true" item="1^" appearance="full" disabledClass="w2selectbox_disabled" ev:onclick="scwin.chb_N_1_2_2_onclick" hierarchy="chb_N_1_2_2" style="" userData2=" checked:checked; border-width:0; border-color:#1d507f;" id="chb_N_1_2_2" renderType="checkboxgroup" displayMode="label" orgid="chb_N_1_2_2">
+								<xf:choices>
+									<xf:item>
+										<xf:label><![CDATA[미해당]]></xf:label>
+										<xf:value><![CDATA[1]]></xf:value>
+									</xf:item>
+								</xf:choices>
+							</xf:select></xf:group></xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:group id="">
+								<w2:textbox hierarchy="label_27" style="" userData2=" class:TopCondition_01; border-color:#C0C0C0;"
+									id="label_27" label=" 2) 최근 2년 L/O 매출합계 100억 이상" orgid="label_27">
+								</w2:textbox>
+							</xf:group>
+							<xf:group id="">
+								<w2:textbox hierarchy="label_20" style="" userData2=" class:TopCondition_01; border-color:#C0C0C0;"
+									id="label_20" label="    (글로벌 TOP 20사 매출은 100억원 미만 가능)" orgid="label_20">
+								</w2:textbox>
+							</xf:group>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+						<xf:group id="" class="flex"><xf:select selectedData="true" item="1^" appearance="full" disabledClass="w2selectbox_disabled" ev:onclick="scwin.chb_Y_1_2_3_onclick" hierarchy="chb_Y_1_2_3" style="" userData2=" border-width:0; border-color:#1d507f;" id="chb_Y_1_2_3" renderType="checkboxgroup" displayMode="label" orgid="chb_Y_1_2_3">
+								<xf:choices>
+									<xf:item>
+										<xf:label><![CDATA[해당]]></xf:label>
+										<xf:value><![CDATA[1]]></xf:value>
+									</xf:item>
+								</xf:choices>
+							</xf:select><w2:textbox hierarchy="label_69" style="" userData2=" class:Blue_Normal; font-family:돋움체; border-color:#C0C0C0;" id="" label="/" orgid="label_69">
+							</w2:textbox><xf:select selectedData="true" item="1^" appearance="full" disabledClass="w2selectbox_disabled" ev:onclick="scwin.chb_N_1_2_3_onclick" hierarchy="chb_N_1_2_3" style="" userData2=" checked:checked; border-width:0; border-color:#1d507f;" id="chb_N_1_2_3" renderType="checkboxgroup" displayMode="label" orgid="chb_N_1_2_3">
+								<xf:choices>
+									<xf:item>
+										<xf:label><![CDATA[미해당]]></xf:label>
+										<xf:value><![CDATA[1]]></xf:value>
+									</xf:item>
+								</xf:choices>
+							</xf:select></xf:group></xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:group id="">
+								<w2:textbox hierarchy="label_21" style="" userData2=" class:TopCondition_01; border-color:#C0C0C0;"
+									id="label_21" label=" 3) 매출액 300억원 이상* &amp; 혁신형 제약기업" orgid="label_21">
+								</w2:textbox>
+							</xf:group>
+							<xf:group id="">
+								<w2:textbox hierarchy="label_22" style="" userData2=" class:TopCondition_01; border-color:#C0C0C0;"
+									id="label_22" label="  * 최근 및 최근 3사업연도 평균 모두 충족" orgid="label_22">
+								</w2:textbox>
+							</xf:group>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+						<xf:group id="" class="flex"><xf:select selectedData="true" item="1^" appearance="full" disabledClass="w2selectbox_disabled" ev:onclick="scwin.chb_Y_1_2_4_onclick" hierarchy="chb_Y_1_2_4" style="" userData2=" border-width:0; border-color:#1d507f;" id="chb_Y_1_2_4" renderType="checkboxgroup" displayMode="label" orgid="chb_Y_1_2_4">
+								<xf:choices>
+									<xf:item>
+										<xf:label><![CDATA[해당]]></xf:label>
+										<xf:value><![CDATA[1]]></xf:value>
+									</xf:item>
+								</xf:choices>
+							</xf:select><w2:textbox hierarchy="label_77" style="" userData2=" class:Blue_Normal; font-family:돋움체; border-color:#C0C0C0;" id="" label="/" orgid="label_77">
+							</w2:textbox><xf:select selectedData="true" item="1^" appearance="full" disabledClass="w2selectbox_disabled" ev:onclick="scwin.chb_N_1_2_4_onclick" hierarchy="chb_N_1_2_4" style="" userData2=" checked:checked; border-width:0; border-color:#1d507f;" id="chb_N_1_2_4" renderType="checkboxgroup" displayMode="label" orgid="chb_N_1_2_4">
+								<xf:choices>
+									<xf:item>
+										<xf:label><![CDATA[미해당]]></xf:label>
+										<xf:value><![CDATA[1]]></xf:value>
+									</xf:item>
+								</xf:choices>
+							</xf:select></xf:group></xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="td" class="w2tb_td  tac">
+							<w2:attributes></w2:attributes>
+							<w2:textbox hierarchy="label_9" id="label_9" label="지배구조" orgid="label_9" style=""
+								userData2=" class:TopCondition_01; border-color:#C0C0C0;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:colspan>2</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_36" id="label_36" label=" 지배구조 평가등급 “B” 이상" orgid="label_36" style=""
+								userData2=" class:TopCondition_01; border-color:#C0C0C0;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+						<xf:group id="" class="flex"><xf:select selectedData="true" item="1^" appearance="full" disabledClass="w2selectbox_disabled" ev:onclick="scwin.chb_Y_2_1_onclick" hierarchy="chb_Y_2_1" style="" userData2=" border-width:0; border-color:#1d507f;" id="chb_Y_2_1" renderType="checkboxgroup" displayMode="label" orgid="chb_Y_2_1">
+								<xf:choices>
+									<xf:item>
+										<xf:label><![CDATA[해당]]></xf:label>
+										<xf:value><![CDATA[1]]></xf:value>
+									</xf:item>
+								</xf:choices>
+							</xf:select><w2:textbox hierarchy="label_65" style="" userData2=" class:Blue_Normal; font-family:돋움체; border-color:#C0C0C0;" id="" label="/" orgid="label_65">
+							</w2:textbox><xf:select selectedData="true" item="1^" appearance="full" disabledClass="w2selectbox_disabled" ev:onclick="scwin.chb_N_2_1_onclick" hierarchy="chb_N_2_1" style="" userData2=" checked:checked; border-width:0; border-color:#1d507f;" id="chb_N_2_1" renderType="checkboxgroup" displayMode="label" orgid="chb_N_2_1">
+								<xf:choices>
+									<xf:item>
+										<xf:label><![CDATA[미해당]]></xf:label>
+										<xf:value><![CDATA[1]]></xf:value>
+									</xf:item>
+								</xf:choices>
+							</xf:select></xf:group></xf:group>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<xf:group class="btnbox" id="">
+				<xf:group class="rt" id="">
+					<xf:trigger class="btn_cm" cursor="pointer" hierarchy="btn_Delete" id="btn_Delete" orgid="btn_Delete"
+						src="../img/btn_delete.gif" style="" text="삭제"
+						userData2=" border-color:#C0C0C0;">
+						<xf:label><![CDATA[삭제]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm pt" cursor="pointer" hierarchy="btn_Save" id="btn_Save" orgid="btn_Save"
+						src="../img/btn_save.gif" style="" text="저장"
+						userData2=" border-color:#C0C0C0;">
+						<xf:label><![CDATA[저장]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.btn_Close_onclick" id="btn_Close"
+						src="../img/btn_close.gif" style="" text="닫기">
+						<xf:label><![CDATA[닫기]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+		</xf:group>
+	</body>
+</html>

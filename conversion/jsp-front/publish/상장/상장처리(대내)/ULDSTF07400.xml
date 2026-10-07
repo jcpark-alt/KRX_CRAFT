@@ -1,0 +1,566 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDSTF07400.gfm" meta_screenName="전문평가관리(코)">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<xf:model>
+			<w2:workflowCollection/>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+/* ★Wcraft guide★    
+스크립트 수작업 유의사항
+*/
+
+
+//★Wcraft guide★ include부분 주석처리 -> include("../js/libRoundPanel.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/stf.js");
+// showObj(ObjID, flag) SetWindowPos(ObjID, nTop, nLeft, nWidth, nHeight)
+//★Wcraft guide★ include부분 주석처리 -> include("../js/utils.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/common.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/session.js");
+// 세션정보를 얻기위한 함수사용
+//★Wcraft guide★ include부분 주석처리 -> include("../js/list_common.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/PopupCalendar.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/controlResize.js");
+scwin.pMenuID = $c.cm.InfoMenuID();
+scwin.fn_GetPar, scwin.fn_SetPar;
+scwin.vBzProcsNo, scwin.vListProcsStatCd, scwin.clickBzProcsNo;
+scwin.clickListInvstgBzTpCd = "210";
+// dialog 호출용 함수
+// 발행기관목록관련
+scwin.vScrenID = "ULDSTF07400.xml";
+scwin.isPopup = false;
+String.prototype.trim = function() {
+    return this.replace(/(^\s*)|(\s*$)/gi, "");
+};
+scwin.onpageload = function() {
+    scwin.gform_onload();
+};
+scwin.onpageunload = function() {
+};
+scwin.fn_SetDate = function() {
+    //  기간 from~ to  셋팅	
+    edt_SDate.setValue('19000101');
+    edt_EDate.setValue($c.ut.cGetToday("yyyymmdd")); // 현재날짜
+
+    $c.stf.Combo_CBDataSetPeriod(cmb_PeriodTp);
+};
+scwin.fn_searchCode = function() {
+    var arrCid = [{
+        cid: "SKIL_VALU_PROG_STAT_CD",
+        cnm: "cmb_SKIL_VALU_PROG_STAT_CD"
+    }];
+    var objCod;
+    var url = "/CodeAction.do?method=listCodeValueNameM&inputMessageId=CODE_M_IN&outputMessageId=CODE_M_OUT" + "&CD_ID_M='SKIL_VALU_PROG_STAT_CD'";
+    dts_Cod.DataID = encodeURI(url);
+    dts_Cod.reset();
+    var strCbd = "",
+        i, j;
+    objCod = document.getElementById(arrCid[0].cnm);
+    strCbd = "^전체";
+    for (j = 1; j <= dts_Cod.getTotalRow(); j++) {
+        if (dts_Cod.getCellData(j, "CD_ENG_NM") == arrCid[0].cid) {
+            strCbd = strCbd + (strCbd == "" ? "" : ",") + dts_Cod.getCellData(j, "VALUE") + "^" + dts_Cod.getCellData(j, "TEXT").replace(/,/g, "','");
+        }
+    }
+    objCod.CBData = strCbd;
+};
+scwin.fn_list_sync = function() {
+    var url = "/lstinvstg/KsqSkilValu.do?SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01 + "&method=selectSpecyValu&inputMessageId=SPECY_VALU_INOUT";
+    url += "&STRT_DD=" + $c.stf.getObjectValue(edt_SDate); // 검색시작일
+    url += "&END_DD=" + $c.stf.getObjectValue(edt_EDate); // 검색종료일
+    url += "&COM_NM=" + $c.stf.getObjectValue(txb_COM_NM); // 회사명
+    url += "&SKIL_VALU_PROG_STAT_CD=" + $c.stf.getObjectValue(cmb_SKIL_VALU_PROG_STAT_CD);
+    url += "&LIST_PROCS_STAT=" + $c.stf.getObjectValue(cmb_PROCS_STAT_CD);
+    dts_List.DataID = encodeURI(url);
+    dts_List.reset();
+    $c.cm.ShowWin(grd_Grid);
+};
+scwin.setBzProcsNo = function(row) {
+    scwin.vBzProcsNo = dts_List.getCellData(row, "BZ_PROCS_NO");
+};
+scwin.fn_OpenDetail = async function() {
+    var wth = 980;
+    var hgt = 880;
+    var pt = $c.stf.fn_getModalCenterPos(frame, wth, hgt);
+    await $c.frame.CreateDialogFrame("SKIL_VALU_APPL", "ULDSTF07401.gfm", "전문평가신청상세", pt.x, pt.y, wth, hgt, "window");
+};
+scwin.fn_setParent = function(row) {
+    var parentWin = $c.frame.path("../");
+    parentWin.dts_List.setCellData(parentWin.dts_List.getFocusedRowIndex(), "ASSGN_COM_NM", dts_List.getCellData(row, "COM_NM"));
+    parentWin.dts_List.setCellData(parentWin.dts_List.getFocusedRowIndex(), "BZ_PROCS_NO", dts_List.getCellData(row, "BZ_PROCS_NO"));
+};
+
+
+//팝업인경우 버튼숨김
+scwin.fn_SetPopup = function() {
+    $c.stf.showObj(btn_ContactPnt, false);
+    $c.stf.showObj(btn_New, false);
+    $c.stf.showObj(btn_Excel, false);
+};
+scwin.btn_Search1_onclick = function() {
+    scwin.fn_list_sync();
+};
+scwin.btn_Excel_onclick = function() {
+    if (dts_List.getTotalRow() > 0) {
+        //엑셀 로그 
+        $c.stf.doLogSave(scwin.vScrenID, SCREN_PROCS_TP_CD_07);
+        $c.data.downloadGridViewOffice(grd_Grid, "기술평가신청", "", 8, 0);
+    } else {
+        $c.win.alert(NO_EXCEL_DATA);
+    }
+};
+scwin.grd_Grid_OnDblClick = async function(row, colid) {
+    if (scwin.isPopup) {
+        scwin.fn_setParent(row);
+        await $c.frame.CloseFrame();
+    } else {
+        if (row > 0) {
+            //그리드에서 선택시
+            scwin.vBzProcsNo = dts_List.getCellData(row, "BZ_PROCS_NO");
+            scwin.vListProcsStatCd = dts_List.getCellData(row, "LIST_PROCS_STAT_CD");
+            scwin.clickBzProcsNo = dts_List.getCellData(row, "BZ_PROCS_NO");
+        }
+        //수정요청 리스트 팝업창
+        if ("34" == scwin.vListProcsStatCd) {
+            //수정요청 리스트 팝업창
+            var adjreqUrl = "/lstinvstg/ULDSTF07407.gfm";
+            await $c.frame.CreateDialogFrame("ULDSTF07407.gfm", adjreqUrl, "전문평가관리 수정요청 리스트", 50, 50, 940, 300, "window");
+        }
+        scwin.fn_OpenDetail();
+    }
+};
+scwin.dts_List_OnLoadCompleted = function(rowcount) {
+    $c.stf.FillGridHeaderTotalCnt(rowcount, panel_page);
+    $c.cm.CloseWin(rowcount, grd_Grid);
+};
+scwin.dts_List_OnLoadError = function() {
+    $c.stf.alert_error(dts_List);
+};
+scwin.gform_onload = function() {
+    $c.cm.PanelToGroupBox(panel_1);
+    scwin.fn_SetDate();
+    scwin.fn_searchCode();
+    scwin.fn_list_sync();
+    var parentWin = $c.frame.path("../");
+    if (parentWin.scwin.vScrenID == "ULDSTF07405.gfm") {
+        scwin.isPopup = true;
+        scwin.fn_SetPopup();
+    }
+};
+scwin.btn_SDate_onclick = function() {
+    popUpCalendar2(edt_SDate);
+};
+scwin.btn_EDate_onclick = function() {
+    popUpCalendar2(edt_EDate);
+};
+scwin.cmb_PeriodTp_OnSelChange = function() {
+    var vTp = $c.cp.valueOfIndex(cmb_PeriodTp, "VALUE", cmb_PeriodTp.getSelectedIndex());
+    $c.stf.fn_setFromToDate(vTp, edt_SDate, edt_EDate);
+};
+scwin.btn_New_onclick = async function() {
+    var wth = 980;
+    var hgt = 880;
+    var pt = $c.stf.fn_getModalCenterPos(frame, wth, hgt);
+    scwin.vBzProcsNo = "";
+    await $c.frame.CreateDialogFrame("SKIL_VALU_APPL", "ULDSTF07401.gfm", "기술평가신청", pt.x, pt.y, wth, hgt, "window");
+};
+scwin.txb_COM_NM_onkeydown = function() {
+    if (window.event.keyCode == 13) {
+        scwin.fn_list_sync();
+    }
+};
+scwin.btn_Remk_onclick = async function() {
+    var wth = 830;
+    var hgt = 210;
+    var pt = $c.stf.fn_getModalCenterPos(frame, wth, hgt);
+    await $c.frame.CreateDialogFrame("비고", "ULDSTF07402.gfm", "전문평가관리 비고", pt.x, pt.y, wth, hgt, "window");
+};
+scwin.btn_ContactPnt_onclick = async function() {
+    var wth = 1300;
+    var hgt = 830;
+    var pt = $c.stf.fn_getModalCenterPos(frame, wth, hgt);
+    await $c.frame.CreateDialogFrame("", "ULDSTF07403.gfm", "전문평가기관 연락처 관리", pt.x, pt.y, wth, hgt, "window");
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+		<xf:group class="sub_contents" id="" meta_snippetCategory="00_화면시작" meta_snippetKeyComponent="true" meta_snippetName="0_01 페이지시작"
+			style="">
+			<xf:group class="pgtbox" id="" meta_snippetCategory="02_타이틀" meta_snippetKeyComponent="true" meta_snippetName="2_01 페이지타이틀"
+				style="">
+				<w2:textbox class="pgt_tit" id="" label="전문평가관리(코)" style="" tagname=""></w2:textbox>
+				<xf:group class="breadcrumb" id="" style="">
+					<xf:group id="" style="" tagname="ul">
+						<xf:group class="home" id="" style="" tagname="li">
+							<w2:anchor id="" outerDiv="false" style="">
+								<xf:label><![CDATA[Home]]></xf:label>
+							</w2:anchor>
+						</xf:group>
+						<xf:group id="" style="" tagname="li">
+							<w2:anchor id="" outerDiv="false" style="">
+								<xf:label><![CDATA[1Depth Menu]]></xf:label>
+							</w2:anchor>
+						</xf:group>
+						<xf:group id="" style="" tagname="li">
+							<w2:anchor id="" outerDiv="false" style="">
+								<xf:label><![CDATA[2Depth Menu]]></xf:label>
+							</w2:anchor>
+						</xf:group>
+						<xf:group id="" style="" tagname="li">
+							<w2:span id="" label="3Depth Menu" style=""></w2:span>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+				<xf:trigger class="btn_fav" id="" style="" type="button">
+					<xf:label></xf:label>
+				</xf:trigger>
+			</xf:group>
+			<xf:group class="schbox" id="panel_1" meta_snippetCategory="03_조회영역" meta_snippetKeyComponent="true"
+				meta_snippetName="3_01 조회조건1행" style="">
+				<xf:group class="schbox_inner" id="" style="">
+					<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl " id="" style="" tagname="table">
+						<w2:attributes>
+							<w2:summary></w2:summary>
+						</w2:attributes>
+						<xf:group tagname="colgroup">
+							<xf:group style="width:80px;" tagname="col"></xf:group>
+							<xf:group style="width:400px;" tagname="col"></xf:group>
+							<xf:group style="width:64px;" tagname="col"></xf:group>
+							<xf:group style="width:210px;" tagname="col"></xf:group>
+							<xf:group style="width:80px;" tagname="col"></xf:group>
+							<xf:group style="width:120px;" tagname="col"></xf:group>
+							<xf:group style="width:80px;" tagname="col"></xf:group>
+							<xf:group style="width:120px;" tagname="col"></xf:group>
+						</xf:group>
+						<xf:group class="" id="" style="" tagname="tr">
+							<xf:group class="w2tb_th" style="" tagname="th">
+								<w2:textbox hierarchy="label_2" id="label_2" label="조회기간" orgid="label_2" style=""
+									userData2=" class:TopCondition_01;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group class="w2tb_td" style="" tagname="td">
+								<w2:inputCalendar calendarValueType="yearMonthDate" focusOnDateSelect="false" footerDiv="true"
+									id="edt_SDate" meta_snippetCategory="10_입력폼" meta_snippetKeyComponent="true" meta_snippetName="10_11 기간조회" renderDiv="true"
+									renderType="" rightAlign="false" style="">
+								</w2:inputCalendar>
+								<w2:span id="" label="~" meta_snippetCategory="10_입력폼" meta_snippetName="10_11 기간조회" style=""></w2:span>
+								<w2:inputCalendar calendarValueType="yearMonthDate" focusOnDateSelect="false" footerDiv="true"
+									id="edt_EDate" meta_snippetCategory="10_입력폼" meta_snippetName="10_11 기간조회" renderDiv="true" renderType="" rightAlign="false"
+									style="">
+								</w2:inputCalendar>
+								<xf:select1 appearance="minimal" cbdatacolumns="disp,value" disabledClass="w2selectbox_disabled"
+									ev:onchange="scwin.cmb_PeriodTp_OnSelChange" hierarchy="cmb_PeriodTp" id="cmb_PeriodTp" listexprformat="disp^0^70" maxlength="20"
+									orgid="cmb_PeriodTp" style="width:108px;"
+									userData2=" bindcolumn:disp; defaultstring:기간선택; inheritcolor:False; listcount:10; xpstyle:True; font-family:돋움;">
+									<xf:choices>
+										<xf:itemset nodeset="">
+											<xf:label ref=""></xf:label>
+											<xf:value ref=""></xf:value>
+										</xf:itemset>
+									</xf:choices>
+								</xf:select1>
+							</xf:group>
+							<xf:group class="w2tb_th" style="" tagname="th">
+								<w2:textbox hierarchy="label_5" id="label_5" label="회사명" orgid="label_5" style=""></w2:textbox>
+							</xf:group>
+							<xf:group class="w2tb_td" id="" style="" tagname="td">
+								<xf:input ev:onkeydown="scwin.txb_COM_NM_onkeydown" hierarchy="txb_COM_NM" id="txb_COM_NM" maxlength="100"
+									orgid="txb_COM_NM"
+									style="width:179px; height:20px; font-size:12; background-color:#ffffff; border-style:solid; border-width:1px; text-align:left;"
+									userData2=" class:TopCondition_01_read; font-family:돋움체; border-color:#92b1f1;">
+								</xf:input>
+							</xf:group>
+							<xf:group class="w2tb_th" tagname="th">
+								<w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes>
+								<w2:textbox hierarchy="label_7" id="label_7" label="평가상태" orgid="label_7" style=""
+									userData2=" class:TopCondition_01; border-color:#0000FF;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group class="w2tb_td" id="" tagname="td">
+								<w2:attributes></w2:attributes>
+								<xf:select1 appearance="minimal" cbdatacolumns="VALUE,TEXT" disabled="false"
+									disabledClass="w2selectbox_disabled" hierarchy="cmb_SKIL_VALU_PROG_STAT_CD" id="cmb_SKIL_VALU_PROG_STAT_CD"
+									listexprformat="TEXT^0^90" orgid="cmb_SKIL_VALU_PROG_STAT_CD" style="width:90px;" tabIndex="7"
+									userData2=" class:TopCondition_01; bindcolumn:VALUE; defaultstring:전체; listcount:10; searchcolumn:TEXT;">
+									<xf:choices>
+										<xf:itemset nodeset="">
+											<xf:label ref=""></xf:label>
+											<xf:value ref=""></xf:value>
+										</xf:itemset>
+									</xf:choices>
+								</xf:select1>
+							</xf:group>
+							<xf:group class="w2tb_th" tagname="th">
+								<w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes>
+								<w2:textbox hierarchy="label_3" id="label_3" label="처리상태" orgid="label_3" style=""
+									userData2=" class:TopCondition_01; border-color:#0000FF;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group class="w2tb_td" id="" tagname="td">
+								<w2:attributes></w2:attributes>
+								<xf:select1 appearance="minimal" cbdatacolumns="VALUE,TEXT" disabled="false"
+									disabledClass="w2selectbox_disabled" hierarchy="cmb_PROCS_STAT_CD" id="cmb_PROCS_STAT_CD"
+									item="^전체,32^제출완료,33^접수완료,34^수정요청,35^수정승인,36^수정불가,37^반려" listexprformat="TEXT^0^90" orgid="cmb_PROCS_STAT_CD" style="width:80px;"
+									tabIndex="7" userData2=" class:TopCondition_01; bindcolumn:VALUE; defaultstring:전체; listcount:10; searchcolumn:TEXT;">
+									<xf:choices>
+										<xf:item>
+											<xf:label><![CDATA[전체]]></xf:label>
+											<xf:value><![CDATA[]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[제출완료]]></xf:label>
+											<xf:value><![CDATA[32]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[접수완료]]></xf:label>
+											<xf:value><![CDATA[33]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[수정요청]]></xf:label>
+											<xf:value><![CDATA[34]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[수정승인]]></xf:label>
+											<xf:value><![CDATA[35]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[수정불가]]></xf:label>
+											<xf:value><![CDATA[36]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[반려]]></xf:label>
+											<xf:value><![CDATA[37]]></xf:value>
+										</xf:item>
+									</xf:choices>
+								</xf:select1>
+							</xf:group>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+				<xf:group class="btn_schbox" id="" style="">
+					<xf:trigger class="btn_cm sch" cursor="pointer" ev:onclick="scwin.btn_Search1_onclick" hierarchy="btn_Search1"
+						id="btn_Search1" orgid="btn_Search1" src="../img/btn_select.gif" style="">
+						<xf:label><![CDATA[조회]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+			<xf:group class="titbox" id="" meta_snippetCategory="02_타이틀" meta_snippetKeyComponent="true" meta_snippetName="2_02 서브타이틀(h3)"
+				style="">
+				<xf:group class="rt" id="" style="">
+					<xf:group class="count" id="" style="">
+						<w2:textbox class="" id="" label="총" style=""></w2:textbox>
+						<w2:textbox class="num" id="panel_page" label="0" style=""></w2:textbox>
+						<w2:textbox class="" id="" label="건" style=""></w2:textbox>
+					</xf:group>
+					<xf:trigger class="btn_cm download" cursor="pointer" ev:onclick="scwin.btn_Excel_onclick" hierarchy="btn_Excel"
+						id="btn_Excel" orgid="btn_Excel" src="../img/btn_excelsave.gif" style="" text="엑셀다운로드">
+						<xf:label><![CDATA[엑셀다운로드]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+			<xf:group class="gvwbox" id="" style="">
+				<w2:gridView autoFit="allColumn" autoFitMinWidth="4400" class="gvw" dataList="dts_List" hierarchy="grd_Grid" id="grd_Grid"
+					orgid="grd_Grid" resize="true" style="height: 153px;"
+					userData2=" class:Grid_01; borderstyle:0; fillarea:True; gtitleheight:0; headborder:4; indwidth:0; sortview:left; titleheight:49; tooltip:use=true;alt=true;createtime=300;color=#FFFFFF;backcolor=#808080;edgecolor=#333333;leftmargin=10;rightmargin=10;topmargin=10;bottommargin=10;; tooltipmarkshow:False; xtitleheight:0; font-family:돋움체; font-weight:normal; border-color:#c0c0c0; ondblclick:grd_Grid_OnDblClick;">
+					<w2:caption id="caption1" style="" value="this is a grid caption."></w2:caption>
+					<w2:header id="header1" style="">
+						<w2:row>
+							<w2:column displayMode="label" fixColumnWidth="true" id="h_NO" inputType="text" textAlign="center"
+								userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; color:#343434; value:{CurRow},{ToString}; sumbgcolor:#fefaef; sumcolor:#343434;"
+								value="번호" width="50">
+							</w2:column>
+							<w2:column displayMode="label" id="h_COM_NM" inputType="text" textAlign="center"
+								userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; color:{decode(SKIL_VALU_PROG_STAT_CD,'06','#000000',decode(FIRST_30,'Y','#800080',decode(OVER_30,'Y','#0000FF',decode(OVER_3,'Y','#008000',decode(MIN_END_YN,'Y','#FF0000','#000000')))))}; sumbgcolor:#fefaef; sumcolor:#343434; sort:True; checkboxcolor:#FFFFFF;"
+								value="회사명" width="180">
+							</w2:column>
+							<w2:column displayMode="label" id="h_MKTPARTC_KOR_NM" inputType="text" textAlign="center"
+								userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; color:#343434; sumbgcolor:#fefaef; sumcolor:#343434; sort:True;"
+								value="상장주선인" width="138">
+							</w2:column>
+							<w2:column displayMode="label" id="h_SKIL_VALU_PROG_STAT_CD_NM" inputType="text" textAlign="center"
+								userData2=" sort:True;" value="평가상태" width="110">
+							</w2:column>
+							<w2:column displayMode="label" id="h_VALU_STRT_DD" inputType="text" textAlign="center"
+								userData2=" sort:True; mask:XXXX-XX-XX;" value="평가시작일" width="90">
+							</w2:column>
+							<w2:column displayMode="label" id="h_VALU_RSLT_LAST_DD" inputType="text" textAlign="center"
+								userData2=" sort:True; headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; color:#343434; sumbgcolor:#fefaef; sumcolor:#343434; mask:XXXX-XX-XX;"
+								value="평가결과일" width="90">
+							</w2:column>
+							<w2:column displayMode="label" id="h_SKIL_VALU_INST_CD1_NM" inputType="text" textAlign="center"
+								userData2=" sort:True;" value="평가기관1" width="150">
+							</w2:column>
+							<w2:column displayMode="label" id="h_SKIL_VALU_GRD_CD1_NM" inputType="text" textAlign="center"
+								userData2=" sort:True;" value="평가등급1" width="83">
+							</w2:column>
+							<w2:column displayMode="label" id="h_SKIL_VALU_INST_CD2_NM" inputType="text" textAlign="center"
+								userData2=" sort:True;" value="평가기관2" width="150">
+							</w2:column>
+							<w2:column displayMode="label" id="h_SKIL_VALU_GRD_CD2_NM" inputType="text" textAlign="center"
+								userData2=" sort:True;" value="평가등급2" width="85">
+							</w2:column>
+							<w2:column displayMode="label" id="h_LIST_PROCS_STAT" inputType="text" textAlign="center"
+								userData2=" sort:True;" value="처리상태" width="80">
+							</w2:column>
+							<w2:column displayMode="label" id="h_CORE_VALU_OBJ_NM" inputType="text" textAlign="center"
+								userData2=" sort:True;" value="핵싱평가대상" width="188">
+							</w2:column>
+							<w2:column displayMode="label" id="h_ASSGN_APPL_DD" inputType="text" textAlign="center"
+								userData2=" mask:XXXX-XX-XX; sort:True;" value="배정신청일" width="90">
+							</w2:column>
+							<w2:column displayMode="label" id="h_SKIL_VALU_ASSGN_DD" inputType="text" textAlign="center"
+								userData2=" mask:XXXX-XX-XX; sort:True;" value="배정일" width="89">
+							</w2:column>
+							<w2:column displayMode="label" id="h_ASSGN_SUSPN_DD" inputType="text" textAlign="center"
+								userData2=" mask:XXXX-XX-XX; sort:True;" value="배정중단일" width="88">
+							</w2:column>
+							<w2:column displayMode="label" id="h_SKIL_BZ_TP_CD_NM" inputType="text" textAlign="center"
+								userData2=" sort:True;" value="기술사업구분" width="142">
+							</w2:column>
+							<w2:column displayMode="label" id="h_SPECY_VALU_IND_CLSS_CD_NM" inputType="text" textAlign="center"
+								userData2=" sort:True;" value="산업선택&lt;/br&gt;1" width="99">
+							</w2:column>
+							<w2:column displayMode="label" id="h_SPECY_VALU_IND_CLSS_CD2_NM" inputType="text" textAlign="center"
+								userData2=" sort:True;" value="산업선택&lt;/br&gt;2" width="99">
+							</w2:column>
+							<w2:column displayMode="label" id="h_SPECY_VALU_SKIL_CLSS_CD_NM" inputType="text" textAlign="center"
+								userData2=" sort:True;" value="기술선택&lt;/br&gt;1" width="99">
+							</w2:column>
+							<w2:column displayMode="label" id="h_SPECY_VALU_SKIL_CLSS_CD2_NM" inputType="text" textAlign="center"
+								userData2=" sort:True;" value="기술선택&lt;/br&gt;2" width="99">
+							</w2:column>
+							<w2:column displayMode="label" id="h_VALU_INST_APPL_CNT" inputType="text" textAlign="center"
+								userData2=" sort:True;" value="평가기관&lt;/br&gt;신청수" width="82">
+							</w2:column>
+							<w2:column displayMode="label" id="h_ONECOM_APPL_RSN_CD_NM" inputType="text" textAlign="center"
+								userData2=" sort:True;" value="1사신청이유" width="105">
+							</w2:column>
+							<w2:column displayMode="label" id="h_SPECY_VALU_INST_CD_NM" inputType="text" textAlign="center"
+								userData2=" sort:True;" value="제척기관" width="325">
+							</w2:column>
+							<w2:column displayMode="label" id="h_REMK" inputType="text" textAlign="center" userData2=" sort:True;"
+								value="비고" width="267">
+							</w2:column>
+							<w2:column displayMode="label" id="h_FILE_CNT1" inputType="text" textAlign="center" userData2=" sort:True;"
+								value="주관사가 제출한&lt;/br&gt;신청서" width="118">
+							</w2:column>
+							<w2:column displayMode="label" id="h_FILE_CNT2" inputType="text" textAlign="center" userData2=" sort:True;"
+								value="부속서류" width="71">
+							</w2:column>
+							<w2:column displayMode="label" id="h_FILE_CNT3" inputType="text" textAlign="center" userData2=" sort:True;"
+								value="내부공유용&lt;/br&gt;평가결과서(원본);1" width="124">
+							</w2:column>
+							<w2:column displayMode="label" id="h_FILE_CNT4" inputType="text" textAlign="center" userData2=" sort:True;"
+								value="이해관계부존재&lt;/br&gt;확인서;1" width="119">
+							</w2:column>
+							<w2:column displayMode="label" id="h_FILE_CNT5" inputType="text" textAlign="center" userData2=" sort:True;"
+								value="내부공유용&lt;/br&gt;평가인력 현황표;1" width="120">
+							</w2:column>
+							<w2:column displayMode="label" id="h_FILE_CNT6" inputType="text" textAlign="center" userData2=" sort:True;"
+								value="내부 공유용&lt;/br&gt;기타첨부서류;1" width="116">
+							</w2:column>
+							<w2:column displayMode="label" id="h_FILE_CNT7" inputType="text" textAlign="center" userData2=" sort:True;"
+								value="내부공유용&lt;/br&gt;평가결과서(원본);2" width="133">
+							</w2:column>
+							<w2:column displayMode="label" id="h_FILE_CNT8" inputType="text" textAlign="center" userData2=" sort:True;"
+								value="이해관계부존재&lt;/br&gt;확인서;2" width="104">
+							</w2:column>
+							<w2:column displayMode="label" id="h_FILE_CNT9" inputType="text" textAlign="center" userData2=" sort:True;"
+								value="내부공유용&lt;/br&gt;평가인력 현황표;2" width="108">
+							</w2:column>
+							<w2:column displayMode="label" id="h_FILE_CNT10" inputType="text" textAlign="center" userData2=" sort:True;"
+								value="내부 공유용&lt;/br&gt;기타첨부서류;2" width="112">
+							</w2:column>
+							<w2:column displayMode="label" id="h_BZ_PROCS_NO" inputType="text" textAlign="center" userData2=" sort:True;"
+								value="업무처리번호" width="108">
+							</w2:column>
+							<w2:column displayMode="label" id="h_APFM_YN" inputType="text" textAlign="center" userData2=" sort:True;"
+								value="예비심사&lt;/br&gt;청구여부" width="77">
+							</w2:column>
+							<w2:column displayMode="label" id="h_APFM_BZ_PROCS_NO" inputType="text" textAlign="center"
+								userData2=" sort:True;" value="예비심사&lt;/br&gt;업무처리번호" width="126">
+							</w2:column>
+						</w2:row>
+					</w2:header>
+					<w2:gBody id="gBody1" style="">
+						<w2:row id="" style="">
+							<w2:column displayMode="label" id="NO" inputType="text" textAlign="center" width="50"></w2:column>
+							<w2:column displayMode="label" id="COM_NM" inputType="text" textAlign="left" width="180"></w2:column>
+							<w2:column displayMode="label" id="MKTPARTC_KOR_NM" inputType="text" textAlign="left" width="138"></w2:column>
+							<w2:column displayMode="label" id="SKIL_VALU_PROG_STAT_CD_NM" inputType="text" textAlign="center" width="110"></w2:column>
+							<w2:column displayMode="label" id="VALU_STRT_DD" inputType="text" textAlign="center" width="90"></w2:column>
+							<w2:column displayMode="label" id="VALU_RSLT_LAST_DD" inputType="text" textAlign="center" width="90"></w2:column>
+							<w2:column displayMode="label" id="SKIL_VALU_INST_CD1_NM" inputType="text" textAlign="left" width="150"></w2:column>
+							<w2:column displayMode="label" id="SKIL_VALU_GRD_CD1_NM" inputType="text" textAlign="center" width="83"></w2:column>
+							<w2:column displayMode="label" id="SKIL_VALU_INST_CD2_NM" inputType="text" textAlign="left" width="150"></w2:column>
+							<w2:column displayMode="label" id="SKIL_VALU_GRD_CD2_NM" inputType="text" textAlign="center" width="85"></w2:column>
+							<w2:column displayMode="label" id="LIST_PROCS_STAT" inputType="text" textAlign="center" width="80"></w2:column>
+							<w2:column displayMode="label" id="CORE_VALU_OBJ_NM" inputType="text" textAlign="left" width="188"></w2:column>
+							<w2:column displayMode="label" id="ASSGN_APPL_DD" inputType="text" textAlign="center" width="90"></w2:column>
+							<w2:column displayMode="label" id="SKIL_VALU_ASSGN_DD" inputType="text" textAlign="center" width="89"></w2:column>
+							<w2:column displayMode="label" id="ASSGN_SUSPN_DD" inputType="text" textAlign="center" width="88"></w2:column>
+							<w2:column displayMode="label" id="SKIL_BZ_TP_CD_NM" inputType="text" textAlign="center" width="142"></w2:column>
+							<w2:column displayMode="label" id="SPECY_VALU_IND_CLSS_CD_NM" inputType="text" textAlign="center" width="99"></w2:column>
+							<w2:column displayMode="label" id="SPECY_VALU_IND_CLSS_CD2_NM" inputType="text" textAlign="center" width="99"></w2:column>
+							<w2:column displayMode="label" id="SPECY_VALU_SKIL_CLSS_CD_NM" inputType="text" textAlign="center" width="99"></w2:column>
+							<w2:column displayMode="label" id="SPECY_VALU_SKIL_CLSS_CD2_NM" inputType="text" textAlign="center"
+								width="99">
+							</w2:column>
+							<w2:column displayMode="label" id="VALU_INST_APPL_CNT" inputType="text" textAlign="center" width="82"></w2:column>
+							<w2:column displayMode="label" id="ONECOM_APPL_RSN_CD_NM" inputType="text" textAlign="center" width="105"></w2:column>
+							<w2:column displayMode="label" id="SPECY_VALU_INST_CD_NM" inputType="text" textAlign="left" width="325"></w2:column>
+							<w2:column displayMode="label" id="REMK" inputType="text" textAlign="left" width="267"></w2:column>
+							<w2:column displayMode="label" id="FILE_CNT1" inputType="text" textAlign="center" width="118"></w2:column>
+							<w2:column displayMode="label" id="FILE_CNT2" inputType="text" textAlign="center" width="71"></w2:column>
+							<w2:column displayMode="label" id="FILE_CNT3" inputType="text" textAlign="center" width="124"></w2:column>
+							<w2:column displayMode="label" id="FILE_CNT4" inputType="text" textAlign="center" width="119"></w2:column>
+							<w2:column displayMode="label" id="FILE_CNT5" inputType="text" textAlign="center" width="120"></w2:column>
+							<w2:column displayMode="label" id="FILE_CNT6" inputType="text" textAlign="center" width="116"></w2:column>
+							<w2:column displayMode="label" id="FILE_CNT7" inputType="text" textAlign="center" width="133"></w2:column>
+							<w2:column displayMode="label" id="FILE_CNT8" inputType="text" textAlign="center" width="104"></w2:column>
+							<w2:column displayMode="label" id="FILE_CNT9" inputType="text" textAlign="center" width="108"></w2:column>
+							<w2:column displayMode="label" id="FILE_CNT10" inputType="text" textAlign="center" width="112"></w2:column>
+							<w2:column displayMode="label" id="BZ_PROCS_NO" inputType="text" textAlign="center" width="108"></w2:column>
+							<w2:column displayMode="label" id="APFM_YN" inputType="text" textAlign="center" width="77"></w2:column>
+							<w2:column displayMode="label" id="APFM_BZ_PROCS_NO" inputType="text" textAlign="center" width="126"></w2:column>
+						</w2:row>
+					</w2:gBody>
+				</w2:gridView>
+			</xf:group>
+			<xf:group class="btnbox" id="" meta_snippetCategory="08_버튼" meta_snippetKeyComponent="true" meta_snippetName="8_05 팝업전체제어버튼"
+				style="">
+				<xf:group class="txt_list" id="" style="" tagname="ul">
+					<xf:group id="" tagname="li">
+						<w2:textbox hierarchy="label_10" id="label_10" label=" 평가결과일은 평가결과일1,2 중 늦은 날짜를 표기하였습니다." orgid="label_10" style=""
+							userData2=" font-weight:normal;">
+						</w2:textbox>
+					</xf:group>
+					<xf:group id="" tagname="li">
+						<w2:textbox hierarchy="label_1" id="label_1" label=" 본 화면은 전문평가 관리를 담당하는 팀 및 소관 부서장만 볼 수있습니다." orgid="label_1"
+							style="" userData2=" font-weight:normal;">
+						</w2:textbox>
+					</xf:group>
+				</xf:group>
+				<xf:group class="rt" id="" style="">
+					<xf:trigger class="btn_cm" ev:onclick="scwin.btn_Remk_onclick" hierarchy="btn_Remk" id="btn_Remk" orgid="btn_Remk"
+						style="" text="비고" userData2=" cursor:pointer;">
+						<xf:label><![CDATA[비고]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm" ev:onclick="scwin.btn_ContactPnt_onclick" hierarchy="btn_ContactPnt" id="btn_ContactPnt"
+						orgid="btn_ContactPnt" style="" text="전문평가기관 연락처 관리" userData2=" cursor:pointer;">
+						<xf:label><![CDATA[전문평가기관 연락처 관리]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm pt" cursor="pointer" ev:onclick="scwin.btn_New_onclick" hierarchy="btn_New" id="btn_New"
+						orgid="btn_New" src="../img/btn_new.gif" style="" text="신규">
+						<xf:label><![CDATA[신규]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+		</xf:group>
+	</body>
+</html>

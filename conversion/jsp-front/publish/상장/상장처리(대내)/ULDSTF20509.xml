@@ -1,0 +1,548 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDSTF20509.gfm" meta_screenName="(팝업)실질심사법인제출자료조회">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<xf:model>
+			<w2:workflowCollection/>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+/* ★Wcraft guide★    
+스크립트 수작업 유의사항
+*/
+
+
+//★Wcraft guide★ include부분 주석처리 -> include("../js/libRoundPanel.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/PopupCalendar.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/stf.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/utils.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/common.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/list_common.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/pre_newlisting.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/session.js");
+// 세션정보를 얻기위한 함수사용
+//★Wcraft guide★ include부분 주석처리 -> include("../js/buttonSet.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/jquery-1.11.0.min.js");
+scwin.vScrenID = "ULDSTF20509.xml";
+scwin.gDepCd = js_dep_cd;
+scwin.gEmpNo = js_emp_no;
+scwin.gLdMktTp = js_market;
+scwin.gMajContCdIndex = 100;
+scwin.isFileDelete = false;
+scwin.vJobMode = "";
+scwin.vBZ_PROCS_NO = "";
+scwin.trsIdx = "";
+scwin.onpageload = function() {
+    scwin.gform_onload();
+};
+scwin.onpageunload = function() {
+};
+scwin.fn_init_code = function() {
+    var arrCid = [{
+        cid: "REAL_INVSTG_STEP_CD",
+        cnm: "cmb_REAL_INVSTG_STEP_CD"
+    }];
+    var objCod;
+    var url = "/CodeAction.do?method=listCodeValueNameM";
+    url += "&inputMessageId=CODE_M_IN&outputMessageId=CODE_M_OUT";
+    url += "&CD_ID_M='REAL_INVSTG_STEP_CD'";
+    dts_Code.DataID = encodeURI(url);
+    dts_Code.reset();
+    var strCbd = "",
+        i, j;
+    var strGubun = "";
+    for (i = 0; i < arrCid.length; i++) {
+        objCod = document.getElementById(arrCid[i].cnm);
+        if (objCod == null) {
+            $c.win.alert(arrCid[i].cnm);
+        }
+        strCbd = "";
+        for (j = 1; j <= dts_Code.getTotalRow(); j++) {
+            if (dts_Code.getCellData(j, "CD_ENG_NM") == arrCid[i].cid) {
+                strGubun = dts_Code.getCellData(j, "VALUE").substring(0, 1); //코 1XX, 유 2XX
+                if (scwin.gLdMktTp == strGubun) {
+                    strCbd = strCbd + (strCbd == "" ? "" : ",") + dts_Code.getCellData(j, "VALUE") + "^" + dts_Code.getCellData(j, "TEXT");
+                } else if (scwin.gLdMktTp == '9') {
+                    strCbd = strCbd + (strCbd == "" ? "" : ",") + dts_Code.getCellData(j, "VALUE") + "^" + dts_Code.getCellData(j, "TEXT");
+                }
+            }
+        }
+        objCod.CBData = strCbd;
+    }
+};
+scwin.fn_init_ctrl = function() {
+    if (scwin.gLdMktTp == "1") {
+        $c.stf.showObj(lbl_stat_23, false);
+        $c.stf.showObj(lbl_stat_13, true);
+        scwin.gMajContCdIndex = 100; // 유가  1XX
+
+    } else {
+        $c.stf.showObj(lbl_stat_23, true);
+        $c.stf.showObj(lbl_stat_13, false);
+        scwin.gMajContCdIndex = 200; // 코스닥 2XX
+
+    }
+    if (scwin.vJobMode == 'M') {
+        getBZ_PROCS_NO = $c.frame.path("../").fn_getBZ_PROCS_NO;
+        scwin.vBZ_PROCS_NO = getBZ_PROCS_NO();
+        btn_Delete.setDisabled(false);
+        btn_Delete.src = "../img/btn_delete.gif";
+        $c.stf.showObj(img_com_srch, false);
+        scwin.fn_list_sync();
+    } else {
+        scwin.fn_setFileDataHeader();
+        scwin.fn_SetSaveHeader();
+        btn_Delete.setDisabled(true);
+        btn_Delete.src = "../img/btn_delete_d.gif";
+    }
+};
+scwin.fn_chk_form = function() {
+    if ($c.stf.getObjectValue(txb_ISUR_CD) == "") {
+        $c.win.alert("'회사코드(명)'을 입력하세요.");
+        return false;
+    }
+    if ($c.stf.getObjectValue(txb_TITLE) == "") {
+        $c.win.alert("'제목'을 입력하세요.");
+        return false;
+    }
+    return true;
+};
+scwin.fn_pre_build = function() {
+    $c.stf.CopyDataSet(dts_REAL_INVSTG_DATA, dts_REAL_INVSTG_DATA1);
+    for (var i = 1; i <= 4; i++) {
+        if (dts_REAL_INVSTG_DATA.getCellData(1, "REAL_INVSTG_MAJ_CONTN_CD" + i) == "1") {
+            if (i == 4) dts_REAL_INVSTG_DATA1.setCellData(1, "REAL_INVSTG_MAJ_CONTN_CD" + i, scwin.gMajContCdIndex + 99);
+
+            else dts_REAL_INVSTG_DATA1.setCellData(1, "REAL_INVSTG_MAJ_CONTN_CD" + i, scwin.gMajContCdIndex + i);
+        } else dts_REAL_INVSTG_DATA1.setCellData(1, "REAL_INVSTG_MAJ_CONTN_CD" + i, "");
+    }
+    if ($c.cp.isModified(dts_fileList)) {
+        scwin.isFileDelete = true;
+    }
+};
+scwin.fn_chk_chrg = function() {
+    if (js_usr_tp_cd == '1') {
+        //운영자이면
+        return true;
+    }
+    var url = "/listingCommon.do?method=listGeneral&outputMessageId=REAL_INVSTG_DATA_CHRG" + "&service=krx.lds.stf.listingcommon.services.ListingCommonApp" + "&queryId=lds.stf.lstsrch.select.real_invstg_data.chrg" + "&{P}param01=" + js_emp_no + "&{P}param02=" + js_emp_no + "&{P}param03=" + js_emp_no + "&{P}param04=" + $c.stf.getObjectValue(txb_ISUR_CD);
+    dts_Chrg.DataID = encodeURI(url);
+    dts_Chrg.Reset();
+    var chrgYn = dts_Chrg.getCellData(1, "CHRG_YN");
+    if (chrgYn != 'Y') {
+        $c.win.alert("해당종목 담당자와 담당 팀장만 변경 가능합니다.");
+        return false;
+    }
+    return true;
+};
+scwin.fn_list_sync = function() {
+    trs_Read.Action = "/RealInvstg.do?method=getRealInvstgData" + "&BZ_PROCS_NO=" + scwin.vBZ_PROCS_NO + "&SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01;
+    trs_Read.KeyValue = "JSP(O:pOutput1=dts_REAL_INVSTG_DATA, O:pOutput2=dts_fileList)";
+    trs_Read.Post();
+};
+scwin.fn_save = function() {
+    if (scwin.fn_chk_form() == false) return;
+    if (scwin.fn_chk_chrg() == false) return;
+    if (dts_fileList.getCellData(1, "fileInfo") == "") {
+        dts_fileList.Reset();
+    }
+    var rtn = confirm('저장 하시겠습니까?');
+    if (rtn == 1) {
+        scwin.trsIdx = TRS_IDX_INSERT;
+        scwin.fn_pre_build();
+        scwin.vBZ_PROCS_NO = $c.stf.fn_getNewBzProcNo(dts_BzProcsNo);
+        dts_REAL_INVSTG_DATA1.setCellData(1, "BZ_PROCS_NO", scwin.vBZ_PROCS_NO);
+        trs_Save.Action = $c.lc.fn_encodeNSession("/RealInvstg.do?method=insertInvstgData" + "&SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_02);
+        trs_Save.KeyValue = "JSP(I:pInput=dts_REAL_INVSTG_DATA1,I:pFile=dts_fileList)";
+        trs_Save.Parameters = "TRS_IDX=" + scwin.trsIdx + ",COUNT=0" + ",BZ_PROCS_NO=" + scwin.vBZ_PROCS_NO + ",LIST_BZ_TP_CD=" + LIST_BZ_TP_CD_207 + ",LD_MKT_TP_CD=" + scwin.gLdMktTp + ",ISUR_CD=" + $c.stf.getObjectValue(txb_ISUR_CD);
+        trs_Save.Post();
+    }
+};
+scwin.fn_update = function() {
+    if (scwin.fn_chk_form() == false) return;
+    if (scwin.fn_chk_chrg() == false) return;
+    var rtn = confirm('수정 하시겠습니까?');
+    if (rtn == 1) {
+        scwin.trsIdx = TRS_IDX_UPDATE;
+        scwin.fn_pre_build();
+        trs_Update.Action = $c.lc.fn_encodeNSession("/RealInvstg.do?method=updateInvstgData&SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_03);
+        trs_Update.KeyValue = "JSP(I:pInput=dts_REAL_INVSTG_DATA1,I:pFile=dts_fileList)";
+        trs_Update.Parameters = "TRS_IDX=" + scwin.trsIdx + ",COUNT=0" + ",BZ_PROCS_NO=" + scwin.vBZ_PROCS_NO + ",LIST_BZ_TP_CD=" + LIST_BZ_TP_CD_207 + ",LD_MKT_TP_CD=" + scwin.gLdMktTp + ",ISUR_CD=" + $c.stf.getObjectValue(txb_ISUR_CD);
+        trs_Update.Post();
+    }
+};
+scwin.fn_delete = function() {
+    if (scwin.fn_chk_chrg() == false) return;
+    var rtn = confirm('삭제 하시겠습니까?');
+    if (rtn == 1) {
+        scwin.trsIdx = TRS_IDX_DELETE;
+        scwin.fn_pre_build();
+        trs_Delete.Action = $c.lc.fn_encodeNSession("/RealInvstg.do?method=deleteInvstgData&SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_04);
+        trs_Delete.KeyValue = "JSP(I:pInput=dts_REAL_INVSTG_DATA1)";
+        trs_Delete.Parameters = "TRS_IDX=" + scwin.trsIdx + ",COUNT=0" + ",BZ_PROCS_NO=" + scwin.vBZ_PROCS_NO;
+        ",LIST_BZ_TP_CD=" + LIST_BZ_TP_CD_207 + ",LD_MKT_TP_CD=" + scwin.gLdMktTp + ",ISUR_CD=" + $c.stf.getObjectValue(txb_ISUR_CD);
+        trs_Delete.Post();
+    }
+};
+scwin.fn_setFileDataHeader = function() {
+    dts_fileList.DataID = "/gauceSystemierAdaptor.do?method=getGauceDataHeader&messageId=REAL_INVSTG_DATA_ATTACH_INOUT";
+    dts_fileList.Reset();
+};
+scwin.fn_SetSaveHeader = function() {
+    dts_REAL_INVSTG_DATA.DataID = "/gauceSystemierAdaptor.do?method=getGauceDataHeader&messageId=REAL_INVSTG_DATA";
+    dts_REAL_INVSTG_DATA.Reset();
+    dts_REAL_INVSTG_DATA.insertRow();
+    dts_REAL_INVSTG_DATA.setCellData(dts_REAL_INVSTG_DATA.getRowPosition(), "REAL_INVSTG_MAJ_CONTN_CD1", "0");
+    dts_REAL_INVSTG_DATA.setCellData(dts_REAL_INVSTG_DATA.getRowPosition(), "REAL_INVSTG_MAJ_CONTN_CD2", "0");
+    dts_REAL_INVSTG_DATA.setCellData(dts_REAL_INVSTG_DATA.getRowPosition(), "REAL_INVSTG_MAJ_CONTN_CD3", "0");
+    dts_REAL_INVSTG_DATA.setCellData(dts_REAL_INVSTG_DATA.getRowPosition(), "REAL_INVSTG_MAJ_CONTN_CD4", "0");
+};
+scwin.fn_filedown = function() {
+    location.href = "/filedownload.do?SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_08 + "&BZ_PROCS_NO=" + dts_fileList.getCellData(dts_fileList.getRowPosition(), "BZ_PROCS_NO") + "&SEQ=" + dts_fileList.getCellData(dts_fileList.getRowPosition(), "ATTACH_SEQ") + "&gubun=48";
+};
+scwin.callElasticFileNoti = function() {
+    $.ajax({
+        type: "POST",
+        url: "/elasticNoti.do",
+        data: {
+            method: "notiElasticCommon",
+            P_bzProcsNo: scwin.vBZ_PROCS_NO,
+            url: "/index/tbld_real_invstg_data_file/kafka",
+            type: "POST"
+        },
+        async: true
+    });
+    scwin.isFileDelete = false;
+};
+scwin.fn_setButton = function() {
+    var url = "/listingCommon.do?method=listGeneral&outputMessageId=BYCORP_DEP_CD_OUT" + "&service=krx.lds.stf.listingcommon.services.ListingCommonApp" + "&queryId=lds.stf.lstproc.bycorpdepcd.condition" + "&{P}param01=" + isurCd;
+    param_Dts.DataID = encodeURI(url);
+    param_Dts.Reset();
+    var depCd = param_Dts.getCellData(1, "DEP_CD");
+    if (jsDepCd != depCd) {
+
+    }
+};
+scwin.btn_Save_onclick = function() {
+    if (scwin.vJobMode == "M") {
+        scwin.fn_update();
+    } else {
+        scwin.fn_save();
+    }
+};
+scwin.btn_Delete_onclick = function() {
+    scwin.fn_delete();
+};
+scwin.btn_Close_onclick = async function() {
+    await $c.frame.CloseFrame();
+};
+scwin.trs_Read_OnFail = function() {
+    $c.win.alert(trs_Read.ErrorMsg);
+};
+scwin.trs_Save_OnSuccess = function() {
+    if (scwin.isFileDelete) scwin.callElasticFileNoti();
+    $c.frame.path("../").fn_list_sync();
+    dts_REAL_INVSTG_DATA.setCellData(1, "BZ_PROCS_NO", scwin.vBZ_PROCS_NO);
+    scwin.vJobMode = "M";
+    btn_Delete.setDisabled(false);
+    btn_Delete.src = "../img/btn_delete.gif";
+    scwin.fn_list_sync();
+    $c.win.alert($c.stf.getMessageParam("MSG-A001", "저장"));
+};
+scwin.trs_Save_OnFail = function() {
+    $c.win.alert($c.stf.getMessageParam("MSG-A002", "저장"));
+    $c.win.alert(trs_Save.ErrorMsg);
+};
+scwin.trs_Update_OnSuccess = function() {
+    if (scwin.isFileDelete) scwin.callElasticFileNoti();
+    $c.frame.path("../").fn_list_sync();
+    $c.win.alert($c.stf.getMessageParam("MSG-A001", "수정"));
+    scwin.fn_list_sync();
+};
+scwin.trs_Update_OnFail = function() {
+    $c.win.alert($c.stf.getMessageParam("MSG-A002", "수정"));
+    $c.win.alert(trs_Update.ErrorMsg);
+};
+scwin.trs_Delete_OnSuccess = async function() {
+    scwin.callElasticFileNoti();
+    $c.frame.path("../").fn_list_sync();
+    $c.win.alert($c.stf.getMessageParam("MSG-A001", "삭제"));
+    await $c.frame.CloseFrame();
+};
+scwin.trs_Delete_OnFail = function() {
+    $c.win.alert($c.stf.getMessageParam("MSG-A002", "삭제"));
+    $c.win.alert(trs_Delete.ErrorMsg);
+};
+scwin.dts_REAL_INVSTG_DATA_OnLoadError = function() {
+    $c.win.alert('dts_REAL_INVSTG_DATA.OnLoadError()');
+};
+scwin.txb_ISUR_CD_onblur = function() {
+    if (txb_ISUR_CD.getValue() == "") {
+        txb_COM_NM.setValue("");
+    }
+};
+scwin.img_com_srch_onclick = function() {
+    $c.cm.IsurcdSearch(txb_ISUR_CD, txb_COM_NM);
+};
+scwin.inf_find_OnClick = function() {
+    var filenm = dts_fileList.getCellData(dts_fileList.getRowPosition(), "filename");
+    if (scwin.vJobMode == "I") {
+        dts_fileList.setCellData(dts_fileList.getRowPosition(), "fileInfo", inf_find.getValue());
+        file_name.setValue(inf_find.getValue());
+    } else {
+        dts_fileList.setCellData(dts_fileList.getRowPosition(), "fileInfo", inf_find.getValue());
+        dts_fileList.setCellData(dts_fileList.getRowPosition(), "ATTACH_SEQ", dts_fileList.getRowPosition());
+        file_name.setValue(inf_find.getValue());
+    }
+    if (inf_find.getValue() == "") {
+        file_name.setValue(filenm);
+    }
+};
+scwin.btn_lineadd_onclick = function() {
+    dts_fileList.insertRow();
+    inf_find.open();
+    if (inf_find.getValue() != "") {
+        if (scwin.vJobMode == "I") {
+            dts_fileList.setCellData(dts_fileList.getRowPosition(), "fileInfo", inf_find.getValue());
+            file_name.setValue(inf_find.getValue());
+        } else {
+            dts_fileList.setCellData(dts_fileList.getRowPosition(), "fileInfo", inf_find.getValue());
+            var seq = dts_fileList.getRowPosition();
+            for (i = 0; i < dts_fileList.getTotalRow(); i++) {
+                if (dts_fileList.getCellData(i, "ATTACH_SEQ") == seq) {
+                    seq++;
+                    i = 0;
+                }
+            }
+            dts_fileList.setCellData(dts_fileList.getRowPosition(), "ATTACH_SEQ", seq);
+            dts_fileList.setCellData(dts_fileList.getRowPosition(), "BZ_PROCS_NO", scwin.vBZ_PROCS_NO);
+            file_name.setValue(inf_find.getValue());
+        }
+    } else {
+        $c.cp.removeRow(dts_fileList, dts_fileList.getRowPosition());
+    }
+};
+scwin.btn_linedelete_onclick = function() {
+    if (dts_fileList.getCellData(dts_fileList.getRowPosition(), "USR_TP_CD") == "3") $c.win.alert("상장법인이 제출한 첨부파일은 삭제되지 않습니다.");
+
+    else $c.cp.removeRow(dts_fileList, dts_fileList.getRowPosition());
+};
+scwin.grd_fileList_OnDblClick = function(row, colid) {
+    if (dts_fileList.getRowStatus(dts_fileList.getRowPosition()) == 0 && dts_fileList.getCellData(dts_fileList.getRowPosition(), "filename") != "" && dts_fileList.getCellData(dts_fileList.getRowPosition(), "ATTACH_SEQ") != "") {
+        $c.elw.fn_filedown();
+    }
+};
+scwin.grd_fileList_CanColumnPosChange = function(row, colid) {
+    return true;
+};
+scwin.gform_onload = function() {
+    $c.cm.PanelToGroupBox(panel_Top);
+    scwin.fn_init_code();
+    scwin.vJobMode = $c.frame.path("../").scwin.vJobMode;
+    scwin.fn_init_ctrl();
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+		<xf:group class="sub_contents" id="" meta_componentContainer="true" style="">
+			<xf:group class="tblbox" id="" style="">
+				<xf:group adaptive="layout" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+					<w2:attributes>
+						<w2:summary></w2:summary>
+					</w2:attributes>
+					<xf:group tagname="colgroup">
+						<xf:group style="width:150px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+					</xf:group>
+					<xf:group style="" tagname="tr">
+						<xf:group class="w2tb_th" style="" tagname="th">
+							<w2:textbox hierarchy="label_13" id="label_13" label=" 회사코드(명)" orgid="label_13" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" style="" tagname="td">
+							<w2:autoComplete hierarchy="txb_ISUR_CD" id="txb_ISUR_CD" maxlength="1000" orgid="txb_ISUR_CD" readOnly="true"
+								style="width:65px;" userData2=" class:TopCondition_01_read; onblur:txb_ISUR_CD_onblur; border-color:#92b1f1;">
+							</w2:autoComplete>
+							<xf:input hierarchy="txb_COM_NM" id="txb_COM_NM" maxlength="1000" orgid="txb_COM_NM" readOnly="true"
+								style="color:#343434;width:200px;" userData2=" class:TopCondition_01_write;">
+							</xf:input>
+							<xf:trigger class="btn_cm icon search" cursor="pointer" ev:onclick="scwin.img_com_srch_onclick"
+								hierarchy="img_com_srch" id="img_com_srch" orgid="img_com_srch" src="../img/btn_search.gif" style="" tabIndex="1">
+								<xf:label><![CDATA[]]></xf:label>
+							</xf:trigger>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="lbl_2" id="lbl_2" label="제목" orgid="lbl_2" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes>
+								<w2:colspan>1</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:input hierarchy="txb_TITLE" id="txb_TITLE" maxlength="200" orgid="txb_TITLE" style="width:430px;"
+								tabIndex="2" userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="lbl_1" id="lbl_1" label="주요내용" orgid="lbl_1" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes></w2:attributes>
+							<xf:group id="" class="flex">
+								<xf:select selectedData="true" hierarchy="chk_stat_1" tabIndex="3" userData2=" checked:checked;" rows=""
+									displayMode="label" orgid="chk_stat_1" ref="" appearance="full" disabledClass="w2selectbox_disabled" style="" id="chk_stat_1"
+									renderType="checkboxgroup" cols="">
+									<xf:choices>
+										<xf:item>
+											<xf:label><![CDATA[영업관련]]></xf:label>
+											<xf:value><![CDATA[]]></xf:value>
+										</xf:item>
+									</xf:choices>
+								</xf:select>
+								<xf:select selectedData="true" hierarchy="chk_stat_2" tabIndex="4" userData2=" checked:checked;" rows=""
+									displayMode="label" orgid="chk_stat_2" ref="" appearance="full" disabledClass="w2selectbox_disabled" style="" id="chk_stat_2"
+									renderType="checkboxgroup" cols="">
+									<xf:choices>
+										<xf:item>
+											<xf:label><![CDATA[재무관련]]></xf:label>
+											<xf:value><![CDATA[]]></xf:value>
+										</xf:item>
+									</xf:choices>
+								</xf:select>
+								<xf:select selectedData="true" hierarchy="chk_stat_3" tabIndex="5" userData2=" checked:checked;" rows=""
+									displayMode="label" orgid="chk_stat_3" ref="" appearance="full" disabledClass="w2selectbox_disabled" style="" id="chk_stat_3"
+									renderType="checkboxgroup" cols="">
+									<xf:choices>
+										<xf:item>
+											<xf:label><![CDATA[경영투명성 관련]]></xf:label>
+											<xf:value><![CDATA[]]></xf:value>
+										</xf:item>
+									</xf:choices>
+								</xf:select>
+								<xf:select selectedData="true" hierarchy="chk_stat_4" tabIndex="6" userData2=" checked:checked;" rows=""
+									displayMode="label" orgid="chk_stat_4" ref="" appearance="full" disabledClass="w2selectbox_disabled" style="" id="chk_stat_4"
+									renderType="checkboxgroup" cols="">
+									<xf:choices>
+										<xf:item>
+											<xf:label><![CDATA[기타내용]]></xf:label>
+											<xf:value><![CDATA[]]></xf:value>
+										</xf:item>
+									</xf:choices>
+								</xf:select>
+							</xf:group>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_2" id="label_2" label="진행단계 " orgid="label_2" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:select1 appearance="minimal" disabledClass="w2selectbox_disabled" displayMode="label"
+								hierarchy="cmb_REAL_INVSTG_STEP_CD" id="cmb_REAL_INVSTG_STEP_CD" orgid="cmb_REAL_INVSTG_STEP_CD" selectedData="true"
+								style="width:180px;" tabIndex="7" userData2=" class:TopCondition_01; bindcolumn:VALUE; listcount:20; listexprformat:TEXT^0^180;">
+							</xf:select1>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="lbl_4" id="lbl_4" label="비고" orgid="lbl_4" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:textarea hierarchy="txa_CONTN" id="txa_CONTN" orgid="txa_CONTN" readOnly="false"
+								style="width:100%; height:60px;" tabIndex="8" userData2=" class:TextArea_01; cacheload:True; wantreturn:True;">
+							</xf:textarea>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_94" id="label_94" label="첨부파일" orgid="label_94" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:group id="" class="titbox mt0">
+								<xf:group id="" class="rt">
+									<xf:input hierarchy="file_name" id="file_name" maxlength="1000" orgid="file_name" style="width:40px;"></xf:input>
+									<xf:trigger cursor="pointer" src="../img/btn_fileadd.gif" ev:onclick="scwin.btn_lineadd_onclick"
+										hierarchy="btn_lineadd" style="" tabIndex="10" id="btn_lineadd" class="btn_cm" orgid="btn_lineadd">
+										<xf:label><![CDATA[파일추가]]></xf:label>
+									</xf:trigger>
+									<xf:trigger cursor="pointer" src="../img/btn_filedelete.gif" ev:onclick="scwin.btn_linedelete_onclick"
+										hierarchy="btn_linedelete" style="" tabIndex="11" id="btn_linedelete" class="btn_cm" orgid="btn_linedelete">
+										<xf:label><![CDATA[파일삭제]]></xf:label>
+									</xf:trigger>
+								</xf:group>
+							</xf:group>
+							<xf:group class="gvwbox" id="" style="">
+								<w2:gridView class="gvw" dataList="data:dts_fileList" hierarchy="grd_fileList" id="grd_fileList"
+									orgid="grd_fileList" style="height: 153px;" tabIndex="9"
+									userData2=" class:Grid_01; cancolumnposchange:grd_fileList_CanColumnPosChange; editable:True; fillarea:False; gtitleheight:0; usingoneclick:0; xtitleheight:0; enablefixedcolumn:False; ondblclick:grd_fileList_OnDblClick;">
+									<w2:caption id="caption1" style="" value="this is a grid caption."></w2:caption>
+									<w2:header id="header1" style="">
+										<w2:row>
+											<w2:column displayMode="label" id="h_filename" inputType="text" readOnly="true"
+												textAlign="center" userData2=" cursor:hand; headmove:False;" value="파일명" width="480">
+											</w2:column>
+										</w2:row>
+									</w2:header>
+									<w2:gBody id="gBody1" style="">
+										<w2:row id="" style="">
+											<w2:column displayMode="label" id="filename" inputType="text" textAlign="center" width="480"></w2:column>
+										</w2:row>
+									</w2:gBody>
+								</w2:gridView>
+							</xf:group>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<xf:group class="btnbox" id="">
+				<xf:group class="rt" id="">
+					<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.btn_Delete_onclick" hierarchy="btn_Delete" id="btn_Delete"
+						orgid="btn_Delete" src="../img/btn_delete.gif" style="" tabIndex="13" text="삭제">
+						<xf:label><![CDATA[삭제]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm pt" cursor="pointer" ev:onclick="scwin.btn_Save_onclick" hierarchy="btn_Save" id="btn_Save"
+						orgid="btn_Save" src="../img/btn_save.gif" style="" tabIndex="12" text="저장">
+						<xf:label><![CDATA[저장]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.btn_Close_onclick" id="btn_Close"
+						src="../img/btn_close.gif" style="" text="닫기">
+						<xf:label><![CDATA[닫기]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+		</xf:group>
+	</body>
+</html>

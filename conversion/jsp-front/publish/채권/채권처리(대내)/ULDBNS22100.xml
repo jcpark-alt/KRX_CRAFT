@@ -1,0 +1,359 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDBNS22100.gfm" meta_screenName="신청시간예외기관관리">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<xf:model>
+			<w2:workflowCollection/>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+/* ★Wcraft guide★    
+스크립트 수작업 유의사항
+*/
+
+
+//★Wcraft guide★ include부분 주석처리 -> include("../js/PopupCalendar.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/libRoundPanel.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/list_common.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/bns_common.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/common.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/session.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/stf.js");
+scwin.vScrenID = 'ULDBNS22100.xml';
+scwin.todat = "";
+scwin.grd_HandOverIsuList_nm = "";
+scwin.grd_TakeOverIsuList_nm = "";
+scwin.grd_byCorpList_nm = "";
+scwin.grd_chgByCorpList_nm = "";
+scwin.grd_allByCorpList_nm = "";
+scwin.gubun = 0; //어느화면에서 수정했는지 체크.
+
+scwin.tmpIdx1 = "";
+scwin.tmpIdx2 = "";
+scwin.gBizTpCd = "";
+scwin.gLdMktTpCd = "";
+scwin.gUpDepCd = "";
+scwin.gETFYn = "N";
+scwin.all_list_count = 0; // 전체 담당지정 법인 목록	
+scwin.filter_cnt = 0;
+scwin.onpageload = function() {
+    scwin.gform_onload();
+};
+scwin.onpageunload = function() {
+}; //filter된 법인목록
+
+
+//조회
+scwin.fn_list_usr_sync = function() {
+    vIsurNm = $c.stf.getObjectValue(txb_IsurCd);
+    var dsNm = 'BNS_ISUR_INFO';
+    var qryId = 'lds.stf.bnslistbzappl.select.listIsurCd.bnsApplPosblTmExcptYn';
+    var param = '&{P}V_ISUR_NM=' + vIsurNm;
+    param += '&{P}V_EXCPT_YN=N';
+    $c.bns.fn_SearchBns(scwin.vScrenID, dts_HandOverIsuList, dsNm, qryId, param);
+    $c.cm.ShowWin(grd_HandOverIsuList);
+    var dsNm = 'BNS_ISUR_INFO';
+    var qryId = 'lds.stf.bnslistbzappl.select.listIsurCd.bnsApplPosblTmExcptYn';
+    var param = '&{P}V_ISUR_NM=';
+    param += '&{P}V_EXCPT_YN=Y';
+    $c.bns.fn_SearchBns(scwin.vScrenID, dts_TakeOverIsuList, dsNm, qryId, param);
+    $c.cm.ShowWin(grd_TakeOverIsuList);
+};
+
+
+
+/*----------------------------------------------------------------------------
+	** 데이터셋의 체크박스 선택이 되어 있는지 확인하여 참,거짓을 넘겨준다. 
+-------------------------------------------------------------------------------*/
+scwin.fn_cntDatasetRowCheck = function(sval) {
+    cCnt = 0;
+    for (i = 1; i <= sval.getTotalRow(); i++) {
+        //alert(sval.NameValue(i, "CHK_FLAG"));
+        if (sval.getCellData(i, "CHK_FLAG") == 1) {
+            cCnt++;
+        }
+    }
+    if (cCnt == 0) {
+        return false;
+    } else {
+        return true;
+    }
+};
+
+
+
+/*----------------------------------------------------------------------------
+	** 예외처리
+-------------------------------------------------------------------------------*/
+scwin.fn_All_HandOver = function() {
+    //gubun = 1;
+    var rowcnt = dts_HandOverIsuList.getTotalRow();
+    if (rowcnt == 0) {
+        $c.win.alert("처리할 사항이 없습니다.");
+        return;
+    }
+    if (!scwin.fn_cntDatasetRowCheck(dts_HandOverIsuList)) {
+        $c.win.alert("적용할 체크사항이 없습니다.");
+    } else {
+        var msg = $c.stf.getMessageParam("MSG-A006", "예외처리");
+        var res = window.confirm(msg);
+        if (res) {
+
+            //dts_Save.setDataHeader(); // W-Craft 주석처리 및 필요시 asis 파라미터 확인 
+            for (var i = 1; i <= dts_HandOverIsuList.getTotalRow(); i++) {
+                if (dts_HandOverIsuList.getCellData(i, "CHK_FLAG") == 1) {
+                    dts_Save.insertRow();
+                    dts_Save.setCellData(dts_Save.getRowPosition(), "ISUR_CD", dts_HandOverIsuList.getCellData(i, "ISUR_CD"));
+                }
+            }
+            trs_Save.Action = "/bns/IsuChgEtc.do?method=updateBndApplTmExcptSaveBtn&V_EXCPT_YN=Y&SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_03;
+            trs_Save.KeyName = "toinb_dataid4";
+            trs_Save.KeyValue = "JSP(I:pInput=dts_Save)";
+            trs_Save.Post();
+        }
+    }
+};
+
+
+
+
+
+/*----------------------------------------------------------------------------
+	** 신청제한처리
+-------------------------------------------------------------------------------*/
+scwin.fn_Select_TakeOver = function() {
+    //gubun = 1;
+    var rowcnt = dts_TakeOverIsuList.getTotalRow();
+    if (rowcnt == 0) {
+        $c.win.alert("처리할 사항이 없습니다.");
+        return;
+    }
+    if (!scwin.fn_cntDatasetRowCheck(dts_TakeOverIsuList)) {
+        $c.win.alert("적용할 체크사항이 없습니다.");
+    } else {
+        var msg = $c.stf.getMessageParam("MSG-A006", "신청제한");
+        var res = window.confirm(msg);
+        if (res) {
+
+            //dts_Save.setDataHeader(); // W-Craft 주석처리 및 필요시 asis 파라미터 확인 
+            for (var i = 1; i <= dts_TakeOverIsuList.getTotalRow(); i++) {
+                if (dts_TakeOverIsuList.getCellData(i, "CHK_FLAG") == 1) {
+                    dts_Save.insertRow();
+                    dts_Save.setCellData(dts_Save.getRowPosition(), "ISUR_CD", dts_TakeOverIsuList.getCellData(i, "ISUR_CD"));
+                }
+            }
+            trs_Save.Action = "/bns/IsuChgEtc.do?method=updateBndApplTmExcptSaveBtn&V_EXCPT_YN=N&SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_03;
+            trs_Save.KeyName = "toinb_dataid4";
+            trs_Save.KeyValue = "JSP(I:pInput=dts_Save)";
+            trs_Save.Post();
+        }
+    }
+};
+scwin.dts_HandOverIsuList_OnLoadCompleted = function(rowcount) {
+    cnt1.setValue(rowcount + " 건");
+    $c.cm.CloseWin(rowcount, grd_HandOverIsuList);
+};
+scwin.dts_TakeOverIsuList_OnLoadCompleted = function(rowcount) {
+    cnt2.setValue(rowcount + " 건");
+    $c.cm.CloseWin(rowcount, grd_TakeOverIsuList);
+};
+scwin.dts_HandOverIsuList_OnLoadError = function() {
+    $c.stf.alert_error(dts_HandOverIsuList);
+};
+scwin.dts_TakeOverIsuList_OnLoadError = function() {
+    $c.stf.alert_error(dts_TakeOverIsuList);
+};
+scwin.trs_Save_OnSuccess = function() {
+    $c.win.alert($c.stf.getMessageParam("MSG-A001", "저장"));
+    scwin.fn_list_usr_sync();
+};
+scwin.trs_Save_OnFail = function() {
+    $c.win.alert($c.stf.getMessageParam("MSG-A002", "저장"));
+    scwin.fn_list_usr_sync();
+};
+scwin.gform_onload = function() {
+    scwin.fn_list_usr_sync();
+    $c.bns.BnsPanelToGroupBox(panel_2);
+    $c.bns.BnsPanelToGroupBox(pnl_IsurSearch);
+};
+scwin.grd_HandOverIsuList_CanColumnPosChange = function(row, colid) {
+    return true;
+};
+scwin.grd_TakeOverIsuList_CanColumnPosChange = function(row, colid) {
+    return true;
+};
+scwin.btn_Select_HandOver_onclick = function() {
+    scwin.fn_Select_TakeOver();
+};
+scwin.btn_All_HandOver_onclick = function() {
+    scwin.fn_All_HandOver();
+};
+scwin.txb_IsurCd_onkeypress = function() {
+    if (event.keyCode == 13) scwin.fn_list_usr_sync();
+};
+scwin.btn_Search_onclick = function() {
+    scwin.fn_list_usr_sync();
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+	<xf:group id="" class="sub_contents">
+		<xf:group class="schbox" id="" meta_snippetCategory="03_조회영역" meta_snippetKeyComponent="true" meta_snippetName="3_01 조회조건1행"
+			style="">
+			<xf:group class="schbox_inner" id="" style="">
+				<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl " id="" style="" tagname="table">
+					<w2:attributes>
+						<w2:summary></w2:summary>
+					</w2:attributes>
+					<xf:group tagname="colgroup">
+						<xf:group style="width:140px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+					</xf:group>
+					<xf:group class="" id="" style="" tagname="tr">
+						<xf:group class="w2tb_th" style="" tagname="th">
+							<w2:textbox hierarchy="lbl_IsurNmCd" id="lbl_IsurNmCd" label="발행기관명(코드)" orgid="lbl_IsurNmCd"
+								style="" userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" style="" tagname="td">
+							<w2:autoComplete hierarchy="txb_IsurCd" id="txb_IsurCd" maxlength="80" orgid="txb_IsurCd"
+								style="width:260px;" tabIndex="1"
+								userData2=" class:TopCondition_01_write; onkeypress:txb_IsurCd_onkeypress; font-family:돋움; border-color:#92b1f1;">
+							</w2:autoComplete>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<xf:group class="btn_schbox" id="" style="">
+				<xf:trigger class="btn_cm sch" cursor="pointer" ev:onclick="scwin.btn_Search_onclick" hierarchy="btn_Search" id="btn_Search"
+					orgid="btn_Search" src="../img/bns/btn_select_n.gif" style="" text="조회">
+					<xf:label><![CDATA[조회]]></xf:label>
+				</xf:trigger>
+			</xf:group>
+		</xf:group>
+		<xf:group hierarchy="panel_2" userData2=" class:TopCondition_01;" style="" id="panel_2" orgid="panel_2" class="lybox horizontal">
+			<xf:group id="">
+				<xf:group id="" class="titbox mt0">
+					<w2:textbox tagname="h3" hierarchy="label_34" userData2=" class:TopCondition_01; font-weight:bold;" style=""
+						id="label_34" label="전체 발행기관 목록" orgid="label_34">
+					</w2:textbox>
+					<xf:group class="rt" id="" style="">
+						<xf:group class="count" id="" style="">
+							<w2:span class="" id="" label="총" style=""></w2:span>
+							<w2:span class="num" id="cnt1" label="0" style=""></w2:span>
+							<w2:span id="" label="건" style=""></w2:span>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+				<xf:group id="" class="gvwbox">
+					<w2:gridView dataList="data:dts_HandOverIsuList" hierarchy="grd_HandOverIsuList"
+						userData2=" class:Grid_01; cancolumnposchange:grd_HandOverIsuList_CanColumnPosChange; colselect:False; colsizing:True; editable:True; fillarea:True; gtitleheight:0; sortview:left; suppressoption:3; titleheight:40; tooltip:use=true;alt=true;createtime=300;leftmargin=10;rightmargin=10;topmargin=10;bottommargin=10;; usingoneclick:1; xtitleheight:0; font-family:돋움체; font-weight:normal;"
+						style="height:153px;" id="grd_HandOverIsuList" class="gvw" orgid="grd_HandOverIsuList" autoFit="allColumn">
+						<w2:caption style="" id="caption1" value="this is a grid caption."></w2:caption>
+						<w2:header style="" id="header1">
+							<w2:row>
+								<w2:column textAlign="center" width="30"
+									userData2=" headalign:center; headcheckshow:False; headcheck:False; headcheckenable:True;" inputType="text" id="h_CHK_FLAG"
+									displayMode="label">
+								</w2:column>
+								<w2:column textAlign="center" width="70" userData2=" value:{currow};" readOnly="true" inputType="text"
+									id="h_NO" value="NO" displayMode="label">
+								</w2:column>
+								<w2:column hidden="false" textAlign="center" width="120" userData2=" sort:True;" readOnly="true"
+									inputType="text" id="h_ISUR_CD" value="발행기관코드" displayMode="label">
+								</w2:column>
+								<w2:column textAlign="center" width="340" userData2=" sort:True;" readOnly="true" inputType="text"
+									id="h_ISUR_NM" value="회사명" displayMode="label">
+								</w2:column>
+							</w2:row>
+						</w2:header>
+						<w2:gBody style="" id="gBody1">
+							<w2:row style="" id="">
+								<w2:column textAlign="center" width="30" inputType="checkbox" id="CHK_FLAG" displayMode="label"></w2:column>
+								<w2:column textAlign="center" width="70" inputType="text" id="NO" displayMode="label"></w2:column>
+								<w2:column textAlign="center" width="120" inputType="text" id="ISUR_CD" displayMode="label"></w2:column>
+								<w2:column textAlign="center" width="340" inputType="text" id="ISUR_NM" displayMode="label"></w2:column>
+							</w2:row>
+						</w2:gBody>
+					</w2:gridView>
+				</xf:group>
+			</xf:group>
+			<xf:group id="" class="ly_btn pt30" style="align-items:center;">
+				<xf:trigger cursor="pointer" src="../img/btn_new_arrowR_all.gif" ev:onclick="scwin.btn_All_HandOver_onclick"
+					hierarchy="btn_All_HandOver" style="" id="btn_All_HandOver" class="btn_cm right" orgid="btn_All_HandOver">
+					<xf:label><![CDATA[]]></xf:label>
+				</xf:trigger>
+				<w2:textbox hierarchy="lbl_2" id="lbl_2" label="예외 처리" orgid="lbl_2" style=""
+					userData2=" class:Blue_Bold; font-family:맑은 고딕;" class="red mb10">
+				</w2:textbox>
+				<xf:trigger cursor="pointer" src="../img/btn_new_arrowL_all.gif" ev:onclick="scwin.btn_Select_HandOver_onclick"
+					hierarchy="btn_Select_HandOver" style="" id="btn_Select_HandOver" class="btn_cm left" orgid="btn_Select_HandOver">
+					<xf:label><![CDATA[]]></xf:label>
+				</xf:trigger>
+				<w2:textbox hierarchy="lbl_1" style="" userData2=" class:Blue_Bold; font-family:맑은 고딕;" id="lbl_1" label="신청 제한"
+					orgid="lbl_1" class="red">
+				</w2:textbox>
+			</xf:group>
+			<xf:group id="">
+				<xf:group id="" class="titbox mt0">
+					<w2:textbox tagname="h3" hierarchy="label_1" userData2=" class:TopCondition_01; font-weight:bold;" style="" id="label_1"
+						label="예외처리 발행기관 목록" orgid="label_1">
+					</w2:textbox>
+					<xf:group class="rt" id="" style="">
+						<xf:group class="count" id="" style="">
+							<w2:span class="" id="" label="총" style=""></w2:span>
+							<w2:span class="num" id="cnt2" label="0" style=""></w2:span>
+							<w2:span id="" label="건" style=""></w2:span>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+				<xf:group id="" class="gvwbox">
+					<w2:gridView dataList="data:dts_TakeOverIsuList" hierarchy="grd_TakeOverIsuList"
+						userData2=" class:Grid_01; cancolumnposchange:grd_TakeOverIsuList_CanColumnPosChange; colselect:False; colsizing:True; editable:True; fillarea:True; gtitleheight:0; sortview:left; titleheight:40; tooltip:use=true;alt=true;createtime=300;leftmargin=10;rightmargin=10;topmargin=10;bottommargin=10;; usingoneclick:1; xtitleheight:0; font-family:돋움체; font-weight:normal;"
+						style="height:153px;" id="grd_TakeOverIsuList" class="gvw" orgid="grd_TakeOverIsuList" autoFit="allColumn">
+						<w2:caption style="" id="caption1" value="this is a grid caption."></w2:caption>
+						<w2:header style="" id="header1">
+							<w2:row>
+								<w2:column textAlign="center" width="30" userData2=" headalign:center;" inputType="text" id="h_CHK_FLAG"
+									displayMode="label">
+								</w2:column>
+								<w2:column textAlign="center" width="70" userData2=" value:{currow};" readOnly="true" inputType="text"
+									id="h_NO" value="NO" displayMode="label">
+								</w2:column>
+								<w2:column hidden="false" textAlign="center" width="120" userData2=" sort:True;" readOnly="true"
+									inputType="text" id="h_ISUR_CD" value="기관코드" displayMode="label">
+								</w2:column>
+								<w2:column textAlign="center" width="340" userData2=" sort:True;" readOnly="true" inputType="text"
+									id="h_ISUR_NM" value="회사명" displayMode="label">
+								</w2:column>
+							</w2:row>
+						</w2:header>
+						<w2:gBody style="" id="gBody1">
+							<w2:row style="" id="">
+								<w2:column textAlign="center" width="30" inputType="checkbox" id="CHK_FLAG" displayMode="label"></w2:column>
+								<w2:column textAlign="center" width="70" inputType="text" id="NO" displayMode="label"></w2:column>
+								<w2:column textAlign="center" width="120" inputType="text" id="ISUR_CD" displayMode="label"></w2:column>
+								<w2:column textAlign="center" width="340" inputType="text" id="ISUR_NM" displayMode="label"></w2:column>
+							</w2:row>
+						</w2:gBody>
+					</w2:gridView>
+				</xf:group>
+			</xf:group>
+		</xf:group>
+		<xf:group class="msgbox" id="" meta_snippetCategory="11_메시지" meta_snippetKeyComponent="true" meta_snippetName="11_05 에러메시지박스"
+			style="">
+			<w2:textbox hierarchy="label_2" style="" userData2=" class:TopCondition_01;" id="label_2" label="신청시간 제한 안내" orgid="label_2"
+				class="txt_msg">
+			</w2:textbox>
+			<w2:textbox hierarchy="label_3" style="" userData2=" class:TopCondition_01;" id="label_3"
+				label="1. 신규상장, ESG채권등록 (09:00 ~ 17:00)" orgid="label_3" class="txt_con">
+			</w2:textbox>
+			<w2:textbox hierarchy="label_4" style="" userData2=" class:TopCondition_01;" id="label_4"
+				label="2. 변경신청, ESG조달자금보고 (09:00 ~ 18:00)" orgid="label_4" class="txt_con">
+			</w2:textbox>
+			<w2:textbox hierarchy="label_5" style="" userData2=" class:TopCondition_01;" id="label_5" label="3. 상장조회 및 파일업로드 제한없음"
+				orgid="label_5" class="txt_con">
+			</w2:textbox>
+		</xf:group>
+	</xf:group></body>
+</html>

@@ -1,0 +1,564 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDSTF10005.gfm" meta_screenName="(팝업)보류처리">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<xf:model>
+			<w2:workflowCollection/>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+/* ★Wcraft guide★    
+스크립트 수작업 유의사항
+*/
+
+
+//★Wcraft guide★ include부분 주석처리 -> include("../js/libRoundPanel.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/stf.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/session.js");
+scwin.gEmpNo;
+scwin.gAcptNo; // 접수번호
+scwin.gProcStat; // 처리단계
+scwin.gProcTpText; // 보류 또는 유보 구분텍스트
+scwin.gLdMktTpCd; // 상장공시시장구분
+scwin.gDoc_LdMktTp;
+scwin.gStatTitle;
+scwin.gRscCd1;
+scwin.gGetRsnCd1;
+scwin.gDRsnCd2;
+scwin.gListFormYn;
+scwin.gIsurCd;
+scwin.gGduty;
+scwin.gEmpNo = js_emp_no; // 세션정보 	
+scwin.gLdMktTpCd = js_market; // 로그인사용자의 시장구분
+scwin.gGduty = js_gduty;
+scwin.vScrenID = 'ULDSTF10005.xml';
+scwin.onpageload = function() {
+    scwin.gform_onload();
+};
+scwin.onpageunload = function() {
+};
+
+// 부모창의 데이타 셋팅하기
+scwin.fn_setParamData = function() {
+    /*
+    gAcptNo = frame.Provider("../../frame_head").dts_AcptProcs.NameString(1, 'ACPT_NO');
+    gProcStat =frame.Provider("../../frame_head").dts_AcptProcs.NameString(1, 'PROCS_STAT_CD');	// 현재 문서의 처리상태
+    gDoc_LdMktTp =frame.Provider("../../frame_head").dts_AcptProcs.NameString(1, 'LD_MKT_TP_CD');
+    */
+    scwin.gAcptNo = $c.frame.path("../../frame_head").scwin.gAcptNo;
+    scwin.gIsurCd = $c.frame.path("../../frame_head").scwin.gIsurCd;
+    scwin.gProcStat = $c.frame.path("../../frame_head").gProcsStatCd;
+    scwin.gDoc_LdMktTp = $c.frame.path("../../frame_head").scwin.gDoc_LdMktTp;
+    scwin.gListFormYn = $c.frame.path("../../frame_head").scwin.gListFormYn;
+    gComAbbrv = $c.frame.path("../../frame_head").scwin.gListFormYn;
+
+    //alert('gDoc_LdMktTp'+gDoc_LdMktTp);
+    if (scwin.gListFormYn == 'Y') {
+        //상장서식이면 보류단계 없음
+        /*
+        cmb_ReservRsn_1.Enable2 = false;
+        cmb_ReservTp.Enable2 = true;
+        showObj(label_noti, false);	
+        */
+        scwin.gStatTitle = "유보";
+        // 코스닥일 경우는 선택 불가 
+        if (scwin.gDoc_LdMktTp == '2' || scwin.gDoc_LdMktTp == '6') {
+            cmb_ReservTp.setDisabled(true);
+            $c.stf.showObj(label_stk, false);
+            $c.stf.showObj(label_kos, true);
+            $c.stf.showObj(label_noti, true);
+            $c.stf.showObj(pnl_rediscl, true);
+        } else {
+            cmb_ReservTp.setDisabled(false);
+            $c.stf.showObj(label_stk, true);
+            $c.stf.showObj(label_kos, false);
+            $c.stf.showObj(label_noti, false);
+            $c.stf.showObj(pnl_rediscl, false);
+            txa_ReservRsnContn.height = "184";
+        }
+    } else {
+        // 코스닥일 경우는 선택 불가 
+        if (scwin.gDoc_LdMktTp == '2' || scwin.gDoc_LdMktTp == '6') {
+            cmb_ReservTp.setDisabled(true);
+            $c.stf.showObj(label_stk, false);
+            $c.stf.showObj(label_kos, true);
+            $c.stf.showObj(label_noti, true);
+            $c.stf.showObj(pnl_rediscl, true);
+        } else {
+            cmb_ReservTp.setDisabled(false);
+            $c.stf.showObj(label_stk, true);
+            $c.stf.showObj(label_kos, false);
+            $c.stf.showObj(label_noti, false);
+            $c.stf.showObj(pnl_rediscl, false);
+            txa_ReservRsnContn.height = "184";
+        }
+        if (scwin.gProcStat == '00' || scwin.gProcStat == '01' || scwin.gProcStat == '02') {
+            // 미처리와 재검토요구일떄
+            scwin.gStatTitle = "보류";
+        } else if (scwin.gProcStat == '10' || scwin.gProcStat == '20' || scwin.gProcStat == '15') {
+            //검토와 보류일떄
+            scwin.gStatTitle = "유보";
+            /*
+            // 담당자가 입력한 보류내용을 읽어오기
+            var url = "/DisclosureStatus.do?method=readDisclosureReserve&inputMessageId=DSCLRESERVELIST_OUT"
+            		+ "&outputMessageId=DSCLRESERVELIST_OUT" 
+            		+ "&ACPT_NO=" +gAcptNo 
+            		+ "&DISCLS_PROCS_TP_CD=20"; 
+            		
+            dts_ReservRead.DataID = encodeURI(url);
+            dts_ReservRead.reset();	
+            */
+
+        } else {
+            scwin.gStatTitle = "유보";
+        }
+    }
+};
+
+
+
+
+
+// 코드 셋팅
+scwin.fn_setCode = function() {
+    var vLdMktTpCd;
+
+    // 공시유보유형 리스트  셋팅
+    dts_ReservTp.DataID = "/CodeAction.do?method=listCodeValueName&inputMessageId=CODEVALUE_INOUT&outputMessageId=CODE_OUT" + "&FOR=C&CD_ENG_NM=RESERV_TP_CD";
+    dts_ReservTp.Reset();
+    if (scwin.gDoc_LdMktTp == '3') {
+        // 선물시장일땐 코스닥기준으로 가져온다.
+        vLdMktTpCd = '2';
+    } else {
+        vLdMktTpCd = scwin.gLdMktTpCd;
+    }
+    if (scwin.gGduty == '11') {
+        vLdMktTpCd = '1';
+    }
+
+    // 공시유보사유 리스트 셋팅
+    dts_ReservRsn.DataID = "/CodeAction.do?method=listDisclsReserveRsnCd&inputMessageId=RESERVRSN_INOUT&outputMessageId=CODE_OUT" + "&FOR=C&LDMKTTP_CD=" + vLdMktTpCd;
+    dts_ReservRsn.Reset();
+
+    // 부모창의 데이타 셋팅하기
+    scwin.fn_setParamData();
+};
+
+
+
+// 보류처리하기  
+scwin.fn_ModifyReserv = function() {
+    var vTp = $c.stf.getObjectValue(cmb_ReservTp);
+    if (scwin.gLdMktTpCd == 1 && vTp.length < 1) {
+        $c.win.alert("유보 유형을 선택하시오.");
+        cmb_ReservTp.focus();
+        return;
+    }
+
+    // 유보사유코드 셋팅
+    var vRsnCd1 = '';
+    var vRsnCd2 = '';
+    var vRsnCd = '';
+    if (scwin.gListFormYn != 'Y') {
+        //상장서식이면 보류단계 없음
+        vRsnCd1 = $c.stf.getObjectValue(cmb_ReservRsn_1);
+        vRsnCd2 = $c.stf.getObjectValue(cmb_ReservRsn_2);
+        if (vRsnCd1.length < 1) {
+            $c.win.alert("유보 사유유형을 선택하시오.");
+            cmb_ReservRsn_1.focus();
+            return;
+        }
+        if (scwin.gDoc_LdMktTp == '1') {
+            // 유가일때
+            if (vRsnCd1 == '02' && vRsnCd2.length < 1) {
+                $c.win.alert("유보 사유 유형의 중분류 선택하시오.");
+                cmb_ReservRsn_2.focus();
+                return;
+            }
+        } else {
+            if (vRsnCd1 == '03' && vRsnCd2.length < 1) {
+                $c.win.alert("유보 사유 유형의 중분류 선택하시오.");
+                cmb_ReservRsn_2.focus();
+                return;
+            }
+        }
+
+        /*
+        if(dts_ReservRsn2.CountRow  > 0 && vRsnCd2.length < 1) {
+        	alert("유보 사유 유형의 중분류 선택하시오." );
+        	cmb_ReservRsn_2.focus();
+        	return;
+        }	
+        */
+        //alert(vRsnCd1 +" = "+vRsnCd2);
+
+        if (vRsnCd2.length == 4) {
+            vRsnCd = vRsnCd2;
+        } else {
+            vRsnCd = vRsnCd1;
+        }
+    }
+    var vRsnContn = $c.stf.getObjectValue(txa_ReservRsnContn);
+    /*  // 선택사항이므로 체크안함.		
+    if(vRsnContn.length < 1) {
+    	alert("유보 사유를 입력하시오." );
+    	txa_ReservRsnContn.focus();
+    	return;
+    	
+    }
+    */
+
+    if ($c.stf.checkMaxLength(txa_ReservRsnContn, 500, '유보사유') == false) {
+        return;
+    }
+    var vRedisclsYn;
+    if ($c.stf.getObjectValue(rdo_rediscls_yn) == '1') {
+        vRedisclsYn = 'Y';
+    } else {
+        vRedisclsYn = 'N';
+    }
+    // 코스닥일 경우만 체크  : 사후에 입력하므로 체크로직 삭제
+    /*
+    if( gDoc_LdMktTp == '2') {
+    	if ( vRedisclsYn  == 'Y' && getObjectValue(txb_rediscls_acptno) == "") {
+    		alert("재공시유무에 '예'를 선택하셨을 경우에는 반드시 재공시를 선택하셔야 합니다.");
+    		return false;
+    	}
+    	
+    	if ( vRedisclsYn  == 'N' && getObjectValue(txb_rediscls_acptno) != "") {
+    		alert("재공시를 선택하셨을 경우에는 재공시유무에 '예'를 선택하셔야 합니다.");
+    		rdo_rediscls_yn.focus();
+    		return false;
+    	}
+    	
+    }
+    */
+
+    if (scwin.gAcptNo == '') {
+        $c.win.alert("접수정보를 다시 읽어와야 하므로 공시뷰어를 닫으신후 다시 열어 주세요.");
+        return false;
+    }
+    dts_ReservInfo.insertRow();
+    dts_ReservInfo.setCellData(1, "ACPT_NO", scwin.gAcptNo);
+    dts_ReservInfo.setCellData(1, "LDMKTTP_CD", scwin.gLdMktTpCd);
+    dts_ReservInfo.setCellData(1, "RESERV_TP_CD", vTp);
+    dts_ReservInfo.setCellData(1, "DISCLS_RESERV_RSN_CD", vRsnCd);
+    dts_ReservInfo.setCellData(1, "DISCLS_PROCS_RSN_DTL_CONTN", vRsnContn);
+    dts_ReservInfo.setCellData(1, "EMP_NO", scwin.gEmpNo);
+    dts_ReservInfo.setCellData(1, "REDISCLS_YN", vRedisclsYn);
+    //dts_ReservInfo.NameValue(1,"REDISCLS_ACPT_NO") = getObjectValue(txb_rediscls_acptno);		
+    dts_ReservInfo.setCellData(1, "DISCLS_DUTY_TP_CD", js_duty_tp_cd);
+    if (dts_ReservInfo.getCellData(1, "ACPT_NO") == '') {
+        $c.win.alert("접수정보를 다시 읽어와야 하므로 공시뷰어를 닫으신후 다시 열어 주세요.");
+        return false;
+    }
+    var vAnswer = confirm(scwin.gStatTitle + '처리 하시겠습니까?');
+    if (vAnswer == true) {
+        if (scwin.fn_getProcsSate(scwin.gAcptNo) == false) {
+            scwin.fn_CloseParentReload();
+            return false;
+        } else {
+            var url = '';
+            if (scwin.gListFormYn == 'Y') {
+                //상장서식이면 보류단계 없음
+                url = "/DisclosureApproval.do?method=processDisclosureReserve&inputMessageId=RESERVRSN_INOUT";
+            } else {
+                if (scwin.gProcStat == '00' || scwin.gProcStat == '01' || scwin.gProcStat == '02') {
+                    // 미처리와 재검토요구일떄 -> 보류
+                    url = "/DisclosureStudy.do?method=processDisclosureHold&inputMessageId=RESERVRSN_INOUT";
+                } else if (scwin.gProcStat == '10' || scwin.gProcStat == '20' || scwin.gProcStat == '15') {
+                    //검토와 보류일떄 -> 유보
+                    url = "/DisclosureApproval.do?method=processDisclosureReserve&inputMessageId=RESERVRSN_INOUT";
+                } else {
+                    url = "/DisclosureApproval.do?method=processDisclosureReserve&inputMessageId=RESERVRSN_INOUT";
+                }
+            }
+            trs_Reserv.Action = url + "&SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_02 + "&ACPT_NO=" + scwin.gAcptNo;
+            trs_Reserv.KeyName = "toinb_dataid4";
+            trs_Reserv.KeyValue = "JSP(I:pInput=dts_ReservInfo)";
+            trs_Reserv.Post();
+        }
+    }
+};
+
+
+
+
+// 처리상태 조회하기
+scwin.fn_getProcsSate = function(gAcptNo) {
+    var url = "/Viewer.do?method=getDsclProcsStat" + "&inputMessageId=VIEWER_OUT" + "&outputMessageId=VIEWER_OUT" + "&ACPT_NO=" + scwin.gAcptNo;
+    dts_procs_stat.DataID = encodeURI(url);
+    dts_procs_stat.reset();
+    var vPROCS_STAT_CD = dts_procs_stat.getCellData(1, "PROCS_STAT_CD");
+    var vPROCS_STAT_NM = dts_procs_stat.getCellData(1, "PROCS_STAT_NM");
+    var vPROCS_DDTM = dts_procs_stat.getCellData(1, "PROCS_DDTM");
+    if (scwin.gProcStat != vPROCS_STAT_CD) {
+        $c.win.alert("본 공시가 " + vPROCS_DDTM + "에  이미 [" + vPROCS_STAT_NM + "] 처리가 되었습니다.");
+        //fn_CloseParentReload();
+        return false;
+    } else {
+        return true;
+    }
+};
+
+
+
+// 뷰어 닫고,  검색목록 reload
+scwin.fn_CloseParentReload = async function() {
+    // 화면닫기
+    $c.frame.path("../../frame_head").fn_CloseParentReload();
+    await $c.frame.CloseFrame();
+};
+scwin.dts_procs_stat_OnLoadCompleted = function(rowcount) {
+
+};
+scwin.dts_procs_stat_OnLoadError = function() {
+    $c.win.alert('dts_procs_stat.OnLoadError()' + dts_procs_stat.ErrorMsg);
+};
+scwin.btn_Cancle_onclick = async function() {
+    await $c.frame.CloseFrame();
+};
+scwin.btn_Save_onclick = function() {
+    scwin.fn_ModifyReserv();
+};
+scwin.trs_Reserv_OnSuccess = async function() {
+    $c.win.alert("성공적으로 " + scwin.gStatTitle + "처리 되었습니다.");
+
+    // 부모창 reload 처리해야함
+    //frame.Provider("../../frame_head").fn_HeadRead() ;
+    $c.frame.path("../../frame_head").fn_CloseParentReload();
+    await $c.frame.CloseFrame();
+};
+scwin.trs_Reserv_OnFail = function() {
+    $c.win.alert('trs_Reserv.OnFail() :' + trs_Reserv.ErrorMsg);
+};
+scwin.dts_ReservRsn_OnLoadCompleted = function(rowcount) {
+    // 데이터셋 복사
+    $c.stf.CopyDataSet(dts_ReservRsn, dts_ReservRsn1);
+    $c.stf.CopyDataSet(dts_ReservRsn, dts_ReservRsn2);
+    dts_ReservRsn1.UseFilter = true;
+    dts_ReservRsn1.Filter();
+    if (scwin.gProcStat == '20') {
+        //검토와 보류일떄		
+        // 담당자가 입력한 보류내용을 읽어오기
+        var url = "/DisclosureStatus.do?method=readDisclosureReserve&inputMessageId=DSCLRESERVELIST_OUT" + "&outputMessageId=DSCLRESERVELIST_OUT" + "&ACPT_NO=" + scwin.gAcptNo + "&DISCLS_PROCS_TP_CD=20";
+        dts_ReservRead.DataID = encodeURI(url);
+        dts_ReservRead.reset();
+    }
+};
+scwin.dts_ReservRsn2_OnLoadCompleted = function(rowcount) {
+
+};
+scwin.dts_ReservRsn1_OnFilter = function(row) {
+    if (dts_ReservRsn1.getCellData(row, "value").length == 2) {
+        return true;
+    } else {
+        return false;
+    }
+};
+scwin.cmb_ReservRsn_1_OnSelChange2 = function() {
+    scwin.gRscCd1 = $c.cp.valueOfIndex(cmb_ReservRsn_1, "value", cmb_ReservRsn_1.getSelectedIndex());
+    dts_ReservRsn2.UseFilter = true;
+    dts_ReservRsn2.Filter();
+
+    // 유보사유 중분류 선택할 값이 있으면 enable
+    if (dts_ReservRsn2.getTotalRow() > 0) {
+        cmb_ReservRsn_2.setDisabled(false);
+        cmb_ReservRsn_2.trigger("onclick");
+    } else {
+        cmb_ReservRsn_2.setDisabled(true);
+    }
+};
+scwin.cmb_ReservRsn_1_OnSelected = function() {
+
+};
+scwin.dts_ReservRsn2_OnFilter = function(row) {
+    //  대분류에 해당하는 중분류를 가져온다.
+    if (dts_ReservRsn2.getCellData(row, "value").substr(0, 2) == scwin.gRscCd1 &&
+        dts_ReservRsn2.getCellData(row, "value").length == 4) {
+        return true;
+    } else {
+        return false;
+    }
+};
+scwin.dts_ReservRead_OnLoadCompleted = function(rowcount) {
+    scwin.gRscCd1 = dts_ReservRead.getCellData(1, "RESERV_RSN_CD1");
+    dts_ReservRsn2.UseFilter = true;
+    dts_ReservRsn2.Filter();
+    scwin.gDRsnCd2 = dts_ReservRead.getCellData(1, "RESERV_RSN_CD2");
+    if (scwin.gDRsnCd2 == null || scwin.gDRsnCd2 == '') {
+        cmb_ReservRsn_2.setDisabled(true);
+    } else {
+        $c.stf.setObjectValue(cmb_ReservRsn_2, scwin.gDRsnCd2);
+        cmb_ReservRsn_2.setDisabled(false);
+    }
+    $c.stf.setObjectValue(rdo_rediscls_yn, dts_ReservRead.getCellData(1, "REDISCLS_YN"));
+    /*
+    setObjectValue(txb_rediscls_acptno, dts_ReservRead.NameValue(1,"REDISCLS_ACPT_NO")) ;	
+    setObjectValue(txb_acpt_ddtm, dts_ReservRead.NameValue(1,"REDISCLS_DOC_TITLE")) ;	
+    setObjectValue(txb_doc_title, dts_ReservRead.NameValue(1,"REDISCLS_PROCS_DDTM")) ;
+    */
+
+};
+scwin.dts_ReservTp_OnLoadCompleted = function(rowcount) {
+    // 유가일때 디폴트는 정정유보
+    if (scwin.gDoc_LdMktTp == '1') {
+        $c.stf.setObjectValue(cmb_ReservTp, '2');
+    }
+};
+scwin.rdo_rediscls_yn_OnSelChange = function() {
+    /*
+    	if (rdo_rediscls_yn.CodeValue == 2) {
+    		setObjectValue(txb_acpt_ddtm, "");	
+    		setObjectValue(txb_doc_title, "");			
+    		setObjectValue(txb_rediscls_acptno, "");	
+    	}
+    */
+};
+scwin.gform_onload = function() {
+    // 패널라운드 처리
+    $c.libRoundPanel.PanelToGroupBox(pnl_1);
+    scwin.fn_setCode();
+    // 가우스헤더 셋팅
+    dts_ReservInfo.DataID = "/gauceSystemierAdaptor.do?method=getGauceDataHeader&messageId=RESERVRSN_INOUT";
+    dts_ReservInfo.reset();
+    cmb_ReservRsn_2.setDisabled(true);
+    //showObj(txb_rediscls_acptno, false);
+
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+		<xf:group class="pop_contents" id="" meta_snippetCategory="00_화면시작" meta_snippetKeyComponent="true"
+			meta_snippetName="0_02 팝업페이지시작">
+			<xf:group class="tblbox" id="pnl_1" meta_snippetCategory="05_입출력테이블" meta_snippetKeyComponent="true"
+				meta_snippetName="5_01 1단테이블" style="">
+				<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+					<w2:attributes>
+						<w2:summary></w2:summary>
+					</w2:attributes>
+					<xf:group tagname="colgroup">
+						<xf:group style="width:150px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+					</xf:group>
+					<xf:group style="" tagname="tr">
+						<xf:group class="w2tb_th" style="" tagname="th">
+							<w2:textbox hierarchy="lbl_tmp_2" id="lbl_tmp_2" label="유보 유형" orgid="lbl_tmp_2" style=""
+								userData2=" class:TopCondition_01; font-family:돋움;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" style="" tagname="td">
+							<xf:select1 appearance="minimal" disabledClass="w2selectbox_disabled" displayMode="label"
+								hierarchy="cmb_ReservTp" id="cmb_ReservTp" orgid="cmb_ReservTp" ref="data:dts_ReservTp" selectedData="true" style="width:140px;"
+								userData2=" class:TopCondition_01; bindcolumn:value; listcount:10; listexprformat:text^0^70; searchcolumn:text; font-family:돋움;">
+							</xf:select1>
+							<w2:textbox class="orange" hierarchy="label_stk" id="label_stk"
+								label="1.정정유보 : 공시유보후 공시문서를 다시 받아야 되는 경우&lt;br&gt;2.유보　 　: 공시유보후 공시문서를 다시 받지 않아야 하는 경우" orgid="label_stk" style=""
+								userData2=" class:Message_01; font-family:돋움; font-weight:normal; vertical-align:middle;" escape="false">
+							</w2:textbox>
+							<w2:textbox hierarchy="label_noti" id="label_noti" label="(※ 유가증권시장만 사용합니다)" orgid="label_noti"
+								style="display: none;" userData2=" font-family:돋움;">
+							</w2:textbox>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_7" id="label_7" label="유보 사유 유형" orgid="label_7" style=""
+								userData2=" class:TopCondition_01; font-family:돋움;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:select1 appearance="minimal" disabledClass="w2selectbox_disabled" displayMode="label"
+								hierarchy="cmb_ReservRsn_1" id="cmb_ReservRsn_1" orgid="cmb_ReservRsn_1" ref="data:dts_ReservRsn1" selectedData="true"
+								style="width:312px;"
+								userData2=" class:TopCondition_01; bindcolumn:value; listcount:10; listexprformat:text^0^500; searchcolumn:text; font-family:돋움;" ev:onchange="scwin.cmb_ReservRsn_1_OnSelChange2">
+							</xf:select1>
+							<xf:select1 appearance="minimal" disabled="false" disabledClass="w2selectbox_disabled" displayMode="label"
+								hierarchy="cmb_ReservRsn_2" id="cmb_ReservRsn_2" orgid="cmb_ReservRsn_2" ref="data:dts_ReservRsn2" selectedData="true"
+								style="width:315px;"
+								userData2=" class:TopCondition_01; bindcolumn:value; listcount:10; listexprformat:text^0^387; searchcolumn:text; font-family:돋움;">
+							</xf:select1>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_6" id="label_6" label="유보(보류) 사유" orgid="label_6" style=""
+								userData2=" class:TopCondition_01; font-family:돋움;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:textarea hierarchy="txa_ReservRsnContn" id="txa_ReservRsnContn" orgid="txa_ReservRsnContn"
+								style="width:630px;" userData2=" font-family:돋움;">
+							</xf:textarea>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="td" class="w2tb_td in_tbl">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+								<w2:colspan>2</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:group class="tblbox" id="pnl_rediscl" meta_snippetCategory="05_입출력테이블" meta_snippetKeyComponent="true"
+								meta_snippetName="5_01 1단테이블" style="">
+								<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+									<w2:attributes>
+										<w2:summary></w2:summary>
+									</w2:attributes>
+									<xf:group tagname="colgroup">
+										<xf:group style="width:150px;" tagname="col"></xf:group>
+										<xf:group style="" tagname="col"></xf:group>
+									</xf:group>
+									<xf:group style="" tagname="tr">
+										<xf:group class="w2tb_th" style="" tagname="th">
+											<w2:textbox hierarchy="label_1" id="label_1" label="재공시 유무" orgid="label_1" style=""
+												userData2=" class:TopCondition_01; font-family:돋움;">
+											</w2:textbox>
+										</xf:group>
+										<xf:group class="w2tb_td" style="" tagname="td">
+											<xf:select1 appearance="full" ev:onchange="scwin.rdo_rediscls_yn_OnSelChange"
+												hierarchy="rdo_rediscls_yn" id="rdo_rediscls_yn" item="1^예,2^아니오" orgid="rdo_rediscls_yn" renderType="radiogroup"
+												selectedIndex="1" style="" userData2=" automargin:True; cols:3; font-family:돋움;">
+												<xf:choices>
+													<xf:item>
+														<xf:label><![CDATA[예]]></xf:label>
+														<xf:value><![CDATA[1]]></xf:value>
+													</xf:item>
+													<xf:item>
+														<xf:label><![CDATA[아니오]]></xf:label>
+														<xf:value><![CDATA[2]]></xf:value>
+													</xf:item>
+												</xf:choices>
+											</xf:select1>
+										</xf:group>
+									</xf:group>
+								</xf:group>
+							</xf:group>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<xf:group class="btnbox" id="" meta_snippetCategory="08_버튼" meta_snippetKeyComponent="true" meta_snippetName="8_05 팝업전체제어버튼"
+				style="">
+				<xf:group id="" class="lt"><w2:textbox hierarchy="label_kos" style="" userData2=" font-family:돋움;" id="label_kos" label='※ 상장법인의 재공시가 예정되어 있을 경우 「 재공시유무」에 "예"를 선택하고 &lt;br&gt;　 추후 공시유보현황 화면에서 관련 재공시내역을 입력해주세요.' class="red" orgid="label_kos" escape="false">
+				</w2:textbox></xf:group><xf:group class="rt" id="" style="">
+					<xf:trigger class="btn_cm pt" id="btn_Save" style="" type="button">
+						<xf:label><![CDATA[저장]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.btn_Cancle_onclick" hierarchy="btn_Cancle" id="btn_Cancle"
+						orgid="btn_Cancle" src="../img/btn_cancel.gif" style="">
+						<xf:label><![CDATA[취소]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+		</xf:group>
+	</body>
+</html>

@@ -1,0 +1,435 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDSTF05010_STK_ReadOnly.gfm" meta_screenName="(팝업)유가 위원회 심의 정보 입력 팝업조회">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<xf:model>
+			<w2:workflowCollection/>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+/* ★Wcraft guide★    
+스크립트 수작업 유의사항
+*/
+
+
+//★Wcraft guide★ include부분 주석처리 -> include("../js/stf.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/list_common.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/session.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/PopupCalendar.js");
+scwin.MSG_TR_DOME = "작업이 정상적으로 처리되었습니다.";
+scwin.MSG_TR_FAIL = "처리 중 오류가 발생하였습니다.";
+scwin.MGS_NO_UPDT = "저장할 수정내용이 없습니다.";
+scwin.MSG_NO_COMT = "위원회심사결과 내역이 없습니다. 새로 추가하시겠습니까?";
+scwin.fn_GetPar, scwin.fn_SetPar, scwin.strKeyLstBzProcsNo = "", scwin.strKeyIsurCd = "";
+scwin.vScrenID = "ULDSTF05010_STK.xml";
+scwin.onpageload = function() {
+    scwin.gform_onload();
+};
+scwin.onpageunload = function() {
+};
+scwin.fn_getUserId = function() {
+    return js_emp_no;
+};
+scwin.fn_ShowCalendar = function(o) {
+    if ((o != undefined) && (!o.readOnly)) {
+        popUpCalendar2(o);
+    }
+};
+scwin.fn_searchCode = function() {
+    var arrCid = [{
+        cid: "COMITE_INVSTG_RSLT_CD",
+        cnm: "cmb_ComiteInvstgRsltCd"
+    }];
+    var objCod;
+    var url = "/CodeAction.do?SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01 + "&method=listCodeValueNameM&inputMessageId=CODE_M_IN&outputMessageId=CODE_M_OUT" + "&CD_ID_M='COMITE_INVSTG_RSLT_CD'";
+    dts_Cod.DataID = encodeURI(url);
+    dts_Cod.reset();
+    var strCbd = "",
+        i, j;
+    for (i = 0; i < arrCid.length; i++) {
+        objCod = document.getElementById(arrCid[i].cnm);
+        if (objCod == null) {
+            $c.win.alert(arrCid[i].cnm);
+        }
+        strCbd = "";
+        for (j = 1; j <= dts_Cod.getTotalRow(); j++) {
+            if (dts_Cod.getCellData(j, "CD_ENG_NM") == arrCid[i].cid) {
+                strCbd = strCbd + (strCbd == "" ? "" : ",") + dts_Cod.getCellData(j, "VALUE") + "^" + dts_Cod.getCellData(j, "TEXT").replace(/,/g, "','");
+            }
+        }
+        objCod.CBData = strCbd;
+    }
+};
+scwin.fn_searchReqInf = function() {
+    var url = "/listingCommon.do?SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01 + "&method=listGeneral" + "&outputMessageId=PRELISTING_KOSDAQ_CMTDELIB_REQINF_INOUT" + "&service=krx.lds.stf.listingcommon.services.ListingCommonApp" + "&queryId=lds.stf.lstproc.prelistingstk.list.cmtdelib.reqinf.condition" + "&{P}param01=" + dts_Cmt.getCellData(dts_Cmt.getRowPosition(), "BZ_PROCS_NO");
+    dts_ReqInf.DataID = encodeURI(url);
+    dts_ReqInf.reset();
+};
+scwin.fn_search = function() {
+    // 발행기관코드가 키값이다.
+
+    var url = "/listingCommon.do?SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01 + "&method=listGeneral" + "&outputMessageId=PRELISTING_KOSDAQ_CMTDELIB_INOUT" + "&service=krx.lds.stf.listingcommon.services.ListingCommonApp" + "&queryId=lds.stf.lstproc.prelistingstk.list.cmtdelib.condition" + "&{P}param01=" + scwin.strKeyIsurCd;
+    dts_Cmt.DataID = encodeURI(url);
+    dts_Cmt.reset();
+};
+scwin.fn_save = function(jobType) {
+    if (js_dep_cd.substring(0, 2) !== '25' && // 유가 - 상장부
+        js_dep_cd !== '2615') {
+        //기업심사팀(2615) by nhkw
+        $c.win.alert("해당 부서만 접수가 가능합니다.");
+        return;
+    }
+
+
+    //if(jobType == "D"){}  -- 삭제일 경우, 쿼리문도 수정해줘야 함.
+    //else{
+
+    //위원회일/철회일 필수 체크
+    //1줄만 있을 경우, 삭제할 수 없음
+    if (med_ComiteDd.getValue() == "") {
+        $c.win.alert("위원회일/철회일을 입력하여 주세요");
+        med_ComiteDd.focus();
+        return false;
+    }
+    //}
+
+    var vScrenProcTpCd;
+    if (jobType == "I") {
+        vScrenProcTpCd = SCREN_PROCS_TP_CD_02;
+    } else if (jobType == "U") {
+        vScrenProcTpCd = SCREN_PROCS_TP_CD_03;
+    } else if (jobType == "D") {
+        vScrenProcTpCd = SCREN_PROCS_TP_CD_04;
+    }
+    if ($c.cp.isModified(dts_Cmt) || $c.cp.isModified(dts_ReqInf)) {
+        dts_ReqInf.setCellData(1, "LST_COMITE_RSLT_SAVE_EMP_NO", scwin.fn_getUserId());
+        tr_Save.Action = "/Prelisting.do?SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + vScrenProcTpCd + "&method=saveCmtdelRslt";
+        tr_Save.KeyName = "toinb_dataid4";
+        tr_Save.KeyValue = "JSP(I:pInpReqInf=dts_ReqInf,I:pInpCmt=dts_Cmt)";
+        tr_Save.Post();
+    } else {
+        $c.win.alert(scwin.MGS_NO_UPDT);
+    }
+};
+scwin.fn_addNewCmt = function() {
+    dts_Cmt.insertRow();
+    dts_Cmt.setCellData(dts_Cmt.getRowPosition(), "BZ_PROCS_NO", scwin.strKeyLstBzProcsNo);
+    scwin.fn_searchReqInf();
+    scwin.fn_setKeyCtrOnAdd(); // 추가상태에서는  key컬럼수정가능
+
+};
+scwin.fn_DeleteRow = function() {
+    $c.cp.removeRow(dts_Cmt, dts_Cmt.getRowPosition());
+    scwin.fn_save("D");
+};
+scwin.fn_setKeyCtrOnAdd = function() {
+    $c.lc.fn_setCtrWritable([med_ComiteDd]);
+};
+scwin.fn_setKeyCtrOnUpd = function() {
+    $c.lc.fn_setCtrReadOnly([med_ComiteDd]);
+};
+scwin.dts_Cmt_OnLoadCompleted = function(rowcount) {
+    if (dts_Cmt.getTotalRow() > 0) {
+        scwin.fn_setKeyCtrOnUpd(); // 조회직후에는 수정상태
+        scwin.fn_searchReqInf();
+    }
+};
+scwin.dts_Cmt_OnRowPosChanged = function(row) {
+    if (dts_Cmt.getTotalRow() > 0) {
+        if (dts_Cmt.getCellData(row, "BZ_PROCS_NO") != "") {
+            scwin.fn_searchReqInf();
+        }
+
+    }
+};
+scwin.dts_ReqInf_OnLoadCompleted = function(rowcount) {
+
+};
+scwin.tr_Save_OnFail = function() {
+    $c.win.alert(scwin.MSG_TR_FAIL);
+};
+scwin.tr_Save_OnSuccess = function() {
+    $c.win.alert(scwin.MSG_TR_DOME);
+    scwin.fn_search();
+
+    //상장위원회일, 심사구분 reLoad
+    var parentWin = $c.frame.path("../");
+    parentWin.fn_read_sync();
+};
+scwin.img_SetComiteDd_onclick = function() {
+    scwin.fn_ShowCalendar(med_ComiteDd);
+};
+scwin.btn_Close_onclick = async function() {
+    await $c.frame.CloseFrame();
+};
+scwin.gform_onload = function() {
+    var arr = new Array();
+    $c.elw.fn_searchCode();
+    scwin.fn_GetPar = $c.frame.path("../").scwin.fn_GetPar;
+    scwin.fn_SetPar = $c.frame.path("../").scwin.fn_SetPar;
+    if (scwin.fn_GetPar != undefined) {
+        scwin.fn_GetPar(arr);
+    }
+    txb_IsurCd.setValue((arr.length >= 1 ? arr[0] : ""));
+    scwin.strKeyIsurCd = (arr.length >= 1 ? arr[0] : "");
+    scwin.strKeyLstBzProcsNo = (arr.length >= 2 ? arr[1] : "");
+    txb_CoNm.setValue((arr.length >= 3 ? arr[2] : "")); // 발행기관명도 넘겨받아 컨트롤에 반영해야 한다.
+
+    if (arr.length > 2) {
+        scwin.fn_search();
+    }
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+		<!-- Tag is Not matched with wCraft2 Rule :<style/>-->
+		<xf:model>
+			<!-- Tag is Not matched with wCraft2 Rule :<mxdataset id="dts_Cod" syncload="True" orgid="dts_Cod" hierarchy="dts_Cod"/>-->
+			<!-- Tag is Not matched with wCraft2 Rule :<mxdataset id="dts_Cmt" userData2=" onloadcompleted:dts_Cmt_OnLoadCompleted; onrowposchanged:dts_Cmt_OnRowPosChanged;" orgid="dts_Cmt" hierarchy="dts_Cmt"/>-->
+			<!-- Tag is Not matched with wCraft2 Rule :<mxlogicaltr id="tr_Save" onfail="tr_Save_OnFail" onsuccess="tr_Save_OnSuccess" keyname="toinb_dataid4" orgid="tr_Save" hierarchy="tr_Save"/>-->
+			<w2:dataMap id="bnd_Cmt" userData2=" activebind:true; dataid:dts_Cmt;" baseNode="map">
+				<w2:keyInfo>
+					<w2:key id="COMITE_DD" ctrl="med_ComiteDd" userData2=" param:text; readonly:False;" />
+					<w2:key id="RETR_YN" ctrl="rdo_RetrYn" userData2=" param:CodeValue; readonly:False;" />
+					<w2:key id="COMITE_INVSTG_RSLT_CD" ctrl="cmb_ComiteInvstgRsltCd" userData2=" param:BindColVal; readonly:False;" />
+					<w2:key id="REMK" ctrl="txa_Remk" userData2=" param:text; readonly:False;" />
+				</w2:keyInfo>
+			</w2:dataMap>
+			<!-- Tag is Not matched with wCraft2 Rule :<mxdataset id="dts_ReqInf" syncload="True" usechangeinfo="False" userData2=" onloadcompleted:dts_ReqInf_OnLoadCompleted;" orgid="dts_ReqInf" hierarchy="dts_ReqInf"/>-->
+			<w2:dataMap id="bnd_ReqInf" userData2=" activebind:true; dataid:dts_ReqInf;" baseNode="map">
+				<w2:keyInfo>
+					<w2:key id="BILL_SUBMIT_DD" ctrl="med_BillSubmitDd" userData2=" param:text; readonly:False;" />
+					<w2:key id="LST_COMITE_RSLT_SAVE_DDTM" ctrl="med_LstComiteRsltSaveDdtm" userData2=" param:text; readonly:False;" />
+					<w2:key id="LST_COMITE_RSLT_SAVE_EMP_NM" ctrl="txb_LstComiteRsltSaveEmpNm" userData2=" param:value; readonly:False;" />
+				</w2:keyInfo>
+			</w2:dataMap>
+		</xf:model>
+		
+		<xf:events>
+			<xf:event userData2=" for:dts_Cmt; eventname:OnLoadCompleted(rowcount);" />
+			<xf:event userData2=" for:dts_Cmt; eventname:OnRowPosChanged(row);" />
+			<xf:event userData2=" for:dts_ReqInf; eventname:OnLoadCompleted(rowcount);" />
+			<xf:event userData2=" for:tr_Save; eventname:OnFail();" />
+			<xf:event userData2=" for:tr_Save; eventname:OnSuccess();" />
+			<xf:event userData2=" for:img_SetComiteDd; eventname:onclick;" />
+			<xf:event userData2=" for:btn_Close; eventname:onclick;" />
+			<xf:event userData2=" for:gform; eventname:onload;" />
+		</xf:events>
+		<xf:group class="pop_contents" id="" meta_snippetCategory="00_화면시작" meta_snippetKeyComponent="true"
+			meta_snippetName="0_02 팝업페이지시작">
+			<xf:group class="tblbox" id="pan_Cnd" meta_snippetCategory="05_입출력테이블" meta_snippetKeyComponent="true"
+				meta_snippetName="5_01 1단테이블" style="">
+				<xf:group adaptive="layout" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+					<w2:attributes>
+						<w2:summary></w2:summary>
+					</w2:attributes>
+					<xf:group tagname="colgroup">
+						<xf:group style="width:150px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+					</xf:group>
+					<xf:group style="" tagname="tr">
+						<xf:group class="w2tb_th" style="" tagname="th">
+							<w2:textbox id="label_2" label="발행기관코드" style="" userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" style="" tagname="td">
+							<xf:input id="txb_IsurCd" maxlength="1000" readOnly="true" style="width:45px;"
+								userData2=" class:TopCondition_01_read;">
+							</xf:input>
+							<xf:input id="txb_CoNm" maxlength="1000" readOnly="true" style="width:210px;"
+								userData2=" class:TopCondition_01_read;">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<xf:group class="tblbox" id="pan_Cmt" meta_snippetCategory="05_입출력테이블" meta_snippetKeyComponent="true"
+				meta_snippetName="5_01 1단테이블" style="">
+				<xf:group adaptive="layout" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+					<w2:attributes>
+						<w2:summary></w2:summary>
+					</w2:attributes>
+					<xf:group tagname="colgroup">
+						<xf:group style="width:150px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+					</xf:group>
+					<xf:group style="" tagname="tr">
+						<xf:group class="w2tb_th" style="" tagname="th">
+							<w2:textbox id="label_1" label="청구서제출일" style="" userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" style="" tagname="td">
+							<xf:input id="med_BillSubmitDd" style="width:70px;"
+								userData2=" class:panel_maskedit_read_01; alignment:1; datemodify:True; numeric:False; valign:1;">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_5" label="철회여부" style="" userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes>
+								<w2:colspan>1</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:select1 appearance="full" id="rdo_RetrYn" item="Y^예,N^아니오" renderType="radiogroup" style=""
+								userData2=" class:TopCondition_Blue; automargin:True; cols:2;">
+								<xf:choices>
+									<xf:item>
+										<xf:label><![CDATA[예]]></xf:label>
+										<xf:value><![CDATA[Y]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[아니오]]></xf:label>
+										<xf:value><![CDATA[N]]></xf:value>
+									</xf:item>
+								</xf:choices>
+							</xf:select1>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_7" label="위원회일/철회일" style="" userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes></w2:attributes>
+							<w2:inputCalendar id="med_ComiteDd" style="width: 120px;" calendarValueType="yearMonthDate"></w2:inputCalendar>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_84" label="위원회결과" style="" userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:select1 appearance="minimal" disabledClass="w2selectbox_disabled" displayMode="label"
+								id="cmb_ComiteInvstgRsltCd" selectedData="true" style="width:135px;"
+								userData2=" class:TopCondition_01; bindcolumn:CODE; listcount:10; listexprformat:TEXT^0^150;">
+							</xf:select1>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_3" label="비고" style="" userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:textarea id="txa_Remk" style="width:408px;" userData2=" class:TextArea_01; applyrtf:False;"></xf:textarea>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<xf:group class="gvwbox" id="" style="">
+				<w2:gridView class="gvw" dataList="data:dts_Cmt" hierarchy="grd" id="grd" orgid="grd" style="height: 153px;"
+					userData2=" class:Grid_01; gtitleheight:0; xtitleheight:0;" autoFit="allColumn">
+					<w2:caption id="caption1" style="" value="this is a grid caption."></w2:caption>
+					<w2:header id="header1" style="">
+						<w2:row>
+							<w2:column displayMode="label" inputType="text" textAlign="center"
+								userData2=" value:{left(BILL_SUBMIT_DD, 4)&amp;'-'&amp;mid(BILL_SUBMIT_DD, 5, 2)&amp;'-'&amp;right(BILL_SUBMIT_DD, 2)};"
+								value="청구서제출일" width="145">
+							</w2:column>
+							<w2:column displayMode="label" inputType="text" textAlign="center"
+								userData2=" value:{left(COMITE_DD, 4)&amp;'-'&amp;mid(COMITE_DD, 5, 2)&amp;'-'&amp;right(COMITE_DD, 2)};" value="위원회일/철회일"
+								width="145">
+							</w2:column>
+							<w2:column displayMode="label" id="COMITE_INVSTG_RSLT_NM" inputType="text" textAlign="center" value="위원회결과"
+								width="200">
+							</w2:column>
+						</w2:row>
+					</w2:header>
+					<w2:gBody id="gBody1" style="">
+						<w2:row id="" style="">
+							<w2:column displayMode="label" id="undefined" inputType="text" textAlign="center" width="145"></w2:column>
+							<w2:column displayMode="label" id="undefined" inputType="text" textAlign="center" width="145"></w2:column>
+							<w2:column displayMode="label" id="COMITE_INVSTG_RSLT_NM" inputType="text" textAlign="left" width="200"></w2:column>
+						</w2:row>
+					</w2:gBody>
+				</w2:gridView>
+			</xf:group>
+			<xf:group class="tblbox" id="" meta_snippetCategory="05_입출력테이블" meta_snippetKeyComponent="true" meta_snippetName="5_02 2단테이블"
+				style="">
+				<xf:group adaptive="layout" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+					<w2:attributes>
+						<w2:summary></w2:summary>
+					</w2:attributes>
+					<xf:group tagname="colgroup">
+						<xf:group style="width:150px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+						<xf:group style="width:150px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_4" label="최종저장시간" style="" userData2=" class:TopCondition_01; border-color:#92b1f1;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes></w2:attributes>
+							<xf:input displayFormat="9999-99-99 99:99:99" id="med_LstComiteRsltSaveDdtm" readOnly="true"
+								style="width:124px;"
+								userData2=" class:panel_maskedit_read_01; alignment:1; datemodify:True; generaledit:False; numeric:False; valign:1;">
+							</xf:input>
+						</xf:group>
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_6" label="저장자" style="" userData2=" class:TopCondition_01; border-color:#92b1f1;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes></w2:attributes>
+							<xf:input id="txb_LstComiteRsltSaveEmpNm" maxlength="1000" readOnly="true" style="width:105px;"
+								userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<xf:group class="btnbox" id="panel_1" meta_snippetCategory="08_버튼" meta_snippetKeyComponent="true"
+				meta_snippetName="8_04 전체제어버튼" style="margin-top: 8px;">
+
+				<xf:group id="" class="lt">
+					<xf:group id="" class="">
+						<w2:textbox class="txt_info" id="label_9" label="* 위원회일은 수정할 수 없습니다." style=""
+							userData2=" class:TopCondition_01; font-family:돋움; border-color:#0000FF;">
+						</w2:textbox>
+						<w2:textbox class="txt_info" id="label_10" label="* 위원회 결과 추가시 '신규' 버튼을 선택하고 입력합니다. " style=""
+							userData2=" class:TopCondition_01; font-family:돋움; border-color:#0000FF;">
+						</w2:textbox>
+					</xf:group>
+				</xf:group>
+				<xf:group class="rt" id="" style="">
+					<xf:trigger class="btn_cm " id="btn_Close" style="" type="button">
+						<xf:label><![CDATA[닫기]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+		</xf:group>
+	<xf:group style="position: absolute;top: 300px;" class="hide">
+			<xf:group id="" userData2=" class:TopCondition_01;" style="position:absolute; left:5px; top:51px; width:530px; height:300px;">
+				<xf:input id="file_name" style="position:absolute; left:340px; top:122px; width:60px; height:20px;" maxlength="1000" userData2=" type:text;" />
+			</xf:group>
+		</xf:group></body>
+</html>

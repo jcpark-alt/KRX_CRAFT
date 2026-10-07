@@ -1,0 +1,564 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDSTF37407.gfm" meta_screenName="사전확인절차 면제 대상법인 지정/제외">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<xf:model>
+			<w2:workflowCollection/>
+			<w2:dataCollection baseNode="map">
+				<w2:dataMap id="bnd_master" userData2=" activebind:true; dataid:dts_MASTER;" baseNode="map">
+					<w2:keyInfo>
+						<w2:key id="ISUR_CD" ctrl="txb_isur_cd" userData2=" param:value; readonly:False;"/>
+						<w2:key id="COM_ABBRV" ctrl="txb_com_nm" userData2=" param:value; readonly:False;"/>
+						<w2:key id="DTEC_DD" ctrl="txb_dtec_dd" userData2=" param:value; readonly:False;"/>
+						<w2:key id="PRE_REVW_EXMPT_OBJ_CHG_TP_CD" ctrl="cmb_design_exclude_tp_cd" userData2=" param:BindColVal; readonly:False;"/>
+						<w2:key id="STRT_DD" ctrl="edt_strt_dd" userData2=" param:text; readonly:False;"/>
+						<w2:key id="MISC" ctrl="txa_misc" userData2=" param:text; readonly:False;"/>
+						<w2:key id="SEQ" ctrl="txb_seq" userData2=" param:value; readonly:False;"/>
+					</w2:keyInfo>
+				</w2:dataMap>
+			</w2:dataCollection>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+/* ★Wcraft guide★    
+스크립트 수작업 유의사항
+*/
+
+
+//★Wcraft guide★ include부분 주석처리 -> include("../js/libRoundPanel.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/utils.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/session.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/PopupCalendar.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/stf.js");
+scwin.vScrenID = 'ULDSTF37407.xml';
+scwin.regMode;
+scwin.cmb_ColIndex;
+scwin.designTpCd;
+scwin.gIsurCd;
+scwin.gDtecDd;
+scwin.gSeq;
+scwin.gLdMktTp = js_market;
+scwin.onpageload = function() {
+    scwin.gform_onload();
+};
+scwin.onpageunload = function() {
+};
+
+
+//saveVar의 값이 비어있을경우 sVar를 그대로 리턴,
+//비어있지 않을경우 ','를 붙여 리턴
+scwin.fn_StrAppend = function(saveVar, sVar) {
+    if (saveVar == '') {
+        return sVar;
+    } else {
+        return "," + sVar;
+    }
+};
+
+
+
+//부모창에서 필요변수 저장
+scwin.fn_GetParentValue = function() {
+    scwin.gIsurCd = frame.opener.scwin.gIsurCd;
+    scwin.gDtecDd = frame.opener.scwin.gDtecDd;
+    scwin.gSeq = frame.opener.scwin.gSeq;
+    gChgStatCd = frame.opener.gChgStatCd;
+    scwin.regMode = frame.opener.scwin.regMode;
+};
+
+
+//선택한 정보 값 셋팅
+scwin.fn_ReadInfo = function() {
+    var url = "/ByPass.do?method=getDesignExcludeCompanyInfo" + "&ISUR_CD=" + scwin.gIsurCd + "&DTEC_DD=" + scwin.gDtecDd + "&SEQ=" + scwin.gSeq + "&SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01;
+    dts_MASTER.DataID = encodeURI(url);
+    dts_MASTER.reset();
+};
+
+
+
+//초기화
+scwin.fn_Init = function() {
+    if (scwin.regMode == 'MOD') {
+        btn_Save.src = "../img/btn_modify.gif";
+        $c.stf.showObj(btn_Review, true);
+        $c.stf.showObj(btn_Del, true);
+        $c.stf.showObj(img_com_srch, false); // 회사선택 아이콘
+        cmb_design_exclude_tp_cd.setDisabled(true);
+    } else {
+        $c.stf.showObj(btn_Review, false);
+        $c.stf.showObj(btn_Del, false);
+    }
+    $c.stf.showObj(txb_dtec_dd, false); // 적출일자 hidden
+    $c.stf.showObj(txb_seq, false); // SEQ hidden
+    $c.stf.showObj(panel_design, false); // 지정사유 체크박스
+    $c.stf.showObj(panel_exclude, false); // 해제사유 체크박스
+
+
+    // 가우스헤더 셋팅
+    dts_MASTER.DataID = "/gauceSystemierAdaptor.do?method=getGauceDataHeader&messageId=BYPASS_DESIGN_EXCLUDE_SECU_INFO";
+    dts_MASTER.reset();
+    dts_MASTER.insertRow();
+};
+
+
+//등록 및 수정 처리
+scwin.fn_Insert = function() {
+    //1.적용구분 유효성 검증
+    var vDesign_exclude_tp_cd = $c.stf.getObjectValue(cmb_design_exclude_tp_cd);
+    if ($c.stf.trim(vDesign_exclude_tp_cd) == '') {
+        $c.win.alert("적용구분을 선택하세요");
+        cmb_design_exclude_tp_cd.focus();
+        return;
+    }
+
+    // 2.회사코드 유효성 검증
+    if (txb_isur_cd.getValue() == '') {
+        $c.win.alert("회사코드를 선택하세요");
+        cmb_design_exclude_tp_cd.focus();
+        return;
+    }
+
+    //3.적용일(시행일) 유효성 검증
+    var vStrt_dd = $c.stf.getObjectValue(edt_strt_dd);
+    if (vStrt_dd == '') {
+        $c.win.alert("적용(시행)일을 선택하세요");
+        edt_strt_dd.focus();
+        return;
+    }
+    if (vStrt_dd <= $c.ut.cGetToday("yyyymmdd")) {
+        $c.win.alert("적용(시행)일을 오늘 날짜 이후로 지정하세요");
+        edt_strt_dd.focus();
+        return;
+    }
+
+
+    //4.지정/해제사유 유효성 검증
+    var design_exclude_reason_tp_cd;
+    if (vDesign_exclude_tp_cd == '1') {
+        //지정
+        if ($c.stf.getObjectValue(cbx_1_1) == 'N' && $c.stf.getObjectValue(cbx_1_2) == 'N') {
+            $c.win.alert("지정 사유가 선택되지 않았습니다.");
+            return;
+        } else {
+            var sTmpVal = '';
+            if ($c.stf.getObjectValue(cbx_1_1) == 'Y') {
+                sTmpVal += scwin.fn_StrAppend(sTmpVal, '20');
+            } // 정기지정요건 충족
+            if ($c.stf.getObjectValue(cbx_1_2) == 'Y') {
+                sTmpVal += scwin.fn_StrAppend(sTmpVal, '25');
+            } // 기타 
+
+            design_exclude_reason_tp_cd = sTmpVal;
+        }
+    } else if (vDesign_exclude_tp_cd == '2') {
+        if ($c.stf.getObjectValue(cbx_2_1) == 'N' && $c.stf.getObjectValue(cbx_2_2) == 'N' && $c.stf.getObjectValue(cbx_2_3) == 'N' && $c.stf.getObjectValue(cbx_2_5) == 'N') {
+            $c.win.alert("해제 사유가 선택되지 않았습니다.");
+            return;
+        } else {
+            var sTmpVal = '';
+            if ($c.stf.getObjectValue(cbx_2_1) == 'Y') {
+                sTmpVal += scwin.fn_StrAppend(sTmpVal, '22');
+            } // 불성실공시법인지정
+            if ($c.stf.getObjectValue(cbx_2_2) == 'Y') {
+                sTmpVal += scwin.fn_StrAppend(sTmpVal, '23');
+            } // 관리종목 지정 
+            if ($c.stf.getObjectValue(cbx_2_3) == 'Y') {
+                sTmpVal += scwin.fn_StrAppend(sTmpVal, '24');
+            } //  투자주의 환기종목 지정
+            if ($c.stf.getObjectValue(cbx_2_5) == 'Y') {
+                sTmpVal += scwin.fn_StrAppend(sTmpVal, '25');
+            } // 기타
+
+            design_exclude_reason_tp_cd = sTmpVal;
+        }
+    } else {
+        $c.win.alert("지정/해제 사유가 선택되지 않았습니다.");
+        return;
+    }
+
+
+    // 메세지 설정
+    var tmpStr;
+    if (scwin.regMode == 'REG') {
+        tmpStr = "저장 하시겠습니까?";
+    } else if (scwin.regMode == 'MOD') {
+        tmpStr = "수정 하시겠습니까?";
+    }
+    var vAnswer = confirm(tmpStr);
+    if (vAnswer == true) {
+        //binding 되어 있지 않은 값들을 dts_MASTER에 저장
+        var vDtec_dd = $c.stf.getObjectValue(txb_dtec_dd);
+        var vIsur_cd = $c.stf.getObjectValue(txb_isur_cd);
+        var vMisc = $c.stf.getObjectValue(txa_misc);
+        var vSeq = $c.stf.getObjectValue(txb_seq);
+        dts_MASTER.insertRow();
+        dts_MASTER.setCellData(1, "DTEC_DD", vDtec_dd); //적출일자
+        dts_MASTER.setCellData(1, "ISUR_CD", vIsur_cd); //회사코드
+        dts_MASTER.setCellData(1, "SEQ", vSeq); //SEQ
+        dts_MASTER.setCellData(1, "PRE_REVW_EXMPT_OBJ_CHG_TP_CD", vDesign_exclude_tp_cd); //지정.해제 구분
+        dts_MASTER.setCellData(1, "STRT_DD", vStrt_dd); //시행일
+        dts_MASTER.setCellData(1, "REG_ID", js_id); //등록자ID
+        dts_MASTER.setCellData(1, "PRE_REVW_EXMPT_CHG_RSN_CD", design_exclude_reason_tp_cd); //지정해제사유 코드
+        dts_MASTER.setCellData(1, "MISC", vMisc); //기타
+
+        trs_inquiry.Action = "/ByPass.do?method=registerDesignExcludeHist&SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_02;
+        trs_inquiry.KeyName = "toinb_dataid4";
+        trs_inquiry.KeyValue = "JSP(I:pInput=dts_MASTER)";
+        trs_inquiry.Post();
+    }
+};
+
+
+
+
+
+//삭제
+scwin.fn_delete = function() {
+    var rtn = confirm('내용을 삭제 하시겠습니까?');
+    var vDtec_dd = $c.stf.getObjectValue(txb_dtec_dd);
+    var vIsur_cd = $c.stf.getObjectValue(txb_isur_cd);
+    var vSeq = $c.stf.getObjectValue(txb_seq);
+    if (rtn == 1) // [확인] 버튼이 눌려졌을 경우
+
+    {
+        dts_MASTER.setCellData(1, "DTEC_DD", vDtec_dd); //적출일자
+        dts_MASTER.setCellData(1, "ISUR_CD", vIsur_cd); //회사코드
+        dts_MASTER.setCellData(1, "SEQ", vSeq); //SEQ
+
+        var url = "/ByPass.do?method=deleteDesignExcludeHist";
+        url += "&SCREN_ID=" + scwin.vScrenID;
+        url += "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_04;
+        trs_inquiry.Action = url;
+        trs_inquiry.KeyName = "toinb_dataid4";
+        trs_inquiry.KeyValue = "JSP(I:pInput=dts_MASTER)";
+        trs_inquiry.Post();
+    }
+};
+
+
+
+//검토
+scwin.fn_review = function() {
+    var rtn = confirm('검토처리 하시겠습니까?');
+    var vDtec_dd = $c.stf.getObjectValue(txb_dtec_dd);
+    var vIsur_cd = $c.stf.getObjectValue(txb_isur_cd);
+    var vSeq = $c.stf.getObjectValue(txb_seq);
+    if (rtn == 1) // [확인] 버튼이 눌려졌을 경우
+
+    {
+        dts_MASTER.setCellData(1, "DTEC_DD", vDtec_dd); //적출일자
+        dts_MASTER.setCellData(1, "ISUR_CD", vIsur_cd); //회사코드
+        dts_MASTER.setCellData(1, "SEQ", vSeq); //SEQ
+        dts_MASTER.setCellData(1, "REG_ID", js_id); //등록자ID
+        dts_MASTER.setCellData(1, "PRE_REVW_EXMPT_OBJ_CHG_STAT_CD", "20"); //승인상태코드
+
+        var url = "/ByPass.do?method=updateDesignExcludeHistReview";
+        url += "&SCREN_ID=" + scwin.vScrenID;
+        url += "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_04;
+        trs_inquiry.Action = url;
+        trs_inquiry.KeyName = "toinb_dataid4";
+        trs_inquiry.KeyValue = "JSP(I:pInput=dts_MASTER)";
+        trs_inquiry.Post();
+    }
+};
+scwin.img_cls_dd_onclick = function() {
+    popUpCalendar2(edt_strt_dd);
+};
+scwin.trs_inquiry_OnSuccess = async function() {
+    $c.win.alert("성공적으로 처리 되었습니다.");
+    await $c.frame.CloseFrame();
+    // 부모창 reload 처리해야함	
+    $c.frame.path("../").fn_Search();
+};
+scwin.trs_inquiry_OnFail = function() {
+    $c.win.alert('trs_inquiry.OnFail() :' + trs_inquiry.ErrorMsg);
+};
+scwin.btn_Close_onclick = async function() {
+    await $c.frame.CloseFrame();
+};
+scwin.btn_Save_onclick = function() {
+    scwin.fn_Insert();
+};
+scwin.dts_MASTER_OnLoadCompleted = function(rowcount) {
+    //적용구분 컬럼값 셋팅	
+    var obj_chg_tp_cd = dts_MASTER.getCellData(1, "PRE_REVW_EXMPT_OBJ_CHG_TP_CD");
+    scwin.cmb_ColIndex = cmb_design_exclude_tp_cd.IndexOfColumn("value", obj_chg_tp_cd);
+    if (scwin.cmb_ColIndex != -1) {
+        cmb_design_exclude_tp_cd.setSelectedIndex(scwin.cmb_ColIndex);
+    }
+    if (scwin.regMode == 'MOD') {
+        //지정해제 사유 셋팅
+        var chg_rsn_cd = dts_MASTER.getCellData(1, "PRE_REVW_EXMPT_CHG_RSN_CD");
+        var arr = chg_rsn_cd.split(",");
+        for (var i = 0; i < arr.length; i++) {
+            if (obj_chg_tp_cd == "1") {
+                //지정 선택 시
+                if (arr[i] == '20') {
+                    cbx_1_1.setValue(1);
+                }
+                if (arr[i] == '25') {
+                    cbx_1_2.setValue(1);
+                }
+            } else if (obj_chg_tp_cd == "2") {
+                //해제 선택시
+                if (arr[i] == '22') {
+                    cbx_2_1.setValue(1);
+                }
+                if (arr[i] == '23') {
+                    cbx_2_2.setValue(1);
+                }
+                if (arr[i] == '24') {
+                    cbx_2_3.setValue(1);
+                }
+                if (arr[i] == '25') {
+                    cbx_2_5.setValue(1);
+                }
+            }
+        }
+    }
+};
+scwin.img_com_srch_onclick = async function() {
+    scwin.designTpCd = $c.stf.getObjectValue(cmb_design_exclude_tp_cd); //지정구분값 저장
+
+    if ($c.stf.trim(scwin.designTpCd) != "") {
+        var url = "/dsclmgt/ULDSTF37306.gfm";
+        var winTitle = "대상 법인 선택";
+        await $c.frame.CreateDialogFrame("ULDSTF37306", url, winTitle, 10, 10, 480, 580, "window");
+    } else {
+        $c.win.alert("[1.적용 구분] 값을 먼저 선택하세요");
+    }
+};
+scwin.cmb_design_exclude_tp_cd_OnSelChange = function() {
+    var selectVal = $c.stf.getObjectValue(cmb_design_exclude_tp_cd);
+    if (selectVal == "1") {
+        //지정선택
+        $c.stf.showObj(label_13, false);
+        $c.stf.showObj(panel_design, true); // 지정사유 체크박스
+        $c.stf.showObj(panel_exclude, false); // 해제사유 체크박스
+        panel_design.style.left = 140;
+        panel_design.style.top = 110;
+    } else if (selectVal == "2") {
+        //해제선택		
+        $c.stf.showObj(label_13, false);
+        $c.stf.showObj(panel_design, false); // 지정사유 체크박스
+        $c.stf.showObj(panel_exclude, true); // 해제사유 체크박스
+        panel_exclude.style.left = 140;
+        panel_exclude.style.top = 110;
+    } else {
+        $c.stf.showObj(label_13, true);
+        $c.stf.showObj(panel_design, false); // 지정사유 체크박스
+        $c.stf.showObj(panel_exclude, false); // 해제사유 체크박스
+
+    }
+
+    // 적용구분값 변경 시 회사 재지정
+    if (scwin.regMode == "REG") {
+        txb_isur_cd.setValue('');
+        txb_com_nm.setValue('');
+    }
+};
+scwin.btn_Review_onclick = function() {
+    scwin.fn_review();
+};
+scwin.btn_Del_onclick = function() {
+    scwin.fn_delete();
+};
+scwin.gform_onload = function() {
+    // 패널라운드 처리
+    $c.libRoundPanel.PanelToGroupBox(panel_1);
+    scwin.fn_GetParentValue();
+    scwin.fn_Init();
+    if (scwin.regMode == 'MOD') {
+        scwin.fn_ReadInfo(); //기본정보 불러오기
+
+    }
+    $c.stf.doLogSave(scwin.vScrenID, SCREN_PROCS_TP_CD_01);
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+		<xf:group userData2=" version:1.5; arfsrc:../js/arf_mgt.vbs; componentset:unicode;" style="height: 500px"
+			class="pop_contents" ev:onpageload="scwin.gform_onload">
+			<xf:group id="" class="titbox"><xf:group id="" class="rt"><xf:trigger cursor="pointer" src="../img/btn_study.gif" ev:onclick="scwin.btn_Review_onclick" style="" id="btn_Review" class="btn_cm">
+				<xf:label><![CDATA[검토]]></xf:label>
+			</xf:trigger><xf:trigger cursor="pointer" src="../img/btn_delete.gif" ev:onclick="scwin.btn_Del_onclick" style="" id="btn_Del" class="btn_cm">
+				<xf:label><![CDATA[삭제]]></xf:label>
+			</xf:trigger><xf:trigger cursor="pointer" src="../img/btn_save.gif" ev:onclick="scwin.btn_Save_onclick" style="" id="btn_Save" class="btn_cm">
+				<xf:label><![CDATA[저장]]></xf:label>
+			</xf:trigger></xf:group></xf:group><xf:group class="tblbox" id="panel_1" meta_snippetCategory="05_입출력테이블" meta_snippetKeyComponent="true"
+				meta_snippetName="5_01 1단테이블" style="">
+				<xf:group adaptive="layout" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+					<w2:attributes>
+						<w2:summary></w2:summary>
+					</w2:attributes>
+					<xf:group tagname="colgroup">
+						<xf:group style="width:150px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+					</xf:group>
+					<xf:group style="" tagname="tr">
+						<xf:group class="w2tb_th" style="" tagname="th">
+							<w2:textbox id="label_1" label="1. 적용 구분" style="" userData2=" class:TopCondition_01; font-weight:normal;"
+								class="req">
+							</w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" style="" tagname="td">
+							<xf:group id="" class="flex">
+								<xf:select1 selectedData="true" item="지정^1,해제^2" ref="data:bnd_master.PRE_REVW_EXMPT_OBJ_CHG_TP_CD"
+									appearance="minimal" disabledClass="w2selectbox_disabled" maxlength="20" disabled="false" style="width:80px;"
+									userData2=" bindcolumn:disp; defaultstring:선택; index:0; inheritcolor:False; listcount:10; listexprformat:disp^0^70; xpstyle:True; font-family:돋움;"
+									id="cmb_design_exclude_tp_cd" displayMode="label" class="flex_no" ev:onchange="scwin.cmb_design_exclude_tp_cd_OnSelChange">
+									<xf:choices>
+										<xf:item>
+											<xf:label><![CDATA[1]]></xf:label>
+											<xf:value><![CDATA[지정]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[2]]></xf:label>
+											<xf:value><![CDATA[해제]]></xf:value>
+										</xf:item>
+									</xf:choices>
+								</xf:select1>
+								<xf:group id="" class="rt">
+									<xf:input ref="data:bnd_master.DTEC_DD" maxlength="1000" readOnly="true" style="width:75px;"
+										userData2=" class:TopCondition_01_read; font-family:돋움; border-color:#92b1f1;" id="txb_dtec_dd">
+									</xf:input>
+									<xf:input ref="data:bnd_master.SEQ" maxlength="1000" readOnly="true" style="width:75px;"
+										userData2=" class:TopCondition_01_read; font-family:돋움; border-color:#92b1f1;" id="txb_seq">
+									</xf:input>
+								</xf:group>
+							</xf:group>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_4" label="2. 회사코드(명)" style="" userData2=" class:TopCondition_01; font-weight:normal;"
+								class="req">
+							</w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes>
+								<w2:colspan>1</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:group id="" class="flex">
+								<w2:autoComplete editType="select" id="txb_isur_cd" style="width:80px;" submenuSize="auto" search="start"
+									class="flex_no">
+								</w2:autoComplete>
+								<xf:input ref="data:bnd_master.COM_ABBRV" maxlength="1000" readOnly="true" style=""
+									userData2=" class:TopCondition_01_read; font-family:돋움; border-color:#92b1f1;" id="txb_com_nm">
+								</xf:input>
+								<xf:trigger cursor="pointer" src="../img/btn_search.gif" ev:onclick="scwin.img_com_srch_onclick" style=""
+									id="img_com_srch" class="btn_cm icon search">
+									<xf:label><![CDATA[]]></xf:label>
+								</xf:trigger>
+							</xf:group>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="lbl_tmp_5" label="3. 적용(시행)일" style="" userData2=" class:TopCondition_01;" class="req">
+							</w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes></w2:attributes>
+							<w2:inputCalendar id="edt_strt_dd" style="" calendarValueType="yearMonthDate"></w2:inputCalendar>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_3" label="4. 지정/해제 사유" style="" userData2=" class:TopCondition_01;" class="req">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<w2:textbox id="label_13" label="※ '2.적용 구분'  선택 시 나타납니다." style="" userData2=" class:TopCondition_01;"
+								class="txt_info">
+							</w2:textbox>
+							<xf:group id="panel_design" style="" class="">
+								<xf:select appearance="full" disabledClass="w2selectbox_disabled" displayMode="label" id="cbx_1_1"
+									renderType="checkboxgroup" selectedData="true" style="min-width:200px;" userData2=" value:1; cursor:auto; border-width:0; border-color:#1d507f;"
+									cols="" rows="" ref="">
+									<xf:choices>
+										<xf:item>
+											<xf:label><![CDATA[지정요건 충족]]></xf:label>
+											<xf:value><![CDATA[]]></xf:value>
+										</xf:item>
+									</xf:choices>
+								</xf:select>
+								<xf:select appearance="full" disabledClass="w2selectbox_disabled" displayMode="label" id="cbx_1_2"
+									renderType="checkboxgroup" selectedData="true" style="" userData2=" value:1; cursor:auto; border-width:0; border-color:#1d507f;"
+									cols="" rows="" ref="">
+									<xf:choices>
+										<xf:item>
+											<xf:label><![CDATA[기타]]></xf:label>
+											<xf:value><![CDATA[]]></xf:value>
+										</xf:item>
+									</xf:choices>
+								</xf:select>
+							</xf:group>
+							<xf:group id="panel_exclude" style="" class="">
+								<xf:group id=""><xf:select selectedData="true" ref="" appearance="full" disabledClass="w2selectbox_disabled" style="min-width:200px" userData2=" value:1; cursor:auto; border-width:0; border-color:#1d507f;" id="cbx_2_1" renderType="checkboxgroup" rows="" cols="" displayMode="label">
+									<xf:choices>
+										<xf:item>
+											<xf:label><![CDATA[불성실공시법인 지정]]></xf:label>
+											<xf:value><![CDATA[]]></xf:value>
+										</xf:item>
+									</xf:choices>
+								</xf:select><xf:select selectedData="true" ref="" appearance="full" disabledClass="w2selectbox_disabled" style="" userData2=" value:1; cursor:auto; border-width:0; border-color:#1d507f;" id="cbx_2_2" renderType="checkboxgroup" rows="" cols="" displayMode="label">
+									<xf:choices>
+										<xf:item>
+											<xf:label><![CDATA[관리종목 지정]]></xf:label>
+											<xf:value><![CDATA[]]></xf:value>
+										</xf:item>
+									</xf:choices>
+								</xf:select></xf:group>
+							<xf:group id=""><xf:select selectedData="true" ref="" appearance="full" disabledClass="w2selectbox_disabled" style="min-width:200px" userData2=" value:1; cursor:auto; border-width:0; border-color:#1d507f;" id="cbx_2_3" renderType="checkboxgroup" rows="" cols="" displayMode="label">
+									<xf:choices>
+										<xf:item>
+											<xf:label><![CDATA[투자주의환기종목 지정]]></xf:label>
+											<xf:value><![CDATA[]]></xf:value>
+										</xf:item>
+									</xf:choices>
+								</xf:select><xf:select selectedData="true" ref="" appearance="full" disabledClass="w2selectbox_disabled" style="" userData2=" value:1; cursor:auto; border-width:0; border-color:#1d507f;" id="cbx_2_5" renderType="checkboxgroup" rows="" cols="" displayMode="label">
+									<xf:choices>
+										<xf:item>
+											<xf:label><![CDATA[기타]]></xf:label>
+											<xf:value><![CDATA[]]></xf:value>
+										</xf:item>
+									</xf:choices>
+								</xf:select></xf:group></xf:group>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="lbl_tmp_1" label="5. 기타"
+								style="" userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:textarea id="txa_misc" readOnly="false" ref="data:bnd_master.MISC"
+								style="width:100%;height:70px;"
+								userData2=" class:TextArea_01; font-family:돋움;">
+							</xf:textarea>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+		<xf:group id="" class="btnbox"><xf:group id="" class="rt"><xf:trigger cursor="pointer" src="../img/btn_close.gif" ev:onclick="scwin.btn_Close_onclick" style="" id="btn_Close" class="btn_cm">
+				<xf:label><![CDATA[닫기]]></xf:label>
+			</xf:trigger></xf:group></xf:group></xf:group>
+	</body>
+</html>

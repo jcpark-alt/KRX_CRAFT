@@ -1,0 +1,826 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDFIS00200_00.gfm" meta_screenName="기업현황-조회항목 선택">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<xf:model>
+			<w2:workflowCollection/>
+			<w2:dataCollection baseNode="map"/>
+			<xf:submission id="sbm_dts_ComInfo" userData2=" syncload:True;" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json" ev:submitdone="scwin.dts_ComInfo_OnLoadCompleted"/>
+			<xf:submission id="sbm_dts_AcntclsDt" userData2=" syncload:True;" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json" ev:submitdone="scwin.dts_AcntclsDt_OnLoadCompleted"/>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+/* ★Wcraft guide★    
+스크립트 수작업 유의사항
+*/
+
+
+
+	//----W-Craft WebSquare 변환 확인: include----//
+include("../js/libRoundPanel.js");
+
+	//----W-Craft WebSquare 변환 확인: include----//
+include("../js/common.js");
+
+	//----W-Craft WebSquare 변환 확인: include----//
+include("../js/session.js");
+
+	//----W-Craft WebSquare 변환 확인: include----//
+include("../js/controlResize.js"); // 화면 리사이징
+
+	//----W-Craft WebSquare 변환 확인: include----//
+include("../js/stf.js");
+
+	//----W-Craft WebSquare 변환 확인: include----//
+include("../js/utils.js");
+
+	//----W-Craft WebSquare 변환 확인: include----//
+include("../js/PopupCalendar.js");
+scwin.vScrenID = "ULDFIS00200_00.gfm";
+scwin.onpageload = function() {
+};
+scwin.onpageunload = function() {
+};
+
+/**
+ *  화면 초기화
+ */
+scwin.fn_Init = function() {
+    //패널 라운드 처리
+    $c.cm.PanelToGroupBox(panel_Top);
+
+    //라디오 기본값 : 사업목적
+    rdo_Fg.setValue("01");
+
+    // rdo_Fg 값에따른 화면 처리
+    scwin.fn_RdoFgOnSelChange();
+};
+
+
+/**
+ *  라디오 OnSelChange
+ */
+scwin.fn_RdoFgOnSelChange = function() {
+    var pageNum = rdo_Fg.getValue();
+    if (pageNum == "08" || pageNum == "09" || pageNum == "12") {
+        img_tmp_11.style.left = 1090 + 81;
+        $c.stf.showObj(btn_Excel, false);
+    } else {
+        img_tmp_11.style.left = 1090;
+        $c.stf.showObj(btn_Excel, true);
+    }
+
+    // 라디오 클릭 시 하단 프레임에 적당한 화면 세팅.
+    scwin.fn_DisplayFrame(rdo_Fg.getValue());
+
+    // 결산일자 visible
+    scwin.fn_DisplayAcntclsDt();
+};
+
+
+/**
+ *  하단 frome에 화면 표시
+ */
+scwin.fn_DisplayFrame = function(pVal) {
+    $c.frame.path("../frame_body").srcUrl = scwin.fn_GetUrl(pVal);
+};
+
+
+/**
+ *  url 만들기
+ */
+scwin.fn_GetUrl = function(pVal) {
+    var vUrl = "./ULDFIS00200_" + pVal + ".gfm";
+    return vUrl;
+};
+
+
+/**
+ * 결산일자 visible
+ */
+scwin.fn_DisplayAcntclsDt = function() {
+    // 주요주주, 배당, 관계회사현황
+    if (rdo_Fg.getValue() == "03" || rdo_Fg.getValue() == "06" || rdo_Fg.getValue() == "18") {
+        $c.stf.showObj(pnl_AcntclsDt1, true);
+        $c.stf.showObj(pnl_AcntclsDt, false);
+        //  기간 from~ to  셋팅	
+        var vCurDate = $c.ut.cGetToday("yyyymmdd");
+        edt_AcntclsEndDt.setValue(vCurDate); // 현재날짜
+        edt_AcntclsStrtDt.setValue($c.ut.cGetMinusDate2(vCurDate, 365));
+        $c.stf.Combo_CBDataSetPeriod(cmb_PeriodTp);
+    } else if (rdo_Fg.getValue() == "05" || rdo_Fg.getValue() == "07" || rdo_Fg.getValue() == "08" ||
+        rdo_Fg.getValue() == "09" || rdo_Fg.getValue() == "11" || rdo_Fg.getValue() == "12" ||
+        rdo_Fg.getValue() == "13" || rdo_Fg.getValue() == "14" || rdo_Fg.getValue() == "15" ||
+        rdo_Fg.getValue() == "17" || rdo_Fg.getValue() == "19" || rdo_Fg.getValue() == "20") {
+        $c.stf.showObj(pnl_AcntclsDt, true);
+        $c.stf.showObj(pnl_AcntclsDt1, false);
+    } else {
+        $c.stf.showObj(pnl_AcntclsDt, false);
+        $c.stf.showObj(pnl_AcntclsDt1, false);
+    }
+};
+
+
+
+/**
+ *  결산일자 검색
+ */
+scwin.fn_SrchAcntclsDt = function() {
+    //데이터셋 초기화
+    scwin.fn_InitDs("2");
+
+    // 결산일자 visible = true인 경우만 조회, KisCd 필수
+    if (pnl_AcntclsDt.style.display == "none" || $c.stf.getObjectValue(txb_KisCd) == "") {
+        return;
+    }
+    var url = "/listingCommon.do?SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01 + "&method=listGeneralForDynamic" + "&service=krx.lds.stf.listingcommon.services.ListingCommonApp" + "&queryId=krx.lds.stf.fis.select.AcntclsDt" + "&outputMessageId=FIS_ACNTCLS_DT" + "&param01=" + $c.stf.getObjectValue(txb_KisCd) + "&param02=" + $c.stf.getObjectValue(rdo_Fg);
+    dts_AcntclsDt.DataID = encodeURI(url);
+
+	//----W-Craft WebSquare 변환 확인: Reset----//
+    dts_AcntclsDt.Reset();
+};
+
+
+/**
+ *  조회조건 유효성 체크
+ */
+scwin.fn_ChkValid = function() {
+    //필수항목 체크.
+    if ($c.stf.getObjectValue(txb_CoSnm) == "") {
+        alert("기업명을 입력하세요.");
+        txb_CoSnm.focus();
+        return false;
+    }
+    if (pnl_AcntclsDt.style.display != "none" && $c.stf.getObjectValue(cmb_AcntclsDt) == "") {
+        alert("결산일자를 입력하세요.");
+        cmb_AcntclsDt.focus();
+        return false;
+    }
+    if (pnl_AcntclsDt1.style.display != "none") {
+        if (!$c.stf.compareFromToDate2(edt_AcntclsStrtDt, edt_AcntclsEndDt)) {
+            return false;
+        }
+        if ($c.stf.getObjectValue(edt_AcntclsStrtDt) == "") {
+            alert("기간 시작일를 입력하세요.");
+            return false;
+        }
+        if ($c.stf.getObjectValue(edt_AcntclsEndDt) == "") {
+            alert("기간 종료일를 입력하세요.");
+            return false;
+        }
+    }
+
+    // 기업명은 있는데 기업코드가 없는 경우
+    if ($c.stf.getObjectValue(txb_CoSnm) != "" && $c.stf.getObjectValue(txb_KisCd) == "") {
+        scwin.fn_ComInfoSrch();
+        return false;
+    }
+    return true;
+};
+
+
+/**
+ * 기업현황 조회
+ */
+scwin.fn_Search = function() {
+    // 조회조건 필수 체크.
+    if (!scwin.fn_ChkValid()) {
+        return;
+    }
+    if ($c.frame.path("../frame_body").fn_Search) {
+        $c.frame.path("../frame_body").fn_Search();
+    }
+};
+
+
+
+/**
+ *  데이터셋 초기화.
+ */
+scwin.fn_InitDs = function(pFg) {
+    if (pFg == "1") {
+        dts_ComInfo.removeAll();
+    } else if (pFg == "2") {
+        dts_AcntclsDt.removeAll();
+    }
+};
+
+
+
+/**
+ * 기업정보 조회(명으로 조회)
+ */
+scwin.fn_ComInfoSrch = function() {
+    //데이터셋 초기화
+    scwin.fn_InitDs("1");
+
+    //기업명 없으면 중지.
+    if ($c.stf.getObjectValue(txb_CoSnm) == "") {
+        return;
+    }
+    var url = "/listingCommon.do?SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01 + "&method=listGeneralForDynamic" + "&service=krx.lds.stf.listingcommon.services.ListingCommonApp" + "&queryId=krx.lds.stf.fis.select.comInfo" + "&outputMessageId=FIS_COM_INFO" + "&param01=" + $c.stf.getObjectValue(txb_CoSnm);
+    dts_ComInfo.DataID = encodeURI(url);
+
+	//----W-Craft WebSquare 변환 확인: Reset----//
+    dts_ComInfo.Reset();
+};
+
+
+/**
+ * 기업검색 팝업
+ */
+scwin.fn_ComSrchOpen = async function() {
+    await $c.frame.CreateDialogFrame("KIS_CD", "./ULDFIS00100_P1.gfm", "기업 검색", 100, 100, 640 + 20, 445 + 45, "window");
+};
+
+
+/**
+ * 팝업으로 값을 넘김.
+ */
+scwin.fn_GetParKisCd = function() {
+    var arrPar = new Array();
+    arrPar[0] = txb_CoSnm.getValue(); // 기업명
+    return arrPar;
+};
+
+
+/**
+ * 팝업에서 넘어온 값 세팅.
+ */
+scwin.fn_SetParKisCd = function(arrPar) {
+    txb_CoSnm.setValue(arrPar[0].CO_SNM); //기업명
+    txb_KisCd.setValue(arrPar[0].KIS_CD); //기업코드
+
+    if ($c.stf.getObjectValue(txb_KisCd) != "") {
+        // 결산일자 visible = true인 경우
+        if (pnl_AcntclsDt.style.display == "none" && pnl_AcntclsDt1.style.display == "none") {
+            // 기업현황 조회
+            scwin.fn_Search();
+        } else {
+            // 결산일자 조회.
+            if (pnl_AcntclsDt.style.display != "none") {
+                scwin.fn_SrchAcntclsDt();
+            }
+        }
+    }
+};
+
+
+
+
+
+/**
+ *  조회조건의 kisCd를 리턴.
+ */
+scwin.fn_GetKisCd = function() {
+    return $c.stf.getObjectValue(txb_KisCd);
+};
+
+
+/**
+ *  조회조건의 AcntclsDt를 리턴.
+ */
+scwin.fn_GetAcntclsDt = function() {
+    return $c.stf.getObjectValue(cmb_AcntclsDt);
+};
+
+
+/**
+ *  조회조건의 AcntclsStrtDt를 리턴.
+ */
+scwin.fn_GetAcntclsStrtDt = function() {
+    return $c.stf.getObjectValue(edt_AcntclsStrtDt);
+};
+
+
+/**
+ *  조회조건의 AcntclsEndDt를 리턴.
+ */
+scwin.fn_GetAcntclsEndDt = function() {
+    return $c.stf.getObjectValue(edt_AcntclsEndDt);
+};
+
+
+/**
+ *  그리드 헤더 명을 구한다.
+ */
+scwin.fn_GetGrdHeaderNm = function() {
+
+	//----W-Craft WebSquare 변환 확인: fn_SetGrdHeaderNm----//
+    if ($c.frame.path("../frame_body").fn_SetGrdHeaderNm) {
+        var nCurrRow = dts_AcntclsDt.getRowPosition();
+        var nTrgtRow = dts_AcntclsDt.getRowPosition() + 4;
+        var aArray = new Array();
+        var nArrRow = 0;
+        for (var nRow = nCurrRow; nRow <= nTrgtRow; nRow++) {
+            aArray[nArrRow] = {
+                VALUE: dts_AcntclsDt.getCellData(nRow, "VALUE"),
+                TEXT: dts_AcntclsDt.getCellData(nRow, "TEXT")
+            };
+            nArrRow++;
+        }
+
+        // 그리드 헤더 호출
+
+	//----W-Craft WebSquare 변환 확인: fn_SetGrdHeaderNm----//
+        $c.frame.path("../frame_body").fn_SetGrdHeaderNm(aArray);
+    }
+};
+scwin.gform_onload = function() {
+    scwin.fn_Init();
+};
+scwin.rdo_Fg_OnSelChange = function() {
+    // 라디오 클릭
+    scwin.fn_RdoFgOnSelChange();
+};
+scwin.btn_Search_onclick = function() {
+    // 조회버튼 클릭
+    scwin.fn_Search();
+};
+scwin.img_CoSearch_onclick = function() {
+    // 기업검색팝업 오픈
+    scwin.fn_ComSrchOpen();
+};
+scwin.txb_CoSnm_onkeydown = function() {
+    // 기업명 키다운.
+    if (event.keyCode == 13) {
+        // 이게 왜 필요하냐구??? kisCD 세팅 후 마우스 포커스가 기업명에서 나갈때 onChange이벤트가 발생해서 kisCd를 지워버리기 때문이다
+        $c.frame.focus();
+        if ($c.stf.getObjectValue(txb_CoSnm) == "") {
+            // 기업검색팝업 오픈
+            scwin.fn_ComSrchOpen();
+        } else {
+            // 기업정보 조회
+            scwin.fn_ComInfoSrch();
+        }
+    }
+};
+scwin.txb_CoSnm_onchange = function() {
+    // 조회조건이 변경된 경우 초기화.
+    txb_KisCd.setValue("");
+};
+scwin.dts_ComInfo_OnLoadCompleted = function(rowcount) {
+    // 조회결과가 1개이면 기업개황 조회 아니면 기업팝업 오픈.
+    if (rowcount == 1) {
+        // 조회조건에 값을 세팅하고..
+        txb_KisCd.setValue(dts_ComInfo.getCellData(0, "KIS_CD"));
+
+        // 결산일자 visible = true인 경우
+        if (pnl_AcntclsDt.style.display == "none" || pnl_AcntclsDt1.style.display == "none") {
+            // 기업현황 조회
+            scwin.fn_Search();
+        } else {
+            // 결산일자 조회.
+            if (pnl_AcntclsDt.style.display != "none") {
+                scwin.fn_SrchAcntclsDt();
+            }
+        }
+    } else {
+        scwin.fn_ComSrchOpen(); //기업검색 팝업 오픈
+
+    }
+};
+scwin.dts_AcntclsDt_OnLoadCompleted = function(rowcount) {
+    // 결산일자 OnLoadCompleted
+    if (rowcount <= 0) {
+        alert("결산일자가 존재하지 않습니다.");
+    }
+};
+scwin.cmb_AcntclsDt_OnSelChange = function() {
+    // 그리드 헤더에 명을 세팅. 필요한 경우만..
+    scwin.fn_GetGrdHeaderNm();
+
+    // 기업현황 조회
+    scwin.fn_Search();
+};
+scwin.btn_Excel_onclick = function() {
+
+	//----W-Craft WebSquare 변환 확인: fn_excel_download----//
+    if ($c.frame.path("../frame_body").fn_excel_download) {
+
+	//----W-Craft WebSquare 변환 확인: fn_excel_download----//
+        $c.frame.path("../frame_body").fn_excel_download();
+    }
+};
+scwin.img_AcntclsStrtDt_onclick = function() {
+
+	//----W-Craft WebSquare 변환 확인: popUpCalendar2----//
+    popUpCalendar2(edt_AcntclsStrtDt);
+};
+scwin.img_AcntclsEndDt_onclick = function() {
+
+	//----W-Craft WebSquare 변환 확인: popUpCalendar2----//
+    popUpCalendar2(edt_AcntclsEndDt);
+};
+scwin.cmb_PeriodTp_OnSelChange = function() {
+    var vTp = $c.cp.valueOfIndex(cmb_PeriodTp, "VALUE", cmb_PeriodTp.getSelectedIndex());
+    $c.stf.fn_setFromToDate(vTp, edt_AcntclsStrtDt, edt_AcntclsEndDt);
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+		<xf:group class="tblbox mb20" id="rdo_Fg" meta_snippetCategory="05_입출력테이블" meta_snippetKeyComponent="true" meta_snippetName="5_01 1단테이블"
+			style="">
+			<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+				<w2:attributes>
+					<w2:summary></w2:summary>
+				</w2:attributes>
+				<xf:group tagname="colgroup">
+					<xf:group tagname="col"></xf:group>
+					<xf:group tagname="col"></xf:group>
+					<xf:group tagname="col"></xf:group>
+					<xf:group tagname="col"></xf:group>
+					<xf:group style="" tagname="col"></xf:group>
+				</xf:group>
+				<xf:group tagname="tr">
+					<xf:group tagname="td" class="w2tb_td">
+						<w2:attributes></w2:attributes>
+						<xf:select1 appearance="full" cols="" disabled="" id="" meta_snippetCategory="10_입력폼"
+							meta_snippetKeyComponent="true" meta_snippetName="10_05 Radio" ref="" renderType="radiogroup" rows="" selectedIndex="1" style=""
+							name="radio">
+							<xf:choices>
+								<xf:item>
+									<xf:label><![CDATA[사업목적]]></xf:label>
+									<xf:value><![CDATA[1]]></xf:value>
+								</xf:item>
+							</xf:choices>
+						</xf:select1>
+					</xf:group>
+					<xf:group tagname="td" class="w2tb_td">
+						<w2:attributes></w2:attributes>
+						<xf:select1 appearance="full" cols="" disabled="" id="" meta_snippetCategory="10_입력폼"
+							meta_snippetKeyComponent="true" meta_snippetName="10_05 Radio" ref="" renderType="radiogroup" rows="" selectedIndex="1" style=""
+							name="radio">
+							<xf:choices>
+								<xf:item>
+									<xf:label><![CDATA[연혁]]></xf:label>
+									<xf:value><![CDATA[02]]></xf:value>
+								</xf:item>
+							</xf:choices>
+						</xf:select1>
+					</xf:group>
+					<xf:group tagname="td" class="w2tb_td">
+						<w2:attributes></w2:attributes>
+						<xf:select1 appearance="full" cols="" disabled="" id="" meta_snippetCategory="10_입력폼"
+							meta_snippetKeyComponent="true" meta_snippetName="10_05 Radio" ref="" renderType="radiogroup" rows="" selectedIndex="1" style=""
+							name="radio">
+							<xf:choices>
+								<xf:item>
+									<xf:label><![CDATA[주요주주]]></xf:label>
+									<xf:value><![CDATA[03]]></xf:value>
+								</xf:item>
+							</xf:choices>
+						</xf:select1>
+					</xf:group>
+					<xf:group tagname="td" class="w2tb_td">
+						<w2:attributes></w2:attributes>
+						<xf:select1 appearance="full" cols="" disabled="" id="" meta_snippetCategory="10_입력폼"
+							meta_snippetKeyComponent="true" meta_snippetName="10_05 Radio" ref="" renderType="radiogroup" rows="" selectedIndex="1" style=""
+							name="radio">
+							<xf:choices>
+								<xf:item>
+									<xf:label><![CDATA[자본금변동]]></xf:label>
+									<xf:value><![CDATA[04]]></xf:value>
+								</xf:item>
+							</xf:choices>
+						</xf:select1>
+					</xf:group>
+					<xf:group tagname="td" class="w2tb_td">
+						<w2:attributes></w2:attributes>
+						<xf:select1 appearance="full" cols="" disabled="" id="" meta_snippetCategory="10_입력폼"
+							meta_snippetKeyComponent="true" meta_snippetName="10_05 Radio" ref="" renderType="radiogroup" rows="" selectedIndex="1" style=""
+							name="radio">
+							<xf:choices>
+								<xf:item>
+									<xf:label><![CDATA[배당]]></xf:label>
+									<xf:value><![CDATA[05]]></xf:value>
+								</xf:item>
+							</xf:choices>
+						</xf:select1>
+					</xf:group>
+				</xf:group>
+				<xf:group tagname="tr">
+					<xf:group tagname="td" class="w2tb_td">
+						<w2:attributes></w2:attributes>
+						<xf:select1 appearance="full" cols="" disabled="" id="" meta_snippetCategory="10_입력폼"
+							meta_snippetKeyComponent="true" meta_snippetName="10_05 Radio" ref="" renderType="radiogroup" rows="" selectedIndex="1" style=""
+							name="radio">
+							<xf:choices>
+								<xf:item>
+									<xf:label><![CDATA[관계회사현황]]></xf:label>
+									<xf:value><![CDATA[06]]></xf:value>
+								</xf:item>
+							</xf:choices>
+						</xf:select1>
+					</xf:group>
+					<xf:group tagname="td" class="w2tb_td">
+						<w2:attributes></w2:attributes>
+						<xf:select1 appearance="full" cols="" disabled="" id="" meta_snippetCategory="10_입력폼"
+							meta_snippetKeyComponent="true" meta_snippetName="10_05 Radio" ref="" renderType="radiogroup" rows="" selectedIndex="1" style=""
+							name="radio">
+							<xf:choices>
+								<xf:item>
+									<xf:label><![CDATA[종업원현황]]></xf:label>
+									<xf:value><![CDATA[07]]></xf:value>
+								</xf:item>
+							</xf:choices>
+						</xf:select1>
+					</xf:group>
+					<xf:group tagname="td" class="w2tb_td">
+						<w2:attributes></w2:attributes>
+						<xf:select1 appearance="full" cols="" disabled="" id="" meta_snippetCategory="10_입력폼"
+							meta_snippetKeyComponent="true" meta_snippetName="10_05 Radio" ref="" renderType="radiogroup" rows="" selectedIndex="1" style=""
+							name="radio">
+							<xf:choices>
+								<xf:item>
+									<xf:label><![CDATA[업계현황]]></xf:label>
+									<xf:value><![CDATA[08]]></xf:value>
+								</xf:item>
+							</xf:choices>
+						</xf:select1>
+					</xf:group>
+					<xf:group tagname="td" class="w2tb_td">
+						<w2:attributes></w2:attributes>
+						<xf:select1 appearance="full" cols="" disabled="" id="" meta_snippetCategory="10_입력폼"
+							meta_snippetKeyComponent="true" meta_snippetName="10_05 Radio" ref="" renderType="radiogroup" rows="" selectedIndex="1" style=""
+							name="radio">
+							<xf:choices>
+								<xf:item>
+									<xf:label><![CDATA[회사현황]]></xf:label>
+									<xf:value><![CDATA[09]]></xf:value>
+								</xf:item>
+							</xf:choices>
+						</xf:select1>
+					</xf:group>
+					<xf:group tagname="td" class="w2tb_td">
+						<w2:attributes></w2:attributes>
+						<xf:select1 appearance="full" cols="" disabled="" id="" meta_snippetCategory="10_입력폼"
+							meta_snippetKeyComponent="true" meta_snippetName="10_05 Radio" ref="" renderType="radiogroup" rows="" selectedIndex="1" style=""
+							name="radio">
+							<xf:choices>
+								<xf:item>
+									<xf:label><![CDATA[경영상주요계약]]></xf:label>
+									<xf:value><![CDATA[10]]></xf:value>
+								</xf:item>
+							</xf:choices>
+						</xf:select1>
+					</xf:group>
+				</xf:group>
+				<xf:group tagname="tr">
+					<xf:group tagname="td" class="w2tb_td">
+						<w2:attributes></w2:attributes>
+						<xf:select1 appearance="full" cols="" disabled="" id="" meta_snippetCategory="10_입력폼"
+							meta_snippetKeyComponent="true" meta_snippetName="10_05 Radio" ref="" renderType="radiogroup" rows="" selectedIndex="1" style=""
+							name="radio">
+							<xf:choices>
+								<xf:item>
+									<xf:label><![CDATA[판매경로]]></xf:label>
+									<xf:value><![CDATA[12]]></xf:value>
+								</xf:item>
+							</xf:choices>
+						</xf:select1>
+					</xf:group>
+					<xf:group tagname="td" class="w2tb_td">
+						<w2:attributes></w2:attributes>
+						<xf:select1 appearance="full" cols="" disabled="" id="" meta_snippetCategory="10_입력폼"
+							meta_snippetKeyComponent="true" meta_snippetName="10_05 Radio" ref="" renderType="radiogroup" rows="" selectedIndex="1" style=""
+							name="radio">
+							<xf:choices>
+								<xf:item>
+									<xf:label><![CDATA[제품및사업구성]]></xf:label>
+									<xf:value><![CDATA[13]]></xf:value>
+								</xf:item>
+							</xf:choices>
+						</xf:select1>
+					</xf:group>
+					<xf:group tagname="td" class="w2tb_td">
+						<w2:attributes></w2:attributes>
+						<xf:select1 appearance="full" cols="" disabled="" id="" meta_snippetCategory="10_입력폼"
+							meta_snippetKeyComponent="true" meta_snippetName="10_05 Radio" ref="" renderType="radiogroup" rows="" selectedIndex="1" style=""
+							name="radio">
+							<xf:choices>
+								<xf:item>
+									<xf:label><![CDATA[주요제품가격동향]]></xf:label>
+									<xf:value><![CDATA[14]]></xf:value>
+								</xf:item>
+							</xf:choices>
+						</xf:select1>
+					</xf:group>
+					<xf:group tagname="td" class="w2tb_td">
+						<w2:attributes></w2:attributes>
+						<xf:select1 appearance="full" cols="" disabled="" id="" meta_snippetCategory="10_입력폼"
+							meta_snippetKeyComponent="true" meta_snippetName="10_05 Radio" ref="" renderType="radiogroup" rows="" selectedIndex="1" style=""
+							name="radio">
+							<xf:choices>
+								<xf:item>
+									<xf:label><![CDATA[주요원재료가격동향]]></xf:label>
+									<xf:value><![CDATA[15]]></xf:value>
+								</xf:item>
+							</xf:choices>
+						</xf:select1>
+					</xf:group>
+					<xf:group tagname="td" class="w2tb_td">
+						<w2:attributes></w2:attributes>
+						<xf:select1 appearance="full" cols="" disabled="" id="" meta_snippetCategory="10_입력폼"
+							meta_snippetKeyComponent="true" meta_snippetName="10_05 Radio" ref="" renderType="radiogroup" rows="" selectedIndex="1" style=""
+							name="radio">
+							<xf:choices>
+								<xf:item>
+									<xf:label><![CDATA[영업소및공장현황]]></xf:label>
+									<xf:value><![CDATA[16]]></xf:value>
+								</xf:item>
+							</xf:choices>
+						</xf:select1>
+					</xf:group>
+				</xf:group>
+				<xf:group tagname="tr">
+					<xf:group tagname="td" class="w2tb_td">
+						<w2:attributes></w2:attributes>
+						<xf:select1 appearance="full" cols="" disabled="" id="" meta_snippetCategory="10_입력폼"
+							meta_snippetKeyComponent="true" meta_snippetName="10_05 Radio" ref="" renderType="radiogroup" rows="" selectedIndex="1" style=""
+							name="radio">
+							<xf:choices>
+								<xf:item>
+									<xf:label><![CDATA[장단기차입금현황]]></xf:label>
+									<xf:value><![CDATA[17]]></xf:value>
+								</xf:item>
+							</xf:choices>
+						</xf:select1>
+					</xf:group>
+					<xf:group tagname="td" class="w2tb_td">
+						<w2:attributes></w2:attributes>
+						<xf:select1 appearance="full" cols="" disabled="" id="" meta_snippetCategory="10_입력폼"
+							meta_snippetKeyComponent="true" meta_snippetName="10_05 Radio" ref="" renderType="radiogroup" rows="" selectedIndex="1" style=""
+							name="radio">
+							<xf:choices>
+								<xf:item>
+									<xf:label><![CDATA[경영진구성]]></xf:label>
+									<xf:value><![CDATA[18]]></xf:value>
+								</xf:item>
+							</xf:choices>
+						</xf:select1>
+					</xf:group>
+					<xf:group tagname="td" class="w2tb_td">
+						<w2:attributes></w2:attributes>
+						<xf:select1 appearance="full" cols="" disabled="" id="" meta_snippetCategory="10_입력폼"
+							meta_snippetKeyComponent="true" meta_snippetName="10_05 Radio" ref="" renderType="radiogroup" rows="" selectedIndex="1" style=""
+							name="radio">
+							<xf:choices>
+								<xf:item>
+									<xf:label><![CDATA[가동률추이]]></xf:label>
+									<xf:value><![CDATA[19]]></xf:value>
+								</xf:item>
+							</xf:choices>
+						</xf:select1>
+					</xf:group>
+					<xf:group tagname="td" class="w2tb_td">
+						<w2:attributes></w2:attributes>
+						<xf:select1 appearance="full" cols="" disabled="" id="" meta_snippetCategory="10_입력폼"
+							meta_snippetKeyComponent="true" meta_snippetName="10_05 Radio" ref="" renderType="radiogroup" rows="" selectedIndex="1" style=""
+							name="radio">
+							<xf:choices>
+								<xf:item>
+									<xf:label><![CDATA[수출및내수구성추이]]></xf:label>
+									<xf:value><![CDATA[20]]></xf:value>
+								</xf:item>
+							</xf:choices>
+						</xf:select1>
+					</xf:group>
+					<xf:group tagname="td" class="w2tb_td">
+						<w2:attributes></w2:attributes>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+		</xf:group>
+		<xf:group class="schbox" id="panel_Top" meta_snippetCategory="03_조회영역" meta_snippetKeyComponent="true" meta_snippetName="3_01 조회조건1행"
+			style="">
+			<xf:group class="schbox_inner" id="" style="">
+				<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl " id="" style="" tagname="table">
+					<w2:attributes>
+						<w2:summary></w2:summary>
+					</w2:attributes>
+					<xf:group tagname="colgroup">
+						<xf:group style="width:80px;" tagname="col"></xf:group>
+						<xf:group style="width:300px;" tagname="col"></xf:group>
+						<xf:group style="width:100px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+					</xf:group>
+				<xf:group tagname="tr" id="" style="">
+					<xf:group tagname="th" class="w2tb_th"><w2:attributes>
+							<w2:scope>row</w2:scope>
+						</w2:attributes><w2:textbox hierarchy="label_82" id="label_82" label="기업명" orgid="label_82"
+							style=""
+							userData2=" class:TopCondition_01; font-family:돋움;">
+						</w2:textbox></xf:group>
+					<xf:group tagname="td" class="w2tb_td">
+						<w2:attributes></w2:attributes>
+						<xf:input ev:onkeydown="scwin.txb_CoSnm_onkeydown" hierarchy="txb_CoSnm" id="txb_CoSnm" maxlength="1000"
+							orgid="txb_CoSnm" style="width:185px;"
+							userData2=" class:TopCondition_01_write; font-family:돋움; border-color:#92b1f1; onchange:txb_CoSnm_onchange;">
+						</xf:input>
+						<xf:trigger class="btn_cm icon search" cursor="pointer" ev:onclick="scwin.img_CoSearch_onclick"
+							hierarchy="img_CoSearch" id="img_CoSearch" orgid="img_CoSearch" src="../img/btn_search.gif"
+							style="">
+							<xf:label><![CDATA[]]></xf:label>
+						</xf:trigger>
+					</xf:group>
+					<xf:group tagname="td" class="w2tb_td in_tbl">
+						<w2:attributes>
+							<w2:scope>row</w2:scope>
+							<w2:colspan>2</w2:colspan>
+							<w2:rowspan>1</w2:rowspan>
+						</w2:attributes>
+						<xf:group class="tblbox" id="pnl_AcntclsDt1" meta_snippetCategory="05_입출력테이블" meta_snippetKeyComponent="true"
+							meta_snippetName="5_01 1단테이블" style="">
+							<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+								<w2:attributes>
+									<w2:summary></w2:summary>
+								</w2:attributes>
+								<xf:group tagname="colgroup">
+									<xf:group style="width:100px;" tagname="col"></xf:group>
+									<xf:group style="" tagname="col"></xf:group>
+								</xf:group>
+								<xf:group tagname="tr">
+									<xf:group tagname="th" class="w2tb_th ">
+										<w2:attributes>
+											<w2:scope>row</w2:scope>
+										</w2:attributes>
+										<w2:textbox hierarchy="label_1" id="label_1" label="기간" orgid="label_1"
+											style=""
+											userData2=" class:TopCondition_01; font-family:돋움;">
+										</w2:textbox>
+									</xf:group>
+									<xf:group tagname="td" class="w2tb_td">
+										<w2:attributes></w2:attributes>
+									<xf:group id="" class="flex flex_no"><w2:inputCalendar hierarchy="edt_AcntclsStrtDt" displayFormat="yyyy-MM-dd" style="" userData2=" class:panel_maskedit_write_01; generaledit:False; valign:1;" id="edt_AcntclsStrtDt" orgid="edt_AcntclsStrtDt">
+										</w2:inputCalendar><w2:textbox hierarchy="label_3" style="" userData2=" class:TopCondition_01; border-color:#0000FF;" id="label_3" label="~" orgid="label_3">
+										</w2:textbox><w2:inputCalendar hierarchy="edt_AcntclsEndDt" displayFormat="yyyy-MM-dd" style="" userData2=" class:panel_maskedit_write_01; generaledit:False; valign:1;" id="edt_AcntclsEndDt" orgid="edt_AcntclsEndDt">
+										</w2:inputCalendar><xf:select1 cbdatacolumns="disp,value" appearance="minimal" ev:onchange="scwin.cmb_PeriodTp_OnSelChange" disabledClass="w2selectbox_disabled" maxlength="20" hierarchy="cmb_PeriodTp" style="width:108px;" userData2=" bindcolumn:disp; defaultstring:기간선택; inheritcolor:False; listcount:10; xpstyle:True; font-family:돋움;" id="cmb_PeriodTp" listexprformat="disp^0^70" orgid="cmb_PeriodTp">
+											<xf:choices>
+												<xf:itemset nodeset="">
+													<xf:label ref=""></xf:label>
+													<xf:value ref=""></xf:value>
+												</xf:itemset>
+											</xf:choices>
+										</xf:select1></xf:group></xf:group>
+								</xf:group>
+							</xf:group>
+						</xf:group>
+						<xf:group class="tblbox" id="pnl_AcntclsDt" meta_snippetCategory="05_입출력테이블" meta_snippetKeyComponent="true"
+							meta_snippetName="5_01 1단테이블" style="">
+							<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+								<w2:attributes>
+									<w2:summary></w2:summary>
+								</w2:attributes>
+								<xf:group tagname="colgroup">
+									<xf:group style="width:100px;" tagname="col"></xf:group>
+									<xf:group style="" tagname="col"></xf:group>
+								</xf:group>
+							<xf:group tagname="tr" style="">
+								<xf:group tagname="th" class="w2tb_th ">
+									<w2:attributes>
+										<w2:scope>row</w2:scope>
+									</w2:attributes>
+									<w2:textbox hierarchy="label_2" id="label_2" label="결산일자" orgid="label_2"
+										style=""
+										userData2=" class:TopCondition_01; font-family:돋움;">
+									</w2:textbox>
+								</xf:group>
+								<xf:group tagname="td" class="w2tb_td">
+									<w2:attributes></w2:attributes>
+									<xf:select1 appearance="minimal" cbdatacolumns="VALUE,TEXT" disabledClass="w2selectbox_disabled"
+										ev:onchange="scwin.cmb_AcntclsDt_OnSelChange" hierarchy="cmb_AcntclsDt" id="cmb_AcntclsDt" listexprformat="TEXT^0^121"
+										orgid="cmb_AcntclsDt" style="width:121px;" tabIndex="2"
+										userData2=" class:TopCondition_01; bindcolumn:VALUE; index:0; listcount:10; searchcolumn:TEXT;">
+										<xf:choices>
+											<xf:itemset nodeset="data:dts_AcntclsDt">
+												<xf:label ref=""></xf:label>
+												<xf:value ref=""></xf:value>
+											</xf:itemset>
+										</xf:choices>
+									</xf:select1>
+								</xf:group></xf:group></xf:group>
+						</xf:group>
+					</xf:group></xf:group></xf:group>
+			</xf:group>
+			<xf:group class="btn_schbox" id="" style="">
+				<xf:trigger class="btn_cm download" cursor="pointer" ev:onclick="scwin.btn_Excel_onclick" hierarchy="btn_Excel"
+					id="btn_Excel" orgid="btn_Excel" src="../img/btn_excelsave.gif"
+					style="" text="엑셀다운로드">
+					<xf:label><![CDATA[엑셀다운로드]]></xf:label>
+				</xf:trigger>
+				<xf:trigger class="btn_cm sch" cursor="pointer" ev:onclick="scwin.btn_Search_onclick" hierarchy="btn_Search" id="btn_Search"
+					orgid="btn_Search" src="../img/btn_select.gif" style="" text="조회">
+					<xf:label><![CDATA[조회]]></xf:label>
+				</xf:trigger>
+			</xf:group>
+		</xf:group>
+	<xf:group hierarchy="panel_Top" style="width:1245px; height:40px; position:absolute; left:5px; top:115px; background-color:#d9e9fc;" userData2=" class:TopCondition_01;" id="" orgid="panel_Top" class="hide">
+				<xf:group hierarchy="panel_1" userData2=" class:TopCondition_01;" style="position:absolute; left:265px; top:5px; width:80px; height:30px; background-color:#d9e9fc; visibility:hidden;" id="panel_1" orgid="panel_1">
+					<xf:input maxlength="10" hierarchy="txb_KisCd" userData2=" class:TopCondition_01_write;" style="position:absolute; left:8px; top:6px; width:62px; height:20px; background-color:#b9d4f7;" readOnly="true" id="txb_KisCd" orgid="txb_KisCd">
+					</xf:input>
+				</xf:group>
+				<xf:image src="../img/img_line2.gif" hierarchy="img_tmp_11" style="position:absolute; left:1090px; top:5px; width:2px; height:30px;" id="img_tmp_11" orgid="img_tmp_11">
+				</xf:image>
+			</xf:group></body>
+</html>

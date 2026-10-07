@@ -1,0 +1,726 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDSTF37700.gfm" meta_screenName="확인절차 대상법인 지정">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<xf:model>
+			<w2:workflowCollection/>
+			<w2:dataCollection baseNode="map">
+				<w2:dataMap id="bnd_reflect" userData2=" activebind:true; dataid:dts_reflect;" baseNode="map">
+					<w2:keyInfo>
+						<w2:key id="CPOC_ENFORCE_DD" ctrl="edt_SchDate" userData2=" param:text; readonly:False;"/>
+					</w2:keyInfo>
+				</w2:dataMap>
+			</w2:dataCollection>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+/* ★Wcraft guide★    
+스크립트 수작업 유의사항
+*/
+
+
+//★Wcraft guide★ include부분 주석처리 -> include("../js/libRoundPanel.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/utils.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/session.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/PopupCalendar.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/stf.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/common.js");
+
+//#include("../js/controlResize.js"); // 화면 리사이징	
+
+
+scwin.gDepCd;
+scwin.gEmpNo;
+scwin.gLdMktTp;
+scwin.gIsurCd;
+scwin.gActTpCd;
+scwin.gSeq;
+scwin.gActTpCd;
+scwin.gApprovStatCd;
+scwin.regMode; // 'REG', 'MOD'
+scwin.gComAbbrv;
+scwin.pageUrl;
+scwin.pageTitle;
+scwin.pageW;
+scwin.pageH;
+scwin.vScrenID = 'ULDSTF37700.xml';
+scwin.gDepCd = js_dep_cd;
+scwin.gEmpNo = js_emp_no;
+scwin.gLdMktTp = js_market;
+scwin.onpageload = function() {
+    scwin.gform_onload();
+};
+scwin.onpageunload = function() {
+};
+
+//페이지 로딩 시 필요한 변수 초기화
+scwin.fn_SetCode = function() {
+    dts_EMP_NO.DataID = "/CodeAction.do?method=getEmpNoDepCode&inputMessageId=CODE_EMPDEP_IN&For=R&DEP_CD=" + scwin.gDepCd;
+    dts_EMP_NO.Reset();
+    dts_DEP_CD.DataID = "/CodeAction.do?method=getDepUpCode&inputMessageId=CODE_EMPDEP_IN&For=R&DEP_CD=" + scwin.gDepCd;
+    dts_DEP_CD.Reset();
+    dts_reflect.DataID = "/gauceSystemierAdaptor.do?method=getGauceDataHeader&messageId=CONFRM_PROCS_CHK_ENFORCE_DD_OUT";
+    dts_reflect.reset();
+    dts_reflect.insertRow();
+
+    //조회일자 오늘로 셋팅
+    var vCurDate = $c.ut.cGetToday("yyyymmdd");
+    edt_SchDate.setValue("");
+    //edt_SchDate.Text = vCurDate;		
+
+    //부서코드 로그인 사용자 부서로 셋팅
+    $c.stf.setObjectValue(cmb_DEP_CD, js_dep_cd);
+    if ($c.stf.getObjectValue(cmb_DEP_CD) == '') {
+        cmb_DEP_CD.setSelectedIndex(0);
+    }
+    if (scwin.gDepCd == 'ZSYS') {
+        $c.stf.showObj(btn_reflect, true);
+    } else {
+        $c.stf.showObj(btn_reflect, false);
+    }
+};
+scwin.fn_Search = function() {
+    var vISUR_CD = $c.stf.getObjectValue(txb_isur_cd);
+    var vDEP_CD = $c.stf.getObjectValue(cmb_DEP_CD);
+    var vEMP_NO = $c.stf.getObjectValue(cmb_EMP_NO);
+    var vSTAT_CD = $c.stf.getObjectValue(cmb_stat_cd);
+    var vENFORCE_DD = $c.stf.getObjectValue(edt_SchDate);
+    if (scwin.gLdMktTp == '9') {
+        scwin.gLdMktTp = '1';
+    } else {
+        scwin.gLdMktTp = scwin.gLdMktTp;
+    }
+    var url = "/ConfrmProcs.do?method=listDesignConfrmProcs";
+    url += "&ISUR_CD=" + vISUR_CD;
+    url += "&CPOC_APPROV_STAT_CD=" + $c.stf.trim(vSTAT_CD);
+    url += "&LD_MKT_TP_CD=" + scwin.gLdMktTp;
+    url += "&ENFORCE_DD=" + vENFORCE_DD;
+    url += "&DEP_CD=" + vDEP_CD;
+    url += "&EMP_NO=" + vEMP_NO;
+    url += "&SCREN_ID=" + scwin.vScrenID;
+    url += "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01;
+    dts_List.DataID = encodeURI(url);
+    dts_List.reset();
+    $c.cm.ShowWin(grd_Grid);
+};
+
+
+
+// 확인절차 대상법인 지정 처리 체크
+scwin.fn_checkConfrmProcsStat = function(pIsurCd, pActTpCd) {
+    var vCPOC_SEQ;
+    var vCPOC_ACT_TP_CD;
+    var vCPOC_ACT_TP_NM;
+    var vCPOC_APPROV_STAT_CD;
+    var vCPOC_APPROV_STAT_NM;
+    var vCPOC_ENFORCE_DD;
+    dts_check.DataID = encodeURI("/ConfrmProcs.do?method=checkConfrmProcsStat&outputMessageId=CONFRM_PROCS_CHK_STAT_OUT&ISUR_CD=" + pIsurCd);
+    dts_check.Reset();
+    vCPOC_SEQ = dts_check.getCellData(1, "CPOC_SEQ");
+    vCPOC_ACT_TP_CD = dts_check.getCellData(1, "CPOC_ACT_TP_CD");
+    vCPOC_ACT_TP_NM = dts_check.getCellData(1, "CPOC_ACT_TP_NM");
+    vCPOC_APPROV_STAT_CD = dts_check.getCellData(1, "CPOC_APPROV_STAT_CD");
+    vCPOC_APPROV_STAT_NM = dts_check.getCellData(1, "CPOC_APPROV_STAT_NM");
+    vCPOC_ENFORCE_DD = dts_check.getCellData(1, "CPOC_ENFORCE_DD");
+
+    // 신규 등록시
+    if (vCPOC_SEQ == undefined) {
+        // [지정] 선택시
+        if (pActTpCd == "1") {
+            return true;
+        } else {
+            $c.win.alert("확인절차 대상법인으로 지정된 상태가 아닙니다.");
+            return false;
+        }
+    } else {
+        // [지정] 선택시
+        if (pActTpCd == "1") {
+            // 가장 마지막 조치가 [지정] 이면
+            if (vCPOC_ACT_TP_CD == "1") {
+                // 가장 마지막 조치의 승인상태가  [승인] 이면
+                if (vCPOC_APPROV_STAT_CD == "30") {
+                    $c.win.alert("이미 확인절차 대상법인으로 지정된 상태입니다.");
+                    return false;
+                } else {
+                    $c.win.alert("확인절차 대상법인 지정 조치의 승인상태가 [" + vCPOC_APPROV_STAT_NM + "] 입니다.");
+                    return false;
+                }
+                // 가장 마지막 조치가 [지정사유변경] 이면	
+
+            } else if (vCPOC_ACT_TP_CD == "2") {
+                // 가장 마지막 조치의 승인상태가  [승인] 이면
+                if (vCPOC_APPROV_STAT_CD == "30") {
+                    $c.win.alert("이미 확인절차 대상법인으로 지정된 상태입니다.");
+                    return false;
+                } else {
+                    $c.win.alert("확인절차 대상법인 지정사유변경 조치의 승인상태가 [" + vCPOC_APPROV_STAT_NM + "] 입니다.");
+                    return false;
+                }
+            } else {
+                // 가장 마지막 조치의 승인상태가  [승인] 이면
+                if (vCPOC_APPROV_STAT_CD == "30") {
+                    return true;
+                } else {
+                    //alert("지정해제 후 확인절차 대상법인으로 지정 할 수 있습니다.");
+                    $c.win.alert("확인절차 대상법인 지정해제 조치의 승인상태가 [" + vCPOC_APPROV_STAT_NM + "] 입니다.");
+                    return false;
+                }
+            }
+
+            // [지정사유변경] 선택시
+
+        } else if (pActTpCd == "2") {
+            // 가장 마지막 조치가 [지정] 이면
+            if (vCPOC_ACT_TP_CD == "1") {
+                // 가장 마지막 조치의 승인상태가  [승인] 이면
+                if (vCPOC_APPROV_STAT_CD == "30") {
+                    return true;
+                } else {
+                    $c.win.alert("확인절차 대상법인 지정 조치의 승인상태가 [" + vCPOC_APPROV_STAT_NM + "] 입니다.");
+                    return false;
+                }
+                // 가장 마지막 조치가 [지정사유변경] 이면		
+
+            } else if (vCPOC_ACT_TP_CD == "2") {
+                // 가장 마지막 조치의 승인상태가  [승인] 이면
+                if (vCPOC_APPROV_STAT_CD == "30") {
+                    return true;
+                } else {
+                    $c.win.alert("확인절차 대상법인 지정사유변경 조치의 승인상태가 [" + vCPOC_APPROV_STAT_NM + "] 입니다.");
+                    return false;
+                }
+            } else {
+                // 가장 마지막 조치의 승인상태가  [승인] 이면
+                if (vCPOC_APPROV_STAT_CD == "30") {
+                    $c.win.alert("지정사유변경을 처리 할 수 없습니다. 먼저 지정 후 지정사유를 변경하세요.");
+                    return false;
+                } else {
+                    $c.win.alert("확인절차 대상법인 지정해제 조치의 승인상태가 [" + vCPOC_APPROV_STAT_NM + "] 입니다.");
+                    return false;
+                }
+            }
+
+            // [지정해제] 선택시
+
+        } else if (pActTpCd == "3") {
+            // 가장 마지막 조치가 [지정] 이면
+            if (vCPOC_ACT_TP_CD == "1") {
+                // 가장 마지막 조치의 승인상태가  [승인] 이면
+                if (vCPOC_APPROV_STAT_CD == "30") {
+                    return true;
+                } else {
+                    $c.win.alert("확인절차 대상법인 지정 조치의 승인상태가 [" + vCPOC_APPROV_STAT_NM + "]입니다.");
+                    return false;
+                }
+                // 가장 마지막 조치가 [지정사유변경] 이면		
+
+            } else if (vCPOC_ACT_TP_CD == "2") {
+                // 가장 마지막 조치의 승인상태가  [승인] 이면
+                if (vCPOC_APPROV_STAT_CD == "30") {
+                    return true;
+                } else {
+                    $c.win.alert("확인절차 대상법인 지정사유변경 조치의 승인상태가 [" + vCPOC_APPROV_STAT_NM + "] 입니다.");
+                    return false;
+                }
+            } else {
+                // 가장 마지막 조치의 승인상태가  [승인] 이면
+                if (vCPOC_APPROV_STAT_CD == "30") {
+                    $c.win.alert("이미 지정해제 된 상태입니다.");
+                    return false;
+                } else {
+                    $c.win.alert("확인절차 대상법인 지정해제 조치의 승인상태가 [" + vCPOC_APPROV_STAT_NM + "] 입니다.");
+                    return false;
+                }
+            }
+        }
+    }
+    return true;
+};
+
+
+
+
+
+//TBLD_ISU_INST에 EXMPT_OBJ_DISCLS_YN 수동 반영
+scwin.fn_updateExmptObjDisclsYn = function() {
+    var tmpStr;
+    var vMethod;
+    vMethod = "updateExmptObjDisclsYn";
+    tmpStr = "반영 하시겠습니까?";
+    var vAnswer = confirm(tmpStr);
+    if (vAnswer == true) {
+        trs_reflect.Action = "/ConfrmProcs.do?method=" + vMethod + "&SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_02;
+        trs_reflect.KeyName = "toinb_dataid4";
+        trs_reflect.KeyValue = "JSP(I:pInput1=dts_reflect)";
+        trs_reflect.Post();
+    }
+};
+scwin.btn_Close_onclick = async function() {
+    await $c.frame.CloseFrame();
+};
+scwin.dts_List_OnLoadCompleted = function(rowcount) {
+    if (dts_List.errorMsg) {
+        $c.win.alert(dts_List.errorMsg);
+    } else {
+        $c.stf.FillGridHeaderTotalCnt(rowcount, panel_page);
+    }
+    $c.cm.CloseWin(rowcount, grd_Grid);
+};
+scwin.dts_List_OnLoadError = function() {
+    $c.stf.alert_error(dts_List);
+    $c.cm.CloseWin('', grd_Grid);
+};
+scwin.grd_Grid_OnDblClick = async function(row, colid) {
+    scwin.gSeq = dts_List.getCellData(eval(row), "CPOC_SEQ");
+    scwin.gIsurCd = dts_List.getCellData(eval(row), "ISUR_CD");
+    scwin.gActTpCd = dts_List.getCellData(eval(row), "CPOC_ACT_TP_CD");
+    scwin.gApprovStatCd = dts_List.getCellData(eval(row), "CPOC_APPROV_STAT_CD");
+    if (scwin.gApprovStatCd == "10") {
+        scwin.regMode = 'MOD'; //수정 및 검토모드
+
+    } else if (scwin.gApprovStatCd == "20") {
+        scwin.regMode = 'APP'; //승인모드
+
+    } else {
+        scwin.regMode = 'VIEW'; //승인완료모드
+
+    }
+
+
+    // 지정	
+    if (scwin.gActTpCd == '1') {
+        scwin.pageUrl = '/dsclmgt/ULDSTF37701.gfm';
+        scwin.pageTitle = '지정';
+        scwin.pageW = '660';
+        scwin.pageH = '350';
+
+        // 지정사유변경
+
+    } else if (scwin.gActTpCd == '2') {
+        scwin.pageUrl = '/dsclmgt/ULDSTF37702.gfm';
+        scwin.pageTitle = '지정사유변경';
+        scwin.pageW = '660';
+        scwin.pageH = '480';
+        // 지정해제
+
+    } else if (scwin.gActTpCd == '3') {
+        scwin.pageUrl = '/dsclmgt/ULDSTF37701.gfm';
+        scwin.pageTitle = '지정해제';
+        scwin.pageW = '660';
+        scwin.pageH = '350';
+    }
+    if (colid == "CPOC_DESIGN_RSN_NM") {
+        // 승인상태 클릭 시
+        await $c.frame.CreateDialogFrame("wndDiscls", scwin.pageUrl, "확인절차 대상법인 " + scwin.pageTitle, 300, 220, scwin.pageW, scwin.pageH, "window");
+    }
+    if (colid == "COM_ABBRV") {
+        $c.stf.fn_PopupCorpInfo();
+    }
+};
+scwin.cmb_DEP_CD_OnSelChange = function() {
+    scwin.gDepCd = $c.stf.getObjectValue(cmb_DEP_CD); //;.ValueOfIndex("VALUE", cmb_DEP_CD.Index);
+
+    dts_EMP_NO.UseFilter = true;
+    dts_EMP_NO.Filter();
+};
+scwin.dts_EMP_NO_OnFilter = function(row) {
+    if (scwin.gDepCd == "") {
+        // 전체일 경우 모두 보여준다.
+        return true;
+    } else {
+        if (dts_EMP_NO.getCellData(row, "dep_cd") == scwin.gDepCd ||
+            dts_EMP_NO.getCellData(row, "dep_cd") == "") {
+            return true;
+        } else {
+            return false;
+        }
+    }
+};
+scwin.Grd_com_isur_OnKeyPress = function(kcode) {
+    if (kcode == '13') {
+        $c.cm.fn_com_Confirm_set();
+    }
+};
+scwin.Grd_com_isur_OnDblClick = function(row, colid) {
+    $c.cm.fn_com_Confirm_set();
+};
+scwin.Grd_com_isur_OnClick = function(row, colid) {
+    Grd_com_isur.style.display = "";
+};
+scwin.Grd_com_isur_OnSetFocus = function() {
+    stFocusGrid = true;
+};
+scwin.Grd_com_isur_OnKillFocus = function() {
+    stFocusGrid = false;
+    Grd_com_isur.style.display = "none";
+};
+scwin.txb_isur_cd_onblur = function() {
+    if (stFocusGrid == false) {
+        Grd_com_isur.style.display = "none";
+    }
+    if (txb_isur_cd.getValue() == "") {
+        txb_com_abbrv.setValue("");
+    }
+};
+scwin.txb_isur_cd_onfocus = function() {
+    Grd_com_isur.style.display = "none";
+};
+scwin.txb_isur_cd_onkeyup = function() {
+    if (txb_isur_cd.getValue() == "") {
+        Grd_com_isur.style.display = "none";
+    } else {
+        if (window.event.keyCode == 40) {
+            //아래화살표눌렀을때 그리드로 포커스
+            Grd_com_isur.focus();
+        } else {
+            $c.cm.fn_com_isur_nm(window.event.keyCode);
+        }
+    }
+};
+scwin.img_com_srch_onclick = function() {
+    $c.cm.IsurcdSearch(txb_isur_cd, txb_com_abbrv);
+};
+scwin.MxDataSet_com_isur_OnFilter = function(row) {
+    if (skw != "" && foColum == "1") {
+        f1 = MxDataSet_com_isur.getCellData(row, "COM_ABBRV");
+        f2 = MxDataSet_com_isur.getCellData(row, "OLD_COM_ABBRV");
+        if (f1.indexOf(skw) != -1 || f2.indexOf(skw) != -1) return true;
+
+        else return false;
+    } else return true;
+};
+scwin.img_FromCal_onclick = function() {
+    popUpCalendar2(edt_SchDate);
+};
+scwin.btn_Search_onclick = function() {
+    scwin.fn_Search();
+};
+scwin.btn_Excel_onclick = function() {
+    $c.stf.doLogSave(scwin.vScrenID, SCREN_PROCS_TP_CD_07, '');
+    $c.data.downloadGridViewExcel(grd_Grid, "확인절차 대상법인 지정/지정해제", "", "8");
+};
+scwin.btn_New_onclick = async function() {
+    scwin.regMode = "REG";
+    if ($c.stf.getObjectValue(txb_isur_cd) == '' || $c.stf.getObjectValue(txb_com_abbrv) == '') {
+        $c.win.alert("확인절차 대상법인을 선택해 주세요.");
+        txb_isur_cd.focus();
+        return true;
+    }
+    if ($c.stf.getObjectValue(cmb_ActTpCd) == '') {
+        $c.win.alert("조치구분을 선택해 주세요.");
+        cmb_ActTpCd.focus();
+        return true;
+    }
+    scwin.gIsurCd = $c.stf.getObjectValue(txb_isur_cd);
+    scwin.gComAbbrv = $c.stf.getObjectValue(txb_com_abbrv);
+    scwin.gActTpCd = $c.stf.getObjectValue(cmb_ActTpCd);
+
+    // 지정	
+    if ($c.stf.getObjectValue(cmb_ActTpCd) == '1') {
+        scwin.pageUrl = '/dsclmgt/ULDSTF37701.gfm';
+        scwin.pageTitle = '지정';
+        scwin.pageW = '660';
+        scwin.pageH = '350';
+
+        // 지정사유변경
+
+    } else if ($c.stf.getObjectValue(cmb_ActTpCd) == '2') {
+        scwin.pageUrl = '/dsclmgt/ULDSTF37702.gfm';
+        scwin.pageTitle = '지정사유변경';
+        scwin.pageW = '660';
+        scwin.pageH = '480';
+        // 지정해제
+
+    } else if ($c.stf.getObjectValue(cmb_ActTpCd) == '3') {
+        scwin.pageUrl = '/dsclmgt/ULDSTF37701.gfm';
+        scwin.pageTitle = '지정해제';
+        scwin.pageW = '660';
+        scwin.pageH = '350';
+    }
+
+    //확인절차 대상법인 지정 처리 체크	
+    if (scwin.fn_checkConfrmProcsStat(scwin.gIsurCd, scwin.gActTpCd) == false) {
+        cmb_ActTpCd.focus();
+        return;
+    }
+    scwin.fn_Search();
+    await $c.frame.CreateDialogFrame("wndDiscls", scwin.pageUrl, "확인절차 대상법인 " + scwin.pageTitle, 300, 220, scwin.pageW, scwin.pageH, "window");
+};
+scwin.trs_check_OnSuccess = async function() {
+    $c.win.alert($c.stf.getMessageParam("MSG-A001", "등록"));
+    parent_function_call();
+    await $c.frame.CloseFrame();
+};
+scwin.trs_check_OnFail = function() {
+    $c.win.alert($c.stf.getMessageParam("MSG-A002", "등록"));
+    $c.win.alert(trs_insert.ErrorMsg);
+};
+scwin.btn_reflect_onclick = function() {
+    scwin.fn_updateExmptObjDisclsYn();
+};
+scwin.trs_reflect_OnSuccess = function() {
+    $c.win.alert($c.stf.getMessageParam("MSG-A001", "등록"));
+};
+scwin.trs_reflect_OnFail = function() {
+    //alert( getMessageParam("MSG-A002", "등록") );
+    $c.win.alert(trs_reflect.ErrorMsg);
+};
+scwin.dts_reflect_OnLoadCompleted = function(rowcount) {
+
+};
+scwin.gform_onload = function() {
+    // 패널라운드 처리
+    $c.libRoundPanel.PanelToGroupBox(panel_1);
+    scwin.fn_SetCode();
+
+    //회사정보 로딩
+    $c.cm.fn_com_isur(txb_isur_cd, txb_com_abbrv);
+    scwin.fn_Search();
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+		<xf:group userData2=" version:1.5; arfsrc:../js/arf.vbs; componentset:unicode;"
+			style="" class="sub_contents" ev:onpageload="scwin.gform_onload">
+			<xf:group class="schbox" id="panel_1" meta_snippetCategory="03_조회영역" meta_snippetKeyComponent="true"
+				meta_snippetName="3_02 조회조건2행" style="">
+				<xf:group class="schbox_inner" id="" style="">
+					<xf:group adaptive="layout" adaptiveThreshold="768" class="w2tb tbl " id="" style="" tagname="table">
+						<w2:attributes>
+							<w2:summary></w2:summary>
+						</w2:attributes>
+						<xf:group tagname="colgroup">
+							<xf:group style="width:100px;" tagname="col"></xf:group>
+							<xf:group style="" tagname="col"></xf:group>
+							<xf:group tagname="col" style="width:100.00px;"></xf:group>
+							<xf:group style="width:120px" tagname="col"></xf:group>
+							<xf:group tagname="col" style="width:100px;"></xf:group>
+							<xf:group style="width:40%" tagname="col"></xf:group>
+						</xf:group>
+						<xf:group class="" id="" style="" tagname="tr">
+							<xf:group class="w2tb_th" style="" tagname="th">
+								<w2:textbox id="label_6" label="회사코드(명)" style="" userData2=" class:TopCondition_01;"></w2:textbox>
+							</xf:group>
+							<xf:group class="w2tb_td" style="" tagname="td">
+								<w2:attributes>
+									<w2:colspan>3</w2:colspan>
+									<w2:rowspan>1</w2:rowspan>
+								</w2:attributes>
+								<xf:group id="" class="flex">
+									<w2:autoComplete editType="select" id="txb_isur_cd" style="width:90px;" submenuSize="auto"
+										search="start" class="flex_no">
+									</w2:autoComplete>
+									<xf:input maxlength="1000" readOnly="true" style=""
+										userData2=" class:panel_text_read_01; font-family:돋움; border-color:#92b1f1;" id="txb_com_abbrv">
+									</xf:input>
+									<xf:trigger cursor="pointer" src="../img/btn_search.gif" ev:onclick="scwin.img_com_srch_onclick"
+										style="" id="img_com_srch" class="btn_cm icon search">
+										<xf:label><![CDATA[]]></xf:label>
+									</xf:trigger>
+								</xf:group>
+							</xf:group>
+							<xf:group tagname="th" class="w2tb_th">
+								<w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes>
+								<w2:textbox id="label_1" label="시행일" style="" userData2=" class:TopCondition_01;"></w2:textbox>
+							</xf:group>
+							<xf:group tagname="td" id="" class="w2tb_td">
+								<w2:attributes></w2:attributes>
+								<w2:inputCalendar id="edt_SchDate" style="" calendarValueType="yearMonthDate"></w2:inputCalendar>
+							</xf:group>
+						</xf:group>
+						<xf:group class="" id="" style="" tagname="tr">
+							<xf:group class="w2tb_th" style="" tagname="th">
+								<w2:textbox id="label_14" label="담당팀" style=""
+									userData2=" class:TopCondition_01; font-family:돋움체; vertical-align:middle;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group class="w2tb_td" style="" tagname="td">
+								<xf:select1 appearance="minimal" disabledClass="w2selectbox_disabled" displayMode="label" id="cmb_DEP_CD"
+									ref="data:dts_DEP_CD" selectedData="true" style=""
+									userData2=" bindcolumn:VALUE; index:1; inheritcolor:False; listcount:10; listexprformat:text^0^178; searchcolumn:TEXT; xpstyle:True; font-family:돋움;" ev:onchange="scwin.cmb_DEP_CD_OnSelChange">
+								</xf:select1>
+							</xf:group>
+							<xf:group class="w2tb_th" style="" tagname="th">
+								<w2:textbox id="label_15" label="담당자" style=""
+									userData2=" class:TopCondition_01; font-family:돋움체; vertical-align:middle;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group class="w2tb_td" id="" style="" tagname="td">
+								<xf:select1 appearance="minimal" disabledClass="w2selectbox_disabled" displayMode="label" id="cmb_EMP_NO"
+									ref="data:dts_EMP_NO" selectedData="true" style=""
+									userData2=" bindcolumn:VALUE; index:0; inheritcolor:False; listcount:10; listexprformat:text^0^110; searchcolumn:TEXT; xpstyle:True; font-family:돋움;">
+								</xf:select1>
+							</xf:group>
+							<xf:group tagname="th" class="w2tb_th">
+								<w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes>
+								<w2:textbox id="label_9" label="승인상태" style="" userData2=" class:TopCondition_01;"></w2:textbox>
+							</xf:group>
+							<xf:group tagname="td" id="" class="w2tb_td">
+								<w2:attributes></w2:attributes>
+								<xf:select1 appearance="minimal" disabled="false" disabledClass="w2selectbox_disabled" displayMode="label"
+									id="cmb_stat_cd" item="전체^ ,접수^10,검토^20,승인^30" maxlength="20" selectedData="true" style="width:120px;"
+									userData2=" bindcolumn:disp; defaultstring:전체; index:0; inheritcolor:False; listcount:10; listexprformat:disp^0^70; xpstyle:True; font-family:돋움;">
+									<xf:choices>
+										<xf:item>
+											<xf:label><![CDATA[ ]]></xf:label>
+											<xf:value><![CDATA[전체]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[10]]></xf:label>
+											<xf:value><![CDATA[접수]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[20]]></xf:label>
+											<xf:value><![CDATA[검토]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[30]]></xf:label>
+											<xf:value><![CDATA[승인]]></xf:value>
+										</xf:item>
+									</xf:choices>
+								</xf:select1>
+							</xf:group>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+				<xf:group class="btn_schbox" id="" style="">
+					<xf:trigger class="btn_cm sch" cursor="pointer" ev:onclick="scwin.btn_Search_onclick" id="btn_Search"
+						src="../img/btn_select.gif" style="">
+						<xf:label><![CDATA[조회]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+			<xf:group id="" class="titbox">
+				<xf:group id="" class="rt">
+					<xf:group id="" class="count">
+						<w2:span id="" label="총" style=""></w2:span>
+						<xf:group tagname="span" style="" id="panel_page" class="num"></xf:group>
+						<w2:span label="건" style="" id=""></w2:span>
+
+					</xf:group>
+
+
+
+					<w2:textbox id="label_7" label="조치구분" style="" userData2=" class:TopCondition_01;"></w2:textbox>
+					<xf:select1 appearance="minimal" disabled="false" disabledClass="w2selectbox_disabled" displayMode="label"
+						id="cmb_ActTpCd" item="(null)^선택해주세요,1^지정,2^지정사유변경,3^지정해제" selectedData="true" style="width:140px;"
+						userData2=" class:TopCondition_01; bindcolumn:value; index:0; listcount:10; listexprformat:text^0^138;">
+						<xf:choices>
+							<xf:item>
+								<xf:label><![CDATA[선택해주세요]]></xf:label>
+								<xf:value><![CDATA[(null)]]></xf:value>
+							</xf:item>
+							<xf:item>
+								<xf:label><![CDATA[지정]]></xf:label>
+								<xf:value><![CDATA[1]]></xf:value>
+							</xf:item>
+							<xf:item>
+								<xf:label><![CDATA[지정사유변경]]></xf:label>
+								<xf:value><![CDATA[2]]></xf:value>
+							</xf:item>
+							<xf:item>
+								<xf:label><![CDATA[지정해제]]></xf:label>
+								<xf:value><![CDATA[3]]></xf:value>
+							</xf:item>
+						</xf:choices>
+					</xf:select1><xf:trigger class="btn_cm download" cursor="pointer" ev:onclick="scwin.btn_Excel_onclick" id="btn_Excel" src="../img/btn_excelsave.gif" style="">
+						<xf:label><![CDATA[엑셀다운로드]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.btn_New_onclick" id="btn_New" src="../img/btn_new.gif"
+						style="">
+						<xf:label><![CDATA[신규]]></xf:label>
+					</xf:trigger>
+					
+
+					<xf:trigger cursor="pointer" src="../img/btn_save.gif" ev:onclick="scwin.btn_reflect_onclick" style="" id="btn_reflect"
+						class="btn_cm">
+						<xf:label><![CDATA[저장]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+			<xf:group id="" class="gvwbox">
+				<w2:gridView id="grd_Grid"
+					userData2=" class:Grid_01; colsizing:True; editable:False; fillarea:True; fixsizing:True; gtitleheight:0; headborder:4; indwidth:0; rowheight:20; sortview:left; suppressoption:1; titleheight:30; tooltip:use=true;alt=true;createtime=300;color=#FFFFFF;backcolor=#808080;edgecolor=#333333;leftmargin=10;rightmargin=10;topmargin=10;bottommargin=10;; xtitleheight:0; font-family:돋움; ondblclick:grd_Grid_OnDblClick;"
+					style="height: 153px;" dataList="data:dts_List" class="gvw" orgid="grd_Grid" hierarchy="grd_Grid" autoFit="allColumn"
+					autoFitMinWidth="1470">
+					<w2:caption id="caption1" style="" value="this is a grid caption." />
+					<w2:header id="header1" style="">
+						<w2:row>
+							<w2:column value="번호" id="RNUM" width="50" textAlign="center"
+								userData2=" suppress:1; value:{CurRow},{ToString};" displayMode="label" inputType="text" />
+							<w2:column value="종목코드" id="ISUR_CD" width="73" textAlign="center" userData2=" suppress:2; sort:True;"
+								displayMode="label" inputType="text" />
+							<w2:column value="회사명" id="COM_ABBRV" width="155" textAlign="center"
+								userData2=" cursor:hand; suppress:3; bgcolor:#FFFF99; sort:True;" displayMode="label" inputType="text" />
+							<w2:column value="일련번호" id="CPOC_SEQ" width="70" hidden="true" displayMode="label" inputType="text"
+								textAlign="center" />
+							<w2:column value="조치구분코드" id="CPOC_ACT_TP_CD" width="120" hidden="true" displayMode="label" inputType="text"
+								textAlign="center" />
+							<w2:column value="조치구분" id="CPOC_ACT_TP_NM" width="120" textAlign="center" userData2=" sort:True; cursor:hand;"
+								displayMode="label" inputType="text" />
+							<w2:column value="지정사유" id="CPOC_DESIGN_RSN_NM" width="250"
+								userData2=" value:{Decode(CPOC_DESIGN_RSN_NM, '', '-', CPOC_DESIGN_RSN_NM)}; sort:True; bgcolor:#FFFF99; cursor:hand;"
+								textAlign="center" displayMode="label" inputType="text" />
+							<w2:column value="시행일" id="CPOC_ENFORCE_DD" width="87" textAlign="center"
+								userData2=" mask:XXXX-XX-XX; sort:True;" displayMode="label" inputType="text" />
+							<w2:column value="승인상태코드" id="CPOC_APPROV_STAT_CD" width="99" hidden="true" displayMode="label" inputType="text"
+								textAlign="center" />
+							<w2:column value="승인상태" id="CPOC_APPROV_STAT_NM" width="84" textAlign="center"
+								userData2=" sort:True; cursor:hand;" displayMode="label" inputType="text" />
+							<w2:column value="접수자" id="ACPTR_NM" userData2=" sort:True;" width="74" textAlign="center" displayMode="label"
+								inputType="text" />
+							<w2:column value="검토자" id="REVWR_NM" width="74" textAlign="center" userData2=" sort:True;" displayMode="label"
+								inputType="text" />
+							<w2:column value="승인자" id="APPROVR_NM" width="74" textAlign="center" userData2=" sort:True;" displayMode="label"
+								inputType="text" />
+							<w2:column value="담당팀" id="DEP_NM" width="74" textAlign="center" userData2=" sort:True;" displayMode="label"
+								inputType="text" />
+							<w2:column value="담당자" id="EMP_NM" width="74" textAlign="center" userData2=" sort:True;" displayMode="label"
+								inputType="text" />
+						</w2:row>
+					</w2:header>
+					<w2:gBody id="gBody1" style="">
+						<w2:row id="" style="">
+							<w2:column id="RNUM" textAlign="center" width="50" inputType="text" displayMode="label" />
+							<w2:column id="ISUR_CD" textAlign="center" width="73" inputType="text" displayMode="label" />
+							<w2:column id="COM_ABBRV" textAlign="default" width="155" inputType="text" displayMode="label" />
+							<w2:column id="CPOC_SEQ" textAlign="center" width="70" inputType="text" displayMode="label" />
+							<w2:column id="CPOC_ACT_TP_CD" textAlign="center" width="120" inputType="text" displayMode="label" />
+							<w2:column id="CPOC_ACT_TP_NM" textAlign="center" width="120" inputType="text" displayMode="label" />
+							<w2:column id="CPOC_DESIGN_RSN_NM" textAlign="{Decode(CPOC_DESIGN_RSN_NM, '', 'center', 'left')}" width="250"
+								inputType="text" displayMode="label" />
+							<w2:column id="CPOC_ENFORCE_DD" textAlign="center" width="87" inputType="text" displayMode="label" />
+							<w2:column id="CPOC_APPROV_STAT_CD" textAlign="center" width="99" inputType="text" displayMode="label" />
+							<w2:column id="CPOC_APPROV_STAT_NM" textAlign="center" width="84" inputType="text" displayMode="label" />
+							<w2:column id="ACPTR_NM" textAlign="center" width="74" inputType="text" displayMode="label" />
+							<w2:column id="REVWR_NM" textAlign="center" width="74" inputType="text" displayMode="label" />
+							<w2:column id="APPROVR_NM" textAlign="center" width="74" inputType="text" displayMode="label" />
+							<w2:column id="DEP_NM" textAlign="center" width="74" inputType="text" displayMode="label" />
+							<w2:column id="EMP_NM" textAlign="center" width="74" inputType="text" displayMode="label" />
+						</w2:row>
+					</w2:gBody>
+				</w2:gridView>
+			</xf:group>
+			<xf:group class="msgbox " id="" meta_snippetCategory="11_메시지" meta_snippetKeyComponent="true"
+				meta_snippetName="11_05 에러메시지박스" style="">
+				<w2:textbox id="label_2" userData2=" class:TopCondition_01;" style="" label="[승인상태]" class="txt_msg blue"/>
+			<w2:textbox id="label_3" userData2=" class:TopCondition_01;" style="" label="- 접수 : 지정/지정사유변경/지정해제 데이터 최초 등록한 상태" class="txt_con"/><w2:textbox id="label_4" userData2=" class:TopCondition_01;" style="" label="- 검토 : 승인 요청중인 상태" class="txt_con"/><w2:textbox id="label_5" userData2=" class:TopCondition_01;" style="" label='- 승인 : 팀장 승인이 완료된 상태 &lt;span class="red"&gt;(시행일에 일배치를 통해 상장원부에 반영됨)&lt;/span&gt;' class="txt_con" escape="false"/></xf:group>
+			
+			
+			
+			
+			<xf:group id="" class="btnbox">
+				<xf:group id="" class="rt">
+					<xf:trigger cursor="pointer" src="../img/btn_close.gif" ev:onclick="scwin.btn_Close_onclick" style="" id="btn_Close"
+						class="btn_cm">
+						<xf:label><![CDATA[닫기]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+		</xf:group>
+	<xf:group id="" class="hide"><w2:textbox userData2=" class:TopCondition_01;" style="position:absolute; left:199px; top:629px; width:410px; height:18px; color:#ff6600;" id="label_8" label="(시행일에 일배치를 통해 상장원부에 반영됨)"></w2:textbox></xf:group></body>
+</html>

@@ -1,0 +1,838 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDSTF08023.gfm" meta_screenName="(팝업)수량변경발행및상장내역세부내역">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<xf:model>
+			<w2:workflowCollection/>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+/* ★Wcraft guide★    
+스크립트 수작업 유의사항
+*/
+
+
+//★Wcraft guide★ include부분 주석처리 -> include("../js/libRoundPanel.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/stf.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/utils.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/PopupCalendar.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/list_common_etn.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/session.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/buttonSet.js");
+scwin.vScrenID = "ULDSTF08023.xml"; //화면ID
+scwin.v_SaveKind = ""; //신규,수정 구분
+scwin.vBzProcsNo = ""; //업무처리번호
+scwin.vAcptNo = ""; //접수번호
+scwin.vIsurCd = ""; //발행기관코드
+scwin.vIsurNm = ""; //발행회사명
+scwin.vIsuAbbrv = ""; //종목약명
+scwin.vNapplShrs = ""; //미반영증권수
+scwin.vChgAfListShrs = ""; //변경후증권수
+scwin.vListBzTpCd = ""; //상장업무구분코드 (삭제시 필요) - 로그처리방지용
+
+//Transaction 처리코드
+scwin.TR_JOB;
+scwin.onpageload = function() {
+    scwin.gform_onload();
+};
+scwin.onpageunload = function() {
+};
+
+/********************************************** 
+ * 함수명 : fn_CheckForm(kind)
+ * Params : kind( N:신규, U:수정)
+ * 설명    : Form Validation Check
+ ***********************************************/
+scwin.fn_CheckForm = function(kind) {
+    var vCurDate = $c.ut.cGetToday("yyyymmdd");
+    if (txb_INCDEC_APPL_LIST_SHRS.getValue() == "") {
+        txb_INCDEC_APPL_LIST_SHRS.setValue("0");
+    }
+    if ($c.stf.getObjectValue(edt_HALFWY_REDMPT_DD) == "") {
+        $c.win.alert("[중도상환일]을 입력하세요.");
+        edt_HALFWY_REDMPT_DD.focus();
+        return false;
+    } else if ($c.stf.getObjectValue(edt_CHG_LIST_DD) == "") {
+        $c.win.alert("[변경상장일]을 입력하세요.");
+        edt_CHG_LIST_DD.focus();
+        return false;
+    }
+
+    //신규인 경우에만 체크하도록 함
+    if (scwin.v_SaveKind == "N") {
+        if (vCurDate >= $c.stf.getObjectValue(edt_CHG_LIST_DD)) {
+            $c.win.alert("[변경상장일]을 현재일이후로 입력하세요.");
+            edt_CHG_LIST_DD.focus();
+            return false;
+        }
+    }
+    return true;
+};
+
+
+/********************************************** 
+ * 함수명 : fn_select_isur_init()
+ * 설명    : 종목코드에 대한 발행회사 조회 / 신규시 초기화됨
+ ***********************************************/
+scwin.fn_select_isur_init = function() {
+    var parentWin = $c.frame.path("../");
+    var url = "/etn/EtnChgList.do?method=selectEtnListDoc";
+    url += "&SCREN_ID=" + scwin.vScrenID;
+    url += "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01;
+    url += "&SRCH_ISU_CD=" + $c.stf.getObjectValue(txb_ISU_CD);
+    dts_Isu.DataID = encodeURI(url);
+    dts_Isu.Reset();
+
+    //발행기관명, 미반영증권수,  변경후증권수 조회
+    vIsuNm = dts_Isu.getCellData(1, "ISU_NM");
+    scwin.vIsurNm = dts_Isu.getCellData(1, "ISUR_NM");
+    scwin.vNapplShrs = dts_Isu.getCellData(1, "NAPPL_SHRS");
+    scwin.vChgAfListShrs = dts_Isu.getCellData(1, "CHG_AF_LIST_SHRS");
+};
+
+
+/********************************************** 
+ * 함수명 : fn_select_isur_detail()
+ * 설명    : 업무처리번호에 대한 상세내역 조회
+ ***********************************************/
+scwin.fn_select_isur_detail = function(selectKind) {
+    var parentWin = $c.frame.path("../");
+    var url = "/etn/EtnChgList.do?method=selectQtyIsurDetail";
+    url += "&SCREN_ID=" + scwin.vScrenID;
+    url += "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01;
+    url += "&BZ_PROCS_NO=" + scwin.vBzProcsNo;
+    url += "&LIST_BZ_TP_CD=" + selectKind;
+    dts_Isu.DataID = encodeURI(url);
+    dts_Isu.Reset();
+
+    //발행기관명, 종목약명 획득 (안내문전송에서 사용함)
+    vIsuNm = dts_Isu.getCellData(1, "ISU_NM");
+    scwin.vIsuAbbrv = dts_Isu.getCellData(1, "ISU_ABBRV");
+    scwin.vIsurNm = dts_Isu.getCellData(1, "ISUR_NM");
+    scwin.vAcptNo = dts_Isu.getCellData(1, "ACPT_NO");
+};
+
+
+/********************************************** 
+ * 함수명 : fn_save_qty_isur_new()
+ * 설명    : 수량변경 > 발행 및 상장내역 > 신규저장
+ ***********************************************/
+scwin.fn_save_qty_isur_new = function() {
+    if ($c.en.fn_CheckForm(scwin.v_SaveKind) == false) return;
+    scwin.TR_JOB = 'I';
+
+    //Transaction 처리전 안내문구
+    if ($c.ut.trim(txb_INCDEC_APPL_LIST_SHRS.getValue()) == "") {
+        txb_INCDEC_APPL_LIST_SHRS.setValue("0");
+    }
+    var rstlMsg = true;
+    if (parseInt(txb_INCDEC_APPL_LIST_SHRS.getValue()) > 0) {
+        LastJob = '저장'; //list_common_etn.js에 있는 상장메세지처리관련
+        //var rstlMsg = confirm("[증감증권수]는 0 이하의 수만 입력가능합니다.\n\n현재 상태로 [저장] 처리하시겠습니까?");
+        //if (rstlMsg == false) {			
+        //	return;
+        //}
+        $c.win.alert("[증감증권수]는 0 이하의 수만 입력가능합니다.");
+        return;
+    } else {
+        if (!$c.lce.fn_isProcess(scwin.TR_JOB)) return;
+    }
+
+    // 저장 처리
+    var vScrenId = "SCREN_ID=" + scwin.vScrenID;
+    var vScrenTpId = "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_02;
+    var vSrvMethod = "&method=insertQtyIsurDtl";
+    scwin.vIsurCd = dts_Isu.getCellData(1, "ISUR_CD"); //발행기관 (조회해 온 데이터)
+    scwin.vBzProcsNo = $c.stf.fn_getNewBzProcNo(dts_BzProcsNo); //업무처리번호 새로 지정
+
+    trs_Save.Action = "/etn/EtnChgList.do?" + vScrenId + vScrenTpId + vSrvMethod;
+    trs_Save.KeyName = "toinb_dataid4";
+    trs_Save.KeyValue = "JSP(I:pInput=dts_Isu)";
+    trs_Save.Parameters = "TRS_IDX=" + TR_JOB_INSERT + ",LIST_BZ_TP_CD=" + LIST_BZ_TP_CD_708 + ",BZ_PROCS_NO=" + scwin.vBzProcsNo + ",ISUR_CD=" + scwin.vIsurCd + ",LD_MKT_TP_CD=1" + ",TRANSTR_EMP_NO=" + js_emp_no;
+    trs_Save.Post();
+};
+
+
+/********************************************** 
+ * 함수명 : fn_save_qty_isur_update()
+ * 설명    : 수량변경 > 발행 및 상장내역 > 수정
+ ***********************************************/
+scwin.fn_save_qty_isur_update = function() {
+    //중도상환인 경우에만 폼 데이터 체크함
+    if (scwin.vListBzTpCd == "708") {
+        if ($c.en.fn_CheckForm(scwin.v_SaveKind) == false) return;
+    }
+    scwin.TR_JOB = 'U';
+
+    //Transaction 처리전 안내문구
+    if ($c.ut.trim(txb_INCDEC_APPL_LIST_SHRS.getValue()) == "") {
+        txb_INCDEC_APPL_LIST_SHRS.setValue("0");
+    }
+    /**
+     * 중도상환인 경우만 증감증권수 validation check
+     */
+    var m_ListBzTpCd = "";
+    if (scwin.vListBzTpCd == "708") {
+        //상장업무구분 (중도상환) 
+        m_ListBzTpCd = LIST_BZ_TP_CD_708;
+
+        //증감증권수 체크
+        if (parseInt(txb_INCDEC_APPL_LIST_SHRS.getValue()) > 0) {
+            LastJob = '수정'; //list_common_etn.js에 있는 상장메세지처리관련
+            $c.win.alert("[증감증권수]는 0 이하의 수만 입력가능합니다.");
+            return;
+        } else {
+            if (!$c.lce.fn_isProcess(scwin.TR_JOB)) return;
+        }
+    } else if (scwin.vListBzTpCd == "704") {
+        //상장업무구분 (추가상장) 
+        m_ListBzTpCd = LIST_BZ_TP_CD_704;
+
+        //증감증권수 체크
+        if (!$c.lce.fn_isProcess(scwin.TR_JOB)) return;
+    }
+    var vScrenId = "SCREN_ID=" + scwin.vScrenID;
+    var vScrenTpId = "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_03;
+    var vSrvMethod = "&method=updateQtyIsurDtl";
+    trs_Save.Action = "/etn/EtnChgList.do?" + vScrenId + vScrenTpId + vSrvMethod;
+    trs_Save.KeyName = "toinb_dataid4";
+    trs_Save.KeyValue = "JSP(I:pInput=dts_Isu)";
+    trs_Save.Parameters = "TRS_IDX=" + TR_JOB_UPDATE + ",LIST_BZ_TP_CD=" + m_ListBzTpCd + ",BZ_PROCS_NO=" + scwin.vBzProcsNo + ",LD_MKT_TP_CD=1" + ",TRANSTR_EMP_NO=" + js_emp_no;
+    trs_Save.Post();
+};
+
+
+/********************************************** 
+ * 함수명 : fn_save_qty_isur_delete
+ * 설명    : 수량변경 > 발행 및 상장내역 > 삭제
+ ***********************************************/
+scwin.fn_save_qty_isur_delete = function() {
+    if (scwin.vBzProcsNo == "") {
+        $c.win.alert("삭제 정보(업무처리번호)가 없습니다.");
+        return;
+    }
+    scwin.TR_JOB = 'D';
+
+    //Transaction 처리전 안내문구
+    if (!$c.lce.fn_isProcess(scwin.TR_JOB)) return;
+    var vScrenId = "SCREN_ID=" + scwin.vScrenID;
+    var vScrenTpId = "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_04;
+    var vSrvMethod = "&method=deleteQtyIsurDtl";
+    var m_ListBzTpCd = "";
+    if (scwin.vListBzTpCd == "704") {
+        m_ListBzTpCd = LIST_BZ_TP_CD_704;
+    } else if (scwin.vListBzTpCd == "708") {
+        m_ListBzTpCd = LIST_BZ_TP_CD_708;
+    }
+
+    //상장업무구분코드 있는 경우에만 삭제 처리 함
+    if (m_ListBzTpCd != "") {
+        trs_Save.Action = "/etn/EtnChgList.do?" + vScrenId + vScrenTpId + vSrvMethod;
+        trs_Save.KeyName = "toinb_dataid4";
+        trs_Save.KeyValue = "JSP(I:pInput=dts_Isu)";
+        trs_Save.Parameters = "TRS_IDX=" + TR_JOB_DELETE + ",LIST_BZ_TP_CD=" + m_ListBzTpCd + ",BZ_PROCS_NO=" + scwin.vBzProcsNo + ",ACPT_NO=" + scwin.vAcptNo + ",LD_MKT_TP_CD=1" + ",TRANSTR_EMP_NO=" + js_emp_no;
+        trs_Save.Post();
+    }
+};
+
+
+
+/********************************************** 
+ * 함수명 : fn_dscl()
+ * 설명    : 수량변경 > 발행 및 상장내역 > 안내문 작성
+ ***********************************************/
+scwin.fn_GetPar, scwin.fn_SetPar;
+scwin.fn_dscl = async function() {
+    var OldGet = scwin.fn_GetPar;
+    var OldSet = scwin.fn_SetPar;
+    var cCtnt = "";
+    scwin.fn_GetPar = function(arr, param_dts_isu, param_dts_mst, param_dts2) {
+        arr[0] = "68353";
+        arr[1] = scwin.vBzProcsNo;
+        arr[2] = scwin.vIsurCd;
+        arr[3] = '1';
+        arr[4] = scwin.fn_getQtyChgDisclsCtnt(); //ctnt
+        arr[5] = scwin.vIsuAbbrv; //add  title
+
+        $c.stf.CopyDataSet(dts_Isu, param_dts_isu);
+
+        //param_dts_mst.NameString(param_dts_mst.RowPosition, "TGT_NM") = Isur_nm ;
+
+        return arr.length;
+    };
+    scwin.fn_SetPar = function(arr) {
+
+    };
+    var wth = 750;
+    var hgt = 820;
+    var pt = $c.stf.fn_getModalCenterPos(frame, wth, hgt);
+    await $c.frame.CreateDialogFrame("ULDSTF92024", "/listingcommon/ULDSTF92024.gfm", "변경상장 수량변경 안내문작성", pt.x, pt.y, wth, hgt, "window");
+    scwin.fn_GetPar = OldGet;
+    scwin.fn_SetPar = OldSet;
+
+    //안내문팝업 후 '닫기'나 '안내문전송' 후에 Popup Close 및 Parent Refresh 함
+    $c.frame.path("../").fn_list_sync();
+};
+
+
+/********************************************** 
+ * 함수명 : fn_getQtyChgDisclsCtnt()
+ * 설명    : 안내문작성 서식 (수량변경)
+ ***********************************************/
+scwin.fn_getQtyChgDisclsCtnt = function() {
+    var vCtnt = "";
+    var indecShrs = 0;
+    var chgPreShrs = 0;
+    var chgAfshrs = 0;
+    var lpHdQty = 0;
+
+    //Comma 처리
+    indecShrs = (parseInt(txb_INCDEC_APPL_LIST_SHRS.getValue()) < 0) ? $c.stf.addCommaMinus(txb_INCDEC_APPL_LIST_SHRS.getValue()) : $c.stf.addComma(txb_INCDEC_APPL_LIST_SHRS.getValue());
+    chgPreShrs = (parseInt(txb_CHG_PRE_LIST_SHRS.getValue()) < 0) ? $c.stf.addCommaMinus(txb_CHG_PRE_LIST_SHRS.getValue()) : $c.stf.addComma(txb_CHG_PRE_LIST_SHRS.getValue());
+    chgAfshrs = (parseInt(txb_CHG_AF_LIST_SHRS.getValue()) < 0) ? $c.stf.addCommaMinus(txb_CHG_AF_LIST_SHRS.getValue()) : $c.stf.addComma(txb_CHG_AF_LIST_SHRS.getValue());
+    lpHdQty = (parseInt(txb_LP_HD_QTY.getValue()) < 0) ? $c.stf.addCommaMinus(txb_LP_HD_QTY.getValue()) : $c.stf.addComma(txb_LP_HD_QTY.getValue());
+    vCtnt += "[공시제목] 상장지수증권 변경상장(수량감소)";
+    vCtnt += "\r\n\r\n";
+    vCtnt += "[본문내용]";
+    vCtnt += "\r\n\r\n";
+    vCtnt += "◎ " + scwin.vIsurNm + " 발행 상장지수증권 변경상장(수량감소)";
+    vCtnt += "\r\n\r\n";
+    vCtnt += "1. 종목명 : " + vIsuNm; //getObjectValue(txb_ISU_NM);
+    vCtnt += "\r\n\r\n";
+    vCtnt += "2. 감소수량 : " + indecShrs;
+    vCtnt += "\r\n\r\n";
+    vCtnt += "3. 상장증권수 : 변경상장전 " + chgPreShrs + " → 변경상장후 " + chgAfshrs;
+    vCtnt += "\r\n\r\n";
+    vCtnt += "4. 감소되는 수량 중 LP 보유수량 : " + lpHdQty;
+    vCtnt += "\r\n\r\n";
+    vCtnt += "5. 변경상장일 : " + scwin.dateForm($c.stf.getObjectValue(edt_CHG_LIST_DD));
+    vCtnt += "\r\n\r\n";
+    return vCtnt;
+};
+
+
+/********************************************** 
+ * 함수명 : dateForm()
+ * 설명    : 년월일 포맷 맞춤 (안내문 작성에서 사용)
+ ***********************************************/
+scwin.dateForm = function(pStr) {
+    var str = "";
+    if (pStr == "") {
+        str = "★★★★년" + "★★월" + "★★일";
+    } else {
+        str = pStr.substring(0, 4) + "년 " + pStr.substring(4, 6) + "월 " + pStr.substring(6, 8) + "일";
+    }
+    return str;
+};
+
+
+/********************************************** 
+ * 함수명 : fn_parentRefresh()
+ * 설명    : Parent 화면 Refresh()
+ ***********************************************/
+scwin.fn_parentRefresh = function() {
+    //Parent 신청내역 화면 Refresh
+    var parentWin = $c.frame.path("../");
+    parentWin.fn_list_sync();
+};
+
+
+/********************************************** 
+ * 함수명 : fn_parentRefresh2()
+ * 설명    : Parent 화면 Refresh()
+ ***********************************************/
+/*function fn_parentRefresh2() {
+	//Parent 신청내역 화면 Refresh
+	var parentWin = frame.Provider("../");
+	parentWin.txb_SearchIsuCd.value = txb_ISU_CD.value;
+	parentWin.txb_SearchIsuNm.value = txb_ISU_NM.value;
+	setObjectValue(parentWin.cmb_ISUR_CD, vIsurCd);
+	parentWin.fn_list_qty_appl(vIsurCd, txb_ISU_CD.value);
+	parentWin.fn_list_sync();
+}
+*/
+scwin.btn_QtyIsuClose_onclick = async function() {
+    //닫기(수량변경)
+    await $c.frame.CloseFrame();
+};
+scwin.gform_onload = function() {
+    //Form onload event
+    $c.libRoundPanel.PanelToGroupBox(panel_Item);
+    var parentWin = $c.frame.path("../");
+
+    //Transaction 구분: 신규(N), 수정(U), 삭제(D)
+    scwin.v_SaveKind = parentWin.vQtyIsurKind;
+    if (scwin.v_SaveKind == "N") {
+        //신규일 경우
+        //수정,삭제,안내문작성 버튼 비활성화
+        btn_QtyIsuUpdate.src = "../img/btn_modify_d.gif";
+        btn_QtyIsuUpdate.setDisabled(true);
+        btn_QtyIsuDel.src = "../img/btn_RcvdocDel_d.gif";
+        btn_QtyIsuDel.setDisabled(true);
+        btn_QtyIsuDscl.src = "../img/btn_make_info_d.gif";
+        btn_QtyIsuDscl.setDisabled(true);
+        $c.stf.setObjectValue(txb_ISU_CD, $c.stf.getObjectValue(parentWin.txb_SearchIsuCd));
+
+        //종목코드 Textbox 설정 및 종목코드 정보 조회
+        scwin.fn_select_isur_init();
+    } else if (scwin.v_SaveKind == "U") {
+        //수정일 경우
+        var v_UpdParam = parentWin.v_UpdQtyIsurParam;
+        var vDisclsYn;
+        var i = 0;
+        scwin.vBzProcsNo = v_UpdParam[i++]; //업무처리번호
+        scwin.vIsurCd = v_UpdParam[i++]; //발행기관코드
+        vDisclsYn = v_UpdParam[i++]; //공시여부
+        scwin.vListBzTpCd = v_UpdParam[i++]; //상장업무구분코드
+
+        //세부내역 조회
+        scwin.fn_select_isur_detail(scwin.vListBzTpCd);
+        btn_QtyIsuSave.src = "../img/btn_save_d.gif";
+        btn_QtyIsuSave.setDisabled(true);
+
+        //공시여부('Y')인 경우 화면의 모든 버튼 상태를 disabled 로 변경
+        if (vDisclsYn == 'Y') {
+            //상장업무구분코드(신규상장:702)
+            if (scwin.vListBzTpCd == "702") {
+                txb_ApplType.setValue("신규상장");
+                $c.stf.setObjectValue(txb_RedMpt_Dd, "발행일");
+                $c.stf.setObjectValue(txb_ListDd, "신규상장일");
+                txb_NAPPL_SHRS.setReadOnly(true);
+                btn_QtyIsuDel.src = "../img/btn_RcvdocDel_d.gif";
+                btn_QtyIsuDel.setDisabled(true);
+                btn_QtyIsuUpdate.src = "../img/btn_modify_d.gif";
+                btn_QtyIsuUpdate.setDisabled(true);
+
+                //상장업무구분코드(추가상장:704)
+
+            } else if (scwin.vListBzTpCd == "704") {
+                txb_ApplType.setValue("추가상장");
+                $c.stf.setObjectValue(txb_RedMpt_Dd, "추가발행일");
+                $c.stf.setObjectValue(txb_ListDd, "추가상장일");
+            }
+
+            //상장업무구분코드(신규상장:702, 추가상장:704)
+            if (scwin.vListBzTpCd == "702" || scwin.vListBzTpCd == "704") {
+                f_FormAllControlDisabled();
+            }
+        }
+
+        //추가상장, 중도상환인 경우
+        //상장일이 지난 경우(오늘 포함)는 컨트롤 비활성화 및 readonly
+        //  대상:  '삭제'버튼,  '증감' 필드 readonly, 변경상장일, 중도상환일
+        if (scwin.vListBzTpCd == "704" || scwin.vListBzTpCd == "708") {
+            //상장일 체크
+            if ($c.stf.getObjectValue(edt_CHG_LIST_DD) <= $c.ut.cGetToday("yyyymmdd")) {
+                f_FormAllControlDisabled();
+            } else {
+                //변경전 증권수 활성화
+                txb_CHG_PRE_LIST_SHRS.setReadOnly(false);
+
+                //삭제버튼 활성화
+                btn_QtyIsuDel.src = "../img/btn_RcvdocDel.gif";
+                btn_QtyIsuDel.setDisabled(false);
+            }
+        }
+    }
+
+    //컨트롤 비활성화
+    function f_FormAllControlDisabled() {
+        //버튼:삭제,안내문전송
+        btn_QtyIsuDel.src = "../img/btn_RcvdocDel_d.gif";
+        btn_QtyIsuDel.setDisabled(true);
+        btn_QtyIsuDscl.src = "../img/btn_make_info_d.gif";
+        btn_QtyIsuDscl.setDisabled(true);
+
+        //텍스트:증감증권수,LP보유량
+        txb_INCDEC_APPL_LIST_SHRS.setReadOnly(true);
+        txb_LP_HD_QTY.setReadOnly(true);
+
+        //달력:발행일,신규상장일
+        edt_HALFWY_REDMPT_DD.setReadOnly(true);
+        img_HALFWY_REDMPT_DD.setDisabled(true);
+        img_HALFWY_REDMPT_DD.src = "../img/icn_calendar_d.gif";
+        edt_CHG_LIST_DD.setReadOnly(true);
+        img_CHG_LIST_DD.setDisabled(true);
+        img_CHG_LIST_DD.src = "../img/icn_calendar_d.gif";
+    };
+};
+scwin.trs_Save_OnSuccess = async function() {
+    //저장메세지, 부모화면 Refresh, 화면 닫기
+    $c.lce.fn_alertMsg('S');
+    scwin.fn_parentRefresh();
+    await $c.frame.CloseFrame();
+};
+scwin.trs_Save_OnFail = function() {
+    $c.lce.fn_alertMsg('F');
+    $c.stf.alert_error(trs_Save);
+};
+scwin.img_HALFWY_REDMPT_DD_onclick = function() {
+    //수량변경 > 발행 및 상장내역 > 중도상환일 달력 클릭
+    popUpCalendar2(edt_HALFWY_REDMPT_DD);
+};
+scwin.img_CHG_LIST_DD_onclick = function() {
+    //수량변경 > 발행 및 상장내역 > 변경상장일 달력 클릭
+    popUpCalendar2(edt_CHG_LIST_DD);
+};
+scwin.btn_QtyIsuSave_onclick = function() {
+    //수량변경 > 발행 및 상장내역 >  세부 > 신규 저장
+    scwin.fn_save_qty_isur_new();
+};
+scwin.btn_QtyIsuUpdate_onclick = function() {
+    //수량변경 > 발행 및 상장내역 >  세부 > 수정
+    scwin.fn_save_qty_isur_update();
+};
+scwin.btn_QtyIsuDel_onclick = function() {
+    //수량변경 > 발행 및 상장내역 >  세부 > 신청종목삭제
+    scwin.fn_save_qty_isur_delete();
+};
+scwin.btn_QtyIsuDscl_onclick = function() {
+    //수량변경 > 발행 및 상장내역 > 안내문작성
+    scwin.fn_dscl();
+};
+scwin.txb_INCDEC_APPL_LIST_SHRS_OnKeyUp = function(keycode, skeycode) {
+    //수량변경 > 발행 및 상장내역  > 세부 > 증감증권수 onkeyup
+    if ($c.ut.trim(txb_INCDEC_APPL_LIST_SHRS.getValue()) == "-0") {
+        txb_INCDEC_APPL_LIST_SHRS.setValue("0");
+    }
+    var rsltCalc = 0;
+    if ($c.ut.trim(txb_INCDEC_APPL_LIST_SHRS.getValue()) == "" || $c.ut.trim(txb_INCDEC_APPL_LIST_SHRS.getValue()) == "-") {
+        rsltCalc = parseInt(txb_CHG_PRE_LIST_SHRS.getValue()) + parseInt(txb_NAPPL_SHRS.getValue());
+    } else {
+        rsltCalc = parseInt(txb_CHG_PRE_LIST_SHRS.getValue()) + parseInt(txb_INCDEC_APPL_LIST_SHRS.getValue()) + parseInt(txb_NAPPL_SHRS.getValue());
+    }
+    txb_CHG_AF_LIST_SHRS.setValue(rsltCalc);
+};
+scwin.txb_LP_HD_QTY_OnKeyUp = function(keycode, skeycode) {
+    //수량변경 > 발행 및 상장내역  > 세부 > LP보유수량 onkeyup
+    if ($c.ut.trim(txb_LP_HD_QTY.getValue()) == "-0") {
+        txb_LP_HD_QTY.setValue("0");
+    }
+};
+scwin.txb_NAPPL_SHRS_OnKeyUp = function(keycode, skeycode) {
+    //수량변경 > 발행 및 상장내역  > 세부 > 미반영증권수 onkeyup
+    if ($c.ut.trim(txb_NAPPL_SHRS.getValue()) == "-0") {
+        txb_NAPPL_SHRS.setValue("0");
+    }
+    var rsltCalc = 0;
+    if ($c.ut.trim(txb_NAPPL_SHRS.getValue()) == "" || $c.ut.trim(txb_NAPPL_SHRS.getValue()) == "-") {
+        rsltCalc = parseInt(txb_CHG_PRE_LIST_SHRS.getValue()) + parseInt(txb_NAPPL_SHRS.getValue());
+    } else {
+        rsltCalc = parseInt(txb_CHG_PRE_LIST_SHRS.getValue()) + parseInt(txb_INCDEC_APPL_LIST_SHRS.getValue()) + parseInt(txb_NAPPL_SHRS.getValue());
+    }
+    txb_CHG_AF_LIST_SHRS.setValue(rsltCalc);
+};
+scwin.txb_CHG_PRE_LIST_SHRS_OnKeyUp = function(keycode, skeycode) {
+    //수량변경 > 발행 및 상장내역  > 세부 > 변경전증권수 onkeyup
+    if ($c.ut.trim(txb_CHG_PRE_LIST_SHRS.getValue()) == "" || $c.ut.trim(txb_CHG_PRE_LIST_SHRS.getValue()) == "-") {
+        txb_CHG_PRE_LIST_SHRS.setValue("0");
+    }
+    var rsltCalc = 0;
+    rsltCalc = parseInt(txb_CHG_PRE_LIST_SHRS.getValue()) + parseInt(txb_INCDEC_APPL_LIST_SHRS.getValue()) + parseInt(txb_NAPPL_SHRS.getValue());
+    txb_CHG_AF_LIST_SHRS.setValue(rsltCalc);
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+		<!-- Tag is Not matched with wCraft2 Rule :<style/>-->
+		<xf:model>
+			<!-- Tag is Not matched with wCraft2 Rule :<mxdataset id="dts_Isu" syncload="True" usechangeinfo="False" orgid="dts_Isu" hierarchy="dts_Isu"/>-->
+			<!-- Tag is Not matched with wCraft2 Rule :<mxlogicaltr id="trs_Save" onsuccess="trs_Save_OnSuccess" onfail="trs_Save_OnFail" orgid="trs_Save" hierarchy="trs_Save"/>-->
+			<w2:dataMap id="bnd_Isu" userData2=" activebind:true; dataid:dts_Isu;" baseNode="map">
+				<w2:keyInfo>
+					<w2:multicolumn userData2=" col:ISU_CD; ctrl:txb_ISU_CD; param:value;" readOnly="true" displayMode="label"
+						inputType="text" rowInfo="1" />
+					<w2:multicolumn userData2=" col:CHG_PRE_LIST_SHRS; ctrl:txb_CHG_PRE_LIST_SHRS; param:text;" readOnly="false"
+						displayMode="label" inputType="text" rowInfo="1" />
+					<w2:multicolumn userData2=" col:INCDEC_APPL_LIST_SHRS; ctrl:txb_INCDEC_APPL_LIST_SHRS; param:text;" readOnly="false"
+						displayMode="label" inputType="text" rowInfo="1" />
+					<w2:multicolumn userData2=" col:LP_HD_QTY; ctrl:txb_LP_HD_QTY; param:text;" readOnly="false" displayMode="label"
+						inputType="text" rowInfo="1" />
+					<w2:multicolumn userData2=" col:CHG_AF_LIST_SHRS; ctrl:txb_CHG_AF_LIST_SHRS; param:text;" readOnly="false"
+						displayMode="label" inputType="text" rowInfo="1" />
+					<w2:multicolumn userData2=" col:HALFWY_REDMPT_DD; ctrl:edt_HALFWY_REDMPT_DD; param:text;" readOnly="false"
+						displayMode="label" inputType="text" rowInfo="1" />
+					<w2:multicolumn userData2=" col:CHG_LIST_DD; ctrl:edt_CHG_LIST_DD; param:text;" readOnly="false" displayMode="label"
+						inputType="text" rowInfo="1" />
+					<w2:multicolumn userData2=" col:ISU_ABBRV; ctrl:txb_ISU_NM; param:value;" readOnly="false" displayMode="label"
+						inputType="text" rowInfo="1" />
+					<w2:multicolumn userData2=" col:ISUR_NM; ctrl:txb_ISUR_NM; param:value;" readOnly="false" displayMode="label"
+						inputType="text" rowInfo="1" />
+					<w2:multicolumn userData2=" col:NAPPL_SHRS; ctrl:txb_NAPPL_SHRS; param:text;" readOnly="false" displayMode="label"
+						inputType="text" rowInfo="1" />
+				</w2:keyInfo>
+			</w2:dataMap>
+			<!-- Tag is Not matched with wCraft2 Rule :<mxdataset id="dts_BzProcsNo" syncload="True" orgid="dts_BzProcsNo" hierarchy="dts_BzProcsNo"/>-->
+		</xf:model>
+		<xf:events>
+			<xf:event userData2=" for:btn_QtyIsuClose; eventname:onclick;" />
+			<xf:event userData2=" for:gform; eventname:onload;" />
+			<xf:event userData2=" for:trs_Save; eventname:OnSuccess();" />
+			<xf:event userData2=" for:trs_Save; eventname:OnFail();" />
+			<xf:event userData2=" for:img_HALFWY_REDMPT_DD; eventname:onclick;" />
+			<xf:event userData2=" for:img_CHG_LIST_DD; eventname:onclick;" />
+			<xf:event userData2=" for:btn_QtyIsuSave; eventname:onclick;" />
+			<xf:event userData2=" for:btn_QtyIsuUpdate; eventname:onclick;" />
+			<xf:event userData2=" for:btn_QtyIsuDel; eventname:onclick;" />
+			<xf:event userData2=" for:btn_QtyIsuDscl; eventname:onclick;" />
+			<xf:event userData2=" for:txb_INCDEC_APPL_LIST_SHRS; eventname:OnKeyUp(keycode, skeycode);" />
+			<xf:event userData2=" for:txb_LP_HD_QTY; eventname:OnKeyUp(keycode, skeycode);" />
+			<xf:event userData2=" for:txb_NAPPL_SHRS; eventname:OnKeyUp(keycode, skeycode);" />
+			<xf:event userData2=" for:txb_CHG_PRE_LIST_SHRS; eventname:OnKeyUp(keycode, skeycode);" />
+		</xf:events>
+		<xf:group class="pop_contents" id="" meta_snippetCategory="00_화면시작" meta_snippetKeyComponent="true"
+			meta_snippetName="0_02 팝업페이지시작">
+			<xf:group class="tblbox" id="panel_Item" meta_snippetCategory="05_입출력테이블" meta_snippetKeyComponent="true" meta_snippetName="5_04 4단테이블"
+				style="">
+				<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+					<w2:attributes>
+						<w2:summary></w2:summary>
+					</w2:attributes>
+					<xf:group tagname="colgroup">
+						<xf:group style="width:120px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+						<xf:group style="width:100px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+						<xf:group style="width:100px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+						<xf:group style="width:100px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+					</xf:group>
+					<xf:group style="" tagname="tr">
+						<xf:group class="w2tb_th" style="" tagname="th">
+							<w2:textbox id="label_2_top" label="종목코드"
+								style=""
+								userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" style="" tagname="td">
+							<xf:input id="txb_ISU_CD" maxlength="1000" readOnly="true"
+								style="width:96px;"
+								userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes></w2:attributes>
+							<w2:textbox id="label_2" label="종목명"
+								style=""
+								userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes>
+								<w2:colspan>3</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:input id="txb_ISU_NM" maxlength="1000" readOnly="true"
+								style="width:279px;" tabIndex="1"
+								userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_4" label="발행회사명"
+								style=""
+								userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes></w2:attributes>
+							<xf:input id="txb_ISUR_NM" maxlength="1000" readOnly="true"
+								style="width:113px;" tabIndex="2"
+								userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox class="req" id="label_8" label="변경전 증권수"
+								style=""
+								userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:colspan>3</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:input id="txb_CHG_PRE_LIST_SHRS" maxlength="13" readOnly="true"
+								style="width:180px;" tabIndex="3"
+								userData2=" class:panel_maskedit_write_02; alignment:2; datemodify:True; generaledit:False; inputformat:YYYYMMDD; maxdecimalplace:4; numeric:True; readonlybackcolor:#b9d4f7; showliteral:false; valign:1;" ev:onkeyup="scwin.txb_CHG_PRE_LIST_SHRS_OnKeyUp">
+							</xf:input>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox class="req" id="label_6" label="신청유형"
+								style="" userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:colspan>3</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<w2:textbox id="txb_ApplType" label="수량감소" maxlength="1000" readOnly="true"
+								style="" tabIndex="8"
+								userData2=" class:TopCondition_01_write; font-weight:normal;">
+							</w2:textbox>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox class="req" id="label_19" label="증감증권수"
+								style=""
+								userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:colspan>3</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:input id="txb_INCDEC_APPL_LIST_SHRS" maxlength="13" readOnly="false"
+								style="width:180px;" tabIndex="4"
+								userData2=" class:panel_maskedit_write_02; alignment:2; datemodify:True; generaledit:False; inputformat:YYYYMMDD; maxdecimalplace:4; numeric:True; readonlybackcolor:#b9d4f7; showliteral:false; valign:1;" ev:onkeyup="scwin.txb_INCDEC_APPL_LIST_SHRS_OnKeyUp">
+							</xf:input>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox class="req" id="txb_RedMpt_Dd" label="수량감소일" maxlength="1000" readOnly="true"
+								style="" tabIndex="11"
+								userData2=" class:TopCondition_01_write; border-color:#d9e9fc;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:colspan>3</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<w2:inputCalendar displayFormat="yyyy-MM-dd" id="edt_HALFWY_REDMPT_DD"
+								style="" tabIndex="9"
+								userData2=" class:panel_maskedit_write_01; generaledit:False; numeric:False; readonlybackcolor:#b9d4f7;">
+							</w2:inputCalendar>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox class="req" id="label_18" label="LP보유증권수"
+								style=""
+								userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:colspan>3</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:input id="txb_LP_HD_QTY" maxlength="13" readOnly="false"
+								style="width:180px;" tabIndex="5"
+								userData2=" class:panel_maskedit_write_02; alignment:2; datemodify:True; generaledit:False; inputformat:YYYYMMDD; maxdecimalplace:4; numeric:True; readonlybackcolor:#b9d4f7; showliteral:false; valign:1;" ev:onkeyup="scwin.txb_LP_HD_QTY_OnKeyUp">
+							</xf:input>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox class="req" id="txb_ListDd" label="변경상장일" maxlength="1000" readOnly="true"
+								style="" tabIndex="12"
+								userData2=" class:TopCondition_01_write; border-color:#d9e9fc;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:colspan>3</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<w2:inputCalendar displayFormat="yyyy-MM-dd" id="edt_CHG_LIST_DD"
+								style="" tabIndex="10"
+								userData2=" class:panel_maskedit_write_01; generaledit:False; numeric:False; readonlybackcolor:#b9d4f7;">
+							</w2:inputCalendar>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox class="req" id="label_16" label="미반영 증권수"
+								style=""
+								userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:colspan>7</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:input id="txb_NAPPL_SHRS" maxlength="13" readOnly="false"
+								style="width:180px;" tabIndex="6"
+								userData2=" class:panel_maskedit_write_02; alignment:2; datemodify:True; generaledit:False; inputformat:YYYYMMDD; maxdecimalplace:4; numeric:True; readonlybackcolor:#b9d4f7; showliteral:false; valign:1;" ev:onkeyup="scwin.txb_NAPPL_SHRS_OnKeyUp">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox class="req" id="label_5" label="변경후 증권수"
+								style=""
+								userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:colspan>7</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:input id="txb_CHG_AF_LIST_SHRS" maxlength="13" readOnly="true"
+								style="width:180px;" tabIndex="7"
+								userData2=" class:panel_maskedit_write_02; alignment:2; datemodify:True; generaledit:False; inputformat:YYYYMMDD; maxdecimalplace:4; numeric:True; readonlybackcolor:#b9d4f7; showliteral:false; valign:1;">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<xf:group class="btnbox" id="" meta_snippetCategory="08_버튼" meta_snippetKeyComponent="true" meta_snippetName="8_04 전체제어버튼"
+				style="">
+				<xf:group class="rt" id="" style="">
+					<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.btn_QtyIsuDel_onclick" id="btn_QtyIsuDel"
+						src="../img/btn_RcvdocDel.gif" style="">
+						<xf:label><![CDATA[신청종목삭제]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.btn_QtyIsuDscl_onclick" id="btn_QtyIsuDscl"
+						src="../img/btn_make_info.gif" style="" userData2=" border-color:#C0C0C0;">
+						<xf:label><![CDATA[안내문작성]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.btn_QtyIsuUpdate_onclick" id="btn_QtyIsuUpdate"
+						src="../img/btn_modify.gif" style="borde" userData2=" border-color:#C0C0C0;">
+						<xf:label><![CDATA[수정]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm pt" cursor="pointer" ev:onclick="scwin.btn_QtyIsuSave_onclick" id="btn_QtyIsuSave"
+						src="../img/btn_save.gif" style="" userData2=" border-color:#C0C0C0;">
+						<xf:label><![CDATA[저장]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.btn_QtyIsuClose_onclick" id="btn_QtyIsuClose"
+						src="../img/btn_close.gif" style="">
+						<xf:label><![CDATA[닫기]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+		</xf:group>
+	</body>
+</html>

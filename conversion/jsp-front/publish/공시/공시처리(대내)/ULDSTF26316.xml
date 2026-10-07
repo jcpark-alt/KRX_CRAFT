@@ -1,0 +1,868 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDSTF26316.gfm" meta_screenName="분/반기/사업보고서 재무자료 추출 - (팝업) 상세 _ 자본변동표 탭">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<xf:model>
+			<w2:workflowCollection/>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+/* ★Wcraft guide★    
+스크립트 수작업 유의사항
+ ASIS에서 문법에 어긋난 문장이 발견되었습니다. 이는 WCRAFT에서 X 로 변환합니다.  
+ X 로 변환된 곳을 찾아 ASIS소스를 참고하여 문법에 맞도록 변환해주세요. 
+
+----------------------------------------------------
+[0] 기존 문법 오류
+----------------------------------------------------
+	> X 오류 확인 - 기존 소스 확인 필요
+
+*/
+
+
+//★Wcraft guide★ include부분 주석처리 -> include("../js/stf.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/session.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/common.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/utils.js");
+scwin.vScrenID = 'ULDSTF26316.xml';
+scwin.gAcptNo = frame.opener.key_acpt_no;
+scwin.gComNm = frame.opener.key_com_nm;
+scwin.gPublDdtm = frame.opener.key_publ_ddtm;
+scwin.gFsAcntTpCd = frame.opener.key_fs_acnt_tp_cd;
+scwin.gFsAcntTpNm = frame.opener.key_fs_acnt_tp_nm;
+scwin.gDisclsTitle = frame.opener.key_discls_title;
+scwin.gSubmitSysTp = ''; // 제출구문 - 한글자동변환 :0=국문제출, 1=영문제출
+scwin.gProcs_063 = ''; // 시장조치관련 - 영문자동변환대상 : count(*)
+
+scwin.gUrl = '';
+scwin.gInterval;
+scwin.onpageload = function() {
+    scwin.gform_onload();
+};
+scwin.onpageunload = function() {
+};
+scwin.fn_Init = function() {
+    $c.stf.setObjectValue(txb_DISCLS_TITLE, scwin.gDisclsTitle);
+    $c.stf.setObjectValue(txb_COM_NM, scwin.gComNm);
+    $c.stf.setObjectValue(txb_FS_ACNT_TP_NM, scwin.gFsAcntTpNm);
+    $c.stf.setObjectValue(txb_PUBL_DDTM, scwin.gPublDdtm);
+    $c.stf.setObjectValue(txb_ACPT_NO, scwin.gAcptNo);
+
+    //수정/삭제 버튼 활성화
+    if (js_market == "1" || js_market == "2" || js_market == "6" || js_usr_tp_cd == "1") {
+        $c.stf.showObj(panel_3, true);
+    } else {
+        $c.stf.showObj(panel_3, false);
+    }
+
+    //탭 비활성화
+    MaxTab_01.setDisabled(true);
+};
+scwin.fn_setSaveHeader = function() {
+    dts_delete.DataID = "/gauceSystemierAdaptor.do?method=getGauceDataHeader&messageId=DSCLSTAT_IFRS_WRTRPT_EXTRC_INFO";
+    dts_delete.Reset();
+    dts_delete.insertRow();
+};
+scwin.fn_list_cd_sync = function() {
+    var limit = 3;
+    for (var i = 1; i <= limit; i++) {
+        eval("fn_Search_n(" + i + ")"); //1_재무상태표, 2_손익계산서, 3_자본변동표
+
+        if (i < limit) eval("fn_Search_Xbrl_n(" + i + ")"); //자본변동표는 수정불가
+
+    }
+};
+scwin.fn_checkNum = function(row, colid, data, text) {
+    var num = eval("dts_" + text).getCellData(row, colid);
+    // ex) (1,632,712,242) 일시 음수로 본다.
+    if (num.indexOf('(') > -1) {
+        num = '-' + num;
+    }
+    num = num.replace(/\,|\(|\)/g, '');
+    num = num.replace(/\s/g, '');
+    eval("dts_" + text, num).setCellData(row, colid);
+    if (isNaN(eval("dts_" + text).getCellData(row, colid))) {
+        $c.win.alert("올바른 숫자형식으로 값을 입력해주세요.");
+        //eval("dts_" + text).NameValue(row,colid) = "123";
+        eval("grd_" + text).Focus();
+    }
+};
+scwin.isDate = function(dd) {
+    try {
+        var y, m, d = "";
+        if (dd.length != 8) {
+            return false;
+        } else {
+            y = dd.substr(0, 4);
+            m = dd.substr(4, 2);
+            d = dd.substr(6, 2);
+        }
+        var date = new Date(y, m - 1, d);
+        if (y == date.getFullYear() && m - 1 == date.getMonth() && d == date.getDate()) {
+            return date;
+        } else {
+            return false;
+        }
+    } catch (e) {
+        return false;
+    }
+};
+scwin.fn_validCheck = function() {
+    //숫자 확인_재무상태표
+    for (var i = 1; i <= dts_1_1.getTotalRow(); i++) {
+        dts_1_1.setRowPosition(i, 0);
+        for (var a = 1; a < 3; a++) {
+            var num = dts_1_1.getCellData(i, "text_1_" + a);
+            if (!$c.ut.isNum(num < 0 ? num * (-1) : num)) {
+                MaxTab_01.setSelectedTabIndex("1"); //탭이동
+                $c.win.alert("숫자를 입력해 주세요.");
+                grd_1_1.SetColumn("text_1_" + a);
+                grd_1_1.focus();
+                return false;
+            }
+        }
+    }
+    //숫자 확인_손익계산서
+    for (var i = 1; i <= dts_2_1.getTotalRow(); i++) {
+        dts_2_1.setRowPosition(i, 0);
+        for (var a = 1; a < 5; a++) {
+            var num = dts_2_1.getCellData(i, "text_2_" + a);
+            if (!$c.ut.isNum(num < 0 ? num * (-1) : num)) {
+                MaxTab_01.setSelectedTabIndex("2"); //탭이동
+                $c.win.alert("숫자를 입력해 주세요.");
+                grd_2_1.SetColumn("text_2_" + a);
+                grd_2_1.focus();
+                return false;
+            }
+        }
+    }
+
+    //입력여부 확인_재무상태표
+    for (var i = 1; i <= dts_1_1.getTotalRow(); i++) {
+        dts_1_1.setRowPosition(i, 0);
+        for (var a = 0; a < 3; a++) {
+            if (dts_1_1.getCellData(i, "text_1_" + a) == "") {
+                MaxTab_01.setSelectedTabIndex("1"); //탭이동
+                $c.win.alert("입력되지 않은 항목이 있습니다.");
+                grd_1_1.SetColumn("text_1_" + a);
+                grd_1_1.focus();
+                return true;
+            }
+        }
+    }
+    //입력여부 확인_손익계산서
+    for (var i = 1; i <= dts_2_1.getTotalRow(); i++) {
+        dts_2_1.setRowPosition(i, 0);
+        for (var a = 0; a < 5; a++) {
+            if (dts_2_1.getCellData(i, "text_2_" + a) == "") {
+                MaxTab_01.setSelectedTabIndex("2"); //탭이동
+                $c.win.alert("입력되지 않은 항목이 있습니다.");
+                grd_2_1.SetColumn("text_2_" + a);
+                grd_2_1.focus();
+                return true;
+            }
+        }
+    }
+    return true;
+};
+scwin.fn_Save = function() {
+    //등록
+    if (!scwin.fn_validCheck()) {
+        return;
+    }
+    if (confirm('저장 하시겠습니까?')) {
+        trs_Save.Action = "/IfrsDisclosureStatistics.do?method=saveIfrsWrtrptInfo&EMP_NO=" + js_emp_no + "&ACPT_NO=" + scwin.gAcptNo + "&FS_ACNT_TP_CD=" + scwin.gFsAcntTpCd + "&SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_02;
+        trs_Save.KeyValue = "JSP(I:pInput1=dts_1_1,I:pInput2=dts_2_1)";
+        trs_Save.Post();
+    }
+};
+scwin.fn_Delete = function() {
+    var str = scwin.gComNm + "의 [" + scwin.gFsAcntTpNm + "]보고서 추출데이터(" + scwin.gPublDdtm + ")를 [삭제]하시겠습니까?";
+    if (confirm(str)) {
+
+        //dts_delete.setDataHeader(); // W-Craft 주석처리 및 필요시 asis 파라미터 확인 
+        dts_delete.insertRow();
+        dts_delete.setCellData(1, "EMP_NO", js_emp_no);
+        trs_Delete.Action = "/IfrsDisclosureStatistics.do?method=deleteIfrsWrtrptInfo&ACPT_NO=" + scwin.gAcptNo + "&FS_ACNT_TP_CD=" + scwin.gFsAcntTpCd + "&SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_04;
+        trs_Delete.KeyValue = "JSP(I:pInput1=dts_delete)";
+        trs_Delete.post();
+    }
+};
+scwin.setHeadTitle = function(pos, a, b) {
+    if (pos < 3) {
+        eval("grd_2_" + pos, a).setColumnProp('groupName_2_' + pos + '_1', 'name');
+        eval("grd_2_" + pos, b).setColumnProp('groupName_2_' + pos + '_2', 'name');
+    } else {
+        eval("grd_" + pos + "_1", a).setColumnProp('groupName_' + pos + '_1_1', 'name');
+        eval("grd_" + pos + "_1", b).setColumnProp('groupName_' + pos + '_1_2', 'name');
+    }
+};
+scwin.fn_Search_n = function(n) {
+    eval("dts_" + n + "_1").ClearData();
+    var url = "/IfrsDisclosureStatistics.do?method=getIfrsWrtrptInfo_" + n + "&ACPT_NO=" + scwin.gAcptNo + "&FS_ACNT_TP_CD=" + scwin.gFsAcntTpCd + "&SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01;
+    eval("dts_" + n + "_1").DataID = encodeURI(url);
+    eval("dts_" + n + "_1").reset();
+};
+scwin.fn_Search_Xbrl_n = function(n) {
+    eval("dts_" + n + "_2").ClearData();
+    var url = "/IfrsDisclosureStatistics.do?method=getIfrsWrtrptXbrlInfo_" + n + "&ACPT_NO=" + scwin.gAcptNo + "&FS_ACNT_TP_CD=" + scwin.gFsAcntTpCd + "&SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01;
+    eval("dts_" + n + "_2").DataID = encodeURI(url);
+    eval("dts_" + n + "_2").reset();
+
+    // ********************************************************************
+    // [WebSquare 전환 추가] 원본 소스와 비교 필요
+    // 
+    // ********************************************************************
+
+};X < !접수정보--;
+데이타;
+읽어오기-- > function() {
+    //alert("헤더읽어오기:"+gAcptNo);
+
+    var url = "/Viewer.do?method=getDsclHeaderBasic&inputMessageId=VIEWER_OUT&outputMessageId=VIEWER_OUT" + "&ACPT_NO=" + scwin.gAcptNo + "&SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01;
+    dts_AcptProcs.DataID = encodeURI(url);
+    dts_AcptProcs.reset();
+};
+scwin.fn_getDocHtmlURL = function(pDisclsDocNo, pMainFormCd, pFormVer, pViewLangTpCd, pSubmitSysTpCd) {
+    dts_DocUrl.removeAll();
+
+    // 공시본문가져오기
+    var url = "/Viewer.do?method=getDsclDocHtmlURL&inputMessageId=VIEWER_DOCURL_INOUT" + "&outputMessageId=VIEWER_DOCURL_INOUT" + "&ACPT_NO=" + scwin.gAcptNo + "&DOC_NO=" + pDisclsDocNo + "&FORM_CD=" + pMainFormCd + "&FORM_VER=" + pFormVer + "&VIEW_LANG_TP_CD=" + pViewLangTpCd + "&SUBMIT_SYS_TP_CD=" + pSubmitSysTpCd;
+    dts_DocUrl.DataID = encodeURI(url);
+    dts_DocUrl.reset();
+};
+
+
+// 프레임셋 가운데 : 공시본문 셋팅
+scwin.fn_getBodyContent = function(pUrl, pTocUrl) {
+    var url = "/dsclproc/JLDSTF10005.jsp?" + "&body_url=" + pUrl + "&acpt_no=" + scwin.gAcptNo + "&gAskScrenID=" + "&gAccssAuthTpCd=01";
+    panel_1.innerHTML = "<iframe id='ifrCtrl' src='' width='100%' height='750'></iframe>";
+    document.getElementById("ifrCtrl").src = url;
+    scwin.gUrl = pUrl;
+};
+scwin.fn_SetPosition = function() {
+    if (document.getElementById("ifrCtrl") != null && document.getElementById("ifrCtrl").readyState == 'complete') {
+        //로딩이 완료되면
+        clearInterval(scwin.gInterval);
+
+        //탭 활성화
+        MaxTab_01.setDisabled(true);
+
+        //tab 클릭 시 위치 이동되도록 id 설정
+        scwin.fn_SetElementId();
+        scwin.fn_MovePosition(MaxTab_01.getSelectedTabIndex());
+    }
+};
+scwin.fn_MovePosition = function(to) {
+    var temp = ifrCtrl.location.href;
+    if (temp.indexOf("#pos") > -1) {
+        temp = temp.substring(0, temp.indexOf("#pos"));
+    }
+    ifrCtrl.location.href = temp + "#pos_1000" + to;
+};
+scwin.fn_SetElementId = function() {
+    var bodyFrame = document.getElementById("ifrCtrl").contentWindow.document;
+    var classArr = document.getElementsByClassName("nb", bodyFrame);
+    var isExistPTag = false;
+
+    //pTag유무 확인
+    for (var i = classArr.length - 1; i >= 0; i--) {
+        if (typeof(classArr[i].getElementsByTagName('p')[0]) != "undefined") {
+            if ($c.ut.replaceAll(classArr[i].getElementsByTagName('p')[0].innerText, " ", "").indexOf("재무상태표") > -1) {
+                isExistPTag = true;
+                i = -1;
+            }
+        }
+    }
+
+    //id 설정
+    for (var i = classArr.length - 1; i >= 0; i--) {
+        //정정보고서 때문에 검색방향 변경
+        var pTagArr = null;
+        //p 태그가 없는 경우엔 클래스 TD를 확인
+        if (isExistPTag) pTagArr = classArr[i].getElementsByTagName('p');
+
+        else pTagArr = document.getElementsByClassName("TD", classArr[i]);
+        if (typeof(pTagArr[0]) != "undefined") {
+            if (scwin.gFsAcntTpCd == "2") {
+                //개별
+                if ($c.ut.replaceAll(pTagArr[0].innerText, " ", "").indexOf("재무상태표") > -1 && $c.ut.replaceAll(pTagArr[0].innerText, " ", "").indexOf("연결") < 0) {
+                    pTagArr[0].innerHTML = "<span id='pos_10001'>" + pTagArr[0].innerText + "</span>";
+                    i = -1;
+                } else if ($c.ut.replaceAll(pTagArr[0].innerText, " ", "").indexOf("손익계산서") > -1 && $c.ut.replaceAll(pTagArr[0].innerText, " ", "").indexOf("연결") < 0) {
+                    pTagArr[0].innerHTML = "<span id='pos_10002'>" + pTagArr[0].innerText + "</span>";
+                } else if ($c.ut.replaceAll(pTagArr[0].innerText, " ", "").indexOf("자본변동표") > -1 && $c.ut.replaceAll(pTagArr[0].innerText, " ", "").indexOf("연결") < 0) {
+                    pTagArr[0].innerHTML = "<span id='pos_10003'>" + pTagArr[0].innerText + "</span>";
+                } else if ($c.ut.replaceAll(pTagArr[0].innerText, " ", "").indexOf("현금흐름표") > -1 && $c.ut.replaceAll(pTagArr[0].innerText, " ", "").indexOf("연결") < 0) {
+                    pTagArr[0].innerHTML = "<span id='pos_10004'>" + pTagArr[0].innerText + "</span>";
+                }
+            } else if (scwin.gFsAcntTpCd == "1") {
+                //연결
+                if ($c.ut.replaceAll(pTagArr[0].innerText, " ", "").indexOf("연결재무상태표") > -1) {
+                    pTagArr[0].innerHTML = "<span id='pos_10001'>" + pTagArr[0].innerText + "</span>";
+                    i = -1;
+                } else if ($c.ut.replaceAll(pTagArr[0].innerText, " ", "").indexOf("연결") > -1 && $c.ut.replaceAll(pTagArr[0].innerText, " ", "").indexOf("손익계산서") > -1) {
+                    pTagArr[0].innerHTML = "<span id='pos_10002'>" + pTagArr[0].innerText + "</span>";
+                } else if ($c.ut.replaceAll(pTagArr[0].innerText, " ", "").indexOf("연결자본변동표") > -1) {
+                    pTagArr[0].innerHTML = "<span id='pos_10003'>" + pTagArr[0].innerText + "</span>";
+                } else if ($c.ut.replaceAll(pTagArr[0].innerText, " ", "").indexOf("연결현금흐름표") > -1) {
+                    pTagArr[0].innerHTML = "<span id='pos_10004'>" + pTagArr[0].innerText + "</span>";
+                }
+            }
+        }
+    }
+};
+
+
+
+
+
+
+
+//getElementsByClassName 사용이 안됨.. 버전문제인듯..
+if (!document.getElementsByClassName) {
+    document.getElementsByClassName = function(className, element) {
+        //var children = (element || document).getElementsByTagName('*');
+        var children = element.getElementsByTagName('*');
+        var elements = new Array();
+        for (var i = 0; i < children.length; i++) {
+            var child = children[i];
+            var classNames = child.className.split(' ');
+            for (var j = 0; j < classNames.length; j++) {
+                if (classNames[j] == className) {
+                    elements.push(child);
+                    break;
+                }
+            }
+        }
+        return elements;
+    };
+}
+scwin.dts_2_1_OnLoadCompleted = function(rowcount) {
+    //setHeadTitle(1, a, b);
+
+};
+scwin.dts_2_2_OnLoadCompleted = function(rowcount) {
+    //setHeadTitle(2, a, b);
+
+};
+scwin.dts_3_1_OnLoadCompleted = function(rowcount) {
+    //setHeadTitle(3, a, b);
+
+};
+scwin.dts_2_1_OnLoadError = function() {
+    $c.stf.alert_error(dts_2_1);
+};
+scwin.dts_2_2_OnLoadError = function() {
+    $c.stf.alert_error(dts_2_2);
+};
+scwin.dts_3_1_OnLoadError = function() {
+    $c.stf.alert_error(dts_3_1);
+};
+scwin.grd_1_2_OnDblClick = function(row, colid) {
+    if (colid == 'text_1_3') {
+        var line = dts_1_2.getCellData(row, "LINE");
+        dts_1_1.setRowPosition(line, 0);
+        var col_0 = dts_1_2.getCellData(row, "text_1_0");
+        var col_1 = dts_1_2.getCellData(row, "text_1_1");
+        var col_2 = dts_1_2.getCellData(row, "text_1_2");
+        var msg = col_0 + " : " + col_1 + ", " + col_2 + "\n\n적용하시겠습니까?";
+
+        //grd_1_1의 같은 자리에 데이터 복사
+        if (confirm(msg)) {
+            dts_1_1.setCellData(line, "text_1_1", col_1);
+            dts_1_1.setCellData(line, "text_1_2", col_2);
+        }
+    }
+};
+scwin.grd_2_2_OnDblClick = function(row, colid) {
+    if (colid == 'text_2_5') {
+        var line = dts_2_2.getCellData(row, "LINE");
+        dts_2_1.setRowPosition(dts_2_2.getCellData(row, "LINE"), 0);
+        var col_0 = dts_2_2.getCellData(row, "text_2_0");
+        var col_1 = dts_2_2.getCellData(row, "text_2_1");
+        var col_2 = dts_2_2.getCellData(row, "text_2_2");
+        var col_3 = dts_2_2.getCellData(row, "text_2_3");
+        var col_4 = dts_2_2.getCellData(row, "text_2_4");
+        var msg = col_0 + " : " + col_1 + ", " + col_2 + ", " + col_3 + ", " + col_4 + "\n\n적용하시겠습니까?";
+
+        //grd_2_1의 같은 자리에 데이터 복사
+        if (confirm(msg)) {
+            dts_2_1.setCellData(line, "text_2_1", col_1);
+            dts_2_1.setCellData(line, "text_2_2", col_2);
+            dts_2_1.setCellData(line, "text_2_3", col_3);
+            dts_2_1.setCellData(line, "text_2_4", col_4);
+        }
+    }
+};
+scwin.grd_1_1_OnExit = function(row, colid, olddata) {
+    if (colid != "text_1_0") {
+        scwin.fn_checkNum(row, colid, olddata, "1_1");
+    }
+};
+scwin.grd_2_1_OnExit = function(row, colid, olddata) {
+    if (colid != "text_2_0") {
+        scwin.fn_checkNum(row, colid, olddata, "2_1");
+    }
+};
+scwin.trs_Save_OnSuccess = async function() {
+    $c.win.alert($c.stf.getMessageParam("MSG-A001", "저장"));
+    $c.frame.path("../").fn_search();
+    await $c.frame.CloseFrame();
+};
+scwin.trs_Save_OnFail = function() {
+    $c.win.alert($c.stf.getMessageParam("MSG-A002", "저장"));
+};
+scwin.trs_Delete_OnSuccess = async function() {
+    $c.win.alert($c.stf.getMessageParam("MSG-A001", "삭제"));
+    $c.frame.path("../").fn_search();
+    await $c.frame.CloseFrame();
+};
+scwin.trs_Delete_OnFail = function() {
+    $c.win.alert($c.stf.getMessageParam("MSG-A002", "삭제"));
+};
+scwin.dts_AcptProcs_OnLoadError = function() {
+    $c.stf.alert_error(dts_AcptProcs);
+};
+scwin.dts_AcptProcs_OnLoadCompleted = function(rowcount) {
+    var vDocNo = dts_AcptProcs.getCellData(1, "DISCLS_DOC_NO");
+    var sMainFormCd = dts_AcptProcs.getCellData(1, "FORM_CD");
+    var sFormVer = dts_AcptProcs.getCellData(1, "FORM_VER");
+    var sLangTpCd = dts_AcptProcs.getCellData(1, "LANG_TP_CD");
+    scwin.gSubmitSysTp = dts_AcptProcs.getCellData(1, "SUBMIT_SYS_TP_CD"); // 제출구문 - 한글자동변환 :0=국문제출, 1=영문제출	
+    scwin.gProcs_063 = dts_AcptProcs.getCellData(1, "FPROCS_063"); // 시장조치관련 - 영문자동변환대상 : count(*)
+
+    if (scwin.gSubmitSysTp == '0' && sLangTpCd == '1') {
+        // 국문제출에서 제출한 영문공시를 디폴트로 볼때..
+        scwin.fn_getDocHtmlURL(vDocNo, sMainFormCd, sFormVer, '0', scwin.gSubmitSysTp);
+    } else {
+        scwin.fn_getDocHtmlURL(vDocNo, sMainFormCd, sFormVer, sLangTpCd, scwin.gSubmitSysTp);
+    }
+};
+scwin.dts_DocUrl_OnLoadCompleted = function(rowcount) {
+    scwin.fn_getBodyContent(dts_DocUrl.getCellData(1, "BODY_URL"), dts_DocUrl.getCellData(1, "TOC_URL"));
+};
+scwin.btn_Modify_onclick = function() {
+    scwin.fn_Save();
+};
+scwin.btn_Delete_onclick = function() {
+    scwin.fn_Delete();
+};
+scwin.btn_Close_onclick = async function() {
+    frame.opener.gRow = 0; //행 초기화
+    await $c.frame.CloseFrame();
+};
+scwin.MaxTab_01_OnSelChanged = function(nIndex) {
+    scwin.fn_MovePosition(nIndex);
+};
+scwin.gform_onload = function() {
+    frame.width = 1926;
+    frame.height = 840;
+    scwin.fn_Init();
+    scwin.fn_setSaveHeader();
+    fn_HeadRead();
+    scwin.gInterval = setInterval(fn_SetPosition, 100); //iframe callback이 안먹혀서 로딩이 끝났는지 인터벌로 확인
+
+    scwin.fn_list_cd_sync();
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+		<xf:group class="pop_contents" id="" meta_componentContainer="true" style="">
+			<xf:group class="lybox mt0" id="" style="">
+				<xf:group class="" id="" meta_componentContainer="true" style="">
+					<xf:group hierarchy="panel_1" id="panel_1" orgid="panel_1" style="height:850px;"></xf:group>
+				</xf:group>
+				<xf:group adaptiveThreshold="" class="col_fix" id="" meta_componentContainer="true" style="width:635px;">
+					<xf:group class="schbox" id="" style="">
+						<xf:group class="schbox_inner" id="" style="">
+							<xf:group adaptive="layout" adaptiveThreshold="768" class="w2tb tbl " id="" style="" tagname="table">
+								<w2:attributes>
+									<w2:summary></w2:summary>
+								</w2:attributes>
+								<xf:group tagname="colgroup">
+									<xf:group style="width:60px;" tagname="col"></xf:group>
+									<xf:group style="" tagname="col"></xf:group>
+									<xf:group style="width:70px;" tagname="col"></xf:group>
+									<xf:group tagname="col"></xf:group>
+									<xf:group tagname="col" style="width:70px;"></xf:group>
+									<xf:group style="" tagname="col"></xf:group>
+								</xf:group>
+								<xf:group class="" id="" style="" tagname="tr">
+									<xf:group class="w2tb_th" style="" tagname="th">
+										<w2:textbox hierarchy="lbl_1" id="lbl_1" label="회사명" orgid="lbl_1" style=""
+											userData2=" class:Comment_02; font-family:돋움; border-color:#343434;">
+										</w2:textbox>
+									</xf:group>
+									<xf:group class="w2tb_td" style="" tagname="td">
+										<xf:input hierarchy="txb_COM_NM" id="txb_COM_NM" maxlength="1000" orgid="txb_COM_NM" readOnly="true"
+											style="width:100%;" userData2=" font-family:돋움; border-color:#C0C0C0;">
+										</xf:input>
+									</xf:group>
+									<xf:group class="w2tb_th" style="" tagname="th">
+										<w2:textbox hierarchy="lbl_4" id="lbl_4" label="공시제목" orgid="lbl_4" style=""
+											userData2=" class:Comment_02; font-family:돋움; border-color:#343434;">
+										</w2:textbox>
+									</xf:group>
+									<xf:group class="w2tb_td" id="" style="" tagname="td">
+										<w2:attributes>
+											<w2:colspan>3</w2:colspan>
+											<w2:rowspan>1</w2:rowspan>
+										</w2:attributes>
+										<xf:input hierarchy="txb_DISCLS_TITLE" id="txb_DISCLS_TITLE" maxlength="1000"
+											orgid="txb_DISCLS_TITLE" readOnly="true" style="width:100%;" userData2=" font-family:돋움; border-color:#C0C0C0;">
+										</xf:input>
+									</xf:group>
+								</xf:group>
+								<xf:group tagname="tr" id="" style="">
+									<xf:group tagname="th" class="w2tb_th">
+										<w2:attributes>
+											<w2:scope>row</w2:scope>
+										</w2:attributes>
+										<w2:textbox hierarchy="lbl_3" id="lbl_3" label="기준" orgid="lbl_3" style=""
+											userData2=" class:Comment_02; font-family:돋움; border-color:#343434;">
+										</w2:textbox>
+									</xf:group>
+									<xf:group tagname="td" class="w2tb_td">
+										<w2:attributes></w2:attributes>
+										<xf:input hierarchy="txb_FS_ACNT_TP_NM" id="txb_FS_ACNT_TP_NM" maxlength="1000"
+											orgid="txb_FS_ACNT_TP_NM" readOnly="true" style="width:100%;" userData2=" font-family:돋움; border-color:#C0C0C0;">
+										</xf:input>
+									</xf:group>
+									<xf:group tagname="th" class="w2tb_th">
+										<w2:attributes>
+											<w2:scope>row</w2:scope>
+										</w2:attributes>
+										<w2:textbox hierarchy="lbl_2" id="lbl_2" label="처리일시" orgid="lbl_2" style=""
+											userData2=" class:Comment_02; font-family:돋움; border-color:#343434;">
+										</w2:textbox>
+									</xf:group>
+									<xf:group tagname="td" id="" class="w2tb_td">
+										<w2:attributes></w2:attributes>
+										<xf:input hierarchy="txb_PUBL_DDTM" id="txb_PUBL_DDTM" maxlength="1000" orgid="txb_PUBL_DDTM"
+											readOnly="true" style="width:100%;" userData2=" font-family:돋움; border-color:#C0C0C0;">
+										</xf:input>
+									</xf:group>
+									<xf:group tagname="th" id="" class="w2tb_th">
+										<w2:attributes></w2:attributes>
+										<w2:textbox hierarchy="lbl_tmp_42" id="lbl_tmp_42" label="접수번호" orgid="lbl_tmp_42" style=""
+											userData2=" class:Comment_02; font-family:돋움; border-color:#343434;">
+										</w2:textbox>
+									</xf:group>
+									<xf:group tagname="td" id="" class="w2tb_td">
+										<w2:attributes></w2:attributes>
+										<xf:input hierarchy="txb_ACPT_NO" id="txb_ACPT_NO" maxlength="1000" orgid="txb_ACPT_NO"
+											readOnly="true" style="width:100%;" userData2=" font-family:돋움; border-color:#C0C0C0;">
+										</xf:input>
+									</xf:group>
+								</xf:group>
+							</xf:group>
+						</xf:group>
+						<xf:group class="btn_schbox" id="" style=""></xf:group>
+					</xf:group>
+					<xf:group class="tbcbox" id="" style="">
+						<w2:tabControl class="tbc" confirmFalseAction="new" confirmTrueAction="exist" hierarchy="MaxTab_01" id="MaxTab_01"
+							orgid="MaxTab_01" selectedIndex="0" style="" useConfirmMessage="false" useMoveNextTabFocus="false"
+							userData2=" class:Tab_01; onselchanged:MaxTab_01_OnSelChanged;">
+							<w2:tabs hierarchy="MaxTab_01.panel_2_1" id="panel_2_1" label="재무상태표" orgid="panel_2_1" style=""></w2:tabs>
+							<w2:tabs hierarchy="MaxTab_01.panel_2_2" id="panel_2_2" label="손익계산서" orgid="panel_2_2" style=""></w2:tabs>
+							<w2:tabs hierarchy="MaxTab_01.panel_2_3" id="panel_2_3" label="자본변동표" orgid="panel_2_3" style=""></w2:tabs>
+							<w2:content hierarchy="MaxTab_01.panel_2_1" id="panel_2_1_01" orgid="panel_2_1" style=""
+								userData2=" left:1266; top:55;">
+								<xf:group class="titbox mt0" id="" style="">
+									<w2:textbox class="blue " id="" label="&lt; 최 종 &gt;" style=""></w2:textbox>
+									<xf:group class="rt" id="" style=""></xf:group>
+								</xf:group>
+								<xf:group class="gvwbox" id="" style="">
+									<w2:gridView class="gvw" dataList="dts_1_1" ev:onafteredit="scwin.grd_1_1_OnExit"
+										hierarchy="MaxTab_01.grd_1_1" id="grd_1_1" orgid="grd_1_1" readOnly="false" resize="true" style="height: 153px;"
+										userData2=" class:Grid_01; allshowedit:true; autoresizing:True; autoresizingallcol:True; autoresizingwithheader:True; colselect:True; fillarea:True; focusrect:true; gtitleheight:25; headborder:0; sortview:left; suppressoption:1; tooltip:use=true;alt=true;createtime=300;destroytime=10000;width=400;color=#FFFFFF;backcolor=#808080;leftmargin=10;rightmargin=10;topmargin=10;bottommargin=10;; xtitleheight:0;">
+										<w2:caption id="caption1" style="" value="this is a grid caption."></w2:caption>
+										<w2:header id="header1" style="">
+											<w2:row>
+												<w2:column displayMode="label" id="h_text_1_0" inputType="text" textAlign="center"
+													value="계정과목" width="180">
+												</w2:column>
+												<w2:column displayMode="label" edit="realnumeric" id="h_text_1_1" inputType="text"
+													textAlign="center" userData2=" bgcolor:@acolor3; displayformat:#,##0;" value="당기" width="222">
+												</w2:column>
+												<w2:column displayMode="label" edit="realnumeric" id="h_text_1_2" inputType="text"
+													textAlign="center" userData2=" bgcolor:@acolor3; displayformat:#,##0;" value="전기" width="222">
+												</w2:column>
+												<w2:column displayMode="label" hidden="true" id="h_LINE" inputType="text" textAlign="center"
+													value="LINE" width="40">
+												</w2:column>
+											</w2:row>
+										</w2:header>
+										<w2:gBody id="gBody1" style="">
+											<w2:row id="" style="">
+												<w2:column displayMode="label" id="text_1_0" inputType="text" textAlign="center"
+													width="180">
+												</w2:column>
+												<w2:column displayMode="label" id="text_1_1" inputType="text" textAlign="right"
+													width="222">
+												</w2:column>
+												<w2:column displayMode="label" id="text_1_2" inputType="text" textAlign="right"
+													width="222">
+												</w2:column>
+												<w2:column displayMode="label" id="LINE" inputType="text" textAlign="center" width="40"></w2:column>
+											</w2:row>
+										</w2:gBody>
+									</w2:gridView>
+								</xf:group>
+								<xf:group class="titbox" id="" style="">
+									<w2:textbox class="blue " id="" label="&lt; 참 조 &gt;" style=""></w2:textbox>
+									<xf:group class="rt" id="" style=""></xf:group>
+								</xf:group>
+								<xf:group class="gvwbox" id="" style="">
+									<w2:gridView class="gvw" dataList="dts_1_2" hierarchy="MaxTab_01.grd_1_2" id="grd_1_2" orgid="grd_1_2"
+										readOnly="false" resize="true" style="height:424px;"
+										userData2=" class:Grid_01; allshowedit:false; autoresizing:True; autoresizingallcol:True; autoresizingwithheader:True; colselect:True; fillarea:True; focusrect:true; gtitleheight:25; headborder:0; sortview:left; suppressoption:1; tooltip:use=true;alt=true;createtime=300;destroytime=10000;width=400;color=#FFFFFF;backcolor=#808080;leftmargin=10;rightmargin=10;topmargin=10;bottommargin=10;; xtitleheight:0; ondblclick:grd_1_2_OnDblClick;">
+										<w2:caption id="caption1" style="" value="this is a grid caption."></w2:caption>
+										<w2:header id="header1" style="">
+											<w2:row>
+												<w2:column displayMode="label" id="h_text_1_0" inputType="text" textAlign="center"
+													value="계정과목" width="140">
+												</w2:column>
+												<w2:column displayMode="label" id="h_text_1_3" inputType="text" textAlign="center"
+													userData2=" bgcolor:#FFFF99; cursor:hand;" width="40">
+												</w2:column>
+												<w2:column displayMode="label" id="h_text_1_1" inputType="text" textAlign="center"
+													userData2=" displayformat:#,##0;" value="당기" width="222">
+												</w2:column>
+												<w2:column displayMode="label" id="h_text_1_2" inputType="text" textAlign="center"
+													userData2=" displayformat:#,##0;" value="전기" width="222">
+												</w2:column>
+											</w2:row>
+										</w2:header>
+										<w2:gBody id="gBody1" style="">
+											<w2:row id="" style="">
+												<w2:column displayMode="label" id="text_1_0" inputType="text" textAlign="center"
+													width="140">
+												</w2:column>
+												<w2:column displayMode="label" id="text_1_3" inputType="text" textAlign="center"
+													width="40">
+												</w2:column>
+												<w2:column displayMode="label" id="text_1_1" inputType="text" textAlign="right"
+													width="222">
+												</w2:column>
+												<w2:column displayMode="label" id="text_1_2" inputType="text" textAlign="right"
+													width="222">
+												</w2:column>
+											</w2:row>
+										</w2:gBody>
+									</w2:gridView>
+								</xf:group>
+							</w2:content>
+							<w2:content hierarchy="MaxTab_01.panel_2_2" id="panel_2_2_01" orgid="panel_2_2" style=""
+								userData2=" left:1266; top:55;">
+								<xf:group class="titbox mt0" id="" style="">
+									<w2:textbox class="blue " id="" label="&lt; 최 종 &gt;" style=""></w2:textbox>
+									<xf:group class="rt" id="" style=""></xf:group>
+								</xf:group>
+								<xf:group class="gvwbox" id="" style="">
+									<w2:gridView class="gvw" dataList="dts_2_1" ev:onafteredit="scwin.grd_2_1_OnExit"
+										hierarchy="MaxTab_01.grd_2_1" id="grd_2_1" orgid="grd_2_1" readOnly="false" resize="true" style="height: 153px;"
+										userData2=" class:Grid_01; allshowedit:true; autoresizing:True; autoresizingallcol:True; autoresizingwithheader:True; colselect:True; fillarea:True; focusrect:true; gtitleheight:25; headborder:0; sortview:left; suppressoption:1; tooltip:use=true;alt=true;createtime=300;destroytime=10000;width=400;color=#FFFFFF;backcolor=#808080;leftmargin=10;rightmargin=10;topmargin=10;bottommargin=10;; xtitleheight:0;">
+										<w2:caption id="caption1" style="" value="this is a grid caption."></w2:caption>
+										<w2:header id="header1" style="">
+											<w2:row>
+												<w2:column displayMode="label" id="h_text_2_0" inputType="text" rowSpan="2"
+													textAlign="center" value="계정과목" width="180">
+												</w2:column>
+												<w2:column colSpan="2" displayMode="label" id="h_groupName_2_1_1" inputType="text"
+													textAlign="center" value="당기">
+												</w2:column>
+												<w2:column colSpan="2" displayMode="label" id="h_groupName_2_1_2" inputType="text"
+													textAlign="center" value="전기">
+												</w2:column>
+												<w2:column displayMode="label" hidden="true" id="h_LINE" inputType="text" rowSpan="2"
+													textAlign="center" value="LINE" width="40">
+												</w2:column>
+											</w2:row>
+											<w2:row id="" style="">
+												<w2:column displayMode="label" edit="realnumeric" id="h_text_2_1" inputType="text"
+													textAlign="center" userData2=" bgcolor:@acolor3; displayformat:#,##0;" value="3개월" width="111">
+												</w2:column>
+												<w2:column displayMode="label" edit="realnumeric" id="h_text_2_2" inputType="text"
+													textAlign="center" userData2=" bgcolor:@acolor3; displayformat:#,##0;" value="누적" width="111">
+												</w2:column>
+												<w2:column displayMode="label" edit="realnumeric" id="h_text_2_3" inputType="text"
+													textAlign="center" userData2=" bgcolor:@acolor3; displayformat:#,##0;" value="3개월" width="111">
+												</w2:column>
+												<w2:column displayMode="label" edit="realnumeric" id="h_text_2_4" inputType="text"
+													textAlign="center" userData2=" bgcolor:@acolor3; displayformat:#,##0;" value="누적" width="111">
+												</w2:column>
+											</w2:row>
+										</w2:header>
+										<w2:gBody id="gBody1" style="">
+											<w2:row id="" style="">
+												<w2:column displayMode="label" id="text_2_0" inputType="text" textAlign="center"
+													width="180">
+												</w2:column>
+												<w2:column displayMode="label" id="text_2_1" inputType="text" textAlign="right"
+													width="111">
+												</w2:column>
+												<w2:column displayMode="label" id="text_2_2" inputType="text" textAlign="right"
+													width="111">
+												</w2:column>
+												<w2:column displayMode="label" id="text_2_3" inputType="text" textAlign="right"
+													width="111">
+												</w2:column>
+												<w2:column displayMode="label" id="text_2_4" inputType="text" textAlign="right"
+													width="111">
+												</w2:column>
+												<w2:column displayMode="label" id="LINE" inputType="text" textAlign="center" width="40"></w2:column>
+											</w2:row>
+										</w2:gBody>
+									</w2:gridView>
+								</xf:group>
+								<xf:group class="titbox" id="" style="">
+									<w2:textbox class="blue " id="" label="&lt; 참 조 &gt;" style=""></w2:textbox>
+									<xf:group class="rt" id="" style=""></xf:group>
+								</xf:group>
+								<xf:group class="gvwbox" id="" style="">
+									<w2:gridView class="gvw" dataList="dts_2_2" hierarchy="MaxTab_01.grd_2_2" id="grd_2_2" orgid="grd_2_2"
+										readOnly="false" resize="true" style="height:424px;"
+										userData2=" class:Grid_01; allshowedit:false; autoresizing:True; autoresizingallcol:True; autoresizingwithheader:True; colselect:True; fillarea:True; focusrect:true; gtitleheight:25; headborder:0; sortview:left; suppressoption:1; tooltip:use=true;alt=true;createtime=300;destroytime=10000;width=400;color=#FFFFFF;backcolor=#808080;leftmargin=10;rightmargin=10;topmargin=10;bottommargin=10;; xtitleheight:0; ondblclick:grd_2_2_OnDblClick;">
+										<w2:caption id="caption1" style="" value="this is a grid caption."></w2:caption>
+										<w2:header id="header1" style="">
+											<w2:row>
+												<w2:column displayMode="label" id="h_text_2_0" inputType="text" rowSpan="2"
+													textAlign="center" value="계정과목" width="140">
+												</w2:column>
+												<w2:column displayMode="label" id="h_text_2_5" inputType="text" rowSpan="2"
+													textAlign="center" userData2=" bgcolor:#FFFF99; cursor:hand;" width="40">
+												</w2:column>
+												<w2:column colSpan="2" displayMode="label" id="h_groupName_2_2_1" inputType="text"
+													textAlign="center" value="당기">
+												</w2:column>
+												<w2:column colSpan="2" displayMode="label" id="h_groupName_2_2_2" inputType="text"
+													textAlign="center" value="전기">
+												</w2:column>
+											</w2:row>
+											<w2:row id="" style="">
+												<w2:column displayMode="label" id="h_text_2_1" inputType="text" textAlign="center"
+													userData2=" displayformat:#,##0;" value="3개월" width="111">
+												</w2:column>
+												<w2:column displayMode="label" id="h_text_2_2" inputType="text" textAlign="center"
+													userData2=" displayformat:#,##0;" value="누적" width="111">
+												</w2:column>
+												<w2:column displayMode="label" id="h_text_2_3" inputType="text" textAlign="center"
+													userData2=" displayformat:#,##0;" value="3개월" width="111">
+												</w2:column>
+												<w2:column displayMode="label" id="h_text_2_4" inputType="text" textAlign="center"
+													userData2=" displayformat:#,##0;" value="누적" width="111">
+												</w2:column>
+											</w2:row>
+										</w2:header>
+										<w2:gBody id="gBody1" style="">
+											<w2:row id="" style="">
+												<w2:column displayMode="label" id="text_2_0" inputType="text" textAlign="center"
+													width="140">
+												</w2:column>
+												<w2:column displayMode="label" id="text_2_5" inputType="text" textAlign="center"
+													width="40">
+												</w2:column>
+												<w2:column displayMode="label" id="text_2_1" inputType="text" textAlign="right"
+													width="111">
+												</w2:column>
+												<w2:column displayMode="label" id="text_2_2" inputType="text" textAlign="right"
+													width="111">
+												</w2:column>
+												<w2:column displayMode="label" id="text_2_3" inputType="text" textAlign="right"
+													width="111">
+												</w2:column>
+												<w2:column displayMode="label" id="text_2_4" inputType="text" textAlign="right"
+													width="111">
+												</w2:column>
+											</w2:row>
+										</w2:gBody>
+									</w2:gridView>
+								</xf:group>
+							</w2:content>
+							<w2:content hierarchy="MaxTab_01.panel_2_3" id="panel_2_3_01" orgid="panel_2_3" style=""
+								userData2=" left:1266; top:55;">
+								<xf:group class="titbox mt0" id="" style="">
+									<w2:textbox class="blue " id="" label="&lt; 최 종 &gt;" style=""></w2:textbox>
+									<xf:group class="rt" id="" style=""></xf:group>
+								</xf:group>
+								<xf:group class="gvwbox" id="">
+									<w2:gridView class="gvw" dataList="dts_3_1" hierarchy="MaxTab_01.grd_3_1" id="grd_3_1" orgid="grd_3_1"
+										readOnly="false" resize="true" style="height: 153px;"
+										userData2=" class:Grid_01; allshowedit:false; autoresizing:True; autoresizingallcol:True; autoresizingwithheader:True; colselect:True; fillarea:True; focusrect:true; gtitleheight:25; headborder:0; sortview:left; suppressoption:1; tooltip:use=true;alt=true;createtime=300;destroytime=10000;width=400;color=#FFFFFF;backcolor=#808080;leftmargin=10;rightmargin=10;topmargin=10;bottommargin=10;; xtitleheight:0;">
+										<w2:caption id="caption1" style="" value="this is a grid caption."></w2:caption>
+										<w2:header id="header1" style="">
+											<w2:row>
+												<w2:column displayMode="label" id="h_text_3_0" inputType="text" rowSpan="2"
+													textAlign="center" value="계정과목" width="180">
+												</w2:column>
+												<w2:column colSpan="2" displayMode="label" id="h_groupName_3_1_1" inputType="text"
+													textAlign="center" value="당기">
+												</w2:column>
+												<w2:column colSpan="2" displayMode="label" id="h_groupName_3_1_2" inputType="text"
+													textAlign="center" value="전기">
+												</w2:column>
+											</w2:row>
+											<w2:row id="" style="">
+												<w2:column displayMode="label" id="h_text_3_1" inputType="text" textAlign="center"
+													userData2=" displayformat:#,##0;" value="3개월" width="111">
+												</w2:column>
+												<w2:column displayMode="label" id="h_text_3_2" inputType="text" textAlign="center"
+													userData2=" displayformat:#,##0;" value="누적" width="111">
+												</w2:column>
+												<w2:column displayMode="label" id="h_text_3_3" inputType="text" textAlign="center"
+													userData2=" displayformat:#,##0;" value="3개월" width="111">
+												</w2:column>
+												<w2:column displayMode="label" id="h_text_3_4" inputType="text" textAlign="center"
+													userData2=" displayformat:#,##0;" value="누적" width="111">
+												</w2:column>
+											</w2:row>
+										</w2:header>
+										<w2:gBody id="gBody1" style="">
+											<w2:row id="" style="">
+												<w2:column displayMode="label" id="text_3_0" inputType="text" textAlign="center"
+													width="180">
+												</w2:column>
+												<w2:column displayMode="label" id="text_3_1" inputType="text" textAlign="right"
+													width="111">
+												</w2:column>
+												<w2:column displayMode="label" id="text_3_2" inputType="text" textAlign="right"
+													width="111">
+												</w2:column>
+												<w2:column displayMode="label" id="text_3_3" inputType="text" textAlign="right"
+													width="111">
+												</w2:column>
+												<w2:column displayMode="label" id="text_3_4" inputType="text" textAlign="right"
+													width="111">
+												</w2:column>
+											</w2:row>
+										</w2:gBody>
+									</w2:gridView>
+								</xf:group>
+							</w2:content>
+						</w2:tabControl>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<xf:group class="btnbox" id="">
+				<xf:group class="rt" id="">
+					<xf:group hierarchy="panel_3" id="panel_3" orgid="panel_3" style="" class="flex">
+						<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.btn_Modify_onclick" hierarchy="btn_Modify"
+							id="btn_Modify" orgid="btn_Modify" src="../img/btn_modify.gif" style="">
+							<xf:label><![CDATA[수정]]></xf:label>
+						</xf:trigger>
+						<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.btn_Delete_onclick" hierarchy="btn_Delete"
+							id="btn_Delete" orgid="btn_Delete" src="../img/btn_delete.gif" style="" text="삭제">
+							<xf:label><![CDATA[삭제]]></xf:label>
+						</xf:trigger>
+					</xf:group>
+					<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.btn_Close_onclick" hierarchy="btn_Close" id="btn_Close"
+						orgid="btn_Close" src="../img/btn_close.gif" style="" text="닫기">
+						<xf:label><![CDATA[닫기]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+		</xf:group>
+	</body>
+</html>

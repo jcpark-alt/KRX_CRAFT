@@ -1,0 +1,710 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDSTF30006.gfm" meta_screenName="공시일정계산식 관리">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<xf:model>
+			<w2:workflowCollection/>
+			<w2:dataCollection baseNode="map"/>
+			<xf:submission id="sbm_trs_Save" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json" ev:submiterror="scwin.trs_Save_OnFail" ev:submitdone="scwin.trs_Save_OnSuccess"/>
+			<xf:submission id="sbm_dts_SCHEDULE" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json" ev:submitdone="scwin.dts_SCHEDULE_OnLoadCompleted" ev:submiterror="scwin.dts_SCHEDULE_OnLoadError"/>
+			<xf:submission id="sbm_dts_schelAdmBas" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json"/>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+/* ★Wcraft guide★    
+스크립트 수작업 유의사항
+*/
+
+
+//★Wcraft guide★ include부분 주석처리 -> include("../js/libRoundPanel.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/stf.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/utils.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/session.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/PopupCalendar.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/common.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/controlResize.js");
+// 화면 리사이징
+
+scwin.vScrenID = 'ULDSTF30006.xml';
+scwin.vUsrId = js_id;
+scwin.vUsrTpCd = js_usr_tp_cd; //'1'관리자, '4'현업
+scwin.gLdMktTp = js_market;
+scwin.gParamObj = new Array(4);
+scwin.onpageload = function() {
+    scwin.gform_onload();
+};
+scwin.onpageunload = function() {
+};
+scwin.fn_SetCode = function() {
+    //평가부문
+    dts_schelAdmBas.DataID = "/CodeAction.do?method=listCodeValueName&inputMessageId=CODEVALUE_INOUT&outputMessageId=CODE_OUT" + "&FOR=R&CD_ENG_NM=DISCLS_SCHDL_ADM_BAS_TP_CD";
+    dts_schelAdmBas.Reset();
+    if (scwin.vUsrTpCd != null && scwin.vUsrTpCd == '1') {
+        //관리자
+        $c.stf.showObj(btn_New, true);
+        $c.stf.showObj(btn_Save, true);
+        $c.stf.setObjectValue(rdo_MKT_ID, "1");
+    } else {
+        //현업
+        if (scwin.gLdMktTp == '' || scwin.gLdMktTp == '9') {
+            $c.stf.setObjectValue(rdo_MKT_ID, "1");
+        } else {
+            $c.stf.setObjectValue(rdo_MKT_ID, scwin.gLdMktTp); //시장구분
+            rdo_MKT_ID.setDisabled(true);
+        }
+        $c.stf.showObj(btn_New, false);
+        $c.stf.showObj(btn_Save, false);
+        $c.stf.showObj(label_5, false);
+        $c.stf.showObj(cmb_DEP_CD, false); //팀구분
+        $c.stf.showObj(label_3, false);
+        $c.stf.showObj(cmb_USE_YN, false); //사용여부
+        $c.stf.showObj(label_4, false);
+        $c.stf.showObj(cmb_DELETE, false); //서식폐지여부
+        $c.stf.showObj(label_1, false);
+        $c.stf.showObj(cmb_ADM_BAS_TP_CD, false); //서식폐지여부
+
+        $c.cm.setColumnProp(grd_Grid, "AUTO_CALC_YN", "show", false); //자동계산
+        $c.cm.setColumnProp(grd_Grid, "X_PATH", "show", false);
+        $c.cm.setColumnProp(grd_Grid, "APPL_REQ_DD", "show", false);
+        $c.cm.setColumnProp(grd_Grid, "DISCLS_SCHDL_REQSTR_NM", "show", false);
+        $c.cm.setColumnProp(grd_Grid, "REQ_CONTN", "show", false);
+        $c.cm.setColumnProp(grd_Grid, "USE_YN", "show", false);
+        $c.cm.setColumnProp(grd_Grid, "DISCLS_SCHDL_ADM_CONTN", "show", false);
+        if (scwin.gLdMktTp == '1' || scwin.gLdMktTp == '3') {
+            $c.cm.setColumnProp(grd_Grid, "DISCLS_SCHDL_GRD_CD", "show", true); //등급
+            $c.cm.setColumnProp(grd_Grid, "SMS_TRNSM_YN", "show", false); //SMS
+            $c.stf.showObj(label_9, false);
+            $c.stf.showObj(cmb_SMS_TRNSM_YN, false);
+        } else if (scwin.gLdMktTp == '2' || scwin.gLdMktTp == '6') {
+            $c.cm.setColumnProp(grd_Grid, "DISCLS_SCHDL_GRD_CD", "show", false); //등급
+            $c.cm.setColumnProp(grd_Grid, "SMS_TRNSM_YN", "show", true); //SMS
+
+        }
+    }
+};
+scwin.fn_Search = function() {
+    var vMKT_ID = $c.stf.getObjectValue(rdo_MKT_ID);
+    var vFORM_CD = $c.stf.getObjectValue(txb_FORM_CD);
+    var vUSE_YN = $c.stf.getObjectValue(cmb_USE_YN);
+    var vDELETE = $c.stf.getObjectValue(cmb_DELETE); // N : 미폐지, D : 폐지
+    var vADM_BAS_TP_CD = $c.stf.getObjectValue(cmb_ADM_BAS_TP_CD);
+    var vDepCD = $c.stf.getObjectValue(cmb_DEP_CD);
+    var vDepCD = $c.stf.getObjectValue(txb_FORM_KOR_NM); // 서식명, 일정내용
+
+    if (scwin.vUsrTpCd != null && scwin.vUsrTpCd == '4') {
+        //현업사용자
+        vUSE_YN = "Y";
+        vDELETE = "N";
+        vDepCD = js_team;
+        if (vDepCD != '' && vDepCD != '13') {
+            vDepCD = '0';
+        }
+    }
+    var url = "/DisclosureSchedule.do?method=listScheduleAdmItems";
+    url += "&MKT_ID=" + vMKT_ID;
+    url += "&FORM_CD=" + vFORM_CD;
+    url += "&USE_YN=" + vUSE_YN;
+    url += "&DELETE=" + vDELETE;
+    url += "&ADM_BAS_TP_CD=" + vADM_BAS_TP_CD;
+    url += "&DEP_CD=" + vDepCD;
+    url += "&SCHDL_ADM_ITM_TP_NM=" + $c.stf.getObjectValue(txb_SCHDL_ADM_ITM_TP_NM);
+    url += "&SUBMIT_SYS_USE_YN=" + $c.stf.getObjectValue(cmb_SUBMIT_SYS_USE_YN);
+    url += "&SMS_TRNSM_YN=" + $c.stf.getObjectValue(cmb_SMS_TRNSM_YN);
+    url += "&FORM_KOR_NM=" + $c.stf.getObjectValue(txb_FORM_KOR_NM);
+    url += "&SCREN_ID=" + scwin.vScrenID;
+    url += "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01;
+    $c.stf.PanelMsg(panel_msg, "로딩중....기다려주세요.");
+    dts_SCHEDULE.DataID = encodeURI(url);
+    dts_SCHEDULE.Reset();
+};
+scwin.fn_Save = function() {
+    var res = window.confirm("저장 하시겠습니까?");
+    if (res) {
+        var url = "/DisclosureSchedule.do?method=saveScheduleAdmItems&SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_02;
+        trs_Save.Action = url;
+        trs_Save.KeyName = "toinb_dataid4";
+        trs_Save.KeyValue = "JSP(I:pInput=dts_SCHEDULE)";
+        trs_Save.Post();
+    }
+};
+scwin.fn_disclsClose = function() {
+    for (var i = 1; i <= dts_SCHEDULE.getTotalRow(); i++) {
+        dts_SCHEDULE.setCellData(i, "REMK", dts_SCHEDULE.getCellData(i, "REMK") + "(서식폐지)");
+    }
+};
+scwin.fn_openForm = async function(form_cd, form_ver, dep_cd, x_path, schdl_adm_itm_tp_nm) {
+    //서식별로 모든항목들에 대해서 보여주려 했으나 팝업호출시 문자열이 길어 호출시 에러발생. 건별로 양식보기에서 보여준다.
+    //var form_x_path = getFormXPath(form_cd,x_path); 
+    var form_x_path = scwin.StringToHex4(schdl_adm_itm_tp_nm) + ":" + x_path;
+    var url;
+    if (js_svrGubun.indexOf("test") > -1) {
+        url = g_test_manager_url + "/filing/findForm.do?method=scheduleFormView";
+    } else if (js_svrGubun == 'dev') {
+        url = g_dev_manager_url + "/filing/findForm.do?method=scheduleFormView";
+    } else {
+        url = g_real_manager_url + "/filing/findForm.do?method=scheduleFormView";
+    }
+    url += "&formCd=" + form_cd;
+    url += "&formVer=" + form_ver;
+    url += "&form_x_path=" + form_x_path;
+    var winTitle = url;
+    await $c.frame.CreateDialogFrame("formPop", url, winTitle, 10, 10, 800, 700, "window");
+};
+scwin.StringToHex4 = function(OriginalString) {
+    var ReturnString = "";
+    for (var i = 0; i < OriginalString.length; i++) {
+        var tmp = "0000" + (parseInt(OriginalString.charCodeAt(i)).toString(16));
+        var tmp2 = tmp.substring(tmp.length - 4);
+        ReturnString += tmp2;
+    }
+    return ReturnString.toUpperCase();
+};
+scwin.getFormXPath = function(form_cd, x_path) {
+    var str = "";
+    for (var i = 0; i < dts_SCHEDULE.getTotalRow(); i++) {
+        if (form_cd == dts_SCHEDULE.getCellData(i, "FORM_CD")) {
+            if (i == 0) {
+                str += dts_SCHEDULE.getCellData(i, "SCHDL_ADM_ITM_TP_NM");
+                str += ":" + dts_SCHEDULE.getCellData(i, "X_PATH");
+            } else {
+                str += "," + dts_SCHEDULE.getCellData(i, "SCHDL_ADM_ITM_TP_NM");
+                str += ":" + dts_SCHEDULE.getCellData(i, "X_PATH");
+            }
+        }
+    }
+    return str;
+};
+scwin.fn_resizeToWin = function() {
+    frame.Width = 1300;
+    frame.Height = 800;
+};
+scwin.btn_Search_onclick = function() {
+    scwin.fn_Search();
+};
+scwin.dts_SCHEDULE_OnLoadCompleted = function(rowcount) {
+    $c.stf.PanelMsg(panel_msg, "총 : " + $c.stf.FormatNumberEx(rowcount) + " 건");
+};
+scwin.dts_SCHEDULE_OnLoadError = function() {
+    $c.stf.alert_error(dts_SCHEDULE);
+};
+scwin.btn_Save_onclick = function() {
+    scwin.fn_Save();
+};
+scwin.trs_Save_OnFail = function() {
+    $c.stf.alert_error(trs_Save);
+};
+scwin.trs_Save_OnSuccess = function() {
+    //alert("저장 성공");
+    scwin.fn_Search();
+};
+scwin.btn_Excel_onclick = function() {
+    $c.stf.doLogSave(scwin.vScrenID, SCREN_PROCS_TP_CD_07);
+    $c.data.downloadGridViewExcel(grd_Grid, "공시일정관리항목", '', 8); //16
+
+};
+scwin.grd_Grid_OnDblClick = function(row, colid) {
+    if (colid == "X_PATH_NM") {
+        if (dts_SCHEDULE.getCellData(row, "DISCLS_SCHDL_ADM_BAS_TP_CD") == '01') {
+            scwin.fn_openForm(dts_SCHEDULE.getCellData(row, "REAL_FORM_CD"), dts_SCHEDULE.getCellData(row, "REAL_FORM_VER"), $c.stf.getObjectValue(cmb_DEP_CD), dts_SCHEDULE.getCellData(row, "X_PATH"), dts_SCHEDULE.getCellData(row, "SCHDL_ADM_ITM_TP_NM"));
+        }
+    }
+};
+scwin.grd_Grid_CanColumnPosChange = function(row, colid) {
+    return true;
+};
+scwin.txb_SCHDL_ADM_ITM_TP_NM_onclick = function() {
+    if (event.keyCode == 13) {
+        scwin.fn_Search();
+    }
+};
+scwin.btn_New_onclick = async function() {
+    await $c.frame.CreateDialogFrame("gform", "/dsclmgt/ULDSTF39203.gfm", "공시일정계산식 등록", 300, 100, 1300, 850, "window");
+};
+scwin.btn_RPT_onclick = async function() {
+    await $c.frame.CreateDialogFrame("DLG_ISUR_CD_", "/dsclmgt/ULDSTF30003.gfm", "보고서 선택", 10, 10, 350, 570, "window");
+};
+scwin.txb_FORM_CD_onblur = function() {
+    if (txb_FORM_CD.getValue() == "") {
+        txb_FORM_KOR_NM.setValue("");
+    }
+};
+scwin.gform_onload = function() {
+    // 패널라운드 처리
+    $c.cm.PanelToGroupBox(panel_1);
+    scwin.fn_SetCode();
+    scwin.fn_resizeToWin();
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+		<xf:group class="sub_contents" id="" meta_componentContainer="true" style="">
+			<xf:group class="schbox" id="" style="">
+				<xf:group class="schbox_inner" id="" style="">
+					<xf:group adaptive="layout" adaptiveThreshold="768" class="w2tb tbl " id="" style="" tagname="table">
+						<w2:attributes>
+							<w2:summary></w2:summary>
+						</w2:attributes>
+						<xf:group tagname="colgroup">
+							<xf:group style="width:115px;" tagname="col"></xf:group>
+							<xf:group style="" tagname="col"></xf:group>
+							<xf:group style="width:20px;" tagname="col"></xf:group>
+							<xf:group tagname="col"></xf:group>
+							<xf:group tagname="col" style="width:100px;"></xf:group>
+							<xf:group tagname="col"></xf:group>
+							<xf:group tagname="col" style="width:100px;"></xf:group>
+							<xf:group tagname="col"></xf:group>
+							<xf:group tagname="col" style="width:100px;"></xf:group>
+							<xf:group tagname="col"></xf:group>
+							<xf:group tagname="col" style="width:70px;"></xf:group>
+							<xf:group style="" tagname="col"></xf:group>
+						</xf:group>
+						<xf:group class="" id="" style="" tagname="tr">
+							<xf:group class="w2tb_th" style="" tagname="th">
+								<w2:textbox hierarchy="label_10" id="label_10" label="시장구분" orgid="label_10" style=""
+									userData2=" class:Blue_Bold;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group class="w2tb_td" style="" tagname="td">
+								<w2:attributes>
+									<w2:colspan>3</w2:colspan>
+									<w2:rowspan>1</w2:rowspan>
+								</w2:attributes>
+								<xf:select1 appearance="full" disabled="false" hierarchy="rdo_MKT_ID" id="rdo_MKT_ID"
+									item="1^유가,2^코스닥,6^코넥스,3^파생,4^채권" orgid="rdo_MKT_ID" renderType="radiogroup" selectedIndex="0" style=""
+									userData2=" class:TopCondition_Blue; automargin:True; cols:5;">
+									<xf:choices>
+										<xf:item>
+											<xf:label><![CDATA[유가]]></xf:label>
+											<xf:value><![CDATA[1]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[코스닥]]></xf:label>
+											<xf:value><![CDATA[2]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[코넥스]]></xf:label>
+											<xf:value><![CDATA[6]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[파생]]></xf:label>
+											<xf:value><![CDATA[3]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[채권]]></xf:label>
+											<xf:value><![CDATA[4]]></xf:value>
+										</xf:item>
+									</xf:choices>
+								</xf:select1>
+							</xf:group>
+							<xf:group tagname="th" id="" class="w2tb_th">
+								<w2:attributes></w2:attributes>
+								<w2:textbox hierarchy="label_7" id="label_7" label="관리내용" orgid="label_7" style=""
+									userData2=" class:Blue_Bold;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group tagname="td" id="" class="w2tb_td">
+								<w2:attributes></w2:attributes>
+								<xf:input ev:onclick="scwin.txb_SCHDL_ADM_ITM_TP_NM_onclick" hierarchy="txb_SCHDL_ADM_ITM_TP_NM"
+									id="txb_SCHDL_ADM_ITM_TP_NM" maxlength="1000" orgid="txb_SCHDL_ADM_ITM_TP_NM" style="width:100px;"
+									userData2=" class:TopCondition_01_write; font-family:돋움; border-color:#92b1f1;">
+								</xf:input>
+							</xf:group>
+							<xf:group tagname="th" id="" class="w2tb_th">
+								<w2:attributes></w2:attributes>
+								<w2:textbox hierarchy="label_9" id="label_9" label="SMS전송여부" orgid="label_9" style=""
+									userData2=" class:Blue_Bold;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group tagname="td" id="" class="w2tb_td">
+								<w2:attributes></w2:attributes>
+								<xf:select1 appearance="minimal" cbdatacolumns="value,text" disabledClass="w2selectbox_disabled"
+									hierarchy="cmb_SMS_TRNSM_YN" id="cmb_SMS_TRNSM_YN" item="^전체,Y^전송,N^미전송" listexprformat="text^0^65" orgid="cmb_SMS_TRNSM_YN"
+									style="width:90px;" userData2=" class:TopCondition_01; bindcolumn:value; index:0; listcount:10; searchcolumn:text;">
+									<xf:choices>
+										<xf:item>
+											<xf:label><![CDATA[전체]]></xf:label>
+											<xf:value><![CDATA[]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[전송]]></xf:label>
+											<xf:value><![CDATA[Y]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[미전송]]></xf:label>
+											<xf:value><![CDATA[N]]></xf:value>
+										</xf:item>
+									</xf:choices>
+								</xf:select1>
+							</xf:group>
+							<xf:group tagname="th" id="" class="w2tb_th">
+								<w2:attributes></w2:attributes>
+								<w2:textbox hierarchy="label_3" id="label_3" label="사용여부" orgid="label_3" style=""
+									userData2=" class:Blue_Bold;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group tagname="td" id="" class="w2tb_td">
+								<w2:attributes></w2:attributes>
+								<xf:select1 appearance="minimal" cbdatacolumns="value,text" disabledClass="w2selectbox_disabled"
+									hierarchy="cmb_USE_YN" id="cmb_USE_YN" item="^전체,Y^사용,N^미사용" listexprformat="text^0^65" orgid="cmb_USE_YN" style="width:96px;"
+									userData2=" class:TopCondition_01; bindcolumn:value; index:1; listcount:10; searchcolumn:text;">
+									<xf:choices>
+										<xf:item>
+											<xf:label><![CDATA[전체]]></xf:label>
+											<xf:value><![CDATA[]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[사용]]></xf:label>
+											<xf:value><![CDATA[Y]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[미사용]]></xf:label>
+											<xf:value><![CDATA[N]]></xf:value>
+										</xf:item>
+									</xf:choices>
+								</xf:select1>
+							</xf:group>
+							<xf:group tagname="th" id="" class="w2tb_th">
+								<w2:attributes></w2:attributes>
+								<w2:textbox hierarchy="label_1" id="label_1" label="관리기준" orgid="label_1" style=""
+									userData2=" class:Blue_Bold;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group tagname="td" id="" class="w2tb_td">
+								<w2:attributes></w2:attributes>
+								<xf:select1 appearance="minimal" cbdatacolumns="value,text" disabledClass="w2selectbox_disabled"
+									hierarchy="cmb_ADM_BAS_TP_CD" id="cmb_ADM_BAS_TP_CD" listexprformat="text^0^65" orgid="cmb_ADM_BAS_TP_CD" style="width:96px;"
+									userData2=" class:TopCondition_01; bindcolumn:value; index:0; listcount:10; searchcolumn:text;">
+									<xf:choices>
+										<xf:itemset nodeset="data:dts_schelAdmBas">
+											<xf:label ref=""></xf:label>
+											<xf:value ref=""></xf:value>
+										</xf:itemset>
+									</xf:choices>
+								</xf:select1>
+							</xf:group>
+						</xf:group>
+						<xf:group tagname="tr" id="" style="">
+							<xf:group tagname="th" class="w2tb_th">
+								<w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes>
+								<w2:textbox hierarchy="label_11" id="label_11" label="서식명/일정내용" orgid="label_11" style=""
+									userData2=" class:Blue_Bold;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group tagname="td" class="w2tb_td">
+								<w2:attributes>
+									<w2:colspan>3</w2:colspan>
+									<w2:rowspan>1</w2:rowspan>
+								</w2:attributes>
+								<xf:input hierarchy="txb_FORM_CD" id="txb_FORM_CD" maxlength="1000" orgid="txb_FORM_CD" style="width:70px;"
+									userData2=" class:TopCondition_01_read; onblur:txb_FORM_CD_onblur;">
+								</xf:input>
+								<xf:input hierarchy="txb_FORM_KOR_NM" id="txb_FORM_KOR_NM" maxlength="1000" orgid="txb_FORM_KOR_NM"
+									style="width:210px;" userData2=" class:TopCondition_01_write;">
+								</xf:input>
+								<xf:trigger class="btn_cm icon search" cursor="pointer" ev:onclick="scwin.btn_RPT_onclick"
+									hierarchy="btn_RPT" id="btn_RPT" orgid="btn_RPT" src="../img/btn_search.gif" style="">
+									<xf:label><![CDATA[]]></xf:label>
+								</xf:trigger>
+							</xf:group>
+							<xf:group tagname="th" id="" class="w2tb_th">
+								<w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes>
+								<w2:textbox hierarchy="label_8" id="label_8" label="제출사용여부" orgid="label_8" style=""
+									userData2=" class:Blue_Bold;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group tagname="td" id="" class="w2tb_td">
+								<w2:attributes></w2:attributes>
+								<xf:select1 appearance="minimal" cbdatacolumns="value,text" disabledClass="w2selectbox_disabled"
+									hierarchy="cmb_SUBMIT_SYS_USE_YN" id="cmb_SUBMIT_SYS_USE_YN" item="^전체,Y^사용,N^미사용" listexprformat="text^0^65"
+									orgid="cmb_SUBMIT_SYS_USE_YN" style="width:90px;"
+									userData2=" class:TopCondition_01; bindcolumn:value; index:0; listcount:10; searchcolumn:text;">
+									<xf:choices>
+										<xf:item>
+											<xf:label><![CDATA[전체]]></xf:label>
+											<xf:value><![CDATA[]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[사용]]></xf:label>
+											<xf:value><![CDATA[Y]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[미사용]]></xf:label>
+											<xf:value><![CDATA[N]]></xf:value>
+										</xf:item>
+									</xf:choices>
+								</xf:select1>
+							</xf:group>
+							<xf:group tagname="th" id="" class="w2tb_th">
+								<w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes>
+							</xf:group>
+							<xf:group tagname="td" id="" class="w2tb_td">
+								<w2:attributes></w2:attributes>
+							</xf:group>
+							<xf:group tagname="th" id="" class="w2tb_th">
+								<w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes>
+								<w2:textbox hierarchy="label_4" id="label_4" label="서식폐지여부" orgid="label_4" style=""
+									userData2=" class:Blue_Bold;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group tagname="td" id="" class="w2tb_td">
+								<w2:attributes></w2:attributes>
+								<xf:select1 appearance="minimal" cbdatacolumns="value,text" disabledClass="w2selectbox_disabled"
+									hierarchy="cmb_DELETE" id="cmb_DELETE" item="^전체,N^미폐지,D^폐지" listexprformat="text^0^65" orgid="cmb_DELETE" style="width:100px;"
+									userData2=" class:TopCondition_01; bindcolumn:value; index:1; listcount:10; searchcolumn:text;">
+									<xf:choices>
+										<xf:item>
+											<xf:label><![CDATA[전체]]></xf:label>
+											<xf:value><![CDATA[]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[미폐지]]></xf:label>
+											<xf:value><![CDATA[N]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[폐지]]></xf:label>
+											<xf:value><![CDATA[D]]></xf:value>
+										</xf:item>
+									</xf:choices>
+								</xf:select1>
+							</xf:group>
+							<xf:group tagname="th" id="" class="w2tb_th"><w2:attributes></w2:attributes><w2:textbox hierarchy="label_5" id="label_5" label="팀구분" orgid="label_5" style=""
+									userData2=" class:Blue_Bold;">
+								</w2:textbox></xf:group>
+							<xf:group tagname="td" id="" class="w2tb_td">
+								<w2:attributes></w2:attributes>
+								<xf:select1 appearance="minimal" cbdatacolumns="value,text" disabledClass="w2selectbox_disabled"
+									hierarchy="cmb_DEP_CD" id="cmb_DEP_CD" item="^전체,0^공시총괄팀,13^시장운영팀" listexprformat="text^0^65" orgid="cmb_DEP_CD"
+									style="width:90px;"
+									userData2=" class:TopCondition_01; bindcolumn:value; index:0; inheritcolor:False; listcount:10; searchcolumn:text; xpstyle:True;">
+									<xf:choices>
+										<xf:item>
+											<xf:label><![CDATA[전체]]></xf:label>
+											<xf:value><![CDATA[]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[공시총괄팀]]></xf:label>
+											<xf:value><![CDATA[0]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[시장운영팀]]></xf:label>
+											<xf:value><![CDATA[13]]></xf:value>
+										</xf:item>
+									</xf:choices>
+								</xf:select1>
+							</xf:group>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+				<xf:group class="btn_schbox" id="" style="">
+					<xf:trigger class="btn_cm sch" cursor="pointer" ev:onclick="scwin.btn_Search_1_onclick" id="btn_Search"
+						src="../img/btn_select.gif" style="">
+						<xf:label><![CDATA[조회]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+			<xf:group class="titbox" id="" style="">
+				<xf:group class="rt" id="" style="">
+					<xf:group class="count" id="" style="">
+						<w2:textbox class="" id="" label="총" style=""></w2:textbox>
+						<w2:textbox class="num" id="" label="0" style=""></w2:textbox>
+						<w2:textbox class="" id="" label="건" style=""></w2:textbox>
+					</xf:group>
+					<xf:trigger class="btn_cm download" cursor="pointer" ev:onclick="scwin.btn_Excel_onclick" hierarchy="btn_Excel"
+						id="btn_Excel" orgid="btn_Excel" src="../img/btn_excelsave.gif" style="" text="엑셀다운로드">
+						<xf:label><![CDATA[엑셀다운로드]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.btn_New_onclick" hierarchy="btn_New" id="btn_New"
+						orgid="btn_New" src="../img/btn_new.gif" style="" text="신규">
+						<xf:label><![CDATA[신규]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm pt" cursor="pointer" ev:onclick="scwin.btn_Save_onclick" hierarchy="btn_Save" id="btn_Save"
+						orgid="btn_Save" src="../img/btn_save.gif" style="" text="저장">
+						<xf:label><![CDATA[저장]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+			<xf:group class="gvwbox" id="" style="">
+				<w2:gridView class="gvw" dataList="dts_SCHEDULE" hierarchy="grd_Grid" id="grd_Grid" orgid="grd_Grid" readOnly="false"
+					resize="true" style="height: 153px;"
+					userData2=" class:Grid_01; cancolumnposchange:grd_Grid_CanColumnPosChange; autoresizing:True; autoresizingallcol:True; autoresizingwithheader:True; colselect:False; fillarea:True; gtitleheight:25; sortview:left; suppressoption:1; titleheight:35; tooltip:use=true;alt=true;header=true;leftmargin=10;rightmargin=10;topmargin=10;bottommargin=10;; ondblclick:grd_Grid_OnDblClick;">
+					<w2:caption id="caption1" style="" value="this is a grid caption."></w2:caption>
+					<w2:header id="header1" style="">
+						<w2:row>
+							<w2:column displayMode="label" id="h_LD_MKT_TP_NM" inputType="text" readOnly="true" textAlign="center"
+								userData2=" sort:True;" value="시장" width="60">
+							</w2:column>
+							<w2:column displayMode="label" id="h_FORM_CD" inputType="text" readOnly="true" textAlign="center"
+								userData2=" sort:True;" value="서식\\코드" width="55">
+							</w2:column>
+							<w2:column displayMode="label" hidden="true" id="h_FORM_VER" inputType="text" readOnly="true" textAlign="center"
+								value="버전" width="43">
+							</w2:column>
+							<w2:column displayMode="label" id="h_FORM_KOR_NM" inputType="text" readOnly="true" textAlign="center"
+								value="서식명/일정내용" width="160">
+							</w2:column>
+							<w2:column displayMode="label" id="h_X_PATH_NM" inputType="text" readOnly="true" textAlign="center"
+								userData2=" bgcolor:#FFFF99;" value="추출 항목명" width="105">
+							</w2:column>
+							<w2:column displayMode="label" id="h_X_PATH" inputType="text" textAlign="center" userData2=" sort:True;"
+								value="XPATH" width="180">
+							</w2:column>
+							<w2:column displayMode="label" id="h_SCHDL_ADM_ITM_TP_NM" inputType="text" readOnly="true" textAlign="center"
+								userData2=" sort:True;" value="관리내용" width="150">
+							</w2:column>
+							<w2:column displayMode="label" id="h_USE_YN" inputType="text" textAlign="center"
+								userData2=" sort:True; data:Y:Y,N:N;" value="사용\\여부" width="50">
+							</w2:column>
+							<w2:column displayMode="label" id="h_CALC_YYS" inputType="text" textAlign="center" value="년수" width="40"></w2:column>
+							<w2:column displayMode="label" id="h_CALC_MMS" inputType="text" textAlign="center" value="월수" width="40"></w2:column>
+							<w2:column displayMode="label" id="h_CALC_DYS" inputType="text" textAlign="center" value="일수" width="40"></w2:column>
+							<w2:column displayMode="label" id="h_DISCLS_SCHDL_ADM_BAS_TP_CD" inputType="text" textAlign="center"
+								userData2=" sort:True; data:dts_schelAdmBas:VALUE:TEXT;" value="관리기준" width="60">
+							</w2:column>
+							<w2:column displayMode="label" id="h_SCHDL_CALC_BAS_TP_CD" inputType="text" textAlign="center"
+								userData2=" sort:True; data:1:달력일,2:거래일,3:공시일(달력일),5:공시일(거래일),4:당일,9:기타;" value="일자기준" width="100">
+							</w2:column>
+							<w2:column displayMode="label" id="h_CORRCT_DYS" inputType="text" textAlign="center" userData2=" sort:True;"
+								value="보정\\일수" width="50">
+							</w2:column>
+							<w2:column displayMode="label" id="h_MKT_HOLDY_CORRCT_DYS" inputType="text" textAlign="center"
+								userData2=" sort:True;" value="시장휴무\\보정일수" width="70">
+							</w2:column>
+							<w2:column displayMode="label" id="h_AUTO_CALC_YN" inputType="text" textAlign="center"
+								userData2=" data:Y:Y,N:N;" value="자동\\계산여부" width="60">
+							</w2:column>
+							<w2:column displayMode="label" id="h_SUBMIT_SYS_USE_YN" inputType="text" textAlign="center"
+								userData2=" data:Y:Y,N:N;" value="제출\\사용여부" width="60">
+							</w2:column>
+							<w2:column displayMode="label" id="h_SMS_TRNSM_YN" inputType="text" textAlign="center"
+								userData2=" data:Y:Y,N:N;" value="SMS\\전송여부(코)" width="60">
+							</w2:column>
+							<w2:column displayMode="label" id="h_DISCLS_SCHDL_GRD_CD" inputType="text" textAlign="center"
+								userData2=" sort:True; data:1:중요,2:일반;" value="등급\\(유)" width="59">
+							</w2:column>
+							<w2:column displayMode="label" id="h_REMK" inputType="text" textAlign="center" value="비고" width="250"></w2:column>
+							<w2:column displayMode="label" id="h_DISCLS_SCHDL_ADM_CONTN" inputType="text" textAlign="center" value="일정내용"
+								width="200">
+							</w2:column>
+							<w2:column displayMode="label" id="h_APPL_REQ_DD" inputType="text" textAlign="center" value="최종\\이행일자"
+								width="80">
+							</w2:column>
+							<w2:column displayMode="label" id="h_DISCLS_SCHDL_REQSTR_NM" inputType="text" textAlign="center" value="최종\\요청자"
+								width="100">
+							</w2:column>
+							<w2:column displayMode="label" id="h_REQ_CONTN" inputType="text" textAlign="center" value="이행내역" width="200"></w2:column>
+							<w2:column displayMode="label" hidden="true" id="h_SCHDL_ADM_ITM_TP_CD" inputType="text" readOnly="true"
+								textAlign="center" value="SCHDL_ADM_ITM_TP_CD" width="128">
+							</w2:column>
+							<w2:column displayMode="label" hidden="true" id="h_SCHDL_CALC_BAS_TP_CD" inputType="text" readOnly="true"
+								textAlign="center" value="SCHDL_CALC_BAS_TP_CD" width="139">
+							</w2:column>
+							<w2:column displayMode="label" hidden="true" id="h_X_PATH_KEY" inputType="text" readOnly="true"
+								textAlign="center" value="X_PATH_KEY">
+							</w2:column>
+							<w2:column displayMode="label" hidden="true" id="h_LD_MKT_TP_CD" inputType="text" readOnly="true"
+								textAlign="center" value="LD_MKT_TP_CD">
+							</w2:column>
+							<w2:column displayMode="label" hidden="true" id="h_BYDD_SEQ" inputType="text" readOnly="true" textAlign="center"
+								value="일련번호">
+							</w2:column>
+							<w2:column displayMode="label" hidden="true" id="h_REC_FORM_VER" inputType="text" readOnly="true"
+								textAlign="center" value="서식버전" width="43">
+							</w2:column>
+							<w2:column displayMode="label" hidden="true" id="h_REAL_FORM_CD" inputType="text" readOnly="true"
+								textAlign="center" value="REAL서식코드" width="43">
+							</w2:column>
+							<w2:column displayMode="label" hidden="true" id="h_REAL_FORM_VER" inputType="text" readOnly="true"
+								textAlign="center" value="REAL서식버전" width="43">
+							</w2:column>
+						</w2:row>
+					</w2:header>
+					<w2:gBody id="gBody1" style="">
+						<w2:row id="" style="">
+							<w2:column displayMode="label" id="LD_MKT_TP_NM" inputType="text" textAlign="center" width="60"></w2:column>
+							<w2:column displayMode="label" id="FORM_CD" inputType="text" textAlign="center" width="55"></w2:column>
+							<w2:column displayMode="label" id="FORM_VER" inputType="text" textAlign="center" width="43"></w2:column>
+							<w2:column displayMode="label" id="FORM_KOR_NM" inputType="text" textAlign="center" width="160"></w2:column>
+							<w2:column displayMode="label" id="X_PATH_NM" inputType="text" textAlign="center" width="105"></w2:column>
+							<w2:column displayMode="label" id="X_PATH" inputType="text" textAlign="center" width="180"></w2:column>
+							<w2:column displayMode="label" id="SCHDL_ADM_ITM_TP_NM" inputType="text" textAlign="center" width="150"></w2:column>
+							<w2:column displayMode="label" id="USE_YN" inputType="select" textAlign="center" width="50"></w2:column>
+							<w2:column displayMode="label" id="CALC_YYS" inputType="text" textAlign="right" width="40"></w2:column>
+							<w2:column displayMode="label" id="CALC_MMS" inputType="text" textAlign="right" width="40"></w2:column>
+							<w2:column displayMode="label" id="CALC_DYS" inputType="text" textAlign="right" width="40"></w2:column>
+							<w2:column displayMode="label" id="DISCLS_SCHDL_ADM_BAS_TP_CD" inputType="lookup" textAlign="center"
+								width="60">
+							</w2:column>
+							<w2:column displayMode="label" id="SCHDL_CALC_BAS_TP_CD" inputType="select" textAlign="center" width="100"></w2:column>
+							<w2:column displayMode="label" id="CORRCT_DYS" inputType="text" textAlign="right" width="50"></w2:column>
+							<w2:column displayMode="label" id="MKT_HOLDY_CORRCT_DYS" inputType="text" textAlign="right" width="70"></w2:column>
+							<w2:column displayMode="label" id="AUTO_CALC_YN" inputType="select" textAlign="center" width="60"></w2:column>
+							<w2:column displayMode="label" id="SUBMIT_SYS_USE_YN" inputType="select" textAlign="center" width="60"></w2:column>
+							<w2:column displayMode="label" id="SMS_TRNSM_YN" inputType="select" textAlign="center" width="60"></w2:column>
+							<w2:column displayMode="label" id="DISCLS_SCHDL_GRD_CD" inputType="select" textAlign="center" width="59"></w2:column>
+							<w2:column displayMode="label" id="REMK" inputType="text" textAlign="center" width="250"></w2:column>
+							<w2:column displayMode="label" id="DISCLS_SCHDL_ADM_CONTN" inputType="text" textAlign="center" width="200"></w2:column>
+							<w2:column displayMode="label" id="APPL_REQ_DD" inputType="text" textAlign="center" width="80"></w2:column>
+							<w2:column displayMode="label" id="DISCLS_SCHDL_REQSTR_NM" inputType="text" textAlign="center" width="100"></w2:column>
+							<w2:column displayMode="label" id="REQ_CONTN" inputType="text" textAlign="center" width="200"></w2:column>
+							<w2:column displayMode="label" id="SCHDL_ADM_ITM_TP_CD" inputType="text" textAlign="center" width="128"></w2:column>
+							<w2:column displayMode="label" id="SCHDL_CALC_BAS_TP_CD" inputType="text" textAlign="center" width="139"></w2:column>
+							<w2:column displayMode="label" id="X_PATH_KEY" inputType="text" textAlign="center" width=""></w2:column>
+							<w2:column displayMode="label" id="LD_MKT_TP_CD" inputType="text" textAlign="center" width=""></w2:column>
+							<w2:column displayMode="label" id="BYDD_SEQ" inputType="text" textAlign="center" width=""></w2:column>
+							<w2:column displayMode="label" id="REC_FORM_VER" inputType="text" textAlign="center" width="43"></w2:column>
+							<w2:column displayMode="label" id="REAL_FORM_CD" inputType="text" textAlign="center" width="43"></w2:column>
+							<w2:column displayMode="label" id="REAL_FORM_VER" inputType="text" textAlign="center" width="43"></w2:column>
+						</w2:row>
+					</w2:gBody>
+				</w2:gridView>
+			</xf:group>
+			<xf:group id="" tagname="ul" class="txt_list num char">
+				<xf:group id="" tagname="li" class="red">
+					<w2:textbox hierarchy="label_6" style="" userData2=" font-family:돋움;" id="label_6"
+						label="일정 추출은 기본적으로 날짜를 계산해서 일정추출을 한다." class="" orgid="label_6">
+					</w2:textbox>
+				</xf:group>
+				<xf:group id="" tagname="li">
+					<w2:textbox hierarchy="label_2" style="" userData2=" font-family:돋움;" id="label_2"
+						label="보정일수 : 계산된 날짜가 휴일일 경우, 보정일수 = 1 : 계산된 날짜 이후 영업일 / 보정일수 = 0 : 계산된 날짜 이전 영업일(달력일에 사용)" class="" orgid="label_2">
+					</w2:textbox>
+				</xf:group>
+				<xf:group id="" tagname="li">
+					<w2:textbox hierarchy="label_14" style="" userData2=" font-family:돋움;" id="label_14"
+						label="시장휴무 보정일수 = &amp;nbsp;-1일 경우 : 추출 일자가 휴일인 경우, 추출일자 이전 영업일을 가져와 계산한다.(거래일에 사용)" class="" orgid="label_14">
+					</w2:textbox>
+				</xf:group>
+				<xf:group id="" tagname="li">
+					<w2:textbox hierarchy="label_12" style="" userData2=" font-family:돋움;" id="label_12"
+						label="제출사용여부 : 제출시스템 공시일정 화면에 표시 여부" class="" orgid="label_12">
+					</w2:textbox>
+				</xf:group>
+				<xf:group id="" tagname="li">
+					<w2:textbox hierarchy="label_13" style="" userData2=" font-family:돋움;" id="label_13"
+						label="등급 : 중요 - 팀장 일정확인 목록 표시(유가만사용)" class="" orgid="label_13">
+					</w2:textbox>
+				</xf:group>
+				<xf:group id="" tagname="li">
+					<w2:textbox hierarchy="label_15" style="" userData2=" font-family:돋움;" id="label_15"
+						label="SMS전송여부 : 일정 SMS전송(코스닥만사용), 일정 전일 SMS전송(파생-주식파생운영팀)" class="" orgid="label_15">
+					</w2:textbox>
+				</xf:group>
+				<xf:group id="" tagname="li">
+					<w2:textbox hierarchy="label_16" style="" userData2=" font-family:돋움;" id="label_16"
+						label="관리기준 : 서식-공시제출승인 시 일정추출 / 테이블-안내문공시승인시 일정추출 / 배치-배치에서 일정추출 / 화면-화면입력시 일정추출 / 추출- 해당공시제출시 일정한조건에 맞으면 일정추출" class=""
+						orgid="label_16">
+					</w2:textbox>
+				</xf:group>
+			</xf:group>
+		</xf:group>
+		<xf:group id="" style="position: absolute;top: 800px;"></xf:group>
+	</body>
+</html>

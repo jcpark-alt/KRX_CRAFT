@@ -1,0 +1,465 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDSTF35005_POP.gfm" meta_screenName="(팝업) 비상연락망 신규 등록">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<xf:model>
+			<w2:workflowCollection/>
+			<w2:dataCollection baseNode="map"/>
+			<xf:submission id="sbm_trs_Save" userData2=" keyname:toinb_dataid4;" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json" ev:submitdone="scwin.trs_Save_OnSuccess" ev:submiterror="scwin.trs_Save_OnFail"/>
+			<xf:submission id="sbm_dts_nmListInfo" userData2=" syncload:True;" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json"/>
+			<xf:submission id="sbm_dts_checkList" userData2=" syncload:True;" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json" ev:submitdone="scwin.dts_checkList_OnLoadCompleted" ev:submiterror="scwin.dts_checkList_OnLoadError"/>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+/* ★Wcraft guide★    
+스크립트 수작업 유의사항
+*/
+
+
+//★Wcraft guide★ include부분 주석처리 -> include("../js/stf.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/session.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/calendar.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/PopupCalendar.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/utils.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/libRoundPanel.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/common.js");
+scwin.dataNum;
+scwin.gCheckTF = true;
+scwin.gMsgStr;
+scwin.gType;
+scwin.nmListSeq;
+scwin.strCBData;
+scwin.gLdMktTp = js_market; // 세션의 시장구분
+scwin.gSndloc = js_sndloc; //송신처구분코드
+scwin.gEmpNo = js_emp_no;
+scwin.vScrenID = "ULDSTF35005_POP.xml";
+scwin.onpageload = function() {
+    scwin.gform_onload();
+};
+scwin.onpageunload = function() {
+};
+
+
+//수정
+scwin.fn_read = function() {
+    var url = "/AtsContactInfo.do?method=readAtsEmContactNmList&inputMessageId=INT_ATSCONTACT_INOUT" + "&NMLIST_SEQ=" + scwin.nmListSeq + "&SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01;
+    dts_nmListInfo.DataID = encodeURI(url);
+    dts_nmListInfo.reset();
+};
+scwin.checkMaxLength1 = function(obj, size, lbl) {
+    var overLen = eval($c.stf.getStringSize(obj.getValue()) - size);
+    if (overLen > 0) {
+        $c.win.alert("[ " + lbl + " ] 항목의 최대입력은 [ " + size + " ] byte 입니다.    \n\n[ " + overLen + " ] byte 를 초과하였습니다.\n\n확인하세요. ( 한글 : 2 byte  숫자,영문 : 1 byte )");
+        obj.focus();
+        return false;
+    }
+    return true;
+};
+scwin.fn_replace = function(datastr) {
+    datastr = datastr.replace(/[-.]/g, "");
+    datastr = datastr.replace(/\s/g, "");
+    return datastr;
+};
+
+
+//번호중복체크
+scwin.fn_checkList = function() {
+    var url = "/AtsContactInfo.do?method=checkAtsEmContactNmList" + "&CELLPHONE_NO=" + scwin.fn_replace($c.stf.getObjectValue(tbox_cellphone)) + "&LD_MKT_TP_CD=" + $c.stf.getObjectValue(rdo_MktTpCd) + "&SNDLOC_TP_CD=" + $c.stf.getObjectValue(rdo_SndLocTpCd) + "&NMLIST_SEQ=" + $c.stf.getObjectValue(tbox_nmlist_seq) + "&SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01;
+    dts_checkList.DataID = encodeURI(url);
+    dts_checkList.reset();
+    var vCntNo = dts_checkList.getCellData(1, "CNTNO");
+    if (vCntNo > 0) {
+        scwin.gCheckTF = false;
+    } else {
+        scwin.gCheckTF = true;
+    }
+};
+
+
+
+//저장
+scwin.fn_save = function() {
+    scwin.fn_checkList();
+    if (scwin.gCheckTF == false) {
+        $c.win.alert("동일한 휴대폰 번호가 존재합니다.");
+        return;
+    }
+    if (!scwin.checkMaxLength1(tbox_belng_hq, 40, "소속본부")) {
+        tbox_belng_hq.focus();
+        return;
+    }
+    if (!scwin.checkMaxLength1(tbox_depnm, 40, "담당부서")) {
+        tbox_depnm.focus();
+        return;
+    }
+    if (!scwin.checkMaxLength1(tbox_chrgteam, 40, "담당팀")) {
+        tbox_chrgteam.focus();
+        return;
+    }
+    if (!scwin.checkMaxLength1(tbox_jobtitle, 40, "직위")) {
+        tbox_jobtitle.focus();
+        return;
+    }
+
+    //필수
+    if ($c.stf.getObjectValue(tbox_empnm) == "") {
+        $c.win.alert("담당자명을 확인하여 주십시요");
+        tbox_empnm.focus();
+        return;
+    }
+    if (!scwin.checkMaxLength1(tbox_empnm, 40, "담당자명")) {
+        tbox_empnm.focus();
+        return;
+    }
+    if ($c.stf.getObjectValue(tbox_telno) == "") {
+        $c.win.alert("전화번호를 확인하여 주십시요");
+        tbox_telno.focus();
+        return;
+    }
+    if (isNaN(scwin.fn_replace($c.stf.getObjectValue(tbox_telno)))) {
+        $c.win.alert("전화번호를 숫자형식으로 값을 입력해주세요.(구분은 '-', '.' 만 사용)");
+        tbox_telno.focus();
+        return;
+    }
+    if ($c.stf.getObjectValue(tbox_cellphone) == "") {
+        $c.win.alert("핸드폰번호를 확인하여 주십시요");
+        tbox_cellphone.focus();
+        return;
+    }
+    if (isNaN(scwin.fn_replace($c.stf.getObjectValue(tbox_cellphone)))) {
+        $c.win.alert("핸드폰번호를 숫자형식으로 값을 입력해주세요.(구분은 '-', '.' 만 사용)");
+        tbox_cellphone.focus();
+        return;
+    }
+    if ($c.stf.getObjectValue(tbox_cellphone) == "") {
+        $c.win.alert("핸드폰번호를 확인하여 주십시요");
+        tbox_cellphone.focus();
+        return;
+    }
+    if ($c.stf.getObjectValue(tbox_email) == "") {
+        $c.win.alert("E-mail 를 확인하여 주십시요");
+        tbox_email.focus();
+        return;
+    }
+    if ("" != tbox_email.getValue()) {
+        var a = tbox_email.getValue().indexOf('@');
+        if (a <= 0 || a == tbox_email.getValue().length - 1) {
+            $c.win.alert("Email은 [id@krx.co.kr] 등의 형태로 입력하셔야 합니다.");
+            tbox_email.focus();
+            return;
+        }
+    }
+    if (!scwin.checkMaxLength1(tbox_email, 100, "이메일")) {
+        tbox_email.focus();
+        return;
+    }
+    if (scwin.gType == "N") {
+        scwin.gMsgStr = "신규등록";
+    } else {
+        scwin.gMsgStr = "수정";
+    }
+    var rtn = window.confirm('[' + scwin.gMsgStr + ']하시겠습니까?');
+    if (rtn == 1) {
+        dts_nmListInfo.setCellData(1, "CONTN_ID", scwin.gType);
+        dts_nmListInfo.setCellData(1, "LST_ADJPRN_ID", scwin.gEmpNo);
+        trs_Save.Action = "/AtsContactInfo.do?method=registerAtsEmContactNm&SCREN_ID=" + scwin.vScrenID + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_02;
+        trs_Save.KeyValue = "JSP(I:pInput=dts_nmListInfo)";
+        trs_Save.Post();
+    }
+};
+scwin.dts_checkList_OnLoadCompleted = function(rowcount) {
+
+};
+scwin.dts_checkList_OnLoadError = function() {
+    $c.win.alert("핸드폰 중복체크를 할수 없습니다. 시스템 관리자에게 문의하세요");
+};
+scwin.btn_save_onclick = function() {
+    scwin.fn_save();
+};
+scwin.trs_Save_OnSuccess = async function() {
+    $c.win.alert($c.stf.getMessageParam("MSG-A001", "비상연락망 " + scwin.gMsgStr));
+    $c.frame.path("../").fn_Search();
+    await $c.frame.CloseFrame();
+};
+scwin.trs_Save_OnFail = function() {
+    $c.win.alert($c.stf.getMessageParam("MSG-A002", "비상연락망 " + scwin.gMsgStr));
+};
+scwin.dts_checkList_OnLoadCompleted = function(rowcount) {
+    if (dts_checkList.errorMsg) {
+        $c.win.alert("조회시 오류가 발생하였습니다. 시스템관리자에게 문의하세요");
+    }
+};
+scwin.img_Close_onclick = async function() {
+    await $c.frame.CloseFrame();
+};
+scwin.gform_onload = function() {
+    $c.cm.PanelToGroupBox(panel_Top);
+    $c.stf.showObj(tbox_nmlist_seq, false);
+
+    /*if(gLdMktTp == "1" || gLdMktTp == "2"){
+    	showObj(rdo_MktTpCd, false);
+    	showObj(label_29, false);
+    }*/
+    $c.stf.showObj(rdo_MktTpCd, false);
+    $c.stf.showObj(label_29, false);
+    $c.stf.showObj(lbl_9, false);
+    $c.stf.showObj(rdo_SndLocTpCd, false);
+    $c.stf.setObjectValue(rdo_MktTpCd, '9');
+    scwin.gType = $c.frame.path("../").scwin.gType;
+    if (scwin.gSndloc == "11" || scwin.gSndloc == "13") {
+        if (scwin.gSndloc == "11") {
+            rdo_SndLocTpCd.cols = "1";
+            rdo_SndLocTpCd.format = "11^공시부";
+            rdo_SndLocTpCd.reset();
+        } else {
+            rdo_SndLocTpCd.cols = "1";
+            rdo_SndLocTpCd.format = "13^시장부";
+            rdo_SndLocTpCd.reset();
+        }
+    } else {
+        rdo_SndLocTpCd.cols = "2";
+        rdo_SndLocTpCd.format = "11^공시부,13^시장부";
+    }
+
+    //수정
+    if (scwin.gType != "N") {
+        scwin.nmListSeq = $c.frame.path("../").inputSeq;
+        scwin.fn_read();
+    }
+    //신규
+    else {
+        dts_nmListInfo.DataID = "/gauceSystemierAdaptor.do?method=getGauceDataHeader&messageId=INT_ATSCONTACT_INOUT";
+        dts_nmListInfo.Reset();
+        dts_nmListInfo.insertRow();
+        if (scwin.gSndloc == "11" || scwin.gSndloc == "13") {
+            $c.stf.setObjectValue(rdo_SndLocTpCd, scwin.gSndloc);
+        } else {
+            $c.stf.setObjectValue(rdo_SndLocTpCd, "11");
+        }
+        $c.stf.setObjectValue(rdo_MktTpCd, '9');
+
+        /*if(gLdMktTp == "1" || gLdMktTp == "2"){
+        	showObj(rdo_MktTpCd, false);
+        	showObj(label_29, false);
+        	setObjectValue(rdo_MktTpCd, gLdMktTp);		
+        }
+        else{
+        	setObjectValue(rdo_MktTpCd, '9');		
+        }*/
+
+    }
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+		<xf:group class="pop_contents" id="" meta_componentContainer="true" style="">
+			<xf:group class="tblbox" id="" style="">
+				<xf:group adaptive="layout" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+					<w2:attributes>
+						<w2:summary></w2:summary>
+					</w2:attributes>
+					<xf:group tagname="colgroup">
+						<xf:group style="width:150px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+						<xf:group style="width:150px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="lbl_9" id="lbl_9" label="연락처구분" orgid="lbl_9"
+								style="" userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:select1 appearance="full" hierarchy="rdo_SndLocTpCd" id="rdo_SndLocTpCd" item="11^공시부"
+								orgid="rdo_SndLocTpCd" renderType="radiogroup" selectedIndex="-1" style=""
+								userData2=" class:TopCondition_Blue; cols:1;">
+								<xf:choices>
+									<xf:item>
+										<xf:label><![CDATA[공시부]]></xf:label>
+										<xf:value><![CDATA[11]]></xf:value>
+									</xf:item>
+								</xf:choices>
+							</xf:select1>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_29" id="label_29" label="시장구분" orgid="label_29"
+								style="" userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:select1 appearance="full" hierarchy="rdo_MktTpCd" id="rdo_MktTpCd" item="9^전체,1^유가^Disabled,2^코스닥^Disabled"
+								orgid="rdo_MktTpCd" renderType="radiogroup" selectedIndex="0" style=""
+								userData2=" class:TopCondition_Blue; automargin:True; cols:4; font-family:돋움체;">
+								<xf:choices>
+									<xf:item>
+										<xf:label><![CDATA[전체]]></xf:label>
+										<xf:value><![CDATA[9]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[유가]]></xf:label>
+										<xf:value><![CDATA[1]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[코스닥]]></xf:label>
+										<xf:value><![CDATA[2]]></xf:value>
+									</xf:item>
+								</xf:choices>
+							</xf:select1>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_3" id="label_3" label="소속본부" orgid="label_3"
+								style="" userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input hierarchy="tbox_belng_hq" id="tbox_belng_hq" maxlength="1000" orgid="tbox_belng_hq"
+								style="width:170px;" tabIndex="1" userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="lbl_1" id="lbl_1" label="담당자명" orgid="lbl_1"
+								style="" userData2=" class:TopCondition_01;" class="req">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input hierarchy="tbox_empnm" id="tbox_empnm" maxlength="1000" orgid="tbox_empnm"
+								style="width:180px;" tabIndex="5" userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_1" id="label_1" label="담당부서" orgid="label_1"
+								style="" userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input hierarchy="tbox_depnm" id="tbox_depnm" maxlength="1000" orgid="tbox_depnm"
+								style="width:170px;" tabIndex="2" userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="lbl_2" id="lbl_2" label="전화번호" orgid="lbl_2"
+								style="" userData2=" class:TopCondition_01;" class="req">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input hierarchy="tbox_telno" id="tbox_telno" maxlength="1000" orgid="tbox_telno"
+								style="   width:180px; height:20px;" tabIndex="6" userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_7" id="label_7" label="담 당 팀" orgid="label_7"
+								style="" userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input hierarchy="tbox_chrgteam" id="tbox_chrgteam" maxlength="1000" orgid="tbox_chrgteam"
+								style="width:170px;" tabIndex="3" userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="lbl_5" id="lbl_5" label="핸 드 폰" orgid="lbl_5"
+								style="" userData2=" class:TopCondition_01;" class="req">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input hierarchy="tbox_cellphone" id="tbox_cellphone" maxlength="1000" orgid="tbox_cellphone"
+								style="width:180px;" tabIndex="7" userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_8" id="label_8" label="직   위" orgid="label_8"
+								style="" userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input hierarchy="tbox_jobtitle" id="tbox_jobtitle" maxlength="1000" orgid="tbox_jobtitle"
+								style="width:170px;" tabIndex="4" userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="lbl_6" id="lbl_6" label="E - mail" orgid="lbl_6"
+								style="" userData2=" class:TopCondition_01;" class="req">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input hierarchy="tbox_email" id="tbox_email" maxlength="1000" orgid="tbox_email"
+								style="width:180px;" tabIndex="8" userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<w2:textbox hierarchy="lbl_11" id="lbl_11" label="* E-mail은 50자, 그외 항목은 20자 내외 " orgid="lbl_11"
+				style="" userData2=" class:TopCondition_01;" class="txt_info">
+			</w2:textbox>
+			<w2:textbox hierarchy="lbl_12" id="lbl_12" label="* 전화번호, 핸드폰번호 구분은 '-'와 '.' 만 해주세요" orgid="lbl_12"
+				style="" userData2=" class:TopCondition_01;" class="txt_info">
+			</w2:textbox>
+			<xf:group class="btnbox" id="">
+				<xf:group class="rt" id="">
+					<xf:input hierarchy="tbox_nmlist_seq" id="tbox_nmlist_seq" maxlength="1000" orgid="tbox_nmlist_seq" style="width:70px;"
+						userData2=" class:TopCondition_01_write; disabled:disabled;">
+					</xf:input>
+					<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.img_Close_onclick" hierarchy="img_Close" id="img_Close"
+						orgid="img_Close" src="../img/btn_close.gif" style="">
+						<xf:label><![CDATA[닫기]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm pt" cursor="pointer" ev:onclick="scwin.btn_save_onclick" hierarchy="btn_save" id="btn_save"
+						orgid="btn_save" src="../img/btn_save.gif" style="" text="저장">
+						<xf:label><![CDATA[저장]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+		</xf:group>
+		<xf:group id="" style="position: absolute;top: 700px;"></xf:group>
+	</body>
+</html>

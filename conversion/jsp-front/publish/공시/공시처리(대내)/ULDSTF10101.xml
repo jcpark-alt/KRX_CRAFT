@@ -1,0 +1,390 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDSTF10101.gfm" meta_screenName="공시뷰어_뷰어">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<xf:model>
+			<w2:workflowCollection/>
+			<w2:dataCollection baseNode="map"/>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+/* ★Wcraft guide★    
+스크립트 수작업 유의사항
+*/
+
+
+//★Wcraft guide★ include부분 주석처리 -> include("../js/libRoundPanel.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/stf.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/session.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/jquery-1.11.0.min.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/json2.js");
+
+
+/*
+function fn_PrintFormCall(){
+	var printType = frame.Provider("../frame_head").gSndlocTpCd;
+	var vFromUpclssCd = frame.Provider("../frame_head").gFromUpclssCd;
+	
+	if ( printType == '20' && vFromUpclssCd != '01') {	// 수시공시는 제외
+		var usrl = "/disclsdocviewer/filedownload_jws_start.jsp?type=pdf"
+				+ "&docpath=" + frame.Provider("../frame_head").gDocUrl+".htm";
+		frame.Provider("../").frame_hidden.srcUrl = usrl;
+	} else {
+		var usrp = "/Viewer.do?method=readDsclDocPrintContent"
+				+ "&ACPT_NO="+frame.Provider("../frame_head").gAcptNo	;
+		 //window.open(usrp,  "printform",
+					"left=0,top=0,width=800,height=600,resizable=yes,scrollbars=yes,location=no,status=no");
+	}	
+}
+*/
+
+/**================================================================================================================ **/
+/** 기업지배구조 공시 뷰어의 html 깨짐 이슈로 기업지배구조 공시 뷰어 새창 보기 기능 추가(2023.12.14 bslee 추가) **/
+/** include(jquery-1.11.0.min.js, json2.js) 추가 **/
+/** 추가한 함수는 fn_viewerUrl()이고 event 함수로는 <event for="viewer_btn" eventname="onclick" > , 디자인 소스에서 '공시뷰어 새창열기' 버튼 추가함 **/
+/** onload 이벤트 함수에는 기존에 아무런 로직이 없었고, 공시뷰어 새창보기 관련 로직이 새로 추가됨.  그 외에 다른 소스는 건드리지 않음. **/
+scwin.dsclViewerUrl = "";
+scwin.onpageload = function() {
+    scwin.gform_onload();
+};
+scwin.onpageunload = function() {
+}; // 공시뷰어URL
+scwin.fn_viewerUrl = function(gDisclsDocNo) {
+    // 이전 화면에서 넘어 온 공시문서번호로 공시viewer url을 조회한다.
+    // json 방식으로 호출
+    $.ajax({
+        type: "POST",
+        url: "/EsgSearch.do",
+        data: {
+            method: "dsclViewerUrlSelectJson",
+            disclsDocNo: gDisclsDocNo
+        },
+        dataType: 'JSON',
+        success: function(data) {
+            if (data.result == 'OK') {
+                var listData = JSON.stringify(data);
+                var obj = JSON.parse(listData);
+                scwin.dsclViewerUrl = obj.contents.viewer_url;
+                // 공시뷰어URL이 있을 경우만 버튼을 노출 시킴
+                if (scwin.dsclViewerUrl != null && scwin.dsclViewerUrl != "undefined") {
+                    viewer_btn.style.display = "block";
+                }
+            }
+        },
+        error: function(request, status, error) {
+            $c.win.alert("공시뷰어 URL 조회 도중 오류가 발생 하였습니다.");
+            return;
+        }
+    });
+};
+
+
+
+/**================================================================================================================ **/
+
+scwin.gAtsSCCB = "";
+scwin.strDepCd = "";
+scwin.fn_sccbBtn = function(strDepCd, gAtsSCCB) {
+    scwin.strDepCd = scwin.strDepCd.substring(0, 2);
+    if (scwin.strDepCd == '22' || scwin.strDepCd == '32' || scwin.strDepCd == 'ZS') {
+        if (scwin.gAtsSCCB != null && scwin.gAtsSCCB != "") {
+            $c.stf.showObj(pnl_ats, true);
+            btn_sccbBtn.style.display = "block";
+            txaSCCB.text = "ATS의 " + scwin.gAtsSCCB + " 내역 수신 여부 확인을 위해 [ATS송수신 내역 조회]버튼을 클릭하십시오☞";
+        } else {
+            $c.stf.showObj(pnl_ats, false);
+            btn_sccbBtn.style.display = "none";
+        }
+    } else {
+        $c.stf.showObj(pnl_ats, false);
+        btn_sccbBtn.style.display = "none";
+    }
+};
+scwin.img_close_onclick = function() {
+    $c.frame.path("../").fn_CloseWin();
+};
+scwin.img_print_onclick = function() {
+    //fn_PrintFormCall();
+    $c.frame.path("../frame_head").fn_PrintOpen();
+};
+scwin.gform_onload = function() {
+    /**================================================================================================== **/
+    /** 기업지배구조 공시 VIEWER 새창 보기 기능 추가(2023.12.14 bslee 추가) **/
+    // 다른 공시에서는 버튼이 안보이게 default는 none 처리
+    viewer_btn.style.display = "none"; // 공시뷰어 새창열기 버튼
+    var gMainFormCd = $c.frame.path("../frame_head").gMainFormCd; // 이전 화면에서 넘어온 서식코드(기업지배구조 보고서 공시의 본문 서식번호는 99667, 기타공개첨부문서는 99926, 기타비공개첨부문서는 99927 )
+    var gDisclsDocNo = $c.frame.path("../frame_head").gOpenDocNo; // 이전 화면에서 넘어온 공시문서번호
+    // 기업지배구조 공시일 경우만 공시뷰어 URL을 조회
+    // 테스트 결과 첨부문서가 추가되거나 첨부문서를 정정하여 생성 된 공시([추가],[첨부정정])를 클릭해도 서식코드는 무조건 99667로 올라왔음. 즉 if문의 조건에 99667만 있어도 될거 같으나 혹시 몰라 99926,99927도 조건에 넣어 URL 조회를 하게 함
+    if (gMainFormCd == '99667' || gMainFormCd == '99926' || gMainFormCd == '99927') {
+        // 공시뷰어URL 조회
+        scwin.fn_viewerUrl(gDisclsDocNo);
+    }
+    /**================================================================================================== **/
+
+    /** SCCB 공시에 대해 이동버튼 생성(20250228) **/
+    // 다른 공시에서는 버튼이 안보이게 default는 none 처리
+    btn_sccbBtn.style.display = "none";
+    scwin.gAtsSCCB = $c.frame.path("../frame_head").scwin.gAtsSCCB;
+    scwin.strDepCd = $c.frame.path("../frame_head").gDepCd;
+    if (scwin.strDepCd != null && scwin.strDepCd != "undefined") {
+        scwin.fn_sccbBtn(scwin.strDepCd, scwin.gAtsSCCB);
+    }
+};
+scwin.viewer_btn_onclick = function() {
+    // 공시뷰어 새창열기 버튼 클릭 시 URL로 이동(2023.12.14 bslee 추가)
+    window.open('microsoft-edge:' + scwin.dsclViewerUrl, '_self'); // 익스플로러로 새창이 열리는 이슈가 있을 수 있어서 엣지로 강제 이동
+
+};
+scwin.btn_sccbBtn_onclick = async function() {
+    // ATS 송수신 내역조회로 이동 
+    await $c.frame.CreateDialogFrame("gform", "/dscltrend/ULDSTF35004.gfm", "CB/SC 관련 송수신 내역", 300, -600, 1300, 800, "window");
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+		<xf:group class="sub_contents" id="" meta_componentContainer="true" style="">
+			<xf:group class="tblbox" id="" style="">
+				<xf:group adaptive="layout" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+					<w2:attributes>
+						<w2:summary></w2:summary>
+					</w2:attributes>
+					<xf:group tagname="colgroup">
+						<xf:group style="width:120px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+						<xf:group style="width:100px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+						<xf:group style="width:100px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+					</xf:group>
+					<xf:group style="" tagname="tr">
+						<xf:group class="w2tb_th" style="" tagname="th">
+							<w2:textbox class="" id="" label="회사명" ref="" style="" userData2=""></w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" style="" tagname="td">
+							<xf:input class="" disabled="true" id="" placeholder="" style="width:100%;"></xf:input>
+						</xf:group>
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes></w2:attributes>
+							<w2:textbox class="" id="" label="공시제목" ref="" style="" userData2=""></w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes>
+								<w2:colspan>3</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:input class="" disabled="true" id="" placeholder="" style="width:100%;"></xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox class="" id="" label="서식대분류" ref="" style="" userData2=""></w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes></w2:attributes>
+							<xf:input class="" disabled="true" id="" placeholder="" style="width:100%;"></xf:input>
+						</xf:group>
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox class="" id="" label="사유분류" ref="" style="" userData2=""></w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes></w2:attributes>
+							<xf:input class="" disabled="true" id="" placeholder="" style="width:100%;"></xf:input>
+						</xf:group>
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox class="" id="" label="접수일시" ref="" style="" userData2=""></w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes></w2:attributes>
+							<xf:input class="" disabled="true" id="" placeholder="" style="width:100%;"></xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group style="" tagname="tr">
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox class="" id="" label="담당팀명" ref="" style="" userData2=""></w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes></w2:attributes>
+							<xf:input class="" disabled="true" id="" placeholder="" style="width:100%;"></xf:input>
+						</xf:group>
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox class="" id="" label="담당팀장명" ref="" style="" userData2=""></w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes></w2:attributes>
+							<xf:input class="" disabled="true" id="" placeholder="" style="width:100%;"></xf:input>
+						</xf:group>
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox class="" id="" label="처리자명" ref="" style="" userData2=""></w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes></w2:attributes>
+							<xf:input class="" disabled="true" id="" placeholder="" style="width:100%;"></xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox class="" id="" label="공시처리상태" ref="" style="" userData2=""></w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes></w2:attributes>
+							<xf:input class="red" disabled="true" id="" placeholder="" style="width:100%;"></xf:input>
+						</xf:group>
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox class="" id="" label="기업구분" ref="" style="" userData2=""></w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes>
+								<w2:colspan>1</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:input class="" disabled="true" id="" placeholder="" style="width:100%;"></xf:input>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes>
+								<w2:colspan>2</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox class="" id="" label="본문문서" ref="" style="" userData2=""></w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes></w2:attributes>
+							<xf:select1 allOption="" appearance="minimal" chooseOption="" class="" direction="auto" disabled="false"
+								disabledClass="w2selectbox_disabled" id="" ref="" renderType="" style="width:100%;" submenuSize="auto">
+								<xf:choices>
+									<xf:item>
+										<xf:label><![CDATA[new row]]></xf:label>
+										<xf:value></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[new row]]></xf:label>
+										<xf:value></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[new row]]></xf:label>
+										<xf:value></xf:value>
+									</xf:item>
+								</xf:choices>
+							</xf:select1>
+						</xf:group>
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox class="" id="" label="첨부문서" ref="" style="" userData2=""></w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes></w2:attributes>
+							<xf:select1 allOption="" appearance="minimal" chooseOption="" class="" direction="auto" disabled="false"
+								disabledClass="w2selectbox_disabled" id="" ref="" renderType="" style="width:100%;" submenuSize="auto">
+								<xf:choices>
+									<xf:item>
+										<xf:label><![CDATA[new row]]></xf:label>
+										<xf:value></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[new row]]></xf:label>
+										<xf:value></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[new row]]></xf:label>
+										<xf:value></xf:value>
+									</xf:item>
+								</xf:choices>
+							</xf:select1>
+						</xf:group>
+						<xf:group class="w2tb_td " tagname="td">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+								<w2:colspan>2</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:trigger class="btn_cm" id="" style="" type="button">
+								<xf:label><![CDATA[정정요구대상 기공시 조회]]></xf:label>
+							</xf:trigger>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<xf:group class="titbox" id="" style="">
+				<w2:textbox class="txt_info" id="" label="공시되는 본문 문서 또는 첨부서류에 개인정보가 기재되어 있는지 확인하시기 바랍니다." style=""
+					userData2=" class:Message_01; font-family:돋움; font-weight:normal;">
+				</w2:textbox>
+				<xf:group class="rt" id="">
+					<xf:group class="" id="panel_2" style="">
+						<w2:textbox class="red" id="" label="주식선물·옵션대상자산임" style="" userData2=" font-family:돋움; font-weight:bold;"></w2:textbox>
+						<w2:textbox class="red" id="" label="(연결)자산2조원이상임" style="" userData2=" font-family:돋움; font-weight:bold;"></w2:textbox>
+					</xf:group>
+					<xf:group id="pnl_lang_btn" style="">
+						<xf:trigger class="btn_cm" cursor="pointer" id="" metaev_onclick_desc="영문공시 보기" metaev_onclick_name="영문보기"
+							src="../img/btn_english_1.gif" style="">
+							<xf:label><![CDATA[영문보기]]></xf:label>
+						</xf:trigger>
+						<xf:trigger class="btn_cm ml5" cursor="pointer" id="" metaev_onclick_desc="국문공시 보기" metaev_onclick_name="국문보기"
+							src="../img/btn_korean.gif" style="">
+							<xf:label><![CDATA[국문보기]]></xf:label>
+						</xf:trigger>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<xf:group class="titbox" id="" style="">
+				<xf:textarea hierarchy="txaSCCB" id="txaSCCB" orgid="txaSCCB" style="width:500px;height:31px;"></xf:textarea>
+				<xf:group class="rt" id="" style="">
+					<xf:group hierarchy="pnl_ats" id="pnl_ats" orgid="pnl_ats" style="" class="flex">
+						<xf:trigger class="btn_cm" cursor="pointer" id="btn_sccbBtn" metaev_onclick_desc="영문공시 보기"
+							metaev_onclick_name="영문보기" src="../img/btn_english_1.gif" style="" ev:onclick="scwin.btn_sccbBtn_onclick">
+							<xf:label><![CDATA[ATS송수신 내역 조회]]></xf:label>
+						</xf:trigger>
+						<xf:trigger class="btn_cm" cursor="pointer" id="viewer_btn" metaev_onclick_desc="영문공시 보기" metaev_onclick_name="영문보기"
+							src="../img/btn_english_1.gif" style="" ev:onclick="scwin.viewer_btn_onclick">
+							<xf:label><![CDATA[ATS송수신 내역 조회]]></xf:label>
+						</xf:trigger>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<xf:group class="btnbox" id="">
+				<xf:group class="rt" id="">
+					<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.img_print_onclick" hierarchy="img_print" id="img_print"
+						orgid="img_print" src="../img/btn_print.gif" style="">
+						<xf:label><![CDATA[인쇄]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.img_close_onclick" hierarchy="img_close" id="img_close"
+						orgid="img_close" src="../img/btn_close.gif" style="">
+						<xf:label><![CDATA[닫기]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+		</xf:group>
+	</body>
+</html>

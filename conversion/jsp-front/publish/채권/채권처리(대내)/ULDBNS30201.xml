@@ -1,0 +1,357 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDBNS30201.gfm" meta_screenName="신용평가 수신내역 기록">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<xf:model>
+			<w2:workflowCollection/>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+/* ★Wcraft guide★    
+스크립트 수작업 유의사항
+*/
+
+
+//★Wcraft guide★ include부분 주석처리 -> include("../js/libRoundPanel.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/utils.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/session.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/PopupCalendar.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/stf.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/bns_common.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/list_common.js");
+//★Wcraft guide★ include부분 주석처리 -> include("../js/common.js");
+scwin.vScrenID = 'ULDBNS30201.xml';
+scwin.fn_GetPar, scwin.fn_SetPar;
+scwin.objParam = new Object();
+scwin.vCurDate = $c.ut.cGetToday("yyyymmdd");
+scwin.onpageload = function() {
+    scwin.gform_onload();
+};
+scwin.onpageunload = function() {
+};
+
+/********************************************** 
+ * 함수명   : fn_SetParam
+ * 설명       : 부모창에서 받은 데이터를 설정한다.
+ ***********************************************/
+scwin.fn_SetParam = function() {
+    var prt = $c.frame.path("../");
+    if (prt != undefined) {
+        scwin.fn_GetPar = prt.scwin.fn_GetPar;
+        scwin.fn_SetPar = prt.scwin.fn_SetPar;
+    }
+    if (scwin.fn_GetPar != undefined) {
+        var arrPar = new Array();
+        scwin.fn_GetPar(arrPar);
+        scwin.objParam.STD_CD = arrPar[0].STD_CD;
+        scwin.objParam.ISU_NM = arrPar[0].BND_ISU_NM;
+    }
+};
+
+
+
+/********************************************** 
+ * 함수명  	 : fn_list_sync
+ * 설명       : 신용평가 수신정보 내역을 조회 한다.
+ ***********************************************/
+scwin.fn_list_sync = function() {
+    var dsNm = 'BNS_CLS_CREDIT_LIST';
+    var qryId = 'lds.stf.bnscls.select.listCreditValuRcv';
+    var param = '&{P}V_RCV_DD=' + $c.stf.getObjectValue(edt_StartDd);
+    param += '&{P}V_RCV_DD_END=' + $c.stf.getObjectValue(edt_EndDd);
+    param += '&{P}V_CREDIT_VALU_INST_NM=' + ''; //신용평가수신 및 처리 수신내역 목록 조회용도
+    param += '&{P}V_SAME_GRD_YN=' + ''; //신용평가수신 및 처리 수신내역 목록 조회용도
+    param += '&{P}V_STD_CD=' + scwin.objParam.STD_CD;
+    $c.bns.fn_SearchBns(scwin.vScrenID, dts_List, dsNm, qryId, param);
+    $c.cm.ShowWin(grd_List);
+};
+
+/********************************************** 
+ * 함수명  	 : fn_delete
+ * 설명       : 중복수신된 수신정보 내역을 삭제 한다.
+ ***********************************************/
+scwin.fn_delete = function() {
+    // 등급기준이 선택된 값이 있는지 확인한다.
+    var total = 0;
+    for (var i = 1; i <= dts_List.getTotalRow(); i++) {
+        if (dts_List.getCellData(i, "CHK") == "T") {
+            total++;
+        }
+    }
+    if (total == 0) {
+        $c.win.alert("선택된 항목이 없습니다.");
+        return;
+    }
+    if (!confirm("신용등급 데이터를 삭제하시겠습니까?")) return false;
+    var V_RCV_DD;
+    var V_CREDIT_VALU_INST_CD;
+    var V_STD_CD;
+    var V_RCV_ISU_NO;
+
+    //선택된값 1개만 전송
+    for (var i = 1; i <= dts_List.getTotalRow(); i++) {
+        if (dts_List.getCellData(i, "CHK") == "T") {
+            V_RCV_DD = dts_List.getCellData(i, "RCV_DD");
+            V_CREDIT_VALU_INST_CD = dts_List.getCellData(i, "CREDIT_VALU_INST_CD");
+            V_STD_CD = dts_List.getCellData(i, "STD_CD");
+            V_RCV_ISU_NO = dts_List.getCellData(i, "RCV_ISU_NO");
+        }
+    }
+
+    //삭제대상의 수신일체크 (당일 수신된 데이터만 삭제가능)
+    //alert(vCurDate +'::'+ V_RCV_DD);
+    if (scwin.vCurDate != V_RCV_DD) {
+        $c.win.alert("당일 수신된 데이터만 삭제 할 수 있습니다.");
+        return;
+    }
+    var url = "/bns/CreditValu.do?method=processCreditValuRcvDelete";
+    url += "&SCREN_ID=" + scwin.vScrenID;
+    url += "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_02;
+    url += "&RCV_DD=" + V_RCV_DD;
+    url += "&CREDIT_VALU_INST_CD=" + V_CREDIT_VALU_INST_CD;
+    url += "&STD_CD=" + V_STD_CD;
+    url += "&RCV_ISU_NO=" + V_RCV_ISU_NO;
+    //alert(url);
+
+    trs_Save.Action = $c.lc.fn_encodeNSession(url);
+    trs_Save.KeyName = "toinb_dataid4";
+    trs_Save.KeyValue = "JSP(I:pInput=dts_List)";
+    trs_Save.Post();
+};
+
+
+
+/**
+ * 마지막 선택 row만 체크박스 선택
+ */
+scwin.fn_Check = function(nRow, colid) {
+    for (var i = 1; i <= dts_List.getTotalRow(); i++) {
+        dts_List.setCellData(i, "CHK", "F");
+    }
+    dts_List.setCellData(nRow, "CHK", "T");
+};
+scwin.gform_onload = function() {
+    // 패널라운드 처리
+    $c.bns.BnsPanelToGroupBox(pnl_Item);
+    $c.bns.BnsPanelToGroupBox(pnl_Srch);
+
+    //호출파라미터설정
+    scwin.fn_SetParam();
+
+    //종목정보 설정
+    var vIsuNm = '[' + scwin.objParam.STD_CD + ']' + '  ' + '[' + scwin.objParam.ISU_NM + ']';
+    $c.stf.setObjectValue(txb_StdCd, vIsuNm);
+
+    //수신일 시작일 현재일자 -10일로 설정, 수신일 종료일 현재일자로 설정 
+    $c.stf.setObjectValue(edt_StartDd, $c.ut.cGetMinusDate2(scwin.vCurDate, 10));
+    $c.stf.setObjectValue(edt_EndDd, scwin.vCurDate);
+
+    //신용평가 수신정보 내역 조회
+    scwin.fn_list_sync();
+};
+scwin.img_StartDd_onclick = function() {
+    popUpCalendar2(edt_StartDd);
+};
+scwin.img_EndDd_onclick = function() {
+    popUpCalendar2(edt_EndDd);
+};
+scwin.dts_List_OnLoadError = function() {
+    $c.win.alert($c.stf.getMessageParam("MSG-0002"));
+};
+scwin.dts_List_OnLoadCompleted = function(rowcount) {
+    txb_TotalCnt.setValue("총 " + rowcount + "건");
+    $c.cm.CloseWin(rowcount, grd_List);
+};
+scwin.btn_Srch_onclick = function() {
+    scwin.fn_list_sync();
+};
+scwin.btn_Close_onclick = async function() {
+    await $c.frame.CloseFrame();
+};
+scwin.btn_Delete_onclick = function() {
+    if (dts_List.getTotalRow() == 0) return;
+    processGp = 5;
+    scwin.fn_delete();
+};
+scwin.grd_List_OnClick = function(row, colid) {
+    scwin.fn_Check(row, colid);
+};
+scwin.trs_Save_OnSuccess = function() {
+    if (processGp == 1) {
+        $c.win.alert($c.stf.getMessageParam("MSG-0001"));
+    }
+    if (processGp == 5) {
+        $c.win.alert($c.stf.getMessageParam("MSG-A001", "삭제"));
+    }
+    dts_List.Reset();
+};
+scwin.trs_Save_OnFail = function() {
+    if (processGp == 1) {
+        $c.win.alert($c.stf.getMessageParam("MSG-0002"));
+    }
+    if (processGp == 5) {
+        $c.win.alert($c.stf.getMessageParam("MSG-A002", "삭제"));
+    }
+};
+scwin.grd_List_CanColumnPosChange = function(row, colid) {
+    return true;
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+		<xf:group style="" userData2=" class:TopCondition_01;" id="pnl_Item" orgid="pnl_Item" hierarchy="pnl_Item" class="pop_contents">
+			<xf:group class="schbox" id="" meta_snippetCategory="03_조회영역" meta_snippetKeyComponent="true" meta_snippetName="3_01 조회조건1행"
+				style="">
+				<xf:group class="schbox_inner" id="" style="">
+					<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl " id="" style="" tagname="table">
+						<w2:attributes>
+							<w2:summary></w2:summary>
+						</w2:attributes>
+						<xf:group tagname="colgroup">
+							<xf:group style="width:90px;" tagname="col"></xf:group>
+							<xf:group style="" tagname="col"></xf:group>
+						</xf:group>
+						<xf:group class="" id="" style="" tagname="tr">
+							<xf:group class="w2tb_th" style="" tagname="th">
+								<w2:textbox hierarchy="label_15" id="label_15" label="종목정보" orgid="label_15" style=""
+									userData2=" class:TopCondition_01; border-color:#f4f0e1;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group class="w2tb_td" style="" tagname="td">
+								<xf:input hierarchy="txb_StdCd" id="txb_StdCd" maxlength="1000" orgid="txb_StdCd" style="width:280px;"
+									userData2=" class:TopCondition_01_read;">
+								</xf:input>
+							</xf:group>
+						</xf:group>
+						<xf:group tagname="tr" id="">
+							<xf:group tagname="th" class="w2tb_th">
+								<w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes>
+								<w2:textbox hierarchy="label_14" id="label_14" label="수신일" orgid="label_14" style=""
+									userData2=" class:TopCondition_01; border-color:#f4f0e1;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group tagname="td" class="w2tb_td">
+								<w2:attributes></w2:attributes>
+								<w2:inputCalendar displayFormat="yyyy-MM-dd" hierarchy="edt_StartDd" id="edt_StartDd" maxlength="8"
+									orgid="edt_StartDd" style="width:120px;" tabIndex="1"
+									userData2=" class:panel_maskedit_write_01; alignment:1; generaledit:False; leftmargin:0; numeric:False;">
+								</w2:inputCalendar>
+								<w2:textbox hierarchy="label_16" id="label_16" label="~" orgid="label_16" style=""
+									userData2=" class:TopCondition_01; font-weight:normal; border-color:#f4f0e1;">
+								</w2:textbox>
+								<w2:inputCalendar displayFormat="yyyy-MM-dd" hierarchy="edt_EndDd" id="edt_EndDd" maxlength="8"
+									orgid="edt_EndDd" style="width:120px;" tabIndex="2"
+									userData2=" class:panel_maskedit_write_01; alignment:1; generaledit:False; leftmargin:0; numeric:False;">
+								</w2:inputCalendar>
+							</xf:group>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+				<xf:group class="btn_schbox" id="" style="">
+					<xf:trigger class="btn_cm sch" cursor="pointer" ev:onclick="scwin.btn_Srch_onclick" hierarchy="btn_Srch" id="btn_Srch"
+						orgid="btn_Srch" src="../img/bns/btn_select_n.gif" style="">
+						<xf:label><![CDATA[조회]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+			<xf:group id="" class="titbox">
+				<xf:group id="" class="rt">
+					<xf:group class="count" id="" style="">
+						<w2:span class="" id="" label="총" style=""></w2:span>
+						<w2:span class="num" id="txb_TotalCnt" label="0" style=""></w2:span>
+						<w2:span id="" label="건" style=""></w2:span>
+					</xf:group>
+					<xf:trigger cursor="pointer" src="../img/bns/btn_delete_n.gif" ev:onclick="scwin.btn_Delete_onclick"
+						hierarchy="btn_Delete" style="" id="btn_Delete" text="삭제" class="btn_cm" orgid="btn_Delete">
+						<xf:label><![CDATA[삭제]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+			<xf:group id="" class="gvwbox">
+				<w2:gridView id="grd_List"
+					userData2=" class:Grid_01; cancolumnposchange:grd_List_CanColumnPosChange; autoresizing:True; autoresizingallcol:True; autoresizingwithheader:True; colselect:True; colsizing:True; editable:True; enable:True; fillarea:True; fixlinemode:1; fixsizing:False; gtitleheight:0; headborder:4; hiddenhscroll:False; indwidth:0; invalidatecell:False; rowheight:20; scrollbarstyle:0; sortview:right; titleheight:30; tooltip:use=true;alt=true;createtime=300;color=#FFFFFF;backcolor=#808080;edgecolor=#333333;leftmargin=10;rightmargin=10;topmargin=10;bottommargin=10;; usingoneclick:1; viewcrlf:False; viewunbind:True; xtitleheight:0; synchiddenscroll:False; font-family:돋움체; font-weight:normal; onclick:grd_List_OnClick;"
+					style="height:153px;" dataList="data:dts_List" class="gvw" orgid="grd_List" hierarchy="grd_List" autoFit="allColumn">
+					<w2:caption id="caption1" style="" value="this is a grid caption." />
+					<w2:header id="header1" style="">
+						<w2:row>
+							<w2:column id="h_RCV_ISU_NO" width="40" value="번호" textAlign="center"
+								userData2=" suppress:1; value:{CurRow},{ToString};" readOnly="true" displayMode="label" inputType="text" rowSpan="2" />
+							<w2:column value="선택" width="40" id="h_CHK" userData2=" headcheckshow:False;" textAlign="center" hidden="false"
+								displayMode="label" inputType="text" rowSpan="2" />
+							<w2:column id="h_RCV_DD" width="77" value="수신일" textAlign="center"
+								userData2=" color:#343434; suppress:0; bgcolor:{decode(currow-tointeger(currow/2)*2,0,'#f2f5f9',1,'#ffffff')}; sort:False; mask:XXXX-XX-XX;"
+								readOnly="true" displayMode="label" inputType="text" rowSpan="2" />
+							<w2:column value="평가사" id="h_CREDIT_VALU_INST_NM" width="80" userData2=" listalign:left;" textAlign="center"
+								readOnly="true" displayMode="label" inputType="text" rowSpan="2" />
+							<!-- Tag is Not matched with wCraft2 Rule :<fgroup name="직전" headbgcolor="#598fd5" headcolor="#ffffff"/>-->
+							<!-- Tag is Not matched with wCraft2 Rule :<fgroup name="직전" headbgcolor="#598fd5" headcolor="#ffffff"/>-->
+							<w2:column width="70" inputType="text" id="column5" value="직전" displayMode="label"></w2:column>
+							<w2:column width="70" inputType="text" id="column2" value="직전" displayMode="label"></w2:column>
+							<w2:column value="평가등급" width="62" id="h_AFCHG_CREDIT_VALU_INST_GRD" textAlign="center" readOnly="true"
+								displayMode="label" inputType="text" rowSpan="2" />
+							<w2:column value="평정일" width="77" userData2=" mask:XXXX-XX-XX;" id="h_AFCHG_EVAL_DD" textAlign="center"
+								readOnly="true" displayMode="label" inputType="text" rowSpan="2" />
+							<w2:column width="64" value="평정종류" textAlign="center" id="h_EVAL_KIND_NM" readOnly="true" displayMode="label"
+								inputType="text" rowSpan="2" />
+							<w2:column value="평가취소" displayMode="label" inputType="text" textAlign="center" colSpan="1" id="column1" />
+						</w2:row>
+						<w2:row id="" style="">
+							<w2:column width="70" inputType="text" id="column6" value="평가등급" displayMode="label"></w2:column>
+							<w2:column width="70" inputType="text" id="column3" value="평정일" displayMode="label"></w2:column>
+							<w2:column width="70" id="h_VALU_GRD_CANCL_YN" value="여부" textAlign="center" readOnly="true" displayMode="label"
+								inputType="text" />
+						</w2:row>
+					</w2:header>
+					<w2:gBody id="gBody1" style="">
+						<w2:row id="" style="">
+							<w2:column id="RCV_ISU_NO" textAlign="center" width="40" inputType="text" displayMode="label" />
+							<w2:column id="CHK" textAlign="center" width="40" inputType="checkbox" displayMode="label" />
+							<w2:column id="RCV_DD" textAlign="center" width="77" inputType="text" displayMode="label" />
+							<w2:column id="CREDIT_VALU_INST_NM" textAlign="center" width="80" inputType="text" displayMode="label" />
+							<w2:column width="70" inputType="text" id="column7" displayMode="label"></w2:column>
+							<w2:column width="70" inputType="text" id="column4" displayMode="label"></w2:column>
+							<w2:column id="AFCHG_CREDIT_VALU_INST_GRD" textAlign="center" width="62" inputType="text" displayMode="label" />
+							<w2:column id="AFCHG_EVAL_DD" textAlign="center" width="77" inputType="text" displayMode="label" />
+							<w2:column id="EVAL_KIND_NM" textAlign="center" width="64" inputType="text" displayMode="label" />
+							<w2:column id="VALU_GRD_CANCL_YN" textAlign="center" width="70" inputType="text" displayMode="label" />
+						</w2:row>
+					</w2:gBody>
+				</w2:gridView>
+			</xf:group>
+			<w2:textbox hierarchy="label_1" userData2=" class:TopCondition_01;" style="" id="label_1"
+				label="※ 신용평가회사에서 수신한 데이터가 중복 또는 오류가 발행한 경우 해당 데이터를 선택하고 삭제" orgid="label_1" class="txt_info mt20">
+			</w2:textbox>
+			<w2:textbox hierarchy="label_12" userData2=" class:TopCondition_01;" style="" id="label_12" label="(데이터의 정합성 여부는 신용평가회사에 문의)"
+				orgid="label_12" class="txt_info">
+			</w2:textbox>
+			<xf:group class="msgbox mt10" id="" meta_snippetCategory="11_메시지" meta_snippetKeyComponent="true"
+				meta_snippetName="11_05 에러메시지박스" style="">
+				<w2:textbox hierarchy="label_13" userData2=" class:TopCondition_01;" style="" id="label_13" label="※ 신용평가회사 연락처"
+					orgid="label_13" class="txt_msg">
+				</w2:textbox>
+				<w2:textbox hierarchy="label_2" userData2=" class:TopCondition_01;" style="" id="label_2"
+					label="1. NICE :            백승석 02-2014-6327 (010-2511-5141)" orgid="label_2" class="txt_con">
+				</w2:textbox>
+				<w2:textbox hierarchy="label_3" userData2=" class:TopCondition_01;" style="" id="label_3"
+					label="2. 한국신용평가 : 이동훈 02-787-2313 (010-9860-1991)" orgid="label_3" class="txt_con">
+				</w2:textbox>
+				<w2:textbox hierarchy="label_4" userData2=" class:TopCondition_01;" style="" id="label_4"
+					label="3. 한국기업평가 : 한민기 02-368-5663 (010-9874-0423)" orgid="label_4" class="txt_con">
+				</w2:textbox>
+				<w2:textbox hierarchy="label_5" userData2=" class:TopCondition_01;" style="" id="label_5"
+					label="4. 서울신용평가 : 김대연 02-6966-2442 (010-3439-0083)" orgid="label_5" class="txt_con">
+				</w2:textbox>
+			</xf:group>
+			<xf:group id="" class="btnbox">
+				<xf:group id="" class="rt">
+					<xf:trigger cursor="pointer" src="../img/bns/btn_close_n.gif" ev:onclick="scwin.btn_Close_onclick" hierarchy="btn_Close"
+						style="" id="btn_Close" text="닫기" class="btn_cm" orgid="btn_Close">
+						<xf:label><![CDATA[닫기]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+		</xf:group>
+	</body>
+</html>
