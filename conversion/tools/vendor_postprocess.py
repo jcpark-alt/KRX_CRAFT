@@ -35,7 +35,7 @@
   V24 `$c.lc.fn_isProcess(X)`(확인창) → 화면 로컬 `scwin.confirmJob(X)`(`$c.win.confirm`, as-is 문구 보존, `scwin.lastJob` 기록) — Stage 2 수작업 1축
   V25 `$c.lc.fn_alertMsg(X)`(결과 알림 MSG-A001/0001/A002) → 화면 로컬 `scwin.alertJobResult(X)` · as-is 전역 `LastJob` → `scwin.lastJob` — 2축
   V26 `$c.fil.SCREN_PROCS_TP_CD_01~08`·`TR_JOB_*`·`$c.lc.NO_EXCEL_DATA` 등 메시지 상수(공급사 pcc 리터럴 상수) → `scwin.<상수>` + 1구역 선언(값·이름 보존) — 3축
-  V27~V31 Stage 2 A 축(vendor_stage2.py) — CreateDialogFrame 5인자 → openPopup · doLogSave 보류 주석 · pcc 함수 5종/`$c.cm` 13종 → 로컬 헬퍼 ·
+  V27~V31 Stage 2 A 축(vendor_stage2.py) — CreateDialogFrame 5인자 → openPopup · doLogSave 문장 삭제(사용자 결정 2026-10-06, 종전 보류 주석) · pcc 함수 5종/`$c.cm` 13종 → 로컬 헬퍼 ·
       공급사 init_recvParam 스텁 → dma_pageContext 표준 수신. V11 은 사문 문장 삭제, V22 는 「마지막 정의가 이긴다」로 교정(A-5·A-6)
 """
 import re

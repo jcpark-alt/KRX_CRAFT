@@ -153,18 +153,23 @@ scwin.popupCallback = function (arg) {
 
 # ---------------------------------------------------------------- V28
 def hold_log_save(script):
+    """V28 `$c.fil.doLogSave(...)` 접속 로그 저장 문장 삭제 — 사용자 결정(2026-10-06): 사용하지 않는 코드. 종전(2026-10-02~)에는 운영 필요 여부 회신 ㉤ 까지
+    블록 주석으로 보류했다. 이미 보류 주석으로 접힌 줄도 함께 지운다."""
     n = 0
     lines = script.split("\n")
     mask_all = cv.code_mask(script)
     pos = 0
-    for i, l in enumerate(lines):
+    keep = []
+    for l in lines:
         s = l.strip()
-        if s.startswith("$c.fil.doLogSave(") and s.endswith(";") and mask_all[pos + len(l) - len(l.lstrip())]:
-            ind = l[:len(l) - len(l.lstrip())]
-            lines[i] = ind + "/* TODO Stage2: 접속 로그 저장 보류(공급사 doLogSave — 운영 필요 여부 회신 ㉤ 뒤 결정) " + s.replace("*/", "* /") + " */"
-            n += 1
+        is_code_call = s.startswith("$c.fil.doLogSave(") and s.endswith(";") and mask_all[pos + len(l) - len(l.lstrip())]
+        is_held = s.startswith("/* TODO Stage2: 접속 로그 저장 보류(공급사 doLogSave") and s.endswith("*/")
         pos += len(l) + 1
-    return "\n".join(lines), n
+        if is_code_call or is_held:
+            n += 1
+            continue
+        keep.append(l)
+    return "\n".join(keep), n
 
 
 # ---------------------------------------------------------------- V29 / V30 헬퍼 본문

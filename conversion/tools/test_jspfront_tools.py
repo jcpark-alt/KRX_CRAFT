@@ -17,6 +17,7 @@ sys.path.insert(0, _HERE)
 import vendor_postprocess as vp  # noqa: E402
 import vendor_stage2 as vs  # noqa: E402
 import publish_normalize as pn  # noqa: E402
+import screen_tools as st  # noqa: E402
 
 HEAD = ('<head meta_screenId="jldfil00002" meta_screenName="jldfil00002" meta_desc="x" meta_author="editor-web generate">\n'
         '  <script src="/_commons/modules.builtin.tobe-pcc/script.js" type="text/javascript"></script>\n'
@@ -479,7 +480,7 @@ def test_stage2_a_rules():
             'width: "750px", height: "300px" }, {});') in script
     assert '})(url), { id: "popup", type: "pageFramePopup", title: "서식조회팝업", width: "1000px", height: "800px" }, {});' in script
     # V28 doLogSave 보류 주석(상수는 V26 이 먼저 바꾸지 않는다 — stage2 가 앞서므로 원문 그대로 주석 안에)
-    assert log["V28_logsave"] == 2 and '/* TODO Stage2: 접속 로그 저장 보류(공급사 doLogSave — 운영 필요 여부 회신 ㉤ 뒤 결정) $c.fil.doLogSave("X.gfm", $c.fil.SCREN_PROCS_TP_CD_05); */' in script
+    assert log["V28_logsave"] == 2 and "doLogSave" not in st.code_only(script)  # 사용자 결정(2026-10-06): 사용하지 않는 코드 — 문장 삭제
     # V29 pcc 함수 → 로컬 헬퍼
     h = log["V29_30_helpers"]
     assert "scwin.fr_MktId = scwin.getMktId();" in script and "$c.fil.getSecuGrpNm(scwin.fr_SecuGrpId)" in script
