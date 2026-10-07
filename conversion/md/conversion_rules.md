@@ -625,6 +625,10 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
   다중행 `try { const pi…; X.set(…); scwin.F(); } catch (ex) { $c.exception.handleError(ex, { context : "화면.핸들러" }); }` 로(안쪽 `notify:'none'` try 는 걷는다 — dataMap.set 은 던지지 않는다; `set` 없는 변형·convert 뒤 async/await 꼴 포함),
   ② 그 밖의 `scwin.<id>_on<ev>` 핸들러 중 실행문이 있고 try 가 없는 본문을 같은 꼴로 감싼다. 본문에 try 가 어디든 있으면·실행문 없음(빈/주석만)·`tx_` 콜백·V22 의 `_1` 접미 중복 정의는 그대로. 멱등.
   제자리 적용 CLI `python conversion/tools/vendor_stage2.py --v37 [--dry] <xml|폴더>`(frozen 화면용).
+* **V38 fn_ 별칭 인라인(P2, 2026-10-07, 사용자 결정 '충돌 없는 것만 기계로', `vendor_stage2.inline_fn_aliases`)**: 규칙 13 이 못 바꾼 `scwin.fn_*` 152자리 중 150 은 함수가 아니라
+  **함수 포인터 별칭**이었다 — 1구역 `scwin.fn_X = null;` 전방 선언 + onpageload 안 `scwin.fn_X = scwin.tx_fn_X;`(무조건·단 한 번) + 호출 `scwin.fn_X()`. 대입이 정확히 한 번이고 타깃이 스크립트에 정의된
+  scwin 함수일 때만 선언·대입 줄을 지우고 참조(문자열 리터럴 안의 `scwin.fn_X` 포함, head/body 도)를 타깃으로 바꾼다. 대입 둘 이상·타깃 정의 없음은 로그로 남기고 건드리지 않는다.
+  숫자로 시작해 식별자가 안 되는 `fn_70000Table_*` 함수 2건은 규칙 13 과 같이 보류(이름 선택이 필요). CLI `--v38`. 멱등.
 
 ### 규칙 34: 퍼블리싱 정규화 — `publish_normalize.py` (P1~P11, lxml · body 만)
 

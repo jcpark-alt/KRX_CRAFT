@@ -2,7 +2,7 @@
 
 > `python conversion/tools/screen_scorecard.py` 가 만든다(P1, 2026-10-07). 점수 = Σ 가중(손작업 축 3 · 회신 축 2 · 기계 축 1) × 건수. `== null` 과 `getComponent` 는 정책상 보존이라 정보로만 싣는다. 화면별 전 수치는 `--tsv`.
 
-화면 1677 · 함수 34,954 · 스크립트 693,798줄 · 점수 합 44,634 · 점수 0 화면 312
+화면 1677 · 함수 34,954 · 스크립트 693,498줄 · 점수 합 44,481 · 점수 0 화면 313
 
 ## 1. 항목별 합계
 
@@ -15,9 +15,9 @@
 | location 이동 | 손작업 | 3 | 58 | 20 |
 | 타이머 | 손작업 | 3 | 81 | 31 |
 | innerHTML | 손작업 | 3 | 435 | 311 |
-| 긴 함수 | 손작업 | 3 | 477 | 320 |
+| 긴 함수 | 손작업 | 3 | 476 | 319 |
 | try 없는 핸들러 | 기계 | 1 | 0 | 0 |
-| fn_ 정의 | 기계 | 1 | 152 | 71 |
+| fn_ 정의 | 기계 | 1 | 2 | 1 |
 | console | 기계 | 1 | 2,369 | 317 |
 | 네이티브 alert | 기계 | 1 | 7 | 2 |
 | JSDoc 없음 | 기계 | 1 | 2 | 2 |
@@ -31,16 +31,16 @@
 
 | 업무군 | 화면 | 점수 | jQuery | 폼 DOM | 원시 DOM | eval | 긴 함수 | try 없는 핸들러 | fn_ | console | TODO(회신) | TODO(병합) | TODO(규칙19) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| jldfil | 823 | 16,364 | 1068 | 15 | 2361 | 46 | 288 | 0 | 24 | 1167 | 415 | 967 | 143 |
+| jldfil | 823 | 16,340 | 1068 | 15 | 2361 | 46 | 288 | 0 | 0 | 1167 | 415 | 967 | 143 |
 | jldinf | 209 | 10,932 | 2438 | 239 | 517 | 2 | 97 | 0 | 0 | 477 | 124 | 47 | 45 |
 | jlddst | 204 | 5,269 | 1344 | 0 | 202 | 16 | 25 | 0 | 0 | 206 | 65 | 0 | 5 |
 | jldbnf | 117 | 3,827 | 442 | 164 | 479 | 65 | 23 | 0 | 0 | 83 | 100 | 0 | 2 |
-| jldstf | 155 | 3,810 | 224 | 1 | 139 | 15 | 31 | 0 | 121 | 325 | 379 | 490 | 45 |
-| jldods | 100 | 3,055 | 755 | 0 | 122 | 0 | 8 | 0 | 1 | 81 | 80 | 27 | 10 |
+| jldstf | 155 | 3,688 | 224 | 1 | 139 | 15 | 30 | 0 | 2 | 325 | 379 | 490 | 45 |
+| jldods | 100 | 3,054 | 755 | 0 | 122 | 0 | 8 | 0 | 0 | 81 | 80 | 27 | 10 |
 | uldmgt | 66 | 1,332 | 23 | 11 | 96 | 4 | 1 | 0 | 0 | 30 | 150 | 170 | 16 |
-| jldcom | 1 | 33 | 1 | 0 | 0 | 0 | 4 | 0 | 4 | 0 | 7 | 0 | 0 |
-| jldbns | 1 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 3 | 0 | 0 |
-| jldmgt | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 2 | 0 | 0 |
+| jldcom | 1 | 29 | 1 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 7 | 0 | 0 |
+| jldbns | 1 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 |
+| jldmgt | 1 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 |
 
 ## 3. 점수 상위 화면 (40)
 
@@ -78,10 +78,10 @@
 | JLDFIL35700C | 212 | 4,368 | jQuery 49, 원시 DOM 11, 긴 함수 5, console 9, TODO(회신) 2, TODO(규칙19) 2 |
 | JLDFIL35700_POP | 212 | 4,361 | jQuery 49, 원시 DOM 11, 긴 함수 5, console 9, TODO(회신) 2, TODO(규칙19) 2 |
 | JLDINF10800 | 207 | 946 | jQuery 47, 원시 DOM 9, 폼 DOM 5, console 9, 긴 함수 2, TODO(회신) 3, eval 1 |
-| JLDSTF70010 | 206 | 1,572 | TODO(병합) 44, jQuery 19, TODO(규칙19) 19, fn_ 정의 11, TODO(회신) 5, console 2 |
 | JLDINF10400 | 202 | 1,424 | jQuery 46, 원시 DOM 6, 폼 DOM 4, 타이머 4, 긴 함수 3, console 9, TODO(회신) 2 |
 | JLDSTF07130 | 201 | 553 | console 192, 긴 함수 3 |
 | JLDINF91910 | 196 | 1,134 | jQuery 58, 폼 DOM 3, 원시 DOM 2, 긴 함수 1, console 2, TODO(회신) 1 |
+| JLDSTF70010 | 195 | 1,550 | TODO(병합) 44, jQuery 19, TODO(규칙19) 19, TODO(회신) 5, console 2 |
 | JLDODS17001 | 187 | 386 | jQuery 62, console 1 |
 | JLDINF10700 | 183 | 1,471 | jQuery 41, 원시 DOM 6, 폼 DOM 4, 타이머 3, 긴 함수 3, console 8, TODO(회신) 2 |
 | JLDINF00000 | 171 | 1,307 | 원시 DOM 40, 폼 DOM 10, TODO(회신) 6, location 이동 3 |
@@ -96,7 +96,7 @@
 | 1 | JLDSTF31200 | 567 | TODO(병합) 278, TODO(회신) 2, 원시 DOM 1, innerHTML 1, console 1 |
 | 2 | JLDFIL00000 | 282 | 원시 DOM 75, TODO(병합) 12, eval 3, TODO(회신) 4, 긴 함수 2, console 4, location 이동 1, innerHTML 1 |
 | 3 | JLDINF92500 | 245 | jQuery 39, TODO(병합) 32, TODO(규칙19) 20, 폼 DOM 3, 원시 DOM 2, console 4, 긴 함수 1, TODO(회신) 1 |
-| 4 | JLDSTF70010 | 206 | TODO(병합) 44, jQuery 19, TODO(규칙19) 19, fn_ 정의 11, TODO(회신) 5, console 2 |
+| 4 | JLDSTF70010 | 195 | TODO(병합) 44, jQuery 19, TODO(규칙19) 19, TODO(회신) 5, console 2 |
 | 5 | JLDFIL25101 | 162 | TODO(병합) 61, 원시 DOM 5, jQuery 3, 긴 함수 3, innerHTML 1, TODO(회신) 1, TODO(규칙19) 1 |
 | 6 | ULDMGT50002 | 142 | TODO(회신) 33, TODO(병합) 18, 원시 DOM 10, 폼 DOM 2, eval 1, console 1 |
 | 7 | JLDFIL00021 | 138 | 원시 DOM 43, TODO(회신) 2, 긴 함수 1, console 2 |
@@ -108,10 +108,10 @@
 | 13 | ULDMGT50316 | 116 | TODO(병합) 32, 원시 DOM 14, TODO(회신) 4, console 2 |
 | 14 | JLDFIL22110 | 114 | jQuery 19, TODO(규칙19) 19, 원시 DOM 3, TODO(병합) 3, innerHTML 1, console 1 |
 | 15 | JLDFIL25107 | 112 | TODO(병합) 46, 원시 DOM 4, innerHTML 1, 긴 함수 1, TODO(회신) 1 |
-| 16 | JLDFIL11010 | 108 | jQuery 13, TODO(규칙19) 13, 원시 DOM 5, TODO(병합) 6, console 6, TODO(회신) 3, innerHTML 1, fn_ 정의 1 |
-| 17 | JLDFIL11060 | 106 | jQuery 15, TODO(규칙19) 14, TODO(병합) 9, 타이머 2, 원시 DOM 1, innerHTML 1, console 2, fn_ 정의 1 |
+| 16 | JLDFIL11010 | 107 | jQuery 13, TODO(규칙19) 13, 원시 DOM 5, TODO(병합) 6, console 6, TODO(회신) 3, innerHTML 1 |
+| 17 | JLDFIL11060 | 105 | jQuery 15, TODO(규칙19) 14, TODO(병합) 9, 타이머 2, 원시 DOM 1, innerHTML 1, console 2 |
 | 18 | JLDFIL20300 | 105 | TODO(병합) 48, 원시 DOM 3 |
-| 19 | JLDSTF75100 | 105 | TODO(병합) 35, jQuery 5, TODO(규칙19) 5, fn_ 정의 7, TODO(회신) 1, console 1 |
+| 19 | JLDSTF75100 | 98 | TODO(병합) 35, jQuery 5, TODO(규칙19) 5, TODO(회신) 1, console 1 |
 | 20 | JLDFIL25910 | 94 | jQuery 14, TODO(규칙19) 14, TODO(병합) 6, 원시 DOM 1, innerHTML 1, 긴 함수 1, TODO(회신) 1, console 1 |
 | 21 | JLDFIL00001 | 89 | 원시 DOM 11, TODO(병합) 14, eval 3, TODO(회신) 3, console 4, location 이동 1, innerHTML 1, 긴 함수 1 |
 | 22 | JLDFIL25104 | 87 | TODO(병합) 36, 원시 DOM 3, location 이동 1, 긴 함수 1 |
@@ -132,5 +132,5 @@
 | 37 | JLDFIL25050 | 56 | eval 15, console 4, 원시 DOM 1, TODO(회신) 1, TODO(병합) 1 |
 | 38 | JLDSTF30100 | 56 | 원시 DOM 4, TODO(회신) 5, innerHTML 3, console 8, TODO(병합) 4, 긴 함수 2, eval 1 |
 | 39 | JLDFIL25800 | 55 | 원시 DOM 8, TODO(병합) 11, console 7, TODO(회신) 1 |
-| 40 | JLDSTF76200 | 54 | jQuery 9, TODO(규칙19) 8, TODO(회신) 3, TODO(병합) 2, fn_ 정의 1 |
+| 40 | JLDSTF76200 | 53 | jQuery 9, TODO(규칙19) 8, TODO(회신) 3, TODO(병합) 2 |
 

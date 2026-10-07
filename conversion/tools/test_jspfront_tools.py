@@ -846,3 +846,39 @@ scwin.btn_close_onclick = function () {
         assert keep in out, keep[:40]
     out2, log2 = vs.wrap_handler_trycatch(out, head)
     assert out2 == out and log2 == {"pager": 0, "wrapped": 0}
+
+
+def test_v38_fn_alias_inline():
+    """P2 V38: `scwin.fn_X = null;` + onpageload 단일 대입 `scwin.fn_X = scwin.T;` → 별칭 제거·호출을 T 로. 대입 2회·타깃 정의 없음은 보류. 멱등."""
+    head = '<head><w2:publicInfo method="scwin.onpageload"/>'
+    body = '<body><xf:trigger id="b" ev:onclick="scwin.b_onclick"/></body>'
+    src = '''scwin.fn_chk = null;
+scwin.fn_two = null;
+scwin.fn_noDef = null;
+
+scwin.onpageload = async function () {
+    try {
+        scwin.init_recvParam();
+        scwin.fn_chk = scwin.tx_fn_chk;
+        scwin.fn_two = scwin.tx_a;
+        scwin.fn_noDef = scwin.tx_missing;
+    } catch (ex) { }
+};
+scwin.b_onclick = async function () {
+    if (cond) { scwin.fn_two = scwin.tx_b; }
+    await scwin.fn_chk();
+    const h = "scwin.fn_chk()";
+    scwin.fn_two();
+};
+scwin.tx_fn_chk = async function () {};
+scwin.tx_a = async function () {};
+scwin.tx_b = async function () {};
+'''
+    h2, s2, b2, log = vs.inline_fn_aliases(head, src, body)
+    assert log["inlined"] == ["fn_chk → scwin.tx_fn_chk"]
+    assert log["skipped"] == ["fn_two(대입 2)", "fn_noDef(타깃 tx_missing 정의 없음)"]
+    assert "scwin.fn_chk" not in s2 and "await scwin.tx_fn_chk();" in s2 and 'const h = "scwin.tx_fn_chk()";' in s2
+    assert "scwin.fn_two = null;" in s2 and "scwin.fn_two = scwin.tx_a;" in s2 and "scwin.fn_noDef = scwin.tx_missing;" in s2
+    assert s2.count("scwin.init_recvParam();\n        scwin.fn_two = scwin.tx_a;") == 1   # 삭제한 줄 자리가 깨끗이 닫힘
+    h3, s3, b3, log3 = vs.inline_fn_aliases(h2, s2, b2)
+    assert s3 == s2 and log3.get("inlined") is None

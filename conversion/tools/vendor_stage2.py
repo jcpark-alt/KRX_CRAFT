@@ -732,6 +732,38 @@ def wrap_handler_trycatch(script, head=""):
     return script, {"pager": n_pager, "wrapped": len(edits)}
 
 
+# ---------------------------------------------------------------- V38 fn_ 별칭 인라인 (P2 기계 축 · 2026-10-07, 사용자 결정: 충돌 없는 것만 기계로)
+# 규칙 13 이 못 바꾼 `scwin.fn_*` 152자리 중 150 은 함수가 아니라 **함수 포인터 별칭**이었다: 1구역 `scwin.fn_X = null;` 전방 선언 + onpageload 안
+# `scwin.fn_X = scwin.tx_fn_X;`(무조건, 단 한 번) + 호출 `scwin.fn_X()`. 별칭을 걷고 호출을 타깃으로 바꾸면 fn_ 이름이 사라진다.
+# 대입이 둘 이상·타깃이 scwin 함수가 아님·타깃 정의 없음이면 건드리지 않고 로그(충돌). 숫자로 시작하는 `fn_70000Table_*` 함수 2건도 규칙 13 과 같이 보류.
+ALIAS_DECL_RE = re.compile(r'(?m)^scwin\.(fn_[A-Za-z_$][\w$]*)\s*=\s*null;[ \t]*(?://[^\n]*)?\n')
+
+
+def inline_fn_aliases(head, script, body):
+    log = {"inlined": [], "skipped": []}
+    for m in list(ALIAS_DECL_RE.finditer(script)):
+        v = m.group(1)
+        if m.group(0) not in script:
+            continue
+        code = st.code_only(script)
+        assigns = re.findall(r'(?m)^[ \t]*scwin\.%s\s*=\s*(scwin\.[A-Za-z_$][\w$]*);' % re.escape(v), code)
+        n_assign = len(re.findall(r'(?<![\w$.])scwin\.%s\s*=(?!=)' % re.escape(v), code))   # null 선언 + 대입
+        if len(assigns) != 1 or n_assign != 2:
+            log["skipped"].append("%s(대입 %d)" % (v, n_assign - 1)); continue
+        target = assigns[0]
+        tname = target.split(".", 1)[1]
+        if not re.search(r'(?m)^scwin\.%s\s*=\s*(?:async\s+)?function' % re.escape(tname), script):
+            log["skipped"].append("%s(타깃 %s 정의 없음)" % (v, tname)); continue
+        # 선언·대입 줄 삭제
+        script = script.replace(m.group(0), "", 1)
+        script = re.sub(r'(?m)^[ \t]*scwin\.%s\s*=\s*%s;[ \t]*(?://[^\n]*)?\n' % (re.escape(v), re.escape(target)), "", script, count=1)
+        # 참조 → 타깃 (scwin. 접두 꼴은 문자열 리터럴 안까지 — 규칙 13 과 같은 이유; head/body 도)
+        pat = re.compile(r'scwin\.%s\b' % re.escape(v))
+        script = pat.sub(target, script); head = pat.sub(target, head); body = pat.sub(target, body)
+        log["inlined"].append("%s → %s" % (v, target))
+    return head, script, body, {k: v for k, v in log.items() if v}
+
+
 def apply(head, script, body):
     log = {}
     body_ids = set(re.findall(r'\sid="([^"]+)"', body))
@@ -748,23 +780,30 @@ def apply(head, script, body):
 
 
 def main(argv=None):
-    """제자리 적용 CLI(frozen 화면 등): python conversion/tools/vendor_stage2.py --v37 [--dry] <xml|폴더> ..."""
+    """제자리 적용 CLI(frozen 화면 등): python conversion/tools/vendor_stage2.py --v37|--v38 [--dry] <xml|폴더> ..."""
     sys.stdout.reconfigure(encoding="utf-8")
     args = argv if argv is not None else sys.argv[1:]
-    files, fl, _ = st.parse_cli([a for a in args if a != "--v37"], flags=("--dry",), opts=())
-    if "--v37" not in args or not files:
+    files, fl, _ = st.parse_cli([a for a in args if a not in ("--v37", "--v38")], flags=("--dry",), opts=())
+    which = "--v38" if "--v38" in args else "--v37" if "--v37" in args else None
+    if not which or not files:
         print(main.__doc__); return 2
-    tot = {"pager": 0, "wrapped": 0}; changed = 0
+    changed = 0; tot = {}
     for f in files:
         raw, eol, reg = st.read_xml(f)
         if reg is None:
             continue
-        new, log = wrap_handler_trycatch(reg["script"], reg["head"])
-        if new != reg["script"]:
-            changed += 1; tot["pager"] += log["pager"]; tot["wrapped"] += log["wrapped"]
+        head, body = reg["head"], reg["body"]
+        if which == "--v37":
+            new, log = wrap_handler_trycatch(reg["script"], reg["head"])
+        else:
+            head, new, body, log = inline_fn_aliases(reg["head"], reg["script"], reg["body"])
+        if new != reg["script"] or head != reg["head"] or body != reg["body"]:
+            changed += 1
+            for k, v in log.items():
+                tot[k] = tot.get(k, 0) + (len(v) if isinstance(v, list) else v)
             print("%-18s %s" % (Path(f).stem, log))
             if not fl["--dry"]:
-                st.write_xml(f, reg["head"], reg["script_open"], new, reg["script_close"], reg["body"], eol)
+                st.write_xml(f, head, reg["script_open"], new, reg["script_close"], body, eol)
     print("변경 화면 %d · %s" % (changed, tot))
     return 0
 
