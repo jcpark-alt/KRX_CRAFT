@@ -669,6 +669,12 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
   `// TODO Stage2(pcc 반입 2차): as-is 공통 fn_X — <사유>` — 사유: 폼·DOM 의존(B-7) / JSP 팝업(window.open+폼 제출, 회신) / 키 입력 필터(window.event — xf:input allowChar 권장) /
   외부 리포트(rexpert) / 동기 ajax(tx 전환) / 타 모듈 as-is 공통(stf·ins) / as-is 정의 없음(원본 JS 미제공, 회신) / 폼 전역 의존(반입 보류). 화면 안에 같은 이름 정의가 있으면 손대지 않는다.
   스코어카드에 `undefined_global`(회신 축 2, "미정의 as-is 공통(fn_)") 을 더했고 TODO(회신) 집계에서 이 표지는 뺀다. 결과: 358화면: 706호출 → $c.fil(7종)·26 → $c.win.print·8 → 같은 화면 scwin, 사유 표지 910(async 헬퍼 호출 45 전부 await).
+* **V47 키 입력 필터 → allowChar/ignoreChar(pcc 반입 2차 후속, 2026-10-07, `vendor_stage2.key_filter_to_allowchar`, CLI `--v47`)**: as-is 공통 `fn_numPointCheck_minus()`·`fn_telNoCheck(obj)`·
+  `fn_etcNumNotCheck()` 류는 `window.event.keyCode` 로 키를 거르는 onkeydown/onkeypress 핸들러 본문이다. WebSquare 에서는 `xf:input` 의 `allowChar`(허용)·`ignoreChar`(차단) 속성이 같은 일을
+  선언적으로 하므로(퍼블리싱도 `allowChar="0-9-"` 꼴을 쓴다), 핸들러 본문이 그 호출 하나뿐이고(try/catch·selfVar 프렐류드 허용) 대상이 실존 `xf:input` 이면 속성을 달고 핸들러 함수·`ev:on<키이벤트>`·
+  publicInfo 항목을 지운다. 대응: numPointCheck_minus `0-9.-` · numPointCheck `0-9.` · telNoCheck `0-9-` · engNumNotSpecCheck_ID `a-zA-Z0-9 -` · engNmCheck `a-zA-Z @().,_-` · etcNotCheck ignoreChar(특수문자) ·
+  etcNumNotCheck ignoreChar(특수문자+숫자). 퍼블리싱에 이미 같은 집합(이스케이프 `\-` 만 다른 것 포함)이 있으면 핸들러만 지우고, 집합이 다르면 손대지 않고 호출 줄 끝에
+  `TODO Stage2(pcc 반입 2차): 키 입력 필터 … 퍼블리싱 allowChar="…" ≠ as-is 허용 "…"(확인 필요)` 를 단다. 결과: 55화면 163핸들러 → 속성(충돌 0), 키 필터 호출 잔존 0, undefined_global 925 → 762.
 * **V42 eval 동적 멤버 접근(P3, 2026-10-07, `vendor_stage2.de_eval_member`, CLI `--v42`)**: `eval("document.all.span" + month)`·`eval('form.isurCd' + obj1)`·`eval('obj.x_' + idx + '.value')` 는
   이름을 문자열로 조립한 멤버 접근이라 대괄호 접근과 의미가 같다 → `document.all["span" + month]`·`form['isurCd' + obj1]`·`obj['x_' + idx].value`. eval 만 걷고 DOM 참조(document.all 등)는 그대로(B-7).
   첫 조각이 "경로.접두" 문자열이고 마지막 조각이 `.식별자` 꼬리면 속성 접근으로 잇는다; 조각에 `.`·`[`·`(` 가 든 문자열(옵션 색인 꼬리), 문장 eval(`eval("var r = " + d)`·대입), 주석 안은 손대지 않는다. 결과: 26화면 83자리 → 대괄호 접근, eval 148 → 65(27화면: 문장 eval·옵션 색인 꼬리·JSON eval).

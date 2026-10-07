@@ -1213,6 +1213,65 @@ def import_globals(script, head="", body=""):
     return "".join(out), log
 
 
+# ---------------------------------------------------------------- V47 키 입력 필터 → allowChar/ignoreChar (pcc 반입 2차 후속 · 2026-10-07)
+# as-is 공통 fn_numPointCheck_minus() 류는 window.event.keyCode 로 키를 거르는 onkeydown/onkeypress 핸들러 본문이다. WebSquare 에서는 xf:input 의 allowChar(허용 문자)·
+# ignoreChar(차단 문자) 속성이 같은 일을 선언적으로 한다(퍼블리싱도 allowChar="0-9-" 꼴을 쓴다). 핸들러 본문이 그 호출 하나뿐이고(try/catch·selfVar 프렐류드 허용) 대상이 실존 xf:input 이면
+# 속성을 달고 핸들러 함수·ev:on<키이벤트>·publicInfo 항목을 지운다. 이미 다른 값의 같은 속성이 있으면 그대로(표지 유지).
+_KEY_SPECIALS = " !&quot;#$%&amp;'()*+,-./:;&lt;=&gt;?@[\\]^_`{|}~"
+KEY_FILTER_ATTR = {"fn_numPointCheck_minus": ("allowChar", "0-9.-"), "fn_numPointCheck": ("allowChar", "0-9."), "fn_telNoCheck": ("allowChar", "0-9-"),
+                   "fn_engNumNotSpecCheck_ID": ("allowChar", "a-zA-Z0-9 -"), "fn_engNmCheck": ("allowChar", "a-zA-Z @().,_-"),
+                   "fn_etcNotCheck": ("ignoreChar", _KEY_SPECIALS), "fn_etcNumNotCheck": ("ignoreChar", _KEY_SPECIALS + "0123456789")}
+KEY_HANDLER_RE = re.compile(r"^(?P<comp>\w+)_on(?P<ev>keydown|keypress|keyup)$")
+_KEY_TRY_RE = re.compile(r"^\s*try\s*\{(?P<inner>[\s\S]*?)\}\s*catch\s*\(\w+\)\s*\{[\s\S]*\}\s*$")
+_KEY_PRELUDE_RE = re.compile(r"^\s*(?:const ev = e|const selfVar = \(ev && \(ev\.element \|\| ev\.target \|\| ev\.srcElement\)\) \|\| this);?\s*$")
+
+
+def key_filter_to_allowchar(head, script, body):
+    n = 0; todo = []
+    for name, s, b, e, _ in reversed(st.func_spans(script)):
+        hm = KEY_HANDLER_RE.match(name)
+        if not hm:
+            continue
+        code = st.code_only(script[b + 1:e]).strip()
+        tm = _KEY_TRY_RE.match(code)
+        inner = tm.group("inner") if tm else code
+        stmts = [t.strip() for t in re.split(r"[;\n]", inner) if t.strip() and not _KEY_PRELUDE_RE.match(t)]
+        if len(stmts) != 1:
+            continue
+        cm = re.match(r"^(fn_\w+)\((?:selfVar)?\)$", stmts[0])
+        if not cm or cm.group(1) not in KEY_FILTER_ATTR:
+            continue
+        attr, val = KEY_FILTER_ATTR[cm.group(1)]
+        comp, ev = hm.group("comp"), hm.group("ev")
+        tag = re.search(r'<xf:input\b[^>]*\sid="%s"[^>]*>' % re.escape(comp), body)
+        if not tag:
+            continue
+        t = tag.group(0)
+        has = re.search(r'\s%s="([^"]*)"' % attr, t)
+        if has and has.group(1).replace("\\", "") != val.replace("\\", ""):     # 퍼블리싱의 "0-9.\-" 는 "0-9.-" 와 같은 집합
+            # 퍼블리싱 디자인(기준)과 as-is 허용 문자가 다르다 — 어느 쪽도 임의로 고르지 않고 드러낸다
+            seg = script[b + 1:e]
+            cm2 = re.search(r"(?m)^([ \t]*%s\((?:selfVar)?\);?)[ \t]*$" % re.escape(cm.group(1)), seg)
+            if cm2 and "TODO Stage2(pcc 반입 2차)" not in seg:
+                note = '  // TODO Stage2(pcc 반입 2차): 키 입력 필터 %s — 퍼블리싱 %s="%s" ≠ as-is 허용 "%s"(확인 필요)' % (cm.group(1), attr, has.group(1), val)
+                script = script[:b + 1 + cm2.end()] + note + script[b + 1 + cm2.end():]
+                todo.append(name)
+            continue
+        t2 = re.sub(r'\sev:on%s="scwin\.%s"' % (ev, re.escape(name)), "", t)
+        if not has:
+            t2 = t2[:-2] + ' %s="%s"/>' % (attr, val) if t2.endswith("/>") else t2[:-1] + ' %s="%s">' % (attr, val)
+        body = body[:tag.start()] + t2 + body[tag.end():]
+        script, _d = pcc_fil_import._drop_definitions(script, {name})
+        head = re.sub(r"(publicInfo method=\"[^\"]*?)(?:,scwin\.%s\b|scwin\.%s,|scwin\.%s\b)" % ((re.escape(name),) * 3), r"\1", head)
+        n += 1
+    log = {}
+    if n:
+        log["attr"] = n
+    if todo:
+        log["conflict"] = len(todo)
+    return head, script, body, log
+
+
 def apply(head, script, body):
     log = {}
     body_ids = set(re.findall(r'\sid="([^"]+)"', body))
@@ -1229,11 +1288,11 @@ def apply(head, script, body):
 
 
 def main(argv=None):
-    """제자리 적용 CLI(frozen 화면 등): python conversion/tools/vendor_stage2.py --v37|--v38|--v39|--v40|--v41|--v42|--v43|--v44|--v45|--v46 [--dry] <xml|폴더> ..."""
+    """제자리 적용 CLI(frozen 화면 등): python conversion/tools/vendor_stage2.py --v37|--v38|--v39|--v40|--v41|--v42|--v43|--v44|--v45|--v46|--v47 [--dry] <xml|폴더> ..."""
     sys.stdout.reconfigure(encoding="utf-8")
     args = argv if argv is not None else sys.argv[1:]
-    files, fl, _ = st.parse_cli([a for a in args if a not in ("--v37", "--v38", "--v39", "--v40", "--v41", "--v42", "--v43", "--v44", "--v45", "--v46")], flags=("--dry",), opts=())
-    which = next((w for w in ("--v46", "--v45", "--v44", "--v43", "--v42", "--v41", "--v40", "--v39", "--v38", "--v37") if w in args), None)
+    files, fl, _ = st.parse_cli([a for a in args if a not in ("--v37", "--v38", "--v39", "--v40", "--v41", "--v42", "--v43", "--v44", "--v45", "--v46", "--v47")], flags=("--dry",), opts=())
+    which = next((w for w in ("--v47", "--v46", "--v45", "--v44", "--v43", "--v42", "--v41", "--v40", "--v39", "--v38", "--v37") if w in args), None)
     if not which or not files:
         print(main.__doc__); return 2
     changed = 0; tot = {}
@@ -1260,6 +1319,8 @@ def main(argv=None):
             new, log = fix_format_number(reg["script"], reg["head"], reg["body"])
         elif which == "--v46":
             new, log = import_globals(reg["script"], reg["head"], reg["body"])
+        elif which == "--v47":
+            head, new, body, log = key_filter_to_allowchar(reg["head"], reg["script"], reg["body"])
         else:
             head, new, body, log = inline_fn_aliases(reg["head"], reg["script"], reg["body"])
         if new != reg["script"] or head != reg["head"] or body != reg["body"]:

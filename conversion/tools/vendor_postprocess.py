@@ -916,6 +916,8 @@ def apply_regions(head, script, body):
     script, log["V23_vendor_pcc"] = replace_vendor_pcc(script)
     # P2 V39 [sdd] 컴포넌트 가드 정리 — body/head 에 실존하는 컴포넌트의 `(G && G.m ? G.m(args) : console.warn('[sdd] …'))` → `G.m(args)`
     script, log["V39_sdd_guard"] = vendor_stage2.simplify_sdd_guards(script, head, body)
+    # V47 키 입력 필터 핸들러(fn_numPointCheck_minus 류 단일 호출) → xf:input allowChar/ignoreChar 속성 + 핸들러·ev:on* 제거 (V46 표지보다 먼저)
+    head, script, body, log["V47_key_filter"] = vendor_stage2.key_filter_to_allowchar(head, script, body)
     # pcc/fil 반입 2차 V46 — 미정의 as-is 전역 fn_X( → $c.fil.*(7종)·$c.win.print·같은 화면 scwin.<camel>; 나머지는 사유 TODO 표지
     script, log["V46_globals"] = vendor_stage2.import_globals(script, head, body)
     # P3 V45 formatNumber($('#id')[0]) → comp.setValue($c.num.formatNumber(comp.getValue())) (공급사가 값 대신 DOM 요소를 넘겨 버려지던 결과 복원)

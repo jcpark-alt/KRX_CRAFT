@@ -1243,3 +1243,68 @@ function fn_local() {}
     assert "    fn_local();\n" in out and "    // fn_ObjValueSetComma(x)\n" in out and 'const s = "fn_print()";' in out
     out2, log2 = vs.import_globals(out, "", "")
     assert out2 == out and log2 == {}
+
+
+def test_v47_key_filter_to_allowchar():
+    """V47: 단일 호출 키 필터 핸들러 → xf:input allowChar/ignoreChar, 핸들러·ev:on*·publicInfo 제거; 복수 문장 핸들러·컴포넌트 없음·다른 값 기존 속성은 그대로. 멱등."""
+    head = '<head><w2:publicInfo method="scwin.onpageload,scwin.ipt_coupnRt_onkeydown,scwin.ipt_telNo_onkeydown,scwin.ipt_apctNm_onkeypress,scwin.ipt_x_onkeydown,scwin.ipt_y_onkeydown,scwin.ipt_w_onkeydown,scwin.ipt_z_onkeydown"/></head>'
+    body = ('<body><xf:input id="ipt_coupnRt" ref="data:dma.r" ev:onkeydown="scwin.ipt_coupnRt_onkeydown"/>'
+            '<xf:input id="ipt_telNo" ev:onkeydown="scwin.ipt_telNo_onkeydown" style="w"></xf:input>'
+            '<xf:input id="ipt_apctNm" ev:onkeypress="scwin.ipt_apctNm_onkeypress"/>'
+            '<xf:input id="ipt_x" allowChar="0-9" ev:onkeydown="scwin.ipt_x_onkeydown"/>'
+            '<xf:input id="ipt_w" allowChar="0-9.\\-" ev:onkeydown="scwin.ipt_w_onkeydown"/>'
+            '<xf:input id="ipt_z" allowChar="0-9" ev:onkeydown="scwin.ipt_z_onkeydown"/></body>')
+    src = '''/**
+ * @method
+ * @name ipt_coupnRt_onkeydown
+ * @returns {void}
+ * @hidden N
+ */
+scwin.ipt_coupnRt_onkeydown = function(e){
+    try {
+        fn_numPointCheck_minus()  // TODO Stage2(pcc 반입 2차): as-is 공통 fn_numPointCheck_minus — 키 입력 필터
+    } catch (_ex) { $c.exception.handleError(_ex, { context: 'x.ipt_coupnRt_onkeydown' }); }
+};
+scwin.ipt_telNo_onkeydown = function(e){
+    try {
+        const ev = e;
+        const selfVar = (ev && (ev.element || ev.target || ev.srcElement)) || this;
+        fn_telNoCheck(selfVar);
+    } catch (_ex) { $c.exception.handleError(_ex, { context: 'x.ipt_telNo_onkeydown' }); }
+};
+scwin.ipt_apctNm_onkeypress = function(e){
+    try {
+        fn_etcNumNotCheck()
+    } catch (_ex) { $c.exception.handleError(_ex, { context: 'x.ipt_apctNm_onkeypress' }); }
+};
+scwin.ipt_x_onkeydown = function(e){
+    try { fn_numPointCheck_minus() } catch (_ex) { $c.exception.handleError(_ex, { context: 'x' }); }
+};
+scwin.ipt_y_onkeydown = function(e){
+    try { scwin.other(); fn_numPointCheck_minus() } catch (_ex) { $c.exception.handleError(_ex, { context: 'x' }); }
+};
+scwin.ipt_w_onkeydown = function(e){
+    try {
+        fn_numPointCheck_minus()
+    } catch (_ex) { $c.exception.handleError(_ex, { context: 'x' }); }
+};
+scwin.ipt_z_onkeydown = function(e){
+    try {
+        fn_numPointCheck_minus()
+    } catch (_ex) { $c.exception.handleError(_ex, { context: 'x' }); }
+};
+'''
+    h, out, b, log = vs.key_filter_to_allowchar(head, src, body)
+    assert log == {"attr": 4, "conflict": 1}
+    assert '<xf:input id="ipt_w" allowChar="0-9.\\-"/>' in b and "scwin.ipt_w_onkeydown" not in out                      # 이스케이프만 다른 같은 집합 → 핸들러 제거, 속성 유지
+    assert '<xf:input id="ipt_z" allowChar="0-9" ev:onkeydown="scwin.ipt_z_onkeydown"/>' in b
+    assert '        fn_numPointCheck_minus()  // TODO Stage2(pcc 반입 2차): 키 입력 필터 fn_numPointCheck_minus — 퍼블리싱 allowChar="0-9" ≠ as-is 허용 "0-9.-"(확인 필요)\n' in out
+    assert '<xf:input id="ipt_coupnRt" ref="data:dma.r" allowChar="0-9.-"/>' in b
+    assert '<xf:input id="ipt_telNo" style="w" allowChar="0-9-"></xf:input>' in b
+    assert '<xf:input id="ipt_apctNm" ignoreChar="' in b and '0123456789"/>' in b
+    assert '<xf:input id="ipt_x" allowChar="0-9" ev:onkeydown="scwin.ipt_x_onkeydown"/>' in b           # 다른 값 기존 속성 → 그대로
+    assert "ipt_coupnRt_onkeydown" not in out and "ipt_telNo_onkeydown" not in out and "ipt_apctNm_onkeypress" not in out and "@name ipt_coupnRt_onkeydown" not in out
+    assert "scwin.ipt_x_onkeydown = function" in out and "scwin.ipt_y_onkeydown = function" in out
+    assert h == '<head><w2:publicInfo method="scwin.onpageload,scwin.ipt_x_onkeydown,scwin.ipt_y_onkeydown,scwin.ipt_z_onkeydown"/></head>'
+    h2, out2, b2, log2 = vs.key_filter_to_allowchar(h, out, b)
+    assert (h2, out2, b2, log2) == (h, out, b, {})
