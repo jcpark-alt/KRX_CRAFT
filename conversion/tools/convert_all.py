@@ -52,6 +52,8 @@ def convert_dir(src_rel, dst_rel, force=False):
         name = os.path.basename(f)
         rel = Path(f).relative_to(src)
         out_path = dst / rel
+        if "jsp-front" in dst_rel:  # jsp-front ui-tobe 파일명은 대문자 줄기(2026-10-07; 재생성 표준은 jspfront_pipeline.py)
+            out_path = out_path.with_name(rel.stem.upper() + rel.suffix)
         # 이미 변환된 산출물(수기 단계2 보강 가능)은 덮어쓰지 않고 건너뛴다. 재생성은 --force.
         if out_path.exists() and not force:
             agg["skipped"].append(str(rel)); continue

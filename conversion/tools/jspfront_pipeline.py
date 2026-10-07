@@ -64,8 +64,9 @@ def _converge(dst, name, max_passes=3):
 
 
 def run(name, publish=True, gate=True, inventory=None, merge=True):
+    name = name.lower()
     src = UI / (name + ".xml")
-    dst = TOBE / (name + ".xml")
+    dst = TOBE / st.jsp_tobe_file(name)  # 파일명은 대문자 줄기(2026-10-07)
     rep = {"name": name}
     idx, overrides = _merge_ctx()
     ov = overrides.get(name) or {}
@@ -132,9 +133,9 @@ def main(argv=None):
             continue
         p = Path(a)
         if p.is_dir():
-            names += sorted(x.stem for x in p.glob("*.xml"))
+            names += sorted(x.stem.lower() for x in p.glob("*.xml"))
         else:
-            names.append(p.stem)
+            names.append(p.stem.lower())
     if not names:
         print(__doc__); return 2
     inv = {}
@@ -151,7 +152,7 @@ def main(argv=None):
             merge_reps.append(r["merge_rep"])
         elif "frozen" in r and n.lower() in _merge_ctx()[0]:
             merge_reps.append({"name": n, "verdict": "frozen", "matched": 0, "pub_items": 0, "missing_refs": [], "unmatched_vendor": [],
-                               "todo": io.open(TOBE / (n + ".xml"), encoding="utf-8").read().count("TODO Stage2(퍼블리싱 병합)"), "log": ["override frozen: " + r["frozen"]], "ambiguous": False})
+                               "todo": io.open(TOBE / st.jsp_tobe_file(n), encoding="utf-8").read().count("TODO Stage2(퍼블리싱 병합)"), "log": ["override frozen: " + r["frozen"]], "ambiguous": False})
         print("=== %s" % n)
         for k in ("fatal", "frozen", "vendor", "convert", "convention", "convert_passes", "idem_after_convention", "publish", "idem_after_publish", "merge", "idem_after_merge", "gate", "todo"):
             if k in r:

@@ -53,6 +53,11 @@ def join_regions(reg, script=None, head=None, body=None):
 
 
 # ---------------------------------------------------------------- 공통 네임스페이스 재고
+def jsp_tobe_file(name):
+    """jsp-front ui-tobe 파일명 규약(2026-10-07, 사용자 지시): 화면 id 는 소문자(jldfil25900 — 리포트·override 키), 파일명은 줄기 대문자 + .xml(JLDFIL25900.xml, sample-front 와 같은 꼴)."""
+    return Path(name).stem.upper() + ".xml"
+
+
 def common_inventory(pcc=None):
     """gcc(+ 모듈 pcc) 공개 함수 재고.
     returns (public: {ns: set(fn)}, async_fns: set((ns, fn)))

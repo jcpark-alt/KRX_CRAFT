@@ -568,19 +568,20 @@ def mark_jquery_todo(script):
 
 def merge_screen(name, pub_path, out_dir, report_only, overrides=None, vendor=None):
     """vendor = (reg, eol): 파이프라인이 넘기는 병합 전 공급사 전환본 영역(없으면 VENDOR_DIR 에서 읽는다)."""
+    name = name.lower()
     ov = (overrides or {}).get(name) or {}
     if ov.get("skip"):
         return {"name": name, "verdict": "mismatch", "matched": 0, "pub_items": 0, "missing_refs": [], "unmatched_vendor": [], "todo": 0,
                 "log": ["override skip: " + ov["skip"]], "detail": {}}
-    if ov.get("frozen") and (out_dir / (name + ".xml")).exists():
+    if ov.get("frozen") and (out_dir / st.jsp_tobe_file(name)).exists():
         # 손으로 재작성한 본(jQuery 화면별 전환 등)은 재생성으로 덮지 않는다 — ui-tobe 파일이 정본(파이프라인은 run() 입구에서 건너뜀)
-        t = io.open(out_dir / (name + ".xml"), encoding="utf-8").read()
+        t = io.open(out_dir / st.jsp_tobe_file(name), encoding="utf-8").read()
         return {"name": name, "verdict": "frozen", "matched": 0, "pub_items": 0, "missing_refs": [], "unmatched_vendor": [],
                 "todo": t.count("TODO Stage2(퍼블리싱 병합)"), "log": ["override frozen: " + ov["frozen"]], "detail": {}}
     if vendor is not None:
         reg, eol = vendor
     else:
-        raw, eol, reg = st.read_xml(VENDOR_DIR / (name + ".xml"))
+        raw, eol, reg = st.read_xml(VENDOR_DIR / st.jsp_tobe_file(name))
     pub_text = io.open(pub_path, encoding="utf-8").read()
     proot, pbody = parse_body(pub_text)
     vroot, vbody = parse_body(reg["body"])
@@ -624,7 +625,7 @@ def merge_screen(name, pub_path, out_dir, report_only, overrides=None, vendor=No
                       "missing_refs": missing, "pub_items": [sp for sp, k, el in numbered(pitems)], "ven_items": [[sp, el.get("id") or ""] for sp, k, el in numbered(vitems)]}}
     if closed and not report_only:
         out_dir.mkdir(parents=True, exist_ok=True)
-        st.write_xml(out_dir / (name + ".xml"), reg["head"], reg["script_open"], script_out, reg["script_close"], body_text, eol)
+        st.write_xml(out_dir / st.jsp_tobe_file(name), reg["head"], reg["script_open"], script_out, reg["script_close"], body_text, eol)
     return rep
 
 
@@ -674,7 +675,7 @@ def main(argv=None):
         if a.startswith("--") or (args.index(a) > 0 and args[args.index(a) - 1] in ("--out", "--detail", "--vendor-dir")):
             continue
         p = Path(a)
-        names += sorted(x.stem for x in p.glob("*.xml")) if p.is_dir() else [p.stem]
+        names += sorted(x.stem.lower() for x in p.glob("*.xml")) if p.is_dir() else [p.stem.lower()]
     detail_path = Path(args[args.index("--detail") + 1]) if "--detail" in args else None
     global VENDOR_DIR
     if "--vendor-dir" in args:

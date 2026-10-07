@@ -37,7 +37,7 @@ def collect():
     qp = collections.defaultdict(set)
     unreal = collections.defaultdict(list)       # intent -> [(screen, fn, line, next_stmt)]
     for f in sorted(glob.glob(str(TOBE / "*.xml"))):
-        name = Path(f).stem
+        name = Path(f).stem.lower()
         raw, _eol, reg = st.read_xml(f)
         if reg is None:
             continue
@@ -103,7 +103,7 @@ def jquery_shapes():
     import dom_rules as dr
     shape = collections.Counter(); screens = collections.defaultdict(set); form = collections.Counter(); form_screens = set()
     for f in sorted(glob.glob(str(ROOT / "conversion" / "jsp-front" / "ui-tobe" / "*.xml"))):
-        n = os.path.basename(f)[:-4]
+        n = os.path.basename(f)[:-4].lower()
         raw, _e, reg = st.read_xml(f)
         code = st.without_comments(reg["script"])
         for m in re.finditer(r'(?<![\w$.])\$\(\s*([^)]{0,80}?)\s*\)\s*(?:\.\s*(\w+))?', code):
