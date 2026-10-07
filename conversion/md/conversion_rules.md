@@ -687,7 +687,7 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
 * **정리**: 퍼블리싱 목업 핸들러(스크립트에 정의 없는 `ev:*="scwin.x"`) 제거 · 목업 중복 id 비움 · 같은 헤더 value 가 여럿이면 공급사 컬럼을 순서대로 소비.
 * **판정**: `auto`(전부 이음·TODO 0) · `todo`(닫혔지만 TODO 표지 있음) · `manual`(override 로 닫음) → `ui-pub/<name>.xml`(head·script 는 ui-tobe 그대로 + 병합 body → 규칙 34 정규화).
   `review` = 퍼블리싱 본문이 자리표뿐 · 공급사 body 에 있던 참조를 못 채움 · 양쪽에 항목이 있는데 하나도 못 이음(다른 구조의 퍼블리싱 파일; 공통 버튼은 항목 수에서 제외). 공급사 body 에도 없던 참조는 게이트처럼 report-only.
-  `mismatch` = override `skip`(같은 이름에 다른 화면·퍼블리싱 빈 자리표 — 사유를 지시 파일에 적고 병합하지 않음). override `accept` 는 정합 0 이어도 TODO 결과를 받아들여 `manual`.
+  `mismatch` = override `skip`(퍼블리싱 빈 자리표 — 기준으로 삼을 UI 가 없을 때만; 2026-10-07 사용자 기준으로 '같은 이름에 다른 화면'도 publish 구조를 기준으로 삼아 `accept`). override `accept` 는 정합 0 이어도 TODO 결과를 받아들여 `manual`.
 * **헤더 표준(사용자 확정 2026-10-06)**: 퍼블리싱 헤더는 `pgtbox`+breadcrumb+즐겨찾기 꼴이지만 **pageFrame 으로 통일** — 본화면(`sub_contents`)은
   `pfmContentHeader` pageFrame 을 첫 자식으로 반드시, 팝업(`pop_contents`)은 헤더 없음(제목은 팝업 프레임). 규칙 34 P1 이 보장하므로 병합본에도 자동 적용된다.
   퍼블리싱 본문이 자리표뿐이면(위젯 없음) `review`. `review` 의 큰 덩어리: 퍼블리싱에만 있는 버튼·select(새 디자인 추가분), 전화번호 3분할 입력 ↔ 공급사 1칸, 라벨 없는 컨트롤 여러 개,

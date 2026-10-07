@@ -2,7 +2,7 @@
 
 > `jspfront_pipeline.py` 가 화면마다 병합(5b 단계)하며 행을 갱신한다(승격 2026-10-06 뒤 ui-tobe 가 병합 결과). `auto` 는 전부 이은 것, `todo` 는 본문에 `TODO Stage2(퍼블리싱 병합)` 표지가 있는 것, `manual` 은 `publish_merge_overrides.json` 지시로 닫은 것, `frozen` 은 손으로 고친 ui-tobe 파일(재생성 건너뜀), `review` 는 참조를 못 채웠거나 퍼블리싱 본문이 비어 있는 것, `mismatch` 는 지시 `skip`(다른 화면/빈 자리표).
 
-화면 260 · auto 79 · todo 151(표지 1576건) · manual(override) 3 · frozen(손작업 정본) 19 · review 0 · mismatch(override skip) 8 · error 0
+화면 260 · auto 79 · todo 151(표지 1701건) · manual(override) 9 · frozen(손작업 정본) 19 · review 0 · mismatch(override skip) 2 · error 0
 
 | 화면 | 판정 | 정합/퍼블리싱 항목 | TODO | 스크립트 참조 누락 | 공급사 미대응(옮겨 넣음) | 메모 |
 | --- | --- | ---: | ---: | --- | --- | --- |
@@ -92,7 +92,7 @@
 | jldfil21100 | todo | 9/9 | 1 |  | pageList:(krxpage_pagenavigator_83) | 그리드 헤더 '적용신처일자' 공급사 쪽 없음; 그리드 헤더 '타이틀' 공급사 쪽 없음; 그리드 1:1(헤더 다름); 버튼 'trigger:조회' ← 공급사 'trigger:검색'(btn_Search, 같은 뜻) |
 | jldfil21101 | todo | 5/9 | 4 |  |  | 버튼 'trigger:Search' ← 공급사 'trigger:icon:search'(btn_findCompany, 같은 뜻) |
 | jldfil21102 | todo | 6/8 | 2 |  |  |  |
-| jldfil21103 | mismatch | 0/0 | 0 |  |  | override skip: 퍼블리싱 파일은 '연계공시신청안내'(변동사실 select·제출/취소 안내 화면), 공급사는 '연계공시법인 탈퇴신청'(신청법인 그리드·신청일·적용신청일·상장자회사 입력) — 같은 이름에 다른 화면. 퍼블리셔에 탈퇴신청 화면 퍼블리싱 요청 |
+| jldfil21103 | manual | 0/3 | 7 |  | grid:신청자회사명/자산총액10%이상여부/자회사시장구분(grd_linkDisclsApplList); input:신청일(ipt_applDd); inputCalendar:적용신청일(cal_lnkDisclsApplApplDd); input:상장자회사(ipt_subcomNm) | 공급사 grid:신청자회사명/자산총액10%이상여부/자회사시장구분(grd_linkDisclsApplList) 옮겨 넣음(TODO); 공급사 input:신청일(ipt_applDd) 옮겨 넣음(TODO); 공급사 inputCalendar:적용신청일(cal_lnkDisclsApplApplDd) 옮겨 넣음(TODO); 공급사 input:상장자회사(ipt_subcomNm) 옮겨 넣음(TODO) |
 | jldfil21104 | todo | 0/3 | 3 |  |  |  |
 | jldfil21110 | auto | 5/5 | 0 |  |  | 버튼 'trigger:조회' ← 공급사 'trigger:검색'(btn_Search, 같은 뜻) |
 | jldfil21200 | auto | 3/3 | 0 |  |  |  |
@@ -145,7 +145,7 @@
 | jldfil35700 ⚠중복 | todo | 0/47 | 42 |  |  | 퍼블리싱 전용 버튼 '인쇄'(공통 처리 대상); 퍼블리싱 전용 버튼 '인쇄'(공통 처리 대상); 퍼블리싱 전용 버튼 '인쇄'(공통 처리 대상); 퍼블리싱 전용 버튼 '인쇄'(공통 처리 대상) |
 | jldfil40100 | auto | 0/0 | 0 |  |  |  |
 | jldfil40105 | auto | 0/0 | 0 |  |  |  |
-| jldfil40200 | mismatch | 0/0 | 0 |  |  | override skip: 회원가입분류: 퍼블리싱은 시장별 select 5개 + 회사코드(5자리) 입력·확인 버튼(재설계), 공급사는 분류 select 8개(유가/코스닥/의결권/채권 묶음 1 + 코넥스·ETF사무관리·ETN발행사·ETN사무관리·투자계약/신탁·신탁상장신청인·상장형수익증권 7). 분류 체계가 달라 기계 대응 불가 — 기획 확인(새 분류 체계 확정) 뒤 pair 작성 |
+| jldfil40200 | manual | 0/7 | 15 |  | select:#1(ipt_corpUsrTpCd); select:#2(ipt_corpUsrTpCd_2); select:#3(ipt_corpUsrTpCd_3); select:#4(ipt_corpUsrTpCd_4) | 공급사 select:#1(ipt_corpUsrTpCd) 옮겨 넣음(TODO); 공급사 select:#2(ipt_corpUsrTpCd_2) 옮겨 넣음(TODO); 공급사 select:#3(ipt_corpUsrTpCd_3) 옮겨 넣음(TODO); 공급사 select:#4(ipt_corpUsrTpCd_4) 옮겨 넣음(TODO) |
 | jldfil40201 | todo | 23/24 | 15 |  | trigger:다음#1(btn_ApplyJoin_2); trigger:취소#2(btn_GoURL_2); trigger:다음#2(btn_ApplyJoin_3); trigger:취소#3(btn_GoURL_3) | trigger:취소 퍼블리싱 1개 ↔ 공급사 8개: 앞에서부터 1개 이음(나머지 TODO); 공급사 trigger:다음#1(btn_ApplyJoin_2) 옮겨 넣음(TODO); 공급사 trigger:취소#2(btn_GoURL_2) 옮겨 넣음(TODO); 공급사 trigger:다음#2(btn_ApplyJoin_3) 옮겨 넣음(TODO) |
 | jldfil40202 | todo | 0/1 | 1 |  |  |  |
 | jldfil40203 | todo | 65/74 | 43 |  | select:(ipt_setChrg); input:생년월일#1(ipt_birthYear); input:생년월일#2(ipt_birthMonth); input:생년월일#3(ipt_birthDay) | input:담당자소재지회사주소 퍼블리싱 6개 ↔ 공급사 9개: 앞에서부터 6개 이음(나머지 TODO); 공급사 select:(ipt_setChrg) 옮겨 넣음(TODO); 공급사 input:생년월일#1(ipt_birthYear) 옮겨 넣음(TODO); 공급사 input:생년월일#2(ipt_birthMonth) 옮겨 넣음(TODO) |
@@ -219,9 +219,9 @@
 | jldinf92200 | auto | 0/2 | 0 |  |  | 퍼블리싱 전용 버튼 '인쇄'(공통 처리 대상); 퍼블리싱 전용 버튼 '닫기'(공통 처리 대상) |
 | jldinf92300 | frozen | 0/0 | 0 |  |  | override frozen: 2026-10-06 jQuery 화면별 재작성(규칙 19) — jQuery 1건: 빈 ready 블록 제거 |
 | jldinf92400 | auto | 0/2 | 0 |  |  | 퍼블리싱 전용 버튼 '인쇄'(공통 처리 대상); 퍼블리싱 전용 버튼 '닫기'(공통 처리 대상); jQuery 잔여 1문장에 규칙 19 TODO |
-| jldinf92500 | mismatch | 0/0 | 0 |  |  | override skip: 퍼블리싱은 '투자계약증권 상세정보'(읽기 전용), 공급사 본문 제목은 'ETN 상세정보 변경'(입력 32개 수정 폼) — 같은 이름에 다른 화면/다른 성격. 공급사 산출의 화면 배정 오류 가능성 포함해 회신 요청 |
+| jldinf92500 | manual | 0/1 | 32 |  | input:발행금액(ipt_isuAmt); inputCalendar:발행일(cal_isuDd); select:발행통화(slc_currTpCd); inputCalendar:만기일(cal_expDd) | 퍼블리싱 전용 버튼 '닫기'(공통 처리 대상); 공급사 input:발행금액(ipt_isuAmt) 옮겨 넣음(TODO); 공급사 inputCalendar:발행일(cal_isuDd) 옮겨 넣음(TODO); 공급사 select:발행통화(slc_currTpCd) 옮겨 넣음(TODO) |
 | jldods20000 | todo | 1/2 | 6 |  | trigger:접기(foldBt); trigger:등록#1(input_46); trigger:등록#2(input_51); trigger:등록#3(input_55) | 그리드 헤더 '담당기관' 공급사 쪽 없음; 그리드 닮음 0.60: grid:공시구분/담당기관/업무및서식/제출시한#1 ← grd_integsrchList; 공급사 trigger:접기(foldBt) 옮겨 넣음(TODO); 공급사 trigger:등록#1(input_46) 옮겨 넣음(TODO) |
-| jldods20010 | mismatch | 0/0 | 0 |  |  | override skip: 퍼블리싱은 '통합검색 결과 상세'(업무해설 본문), 공급사는 '키워드목록'(ㄱ~ㅎ 색인 버튼·검색) — 같은 이름에 다른 화면. 퍼블리셔 확인 |
+| jldods20010 | manual | 0/3 | 21 |  | input:(ipt_keywrdNmInput); trigger:검색(ipt_searchBtn); trigger:ㄱ(btn_searchKeywrd); trigger:ㄴ(btn_searchKeywrd_2) | 퍼블리싱 전용 버튼 '인쇄'(공통 처리 대상); 공급사 input:(ipt_keywrdNmInput) 옮겨 넣음(TODO); 공급사 trigger:검색(ipt_searchBtn) 옮겨 넣음(TODO); 공급사 trigger:ㄱ(btn_searchKeywrd) 옮겨 넣음(TODO) |
 | jldstf10002 | todo | 2/5 | 3 |  | trigger:공시뷰어새창열기(viewer_btn) | 버튼 'trigger:조회' ← 공급사 'trigger:icon:search'(newWindowId, 같은 뜻); 버튼 'trigger:닫기' ← 공급사 'trigger:icon:close'(img_18, 같은 뜻); 퍼블리싱 전용 버튼 '인쇄'(공통 처리 대상); 공급사 trigger:공시뷰어새창열기(viewer_btn) 옮겨 넣음(TODO) |
 | jldstf30100 | manual | 7/10 | 4 |  | trigger:일정추출계산식(btn_openSchdul) | override: select:년도#1 ← slc_YYYY; override: select:년도#2 ← slc_MM; override: select:표준산업업종 ← slc_STD_INDTP; override: trigger:신규 ← btn_New |
 | jldstf30101 | auto | 0/0 | 0 |  |  |  |
@@ -239,7 +239,7 @@
 | jldstf75500 | todo | 2/9 | 13 |  | input:(ipt_formatKeywrd); select:#1(slc_disclsTp); select:#2(slc_ldMktTpCd); select:#3(ipt_modYn) | 버튼 'trigger:Search' ← 공급사 'trigger:조회#1'(input_24, 같은 뜻); 버튼 'trigger:조회' ← 공급사 'trigger:조회#2'(input_26, 같은 뜻); 공급사 input:(ipt_formatKeywrd) 옮겨 넣음(TODO); 공급사 select:#1(slc_disclsTp) 옮겨 넣음(TODO) |
 | jldstf75600 | todo | 2/9 | 13 |  | input:(ipt_formatKeywrd); select:#1(slc_disclsTp); select:#2(slc_ldMktTpCd); select:#3(ipt_modYn) | 버튼 'trigger:Search' ← 공급사 'trigger:조회#1'(input_24, 같은 뜻); 버튼 'trigger:조회' ← 공급사 'trigger:조회#2'(input_26, 같은 뜻); 공급사 input:(ipt_formatKeywrd) 옮겨 넣음(TODO); 공급사 select:#1(slc_disclsTp) 옮겨 넣음(TODO) |
 | jldstf76200 | todo | 1/1 | 2 |  | trigger:등록(btn_openRegisterPop); trigger:저장(btn_setOutOrdNo) | 공급사 trigger:등록(btn_openRegisterPop) 옮겨 넣음(TODO); 공급사 trigger:저장(btn_setOutOrdNo) 옮겨 넣음(TODO); jQuery 잔여 8문장에 규칙 19 TODO |
-| uldmgt50002 | mismatch | 0/0 | 0 |  |  | override skip: 퍼블리싱은 '기본정보서식맵핑조회'(검색 조건 5 + 그리드, 이미 의미 id rdo_MKT_ID·txb_ELMT_KOR_NM·btn_Search·grd_Grid 를 가짐 — mgt-front 용으로 만든 파일), 공급사 본문은 숨은 입력 3 + 아이콘 버튼 10(프레임 셸). 대응 불가 — mgt 쪽 전환본과 짝지을 것 |
+| uldmgt50002 | manual | 0/8 | 18 |  | trigger:icon:close#1(img_37); trigger:icon:close#2(img_47); trigger:icon:close#3(img_57); trigger:icon:close#4(img_68) | 공급사 trigger:icon:close#1(img_37) 옮겨 넣음(TODO); 공급사 trigger:icon:close#2(img_47) 옮겨 넣음(TODO); 공급사 trigger:icon:close#3(img_57) 옮겨 넣음(TODO); 공급사 trigger:icon:close#4(img_68) 옮겨 넣음(TODO) |
 | uldmgt50014 | mismatch | 0/0 | 0 |  |  | override skip: 퍼블리싱 본문이 빈 자리표('(팝업)양식보기') — 공급사는 ${htmlContent} 서버 렌더 뷰어(B-1 회신 대상). 퍼블리싱 미작성 |
 | uldmgt50300 | todo | 1/3 | 2 |  |  | 버튼 'trigger:등록' ← 공급사 'trigger:icon:save'(img_15, 같은 뜻) |
 | uldmgt50301 | todo | 2/8 | 12 |  | select:#1(slc_ldMktTpCd); inputCalendar:(cal_lawAmendDd); input:(ipt_lawTitle); upload:(upd_lawBinfile) | 버튼 'trigger:닫기' ← 공급사 'trigger:icon:close'(img_83, 같은 뜻); 버튼 'trigger:등록' ← 공급사 'trigger:icon:save'(img_82, 같은 뜻); 공급사 select:#1(slc_ldMktTpCd) 옮겨 넣음(TODO); 공급사 inputCalendar:(cal_lawAmendDd) 옮겨 넣음(TODO) |
@@ -257,7 +257,7 @@
 | uldmgt50313 | todo | 2/6 | 8 |  | select:#1(slc_notiObjSysTpCd); select:#2(slc_ldHelpUseAreaTpCd); select:#3(slc_upHelpClssId); input:(ipt_helpClssNm) | 버튼 'trigger:닫기' ← 공급사 'trigger:icon:close'(img_76, 같은 뜻); 버튼 'trigger:저장' ← 공급사 'trigger:icon:save'(img_75, 같은 뜻); 공급사 select:#1(slc_notiObjSysTpCd) 옮겨 넣음(TODO); 공급사 select:#2(slc_ldHelpUseAreaTpCd) 옮겨 넣음(TODO) |
 | uldmgt50314 | todo | 1/3 | 1 |  |  | 퍼블리싱 전용 버튼 '닫기'(공통 처리 대상) |
 | uldmgt50315 | todo | 1/3 | 1 |  |  | 퍼블리싱 전용 버튼 '닫기'(공통 처리 대상) |
-| uldmgt50316 | mismatch | 0/0 | 0 |  |  | override skip: 시행세칙 등록: 퍼블리싱은 법규/세칙 2열 정적 표 14행(행마다 '등록' 목업 버튼), 공급사는 그리드 grd_lawItems(법규/세칙). 그리드 → 버튼 컬럼 있는 그리드로 퍼블리싱 재설계 필요(목업 행을 데이터로 오인하지 않도록 병합하지 않음) |
+| uldmgt50316 | manual | 0/31 | 32 |  | grid:법규/세칙(grd_lawItems) | 공급사 grid:법규/세칙(grd_lawItems) 옮겨 넣음(TODO); override accept: 2026-10-07 사용자 기준(동일 파일명이면 publish UI 구조가 기준) — 퍼블리싱 body 를 기준으로 두고 공급사 상호작용 요소는 TODO 표지와 함께 옮겨 넣음. 종전 skip 사유: 시행세칙 등록: 퍼블리싱은 법규/세칙 2열 정적 표 14행(행마다 '등록' 목업 버튼), 공급사는 그리드 grd_lawItems(법규/세칙). 그리드 → 버튼 컬럼 있는 그리드로 퍼블리싱 재설계 필요(목업 행을 데이터로 오인하지 않도록 병합하지 않음) |
 | uldmgt50317 | todo | 2/3 | 1 |  |  | 버튼 'trigger:닫기' ← 공급사 'trigger:icon:close'(img_59, 같은 뜻); 버튼 'trigger:저장' ← 공급사 'trigger:icon:save'(img_58, 같은 뜻) |
 | uldmgt50319 | todo | 0/0 | 1 |  | trigger:icon:close(img_15) | 공급사 trigger:icon:close(img_15) 옮겨 넣음(TODO) |
 | uldmgt50320 | todo | 0/4 | 4 |  |  |  |
