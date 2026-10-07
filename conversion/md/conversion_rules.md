@@ -648,6 +648,13 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
   `await scwin.tx_X(URL);` + `scwin.tx_X = async function (action) { … action: action ?? "<고정>" … }`(JSDoc `@param action`). 사이에 `$c.util.getComponent('dma_…').set(…)` 줄은 허용(8줄 안).
   호출부 주소가 고정값과 같고 한 가지뿐이면 폼 문장만 지운다. 그대로 두는 것: 분기(if/else) 안에서 action 만 정하고 밖에서 tx 를 부르는 꼴, tx 가 ⛔ 미해결 스텁(주소 "null"·self_submit)인 것,
   `window.open` 으로 이어지는 폼 — 스코어카드 `form_dom` 에 남아 화면별(B-7·회신). 결과: 폼 문장 441줄 삭제·호출 346(인자 전달 243)·tx 151 정의(98화면)이 action 인자, 폼 action 잔존 94(분기 안 대입·⛔ 스텁·window.open — 화면별/회신).
+* **V41 확장(P3 둘째 배치, 2026-10-07)**: 폼 참조가 지역 변수여도(`const frm = (document.F || { elements: [] }); … frm.action = U; frm.target = …;`) 같게 다루고,
+  tx 호출이 대입형·return·한 줄 블록형(`const nr = await scwin.tx_X();` · `return await scwin.tx_X();` · `{ const __nr = await scwin.tx_X(); if (…) {…} };`)이어도 인자를 끼운다. 결과: 486화면 688호출(인자 전달)·폼 문장 806줄 삭제, tx(action) 정의 151 → 675(318화면).
+* **V43 미사용 폼 변수 선언 삭제(P3, 2026-10-07, `vendor_stage2.drop_unused_form_vars`, CLI `--v43`)**: `const frm = (document.F || { elements: [] });` 가 같은 함수 안(선언보다 얕은 `}` 까지)에서
+  식별자로 다시 나오지 않으면 선언 줄을 지운다 — V41 이 `.action/.target` 을 걷은 뒤 흔히 남는 사문. 필드 접근(`frm.bzCd.value`)이 남은 것은 그대로(B-7 DOM). 결과: 1,045 선언 삭제.
+* **V44 as-is 공통 fn_SelEmail(P3, 2026-10-07, `vendor_stage2.sel_email`, CLI `--v44`)**: 공급사가 전역 호출로 남긴 `fn_SelEmail($c.util.getComponent("slc_selEmail<sfx>"), (document.F || …).email2)` 를
+  pcc/fil 로 반입한 `$c.fil.selEmail(selComp, targetComp)` 호출로 바꾸고 둘째 인자는 같은 접미의 퍼블리싱 입력 `ipt_email2<sfx>` 로 잇는다(body 에 그 id 가 있을 때만; 없으면 그대로 + `TODO Stage2(B-7)`). 결과: 16화면 38호출 → $c.fil.selEmail, JLDFIL25101 5자리는 ipt_email2 없음(B-7 표지).
+  같은 꼴의 **미정의 as-is 전역 함수 호출이 143종·1,406자리·326화면** 더 남아 있다(`fn_ObjValueSetComma` 498·`fn_ObjValueResetRmComma2` 152·`fn_validate` 52·`fn_getFileNm` 49 …, 정의는 `cm/as-is/fil/**`) — pcc/fil 반입 2차 후보(결정 대기).
 * **V42 eval 동적 멤버 접근(P3, 2026-10-07, `vendor_stage2.de_eval_member`, CLI `--v42`)**: `eval("document.all.span" + month)`·`eval('form.isurCd' + obj1)`·`eval('obj.x_' + idx + '.value')` 는
   이름을 문자열로 조립한 멤버 접근이라 대괄호 접근과 의미가 같다 → `document.all["span" + month]`·`form['isurCd' + obj1]`·`obj['x_' + idx].value`. eval 만 걷고 DOM 참조(document.all 등)는 그대로(B-7).
   첫 조각이 "경로.접두" 문자열이고 마지막 조각이 `.식별자` 꼬리면 속성 접근으로 잇는다; 조각에 `.`·`[`·`(` 가 든 문자열(옵션 색인 꼬리), 문장 eval(`eval("var r = " + d)`·대입), 주석 안은 손대지 않는다. 결과: 26화면 83자리 → 대괄호 접근, eval 148 → 65(27화면: 문장 eval·옵션 색인 꼬리·JSON eval).

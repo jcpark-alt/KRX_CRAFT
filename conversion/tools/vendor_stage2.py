@@ -867,13 +867,17 @@ def simplify_innerhtml(script, head="", body=""):
 # ---------------------------------------------------------------- V41 폼 action → tx 인자 (P3 첫 배치에서 발견 · 2026-10-07)
 # as-is `form.action = URL; form.submit();` 를 공급사가 `(document.F || { elements: [] }).action = URL; await scwin.tx_X();` 로 옮기면서 tx_X 의 sbmOptions.action 은
 # 고정 리터럴 하나만 넣었다 — 분기마다 다른 URL 로 제출하던 화면(JLDFIL00000 goWrite 7갈래 등)은 전부 같은 주소로 가는 결함. 폼 문장을 걷고 URL 을 tx 인자로 넘긴다:
-#   `(document.F || …).action = U;` [`(document.F || …).target|method = …;` · `$c.util.getComponent('dma_…').set(…)` 몇 줄] `await scwin.tx_X();`
+#   `(document.F || …).action = U;` 또는 지역 폼 변수 `frm.action = U;` [`.target|method = …;` · `$c.util.getComponent('dma_…').set(…)` 몇 줄] `await scwin.tx_X();`(대입형·return·한 줄 블록형 포함)
 #   → `await scwin.tx_X(U);` + `scwin.tx_X = async function (action) { … action: action ?? "<고정>", … }` (+ JSDoc @param).
 # tx 가 sbmOptions 꼴이거나 `$c.data.downFile("<고정>", …)` 꼴일 때만(그 밖의 꼴·⛔ 미해결 스텁은 그대로). 호출부 action 이 고정값과 같고 하나뿐이면 폼 문장만 지운다.
-FORM_ACTION_RE = re.compile(r"^(?P<ind>[ \t]*)\(document\.(?P<f>\w+) \|\| \{ elements: \[\] \}\)\.action = (?P<u>.+?);[ \t]*$")
-FORM_OTHER_RE = re.compile(r"^[ \t]*\(document\.(?P<f>\w+) \|\| \{ elements: \[\] \}\)\.(?:target|method|encoding|enctype) = .+?;[ \t]*$")
+# 폼 참조: `(document.F || { elements: [] })` 직접 꼴, 또는 같은 스크립트에 `const V = (document.F || { elements: [] });` 로 선언된 지역 변수 V
+FORM_DECL_RE = re.compile(r"^(?P<ind>[ \t]*)(?:const|let|var) (?P<v>\w+) = \(document\.(?P<f>\w+) \|\| \{ elements: \[\] \}\);[ \t]*$", re.M)
+_FORM_REF = r"(?:\(document\.\w+ \|\| \{ elements: \[\] \}\)|(?P<v>\w+))"
+FORM_ACTION_RE = re.compile(r"^(?P<ind>[ \t]*)" + _FORM_REF + r"\.action = (?P<u>.+?);[ \t]*$")
+FORM_OTHER_RE = re.compile(r"^[ \t]*" + _FORM_REF + r"\.(?:target|method|encoding|enctype) = .+?;[ \t]*$")
 DMA_SET_RE = re.compile(r"^[ \t]*\$c\.util\.getComponent\(['\"]dma_\w+['\"]\)\.set\(.*\);[ \t]*$")
-TX_CALL_RE = re.compile(r"^(?P<ind>[ \t]*)(?P<aw>await )?scwin\.(?P<tx>tx_\w+)\(\);[ \t]*$")
+# tx 호출: `await scwin.tx_X();` · `const nr = await scwin.tx_X();` · `return await scwin.tx_X();` · `{ const __nr = await scwin.tx_X(); if (…) {…} };` (한 줄 블록)
+TX_CALL_RE = re.compile(r"^(?P<ind>[ \t]*)(?P<pre>(?:\{ )?(?:const \w+ = |return )?)(?P<aw>await )?scwin\.(?P<tx>tx_\w+)\(\)(?P<post>;.*)$")
 # tx 정의의 고정 주소: sbmOptions.action 리터럴 또는 `$c.data.downFile("<고정>", …)` 첫 인자(같은 함수 안, `\n};` 전까지)
 TX_FIXED_RE = re.compile(r'(?m)^scwin\.(tx_\w+) = async function \(\) \{\n(?:(?!\n\};)[\s\S])*?(?:const sbmOptions = \{(?:(?!\n\};)[\s\S])*?\n[ \t]*action: |\$c\.data\.downFile\()(?P<a>"[^"\n]*"|\'[^\'\n]*\'),')
 
@@ -883,19 +887,24 @@ def form_action_to_tx(script):
     tx_fixed = {}
     for m in re.finditer(TX_FIXED_RE, script):
         tx_fixed[m.group(1)] = m.group("a")
+    form_vars = {m.group("v") for m in FORM_DECL_RE.finditer(script)}
+
+    def _is_form(m):
+        return m.group("v") is None or m.group("v") in form_vars
     uses = {}        # tx → set(action 리터럴/식)
     edits = []       # (start, end, replacement lines)
     i = 0
     while i < len(lines):
         m = FORM_ACTION_RE.match(lines[i])
-        if not m:
+        if not m or not _is_form(m):
             i += 1; continue
         j = i + 1; drop = [i]
         while j < len(lines) and j <= i + 8:
             t = lines[j]
             if not t.strip():
                 j += 1; continue
-            if FORM_OTHER_RE.match(t):
+            mo = FORM_OTHER_RE.match(t)
+            if mo and _is_form(mo):
                 drop.append(j); j += 1; continue
             if DMA_SET_RE.match(t):
                 j += 1; continue
@@ -917,7 +926,7 @@ def form_action_to_tx(script):
     for drop, j, c, u in edits:
         tx = c.group("tx")
         if tx in param_tx:
-            lines[j] = "%s%sscwin.%s(%s);" % (c.group("ind"), c.group("aw") or "", tx, u)
+            lines[j] = "%s%s%sscwin.%s(%s)%s" % (c.group("ind"), c.group("pre"), c.group("aw") or "", tx, u, c.group("post"))
         for d in drop:
             lines[d] = None
     script = "\n".join(l for l in lines if l is not None)
@@ -1010,6 +1019,64 @@ def de_eval_member(script):
     return "".join(out), ({"member": n} if n else {})
 
 
+# ---------------------------------------------------------------- V43 미사용 폼 변수 선언 삭제 (P3 둘째 배치 · 2026-10-07)
+# `const frm = (document.F || { elements: [] });` 가 같은 함수 안에서 한 번도 쓰이지 않으면(V41 이 `.action/.target` 을 걷은 뒤 흔한 꼴) 선언 줄을 지운다.
+# 함수 끝은 선언보다 얕은 들여쓰기의 `}` 줄. 변수명이 그 범위 안에 식별자로 남아 있으면(필드 접근 `frm.x.value` 등 — B-7 DOM) 그대로 둔다.
+def drop_unused_form_vars(script):
+    lines = script.split("\n")
+    n = 0
+    for i, l in enumerate(lines):
+        m = FORM_DECL_RE.match(l)
+        if not m:
+            continue
+        ind = len(m.group("ind")); v = m.group("v")
+        j = i + 1; body = []
+        while j < len(lines):
+            t = lines[j]
+            if t.strip() and (len(t) - len(t.lstrip())) < ind and t.lstrip().startswith("}"):
+                break
+            body.append(t); j += 1
+        if not re.search(r"(?<![\w$.])%s(?![\w$])" % re.escape(v), "\n".join(body)):
+            lines[i] = None; n += 1
+    return "\n".join(l for l in lines if l is not None), ({"dropped": n} if n else {})
+
+
+# ---------------------------------------------------------------- V44 as-is 공통 fn_SelEmail (P3 둘째 배치 · 2026-10-07)
+# 공급사가 그대로 둔 전역 호출 `fn_SelEmail($c.util.getComponent("slc_selEmail<sfx>"), (document.F || { elements: [] }).email2)` —
+# as-is 공통(cm/as-is/fil/common.xml)을 pcc/fil `$c.fil.selEmail(selComp, targetComp)` 로 반입했고, 둘째 인자는 퍼블리싱 입력 `ipt_email2<sfx>` 로 잇는다
+# (같은 접미 규약: slc_selEmail_r1 ↔ ipt_email2_r1; 한 폼에 반복 입력인 `.email2[N]` 꼴도 select 접미로 잇는다). 그 id 가 body 에 없으면 호출을 그대로 두고 B-7 표지를 단다.
+SEL_EMAIL_RE = re.compile(r"(?<![\w$.])fn_SelEmail\(\$c\.util\.getComponent\((?P<q>['\"])slc_selEmail(?P<sfx>\w*)(?P=q)\), \(document\.\w+ \|\| \{ elements: \[\] \}\)\.email2(?:\[\d+\])?\)")
+SEL_EMAIL_TODO = "// TODO Stage2(B-7): 퍼블리싱에 ipt_email2%s 입력 없음 — as-is 공통 fn_SelEmail 대상 미확정"
+
+
+def sel_email(script, head, body):
+    ids = set(re.findall(r'\sid="([^"]+)"', body or ""))
+    n = todo = 0
+    mask = cv.code_mask(script)
+    out, pos = [], 0
+    for m in SEL_EMAIL_RE.finditer(script):
+        if not mask[m.start()]:
+            continue
+        sfx, q = m.group("sfx"), m.group("q")
+        out.append(script[pos:m.start()])
+        if "ipt_email2" + sfx in ids:
+            out.append("$c.fil.selEmail($c.util.getComponent(%sslc_selEmail%s%s), $c.util.getComponent(%sipt_email2%s%s))" % (q, sfx, q, q, sfx, q))
+            n += 1
+        else:
+            out.append(m.group(0))
+            eol = script.find("\n", m.end())
+            if eol < 0:
+                eol = len(script)
+            if "TODO Stage2(B-7): 퍼블리싱에 ipt_email2" not in script[m.end():eol]:
+                tail = script[m.end():eol]
+                out.append(tail + "  " + SEL_EMAIL_TODO % sfx)
+                pos = eol; todo += 1
+                continue
+        pos = m.end()
+    out.append(script[pos:])
+    return "".join(out), {k: v for k, v in (("calls", n), ("todo", todo)) if v}
+
+
 def apply(head, script, body):
     log = {}
     body_ids = set(re.findall(r'\sid="([^"]+)"', body))
@@ -1026,11 +1093,11 @@ def apply(head, script, body):
 
 
 def main(argv=None):
-    """제자리 적용 CLI(frozen 화면 등): python conversion/tools/vendor_stage2.py --v37|--v38|--v39|--v40|--v41|--v42 [--dry] <xml|폴더> ..."""
+    """제자리 적용 CLI(frozen 화면 등): python conversion/tools/vendor_stage2.py --v37|--v38|--v39|--v40|--v41|--v42|--v43|--v44 [--dry] <xml|폴더> ..."""
     sys.stdout.reconfigure(encoding="utf-8")
     args = argv if argv is not None else sys.argv[1:]
-    files, fl, _ = st.parse_cli([a for a in args if a not in ("--v37", "--v38", "--v39", "--v40", "--v41", "--v42")], flags=("--dry",), opts=())
-    which = next((w for w in ("--v42", "--v41", "--v40", "--v39", "--v38", "--v37") if w in args), None)
+    files, fl, _ = st.parse_cli([a for a in args if a not in ("--v37", "--v38", "--v39", "--v40", "--v41", "--v42", "--v43", "--v44")], flags=("--dry",), opts=())
+    which = next((w for w in ("--v44", "--v43", "--v42", "--v41", "--v40", "--v39", "--v38", "--v37") if w in args), None)
     if not which or not files:
         print(main.__doc__); return 2
     changed = 0; tot = {}
@@ -1049,6 +1116,10 @@ def main(argv=None):
             new, log = form_action_to_tx(reg["script"])
         elif which == "--v42":
             new, log = de_eval_member(reg["script"])
+        elif which == "--v43":
+            new, log = drop_unused_form_vars(reg["script"])
+        elif which == "--v44":
+            new, log = sel_email(reg["script"], reg["head"], reg["body"])
         else:
             head, new, body, log = inline_fn_aliases(reg["head"], reg["script"], reg["body"])
         if new != reg["script"] or head != reg["head"] or body != reg["body"]:

@@ -1056,3 +1056,72 @@ scwin.tx_request = async function () {
     assert '(document.form1 || { elements: [] }).action = "null";' in out and "await scwin.tx_request();" in out
     out2, log2 = vs.form_action_to_tx(out)
     assert out2 == out and log2 == {}
+
+
+def test_v41_local_form_var_and_assignment_calls():
+    """V41 확장: 지역 폼 변수 `frm.action`/`frm.target` + `const nr = await tx()` · `{ const __nr = await tx(); … }` · `return await tx()` 꼴; 선언만 남은 변수는 V43 이 지운다."""
+    src = '''scwin.a = async function () {
+    const frm = (document.applyCheck || { elements: [] });
+    $c.util.getComponent('dma_Req').set('method', 'view');
+    frm.action = '/outer/announcement.do';
+    const nr = await scwin.tx_fn_View();
+    if (nr) { return; }
+};
+scwin.b = async function () {
+    const f = (document.goForm || { elements: [] });
+    f.action = '/a/b.do?method=x';
+    f.target = '_self';
+    { const __nr = await scwin.tx_fn_View(); if (__nr && __nr.responseJSON) { $c.win.moveUrl("/x/x.xml"); } };
+};
+scwin.c = async function () {
+    const keep = (document.keepForm || { elements: [] });
+    keep.action = '/k.do';
+    return await scwin.tx_fn_View();
+    keep.bzCd.value = "1";
+};
+scwin.d = function () {
+    const other = (document.otherForm || { elements: [] });
+    other.bzCd.value = "1";
+};
+scwin.tx_fn_View = async function () {
+    const sbmOptions = {
+        id: "tx_fn_View",
+        action: "/outer/announcement.do",
+        ref: "dma_Req"
+    };
+    const res = await $c.sbm.executeDynamic(sbmOptions);
+};
+'''
+    out, log = vs.form_action_to_tx(src)
+    assert log == {"calls": 3, "tx_param": 1, "form_lines": 4}
+    assert "    const nr = await scwin.tx_fn_View('/outer/announcement.do');\n" in out
+    assert "    { const __nr = await scwin.tx_fn_View('/a/b.do?method=x'); if (__nr && __nr.responseJSON) { $c.win.moveUrl(\"/x/x.xml\"); } };\n" in out
+    assert "    return await scwin.tx_fn_View('/k.do');\n" in out
+    assert "frm.action" not in out and "f.target" not in out and "keep.action" not in out
+    out2, log2 = vs.drop_unused_form_vars(out)
+    assert log2 == {"dropped": 2}
+    assert "const frm = " not in out2 and "const f = " not in out2
+    assert "const keep = (document.keepForm || { elements: [] });" in out2 and 'keep.bzCd.value = "1";' in out2   # 필드 접근 남음 → 보존
+    assert "const other = (document.otherForm || { elements: [] });" in out2
+    out3, log3 = vs.drop_unused_form_vars(out2)
+    assert out3 == out2 and log3 == {}
+
+
+def test_v44_sel_email():
+    """V44: fn_SelEmail(slc_selEmail<sfx>, form.email2) → $c.fil.selEmail(select, ipt_email2<sfx>); 입력 id 없으면 그대로 + B-7 표지(한 번만). 멱등."""
+    body = '<body><xf:select1 id="slc_selEmail"/><xf:input id="ipt_email2"/><xf:select1 id="slc_selEmail_r1"/><xf:input id="ipt_email2_r1"/><xf:select1 id="slc_selEmail_r2"/></body>'
+    src = '''scwin.a = function () {
+    fn_SelEmail($c.util.getComponent("slc_selEmail"), (document.corpForm1 || { elements: [] }).email2);
+    fn_SelEmail($c.util.getComponent("slc_selEmail_r1"), (document.corpForm || { elements: [] }).email2[1]);
+    fn_SelEmail($c.util.getComponent("slc_selEmail_r2"), (document.corpForm3 || { elements: [] }).email2);
+    // fn_SelEmail($c.util.getComponent("slc_selEmail"), (document.corpForm1 || { elements: [] }).email2);
+};
+'''
+    out, log = vs.sel_email(src, "", body)
+    assert log == {"calls": 2, "todo": 1}
+    assert '    $c.fil.selEmail($c.util.getComponent("slc_selEmail"), $c.util.getComponent("ipt_email2"));\n' in out
+    assert '    $c.fil.selEmail($c.util.getComponent("slc_selEmail_r1"), $c.util.getComponent("ipt_email2_r1"));\n' in out
+    assert '    fn_SelEmail($c.util.getComponent("slc_selEmail_r2"), (document.corpForm3 || { elements: [] }).email2);  // TODO Stage2(B-7): 퍼블리싱에 ipt_email2_r2 입력 없음' in out
+    assert '    // fn_SelEmail($c.util.getComponent("slc_selEmail"), (document.corpForm1' in out
+    out2, log2 = vs.sel_email(out, "", body)
+    assert out2 == out and log2 == {}
