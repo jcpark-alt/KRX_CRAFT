@@ -938,6 +938,8 @@ def apply_regions(head, script, body):
     # P2 V37 핸들러 try/catch 표준 래핑 — V22(중복 정의 `_1` 개명) 뒤에 둬야 죽은 `_1` 본문은 건드리지 않는다
     script, v37 = vendor_stage2.wrap_handler_trycatch(script, head)
     log["V37_trycatch"] = {k: v for k, v in v37.items() if v}
+    # V48 배포 경로 규약 /ui/jsp/<대문자파일>.xml (사용자 확정 2026-10-08) — 맨 끝(context 문자열은 소문자 유지)
+    head, script, body, log["V48_paths"] = vendor_stage2.normalize_deploy_paths(head, script, body)
     return head, script, body, log
 
 

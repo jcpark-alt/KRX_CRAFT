@@ -477,7 +477,7 @@ def test_stage2_a_rules():
     assert ('$c.win.openPopup((function (__u) { return __u; })(url), { id: "STOCK_LISTING", type: "browserPopup", title: nm + " 관리", width: "1020px", '
             'height: hight, callbackFn: "scwin.popupCallback" });') in script and script.count("scwin.popupCallback = function") == 1
     assert '$c.win.openPopup(url, { id: "NEW_LISTING", type: "pageFramePopup", title: winTitle, width: "1400px", height: "835px" }, {});' in script
-    assert ('$c.win.openPopup("/jldfil55330/jldfil55330.xml", { id: "JLDFIL55330", type: "pageFramePopup", title: "종목명 입력안내", '
+    assert ('$c.win.openPopup("/ui/jsp/JLDFIL55330.xml", { id: "JLDFIL55330", type: "pageFramePopup", title: "종목명 입력안내", '
             'width: "750px", height: "300px" }, {});') in script
     assert '})(url), { id: "popup", type: "pageFramePopup", title: "서식조회팝업", width: "1000px", height: "800px" }, {});' in script
     # V28 doLogSave 보류 주석(상수는 V26 이 먼저 바꾸지 않는다 — stage2 가 앞서므로 원문 그대로 주석 안에)
@@ -1384,3 +1384,27 @@ scwin.tx_A = async function () {
 };""" in out
     out2, log2 = vs.form_action_to_tx(out)
     assert out2 == out and log2 == {}
+
+
+def test_v48_normalize_deploy_paths(monkeypatch):
+    """V48: `"/x/x.xml"` 경로 리터럴·body src·meta_screenId·scwin.screenId → /ui/jsp/<대문자>.xml; 없는 대상은 표지; 주석·context 는 그대로. 멱등."""
+    monkeypatch.setattr(vs, "_tobe_stems", {"JLDFIL05401", "JLDFIL05010C"})
+    head = '<head meta_screenName="x" meta_screenId="jldfil05400"><w2:publicInfo method="scwin.a"/></head>'
+    body = '<body><w2:pageFrame id="p1" src="/jldfil05010c/jldfil05010c.xml"/><w2:pageFrame id="p2" src="/cm/xml/contentHeader.xml"/></body>'
+    src = '''scwin.screenId = "jldfil05400";
+scwin.a = async function () {
+    $c.win.moveUrl("/jldfil05401/jldfil05401.xml", { "a": 1 });
+    $c.win.openPopup('/pop_emergency_nprotect/pop_emergency_nprotect.xml?x=1', { id: "p" });
+    // $c.win.moveUrl("/jldfil05401/jldfil05401.xml")
+    $c.exception.handleError(e, { context: 'jldfil05400.a' });
+};
+'''
+    h, out, b, log = vs.normalize_deploy_paths(head, src, body)
+    assert log == {"script": 2, "screenId": 1, "body_src": 1, "meta_screenId": 1, "missing": 1}
+    assert 'meta_screenId="JLDFIL05400"' in h and 'scwin.screenId = "JLDFIL05400";' in out
+    assert '    $c.win.moveUrl("/ui/jsp/JLDFIL05401.xml", { "a": 1 });\n' in out
+    assert "    $c.win.openPopup('/ui/jsp/POP_EMERGENCY_NPROTECT.xml?x=1', { id: \"p\" });  // TODO Stage2(V48): 대상 화면 POP_EMERGENCY_NPROTECT 이(가) ui-tobe 에 없음(미전환·공통 팝업) — 경로 확인\n" in out
+    assert '    // $c.win.moveUrl("/jldfil05401/jldfil05401.xml")\n' in out and "context: 'jldfil05400.a'" in out
+    assert '<w2:pageFrame id="p1" src="/ui/jsp/JLDFIL05010C.xml"/>' in b and 'src="/cm/xml/contentHeader.xml"' in b
+    h2, out2, b2, log2 = vs.normalize_deploy_paths(h, out, b)
+    assert (h2, out2, b2, log2) == (h, out, b, {})

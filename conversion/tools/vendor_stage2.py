@@ -17,6 +17,7 @@
   V31 `init_recvParam` 이 공급사 스텁(「전환 파라미터 수신 대상 없음: dma_pageContext — 읽는 자리 0」)이면 head 에 `dma_pageContext`
       dataMap 을 넣고 표준 수신(`dma_pageContext.setJSON($c.data.getParameter() ?? {})`)으로 — 나머지 1,036화면과 같은 꼴.
 """
+import glob
 import re
 import sys
 from pathlib import Path
@@ -1324,6 +1325,62 @@ def key_filter_to_allowchar(head, script, body):
     return head, script, body, log
 
 
+# ---------------------------------------------------------------- V48 배포 경로 규약 /ui/jsp/<대문자파일>.xml (사용자 확정 2026-10-08)
+# 공급사 리터럴은 "화면마다 폴더" 소문자(`"/jldfil05401/jldfil05401.xml"`)였고 ui-tobe 파일명은 대문자 줄기라 Linux 배포에서 어긋났다. 사용자 결정: 한 폴더 `/ui/jsp/` + 대문자 파일명.
+# 스크립트 경로 리터럴(moveUrl·openPopup·setPageFrameSrc·jQuery val 등 꼴 무관, 뒤에 ?쿼리 허용) · body `src="…"` · head `meta_screenId` · `scwin.screenId = "…"` 를 바꾼다.
+# 대상이 ui-tobe 에 없는 화면(미전환·공통 팝업)은 같은 규약으로 바꾸되 줄 끝에 표지를 단다. context 문자열(로그 표식)은 그대로.
+JSP_DEPLOY_ROOT = "/ui/jsp/"
+_PATH_LIT_RE = re.compile(r"""(?P<q>['"])/(?P<d>[a-z0-9_]+)/(?P<f>[a-z0-9_]+)\.xml(?=[?#'"])""")     # 폴더==파일 이 보통, 레이어 팝업은 <화면>/<화면>_layer_x.xml
+_BODY_SRC_RE = re.compile(r"""\s(?:src|href|ref)="/(?P<d>[a-z0-9_]+)/(?P<f>[a-z0-9_]+)\.xml(?=[?#"])""")
+_tobe_stems = None
+
+
+def _tobe_names():
+    global _tobe_stems
+    if _tobe_stems is None:
+        _tobe_stems = {Path(p).stem.upper() for p in glob.glob(str(st.ROOT / "conversion" / "jsp-front" / "ui-tobe" / "*.xml"))}
+    return _tobe_stems
+
+
+def normalize_deploy_paths(head, script, body, name=None):
+    names = _tobe_names(); log = {}; missing = set()
+    lines = script.split("\n")
+    for i, l in enumerate(lines):
+        if not _PATH_LIT_RE.search(l) or l.lstrip().startswith(("//", "*", "/*")):     # 규칙 0: 주석 줄은 바꾸지 않는다
+            continue
+
+        def rep(m):
+            tgt = m.group("f").upper()
+            if tgt not in names:
+                missing.add(tgt)
+            log["script"] = log.get("script", 0) + 1
+            return m.group("q") + JSP_DEPLOY_ROOT + tgt + ".xml"
+        miss_before = set(missing)
+        l2 = _PATH_LIT_RE.sub(rep, l)
+        new_missing = missing - miss_before
+        if new_missing and "TODO Stage2(V48)" not in l2 and not l2.lstrip().startswith("//"):
+            l2 += "  // TODO Stage2(V48): 대상 화면 %s 이(가) ui-tobe 에 없음(미전환·공통 팝업) — 경로 확인" % "·".join(sorted(new_missing))
+        lines[i] = l2
+    script = "\n".join(lines)
+    script, c = re.subn(r'(scwin\.screenId\s*=\s*["\'])([a-z0-9_]+)(["\'])', lambda m: m.group(1) + m.group(2).upper() + m.group(3), script)
+    if c:
+        log["screenId"] = c
+
+    def rep_body(m):
+        tgt = m.group("f").upper()
+        if tgt not in names:
+            missing.add(tgt)
+        log["body_src"] = log.get("body_src", 0) + 1
+        return m.group(0)[:m.group(0).index('"') + 1] + JSP_DEPLOY_ROOT + tgt + ".xml"
+    body = _BODY_SRC_RE.sub(rep_body, body)
+    head, c = re.subn(r'meta_screenId="([a-z][a-z0-9_]*)"', lambda m: 'meta_screenId="%s"' % m.group(1).upper(), head)
+    if c:
+        log["meta_screenId"] = c
+    if missing:
+        log["missing"] = len(missing)
+    return head, script, body, log
+
+
 def apply(head, script, body):
     log = {}
     body_ids = set(re.findall(r'\sid="([^"]+)"', body))
@@ -1340,11 +1397,11 @@ def apply(head, script, body):
 
 
 def main(argv=None):
-    """제자리 적용 CLI(frozen 화면 등): python conversion/tools/vendor_stage2.py --v37|--v38|--v39|--v40|--v41|--v42|--v43|--v44|--v45|--v46|--v47 [--dry] <xml|폴더> ..."""
+    """제자리 적용 CLI(frozen 화면 등): python conversion/tools/vendor_stage2.py --v37|--v38|--v39|--v40|--v41|--v42|--v43|--v44|--v45|--v46|--v47|--v48 [--dry] <xml|폴더> ..."""
     sys.stdout.reconfigure(encoding="utf-8")
     args = argv if argv is not None else sys.argv[1:]
-    files, fl, _ = st.parse_cli([a for a in args if a not in ("--v37", "--v38", "--v39", "--v40", "--v41", "--v42", "--v43", "--v44", "--v45", "--v46", "--v47")], flags=("--dry",), opts=())
-    which = next((w for w in ("--v47", "--v46", "--v45", "--v44", "--v43", "--v42", "--v41", "--v40", "--v39", "--v38", "--v37") if w in args), None)
+    files, fl, _ = st.parse_cli([a for a in args if a not in ("--v37", "--v38", "--v39", "--v40", "--v41", "--v42", "--v43", "--v44", "--v45", "--v46", "--v47", "--v48")], flags=("--dry",), opts=())
+    which = next((w for w in ("--v48", "--v47", "--v46", "--v45", "--v44", "--v43", "--v42", "--v41", "--v40", "--v39", "--v38", "--v37") if w in args), None)
     if not which or not files:
         print(main.__doc__); return 2
     changed = 0; tot = {}
@@ -1373,6 +1430,8 @@ def main(argv=None):
             new, log = import_globals(reg["script"], reg["head"], reg["body"])
         elif which == "--v47":
             head, new, body, log = key_filter_to_allowchar(reg["head"], reg["script"], reg["body"])
+        elif which == "--v48":
+            head, new, body, log = normalize_deploy_paths(reg["head"], reg["script"], reg["body"])
         else:
             head, new, body, log = inline_fn_aliases(reg["head"], reg["script"], reg["body"])
         if new != reg["script"] or head != reg["head"] or body != reg["body"]:
