@@ -126,6 +126,32 @@ ui/<name>.xml
 
 **인계 — 다음 사람이 할 일(권장 순서)**: ① 규칙 하나로 묶이는 축부터 — `$c.lc.fn_isProcess`(92화면, executeDynamic `skipped` 가드로 대체 후보)·폼 action 사문 주석 삭제·`$c.cm.fn_*` 치환 방향 결정 ② 회신 의존 축(컨텍스트 키 A-3·세션 키·bizMessage 목적지) ③ 화면별 재설계 축(jQuery/`document.`→규칙 19, 조건 래퍼→show/hide, hidden 입력→dataMap, lybox 표형 그리드, fieldEl 계약 전환). 변환 도구를 고쳐 전량 재생성하는 것이 원칙이며(`ui-tobe` 는 수기 보강 전까지 재생성 가능), 수기 보강을 시작한 화면은 `convert_all.py` 의 "기존 산출물 건너뜀" 규약대로 보호한다.
 
+## 현재 상태(2026-10-08) — 기계 축 종료, 잔여는 회신·퍼블리싱 의존
+
+**산출·검증**: `ui-tobe` 1,677본 = 단일 산출(파이프라인 `ui/` → ui-tobe, frozen 25본은 손작업 보호로 재생성 제외). 게이트 전건 OK · `wsxml_lint` 0/0 · 규칙 고정점(V37~V47 dry 0) · 도구 테스트 141.
+스코어카드(`scorecard.md`) 44,878(P1 기준선) → **38,033**, 점수 0 화면 310 → 401. 숫자가 덜 줄어 보이는 것은 P1 뒤 `undefined_global`(762자리) 처럼 숨어 있던 편차를 metric 으로 드러냈기 때문이다.
+
+**P2~P3 에서 닫은 기계 축(규칙 33 V37~V47)**: 핸들러 try/catch(V37) · fn_ 별칭(V38) · console 분류(V39) · innerHTML(V40) · 폼 action → tx 인자(V41, 네 차례 확장: 직접 폼·지역 폼 변수·공급사 폼 객체·far·branch) ·
+eval 대괄호(V42) · 미사용 폼 변수(V43) · fn_SelEmail(V44) · formatNumber DOM(V45) · 미정의 as-is 전역 fn_(V46, pcc/fil 반입 2차 — `$c.fil` 26함수) · 키 입력 필터 → allowChar(V47).
+손작업(frozen): JLDFIL00000·00001(goWrite 분기·formKorNm), JLDSTF30001/30100/30110(gParamObj), JLDSTF30101(월 분기) + ui-pub jQuery 재작성 19본.
+
+**남은 일(기계로는 더 못 닫는 것)** — 전부 `scorecard.md` 와 화면 안 TODO 표지로 위치가 드러나 있다:
+
+| 갈래 | 자리 | 화면 | 누가·무엇 |
+| --- | ---: | ---: | --- |
+| 퍼블리싱 병합 TODO(`TODO Stage2(퍼블리싱 병합)`) | 1,701 | 169 | 퍼블리셔 — 매칭 못한 공급사 요소·남은 퍼블리싱 요소 확정 |
+| jQuery(규칙 19 힌트 포함) | 6,247 | 490 | 퍼블리셔(B-7) — DOM 조립·탐색·표시 토글을 컴포넌트로 |
+| 원시 DOM·폼 DOM 필드(`frm.X.value`·`getElementsByName`·as-is img `.src`) | 2,418 | 6xx | 퍼블리셔(B-7) — 퍼블리싱에 없는 입력·이미지 컴포넌트 |
+| ⛔ 제출 주소 스텁(`⛔주소`) | 219 | 122 | 공급사 회신(B-4) — as-is 폼 action 은 호출부에 남아 있음(폼 action 잔존 152 중 49) |
+| 미정의 as-is 공통 fn_(`TODO Stage2(pcc 반입 2차)`) | 786 | 301 | 폼·DOM 의존 271 / 폼 전역 의존 201 / 정의 없음 119(원본 JS 미제공 — 회신) / JSP 팝업 114(회신) / rexpert 15 / 타 모듈 15 / 동기 ajax 12 |
+| 회신 TODO(B-1~B-7, `[sdd]` console) | 1,338 + 521 | 727 | 공급사·KRX 회신(`reply_request.md`) |
+| 긴 함수(4,000자 초과) | 444 | 292 | 화면별 리팩터링(회신 뒤) |
+
+**결정 대기(사용자)**: ① 배포 경로 규약 — ui-tobe 파일명은 대문자 줄기(`JLDFIL25900.xml`)인데 스크립트 경로 리터럴 1,477자리/550화면(`"/jldfil30300/jldfil30300.xml"`)과 `meta_screenId` 는 소문자 — Linux 배포면 어긋난다
+(파일명을 되돌리거나 리터럴을 바꾸거나, 배포 폴더 구조 확정 필요) ② `fn_70000Table_*` 2건 개명 ③ 병합 도구(규칙 35)의 타 모듈 확장 ④ 미정의 as-is 공통 중 "폼 전역 의존" 201자리의 처리 방침(퍼블리싱 확정 뒤 화면별 재작성 vs pcc 3차).
+
+**작업 요령**: 규칙을 더하면 `jspfront_pipeline.py <names>` 로 재생성(frozen 은 `vendor_stage2.py --vNN` 제자리), 뒤에 `gate_screen.py ui-tobe`·`wsxml_lint`·`screen_scorecard.py`. 이름 목록 파일은 LF.
+
 ## Stage 2 수작업 이력
 
 | 날짜 | 축 | 처방 | 결과 |
