@@ -1178,11 +1178,11 @@ scwin.tx_fn_Register = async function (action) {
 };
 '''
     out, log = vs.form_action_to_tx(src)
-    assert log == {"calls": 1, "tx_param": 1, "form_lines": 3, "far": 1}
+    assert log == {"calls": 1, "tx_param": 2, "form_lines": 3, "far": 1, "branch": 1}
     assert '    await scwin.tx_fn_List("/list/a.do?method=x");\n' in out and "scwin.form_listForm.action" not in out and "scwin.form_listForm.target" not in out
     assert 'action: action ?? "/list/a.do?method=y",' in out
     assert "(document.irDataForm || { elements: [] }).action = '/company/irData.do';" not in out      # far: 뒤쪽 tx 고정 주소와 같음 → 삭제
-    assert "(document.irDataForm || { elements: [] }).action = '/company/other.do';" in out          # 다른 주소 → 보존
+    assert "    let action;\n    action = '/company/other.do';\n    let str = \"x\";\n    if (str) {\n        await scwin.tx_fn_Register(action);\n" in out   # 다른 주소 → branch 패스(변수)
     out2, log2 = vs.drop_unused_form_vars(out)
     assert log2 == {"dropped": 3}
     assert "scwin.form_listForm = {" not in out2 and "let frm = " not in out2 and "frm = (document.eduForm" not in out2
@@ -1308,3 +1308,79 @@ scwin.ipt_z_onkeydown = function(e){
     assert h == '<head><w2:publicInfo method="scwin.onpageload,scwin.ipt_x_onkeydown,scwin.ipt_y_onkeydown,scwin.ipt_z_onkeydown"/></head>'
     h2, out2, b2, log2 = vs.key_filter_to_allowchar(h, out, b)
     assert (h2, out2, b2, log2) == (h, out, b, {})
+
+
+def test_v41_branch_action_variable():
+    """V41 branch 패스: 분기 안 action 리터럴 대입들 + 뒤쪽 tx 호출 하나 → `let action;`·`action = U;`·`tx(action)`; 사이에 tx 가 있거나 `action` 식별자가 이미 있으면 그대로."""
+    src = '''scwin.sendForm = async function () {
+    if (x === "1") {
+        (document.SendForm || { elements: [] }).action = "/amount/amount.do?method=a";
+    } else {
+        if (y) {
+            (document.SendForm || { elements: [] }).action = "/amount/amount.do?method=b";
+        }
+    }
+    (document.SendForm || { elements: [] }).target = "_top";
+    await scwin.tx_Send_form();
+};
+scwin.other = async function () {
+    const frm = (document.f || { elements: [] });
+    if (z) {
+        frm.action = "/k.do";
+    }
+    await scwin.tx_A();
+    frm.action = "/k2.do";
+    await scwin.tx_A();
+};
+scwin.keep = async function () {
+    const action = "x";
+    if (z) {
+        (document.f || { elements: [] }).action = "/k.do";
+    }
+    await scwin.tx_A();
+};
+scwin.tx_Send_form = async function () {
+    const sbmOptions = {
+        id: "tx_Send_form",
+        action: "/amount/amount.do?method=b",
+        ref: "dma_SendFormReq"
+    };
+    const res = await $c.sbm.executeDynamic(sbmOptions);
+};
+scwin.tx_A = async function () {
+    const sbmOptions = {
+        id: "tx_A",
+        action: "/k.do",
+        ref: "dma_Req"
+    };
+    const res = await $c.sbm.executeDynamic(sbmOptions);
+};
+'''
+    out, log = vs.form_action_to_tx(src)
+    assert log == {"calls": 1, "tx_param": 2, "form_lines": 4, "far": 3, "branch": 1}      # sendForm: b 는 far(고정 주소와 같음)·a 는 branch; other: k.do far·k2.do 는 8줄 안 호출; keep: far
+    assert '''scwin.sendForm = async function () {
+    let action;
+    if (x === "1") {
+        action = "/amount/amount.do?method=a";
+    } else {
+        if (y) {
+        }
+    }
+    await scwin.tx_Send_form(action);
+};''' in out
+    assert 'scwin.tx_Send_form = async function (action) {' in out and 'action: action ?? "/amount/amount.do?method=b",' in out
+    assert """scwin.other = async function () {
+    const frm = (document.f || { elements: [] });
+    if (z) {
+    }
+    await scwin.tx_A();
+    await scwin.tx_A("/k2.do");
+};""" in out
+    assert """scwin.keep = async function () {
+    const action = "x";
+    if (z) {
+    }
+    await scwin.tx_A();
+};""" in out
+    out2, log2 = vs.form_action_to_tx(out)
+    assert out2 == out and log2 == {}

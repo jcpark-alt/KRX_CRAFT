@@ -675,6 +675,9 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
   publicInfo 항목을 지운다. 대응: numPointCheck_minus `0-9.-` · numPointCheck `0-9.` · telNoCheck `0-9-` · engNumNotSpecCheck_ID `a-zA-Z0-9 -` · engNmCheck `a-zA-Z @().,_-` · etcNotCheck ignoreChar(특수문자) ·
   etcNumNotCheck ignoreChar(특수문자+숫자). 퍼블리싱에 이미 같은 집합(이스케이프 `\-` 만 다른 것 포함)이 있으면 핸들러만 지우고, 집합이 다르면 손대지 않고 호출 줄 끝에
   `TODO Stage2(pcc 반입 2차): 키 입력 필터 … 퍼블리싱 allowChar="…" ≠ as-is 허용 "…"(확인 필요)` 를 단다. 결과: 55화면 163핸들러 → 속성(충돌 0), 키 필터 호출 잔존 0, undefined_global 925 → 762.
+* **V41 넷째 확장(branch, 2026-10-07)**: 함수 안 폼 action 대입이 전부 리터럴이고(분기 안 포함) 첫 대입~마지막 대입 사이에 tx 호출이 없으며 마지막 대입 뒤 tx 호출이 정확히 하나(고정 주소 tx)면,
+  `let action;` 을 함수 첫 줄에 두고 대입을 `action = U;` 로, 그 호출을 `tx(action)` 으로 바꾼다(JLDFIL00000 손작업과 같은 꼴을 규칙화). 함수에 `action` 식별자가 이미 있으면 그대로. 결과: 31화면 53함수 → let action(폼 action 잔존 206 → 152: 분기/팝업 사이 101·⛔ 스텁 49).
+  남는 폼 action 잔여는 ⛔ 스텁/동적 주소 tx 를 부르는 것(126 함수 — 호출부 주소를 알아도 제출 전문이 없어 회신)과 tx 없이 끝나는 것(93 — window.open·popup 제출, B-7).
 * **V42 eval 동적 멤버 접근(P3, 2026-10-07, `vendor_stage2.de_eval_member`, CLI `--v42`)**: `eval("document.all.span" + month)`·`eval('form.isurCd' + obj1)`·`eval('obj.x_' + idx + '.value')` 는
   이름을 문자열로 조립한 멤버 접근이라 대괄호 접근과 의미가 같다 → `document.all["span" + month]`·`form['isurCd' + obj1]`·`obj['x_' + idx].value`. eval 만 걷고 DOM 참조(document.all 등)는 그대로(B-7).
   첫 조각이 "경로.접두" 문자열이고 마지막 조각이 `.식별자` 꼬리면 속성 접근으로 잇는다; 조각에 `.`·`[`·`(` 가 든 문자열(옵션 색인 꼬리), 문장 eval(`eval("var r = " + d)`·대입), 주석 안은 손대지 않는다. 결과: 26화면 83자리 → 대괄호 접근, eval 148 → 65(27화면: 문장 eval·옵션 색인 꼬리·JSON eval).

@@ -942,6 +942,56 @@ def form_action_to_tx(script):
                     drop.append(k); k += 1; continue
                 break
             edits.append((drop, None, None, u)); far += 1
+    # 셋째 패스(branch): 함수 안 폼 action 대입이 전부 리터럴이고(분기 안 포함), 첫 대입~마지막 대입 사이에 tx 호출이 없고, 마지막 대입 뒤 tx 호출이 정확히 하나(고정 주소 tx)면
+    # `let action;` 을 함수 첫 줄에 두고 대입을 `action = U;` 로, 그 호출을 `tx(action)` 으로 — 분기별 제출 주소를 변수로 모은다(JLDFIL00000 손작업과 같은 꼴). 함수 안에 이미 `action` 식별자가 있으면 건드리지 않는다.
+    branch = 0
+    taken = {d for drop, _j, _c, _u in edits for d in drop}
+    fn_bounds = []
+    for i, l in enumerate(lines):
+        if re.match(r"^scwin\.\w+ = (?:async )?function\b.*\{\s*$", l) or re.match(r"^(?:async )?function \w+\(.*\{\s*$", l):
+            fn_bounds.append(i)
+    for fi, start in enumerate(fn_bounds):
+        end = len(lines)
+        for k in range(start + 1, len(lines)):
+            if re.match(r"^\};?\s*$", lines[k]):
+                end = k; break
+        acts = []
+        for i in range(start + 1, end):
+            if i in taken or lines[i] is None:
+                continue
+            m = FORM_ACTION_RE.match(lines[i])
+            if m and _is_form(m):
+                acts.append((i, m))
+        if not acts or not all(re.match(r"""^(?:"[^"]*"|'[^']*')$""", m.group("u").strip()) for _i, m in acts):
+            continue
+        first, last = acts[0][0], acts[-1][0]
+        between = [c for i in range(first + 1, last) for c in re.findall(r"(?<![\w$])scwin\.(tx_\w+)\(", lines[i] or "")]
+        after = [(i, c) for i in range(last + 1, end) for c in re.findall(r"(?<![\w$])scwin\.(tx_\w+)\(", lines[i] or "")]
+        if between or len(after) != 1 or after[0][1] not in tx_fixed:
+            continue
+        j, tx = after[0]
+        c = TX_CALL_RE.match(lines[j])
+        if not c or c.group("tx") != tx:
+            continue
+        body_text = "\n".join(lines[k] or "" for k in range(start + 1, end))
+        if re.search(r"(?<![\w$.])action(?![\w$])", body_text):
+            continue
+        ind = re.match(r"[ \t]*", lines[start + 1] or "").group(0) or "    "
+        for i, m in acts:
+            lines[i] = m.group("ind") + "action = " + m.group("u").strip() + ";"
+            k = i + 1
+            while k < end and k <= i + 3:
+                mo = FORM_OTHER_RE.match(lines[k] or "")
+                if mo and _is_form(mo) and (mo.group("v") or "") == (m.group("v") or ""):
+                    lines[k] = None; k += 1; continue
+                break
+        for k in range(last + 1, j):            # 마지막 대입과 호출 사이의 같은 폼 target/method 줄도 사문
+            mo = FORM_OTHER_RE.match(lines[k] or "")
+            if mo and _is_form(mo) and (mo.group("v") or "") == (acts[-1][1].group("v") or ""):
+                lines[k] = None
+        lines[start + 1] = ind + "let action;\n" + lines[start + 1]
+        uses.setdefault(tx, set()).add("action")
+        edits.append(([], j, c, "action")); branch += 1
     if not edits:
         return script, {}
     param_tx = set()
@@ -949,7 +999,7 @@ def form_action_to_tx(script):
         if c is None:
             continue
         tx = c.group("tx")
-        if len(uses[tx]) > 1 or u != tx_fixed[tx]:
+        if len(uses[tx]) > 1 or u != tx_fixed[tx] or u == "action":
             param_tx.add(tx)
     for drop, j, c, u in edits:
         tx = c.group("tx") if c is not None else None
@@ -968,9 +1018,11 @@ def form_action_to_tx(script):
         doc = re.search(r'(/\*\*(?:(?!\*/).)*?)(\n \* @returns[^\n]*\n(?:(?!\*/).)*\*/\nscwin\.%s = async function \(action\))' % re.escape(tx), script, re.S)
         if doc and not re.search(r"@param \{[^}]*\} action\b", doc.group(1)):
             script = script[:doc.start()] + doc.group(1) + "\n * @param {String} action 제출 주소(호출부가 as-is form.action 으로 정하던 분기별 URL · 생략 시 기본 주소)" + doc.group(2) + script[doc.end():]
-    log = {"calls": len(edits) - far, "tx_param": len(param_tx), "form_lines": sum(len(d) for d, _j, _c, _u in edits)}
+    log = {"calls": len(edits) - far - branch, "tx_param": len(param_tx), "form_lines": sum(len(d) for d, _j, _c, _u in edits)}
     if far:
         log["far"] = far
+    if branch:
+        log["branch"] = branch
     return script, {k: v for k, v in log.items() if v}
 
 
