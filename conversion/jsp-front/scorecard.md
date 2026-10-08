@@ -2,7 +2,7 @@
 
 > `python conversion/tools/screen_scorecard.py` 가 만든다(P1, 2026-10-07). 점수 = Σ 가중(손작업 축 3 · 회신 축 2 · 기계 축 1) × 건수. `== null` 과 `getComponent` 는 정책상 보존이라 정보로만 싣는다. 화면별 전 수치는 `--tsv`.
 
-화면 1677 · 함수 34,791 · 스크립트 688,945줄 · 점수 합 38,163 · 점수 0 화면 388
+화면 1677 · 함수 34,747 · 스크립트 688,285줄 · 점수 합 38,163 · 점수 0 화면 388
 
 ## 1. 항목별 합계
 
@@ -52,7 +52,7 @@
 | JLDINF10100 | 714 | 4,264 | jQuery 193, 원시 DOM 28, 긴 함수 6, 미정의 as-is 공통(fn_) 8, 폼 DOM 3, TODO(회신) 4 |
 | JLDSTF31200 | 565 | 332 | TODO(병합) 278, TODO(회신) 2, 원시 DOM 1, innerHTML(attrReals __html 실현) 1 |
 | JLDODS60301 | 454 | 1,537 | jQuery 149, 긴 함수 1, TODO(회신) 1, 미정의 as-is 공통(fn_) 1 |
-| JLDBNF05001 | 368 | 3,905 | jQuery 83, 원시 DOM 28, 폼 DOM 3, 긴 함수 3, 미정의 as-is 공통(fn_) 4, TODO(회신) 3, 타이머 1 |
+| JLDBNF05001 | 368 | 3,845 | jQuery 83, 원시 DOM 28, 폼 DOM 3, 긴 함수 3, 미정의 as-is 공통(fn_) 4, TODO(회신) 3, 타이머 1 |
 | JLDINF10600 | 326 | 1,388 | jQuery 92, 미정의 as-is 공통(fn_) 8, 원시 DOM 5, 긴 함수 3, 폼 DOM 2, TODO(회신) 2 |
 | JLDINF10000 | 307 | 1,791 | jQuery 81, 원시 DOM 5, 긴 함수 5, TODO(회신) 6, 미정의 as-is 공통(fn_) 5, 폼 DOM 3, 타이머 1 |
 | JLDINF10200 | 303 | 1,285 | jQuery 88, 원시 DOM 4, 긴 함수 3, 미정의 as-is 공통(fn_) 4, 폼 DOM 2, TODO(회신) 2 |

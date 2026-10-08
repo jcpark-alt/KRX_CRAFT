@@ -126,6 +126,8 @@ ui/<name>.xml
 
 **인계 — 다음 사람이 할 일(권장 순서)**: ① 규칙 하나로 묶이는 축부터 — `$c.lc.fn_isProcess`(92화면, executeDynamic `skipped` 가드로 대체 후보)·폼 action 사문 주석 삭제·`$c.cm.fn_*` 치환 방향 결정 ② 회신 의존 축(컨텍스트 키 A-3·세션 키·bizMessage 목적지) ③ 화면별 재설계 축(jQuery/`document.`→규칙 19, 조건 래퍼→show/hide, hidden 입력→dataMap, lybox 표형 그리드, fieldEl 계약 전환). 변환 도구를 고쳐 전량 재생성하는 것이 원칙이며(`ui-tobe` 는 수기 보강 전까지 재생성 가능), 수기 보강을 시작한 화면은 `convert_all.py` 의 "기존 산출물 건너뜀" 규약대로 보호한다.
 
+보조 문서: `form_dep_worklist.md`(폼 의존 as-is 공통 × 화면 워크리스트, 2026-10-08).
+
 ## 현재 상태(2026-10-08) — 기계 축 종료, 잔여는 회신·퍼블리싱 의존
 
 **산출·검증**: `ui-tobe` 1,677본 = 단일 산출(파이프라인 `ui/` → ui-tobe, frozen 25본은 손작업 보호로 재생성 제외). 게이트 전건 OK · `wsxml_lint` 0/0 · 규칙 고정점(V37~V47 dry 0) · 도구 테스트 141.
@@ -149,7 +151,9 @@ eval 대괄호(V42) · 미사용 폼 변수(V43) · fn_SelEmail(V44) · formatNu
 
 **배포 경로 규약(사용자 확정 2026-10-08)**: `/ui/jsp/<대문자파일>.xml` — V48 로 스크립트 경로 리터럴·body `src`·`meta_screenId`·`scwin.screenId` 를 전부 맞췄다(1,671화면: 경로 리터럴 985(레이어 팝업 /<화면>/<화면>_layer_x.xml 포함)·body src/href/ref 555·meta_screenId 1,671·scwin.screenId 1,665, 없는 대상 70종 표지, 잔존 소문자 경로 0). ui-tobe 에 없는 대상 66종(미전환·공통 팝업)은 `TODO Stage2(V48)` 표지. 배포 시 ui-tobe 폴더를 `/ui/jsp/` 로 올리면 된다.
 
-**결정 대기(사용자)**: ① 병합 도구(규칙 35)의 타 모듈 확장 ② 미정의 as-is 공통 중 "폼 전역 의존" 201자리의 처리 방침(퍼블리싱 확정 뒤 화면별 재작성 vs pcc 3차). (`fn_70000Table_*` 2건은 2026-10-08 손작업으로 닫음 — 아래 이력.)
+**폼 의존 as-is 공통의 처리 방침(2026-10-08 확정, 사용자 위임)**: 전역 `form` 필드를 읽고 쓰는 as-is 공통(`fn_chkSaveElwPrc`·prelist 계산 `fn_Calc*`·`fn_UserCheckValues` 등)은 pcc 로 반입하지 않는다 — WebSquare 에서 그 필드는 dataMap 키(`dma_X.get/set`)이고 focus 는 바인딩 컴포넌트인데, 실측(`form_dep_worklist.md`)에서 (함수, 화면) 쌍 252(email 필터 흡수 뒤 222) 중 동적/DOM 104·필드가 dataMap 0곳/여럿에 걸치는 미해결 90 이라 기계로도 손으로도 지금은 못 정한다. **퍼블리싱·dataMap 확정 뒤 화면 안에서 재작성**하며, 그때 필요한 사실(필드 → dataMap 키, focus → 컴포넌트, 산술·중첩 여부)은 워크리스트에 화면별로 뽑아 두었다. 산술 함수(`fn_RmComma(a) + fn_RmComma(b)` — as-is 가 문자열 덧셈일 수 있음)는 재작성 전에 as-is 동작 확인이 필요(회신 항목). 그 과정에서 드러난 공급사 오매핑 `fn_emailFrontCheck/BackCheck`(키 입력 필터를 `$c.str.isEmail()` 빈 호출로 바꿔 둔 것)은 V47 로 `allowChar` 에 흡수(19화면 72핸들러 → allowChar).
+
+**결정 대기(사용자)**: 병합 도구(규칙 35)의 타 모듈 확장. (`fn_70000Table_*` 2건은 2026-10-08 손작업으로 닫음 — 아래 이력.)
 
 **작업 요령**: 규칙을 더하면 `jspfront_pipeline.py <names>` 로 재생성(frozen 은 `vendor_stage2.py --vNN` 제자리), 뒤에 `gate_screen.py ui-tobe`·`wsxml_lint`·`screen_scorecard.py`. 이름 목록 파일은 LF.
 
@@ -178,6 +182,7 @@ eval 대괄호(V42) · 미사용 폼 변수(V43) · fn_SelEmail(V44) · formatNu
 | 2026-10-07 | **publish 기준 전면 적용**(사용자 기준: ui-tobe 와 동일 파일명이 publish 에 있으면 publish 의 UI 구조가 기준) | 동일 파일명 260 전부가 리포트에 있음을 확인. 종전 '같은 이름에 다른 화면'으로 건너뛴 6본(jldfil21103·40200, jldinf92500, jldods20010, uldmgt50002·50316)을 override `skip` → `accept` 로 바꿔 publish body 를 기준으로 두고 공급사 상호작용 요소는 TODO 표지와 함께 옮겨 넣었다(종전 사유는 accept 문구에 보존). 퍼블리싱 본문이 빈 자리표인 2본(jldfil35200·uldmgt50014)은 기준으로 삼을 UI 가 없어 `skip` 유지 | 6본 재생성 게이트 6/6 · lint 0/0 · idem 전건 · 260화면: auto 79 · todo 151 · manual 9 · frozen 19 · mismatch 2(TODO 표지 1,701건) |
 | 2026-10-07 | **규칙 0 — 주석 처리된 구문은 변환하지 않는다**(사용자 지시) | `convert.py` 문장 변환 규칙 22종을 주석 마스킹(`mask_comments`·자리표 `/*@CMTn@*/`) 아래에서 돌린다. 문서 주석·섹션 헤더·W-Craft 마커는 보호 대상이 아니고, 주석 자체를 다루는 규칙(9·11·30·format)은 마스킹 밖. 공급사 후처리 단계는 원래 `code_mask`/`segments` 로 주석을 제외해 왔음을 실측으로 확인 | 테스트 신설(`test_convert_rule0_comment_guard.py`, 규칙 12 주석 함수 테스트 기대 갱신) · 도구 테스트 126 통과 · ui-tobe 전량 convert dry-run 고정점 확인은 별도 실행(결과는 다음 행) |
 | 2026-10-07 | 규칙 0 전량 dry-run 결과 | ui-tobe 1,677본에 `convert.convert` 를 다시 돌려 본 결과 변경 2본(JLDFIL11000·JLDFIL25100) — 둘 다 손으로 핸들러를 넣은 frozen 화면이라 규칙 4 가 핸들러를 3구역으로 옮기려 한 것(41줄 재배치, 내용 동일)뿐. 제자리 수렴시켜 고정점 회복 | 1,675본 변경 0 · 2본 재배치 뒤 고정점 · 게이트·lint 0/0 |
+| 2026-10-08 | **폼 의존 as-is 공통 처리 방침 확정 + 워크리스트**(사용자 위임) | 실측: (함수, 화면) 쌍 252(email 필터 흡수 뒤 222) — 동적/DOM 104 · 필드 매핑 미해결 90 · 나머지는 키 필터·폼 객체 인자형. 방침 = pcc 반입 없음, 퍼블리싱·dataMap 확정 뒤 화면별 재작성; `form_dep_worklist.md` 에 화면별 사실 수록. `fn_emailFrontCheck/BackCheck`(공급사가 `$c.str.isEmail()` 빈 호출로 오매핑) 는 V47 키 필터 표에 추가(19화면 72핸들러 → allowChar) | 게이트·lint 0/0 |
 | 2026-10-08 | **`fn_70000Table_*` 2건 개명**(사용자 지시 · 손작업 frozen 26) | 원인은 공급사 그리드 id `70000Table`(숫자로 시작, 트리에서 유일)에서 파생된 핸들러명. JLDSTF70000 의 그리드 id 를 dataList 규약대로 `grd_resultList` 로 바꾸고 핸들러 `grd_resultList_oncellclick`·포매터 `grd_resultList_fmt_column2`·헤더/바디 id·publicInfo·JSDoc·context 를 함께 정리 | 게이트 OK·lint 0/0 · 스코어카드 `fn_ 정의` 2 → 0 |
 | 2026-10-08 | **V48 배포 경로 규약 `/ui/jsp/<대문자파일>.xml`**(사용자 확정) | 공급사 소문자 "화면마다 폴더" 리터럴·`meta_screenId`·`scwin.screenId`·body `src` 를 규약으로 통일, 없는 대상 66종은 표지. 1,671본 제자리 적용 + 표본 재생성으로 파이프라인 고정점 확인 | 1,671화면: 경로 리터럴 985(레이어 팝업 /<화면>/<화면>_layer_x.xml 포함)·body src/href/ref 555·meta_screenId 1,671·scwin.screenId 1,665, 없는 대상 70종 표지, 잔존 소문자 경로 0 · 1,677본 게이트 전건·lint 0/0 · 테스트 142 |
 | 2026-10-07 | **V41 넷째 확장(branch)** — 분기 안 action 대입 + 뒤쪽 tx 1개 | 잔여 폼 action 285함수 실측: 리터럴·사이 tx 없음·뒤 tx 1개(고정 주소) 53 → `let action;`/`action = U;`/`tx(action)` 규칙화; 126 은 ⛔ 스텁·동적 주소 tx(회신), 93 은 tx 없이 끝남(window.open·팝업 제출, B-7) | 31화면 53함수 → let action(폼 action 잔존 206 → 152: 분기/팝업 사이 101·⛔ 스텁 49) · 1,677본 게이트 전건·lint 0/0 · 스코어카드 38,195 → 38,033(점수 0 화면 401) · 테스트 141 |
@@ -240,3 +245,4 @@ PowerShell 5.1 `Out-File` 의 BOM 이 커밋 제목에 섞인다.
 - 2026-10-07 V41 넷째 확장(branch): 31화면 53함수 → let action(폼 action 잔존 206 → 152: 분기/팝업 사이 101·⛔ 스텁 49), 스코어카드 38,195 → 38,033(점수 0 화면 401). **기계 축 종료 — 잔여는 회신·퍼블리싱(B-7) 의존.**
 - 2026-10-08 V48 배포 경로 규약 /ui/jsp/<대문자파일>.xml(사용자 확정): 1,671화면: 경로 리터럴 985(레이어 팝업 /<화면>/<화면>_layer_x.xml 포함)·body src/href/ref 555·meta_screenId 1,671·scwin.screenId 1,665, 없는 대상 70종 표지, 잔존 소문자 경로 0.
 - 2026-10-08 fn_70000Table 2건 개명 — 그리드 id 70000Table → grd_resultList(frozen 26), fn_ 정의 0.
+- 2026-10-08 폼 의존 as-is 공통 방침: 반입 없음·화면별 재작성(form_dep_worklist.md), email 키 필터 V47 흡수(19화면 72핸들러 → allowChar).

@@ -673,7 +673,7 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
   `fn_etcNumNotCheck()` 류는 `window.event.keyCode` 로 키를 거르는 onkeydown/onkeypress 핸들러 본문이다. WebSquare 에서는 `xf:input` 의 `allowChar`(허용)·`ignoreChar`(차단) 속성이 같은 일을
   선언적으로 하므로(퍼블리싱도 `allowChar="0-9-"` 꼴을 쓴다), 핸들러 본문이 그 호출 하나뿐이고(try/catch·selfVar 프렐류드 허용) 대상이 실존 `xf:input` 이면 속성을 달고 핸들러 함수·`ev:on<키이벤트>`·
   publicInfo 항목을 지운다. 대응: numPointCheck_minus `0-9.-` · numPointCheck `0-9.` · telNoCheck `0-9-` · engNumNotSpecCheck_ID `a-zA-Z0-9 -` · engNmCheck `a-zA-Z @().,_-` · etcNotCheck ignoreChar(특수문자) ·
-  etcNumNotCheck ignoreChar(특수문자+숫자). 퍼블리싱에 이미 같은 집합(이스케이프 `\-` 만 다른 것 포함)이 있으면 핸들러만 지우고, 집합이 다르면 손대지 않고 호출 줄 끝에
+  etcNumNotCheck ignoreChar(특수문자+숫자) · emailFrontCheck `a-zA-Z0-9._` · emailBackCheck `a-zA-Z0-9.-`(2026-10-08 추가 — 공급사가 `$c.str.isEmail()` 빈 호출로 오매핑해 두었던 것). 퍼블리싱에 이미 같은 집합(이스케이프 `\-` 만 다른 것 포함)이 있으면 핸들러만 지우고, 집합이 다르면 손대지 않고 호출 줄 끝에
   `TODO Stage2(pcc 반입 2차): 키 입력 필터 … 퍼블리싱 allowChar="…" ≠ as-is 허용 "…"(확인 필요)` 를 단다. 결과: 55화면 163핸들러 → 속성(충돌 0), 키 필터 호출 잔존 0, undefined_global 925 → 762.
 * **V41 넷째 확장(branch, 2026-10-07)**: 함수 안 폼 action 대입이 전부 리터럴이고(분기 안 포함) 첫 대입~마지막 대입 사이에 tx 호출이 없으며 마지막 대입 뒤 tx 호출이 정확히 하나(고정 주소 tx)면,
   `let action;` 을 함수 첫 줄에 두고 대입을 `action = U;` 로, 그 호출을 `tx(action)` 으로 바꾼다(JLDFIL00000 손작업과 같은 꼴을 규칙화). 함수에 `action` 식별자가 이미 있으면 그대로. 결과: 31화면 53함수 → let action(폼 action 잔존 206 → 152: 분기/팝업 사이 101·⛔ 스텁 49).

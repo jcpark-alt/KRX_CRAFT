@@ -1210,7 +1210,7 @@ IMPORT2_REASON = {
     "JSP 팝업(window.open+폼 제출 — 회신)": ("fn_passwordWin", "fn_popupCorpSearch", "fn_downInfoWin", "fn_stdCdDelWin", "fn_EtnExcelUploadPop", "fn_DigitalExcelUploadPop",
                                         "fn_findCompany", "fn_OpenIndCodeWin", "fn_popupCorpUpdReq"),
     "키 입력 필터(window.event — xf:input allowChar 속성 권장)": ("fn_numPointCheck_minus", "fn_etcNumNotCheck", "fn_etcNotCheck", "fn_telNoCheck", "fn_numPointCheck",
-                                                   "fn_engNumNotSpecCheck_ID", "fn_engNmCheck"),
+                                                   "fn_engNumNotSpecCheck_ID", "fn_engNmCheck", "fn_emailFrontCheck", "fn_emailBackCheck"),
     "외부 리포트 도구(rexpert)": ("fn_PrintPreView_DB",),
     "동기 ajax(tx 전환 필요)": ("fn_getBzDate",),
     "타 모듈 as-is 공통(stf/ods·ins/hindr) — 반입 범위 밖": ("fn_newTextToString", "fn_delTextToString", "fn_condUrl2", "fn_connStratLog", "fn_connEndLog"),
@@ -1273,7 +1273,8 @@ def import_globals(script, head="", body=""):
 _KEY_SPECIALS = " !&quot;#$%&amp;'()*+,-./:;&lt;=&gt;?@[\\]^_`{|}~"
 KEY_FILTER_ATTR = {"fn_numPointCheck_minus": ("allowChar", "0-9.-"), "fn_numPointCheck": ("allowChar", "0-9."), "fn_telNoCheck": ("allowChar", "0-9-"),
                    "fn_engNumNotSpecCheck_ID": ("allowChar", "a-zA-Z0-9 -"), "fn_engNmCheck": ("allowChar", "a-zA-Z @().,_-"),
-                   "fn_etcNotCheck": ("ignoreChar", _KEY_SPECIALS), "fn_etcNumNotCheck": ("ignoreChar", _KEY_SPECIALS + "0123456789")}
+                   "fn_etcNotCheck": ("ignoreChar", _KEY_SPECIALS), "fn_etcNumNotCheck": ("ignoreChar", _KEY_SPECIALS + "0123456789"),
+                   "fn_emailFrontCheck": ("allowChar", "a-zA-Z0-9._"), "fn_emailBackCheck": ("allowChar", "a-zA-Z0-9.-")}
 KEY_HANDLER_RE = re.compile(r"^(?P<comp>\w+)_on(?P<ev>keydown|keypress|keyup)$")
 _KEY_TRY_RE = re.compile(r"^\s*try\s*\{(?P<inner>[\s\S]*?)\}\s*catch\s*\(\w+\)\s*\{[\s\S]*\}\s*$")
 _KEY_PRELUDE_RE = re.compile(r"^\s*(?:const ev = e|const selfVar = \(ev && \(ev\.element \|\| ev\.target \|\| ev\.srcElement\)\) \|\| this);?\s*$")
