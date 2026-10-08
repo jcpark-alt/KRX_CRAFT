@@ -344,22 +344,63 @@ describe("validateDataCollect (cm/gcc/validate.xml)", () => {
     expect(await h2.scwin.validateDataCollect(container, { ...OPTS, fields: { acntClsMm1: rule } })).toBe(true);
   });
 
-  test("§2 maxLengthB — UTF-8(한글 3byte) 계산 + korEng 옵션 문구", async () => {
-    // 한글 4자 = 12byte > 11 — 한글 2byte 계산(8byte)이면 통과했을 케이스로 3byte 계산을 검증
+  test("§2 maxLengthB — 기본 한글 2byte 계산 + korEng 옵션 문구", async () => {
+    expect(loadHarness().scwin.BYTE_LENGTH_INFO.KOR_BYTE).toBe(2);   // 전역 설정 기본값
+
+    // 한글 4자 = 8byte > 7 실패 — 3byte 계산(12byte)과 구분되도록 한도 7 선택 후 통과 케이스(한도 8)도 확인
     const h = loadHarness();
+    mockFormPath(h, [{ comp: makeComp("ipb_nm", "한글한글"), columnId: "NM", columnName: "이름" }]);
+    expect(await h.scwin.validateDataCollect(container, {
+      ...OPTS, fields: { ipb_nm: { maxLengthB: 7, name: "이름" } },
+    })).toBe(false);
+    expect(h.state.alerts.join("")).toContain("7byte");
+
+    const h1 = loadHarness();
+    mockFormPath(h1, [{ comp: makeComp("ipb_nm", "한글한글"), columnId: "NM", columnName: "이름" }]);
+    expect(await h1.scwin.validateDataCollect(container, {
+      ...OPTS, fields: { ipb_nm: { maxLengthB: 8, name: "이름" } },
+    })).toBe(true);   // 8byte == 한도 8 통과 (3byte 계산이면 12byte 로 실패했을 케이스)
+
+    // 객체형 + korEng — 한도 18byte, 한글 10자(20byte) 실패 → "한글 9자 영문 18자" 문구 (18/2)
+    const h2 = loadHarness();
+    mockFormPath(h2, [{ comp: makeComp("ipb_corpNm", "한글한글한글한글한글"), columnId: "CN", columnName: "발행기관명" }]);
+    expect(await h2.scwin.validateDataCollect(container, {
+      ...OPTS, fields: { ipb_corpNm: { maxLengthB: { value: 18, msgType: "korEng" }, name: "발행기관명" } },
+    })).toBe(false);
+    expect(h2.state.alerts.join("")).toContain("한글 9자 영문 18자");
+  });
+
+  test("§2 maxLengthB — BYTE_LENGTH_INFO.KOR_BYTE = 3 설정 시 UTF-8(한글 3byte) 계산으로 전환", async () => {
+    // 한글 4자 = 12byte > 11 실패 (기본 2byte 계산이면 8byte 로 통과했을 케이스)
+    const h = loadHarness();
+    h.scwin.BYTE_LENGTH_INFO.KOR_BYTE = 3;
     mockFormPath(h, [{ comp: makeComp("ipb_nm", "한글한글"), columnId: "NM", columnName: "이름" }]);
     expect(await h.scwin.validateDataCollect(container, {
       ...OPTS, fields: { ipb_nm: { maxLengthB: 11, name: "이름" } },
     })).toBe(false);
     expect(h.state.alerts.join("")).toContain("11byte");
 
-    // 객체형 + korEng — 한도 18byte, 한글 7자(21byte) 실패 → "한글 6자 영문 18자" 문구
+    // minLengthB 도 같은 설정을 따른다 — 한글 2자 = 6byte ≥ 6 통과(2byte 계산이면 4byte 로 실패)
+    const h1 = loadHarness();
+    h1.scwin.BYTE_LENGTH_INFO.KOR_BYTE = 3;
+    mockFormPath(h1, [{ comp: makeComp("ipb_nm", "한글"), columnId: "NM", columnName: "이름" }]);
+    expect(await h1.scwin.validateDataCollect(container, {
+      ...OPTS, fields: { ipb_nm: { minLengthB: 6, name: "이름" } },
+    })).toBe(true);
+
+    // korEng 문구 환산도 설정을 따른다 — 한도 18byte, 한글 7자(21byte) 실패 → "한글 6자 영문 18자" (18/3)
     const h2 = loadHarness();
+    h2.scwin.BYTE_LENGTH_INFO.KOR_BYTE = 3;
     mockFormPath(h2, [{ comp: makeComp("ipb_corpNm", "한글한글한글한"), columnId: "CN", columnName: "발행기관명" }]);
     expect(await h2.scwin.validateDataCollect(container, {
       ...OPTS, fields: { ipb_corpNm: { maxLengthB: { value: 18, msgType: "korEng" }, name: "발행기관명" } },
     })).toBe(false);
     expect(h2.state.alerts.join("")).toContain("한글 6자 영문 18자");
+
+    // 유효하지 않은 설정값은 기본 2 로 계산한다
+    const h3 = loadHarness();
+    h3.scwin.BYTE_LENGTH_INFO.KOR_BYTE = "abc";
+    expect(h3.scwin.__getByteLength("1231a한글")).toBe(9);
   });
 
   test("composition — 프리셋 engNum: 조합 위반 실패, 충족 통과, 빈 값 통과", async () => {

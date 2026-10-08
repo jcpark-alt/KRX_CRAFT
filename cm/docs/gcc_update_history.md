@@ -1,6 +1,6 @@
 # gcc 공통 함수 업데이트 이력
 
-`cm/gcc/` 공통 라이브러리(`$c.*`)의 최초 반입(2026-06-08, `92a35bd`) 이후 변경 내역 정리 (최종 갱신 2026-09-21).
+`cm/gcc/` 공통 라이브러리(`$c.*`)의 최초 반입(2026-06-08, `92a35bd`) 이후 변경 내역 정리 (최종 갱신 2026-10-08).
 API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-09-21 기준 **13개 모듈 / 300개 공개 메서드**.
 
 > `src/cm/gcc/`는 CM 모듈용 사본으로 일반적 개선만 선별 반영해 왔으나(2026-06-10 병합, 2026-07-22 대규모 동기화로 11파일 체제),
@@ -21,7 +21,7 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 | `date.xml` (`$c.date`) | 날짜 포맷 검증(`checkCalendarFormat`/`compareFromToDate`), `getDateInterval` 단위 버그 수정, commonPrototype 의존 제거 |
 | `str.xml` (`$c.str`) | validate 중복 검증기 통합, 목적격 조사(`attachObjectPostposition`), 바이트/포맷 함수 자체 구현 전환 |
 | `session.xml` (`$c.session`) | **신설**(2026-06-09) — 세션 체크, 로그인/사용자 정보 관리 |
-| `validate.xml` (`$c.validate`) | DataCollection/DataGroup 검증, `validateSiteUrl` |
+| `validate.xml` (`$c.validate`) | DataCollection/DataGroup 검증, `validateSiteUrl`, byte 길이 규칙 한글 byte 전역 설정 `BYTE_LENGTH_INFO.KOR_BYTE`(기본 2) |
 | `ext.xml` (`$c.ext`) | SB차트 연동(`drawSBChart`/`drawChartData`) |
 | `cert.xml` (`$c.cert`) | **신설**(2026-09-15) — 이니텍 공동인증서(INISAFE Sign)+라온 TransKey 연동: 벤더 스크립트·CSS 동적 로드/모듈 초기화 `loadModule`·`initModule`, 키패드 z-index 보정 `applyKeypadStyle`, 키패드 사용 여부 `setTranskeyUse`, 전자서명 호출 `auth(url, callback, { params, useTranskey })`; 벤더 경로·키패드 id 상수 `INITECH_INFO` |
 
@@ -273,6 +273,16 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 - `7c0c78b` (08-28) — [연관] **ULDINF05000 발행기관등록 가이드 화면 신설**(`sample-front/ui`, gcc 무변경): 코드 컨벤션 전면 적용(5단계·JSDoc·진입점 handleError·camelCase·엄격 비교 43곳) + 결함 4건 수정. **수작업 검증 약 47건 → validateDataCollect 규칙 50건 전환** — 정적 규칙 + 복합 조건(법인/사업자 3중 조건·팩스 all-or-none)은 `options.fields` 동적 구성, `includeUnbound`·`matchValue`·`composition`·korEng 등 신규 옵션 실사용 예. 잔여 수작업은 구조적 이관 불가분(동적 결산월·OR·그리드 안내)만
 
 ---
+
+## 2026년 10월
+
+### byte 길이 검증 한글 2byte 기본·전역 설정화 (10-08)
+- (미커밋, 10-08) — **`$c.validate` byte 길이 규칙(minLengthB/maxLengthB) 한글 계산을 3byte 고정 → 전역 설정 `BYTE_LENGTH_INFO.KOR_BYTE`(기본 2byte) 로 전환** (메서드 수 유지, 사용자 지시):
+  - 배경: 08-28 명세 v3 반영 때 byte 계산을 UTF-8 기준(한글 3byte) 자체 헬퍼 `__getByteLengthUtf8` 로 고정했으나, 운영 검증 기준(EUC-KR 2byte, `$c.str.getByteLength` 와 동일)과 맞지 않아 기본값을 2byte 로 되돌리고 서버 인코딩에 따라 바꿀 수 있게 했다.
+  - `scwin.BYTE_LENGTH_INFO = { KOR_BYTE : 2 }` 신설 — ASCII(0x00~0x7F)는 항상 1byte, 한글 등 그 외 문자는 `KOR_BYTE`. UTF-8 기준 검증이 필요하면 `$c.validate.BYTE_LENGTH_INFO.KOR_BYTE = 3` 한 줄로 전환(유효하지 않은 값은 기본 2 로 계산).
+  - 헬퍼 `__getByteLengthUtf8` → `__getByteLength`(설정 반영) 개명, 설정값 조회 `__getKorByte` 신설(둘 다 `@hidden Y`·publicInfo 미등재). `maxLengthB` 객체형 `korEng` 안내 문구의 "한글 N자" 환산(`limit / 3` 고정)도 같은 설정을 따르도록 변경(80byte → 한글 40자).
+  - 문서: JSDoc 옵션 설명·`validate-generator.html` 안내 문구 갱신, `npm run docs:gcc` 재생성.
+  - 검증: Jest `test/validateDataCollect.test.js` — 기본 2byte 계산(실패/통과 경계·korEng 18/2=9자) 재작성 + `KOR_BYTE = 3` 전환(maxLengthB·minLengthB·korEng 18/3=6자·비정상 값 기본 2) 신규, 22건 통과(전체 237건); gcc lint 13 files 0/0.
 
 ## 2026년 9월
 
