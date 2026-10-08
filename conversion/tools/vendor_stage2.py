@@ -1382,6 +1382,16 @@ def normalize_deploy_paths(head, script, body, name=None):
     return head, script, body, log
 
 
+# ---------------------------------------------------------------- V39 보강: handleError 뒤 중복 console.error (2026-10-08)
+# `} catch (e) { $c.exception.handleError(e, {…});\n    console.error(e.message);\n }` — handleError 가 이미 기록하므로 뒤의 console.error 는 사문. 같은 catch 안, 바로 다음 문장일 때만 지운다.
+REDUNDANT_CONSOLE_RE = re.compile(r"(\$c\.exception\.handleError\((?P<v>\w+), \{[^\n]*\}\);[ \t]*\n)[ \t]*console\.(?:error|log|warn)\((?P=v)(?:\.message)?\);[ \t]*\n")
+
+
+def drop_redundant_console(script):
+    script, n = REDUNDANT_CONSOLE_RE.subn(r"\1", script)
+    return script, ({"dropped": n} if n else {})
+
+
 def apply(head, script, body):
     log = {}
     body_ids = set(re.findall(r'\sid="([^"]+)"', body))

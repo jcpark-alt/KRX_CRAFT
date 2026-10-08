@@ -682,6 +682,8 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
   (`"/jldfil05401/jldfil05401.xml"`)였고 ui-tobe 파일명은 대문자 줄기라 Linux 배포에서 어긋났다. 스크립트 경로 리터럴(moveUrl·openPopup·setPageFrameSrc·jQuery val 등 꼴 무관, `?쿼리` 허용) ·
   body `src=`/`href=` · head `meta_screenId` · `scwin.screenId = "…"` 를 규약으로 바꾼다. 대상이 ui-tobe 에 없는 화면(미전환·공통 팝업)은 같은 규약으로 바꾸되 줄 끝에 `TODO Stage2(V48)` 표지.
   주석 줄(규칙 0)과 `handleError` context 문자열(로그 표식)은 그대로. apply_regions 맨 끝(V37 뒤)에 둔다. 결과: 1,671화면: 경로 리터럴 985(레이어 팝업 /<화면>/<화면>_layer_x.xml 포함)·body src/href/ref 555·meta_screenId 1,671·scwin.screenId 1,665, 없는 대상 70종 표지, 잔존 소문자 경로 0.
+* **V39 보강 — handleError 뒤 중복 console(2026-10-08, `vendor_stage2.drop_redundant_console`)**: `} catch (e) { $c.exception.handleError(e, {…});` 바로 다음 문장이 `console.error(e.message);` 면
+  handleError 가 이미 기록하므로 지운다(같은 catch·같은 변수일 때만). 전량 검증에서 드러난 3자리(JLDDST15600·JLDDST90000).
 * **V42 eval 동적 멤버 접근(P3, 2026-10-07, `vendor_stage2.de_eval_member`, CLI `--v42`)**: `eval("document.all.span" + month)`·`eval('form.isurCd' + obj1)`·`eval('obj.x_' + idx + '.value')` 는
   이름을 문자열로 조립한 멤버 접근이라 대괄호 접근과 의미가 같다 → `document.all["span" + month]`·`form['isurCd' + obj1]`·`obj['x_' + idx].value`. eval 만 걷고 DOM 참조(document.all 등)는 그대로(B-7).
   첫 조각이 "경로.접두" 문자열이고 마지막 조각이 `.식별자` 꼬리면 속성 접근으로 잇는다; 조각에 `.`·`[`·`(` 가 든 문자열(옵션 색인 꼬리), 문장 eval(`eval("var r = " + d)`·대입), 주석 안은 손대지 않는다. 결과: 26화면 83자리 → 대괄호 접근, eval 148 → 65(27화면: 문장 eval·옵션 색인 꼬리·JSON eval).

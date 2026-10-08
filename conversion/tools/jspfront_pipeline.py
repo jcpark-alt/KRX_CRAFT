@@ -8,7 +8,7 @@
   1 vendor_postprocess   공급사 관용구 접기(V1~V13) — 규칙 13 충돌 개명은 convert 보다 먼저
   2 convert.convert      Stage 1 기계 치환(규칙 1~32)
   3 screen_convention    jsdoc·await·reindent·unused·finalize
-  4 convert.convert      재실행(고정점 확인 — 3 의 출력이 포매터와 호환되는지)
+  4 _settle               컨벤션 ↔ convert 를 둘 다 안 바뀔 때까지(convert 의 async 승격 뒤 JSDoc·await 가 따라오도록, 2026-10-08)
   5 publish_normalize    body 퍼블리싱 정규화(있을 때)
   6 convert.convert      재실행 → 5 의 결과가 다시 바뀌면 IDEM FAIL 로 보고
   5b publish_merge       KRX 퍼블리싱 XML 이 있는 화면은 퍼블리싱 body 에 공급사 id·이벤트·바인딩을 옮겨 심는다(규칙 35) — 판정 auto/todo/manual 이면
@@ -63,6 +63,26 @@ def _converge(dst, name, max_passes=3):
     return changed, False
 
 
+def _settle(dst, name, pcc, async_common, max_rounds=3):
+    """컨벤션 → convert 수렴을 둘 다 안 바뀔 때까지(최대 max_rounds). convert 가 함수를 async 로 올리면 컨벤션의 `@returns {Promise<void>}`·await 가
+    다음 회차에서야 따라오므로(전량 검증 2026-10-08: 371본이 `@returns {void}` 로 남아 있었다) 한 번으로 끝내지 않는다. returns (convert 변경 회차 합, 수렴 여부)."""
+    total = 0
+    for _ in range(max_rounds):
+        before = io.open(dst, "r", encoding="utf-8").read()
+        sc.apply(str(dst), pcc=pcc, async_common=async_common)
+        conv_changed = io.open(dst, "r", encoding="utf-8").read() != before
+        changed, ok = _converge(dst, name)
+        total += changed
+        if not conv_changed and changed == 0:
+            return total, True
+        if not ok:
+            return total, False
+    # 마지막 회차에서도 둘 중 하나가 바뀌었으면 한 번 더 확인
+    before = io.open(dst, "r", encoding="utf-8").read()
+    sc.apply(str(dst), pcc=pcc, async_common=async_common)
+    return total, io.open(dst, "r", encoding="utf-8").read() == before
+
+
 def run(name, publish=True, gate=True, inventory=None, merge=True):
     name = name.lower()
     src = UI / (name + ".xml")
@@ -90,15 +110,16 @@ def run(name, publish=True, gate=True, inventory=None, merge=True):
     TOBE.mkdir(parents=True, exist_ok=True)
     io.open(dst, "w", encoding="utf-8", newline="").write(text)
     # 3 convention
-    rep["convention"] = sc.apply(str(dst), pcc=st.pcc_for(name), async_common=(inventory or st.common_inventory(st.pcc_for(name)))[1])
+    async_common = (inventory or st.common_inventory(st.pcc_for(name)))[1]
+    rep["convention"] = sc.apply(str(dst), pcc=st.pcc_for(name), async_common=async_common)
     rep["convention"].pop("name", None)
     # 4 convert again — 컨벤션 단계가 규칙 4 보류 원인(함수 사이 최상위 실행문·미사용 전역)을 치우면 다음 회차에서야
-    #   재정렬이 일어나므로 안정될 때까지 돌린다(최대 3회). 3회 안에 수렴하지 않으면 FAIL.
-    rep["convert_passes"], rep["idem_after_convention"] = _converge(dst, name)
+    #   재정렬이 일어나므로 안정될 때까지 돌린다(최대 3회). convert 가 async 를 올리면 컨벤션(JSDoc·await)도 다시 — _settle.
+    rep["convert_passes"], rep["idem_after_convention"] = _settle(dst, name, st.pcc_for(name), async_common)
     # 5 publish
     if publish and pn is not None:
         rep["publish"] = pn.apply(str(dst))
-        _, rep["idem_after_publish"] = _converge(dst, name)
+        _, rep["idem_after_publish"] = _settle(dst, name, st.pcc_for(name), async_common)
     # 5b publish_merge — 퍼블리싱 XML 이 있는 화면은 병합 결과를 ui-tobe 에 쓴다(판정이 닫힘일 때만)
     if merge and name.lower() in idx and not ov.get("skip"):
         pub_path, ambiguous = pm.pick_publish(idx[name.lower()])
@@ -108,7 +129,7 @@ def run(name, publish=True, gate=True, inventory=None, merge=True):
         rep["merge"] = {"verdict": mrep["verdict"], "matched": mrep["matched"], "pub_items": mrep["pub_items"], "todo": mrep.get("todo", 0), "jquery": mrep.get("jquery", 0)}
         rep["merge_rep"] = mrep
         if mrep["verdict"] in ("auto", "todo", "manual"):
-            _, rep["idem_after_merge"] = _converge(dst, name)
+            _, rep["idem_after_merge"] = _settle(dst, name, st.pcc_for(name), async_common)
     elif merge and name.lower() in idx:
         rep["merge"] = {"verdict": "mismatch", "skip": ov["skip"]}
         rep["merge_rep"] = {"name": name, "verdict": "mismatch", "matched": 0, "pub_items": 0, "missing_refs": [], "unmatched_vendor": [], "todo": 0, "log": ["override skip: " + ov["skip"]], "ambiguous": False}

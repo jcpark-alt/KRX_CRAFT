@@ -1408,3 +1408,27 @@ scwin.a = async function () {
     assert '<w2:pageFrame id="p1" src="/ui/jsp/JLDFIL05010C.xml"/>' in b and 'src="/cm/xml/contentHeader.xml"' in b
     h2, out2, b2, log2 = vs.normalize_deploy_paths(h, out, b)
     assert (h2, out2, b2, log2) == (h, out, b, {})
+
+
+def test_v39_drop_redundant_console():
+    """V39 보강: handleError 바로 뒤의 console.error(e.message) 삭제; 다른 변수·다른 자리의 console 은 그대로. 멱등."""
+    src = """scwin.a = function () {
+    try {
+        x();
+    } catch (e) { $c.exception.handleError(e, { notify: 'none', context: 'jlddst15600' });
+        console.error(e.message);
+    }
+    try {
+        y();
+    } catch (ex) { $c.exception.handleError(ex, { context: 'x' });
+        console.error(e.message);
+    }
+    console.error(e.message);
+};
+"""
+    out, log = vs.drop_redundant_console(src)
+    assert log == {"dropped": 1}
+    assert "    } catch (e) { $c.exception.handleError(e, { notify: 'none', context: 'jlddst15600' });\n    }\n" in out
+    assert out.count("console.error(e.message);") == 2
+    out2, log2 = vs.drop_redundant_console(out)
+    assert out2 == out and log2 == {}
