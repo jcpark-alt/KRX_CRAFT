@@ -135,3 +135,17 @@ def test_init_restructure_moves_init_statements():
     assert "// 초기화함수\n        scwin.init();\n\n        await scwin.searchList();" in new_js
     again, msg2 = init_restructure.restructure(new_js)
     assert again is None and msg2 == "이미 init 호출 구조"
+
+
+def test_parse_box_strips_single_line_block_comment_markers():
+    # 2026-10-08 ULDSTF92040: `/* 설명 */` 한 줄 블록 주석의 표지가 @description 에 남아 JSDoc 이 `*/` 에서 닫히던 결함
+    desc, params = sc.parse_box("/* 기초시장 및 기초 자산*/\n")
+    assert desc == "기초시장 및 기초 자산" and params == {}
+    desc2, _ = sc.parse_box("/*\n * 설명 : 목록 조회\n */\n")
+    assert desc2 == "목록 조회"
+
+
+def test_finalize_adds_screen_id_without_screen_name():
+    head = '<head meta_convertType="Craft" >\n<w2:buildDate/>\n<xf:model><w2:dataCollection baseNode="map"></w2:dataCollection></xf:model>\n</head>'
+    new_head, _s, _b, _log = sc.finalize_head_body(head, "scwin.onpageload = function () {};\n", "<body></body>", "ULDSTF99999")
+    assert 'meta_screenId="ULDSTF99999"' in new_head and "<w2:layoutInfo/>" in new_head

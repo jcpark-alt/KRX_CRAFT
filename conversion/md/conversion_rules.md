@@ -186,7 +186,7 @@
     * 규칙 14b: `$c.{객체명}.showObj({컴포넌트}, false)` → `{컴포넌트}.hide();`
     * 규칙 14c: `$c.{객체명}.getObjectValue({컴포넌트})` → `{컴포넌트}.getValue();`
     * 규칙 14d: `$c.{객체명}.setObjectValue({컴포넌트}, value)` → `{컴포넌트}.setValue(value);`
-    * 규칙 14e: `$c.{객체명}.removeRow({컴포넌트}, row)` → `{컴포넌트}.removeRows(row);` — 첫 인자=컴포넌트를 수신 객체로 승격하고, 두 번째 인자(행 위치/인덱스)를 네이티브 `removeRows(…)` 에 그대로 전달(메서드명 단수→복수). *예시:* `$c.cp.removeRow(dts_fileList, i)` → `dts_fileList.removeRows(i)`
+    * 규칙 14e: `$c.{객체명}.removeRow({컴포넌트}, row)` → `{컴포넌트}.removeRow(row);` — 첫 인자=컴포넌트를 수신 객체로 승격하고, 두 번째 인자(행 위치/인덱스)를 네이티브 `removeRow(…)` 에 그대로 전달. 엔진 `DataList.removeRows(t)` 는 **배열 전용**(`t.length`·`t.sort()`)이라 단일 인덱스를 넘기면 예외가 엔진 try/catch 에 삼켜져 행이 지워지지 않는다 — 2026-10-08 이전 산출(`removeRows(i)`)은 이 결함을 안고 있으므로 전환본에서 `.removeRows(<배열 아닌 인자>)` 를 찾아 `removeRow` 로 바꿀 것. *예시:* `$c.cp.removeRow(dts_fileList, i)` → `dts_fileList.removeRow(i)`
 * **치환 시 유의사항**:
     * `{객체명}` 네임스페이스는 무엇이든(`$c.stf`, `$c.fil`, `$c.ins`, `$c.mgt` 등) 대상이며, 첫 인자(컴포넌트 식별자/표현식)와 나머지 인자(setObjectValue 의 `value` 등)는 보존합니다.
     * `showObj` 의 두 번째 인자는 **불리언 리터럴(`true`/`false`)** 인 경우에만 자동 치환합니다. 변수 등 동적 값이면 `show`/`hide` 분기를 정적으로 결정할 수 없으므로 보류·리포트합니다.
@@ -780,6 +780,8 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
   기준(2026-10-06): 이름 일치 260화면 → auto 89 · todo 160(표지 1,576) · manual 3 · mismatch 8(override skip: 같은 이름에 다른 화면 6·퍼블리싱 빈 자리표 2) · review 0, `ui-pub` 252본 게이트·lint 0/0, 고정점. 테스트 `test_jspfront_tools.py::test_publish_merge_*`.
 
 ## 규칙 6 보충: Submission 변환 상세
+
+* **규칙 12 — `{DC}.DataID = encodeURI(url)` 의 `url` 선언 역추적 스코프**(2026-10-08): 선언(`var|let|const url = …;`)은 DataID 문이 든 **같은 최상위 함수 안**에서만 찾는다. 스크립트 전체에서 "앞에 있는 마지막 대입"을 고르면 규칙 4 재배치 뒤 다른 핸들러의 팝업 URL 상수(`let url = "/ui/lst/lstproc/ULDSTF05106_read.xml";`)가 걸려 삭제되고 해석 실패한 DataID 는 그대로 남는다(ULDSTF92002 button_1_onclick). 같은 함수에 선언이 없으면 「action URL 해석 실패」로 보류한다. 회귀 테스트 `test_convert_rule12_scope.py`.
 
 기존 가이드의 `gridview : "grd_main"`과 같은 고정 기본값 대신, 아래의 **역추적 매핑 규칙**을 적용합니다.
 

@@ -141,7 +141,8 @@ def returns_of(body_code, is_async):
 
 def parse_box(block):
     """레거시 박스/자유 블록 주석 → (description, {param: desc}) 또는 None(JSDoc 꼴이면)."""
-    lines = [re.sub(r'^\s*\*+\s?', '', l).rstrip() for l in block.split("\n")]
+    # 한 줄 블록 주석(`/* 설명 */`)의 여닫는 표지도 벗긴다 — 안 벗기면 @description 에 `*/` 가 남아 JSDoc 이 거기서 닫힌다(2026-10-08 ULDSTF92040)
+    lines = [re.sub(r'^\s*\*+\s?', '', re.sub(r'\s*\*/\s*$', '', re.sub(r'^\s*/\*+\s?', '', l))).rstrip() for l in block.split("\n")]
     lines = [l for l in lines if l.strip() and not re.fullmatch(r'[\s*/]+', l)]
     desc, params, extra = [], {}, []
     for l in lines:
@@ -363,7 +364,11 @@ def finalize_head_body(head, script, body, name):
     log = {}
     funcs = st.defined_functions(script)
     if 'meta_screenId=' not in head:
-        head = re.sub(r'(meta_screenName="[^"]*")', r'\1 meta_screenId="%s"' % name, head, 1)
+        if 'meta_screenName=' in head:
+            head = re.sub(r'(meta_screenName="[^"]*")', r'\1 meta_screenId="%s"' % name, head, 1)
+        else:
+            # meta_screenName 조차 없는 head(W-Craft 사본 일부) — id 만 넣고 이름은 사람이 채운다(WS111 은 이름 쪽만 남는다)
+            head = re.sub(r'<head\b', '<head meta_screenId="%s"' % name, head, 1)
     head = st.set_public_info(head, funcs)
     if "<w2:layoutInfo" not in head:
         head = re.sub(r'(<w2:buildDate\s*/>)', r'\1\n\t\t<w2:layoutInfo/>', head, 1)
@@ -431,7 +436,9 @@ def apply(path, steps=STEPS, pcc=None, async_common=None, dry=False, overrides=N
     if "await" in steps:
         if async_common is None:
             async_common = st.common_inventory(pcc or st.pcc_for(name))[1]
-        script, n1 = propagate_await(script, async_common)
+        # $c.win.alert/confirm 은 async 선언이 아니지만 Promise 를 돌려준다 — 재고(async 선언만 수집)에 없어도 항상 await 대상
+        # (2026-10-08 fil/lst/common 리뷰: async 함수 안의 alert 미await → return 이 대화상자보다 먼저 실행, confirm 은 Promise 가 항상 참)
+        script, n1 = propagate_await(script, set(async_common) | {("win", "alert"), ("win", "confirm")})
         script, n2 = fix_catch_await(script)
         log["await_added"] = n1 + n2
     if "reindent" in steps:

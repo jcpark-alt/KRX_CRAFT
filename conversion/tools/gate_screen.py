@@ -47,9 +47,10 @@ KEEP_GLOBALS = {"screenId"}
 # 공급사 확장 중 2차(컴포넌트 계약 전환)로 미룬 것 — 호출은 남고 TODO Stage2 로 집계한다(r13 README §2-2 fieldEl 199~239자리)
 KNOWN_TODO_C = {"$c.util.fieldEl"}
 # 정의가 어디에도 없는 as-is 공통(`$c.cm.fn_*`, 공급사 README §2-2 B 그룹 잔존·목록 밖 19종) — 닿으면 오류로 드러나는 자리, TODO 집계
-KNOWN_TODO_RE = re.compile(r'^\$c\.(cm\.|lc\.|frame\.|utils\.|fil\.)')
+KNOWN_TODO_RE = re.compile(r'^\$c\.(cm\.|lc\.|frame\.|utils\.|fil\.|rpt\.)')
 # $c.lc/$c.frame/$c.utils 는 공급사 pcc 번들·Gauce 프레임 의존(저장소에 정의 없음), $c.fil 은 저장소 pcc/fil 이 부분 반입(2종)이라
-# 재고에 없는 호출은 결함이 아니라 「반입 또는 치환 판단」 명부다(2026-10-02 2단계 jldstf 배치)
+# 재고에 없는 호출은 결함이 아니라 「반입 또는 치환 판단」 명부다(2026-10-02 2단계 jldstf 배치).
+# $c.rpt(리포트 공통, 저장소에 정의 없음)도 같은 명부 — stf 25화면·fil/lst/common 26화면 전환본이 `TODO Stage2: 리포트 공통 $c.rpt 미반입` 주석과 함께 호출을 남긴다(2026-10-08)
 FAIL_TOKENS = ("console.log", "var ", "loose ==/!=", "native alert(", "debugger", "tab char", "trailing ws",
                "/_commons script")
 # 보고만 하는 토큰: `new Array(n)`(길이 지정) · `fn_ def`(규칙 13 이 못 바꾸는 정의 — 숫자 시작 `fn_70000Table_*`·예약어·동명 전역, 공급사 README 52자리)

@@ -16,8 +16,8 @@ substitution_dict() 를 단일 출처로 사용한다.
   · 규칙 7 : substitution_dict() 의 (태그없음·무충돌·순수식별자) 함수 호출부 단어경계 치환
   · 규칙 7m: 레거시 메서드 호출 {객체}.CloseFrame() -> $c.win.closePopup() (수신 객체 제거, 무인자만)
   · 규칙 7n: 이미 $c.<ns>. 붙은 레거시명 정규화 $c.stf.fn_setFromToDate( -> $c.stf.setFromToDate( (인자 보존)
-  · 규칙 14: $c.<ns>.showObj/getObjectValue/setObjectValue/removeRow(컴포넌트,…) -> 컴포넌트.show("")/hide()/getValue()/setValue(…)/removeRows(…)
-            (첫 인자=컴포넌트를 수신 객체로 승격; showObj 는 2번째 불리언 리터럴로 분기; removeRow→removeRows)
+  · 규칙 14: $c.<ns>.showObj/getObjectValue/setObjectValue/removeRow(컴포넌트,…) -> 컴포넌트.show("")/hide()/getValue()/setValue(…)/removeRow(…)
+            (첫 인자=컴포넌트를 수신 객체로 승격; showObj 는 2번째 불리언 리터럴로 분기; removeRow 는 단일 인덱스라 removeRow 유지 — removeRows 는 배열 전용)
   · 규칙 15: $c.<ns>.alert_error(…) -> $c.win.alert(…)  (네임스페이스+이름 변경, 인자 보존)
   · 규칙 13: scwin.fn_* 정의 함수의 fn_ 제거 + camelCase 정규화, 정의·호출부(head/script/body) 동기화
   · 규칙 12: 같은 스코프의 {DC}.DataID = encode({url})|"리터럴" + {DC}.reset()|{DC}.Reset() 쌍을
@@ -766,13 +766,15 @@ def _rule14_build(method, args, snippet, report):
         comp = args[0]
         report["rule14"].append("getObjectValue(%s) -> %s.getValue()" % (comp, comp))
         return "%s.getValue()" % comp
-    if method == "removeRow":   # $c.cp.removeRow(comp, row) -> comp.removeRows(row)
+    if method == "removeRow":   # $c.cp.removeRow(comp, row) -> comp.removeRow(row)
+        # 엔진 DataList.removeRows(t) 는 배열(t.length·t.sort) 만 받는다 — 단일 인덱스는 removeRow(idx). 종전 removeRows(row) 산출은
+        # try/catch 에 삼켜져 행이 지워지지 않는 결함이었다(2026-10-08 fil/lst/common 리뷰)
         if len(args) != 2:
             report["judgment"].append("규칙14 removeRow 보류(인자 %d개): %s" % (len(args), snippet))
             return None
         comp, row = args[0], args[1]
-        report["rule14"].append("removeRow(%s, …) -> %s.removeRows(…)" % (comp, comp))
-        return "%s.removeRows(%s)" % (comp, row)
+        report["rule14"].append("removeRow(%s, …) -> %s.removeRow(…)" % (comp, comp))
+        return "%s.removeRow(%s)" % (comp, row)
     # setObjectValue
     if len(args) != 2:
         report["judgment"].append("규칙14 setObjectValue 보류(인자 %d개): %s" % (len(args), snippet))
@@ -786,7 +788,7 @@ def rule14_component_method(code, report):
     """`$c.<ns>.showObj/getObjectValue/setObjectValue/removeRow(컴포넌트, …)` 를 컴포넌트 네이티브
     메서드 호출로 치환(첫 인자=컴포넌트를 수신 객체로 승격). 인자 안의 중첩 호출도 재귀로 함께 변환한다.
     showObj 는 2번째 불리언 리터럴(true/false)일 때만 show("")/hide() 로 분기.
-    removeRow(comp, row) 는 comp.removeRows(row) 로 승격. 리터럴 내부 보호."""
+    removeRow(comp, row) 는 comp.removeRow(row) 로 승격(단일 인덱스 — removeRows 는 배열 전용). 리터럴 내부 보호."""
     pat = re.compile(r'\$c\.[A-Za-z_$][\w$]*\.(' + "|".join(_COMPONENT_METHODS) + r')\s*\(')
     mask = code_mask(code)
     res, last = [], 0
@@ -1905,10 +1907,18 @@ def rule12_dynamic_submission(script, report):
         action = _find_url_literal(inner, loose=False)
         if not action and re.match(r'^[A-Za-z_$][\w$]*$', inner):
             ident = inner
+            # 선언 탐색은 DataID 문이 든 **같은 최상위 함수 안**으로 제한한다 — 스크립트 전체에서 "앞에 있는 마지막 대입"을 고르면
+            # 규칙 4 재배치 뒤 다른 함수의 `let url = "/ui/…xml"`(팝업 URL) 이 걸려 삭제된다(2026-10-08 ULDSTF92002 button_1_onclick)
+            scope_start = 0
+            for fm in re.finditer(r'(?m)^scwin\.[\w$]+\s*=\s*(?:async\s+)?function\b', script):
+                if fm.start() < mo.start():
+                    scope_start = fm.start()
+                else:
+                    break
             for dm in re.finditer(
                     r'(?m)^[ \t]*(?:/+[ \t]*)?(?:var|let|const)?[ \t]*' + re.escape(ident)
                     + r'\s*=(?!=)\s*([^\n;]+);', script):
-                if dm.start() < mo.start():
+                if scope_start <= dm.start() < mo.start():
                     url_decl = (dm.start(), dm.end(), ident, dm.group(1))
             if url_decl:
                 action = _find_url_literal(url_decl[3], loose=True)
