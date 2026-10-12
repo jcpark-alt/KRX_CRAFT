@@ -1,0 +1,509 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDSTF35004.gfm" meta_screenName="CB/SC 관련 송수신 내역" meta_screenId="ULDSTF35004">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<w2:layoutInfo/>
+		<w2:publicInfo method="scwin.onpageload,scwin.onpageunload,scwin.icn_SCal_onclick,scwin.icn_ECal_onclick,scwin.edt_SDate_OnLastChar,scwin.edt_EDate_OnLastChar,scwin.btn_Search_onclick,scwin.dts_Grid_OnFail,scwin.dts_Grid_OnLoadError,scwin.dts_Grid_OnLoadCompleted,scwin.grd_Grid_OnClick,scwin.trs_save_OnFail,scwin.trs_save_OnSuccess,scwin.btn_Excel_onclick,scwin.cmb_PeriodTp_onselchange,scwin.search,scwin.save,scwin.dateCheck"/>
+		<xf:model>
+			<w2:dataCollection baseNode="map"></w2:dataCollection>
+			<w2:workflowCollection/>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+
+// 화면 리사이징
+
+scwin.gLdMktTp = js_market;
+scwin.gEmpNo = js_emp_no;
+scwin.gIsurCd;
+scwin.gMsgStr;
+
+///////// 2. 초기화 영역 /////////
+/**
+ * @method
+ * @name onpageload
+ * @description 화면 로딩 시 초기 처리 — init 순차 호출
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.onpageload = async function() {
+    try {
+        $c.cm.PanelToGroupBox(panel_1);
+        vCurDate = $c.ut.cGetToday("yyyymmdd");
+        edt_SDate.setValue(vCurDate); // 일주일전 날짜 cGetMinusDate2(vCurDate, 7)
+        edt_EDate.setValue(vCurDate);
+        if (scwin.gLdMktTp === '1' || scwin.gLdMktTp === '2') {
+            rdo_MKT_ID.setValue(scwin.gLdMktTp);
+            rdo_MKT_ID.hide();
+            label_4.hide();
+            $c.cm.setColumnProp(grd_Grid, "LD_MKT_TP_NM", "show", false);
+        } else {
+            rdo_MKT_ID.setValue('9');
+            rdo_MKT_ID.show("");
+            label_4.show("");
+            $c.cm.setColumnProp(grd_Grid, "LD_MKT_TP_NM", "show", true);
+        }
+        await scwin.search();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF35004.onpageload" });
+    }
+};
+
+/**
+ * @method
+ * @name onpageunload
+ * @description 화면 언로드 시 정리 처리
+ * @returns {void}
+ * @hidden N
+ */
+scwin.onpageunload = function() {
+};
+
+///////// 3. 컴포넌트 이벤트 영역 /////////
+/**
+ * @method
+ * @name icn_SCal_onclick
+ * @description icn_SCal 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.icn_SCal_onclick = function() {
+    try {
+        popUpCalendar4(edt_SDate, 1);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF35004.icn_SCal_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name icn_ECal_onclick
+ * @description icn_ECal 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.icn_ECal_onclick = function() {
+    try {
+        popUpCalendar4(edt_EDate, 2);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF35004.icn_ECal_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name edt_SDate_OnLastChar
+ * @description edt SDate On Last Char 처리
+ * @param {*} ch ch
+ * @returns {void}
+ * @hidden N
+ */
+scwin.edt_SDate_OnLastChar = function(ch) {
+    try {
+        afterPopUpCalendar(1); // if(시작일>종료일) 종료일=시작일;
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF35004.edt_SDate_OnLastChar" });
+    }
+};
+
+/**
+ * @method
+ * @name edt_EDate_OnLastChar
+ * @description edt EDate On Last Char 처리
+ * @param {*} ch ch
+ * @returns {void}
+ * @hidden N
+ */
+scwin.edt_EDate_OnLastChar = function(ch) {
+    try {
+        afterPopUpCalendar(2); // if(시작일>종료일) 시작일=종료일;
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF35004.edt_EDate_OnLastChar" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_Search_onclick
+ * @description 「조회」 클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.btn_Search_onclick = async function() {
+    try {
+        await scwin.search();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF35004.btn_Search_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name dts_Grid_OnFail
+ * @description Grid On Fail 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.dts_Grid_OnFail = async function() {
+    try {
+        await $c.win.alert("조회시 오류가 발생하였습니다. 시스템관리자에게 문의하세요");
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF35004.dts_Grid_OnFail" });
+    }
+};
+
+/**
+ * @method
+ * @name dts_Grid_OnLoadError
+ * @description dts_Grid 로드 오류 처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.dts_Grid_OnLoadError = async function() {
+    try {
+        await $c.win.alert("조회시 오류가 발생하였습니다. 시스템관리자에게 문의하세요");
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF35004.dts_Grid_OnLoadError" });
+    }
+};
+
+/**
+ * @method
+ * @name dts_Grid_OnLoadCompleted
+ * @description dts_Grid 로드 완료 후처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @param {Number} rowcount 조회 건수
+ * @returns {void}
+ * @hidden N
+ */
+scwin.dts_Grid_OnLoadCompleted = function(rowcount) {
+    try {
+        $c.stf.fillGridHeaderTotalCnt(rowcount, panel_page);
+        if (rowcount <= 0) {
+            dts_Grid.removeAll();
+        }
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF35004.dts_Grid_OnLoadCompleted" });
+    }
+};
+
+/**
+ * @method
+ * @name grd_Grid_OnClick
+ * @description grd_Grid 클릭 처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @param {Number} row 행 인덱스
+ * @param {*} colid colid
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.grd_Grid_OnClick = async function(row, colid) {
+    try {
+        const gNotiYn = dts_Grid.getCellData(row, "NOTI_YN");
+        const gAcptNo = dts_Grid.getCellData(row, "ACPT_NO");
+        if (colid === 'NOTI_YN') {
+            if (gNotiYn === 'R') {
+                const sbmOptions = {
+                    id : "sbm_dts_UpdateList",
+                    action : "/gauceSystemierAdaptor.do",
+                    ref : "",
+                    target : "dts_UpdateList=body.content",
+                    isProcessMsg : false
+                };
+
+                const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+                // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+                dts_UpdateList.insertRow();
+                await scwin.save(gAcptNo);
+            }
+        } else if (colid === "DOC_TITLE") {
+            await $c.stf.openDisclViewer(gAcptNo, "R");
+        }
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF35004.grd_Grid_OnClick" });
+    }
+};
+
+/**
+ * @method
+ * @name trs_save_OnFail
+ * @description save On Fail 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.trs_save_OnFail = async function() {
+    try {
+        await $c.win.alert($c.stf.getMessageParam("MSG-A002", '유선통보 저장'));
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF35004.trs_save_OnFail" });
+    }
+};
+
+/**
+ * @method
+ * @name trs_save_OnSuccess
+ * @description save On Success 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.trs_save_OnSuccess = async function() {
+    try {
+        await $c.win.alert($c.stf.getMessageParam("MSG-0001", '유선통보 저장'));
+        await scwin.search();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF35004.trs_save_OnSuccess" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_Excel_onclick
+ * @description 「엑셀다운로드」 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.btn_Excel_onclick = function() {
+    try {
+        $c.stf.doLogSave("ULDSTF35004.xml", SCREN_PROCS_TP_CD_07, '');
+        $c.data.downloadGridViewExcel(grd_Grid, {fileName: "CB,SC 송수신 내역", type: "2"});
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF35004.btn_Excel_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name cmb_PeriodTp_onselchange
+ * @description cmb_PeriodTp onselchange 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.cmb_PeriodTp_onselchange = function() {
+    try {
+        const vTp = $c.cp.valueOfIndex(cmb_PeriodTp, "VALUE", cmb_PeriodTp.getSelectedIndex());
+        $c.stf.setFromToDate(vTp, edt_SDate, edt_EDate);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF35004.cmb_PeriodTp_onselchange" });
+    }
+};
+
+///////// 4. 서브미션 콜백 영역 /////////
+/**
+ * @method
+ * @name search
+ * @description search 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.search = async function() {
+    if (await scwin.dateCheck() === false) {
+        return;
+    }
+    const sbmOptions = {
+        id : "sbm_dts_Grid",
+        action : "/AtsContactInfo.do",
+        ref : "",
+        target : "dts_Grid=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+};
+
+/**
+ * @method
+ * @name save
+ * @description save 처리
+ * @param {*} gAcptNo gAcptNo
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.save = async function(gAcptNo) {
+    const rtn = window.confirm('유선 통보하였습니까?');
+    if (rtn === 1) {
+        dts_UpdateList.setCellData(1, "ACPT_NO", gAcptNo);
+        dts_UpdateList.setCellData(1, "EMP_NO", scwin.gEmpNo);
+        trs_save.KeyName = "toinb_dataid4";
+        const sbmOptions = {
+            id : "sbm_trs_save",
+            action : "/AtsContactInfo.do",
+            ref : "dts_UpdateList",
+            target : "trs_save=body.content",
+            isProcessMsg : false
+        };
+
+        const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+        // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+    }
+};
+
+///////// 5. 일반/업무 함수 영역 /////////
+/**
+ * @method
+ * @name dateCheck
+ * @description date Check 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.dateCheck = async function() {
+    if (parseInt(edt_SDate.getValue(), '10') > parseInt(edt_EDate.getValue(), '10')) {
+        await $c.win.alert("[조회기간 시작일은 종료일보다 작아야 합니다.]다시 입력해주세요");
+        return false;
+    }
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+		<xf:group class="sub_contents" id="" meta_componentContainer="true" style="">
+			<xf:group class="schbox" id="" style="">
+				<xf:group class="schbox_inner" id="" style="">
+					<xf:group adaptive="layout" adaptiveThreshold="768" class="w2tb tbl " id="" style="" tagname="table">
+						<w2:attributes>
+							<w2:summary></w2:summary>
+						</w2:attributes>
+						<xf:group tagname="colgroup">
+							<xf:group style="width:100px;" tagname="col"></xf:group>
+							<xf:group style="" tagname="col"></xf:group>
+							<xf:group style="width:100px;" tagname="col"></xf:group>
+							<xf:group style="" tagname="col"></xf:group>
+						</xf:group>
+						<xf:group class="" id="" style="" tagname="tr">
+							<xf:group class="w2tb_th" style="" tagname="th">
+								<w2:textbox hierarchy="lbl_tmp_1" id="lbl_tmp_1" label="조회일자" orgid="lbl_tmp_1" style=""
+									userData2=" class:TopCondition_01; font-family:돋움;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group class="w2tb_td" style="" tagname="td">
+								<w2:inputCalendar calendarValueType="yearMonthDate" focusOnDateSelect="false" footerDiv="true"
+									id="edt_SDate" renderDiv="true" renderType="" rightAlign="false" style="width: 120px;">
+								</w2:inputCalendar>
+								<w2:span id="" label="~" style=""></w2:span>
+								<w2:inputCalendar calendarValueType="yearMonthDate" focusOnDateSelect="false" footerDiv="true"
+									id="edt_EDate" renderDiv="true" renderType="" rightAlign="false" style="width: 120px;">
+								</w2:inputCalendar>
+								<xf:select1 appearance="minimal" disabledClass="w2selectbox_disabled" displayMode="label"
+									ev:onchange="scwin.cmb_PeriodTp_onselchange" hierarchy="cmb_PeriodTp" id="cmb_PeriodTp" item="1주일^1,1개월^2,3개월^3,6개월^4,1년^5,2년^6"
+									maxlength="20" orgid="cmb_PeriodTp" selectedData="true" style="width:108px;"
+									userData2=" bindcolumn:disp; defaultstring:기간선택; inheritcolor:False; listcount:10; listexprformat:disp^0^70; xpstyle:True; font-family:돋움;">
+									<xf:choices>
+										<xf:item>
+											<xf:label><![CDATA[1]]></xf:label>
+											<xf:value><![CDATA[1주일]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[2]]></xf:label>
+											<xf:value><![CDATA[1개월]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[3]]></xf:label>
+											<xf:value><![CDATA[3개월]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[4]]></xf:label>
+											<xf:value><![CDATA[6개월]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[5]]></xf:label>
+											<xf:value><![CDATA[1년]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[6]]></xf:label>
+											<xf:value><![CDATA[2년]]></xf:value>
+										</xf:item>
+									</xf:choices>
+								</xf:select1>
+							</xf:group>
+							<xf:group class="w2tb_th" style="" tagname="th">
+								<w2:textbox hierarchy="label_4" id="label_4" label="시장구분" orgid="label_4" style=""
+									userData2=" class:TopCondition_01; font-family:돋움;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group class="w2tb_td" id="" style="" tagname="td">
+								<xf:select1 appearance="full" hierarchy="rdo_MKT_ID" id="rdo_MKT_ID" item="9^전체,1^유가,2^코스닥"
+									orgid="rdo_MKT_ID" renderType="radiogroup" selectedIndex="0" style=""
+									userData2=" class:TopCondition_Blue; automargin:True; cols:3; font-family:돋움;">
+									<xf:choices>
+										<xf:item>
+											<xf:label><![CDATA[전체]]></xf:label>
+											<xf:value><![CDATA[9]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[유가]]></xf:label>
+											<xf:value><![CDATA[1]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[코스닥]]></xf:label>
+											<xf:value><![CDATA[2]]></xf:value>
+										</xf:item>
+									</xf:choices>
+								</xf:select1>
+							</xf:group>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+				<xf:group class="btn_schbox" id="" style="">
+					<xf:trigger class="btn_cm sch" cursor="pointer" id="btn_Search"
+						src="../img/btn_select.gif" style="">
+						<xf:label><![CDATA[조회]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+			<xf:group class="titbox" id="" style="">
+				<xf:group class="rt" id="" style="">
+					<xf:trigger class="btn_cm download" cursor="pointer" ev:onclick="scwin.btn_Excel_onclick" hierarchy="btn_Excel"
+						id="btn_Excel" orgid="btn_Excel" src="../img/btn_excelsave.gif" style="" text="엑셀다운로드">
+						<xf:label><![CDATA[엑셀다운로드]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+			<xf:group class="gvwbox" id="" style="">
+				<w2:gridView class="gvw" dataList="data:dts_Grid" hierarchy="grd_Grid" id="grd_Grid" orgid="grd_Grid" style="height: 153px;"
+					userData2=" class:Grid_01; colsizing:True; editable:False; fillarea:True; fixsizing:True; focusrect:False; gtitleheight:0; headborder:4; indwidth:0; rowheight:22; sortview:left; titleheight:25; tooltip:use=true;alt=true;createtime=300;color=#FFFFFF;backcolor=#808080;edgecolor=#333333;leftmargin=10;rightmargin=10;topmargin=10;bottommargin=10;; usingoneclick:1; xtitleheight:0; onclick:grd_Grid_OnClick;">
+					<w2:caption id="caption1" style="" value="this is a grid caption."></w2:caption>
+					<w2:header id="header1" style="">
+						<w2:row>
+							<w2:column displayMode="label" id="h_NO" inputType="text" textAlign="center"
+								userData2=" color:#343434; value:{currow};" value="번호" width="50">
+							</w2:column>
+							<w2:column displayMode="label" id="h_LD_MKT_TP_NM" inputType="text" textAlign="center" userData2=" sort:True;"
+								value="시장구분" width="80">
+							</w2:column>
+							<w2:column displayMode="label" id="h_DOC_TITLE" inputType="text" textAlign="center"
+								userData2=" cursor:hand; sort:True;" value="시장안내 제목" width="370">
+							</w2:column>
+							<w2:column displayMode="label" id="h_RCV_DDTM" inputType="text" textAlign="center" userData2=" sort:True;"
+								value="CB/SC 발동 시각" width="150">
+							</w2:column>
+							<w2:column displayMode="label" id="h_PUBL_DDTM" inputType="text" textAlign="center" userData2=" sort:True;"
+								value="CB/SC 시장안내 시각" width="150">
+							</w2:column>
+							<w2:column displayMode="label" id="h_SMS_DDTM" inputType="text" textAlign="center" value="SMS 발신 시각"
+								width="150">
+							</w2:column>
+							<w2:column displayMode="label" id="h_ATS_DDTM" inputType="text" textAlign="center" userData2=" sort:True;"
+								value="NXT 전문 수신 시각" width="150">
+							</w2:column>
+							<w2:column displayMode="label" id="h_NOTI_YN" inputType="text" textAlign="center"
+								userData2=" value:{Decode(NOTI_YN,'R','필요','N','불필요','Y', '완료', '-')}; sort:True; bgcolor:{Decode(NOTI_YN,'R','#FFFF99')};"
+								value="유선통보" width="120">
+							</w2:column>
+						</w2:row>
+					</w2:header>
+					<w2:gBody id="gBody1" style="">
+						<w2:row id="" style="">
+							<w2:column displayMode="label" id="NO" inputType="text" textAlign="center" width="50"></w2:column>
+							<w2:column displayMode="label" id="LD_MKT_TP_NM" inputType="text" textAlign="center" width="80"></w2:column>
+							<w2:column displayMode="label" id="DOC_TITLE" inputType="text" textAlign="left" width="370"></w2:column>
+							<w2:column displayMode="label" id="RCV_DDTM" inputType="text" textAlign="center" width="150"></w2:column>
+							<w2:column displayMode="label" id="PUBL_DDTM" inputType="text" textAlign="center" width="150"></w2:column>
+							<w2:column displayMode="label" id="SMS_DDTM" inputType="text" textAlign="center" width="150"></w2:column>
+							<w2:column displayMode="label" id="ATS_DDTM" inputType="text" textAlign="center" width="150"></w2:column>
+							<w2:column displayMode="label" id="NOTI_YN" inputType="text" textAlign="center" width="120"></w2:column>
+						</w2:row>
+					</w2:gBody>
+				</w2:gridView>
+			</xf:group>
+		</xf:group>
+	</body>
+</html>

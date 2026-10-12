@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""퍼블리싱 병합 — KRX 퍼블리싱 XML(`conversion/jsp-front/publish/**`, 시각 목업·id 자동생성)의 body 에 공급사 전환본(ui-tobe)의
+"""퍼블리싱 병합 — KRX 퍼블리싱 XML(`conversion/publish/**`(2026-10-08 까지 `jsp-front/publish`), 시각 목업·id 자동생성)의 body 에 공급사 전환본(ui-tobe)의
 의미 id·이벤트·바인딩을 옮겨 심어 스크립트가 그대로 도는 화면을 만든다(가이드 샘플 JLDFIL25900 이 같은 방법으로 만들어졌다).
 
     python conversion/tools/publish_merge.py [--report-only] [--vendor-dir <병합 전 전환본 폴더>] [--out <폴더>] <name|폴더> ...
@@ -52,7 +52,7 @@ import publish_normalize as pn  # noqa: E402
 import convert as cv  # noqa: E402
 
 ROOT = st.ROOT
-PUB_DIR = ROOT / "conversion" / "jsp-front" / "publish"
+PUB_DIR = ROOT / "conversion" / "publish"  # 2026-10-08 사용자 이동: jsp-front/publish → conversion/publish(전환 원본 폴더, publish_pipeline.py 입력)
 TOBE = ROOT / "conversion" / "jsp-front" / "ui-tobe"
 VENDOR_DIR = TOBE  # CLI 단독 실행 때 공급사 전환본을 읽는 폴더(--vendor-dir). 승격(2026-10-06) 뒤 ui-tobe 는 병합 결과라 CLI 는 임시 폴더·보고용
 XF, W2, EV = pn.XF, pn.W2, pn.EV

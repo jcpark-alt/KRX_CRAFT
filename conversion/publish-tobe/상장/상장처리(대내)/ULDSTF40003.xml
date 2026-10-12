@@ -1,0 +1,995 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDSTF40003.gfm" meta_screenName="주식매수선택권 의무보유 관리" meta_screenId="ULDSTF40003">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<w2:layoutInfo/>
+		<w2:publicInfo method="scwin.onpageload,scwin.onpageunload,scwin.btn_select_onclick,scwin.btn_Excel_onclick,scwin.btn_Close_onclick,scwin.dts_List_OnLoadCompleted,scwin.grd_Grid_OnDblClick,scwin.btn_Input_onclick,scwin.txb_ISUR_CD_onkeyup,scwin.txb_ISUR_CD_onfocus,scwin.txb_ISUR_CD_onblur,scwin.img_COM_NM_onclick,scwin.MxDataSet_com_isur_OnFilter,scwin.Grd_com_isur_OnKeyPress,scwin.Grd_com_isur_OnDblClick,scwin.Grd_com_isur_OnClick,scwin.Grd_com_isur_OnSetFocus,scwin.Grd_com_isur_OnKillFocus,scwin.btn_Modify_onclick,scwin.grd_Grid_oncheckclick,scwin.btn_Acpt_onclick,scwin.btn_Ret_onclick,scwin.trs_Save_OnFail,scwin.trs_Save_OnSuccess,scwin.listSync,scwin.receive,scwin.popupCallback,scwin.getPar,scwin.setPar,scwin.checkCount,scwin.checkOnly,scwin.checkChecked,scwin.checkProcsStatCd,scwin.checkValid,scwin.checkIsurCd,scwin.setBzProcsNo"/>
+		<xf:model>
+			<w2:dataCollection baseNode="map"></w2:dataCollection>
+			<w2:workflowCollection/>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+///////// 1. 변수 및 선언 영역 /////////
+scwin.vSecugrpID = "";
+// 화면 리사이징
+
+scwin.list_dtl_noti_id;
+scwin.belongDepCd = js_belngdepcd;
+scwin.selBzProcsNo, scwin.selPrtDepoId, scwin.selExerSeq, scwin.selRowPos, scwin.isGongsi = "";
+scwin.vIsurCd, scwin.vComNm = "";
+scwin.clickBzProcsNo, scwin.clickListProcsStatCd = "";
+
+///////// 2. 초기화 영역 /////////
+/**
+ * @method
+ * @name onpageload
+ * @description 화면 로딩 시 초기 처리 — init 순차 호출
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.onpageload = async function() {
+    try {
+        $c.cm.PanelToGroupBox(__GROUPBOX_BACKGROUND__panel_1);
+        $c.cm.fn_com_isur(txb_ISUR_CD, txb_COM_NM);
+        btn_Input.hide();
+        // 2600 유가공시부, 3400 코스닥공시부
+        if (scwin.belongDepCd === "2600" || scwin.belongDepCd === "3400") {
+            btn_Modify.hide();
+            // 2500 유가상장부, 3300 코스닥 상장부
+
+        } else if (scwin.belongDepCd === "2500" || scwin.belongDepCd === "3300") {
+            btn_Modify.hide();
+        } else {
+            // showObj(btn_Input, false);
+            btn_Modify.hide();
+            $c.cm.setColumnProp(grd_Grid, "CHK_YN", "edit", "none");
+        }
+        if (js_dep_cd === 'ZSYS') {
+            btn_Input.show("");
+            btn_Modify.show("");
+            $c.cm.setColumnProp(grd_Grid, "CHK_YN", "edit", "any");
+        }
+        scwin.vIsurCd = $c.frame.path("../").vStkOptIsurCd;
+        scwin.vComNm = $c.frame.path("../").vStkOptComNm;
+        // 신주추가상장에서 호출
+        if (scwin.vIsurCd !== null && scwin.vIsurCd.length > 0) {
+            txb_ISUR_CD.setValue(scwin.vIsurCd);
+            txb_COM_NM.setValue(scwin.vComNm);
+            txb_ISUR_CD.setReadOnly(true);
+            txb_ISUR_CD.setDisabled(true);
+            txb_ISUR_CD.style.backgroundColor = "#b9d4f7";
+            img_COM_NM.hide();
+            await scwin.listSync();
+        }
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF40003.onpageload" });
+    }
+};
+
+/**
+ * @method
+ * @name onpageunload
+ * @description 화면 언로드 시 정리 처리
+ * @returns {void}
+ * @hidden N
+ */
+scwin.onpageunload = function() {
+};
+
+///////// 3. 컴포넌트 이벤트 영역 /////////
+/**
+ * @method
+ * @name btn_select_onclick
+ * @description 「조회」 클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.btn_select_onclick = async function() {
+    try {
+        await scwin.listSync();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF40003.btn_select_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_Excel_onclick
+ * @description 「엑셀다운로드」 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.btn_Excel_onclick = function() {
+    try {
+        // 엑셀 로그
+        $c.stf.doLogSave("ULDSTF40003.xml", SCREN_PROCS_TP_CD_07);
+        $c.data.downloadGridViewOffice(grd_Grid, "주식매수선택권 의무보유", "", 1, 0);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF40003.btn_Excel_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_Close_onclick
+ * @description 「닫기」 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.btn_Close_onclick = function() {
+    try {
+        self.close();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF40003.btn_Close_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name dts_List_OnLoadCompleted
+ * @description dts_List 로드 완료 후처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @param {Number} rowcount 조회 건수
+ * @returns {void}
+ * @hidden N
+ */
+scwin.dts_List_OnLoadCompleted = function(rowcount) {
+    try {
+        // txb_TotCnt.value = "총 " + rowcount + "건";
+        if (rowcount <= 0) {
+            dts_List.removeAll();
+        }
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF40003.dts_List_OnLoadCompleted" });
+    }
+};
+
+/**
+ * @method
+ * @name grd_Grid_OnDblClick
+ * @description grd_Grid 더블클릭 처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @param {Number} row 행 인덱스
+ * @param {*} colid colid
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.grd_Grid_OnDblClick = async function(row, colid) {
+    try {
+        if (colid === "CHK_YN") return;
+        let stkoptDutyExerSeq = dts_List.getCellData(row, "STKOPT_DUTY_EXER_SEQ");
+        const type = "";
+        // 공시부
+        if (scwin.belongDepCd === "2600" || scwin.belongDepCd === "3400") {
+            if (stkoptDutyExerSeq === "99999") {
+                return;
+            }
+            // 2500 유가상장부, 3300 코스닥 상장부
+
+        } else if (scwin.belongDepCd === "2500" || scwin.belongDepCd === "3300") {
+            if (stkoptDutyExerSeq !== "99999") {
+                return;
+            }
+        }
+        if (row > 0) {
+            // 그리드에서 선택시
+            scwin.setBzProcsNo(row);
+        }
+        if ("34" === scwin.clickListProcsStatCd) {
+            // 수정요청 리스트 팝업창
+            const adjreqUrl = "/lstmgt/ULDSTF40005.gfm";
+            await $c.frame.CreateDialogFrame("ULDSTF07090.gfm", adjreqUrl, "주식매수선택권 의무보유 수정요청 리스트", 50, 50, 940, 300, "window");
+        }
+        // 2500 유가상장부, 3300 코스닥 상장부
+        if (scwin.belongDepCd === "2500" || scwin.belongDepCd === "3300" || js_dep_cd === 'ZSYS') {
+            scwin.isGongsi = false;
+            scwin.selBzProcsNo = dts_List.getCellData(row, "BZ_PROCS_NO");
+            scwin.selPrtDepoId = dts_List.getCellData(row, "PRTDEPO_ID");
+            scwin.selExerSeq = dts_List.getCellData(row, "STKOPT_DUTY_EXER_SEQ");
+            const options = {
+                id: "ULDSTF40004",
+                title: "주식매수선택권 의무보유 관리 상세내역",
+                type: "browserPopup",
+                width: "790px",
+                height: "400px",
+                callbackFn: "scwin.popupCallback"
+            };
+
+            $c.win.openPopup("/lstmgt/ULDSTF40004.gfm", options);
+        }
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF40003.grd_Grid_OnDblClick" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_Input_onclick
+ * @description 「입력」 클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.btn_Input_onclick = async function() {
+    try {
+        scwin.selBzProcsNo = "";
+        scwin.selPrtDepoId = "";
+        scwin.selExerSeq = "";
+        const options = {
+            id: "ULDSTF40004",
+            title: "주식매수선택권 의무보유 관리 상세내역 등록",
+            type: "browserPopup",
+            width: "790px",
+            height: "350px",
+            callbackFn: "scwin.popupCallback"
+        };
+
+        $c.win.openPopup("/lstmgt/ULDSTF40004.gfm", options);
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF40003.btn_Input_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name txb_ISUR_CD_onkeyup
+ * @description txb_ISUR_CD 키 입력 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.txb_ISUR_CD_onkeyup = function() {
+    try {
+        if (txb_ISUR_CD.getValue() === "") {
+            Grd_com_isur.style.display = "none";
+        } else {
+            if (window.event.keyCode === 40) {
+                // 아래화살표눌렀을때 그리드로 포커스
+                Grd_com_isur.focus();
+            } else {
+                $c.cm.fn_com_isur_nm(window.event.keyCode);
+            }
+        }
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF40003.txb_ISUR_CD_onkeyup" });
+    }
+};
+
+/**
+ * @method
+ * @name txb_ISUR_CD_onfocus
+ * @description txb_ISUR_CD 포커스 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.txb_ISUR_CD_onfocus = function() {
+    try {
+        Grd_com_isur.style.display = "none";
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF40003.txb_ISUR_CD_onfocus" });
+    }
+};
+
+/**
+ * @method
+ * @name txb_ISUR_CD_onblur
+ * @description txb_ISUR_CD 포커스 이탈 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.txb_ISUR_CD_onblur = function() {
+    try {
+        if (stFocusGrid === false) {
+            Grd_com_isur.style.display = "none";
+        }
+        if (txb_ISUR_CD.getValue() === "") {
+            txb_COM_NM.setValue("");
+        }
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF40003.txb_ISUR_CD_onblur" });
+    }
+};
+
+/**
+ * @method
+ * @name img_COM_NM_onclick
+ * @description img_COM_NM 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.img_COM_NM_onclick = function() {
+    try {
+        $c.cm.IsurcdSearch(txb_ISUR_CD, txb_COM_NM);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF40003.img_COM_NM_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name MxDataSet_com_isur_OnFilter
+ * @description Mx Data Set com isur On Filter 처리
+ * @param {Number} row 행 인덱스
+ * @returns {void}
+ * @hidden N
+ */
+scwin.MxDataSet_com_isur_OnFilter = function(row) {
+    try {
+        if (skw !== "" && foColum === "1") {
+            f1 = MxDataSet_com_isur.getCellData(row, "COM_ABBRV");
+            f2 = MxDataSet_com_isur.getCellData(row, "OLD_COM_ABBRV");
+            if (f1.indexOf(skw) !== -1 || f2.indexOf(skw) !== -1) return true;
+
+            else return false;
+        } else return true;
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF40003.MxDataSet_com_isur_OnFilter" });
+    }
+};
+
+/**
+ * @method
+ * @name Grd_com_isur_OnKeyPress
+ * @description Grd com isur On Key Press 처리
+ * @param {*} kcode kcode
+ * @returns {void}
+ * @hidden N
+ */
+scwin.Grd_com_isur_OnKeyPress = function(kcode) {
+    try {
+        if (kcode === '13') {
+            $c.cm.fn_com_Confirm_set();
+        }
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF40003.Grd_com_isur_OnKeyPress" });
+    }
+};
+
+/**
+ * @method
+ * @name Grd_com_isur_OnDblClick
+ * @description Grd_com_isur 더블클릭 처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @param {Number} row 행 인덱스
+ * @param {*} colid colid
+ * @returns {void}
+ * @hidden N
+ */
+scwin.Grd_com_isur_OnDblClick = function(row, colid) {
+    try {
+        $c.cm.fn_com_Confirm_set();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF40003.Grd_com_isur_OnDblClick" });
+    }
+};
+
+/**
+ * @method
+ * @name Grd_com_isur_OnClick
+ * @description Grd_com_isur 클릭 처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @param {Number} row 행 인덱스
+ * @param {*} colid colid
+ * @returns {void}
+ * @hidden N
+ */
+scwin.Grd_com_isur_OnClick = function(row, colid) {
+    try {
+        Grd_com_isur.style.display = "";
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF40003.Grd_com_isur_OnClick" });
+    }
+};
+
+/**
+ * @method
+ * @name Grd_com_isur_OnSetFocus
+ * @description Grd com isur On Set Focus 처리
+ * @returns {void}
+ * @hidden N
+ */
+scwin.Grd_com_isur_OnSetFocus = function() {
+    try {
+        stFocusGrid = true;
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF40003.Grd_com_isur_OnSetFocus" });
+    }
+};
+
+/**
+ * @method
+ * @name Grd_com_isur_OnKillFocus
+ * @description Grd_com_isur 포커스 이탈 처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @returns {void}
+ * @hidden N
+ */
+scwin.Grd_com_isur_OnKillFocus = function() {
+    try {
+        stFocusGrid = false;
+        Grd_com_isur.style.display = "none";
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF40003.Grd_com_isur_OnKillFocus" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_Modify_onclick
+ * @description 「수정」 클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.btn_Modify_onclick = async function() {
+    try {
+        let rowPos = await scwin.checkChecked();
+        if (rowPos > 0) {
+            if (scwin.checkCount() > 1) {
+                await $c.win.alert("하나만 수정할 수 있습니다.");
+            } else {
+                const payDd = dts_List.getCellData(rowPos, "STKOPT_DUTY_EXER_PAY_DD");
+                if (js_dep_cd !== 'ZSYS' && payDd.length === 0) {
+                    await $c.win.alert("수정할 납입일 정보가 없습니다");
+                    return;
+                }
+                const res = window.confirm("선택된 항목의 납입일, 행사주식수만 수정됩니다.\n진행하시겠습니까?");
+                if (res) {
+                    scwin.isGongsi = true;
+                    scwin.selBzProcsNo = dts_List.getCellData(rowPos, "BZ_PROCS_NO");
+                    scwin.selPrtDepoId = dts_List.getCellData(rowPos, "PRTDEPO_ID");
+                    scwin.selExerSeq = dts_List.getCellData(rowPos, "STKOPT_DUTY_EXER_SEQ");
+                    const options = {
+                        id: "ULDSTF40004",
+                        title: "주식매수선택권 의무보유 관리 상세내역",
+                        type: "browserPopup",
+                        width: "790px",
+                        height: "400px",
+                        callbackFn: "scwin.popupCallback"
+                    };
+
+                    $c.win.openPopup("/lstmgt/ULDSTF40004.gfm", options);
+                }
+            }
+        }
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF40003.btn_Modify_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name grd_Grid_oncheckclick
+ * @description grd_Grid oncheckclick 이벤트
+ * @param {*} col col
+ * @param {*} colid colid
+ * @param {*} bCheck bCheck
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.grd_Grid_oncheckclick = async function(col, colid, bCheck) {
+    try {
+        // checkOnly(col, bCheck);
+        await scwin.checkValid(col, bCheck);
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF40003.grd_Grid_oncheckclick" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_Acpt_onclick
+ * @description 「접수」 클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.btn_Acpt_onclick = async function() {
+    try {
+        await scwin.receive("33");
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF40003.btn_Acpt_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_Ret_onclick
+ * @description 「반려」 클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.btn_Ret_onclick = async function() {
+    try {
+        await scwin.receive("37");
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF40003.btn_Ret_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name trs_Save_OnFail
+ * @description Save On Fail 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.trs_Save_OnFail = async function() {
+    try {
+        $c.lc.fn_alertMsg('F');
+        await $c.win.alert(trs_Save);
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF40003.trs_Save_OnFail" });
+    }
+};
+
+/**
+ * @method
+ * @name trs_Save_OnSuccess
+ * @description Save On Success 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.trs_Save_OnSuccess = async function() {
+    try {
+        $c.lc.fn_alertMsg('S');
+        await scwin.listSync();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF40003.trs_Save_OnSuccess" });
+    }
+};
+
+///////// 4. 서브미션 콜백 영역 /////////
+/**
+ * @method
+ * @name listSync
+ * @description list Sync 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.listSync = async function() {
+    if (txb_ISUR_CD.getValue() === "") {
+        await $c.win.alert("[회사]를 선택해주세요.");
+        txb_ISUR_CD.focus();
+        return;
+    }
+    const ISUR_CD = txb_ISUR_CD.getValue();
+    url += "&ISUR_CD=" + ISUR_CD;
+    url += "&LD_MKT_TP_CD=" + js_market;
+    const sbmOptions = {
+        id : "sbm_dts_List",
+        action : "/StockOptionDutyHold.do",
+        ref : "",
+        target : "dts_List=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+};
+
+/**
+ * @method
+ * @name receive
+ * @description receive 처리
+ * @param {*} type type
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.receive = async function(type) {
+    let typeString = "";
+    if (type === "33") typeString = "접수";
+
+    else typeString = "반려";
+    if (await scwin.checkChecked() > 0) {
+        if (await scwin.checkProcsStatCd()) {
+            const vAnswer = confirm("선택된 항목을 모두 " + typeString + "처리 하시겠습니까?");
+            if (vAnswer) {
+                vScrenProcTpCd = SCREN_PROCS_TP_CD_03;
+                trs_Save.KeyName = "toinb_dataid4";
+                // [전환검토] trs_Save.Parameters → 동적 파라미터(필요 시 sbmOptions 에 반영)
+                // const sbmParams = {
+                //     TRS_IDX : "U",
+                //     LIST_BZ_TP_CD : "770",
+                //     LIST_PROCS_STAT_CD : type,
+                //     PROCS_EMP_NO : js_emp_no
+                // };
+                const sbmOptions = {
+                    id : "sbm_trs_Save",
+                    action : "/StockOptionDutyHold.do",
+                    ref : "dts_List",
+                    target : "trs_Save=body.content",
+                    isProcessMsg : false
+                };
+
+                const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+                // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+            }
+        }
+    }
+};
+
+/**
+ * @method
+ * @name popupCallback
+ * @description browserPopup 팝업의 callback 함수. 부모창에서 팝업 결과 값을 처리한다.
+ * @param {*} arg 팝업에서 전달받은 값
+ * @returns {void}
+ * @hidden N
+ */
+scwin.popupCallback = function (arg) {
+    // TO-DO : arg 값 확인 후 업무 로직 추가
+};
+
+///////// 5. 일반/업무 함수 영역 /////////
+/**
+ * @method
+ * @name getPar
+ * @description 넘길 인수를 지정하는 펑션
+ * @param {Array} arrPar 팝업 파라미터 배열(참조 채움)
+ * @returns {void}
+ * @hidden N
+ */
+scwin.getPar = function(arrPar) {
+    // 넘길 인수를 지정하는 펑션
+    arrPar[0] = ""; // 코드값을 포함할 컨트롤
+    arrPar[1] = ""; // 명칭값을 포함할 컨트롤
+    arrPar[2] = scwin.vSecugrpID; // 명칭값을 포함할 컨트롤
+    return
+    // ********************************************************************
+    // [WebSquare 전환 추가] 원본 소스와 비교 필요
+    //
+    // ********************************************************************
+    arrPar, length;
+};
+
+/**
+ * @method
+ * @name setPar
+ * @description 2010.04.20 회사코드 추가
+ * @param {Array} arrPar 팝업 파라미터 배열(참조 채움)
+ * @returns {void}
+ * @hidden N
+ */
+scwin.setPar = function(arrPar) {
+    txb_COM_NM.setValue(arrPar[0].COM_NM);
+    txb_ISUR_CD.setValue(arrPar[0].ISUR_CD);
+};
+
+/**
+ * @method
+ * @name checkCount
+ * @description check Count 처리
+ * @returns {void}
+ * @hidden N
+ */
+scwin.checkCount = function() {
+    let count = 0;
+    for (let i = 1; i <= dts_List.getRowCount(); i++) {
+        checked.setValue(dts_List.getCellData(i, "CHK_YN"));
+        if (checked === "T") count++;
+    }
+    return count;
+};
+
+/**
+ * @method
+ * @name checkOnly
+ * @description check Only 처리
+ * @param {*} selRow selRow
+ * @param {*} bCheck bCheck
+ * @returns {void}
+ * @hidden N
+ */
+scwin.checkOnly = function(selRow, bCheck) {
+    let checked = "";
+    if (bCheck === 1) {
+        dts_List.setBroadcast(false);
+        for (let i = 1; i <= dts_List.getRowCount(); i++) {
+            checked.setValue(dts_List.getCellData(i, "CHK_YN"));
+            if (selRow === i) continue;
+            dts_List.setCellData(i, "CHK_YN", "");
+        }
+        dts_List.setBroadcast(true, true);
+    }
+};
+
+/**
+ * @method
+ * @name checkChecked
+ * @description check Checked 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.checkChecked = async function() {
+    let rowPos = 0;
+    rowPos = $c.cp.getNameValueRow(dts_List, "CHK_YN", "T");
+    if (rowPos === 0) {
+        await $c.win.alert("선택된 항목이 없습니다.");
+    }
+    return rowPos;
+};
+
+/**
+ * @method
+ * @name checkProcsStatCd
+ * @description check Procs Stat Cd 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.checkProcsStatCd = async function() {
+    let listProcsStatCd = "";
+    let check = "";
+    const isPass = true;
+    for (let i = 1; i <= dts_List.getRowCount(); i++) {
+        listProcsStatCd = dts_List.getCellData(i, "LIST_PROCS_STAT_CD");
+        check = dts_List.getCellData(i, "CHK_YN");
+        if (check === "T" && listProcsStatCd !== "32") {
+            await $c.win.alert("처리상태가 제출완료인 항목만 처리가능합니다.");
+            return false;
+        }
+    }
+    return isPass;
+    송;
+};
+
+/**
+ * @method
+ * @name checkValid
+ * @description check Valid 처리
+ * @param {*} selRow selRow
+ * @param {*} bCheck bCheck
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.checkValid = async function(selRow, bCheck) {
+    let checked = "";
+    if (bCheck === 1) {
+        let stkoptDutyExerSeq = dts_List.getCellData(selRow, "STKOPT_DUTY_EXER_SEQ");
+        // 2600 유가공시부, 3400 코스닥공시부
+        if (scwin.belongDepCd === "2600" || scwin.belongDepCd === "3400") {
+            if (stkoptDutyExerSeq === "99999") {
+                await $c.win.alert("대상자는 상장부에서만 선택할수 있습니다");
+                dts_List.setCellData(selRow, "CHK_YN", "");
+            }
+            // 2500 유가상장부, 3300 코스닥 상장부
+
+        } else if (scwin.belongDepCd === "2500" || scwin.belongDepCd === "3300") {
+            if (stkoptDutyExerSeq !== "99999") {
+                await $c.win.alert("납입일은 공시부에서만 선택할수 있습니다.");
+                dts_List.setCellData(selRow, "CHK_YN", "");
+            }
+        }
+    }
+};
+
+/**
+ * @method
+ * @name checkIsurCd
+ * @description check Isur Cd 처리
+ * @returns {void}
+ * @hidden N
+ */
+scwin.checkIsurCd = function() {
+    const isurCd = txb_ISUR_CD.getValue();
+    if (isurCd.length > 0) {
+        return true;
+    } else {
+        return false;
+    }
+};
+
+/**
+ * @method
+ * @name setBzProcsNo
+ * @description set Bz Procs No 처리
+ * @param {Object} obj 컴포넌트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.setBzProcsNo = function(obj) {
+    scwin.clickBzProcsNo = dts_List.getCellData(Number(obj), "BZ_PROCS_NO");
+    scwin.clickListProcsStatCd = dts_List.getCellData(Number(obj), "LIST_PROCS_STAT_CD");
+    let stkoptDutyExerSeq = dts_List.getCellData(Number(obj), "STKOPT_DUTY_EXER_SEQ");
+    if (stkoptDutyExerSeq !== "99999") {
+        scwin.clickBzProcsNo = dts_List.getCellData(Number(obj), "FOLLW_BZ_PROCS_NO");
+    }
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+		<xf:group class="sub_contents" id="" meta_snippetCategory="00_화면시작" meta_snippetKeyComponent="true" meta_snippetName="0_01 페이지시작"
+			style="">
+			<xf:group class="pgtbox" id="" meta_snippetCategory="02_타이틀" meta_snippetKeyComponent="true" meta_snippetName="2_01 페이지타이틀"
+				style="">
+				<w2:textbox class="pgt_tit" id="" label="주식매수선택권 의무보유 관리" style="" tagname=""></w2:textbox>
+				<xf:group class="breadcrumb" id="" style="">
+					<xf:group id="" style="" tagname="ul">
+						<xf:group class="home" id="" style="" tagname="li">
+							<w2:anchor id="" outerDiv="false" style="">
+								<xf:label><![CDATA[Home]]></xf:label>
+							</w2:anchor>
+						</xf:group>
+						<xf:group id="" style="" tagname="li">
+							<w2:anchor id="" outerDiv="false" style="">
+								<xf:label><![CDATA[1Depth Menu]]></xf:label>
+							</w2:anchor>
+						</xf:group>
+						<xf:group id="" style="" tagname="li">
+							<w2:anchor id="" outerDiv="false" style="">
+								<xf:label><![CDATA[2Depth Menu]]></xf:label>
+							</w2:anchor>
+						</xf:group>
+						<xf:group id="" style="" tagname="li">
+							<w2:span id="" label="3Depth Menu" style=""></w2:span>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+				<xf:trigger class="btn_fav" id="" style="" type="button">
+					<xf:label></xf:label>
+				</xf:trigger>
+			</xf:group>
+			<xf:group class="schbox" id="__GROUPBOX_BACKGROUND__panel_1" meta_snippetCategory="03_조회영역" meta_snippetKeyComponent="true"
+				meta_snippetName="3_01 조회조건1행" style="">
+				<xf:group class="schbox_inner" id="" style="">
+					<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl " id="" style="" tagname="table">
+						<w2:attributes>
+							<w2:summary></w2:summary>
+						</w2:attributes>
+						<xf:group tagname="colgroup">
+							<xf:group style="width:100px;" tagname="col"></xf:group>
+							<xf:group style="" tagname="col"></xf:group>
+							<xf:group style="width:100px;" tagname="col"></xf:group>
+							<xf:group style="" tagname="col"></xf:group>
+						</xf:group>
+						<xf:group class="" id="" style="" tagname="tr">
+							<xf:group class="w2tb_th" style="" tagname="th">
+								<w2:textbox hierarchy="label_3" id="label_3" label="회사코드(명)" orgid="label_3" style=""
+									userData2=" class:TopCondition_01; border-color:#0000FF;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group class="w2tb_td" style="" tagname="td">
+								<w2:attributes>
+									<w2:colspan>3</w2:colspan>
+									<w2:rowspan>1</w2:rowspan>
+								</w2:attributes>
+								<w2:autoComplete ev:onkeyup="scwin.txb_ISUR_CD_onkeyup" hierarchy="txb_ISUR_CD" id="txb_ISUR_CD"
+									maxlength="12" orgid="txb_ISUR_CD" style="width:90px;"
+									userData2=" class:TopCondition_01_write; onfocus:txb_ISUR_CD_onfocus; onblur:txb_ISUR_CD_onblur;">
+								</w2:autoComplete>
+								<xf:input hierarchy="txb_COM_NM" id="txb_COM_NM" maxlength="1000" orgid="txb_COM_NM" readOnly="true"
+									style="width:210px;" userData2=" class:TopCondition_01_read;">
+								</xf:input>
+								<xf:trigger class="btn_cm icon search" cursor="pointer" ev:onclick="scwin.img_COM_NM_onclick"
+									hierarchy="img_COM_NM" id="img_COM_NM" orgid="img_COM_NM" src="../img/btn_search.gif" style="">
+									<xf:label><![CDATA[]]></xf:label>
+								</xf:trigger>
+							</xf:group>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+				<xf:group class="btn_schbox" id="" style="">
+					<xf:trigger class="btn_cm sch" cursor="pointer" ev:onclick="scwin.btn_select_onclick" hierarchy="btn_select"
+						id="btn_select" orgid="btn_select" src="../img/btn_select.gif" style="">
+						<xf:label><![CDATA[조회]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+			<xf:group class="titbox" id="" meta_snippetCategory="02_타이틀" meta_snippetKeyComponent="true" meta_snippetName="2_02 서브타이틀(h3)"
+				style="">
+				<xf:group class="rt" id="" style="">
+					<xf:trigger class="btn_cm download" cursor="pointer" ev:onclick="scwin.btn_Excel_onclick" hierarchy="btn_Excel"
+						id="btn_Excel" orgid="btn_Excel" src="../img/btn_excelsave.gif" style="" text="엑셀다운로드">
+						<xf:label><![CDATA[엑셀다운로드]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+			<xf:group class="gvwbox" id="" style="">
+				<w2:gridView class="gvw" dataList="data:dts_List" ev:oncellclick="scwin.grd_Grid_oncheckclick" hierarchy="grd_Grid"
+					id="grd_Grid" orgid="grd_Grid" style="height: 153px;"
+					userData2=" class:Grid_01; colsizing:True; editable:True; enable:True; fillarea:True; fixsizing:True; gtitleheight:0; suppressoption:3; titleheight:39; tooltip:use=true;alt=true;createtime=300;color=#FFFFFF;backcolor=#808080;edgecolor=#333333;leftmargin=10;rightmargin=10;topmargin=10;bottommargin=10;; viewsummary:1; xtitleheight:0; ondblclick:grd_Grid_OnDblClick;" autoFit="allColumn" autoFitMinWidth="1440">
+					<w2:caption id="caption1" style="" value="this is a grid caption."></w2:caption>
+					<w2:header id="header1" style="">
+						<w2:row>
+							<w2:column displayMode="label" id="h_NO" inputType="text" readOnly="true" textAlign="center"
+								userData2=" value:{CurRow},{ToString};" value="번호" width="50" fixColumnWidth="true">
+							</w2:column>
+							<w2:column displayMode="label" id="h_CHK_YN" inputType="text" textAlign="center" value="선택" width="40"></w2:column>
+							<w2:column displayMode="label" id="h_STKOPT_DUTY_HD_INPUT_TP_NM" inputType="text" readOnly="true"
+								textAlign="center" userData2=" suppress:1;" value="상장구분" width="123">
+							</w2:column>
+							<w2:column displayMode="label" id="h_COM_ABBRV" inputType="text" readOnly="true" textAlign="center"
+								userData2=" suppress:1;" value="회사명" width="105">
+							</w2:column>
+							<w2:column displayMode="label" id="h_PRTDEPO_PRN_TP_NM" inputType="text" readOnly="true" textAlign="center"
+								userData2=" sort:False; bgcolor:{decode(currow-tointeger(currow/2)*2,0,'#f2f5f9',1,'#ffffff')}; suppress:1;" value="대상자구분"
+								width="101">
+							</w2:column>
+							<w2:column displayMode="label" id="h_NM" inputType="text" readOnly="true" textAlign="center"
+								userData2=" sort:False; bgcolor:{decode(currow-tointeger(currow/2)*2,0,'#f2f5f9',1,'#ffffff')}; suppress:1;" value="대상자"
+								width="112">
+							</w2:column>
+							<w2:column displayMode="label" id="h_RESDBZ_REG_NO" inputType="text" readOnly="true" textAlign="center"
+								userData2=" sort:False; suppress:1;" value="생년월일&lt;/br&gt;(사업자번호)" width="113">
+							</w2:column>
+							<w2:column displayMode="label" id="h_STKOPT_DUTY_RESOL_DD" inputType="text" readOnly="true" textAlign="center"
+								userData2=" mask:XXXX-XX-XX; sort:False; suppress:1;" value="부여결의일" width="83">
+							</w2:column>
+							<w2:column displayMode="label" id="h_PRTDEPO_OBJ_KIND_NM" inputType="text" readOnly="true" textAlign="center"
+								userData2=" sort:False; suppress:1;" value="주식의 종류" width="80">
+							</w2:column>
+							<w2:column displayMode="label" id="h_STKOPT_DUTY_TOT_GRNT_SHRS" inputType="text" readOnly="true"
+								textAlign="center" userData2=" decao:3; sumtextalign:right; sort:False; suppress:1;" value="총 부여주식수" width="83">
+							</w2:column>
+							<w2:column displayMode="label" id="h_STKOPT_DUTY_EXER_STRT_DD" inputType="text" readOnly="true"
+								textAlign="center" userData2=" mask:XXXX-XX-XX; sumtextalign:center; sort:False; suppress:1;" value="행사기간&lt;/br&gt;시작일"
+								width="78">
+							</w2:column>
+							<w2:column displayMode="label" id="h_STKOPT_DUTY_EXER_END_DD" inputType="text" readOnly="true"
+								textAlign="center" userData2=" mask:XXXX-XX-XX; sumtextalign:center; sort:False; suppress:1;" value="행사기간&lt;/br&gt;만료일"
+								width="76">
+							</w2:column>
+							<w2:column displayMode="label" id="h_PRTDEPO_END_DD" inputType="text" readOnly="true" textAlign="center"
+								userData2=" mask:XXXX-XX-XX; sumtextalign:center; sort:False; suppress:1;" value="의무보유기간&lt;/br&gt;만료일" width="86">
+							</w2:column>
+							<w2:column displayMode="label" id="h_LIST_PROCS_STAT_NM" inputType="text" readOnly="true" textAlign="center"
+								userData2=" color:#003300; bgcolor:{decode(LIST_PROCS_STAT_CD,34,'#FFFF00',decode(currow-tointeger(currow/2)*2,0,'#f2f5f9',1,'#ffffff'))}; cursor:{decode(LIST_PROCS_STAT_CD,34,'hand','arrow')};"
+								value="처리상태" width="67">
+							</w2:column>
+							<w2:column displayMode="label" id="h_STKOPT_DUTY_EXER_PAY_DD" inputType="text" readOnly="true"
+								textAlign="center" userData2=" mask:XXXX-XX-XX; sort:False;" value="납일일" width="77">
+							</w2:column>
+							<w2:column displayMode="label" id="h_STKOPT_DUTY_EXER_SHRS" inputType="text" readOnly="true" textAlign="center"
+								userData2=" sort:False;" value="행사주식수" width="87">
+							</w2:column>
+							<w2:column displayMode="label" id="h_STKOPT_DUTY_EXER_LAST_SHRS" inputType="text" readOnly="true"
+								textAlign="center" value="잔여 행사가능&lt;/br&gt;주식수" width="94">
+							</w2:column>
+						</w2:row>
+					</w2:header>
+					<w2:gBody id="gBody1" style="">
+						<w2:row id="" style="">
+							<w2:column displayMode="label" id="NO" inputType="text" textAlign="center" width="50"></w2:column>
+							<w2:column displayMode="label" id="CHK_YN" inputType="checkbox" textAlign="center" width="40"></w2:column>
+							<w2:column displayMode="label" id="STKOPT_DUTY_HD_INPUT_TP_NM" inputType="text" textAlign="center"
+								width="123">
+							</w2:column>
+							<w2:column displayMode="label" id="COM_ABBRV" inputType="text" textAlign="left" width="105"></w2:column>
+							<w2:column displayMode="label" id="PRTDEPO_PRN_TP_NM" inputType="text" textAlign="center" width="101"></w2:column>
+							<w2:column displayMode="label" id="NM" inputType="text" textAlign="left" width="112"></w2:column>
+							<w2:column displayMode="label" id="RESDBZ_REG_NO" inputType="text" textAlign="center" width="113"></w2:column>
+							<w2:column displayMode="label" id="STKOPT_DUTY_RESOL_DD" inputType="text" textAlign="center" width="83"></w2:column>
+							<w2:column displayMode="label" id="PRTDEPO_OBJ_KIND_NM" inputType="text" textAlign="center" width="80"></w2:column>
+							<w2:column displayMode="label" id="STKOPT_DUTY_TOT_GRNT_SHRS" inputType="text" textAlign="right" width="83"></w2:column>
+							<w2:column displayMode="label" id="STKOPT_DUTY_EXER_STRT_DD" inputType="text" textAlign="center" width="78"></w2:column>
+							<w2:column displayMode="label" id="STKOPT_DUTY_EXER_END_DD" inputType="text" textAlign="center" width="76"></w2:column>
+							<w2:column displayMode="label" id="PRTDEPO_END_DD" inputType="text" textAlign="center" width="86"></w2:column>
+							<w2:column displayMode="label" id="LIST_PROCS_STAT_NM" inputType="text" textAlign="center" width="67"></w2:column>
+							<w2:column displayMode="label" id="STKOPT_DUTY_EXER_PAY_DD" inputType="text" textAlign="center" width="77"></w2:column>
+							<w2:column displayMode="label" id="STKOPT_DUTY_EXER_SHRS" inputType="text" textAlign="right" width="87"></w2:column>
+							<w2:column displayMode="label" id="STKOPT_DUTY_EXER_LAST_SHRS" inputType="text" textAlign="right" width="94"></w2:column>
+						</w2:row>
+					</w2:gBody>
+				</w2:gridView>
+			</xf:group>
+			<xf:group class="btnbox" id="" meta_snippetCategory="08_버튼" meta_snippetKeyComponent="true" meta_snippetName="8_05 팝업전체제어버튼"
+				style="">
+				<xf:group class="rt" id="" style="">
+					<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.btn_Input_onclick" hierarchy="btn_Input" id="btn_Input"
+						orgid="btn_Input" src="../img/btn_input.gif" style="">
+						<xf:label><![CDATA[입력]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.btn_Modify_onclick" hierarchy="btn_Modify" id="btn_Modify"
+						orgid="btn_Modify" src="../img/btn_modify.gif" style="" userData2=" border-color:#C0C0C0;">
+						<xf:label><![CDATA[수정]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.btn_Ret_onclick" hierarchy="btn_Ret" id="btn_Ret"
+						orgid="btn_Ret" src="../img/btn_reject.gif" style="">
+						<xf:label><![CDATA[반려]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.btn_Close_onclick" hierarchy="btn_Close" id="btn_Close"
+						orgid="btn_Close" src="../img/btn_close.gif" style="" text="닫기">
+						<xf:label><![CDATA[닫기]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm pt" cursor="pointer" ev:onclick="scwin.btn_Acpt_onclick" hierarchy="btn_Acpt" id="btn_Acpt"
+						orgid="btn_Acpt" src="../img/btn_Acpt.gif" style="">
+						<xf:label><![CDATA[접수]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+		</xf:group>
+	</body>
+</html>

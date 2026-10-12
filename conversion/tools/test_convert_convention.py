@@ -605,3 +605,23 @@ scwin.b = async function () {
     again = convert.mark_async_functions(out, _rep())
     assert again == out
     assert rep["async_marked"] == ["scwin.a"]
+
+
+def test_rule11_marker_prefixed_include_variant():
+    """W-Craft 20251209판(conversion/publish)의 마커 접두 include 변형도 규칙 11 이 삭제한다(ULDSTF05603 잔존 사례, 2026-10-08).
+    마커가 붙은 다른 안내 줄·문자열 안의 include( 는 보존."""
+    src = """
+//★Wcraft guide★ include부분 주석처리 -> include("../js/libRoundPanel.js");
+	//★Wcraft guide★ include부분 주석처리 -> include("../js/stf.js");
+// ★Wcraft guide★ include부분 주석처리 -> include("/RexServer/rexscript/rexpert.js");
+//★Wcraft guide★ 다른 안내 문장은 남아야 한다
+scwin.x = function() { let s = "include(a)"; };
+"""
+    rep = {}
+    out = convert.rule11_remove_include(src, rep)
+    assert rep["rule11"] == 3
+    assert "include부분 주석처리" not in out
+    assert "다른 안내 문장은 남아야 한다" in out
+    assert 'let s = "include(a)"' in out
+    assert convert.rule11_remove_include(out, {}) == out
+

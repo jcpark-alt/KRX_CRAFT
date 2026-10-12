@@ -1,0 +1,694 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDMGT10000.gfm" meta_screenName="시작/마감현황" meta_screenId="ULDMGT10000">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<w2:layoutInfo/>
+		<w2:publicInfo method="scwin.onpageload,scwin.onpageunload,scwin.MxDataSet_OnLoadCompleted,scwin.btn_sys_search_onclick,scwin.image_1_onclick,scwin.MxLogicalTr_save_OnFail,scwin.MxLogicalTr_save_OnSuccess,scwin.MxGrid_1_oncheckclick,scwin.image_2_onclick,scwin.MxGrid_1_OnClick,scwin.btn_cal_onclick,scwin.image_3_onclick,scwin.listSync,scwin.listSub,scwin.listSync2,scwin.save,scwin.save2,scwin.chk,scwin.cntDatasetRowCheck,scwin.notEndDocLst,scwin.MxGrid_1_CanColumnPosChange"/>
+		<xf:model>
+			<w2:dataCollection baseNode="map"></w2:dataCollection>
+			<w2:workflowCollection/>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+///////// 1. 변수 및 선언 영역 /////////
+scwin.toDay = '';
+scwin.clientnow = new Date();
+
+/* 오늘 날짜를 구한다 */
+scwin.curYear = scwin.clientnow.getYear();
+scwin.curMonth = (scwin.clientnow.getMonth()) + 1;
+scwin.curDay = scwin.clientnow.getDate();
+if (scwin.curMonth <= 9) {
+    scwin.curMonth = "0" + scwin.curMonth;
+}
+if (scwin.curDay <= 9) {
+    scwin.curDay = "0" + scwin.curDay;
+}
+scwin.txb_date = scwin.curYear + "" + scwin.curMonth + "" + scwin.curDay;
+scwin.toDay = scwin.txb_date;
+
+// 현시각(시분) 20210528
+scwin.curHH = scwin.clientnow.getHours();
+scwin.curMM = scwin.clientnow.getMinutes();
+if (scwin.curHH <= 9) {
+    scwin.curHH = "0" + scwin.curHH;
+}
+if (scwin.curMM <= 9) {
+    scwin.curMM = "0" + scwin.curMM;
+}
+scwin.vNowHHMM = scwin.curHH + "" + scwin.curMM;
+
+///////// 2. 초기화 영역 /////////
+/**
+ * @method
+ * @name onpageload
+ * @description 화면 로딩 시 초기 처리 — init 순차 호출
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.onpageload = async function() {
+    try {
+        tmbDate.setValue(scwin.txb_date);
+        const sbmOptions = {
+            id : "sbm_MxDataSet",
+            action : "/gauceSystemierAdaptor.do",
+            ref : "",
+            target : "MxDataSet=body.content",
+            isProcessMsg : false
+        };
+
+        const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+        // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+        const sbmOptions2 = {
+            id : "sbm_MxDataSet_insert",
+            action : "/gauceSystemierAdaptor.do",
+            ref : "",
+            target : "MxDataSet_insert=body.content",
+            isProcessMsg : false
+        };
+
+        const sbmRtn2 = await $c.sbm.executeDynamic(sbmOptions2);
+        // TODO Stage2: sbmRtn2 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+        const sbmOptions3 = {
+            id : "sbm_MxDataSet_select",
+            action : "/gauceSystemierAdaptor.do",
+            ref : "",
+            target : "MxDataSet_select=body.content",
+            isProcessMsg : false
+        };
+
+        const sbmRtn3 = await $c.sbm.executeDynamic(sbmOptions3);
+        // TODO Stage2: sbmRtn3 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+        $c.cm.PanelToGroupBox_01(panel_1);
+        // PanelToGroupBox_02(panel_2);
+
+        // 미승인건 조회 버튼은 18시 이후부터 보이도록 수정 20210528
+        if (scwin.vNowHHMM > '1800') {
+            showObj(image_3, true);
+        } else {
+            showObj(image_3, false);
+        }
+        await scwin.listSync();
+        // toDaySet(txb_date);
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDMGT10000.onpageload" });
+    }
+};
+
+/**
+ * @method
+ * @name onpageunload
+ * @description 화면 언로드 시 정리 처리
+ * @returns {void}
+ * @hidden N
+ */
+scwin.onpageunload = function() {
+};
+
+///////// 3. 컴포넌트 이벤트 영역 /////////
+/**
+ * @method
+ * @name MxDataSet_OnLoadCompleted
+ * @description MxDataSet 로드 완료 후처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @param {Number} rowcount 조회 건수
+ * @returns {void}
+ * @hidden N
+ */
+scwin.MxDataSet_OnLoadCompleted = function(rowcount) {
+    try {
+        textbox_1.setValue("총 " + rowcount + "건");
+        // CloseWin(rowcount, MxGrid_1);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDMGT10000.MxDataSet_OnLoadCompleted" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_sys_search_onclick
+ * @description 「조회」 클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.btn_sys_search_onclick = async function() {
+    try {
+        await scwin.listSync(); // alert();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDMGT10000.btn_sys_search_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name image_1_onclick
+ * @description 「선택 업무 개시」 클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.image_1_onclick = async function() {
+    try {
+        if (scwin.toDay === scwin.txb_date) {
+            await scwin.save();
+        } else {
+            await $c.win.alert("과거일은 조회만 가능합니다.");
+        }
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDMGT10000.image_1_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name MxLogicalTr_save_OnFail
+ * @description Mx Logical Tr save On Fail 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.MxLogicalTr_save_OnFail = async function() {
+    try {
+        await scwin.listSync();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDMGT10000.MxLogicalTr_save_OnFail" });
+    }
+};
+
+/**
+ * @method
+ * @name MxLogicalTr_save_OnSuccess
+ * @description Mx Logical Tr save On Success 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.MxLogicalTr_save_OnSuccess = async function() {
+    try {
+        await scwin.listSync();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDMGT10000.MxLogicalTr_save_OnSuccess" });
+    }
+};
+
+/**
+ * @method
+ * @name MxGrid_1_oncheckclick
+ * @description MxGrid_1 oncheckclick 이벤트
+ * @param {*} col col
+ * @param {*} colid colid
+ * @param {*} bCheck bCheck
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.MxGrid_1_oncheckclick = async function(col, colid, bCheck) {
+    try {
+        if (bCheck !== 0) {
+            await scwin.chk(col);
+            // alert('MxGrid_1.OnCheckClick('+col+','+ colid+','+ bCheck+')');
+
+        }
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDMGT10000.MxGrid_1_oncheckclick" });
+    }
+};
+
+/**
+ * @method
+ * @name image_2_onclick
+ * @description 「수동 전체 개시」 클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.image_2_onclick = async function() {
+    try {
+        if (scwin.toDay === scwin.txb_date) {
+            if (confirm('really?')) await scwin.save2();
+        } else {
+            await $c.win.alert("과거일은 조회만 가능합니다.");
+        }
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDMGT10000.image_2_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name MxGrid_1_OnClick
+ * @description MxGrid_1 클릭 처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @param {Number} row 행 인덱스
+ * @param {*} colid colid
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.MxGrid_1_OnClick = async function(row, colid) {
+    try {
+        await scwin.listSub(MxDataSet.getCellData(row, "CHK_BZ_TP_CD"));
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDMGT10000.MxGrid_1_OnClick" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_cal_onclick
+ * @description btn_cal 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.btn_cal_onclick = function() {
+    try {
+        popUpCalendar(txb_date_bg, 'tmbDate', 'yyyymmdd'); // alert('image_2.onclick');
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDMGT10000.btn_cal_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name image_3_onclick
+ * @description 「미승인건조회」 클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.image_3_onclick = async function() {
+    try {
+        await scwin.notEndDocLst();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDMGT10000.image_3_onclick" });
+    }
+};
+
+///////// 4. 서브미션 콜백 영역 /////////
+// alert(vNowHHMM);
+
+/**
+ * @method
+ * @name listSync
+ * @description list Sync 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.listSync = async function() {
+    scwin.txb_date = tmbDate.getValue();
+    const sbmOptions = {
+        id : "sbm_MxDataSet",
+        action : "/bzchklist.do",
+        ref : "",
+        target : "MxDataSet=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+    // ShowWin(MxGrid_1);
+
+};
+
+/**
+ * @method
+ * @name listSub
+ * @description list Sub 처리
+ * @param {*} sval sval
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.listSub = async function(sval) {
+    const sbmOptions = {
+        id : "sbm_MxDataSet_select",
+        action : "/bzchklist.do",
+        ref : "",
+        target : "MxDataSet_select=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+    // ShowWin(MxGrid_1);
+
+};
+
+/**
+ * @method
+ * @name listSync2
+ * @description list Sync2 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.listSync2 = async function() {
+    const sbmOptions = {
+        id : "sbm_MxDataSet",
+        action : "/gauceSystemierAdaptor.do",
+        ref : "",
+        target : "MxDataSet=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+    const sbmOptions2 = {
+        id : "sbm_MxDataSet_select",
+        action : "/gauceSystemierAdaptor.do",
+        ref : "",
+        target : "MxDataSet_select=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn2 = await $c.sbm.executeDynamic(sbmOptions2);
+    // TODO Stage2: sbmRtn2 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+    const sbmOptions3 = {
+        id : "sbm_MxDataSet_insert",
+        action : "/gauceSystemierAdaptor.do",
+        ref : "",
+        target : "MxDataSet_insert=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn3 = await $c.sbm.executeDynamic(sbmOptions3);
+    // TODO Stage2: sbmRtn3 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+    const sbmOptions4 = {
+        id : "sbm_MxDataSet",
+        action : "/bzchklist.do",
+        ref : "",
+        target : "MxDataSet=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn4 = await $c.sbm.executeDynamic(sbmOptions4);
+    // TODO Stage2: sbmRtn4 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+    // ShowWin(MxGrid_1);
+
+};
+
+/**
+ * @method
+ * @name save
+ * @description save 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.save = async function() {
+    // MxDataSet_insert.DataID = "/gauceSystemierAdaptor.do?method=getGauceDataHeader&messageId=bzchklist";
+    MxDataSet_insert.reset();
+    if (!scwin.cntDatasetRowCheck(MxDataSet)) {
+        await $c.win.alert('체크사항이 없습니다');
+        return;
+    }
+    let lastch = "Y"; // 최종업무확인
+    let unitCl = 0;
+    for (i = 1; i <= MxDataSet.getRowCount(); i++) {
+        if (MxDataSet.getCellData(i, "CHK_FLAG") === 1) {
+            unitCl = i;
+        }
+    }
+    if (unitCl !== 0) {
+        MxDataSet.insertRow();
+        // alert("단위업무마감을 시작합니다.");
+        MxDataSet.setCellData(MxDataSet.getRowPosition(), "BAS_DD", MxDataSet.getCellData(unitCl, "BAS_DD"));
+        MxDataSet.setCellData(MxDataSet.getRowPosition(), "CHK_BZ_TP_CD", MxDataSet.getCellData(unitCl, "CHK_BZ_TP_CD"));
+        MxDataSet.setCellData(MxDataSet.getRowPosition(), "UNIT_BZ_CLS_DDTM", "99991231000000");
+        MxDataSet.setCellData(MxDataSet.getRowPosition(), "CLS_TRANSTR_EMP_NO", js_emp_no);
+    }
+    for (k = 1; k <= MxDataSet.getRowCount(); k++) {
+        if (MxDataSet.getCellData(k, "CHK_BZ_TP_CD") === '40' && MxDataSet.getCellData(k, "UNIT_BZ_CLS_DDTM") === "99991231000000") {
+            lastch = "N";
+            break;
+        }
+    }
+    if (lastch === "Y") {
+        MxDataSet.insertRow();
+        MxDataSet.setCellData(MxDataSet.getRowPosition(), "BAS_DD", MxDataSet.getCellData(1, "BAS_DD"));
+        MxDataSet.setCellData(MxDataSet.getRowPosition(), "CHK_BZ_TP_CD", "40");
+        MxDataSet.setCellData(MxDataSet.getRowPosition(), "UNIT_BZ_CLS_DDTM", "99991231000000");
+        MxDataSet.setCellData(MxDataSet.getRowPosition(), "CLS_TRANSTR_EMP_NO", js_emp_no);
+    }
+    /*
+					MxDataSet_insert.AddRow();
+MxDataSet_insert.setNameValue(1, "BAS_DD","20080516") ;
+MxDataSet_insert.setNameValue(1, "CHK_BZ_TP_CD","31") ;
+MxDataSet_insert.setNameValue(1, "UNIT_BZ_STRT_DDTM",MxDataSet_insert.NameValue(1, "UNIT_BZ_STRT_DDTM") =) ;
+MxDataSet_insert.setNameValue(1, "UNIT_BZ_CLS_DDTM",MxDataSet_insert.NameValue(1, "UNIT_BZ_CLS_DDTM") =) ;
+MxDataSet_insert.setNameValue(1, "CLS_TRANSTR_EMP_NO","010271") ;
+     */
+    // alert(MxDataSet_insert.Text);
+    // alert("단위업무의 재시작을 시작합니다\n최종업무가 마감된 경우 최종업무는 개시됩니다");
+    MxLogicalTr_save.KeyName = "toinb_dataid4";
+    const sbmOptions = {
+        id : "sbm_MxLogicalTr_save",
+        action : "/bzchklist.do",
+        ref : "MxDataSet",
+        target : "MxLogicalTr_save=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+};
+
+/**
+ * @method
+ * @name save2
+ * @description save2 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.save2 = async function() {
+    await $c.win.alert("금감원 제출, 코스콤공시전송을 제외한 시작되지 않은 모든 업무를 수동시작합니다.");
+    for (i = 1; i <= MxDataSet.getRowCount(); i++) {
+        if (MxDataSet.getCellData(i, "BAS_DD") === "" && MxDataSet.getCellData(i, "CHK_BZ_TP_CD").substring(0, 1) !== '2') {
+            if (MxDataSet.getCellData(i, "CHK_BZ_TP_CD") !== '51') {
+                MxDataSet.setCellData(i, "BAS_DD", scwin.txb_date);
+            }
+        }
+    }
+
+    // alert(MxDataSet.Text);
+    MxLogicalTr_save.KeyName = "toinb_dataid4";
+    const sbmOptions = {
+        id : "sbm_MxLogicalTr_save",
+        action : "/bzchklist.do",
+        ref : "MxDataSet",
+        target : "MxLogicalTr_save=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+};
+
+///////// 5. 일반/업무 함수 영역 /////////
+/**
+ * @method
+ * @name chk
+ * @description chk 처리
+ * @param {*} sval sval
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.chk = async function(sval) {
+    if (MxDataSet.getCellData(sval, "CHK_BZ_TP_CD") !== '31' && // 유가 공시팀
+        MxDataSet.getCellData(sval, "CHK_BZ_TP_CD") !== '32' && // 코스닥 공시팀
+        MxDataSet.getCellData(sval, "CHK_BZ_TP_CD") !== '33' && // 코스닥시장운영팀
+        MxDataSet.getCellData(sval, "CHK_BZ_TP_CD") !== '34' && // 주식시장운영팀
+        MxDataSet.getCellData(sval, "CHK_BZ_TP_CD") !== '35' && // ETF시장팀
+        MxDataSet.getCellData(sval, "CHK_BZ_TP_CD") !== '36' && // 예방감시팀(코스닥)
+        MxDataSet.getCellData(sval, "CHK_BZ_TP_CD") !== '37' && // 예방감시팀(유가)
+        MxDataSet.getCellData(sval, "CHK_BZ_TP_CD") !== '39' && // 시장감시3팀(ELW)
+        MxDataSet.getCellData(sval, "CHK_BZ_TP_CD") !== '38' && // 채권상장공시팀
+        MxDataSet.getCellData(sval, "CHK_BZ_TP_CD") !== '3A' && // 코넥스상장공시팀
+        MxDataSet.getCellData(sval, "CHK_BZ_TP_CD") !== '3B' && // 코넥스시장운영팀
+        MxDataSet.getCellData(sval, "CHK_BZ_TP_CD") !== '3C' && // 예방감시팀(코넥스)
+        MxDataSet.getCellData(sval, "CHK_BZ_TP_CD") !== '3E' && // 예방감시팀(배출권)
+        MxDataSet.getCellData(sval, "CHK_BZ_TP_CD") !== '3D' && // ETN시장팀
+        MxDataSet.getCellData(sval, "CHK_BZ_TP_CD") !== '3F') {
+        await $c.win.alert("재시작 대상업무가 아닙니다.");
+        MxDataSet.setCellData(sval, "CHK_FLAG", 0);
+        return;
+    }
+    if (MxDataSet.getCellData(sval, "BAS_DD") === '') {
+        await $c.win.alert("업무가 시작되지 않았습니다");
+        MxDataSet.setCellData(sval, "CHK_FLAG", 0);
+        return;
+    }
+    if (MxDataSet.getCellData(sval, "UNIT_BZ_CLS_DDTM") === '99991231000000') {
+        await $c.win.alert("업무가 종료되지 않았습니다.");
+        MxDataSet.setCellData(sval, "CHK_FLAG", 0);
+        return;
+    }
+    for (i = 1; i <= MxDataSet.getRowCount(); i++) {
+
+        // ********************************************************************
+        // [WebSquare 전환 추가] 원본 소스와 비교 필요
+        //
+        // ********************************************************************
+
+        if (MxDataSet.getCellData(i, "CHK_FLAG") === 1 && i !== sval) /*ORG SRC: if (MxDataSet.NameValue(i, "CHK_FLAG") == 1 && i != sval) MxDataSet.NameValue(i, "CHK_FLAG") = 0;*/ X = 0;
+    }
+    MxDataSet.getCellData(sval, "CHK_FLAG") === 1;
+};
+
+/**
+ * @method
+ * @name cntDatasetRowCheck
+ * @description 데이터셋의 체크박스 선택이 되어 있는지 확인하여 참,거짓을 넘겨준다.
+ * @param {*} sval sval
+ * @returns {void}
+ * @hidden N
+ */
+scwin.cntDatasetRowCheck = function(sval) {
+    // 데이터셋의 체크박스 선택이 되어 있는지 확인하여 참,거짓을 넘겨준다.
+    cCnt = 0;
+    for (i = 1; i <= sval.getRowCount(); i++) {
+        // alert(sval.NameValue(i, "CHK_FLAG"));
+        if (sval.getCellData(i, "CHK_FLAG") === 1) {
+            cCnt++;
+        }
+    }
+    if (cCnt === 0) return false;
+
+    else return true;
+};
+
+/**
+ * @method
+ * @name notEndDocLst
+ * @description not End Doc Lst 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.notEndDocLst = async function() {
+    const url = "/jobmonitor/ULDMGT10005.gfm?date=" + tmbDate.getValue();
+    const left = screen.width / 2 - document.body.offsetWidth / 2;
+    const right = screen.height / 2 - document.body.offsetHeight / 2;
+    await $c.frame.CreateDialogFrame("virWinNotEndDocLst", url, "미처리 공시 리스트(" + tmbDate.getValue() + ")", left, right, 865, 315, "tool");
+};
+
+/**
+ * @method
+ * @name MxGrid_1_CanColumnPosChange
+ * @description Mx Grid 1 Can Column Pos Change 처리
+ * @param {Number} row 행 인덱스
+ * @param {*} colid colid
+ * @returns {void}
+ * @hidden N
+ */
+scwin.MxGrid_1_CanColumnPosChange = function(row, colid) {
+    return true;
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+		<xf:group id="" class="sub_contents"><xf:group meta_snippetCategory="03_조회영역" meta_snippetName="3_01 조회조건1행" meta_snippetKeyComponent="true" style="" id="panel_1" class="schbox">
+			<xf:group style="" id="" class="schbox_inner">
+				<xf:group adaptive="" adaptiveThreshold="768" tagname="table" style="" id="" class="w2tb tbl ">
+					<w2:attributes>
+						<w2:summary></w2:summary>
+					</w2:attributes>
+					<xf:group tagname="colgroup">
+						<xf:group tagname="col" style="width:140px;"></xf:group>
+						<xf:group tagname="col" style=""></xf:group>
+					</xf:group>
+					<xf:group tagname="tr" style="" id="" class="">
+						<xf:group tagname="th" style="" class="w2tb_th">
+							<w2:textbox hierarchy="label_2" style="" userData2=" class:TopCondition_01; font-weight:normal; border-color:#ece9d8;" id="label_2" label="업무 개시/마감 현황" orgid="label_2">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" style="" class="w2tb_td">
+							<w2:inputCalendar style="" id="tmbDate" calendarValueType="yearMonthDate"></w2:inputCalendar>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<xf:group style="" id="" class="btn_schbox">
+				<xf:trigger cursor="pointer" src="../img/btn_select.gif" ev:onclick="scwin.btn_sys_search_onclick" hierarchy="btn_sys_search" style="" id="btn_sys_search" class="btn_cm sch" orgid="btn_sys_search">
+					<xf:label><![CDATA[조회]]></xf:label>
+				</xf:trigger>
+			</xf:group>
+		</xf:group><xf:group id="" class="titbox">
+			<xf:group id="" class="rt">
+
+				<xf:group meta_snippetCategory="02_타이틀" meta_snippetName="총건수" meta_snippetKeyComponent="true" id="" class="count">
+					<w2:span style="" id="" label="총"></w2:span>
+					<w2:textbox tagname="span" style="" id="textbox_1" label="" class="num"></w2:textbox>
+					<w2:span style="" id="" label="건"></w2:span>
+				</xf:group>
+			<xf:trigger ev:onclick="scwin.image_3_onclick" style="" id="image_3" type="button" class="btn_cm">
+			<xf:label><![CDATA[미승인건조회]]></xf:label>
+		</xf:trigger></xf:group>
+		</xf:group><xf:group id="" class="gvwbox">
+			<w2:gridView ev:oncellclick="scwin.MxGrid_1_oncheckclick" dataList="data:MxDataSet" hierarchy="MxGrid_1" userData2=" class:Grid_01; cancolumnposchange:MxGrid_1_CanColumnPosChange; colsizing:True; editable:True; fillarea:True; gtitleheight:0; suppressoption:3; titleheight:25; tooltip:use=true;alt=true;createtime=300;color=#FFFFFF;backcolor=#808080;edgecolor=#333333;leftmargin=10;rightmargin=10;topmargin=10;bottommargin=10;; usingoneclick:1; xtitleheight:0; onclick:MxGrid_1_OnClick;" style="height:153px;" id="MxGrid_1" autoFit="allColumn" class="gvw" orgid="MxGrid_1" autoFitMinWidth="800">
+				<w2:caption style="" id="caption1" value="this is a grid caption."></w2:caption>
+				<w2:header style="" id="header1">
+					<w2:row>
+						<w2:column textAlign="center" width="40" userData2=" headalign:center;" inputType="text" id="h_CHK_FLAG" value="" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="80" userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#FFFFFF; mask:XXXX-XX-XX; color:{Decode(UNIT_BZ_CLS_DDTM,'99991231000000','#009933')}; suppress:1;" readOnly="true" inputType="text" id="h_BAS_DD" value="기준일자" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="40" userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#FFFFFF; color:{Decode(UNIT_BZ_CLS_DDTM,'99991231000000','#009933')}; suppress:1;" readOnly="true" inputType="text" id="h_CHK_BZ_TP_CD" value="코드" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="180" userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#FFFFFF; color:{Decode(UNIT_BZ_CLS_DDTM,'99991231000000','#009933')}; suppress:1;" readOnly="true" inputType="text" id="h_CHK_BZ_NM" value="업무명" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="60" userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#FFFFFF; color:{Decode(UNIT_BZ_CLS_DDTM,'99991231000000','#009933')};" readOnly="true" inputType="text" id="h_GUBN" value="구분" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="130" userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#FFFFFF; mask:XXXX-XX-XX  XX:XX:XX; color:{Decode(UNIT_BZ_CLS_DDTM,'99991231000000','#009933')};" readOnly="true" inputType="text" id="h_UNIT_BZ_STRT_DDTM" value="단위업무개시일시" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="130" userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#FFFFFF; mask:XXXX-XX-XX  XX:XX:XX; color:{Decode(UNIT_BZ_CLS_DDTM,'99991231000000','#009933')};" readOnly="true" inputType="text" id="h_UNIT_BZ_CLS_DDTM" value="단위업무마감일시" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="140" userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#FFFFFF; color:{Decode(UNIT_BZ_CLS_DDTM,'99991231000000','#009933')};" readOnly="true" inputType="text" id="h_CLS_TRANSTR_EMP_NO" value="마감처리자사원번호" displayMode="label"></w2:column>
+					</w2:row>
+				</w2:header>
+				<w2:gBody style="" id="gBody1">
+					<w2:row style="" id="">
+						<w2:column textAlign="center" width="40" inputType="checkbox" id="CHK_FLAG" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="80" inputType="text" id="BAS_DD" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="40" inputType="text" id="CHK_BZ_TP_CD" displayMode="label"></w2:column>
+						<w2:column textAlign="left" width="180" inputType="text" id="CHK_BZ_NM" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="60" inputType="text" id="GUBN" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="130" inputType="text" id="UNIT_BZ_STRT_DDTM" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="130" inputType="text" id="UNIT_BZ_CLS_DDTM" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="140" inputType="text" id="CLS_TRANSTR_EMP_NO" displayMode="label"></w2:column>
+					</w2:row>
+				</w2:gBody>
+			</w2:gridView>
+		</xf:group><xf:group id="" class="titbox">
+			<xf:trigger cursor="pointer" src="../img/2_butt_all_start.gif" ev:onclick="scwin.image_2_onclick" hierarchy="image_2" style="" id="image_2" class="btn_cm" orgid="image_2">
+				<xf:label><![CDATA[수동 전체 개시]]></xf:label>
+			</xf:trigger>
+			<xf:group id="" class="rt">
+				<xf:trigger cursor="pointer" src="../img/2_butt_sel_start.gif" ev:onclick="scwin.image_1_onclick" hierarchy="image_1" style="" id="image_1" class="btn_cm" orgid="image_1">
+					<xf:label><![CDATA[선택 업무 개시]]></xf:label>
+				</xf:trigger>
+			</xf:group>
+		</xf:group><xf:group id="" class="gvwbox">
+			<w2:gridView dataList="data:MxDataSet_select" hierarchy="MxGrid_2" userData2=" class:Grid_01; colsizing:True; editable:True; fillarea:True; gtitleheight:0; suppressoption:3; titleheight:25; tooltip:use=true;alt=true;createtime=300;color=#FFFFFF;backcolor=#808080;edgecolor=#333333;leftmargin=10;rightmargin=10;topmargin=10;bottommargin=10;; usingoneclick:1; xtitleheight:0;" style="height:153px;" id="MxGrid_2" autoFit="allColumn" class="gvw" orgid="MxGrid_2" autoFitMinWidth="800">
+				<w2:caption style="" id="caption2" value="this is a grid caption."></w2:caption>
+				<w2:header style="" id="header2">
+					<w2:row>
+						<w2:column textAlign="center" width="40" userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; color:#343434; value:{currow}; sumbgcolor:#fefaef; sumcolor:#343434;" inputType="text" id="column1" value="NO" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="80" userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#FFFFFF; mask:XXXX-XX-XX; color:{Decode(UNIT_BZ_CLS_DDTM,'99991231000000','#009933')}; suppress:1;" readOnly="true" inputType="text" id="h_BAS_DD" value="기준일자" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="40" userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#FFFFFF; color:{Decode(UNIT_BZ_CLS_DDTM,'99991231000000','#009933')}; suppress:1;" readOnly="true" inputType="text" id="h_CHK_BZ_TP_CD" value="코드" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="180" userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#FFFFFF; color:{Decode(UNIT_BZ_CLS_DDTM,'99991231000000','#009933')}; suppress:1;" readOnly="true" inputType="text" id="h_CHK_BZ_NM" value="업무명" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="60" userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#FFFFFF; color:{Decode(UNIT_BZ_CLS_DDTM,'99991231000000','#009933')};" readOnly="true" inputType="text" id="h_GUBN" value="구분" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="130" userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#FFFFFF; mask:XXXX-XX-XX  XX:XX:XX; color:{Decode(UNIT_BZ_CLS_DDTM,'99991231000000','#009933')};" readOnly="true" inputType="text" id="h_UNIT_BZ_STRT_DDTM" value="단위업무개시일시" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="130" userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#FFFFFF; mask:XXXX-XX-XX  XX:XX:XX; color:{Decode(UNIT_BZ_CLS_DDTM,'99991231000000','#009933')};" readOnly="true" inputType="text" id="h_UNIT_BZ_CLS_DDTM" value="단위업무마감일시" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="140" userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#FFFFFF; color:{Decode(UNIT_BZ_CLS_DDTM,'99991231000000','#009933')};" readOnly="true" inputType="text" id="h_CLS_TRANSTR_EMP_NO" value="마감처리자사원번호" displayMode="label"></w2:column>
+					</w2:row>
+				</w2:header>
+				<w2:gBody style="" id="gBody2">
+					<w2:row style="" id="">
+						<w2:column textAlign="center" width="40" inputType="text" id="column2" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="80" inputType="text" id="BAS_DD" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="40" inputType="text" id="CHK_BZ_TP_CD" displayMode="label"></w2:column>
+						<w2:column textAlign="left" width="180" inputType="text" id="CHK_BZ_NM" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="60" inputType="text" id="GUBN" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="130" inputType="text" id="UNIT_BZ_STRT_DDTM" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="130" inputType="text" id="UNIT_BZ_CLS_DDTM" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="140" inputType="text" id="CLS_TRANSTR_EMP_NO" displayMode="label"></w2:column>
+					</w2:row>
+				</w2:gBody>
+			</w2:gridView>
+		</xf:group></xf:group><xf:group id="" class="hide">
+			<xf:input maxlength="1000" hierarchy="txb_date_bg" userData2=" class:TopCondition_01_write;"
+				style="position:absolute; left:243px; top:10px; width:76px; height:22px;" id="txb_date_bg" orgid="txb_date_bg">
+			</xf:input>
+		</xf:group>
+	</body>
+</html>

@@ -1,0 +1,647 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDSTF31100.gfm" meta_screenName="승인권한 관리" meta_screenId="ULDSTF31100">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<w2:layoutInfo/>
+		<w2:publicInfo method="scwin.onpageload,scwin.onpageunload,scwin.trs_Save_OnFail,scwin.trs_Save_OnSuccess,scwin.btn_Save_onclick,scwin.btn_SDate_onclick,scwin.btn_EDate_onclick,scwin.dts_Approv_Auth_List_OnLoadCompleted,scwin.cmb_DEP_CD_onselchange,scwin.dts_EMP_NO_OnFilter,scwin.grd_Approv_Auth_List_OnDblClick,scwin.setCode,scwin.setHeader,scwin.list,scwin.save,scwin.delete,scwin.checkForm"/>
+		<xf:model>
+			<w2:workflowCollection/>
+			<w2:dataCollection baseNode="map">
+				<w2:dataMap id="bnd_Save" userData2=" activebind:true; dataid:dts_Save;" baseNode="map" orgid="bnd_Save" hierarchy="bnd_Save">
+					<w2:keyInfo>
+						<w2:key id="AUTH_ENTRUSTED_USR_ID" ctrl="cmb_EMP_NO" userData2=" param:BindColVal; readonly:False;" orgid="AUTH_ENTRUSTED_USR_ID" hierarchy="AUTH_ENTRUSTED_USR_ID"/>
+						<w2:key id="AUTH_STRT_DD" ctrl="edt_SDate" userData2=" param:text; readonly:False;" orgid="AUTH_STRT_DD" hierarchy="AUTH_STRT_DD"/>
+						<w2:key id="AUTH_END_DD" ctrl="edt_EDate" userData2=" param:text; readonly:False;" orgid="AUTH_END_DD" hierarchy="AUTH_END_DD"/>
+						<w2:key id="ENTRUST_RSN_CONTN" ctrl="txb_Reason" userData2=" param:value; readonly:False;" orgid="ENTRUST_RSN_CONTN" hierarchy="ENTRUST_RSN_CONTN"/>
+					</w2:keyInfo>
+				</w2:dataMap>
+			</w2:dataCollection>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+///////// 1. 변수 및 선언 영역 /////////
+scwin.LastJob = "";
+scwin.gDepCd = js_dep_cd;
+scwin.gEmpNo = js_emp_no;
+
+///////// 2. 초기화 영역 /////////
+/**
+ * @method
+ * @name onpageload
+ * @description 화면 로딩 시 초기 처리 — init 순차 호출
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.onpageload = async function() {
+    try {
+        $c.libRoundPanel.PanelToGroupBox(panel_1);
+        await scwin.setCode();
+
+        // 2009.09.01 채권공시 - 채권상장팀인경우..채권상장팀만 나오도록 셋팅한다.
+        if (scwin.gDepCd === "2430") {
+            cmb_DEP_CD.setValue(scwin.gDepCd);
+        }
+        await scwin.setHeader();
+        await scwin.list();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF31100.onpageload" });
+    }
+};
+
+/**
+ * @method
+ * @name onpageunload
+ * @description 화면 언로드 시 정리 처리
+ * @returns {void}
+ * @hidden N
+ */
+scwin.onpageunload = function() {
+};
+
+///////// 3. 컴포넌트 이벤트 영역 /////////
+/**
+ * @method
+ * @name trs_Save_OnFail
+ * @description Save On Fail 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.trs_Save_OnFail = async function() {
+    try {
+        await $c.win.alert(scwin.LastJob + " 실패");
+        await $c.win.alert(trs_Save);
+        dts_Save.Reset();
+        dts_Save.insertRow(); // 성공일 때 Default로 한줄 추가해 놓는다.
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF31100.trs_Save_OnFail" });
+    }
+};
+
+/**
+ * @method
+ * @name trs_Save_OnSuccess
+ * @description Save On Success 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.trs_Save_OnSuccess = async function() {
+    try {
+        await $c.win.alert(scwin.LastJob + " 성공");
+        dts_Save.Reset();
+        dts_Save.insertRow(); // 성공일 때 Default로 한줄 추가해 놓는다.
+        await scwin.list();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF31100.trs_Save_OnSuccess" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_Save_onclick
+ * @description 「저장」 클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.btn_Save_onclick = async function() {
+    try {
+        await scwin.checkForm();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF31100.btn_Save_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_SDate_onclick
+ * @description btn_SDate 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.btn_SDate_onclick = function() {
+    try {
+        popUpCalendar2(edt_SDate);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF31100.btn_SDate_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_EDate_onclick
+ * @description btn_EDate 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.btn_EDate_onclick = function() {
+    try {
+        popUpCalendar2(edt_EDate);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF31100.btn_EDate_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name dts_Approv_Auth_List_OnLoadCompleted
+ * @description dts_Approv_Auth_List 로드 완료 후처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @param {Number} rowcount 조회 건수
+ * @returns {void}
+ * @hidden N
+ */
+scwin.dts_Approv_Auth_List_OnLoadCompleted = function(rowcount) {
+    try {
+        // if (rowcount > 0)
+        //    grd_Approv_Auth_List.AutoResizeAllCol(true);
+        const vTotalCnt = rowcount;
+        $c.stf.fillGridHeaderTotalCnt(vTotalCnt, panel_page);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF31100.dts_Approv_Auth_List_OnLoadCompleted" });
+    }
+};
+
+/**
+ * @method
+ * @name cmb_DEP_CD_onselchange
+ * @description cmb_DEP_CD onselchange 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.cmb_DEP_CD_onselchange = function() {
+    try {
+        dts_EMP_NO.sort("DEP_CD", 0);
+        // dts_EMP_NO.sort(); // W-Craft 주석처리
+        dts_EMP_NO.UseFilter = true;
+        dts_EMP_NO.Filter();
+        if (cmb_DEP_CD.getValue() === "") {
+            cmb_EMP_NO.setValue("");
+        }
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF31100.cmb_DEP_CD_onselchange" });
+    }
+};
+
+/**
+ * @method
+ * @name dts_EMP_NO_OnFilter
+ * @description EMP NO On Filter 처리
+ * @param {Number} row 행 인덱스
+ * @returns {void}
+ * @hidden N
+ */
+scwin.dts_EMP_NO_OnFilter = function(row) {
+    try {
+        //  부서코드에  해당하는 사원을 가져온다.
+        const vVal = cmb_DEP_CD.getValue();
+        if (vVal === "") {
+            // 전체일 경우
+            return true;
+        } else {
+            const vVal2 = dts_EMP_NO.getCellData(row, "dep_cd"); // 전체.
+            if (vVal2 === "") return true; // 전체.
+            return (vVal === vVal2) ? true : false;
+        }
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF31100.dts_EMP_NO_OnFilter" });
+    }
+};
+
+/**
+ * @method
+ * @name grd_Approv_Auth_List_OnDblClick
+ * @description grd_Approv_Auth_List 더블클릭 처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @param {Number} row 행 인덱스
+ * @param {*} colid colid
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.grd_Approv_Auth_List_OnDblClick = async function(row, colid) {
+    try {
+        await scwin.delete(row, colid);
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF31100.grd_Approv_Auth_List_OnDblClick" });
+    }
+};
+
+///////// 4. 서브미션 콜백 영역 /////////
+/**
+ * @method
+ * @name setCode
+ * @description set Code 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.setCode = async function() {
+    const sbmOptions = {
+        id : "sbm_dts_EMP_NO",
+        action : "/CodeAction.do",
+        ref : "",
+        target : "dts_EMP_NO=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+    const sbmOptions2 = {
+        id : "sbm_dts_DEP_CD",
+        action : "/CodeAction.do",
+        ref : "",
+        target : "dts_DEP_CD=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn2 = await $c.sbm.executeDynamic(sbmOptions2);
+    // TODO Stage2: sbmRtn2 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+    // 2009.09.01 채권공시 - 채권상장팀인경우..전체를 밴다..
+    if (js_bond_yn === "Y") {
+        dts_DEP_CD.removeRow(1);
+    }
+};
+
+/**
+ * @method
+ * @name setHeader
+ * @description CUD용 Header
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.setHeader = async function() {
+    // CUD용 Header
+    const sbmOptions = {
+        id : "sbm_dts_Save",
+        action : "/gauceSystemierAdaptor.do",
+        ref : "",
+        target : "dts_Save=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+    dts_Save.insertRow();
+};
+
+/**
+ * @method
+ * @name list
+ * @description list 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.list = async function() {
+    const sbmOptions = {
+        id : "sbm_dts_Approv_Auth_List",
+        action : "/DisclosureTransmitAuthority.do",
+        ref : "",
+        target : "dts_Approv_Auth_List=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+    // alert(dts_Approv_Auth_List.Text);
+
+};
+
+/**
+ * @method
+ * @name save
+ * @description ********************************************************************
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.save = async function() {
+
+    // ********************************************************************
+    // [WebSquare 전환 추가] 원본 소스와 비교 필요
+    //
+    // ********************************************************************
+
+    scwin.LastJob = "저장"; /*ORG SRC: dts_Save.UserStatus(1) = TB_JOB_INSERT;*/ X = TB_JOB_INSERT;
+    dts_Save.setCellData(1, "LST_CHG_EMP_NO", scwin.gEmpNo);
+    trs_Save.KeyName = "toinb_dataid4";
+    const sbmOptions = {
+        id : "sbm_trs_Save",
+        action : "/DisclosureTransmitAuthority.do",
+        ref : "dts_Save",
+        target : "trs_Save=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+};
+
+/**
+ * @method
+ * @name delete
+ * @description delete 처리
+ * @param {Number} row 행 인덱스
+ * @param {*} colid colid
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.delete = async function(row, colid) {
+    if ((colid === "FUNC_DEL") &&
+        (row > 0) &&
+        (dts_Approv_Auth_List.getCellData(row, "FUNC_DEL") !== "")) {
+        let res = window.confirm("삭제하시겠습니까?");
+        if (res) {
+            scwin.LastJob = "삭제";
+            const str_AUTH_ENTRUST_USR_ID = dts_Approv_Auth_List.getCellData(row, "AUTH_ENTRUST_USR_ID");
+            const str_AUTH_ENTRUSTED_USR_ID = dts_Approv_Auth_List.getCellData(row, "AUTH_ENTRUSTED_USR_ID");
+            const str_AUTH_END_DD = dts_Approv_Auth_List.getCellData(row, "AUTH_END_DD");
+            const str_AUTH_STRT_DD = dts_Approv_Auth_List.getCellData(row, "AUTH_STRT_DD");
+            const str_LST_CHG_DDTM = dts_Approv_Auth_List.getCellData(row, "LST_CHG_DDTM");
+            // alert(str_AUTH_ENTRUST_USR_ID + ", " + str_AUTH_ENTRUSTED_USR_ID + ", " + str_AUTH_END_DD + ", " + str_AUTH_STRT_DD);
+
+            // ********************************************************************
+            // [WebSquare 전환 추가] 원본 소스와 비교 필요
+            //
+            // ********************************************************************
+
+            /*ORG SRC: dts_Save.UserStatus(1) = TB_JOB_DELETE;*/
+            X = TB_JOB_DELETE;
+            dts_Save.setCellData(1, "AUTH_ENTRUST_USR_ID", str_AUTH_ENTRUST_USR_ID);
+            dts_Save.setCellData(1, "AUTH_ENTRUSTED_USR_ID", str_AUTH_ENTRUSTED_USR_ID);
+            dts_Save.setCellData(1, "AUTH_END_DD", str_AUTH_END_DD);
+            dts_Save.setCellData(1, "AUTH_STRT_DD", str_AUTH_STRT_DD);
+            dts_Save.setCellData(1, "LST_CHG_DDTM", str_LST_CHG_DDTM);
+
+            // alert_parse(dts_Save.Text, ",");return;
+
+            // alert(dts_Save.Text);
+
+            trs_Save.KeyName = "toinb_dataid4";
+            const sbmOptions = {
+                id : "sbm_trs_Save",
+                action : "/DisclosureTransmitAuthority.do",
+                ref : "dts_Save",
+                target : "trs_Save=body.content",
+                isProcessMsg : false
+            };
+
+            const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+            // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+        }
+    }
+};
+
+///////// 5. 일반/업무 함수 영역 /////////
+/**
+ * @method
+ * @name checkForm
+ * @description check Form 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.checkForm = async function() {
+    if (cmb_DEP_CD.getValue() === "") {
+        await $c.win.alert("[팀]을 선택하세요.");
+        cmb_DEP_CD.focus();
+        return;
+    }
+    if (cmb_EMP_NO.getValue() === "") {
+        await $c.win.alert("[담당자]을 선택하세요.");
+        cmb_EMP_NO.focus();
+        return;
+    }
+    if (edt_SDate.getValue() === "") {
+        await $c.win.alert("[시작일시]를 입력하세요.");
+        edt_SDate.focus();
+        return;
+    }
+    if (edt_EDate.getValue() === "") {
+        await $c.win.alert("[만료일시]를 입력하세요.");
+        edt_EDate.focus();
+        return;
+    }
+    if (txb_Reason.getValue() === "") {
+        await $c.win.alert("[사유]를 입력하세요.");
+        txb_Reason.focus();
+        return;
+    }
+    let res = window.confirm("저장하시겠습니까?");
+    if (res) {
+        await scwin.save();
+    }
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+		<xf:group class="sub_contents" id="" meta_snippetCategory="00_화면시작" meta_snippetKeyComponent="true" meta_snippetName="0_01 페이지시작"
+			style="">
+			<xf:group class="pgtbox" id="" meta_snippetCategory="02_타이틀" meta_snippetKeyComponent="true" meta_snippetName="2_01 페이지타이틀"
+				style="">
+				<w2:textbox class="pgt_tit" id="" label="승인권한 관리" style="" tagname=""></w2:textbox>
+				<xf:group class="breadcrumb" id="" style="">
+					<xf:group id="" style="" tagname="ul">
+						<xf:group class="home" id="" style="" tagname="li">
+							<w2:anchor id="" outerDiv="false" style="">
+								<xf:label><![CDATA[Home]]></xf:label>
+							</w2:anchor>
+						</xf:group>
+						<xf:group id="" style="" tagname="li">
+							<w2:anchor id="" outerDiv="false" style="">
+								<xf:label><![CDATA[1Depth Menu]]></xf:label>
+							</w2:anchor>
+						</xf:group>
+						<xf:group id="" style="" tagname="li">
+							<w2:anchor id="" outerDiv="false" style="">
+								<xf:label><![CDATA[2Depth Menu]]></xf:label>
+							</w2:anchor>
+						</xf:group>
+						<xf:group id="" style="" tagname="li">
+							<w2:span id="" label="3Depth Menu" style=""></w2:span>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+				<xf:trigger class="btn_fav" id="" style="" type="button">
+					<xf:label></xf:label>
+				</xf:trigger>
+			</xf:group>
+			<xf:group class="titbox" id="" meta_snippetCategory="02_타이틀" meta_snippetKeyComponent="true" meta_snippetName="2_02 서브타이틀(h3)"
+				style="">
+				<xf:group class="rt" id="" style="">
+					<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.btn_Save_onclick" hierarchy="btn_Save" id="btn_Save"
+						orgid="btn_Save" src="../img/btn_save.gif" style="" text="저장">
+						<xf:label><![CDATA[저장]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+			<xf:group class="tblbox" id="panel_1" meta_snippetCategory="05_입출력테이블" meta_snippetKeyComponent="true"
+				meta_snippetName="5_04 4단테이블" style="">
+				<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+					<w2:attributes>
+						<w2:summary></w2:summary>
+					</w2:attributes>
+					<xf:group tagname="colgroup">
+						<xf:group style="width:100px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+						<xf:group style="width:100px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+						<xf:group style="width:100px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+						<xf:group style="width:100px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group class="w2tb_th" tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_2" id="label_2" label="팀" orgid="label_2" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes></w2:attributes>
+							<xf:select1 appearance="minimal" disabledClass="w2selectbox_disabled" displayMode="label"
+								ev:onchange="scwin.cmb_DEP_CD_onselchange" hierarchy="cmb_DEP_CD" id="cmb_DEP_CD" orgid="cmb_DEP_CD" ref="data:dts_DEP_CD"
+								selectedData="true" style="width:125px;"
+								userData2=" bindcolumn:VALUE; index:1; inheritcolor:False; listcount:10; listexprformat:text^0^177; searchcolumn:TEXT; xpstyle:True; font-family:돋움;">
+							</xf:select1>
+						</xf:group>
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_3" id="label_3" label="담당자" orgid="label_3" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes></w2:attributes>
+							<xf:select1 appearance="minimal" disabledClass="w2selectbox_disabled" displayMode="label" hierarchy="cmb_EMP_NO"
+								id="cmb_EMP_NO" orgid="cmb_EMP_NO" ref="data:dts_EMP_NO" selectedData="true" style="width:105px;"
+								userData2=" bindcolumn:VALUE; index:0; inheritcolor:False; listcount:10; listexprformat:text^0^100; searchcolumn:TEXT; xpstyle:True; font-family:돋움;">
+							</xf:select1>
+						</xf:group>
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_10" id="label_10" label="시작일시" orgid="label_10" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes></w2:attributes>
+							<w2:inputCalendar displayFormat="yyyy-MM-dd" hierarchy="edt_SDate" id="edt_SDate" orgid="edt_SDate" style=""
+								userData2=" class:panel_maskedit_write_01; alignment:1; border:False; numeric:False; valign:1;">
+							</w2:inputCalendar>
+						</xf:group>
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_1" id="label_1" label="만료일시" orgid="label_1" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes></w2:attributes>
+							<w2:inputCalendar displayFormat="yyyy-MM-dd" hierarchy="edt_EDate" id="edt_EDate" orgid="edt_EDate" style=""
+								userData2=" class:panel_maskedit_write_01; alignment:1; border:False; numeric:False; valign:1;">
+							</w2:inputCalendar>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_4" id="label_4" label="사유" orgid="label_4" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:colspan>7</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:input hierarchy="txb_Reason" id="txb_Reason" maxlength="1000" orgid="txb_Reason" style="width:480px;"
+								userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<xf:group class="titbox" id="" meta_snippetCategory="02_타이틀" meta_snippetKeyComponent="true" meta_snippetName="2_02 서브타이틀(h3)"
+				style="">
+				<xf:group class="rt" id="" style="">
+					<xf:group class="count" id="" style="">
+						<w2:textbox class="" id="" label="총" style=""></w2:textbox>
+						<w2:textbox class="num" id="panel_page" label="0" style=""></w2:textbox>
+						<w2:textbox class="" id="" label="건" style=""></w2:textbox>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<xf:group class="gvwbox" id="" style="">
+				<w2:gridView class="gvw" dataList="data:dts_Approv_Auth_List" hierarchy="grd_Approv_Auth_List" id="grd_Approv_Auth_List"
+					orgid="grd_Approv_Auth_List" style="height: 153px;"
+					userData2=" class:Grid_01; autoresizing:True; autoresizingallcol:True; autoresizingwithheader:True; colsizing:True; fillarea:True; fixsizing:True; gtitleheight:0; headborder:0; sortview:left; xtitleheight:0; ondblclick:grd_Approv_Auth_List_OnDblClick;" autoFit="allColumn" autoFitMinWidth="1600">
+					<w2:caption id="caption1" style="" value="this is a grid caption."></w2:caption>
+					<w2:header id="header1" style="">
+						<w2:row>
+							<w2:column displayMode="label" id="column1" inputType="text" textAlign="center"
+								userData2=" color:#343434; value:{ToString(CurRow)};" value="번호" width="50" fixColumnWidth="true">
+							</w2:column>
+							<w2:column displayMode="label" id="h_LST_CHG_DDTM" inputType="text" textAlign="center"
+								userData2=" color:#343434; mask:XXXX-XX-XX XX:XX; sort:True;" value="조치일" width="122">
+							</w2:column>
+							<w2:column displayMode="label" id="h_AUTH_ENTRUST_USR_NM" inputType="text" textAlign="center"
+								userData2=" color:#343434; sort:True;" value="승인권자" width="134">
+							</w2:column>
+							<w2:column displayMode="label" id="h_AUTH_ENTRUSTED_USR_NM" inputType="text" textAlign="center"
+								userData2=" color:#343434; sort:True;" value="위임자" width="136">
+							</w2:column>
+							<w2:column displayMode="label" id="h_AUTH_STRT_DD" inputType="text" textAlign="center"
+								userData2=" color:#343434; mask:XXXX-XX-XX; sort:True;" value="시작일시" width="132">
+							</w2:column>
+							<w2:column displayMode="label" id="h_AUTH_END_DD" inputType="text" textAlign="center"
+								userData2=" color:#343434; mask:XXXX-XX-XX; sort:True;" value="만료일시" width="130">
+							</w2:column>
+							<w2:column displayMode="label" id="h_ENTRUST_RSN_CONTN" inputType="text" textAlign="center"
+								userData2=" color:#343434; sort:True;" value="사유" width="466">
+							</w2:column>
+							<w2:column displayMode="label" id="h_FUNC_DEL" inputType="text" textAlign="center"
+								userData2=" color:#343434; cursor:hand; bgcolor:#ffff99; sort:True;" value="삭제" width="60">
+							</w2:column>
+							<w2:column displayMode="label" hidden="true" id="h_DEL_YN" inputType="text" textAlign="center"
+								userData2=" sort:True;" value="삭제여부" width="60">
+							</w2:column>
+							<w2:column displayMode="label" hidden="true" id="h_AUTH_GRD_CD" inputType="text" textAlign="center"
+								userData2=" sort:True;" value="권한등급" width="60">
+							</w2:column>
+							<w2:column displayMode="label" hidden="true" id="h_AUTH_ENTRUST_USR_ID" inputType="text" textAlign="center"
+								value="AUTH_ENTRUST_USR_ID" width="122">
+							</w2:column>
+							<w2:column displayMode="label" hidden="true" id="h_AUTH_ENTRUSTED_USR_ID" inputType="text" textAlign="center"
+								value="AUTH_ENTRUSTED_USR_ID" width="134">
+							</w2:column>
+						</w2:row>
+					</w2:header>
+					<w2:gBody id="gBody1" style="">
+						<w2:row id="" style="">
+							<w2:column displayMode="label" id="column2" inputType="text" textAlign="center" width="50"></w2:column>
+							<w2:column displayMode="label" id="LST_CHG_DDTM" inputType="text" textAlign="center" width="122"></w2:column>
+							<w2:column displayMode="label" id="AUTH_ENTRUST_USR_NM" inputType="text" textAlign="center" width="134"></w2:column>
+							<w2:column displayMode="label" id="AUTH_ENTRUSTED_USR_NM" inputType="text" textAlign="center" width="136"></w2:column>
+							<w2:column displayMode="label" id="AUTH_STRT_DD" inputType="text" textAlign="center" width="132"></w2:column>
+							<w2:column displayMode="label" id="AUTH_END_DD" inputType="text" textAlign="center" width="130"></w2:column>
+							<w2:column displayMode="label" id="ENTRUST_RSN_CONTN" inputType="text" textAlign="center" width="466"></w2:column>
+							<w2:column displayMode="label" id="FUNC_DEL" inputType="popupfix" textAlign="center" width="60"></w2:column>
+							<w2:column displayMode="label" id="DEL_YN" inputType="text" textAlign="center" width="60"></w2:column>
+							<w2:column displayMode="label" id="AUTH_GRD_CD" inputType="text" textAlign="center" width="60"></w2:column>
+							<w2:column displayMode="label" id="AUTH_ENTRUST_USR_ID" inputType="text" textAlign="center" width="122"></w2:column>
+							<w2:column displayMode="label" id="AUTH_ENTRUSTED_USR_ID" inputType="text" textAlign="center" width="134"></w2:column>
+						</w2:row>
+					</w2:gBody>
+				</w2:gridView>
+			</xf:group>
+		</xf:group>
+	</body>
+</html>

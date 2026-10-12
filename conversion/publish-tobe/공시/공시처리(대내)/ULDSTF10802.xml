@@ -1,0 +1,841 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDSTF10802.gfm" meta_screenName="온라인통보결과조회" meta_screenId="ULDSTF10802.gfm" meta_screenDesc="온라인 통보결과를 조회 및 접수/반송 처리하는 팝업\n공시담당자는 접수/반송 처리를 하며 사이버정보분석팀은 접수되었다면 공시를 등록하고 반송되었다면 반송승인/반송거부 처리를 함" meta_type="유지" meta_memo="1. &lt;사이버정보분석팀(5B10)&gt;「공시시각」 더블클릭 시 접수상태가 '접수','반송거부'인 경우 [공시선택] 팝업 호출\n2. &lt;사이버정보분석팀&gt;「접수상태」 더블 클릭 시 접수상태가 '반송' 인 경우 [온라인통보 반송] 팝업 호출\n3. 「비고」 항목은 자신의 부서에 해당하는 경우 수정 가능함\n4. 「저장」 클릭 시 수정된 값을 저장\n5. 「취소」 클릭 시 팝업을 닫음">
+		<w2:historyInfo>
+			<w2:history meta_no="1" meta_desc="최초" meta_date="2026.02.25" meta_user="류태연"></w2:history>
+		</w2:historyInfo>
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<w2:layoutInfo/>
+		<w2:publicInfo method="scwin.onpageload,scwin.onpageunload,scwin.init,scwin.trs_Sub_OnFail,scwin.trs_Sub_OnSuccess,scwin.btn_Save_onclick,scwin.btn_Cancel_onclick,scwin.txb_ACPT_STAT1_ondblclick,scwin.txb_ACPT_STAT2_ondblclick,scwin.txb_ACPT_STAT3_ondblclick,scwin.txb_ACPT_STAT4_ondblclick,scwin.txb_DISCLS_DDTM2_ondblclick,scwin.txb_DISCLS_DDTM3_ondblclick,scwin.read,scwin.popupCallback,scwin.save,scwin.openDiscls,scwin.setDiscls,scwin.onlineAcpt"/>
+		<xf:model>
+			<w2:dataCollection baseNode="map"></w2:dataCollection>
+			<w2:workflowCollection/>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+///////// 1. 변수 및 선언 영역 /////////
+scwin.link_num = '';
+scwin.acpt_num = '';
+scwin.gDepCd = js_dep_cd;
+// 사이버정보분석팀일경우 팀코드가 시장마다 다르기 때문에 상위부서코드로 넣어준다. 20240510
+if (scwin.gDepCd.substring(0, 2) === '5B') {
+    scwin.gDepCd = '5B10';
+}
+scwin.gEmpNo = js_emp_no;
+scwin.key_row = frame.opener.scwin.key_row;
+
+///////// 2. 초기화 영역 /////////
+/**
+ * @method
+ * @name onpageload
+ * @description 화면 로딩 시 초기 처리 — init 순차 호출
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.onpageload = async function() {
+    try {
+        await scwin.read();
+        setTimeout("fn_init()", 1000); // 데이터 로딩시간이 있어 1초후 화면초기화 작업한다.
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF10802.onpageload" });
+    }
+};
+
+/**
+ * @method
+ * @name onpageunload
+ * @description 화면 언로드 시 정리 처리
+ * @returns {void}
+ * @hidden N
+ */
+scwin.onpageunload = function() {
+};
+
+/**
+ * @method
+ * @name init
+ * @description 화면 초기화 — 파라미터 수신·기본값·컴포넌트 초기 설정(onpageload 에서 순차 호출)
+ * @returns {void}
+ * @hidden N
+ */
+scwin.init = function() {
+    // (유가/코스닥)공시총괄팀 당번아이디로 수정할수 있게 세팅.
+    if (js_dep_cd === '2600' || js_dep_cd === '3400') {
+        scwin.gDepCd = txb_DEP_CD2.getValue();
+    }
+    txb_NOTI_SEQ.hide();
+    txb_ISUR_CD.hide();
+    txb_EMP_NO.hide();
+    for (let i = 1; i < 4; i++) {
+        $p.getComponentById("txb_ACPT_NO" + i).hide();
+        $p.getComponentById("txb_DEP_CD" + i).hide();
+        const dep_cd = $p.getComponentById("txb_DEP_CD" + i).getValue();
+        // alert("gDepCd : " + gDepCd + " : dep_cd : " + dep_cd);
+        if (scwin.gDepCd === dep_cd) {
+            $p.getComponentById("txb_REMK" + i).setReadOnly("");
+        } else {
+            $p.getComponentById("txb_REMK" + i).style.backgroundColor = '#b9d4f7';
+        }
+
+        // 시장감시부일때만 '공시시각','반송사유' 를 보여주고 다른팀일때 보여주지 않는다.
+        if (scwin.gDepCd !== '5B10') {
+            if (i === 1) {
+                label_13.hide();
+                label_18.hide();
+                label_25.hide();
+                panel_1.style.height = 457;
+                panel_2.style.height = 145;
+                btn_Save.style.top = 357;
+                btn_Cancel.style.top = 357;
+                label_31.style.top = 357;
+                label_21.style.top = 378;
+                label_22.style.top = 399;
+                label_23.style.top = 420;
+                label_24.style.top = 441;
+            }
+            $p.getComponentById("txb_DISCLS_DDTM" + i).hide();
+            $p.getComponentById("txb_RET_RSN" + i).hide();
+        }
+    }
+    $c.cm.PanelToGroupBox(panel_1);
+};
+
+///////// 3. 컴포넌트 이벤트 영역 /////////
+/**
+ * @method
+ * @name trs_Sub_OnFail
+ * @description Sub On Fail 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.trs_Sub_OnFail = async function() {
+    try {
+        await $c.win.alert(trs_Sub);
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF10802.trs_Sub_OnFail" });
+    }
+};
+
+/**
+ * @method
+ * @name trs_Sub_OnSuccess
+ * @description Sub On Success 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.trs_Sub_OnSuccess = async function() {
+    try {
+        const msg = $c.stf.getMessageParam("MSG-A001", gLastJob);
+        await $c.win.alert(msg);
+        const fr_fn_Search = $c.frame.path("../").fn_Search;
+        fr_fn_Search();
+        await $c.win.closePopup();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF10802.trs_Sub_OnSuccess" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_Save_onclick
+ * @description 「저장」 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.btn_Save_onclick = function() {
+    try {
+        scwin.save();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF10802.btn_Save_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_Cancel_onclick
+ * @description 「취소」 클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.btn_Cancel_onclick = async function() {
+    try {
+        await $c.win.closePopup();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF10802.btn_Cancel_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name txb_ACPT_STAT1_ondblclick
+ * @description txb_ACPT_STAT1 더블클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.txb_ACPT_STAT1_ondblclick = async function() {
+    try {
+        await scwin.onlineAcpt('1');
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF10802.txb_ACPT_STAT1_ondblclick" });
+    }
+};
+
+/**
+ * @method
+ * @name txb_ACPT_STAT2_ondblclick
+ * @description txb_ACPT_STAT2 더블클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.txb_ACPT_STAT2_ondblclick = async function() {
+    try {
+        await scwin.onlineAcpt('2');
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF10802.txb_ACPT_STAT2_ondblclick" });
+    }
+};
+
+/**
+ * @method
+ * @name txb_ACPT_STAT3_ondblclick
+ * @description txb_ACPT_STAT3 더블클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.txb_ACPT_STAT3_ondblclick = async function() {
+    try {
+        await scwin.onlineAcpt('3');
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF10802.txb_ACPT_STAT3_ondblclick" });
+    }
+};
+
+/**
+ * @method
+ * @name txb_ACPT_STAT4_ondblclick
+ * @description txb_ACPT_STAT4 더블클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.txb_ACPT_STAT4_ondblclick = async function() {
+    try {
+        await scwin.onlineAcpt('4');
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF10802.txb_ACPT_STAT4_ondblclick" });
+    }
+};
+
+/**
+ * @method
+ * @name txb_DISCLS_DDTM2_ondblclick
+ * @description txb_DISCLS_DDTM2 더블클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.txb_DISCLS_DDTM2_ondblclick = async function() {
+    try {
+        await scwin.openDiscls('2');
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF10802.txb_DISCLS_DDTM2_ondblclick" });
+    }
+};
+
+/**
+ * @method
+ * @name txb_DISCLS_DDTM3_ondblclick
+ * @description txb_DISCLS_DDTM3 더블클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.txb_DISCLS_DDTM3_ondblclick = async function() {
+    try {
+        await scwin.openDiscls('3');
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF10802.txb_DISCLS_DDTM3_ondblclick" });
+    }
+};
+
+///////// 4. 서브미션 콜백 영역 /////////
+/**
+ * @method
+ * @name read
+ * @description read 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.read = async function() {
+    url += "&NOTI_SEQ=" + frame.opener.dts_Grid.getCellData(scwin.key_row, "NOTI_SEQ");
+    url += "&ISUR_CD=" + frame.opener.dts_Grid.getCellData(scwin.key_row, "ISUR_CD");
+    url += "&SCREN_ID=" + 'ULDSTF10802.xml';
+    url += "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01;
+    const sbmOptions = {
+        id : "sbm_dts_Master",
+        action : "/OnlineNotice.do",
+        ref : "",
+        target : "dts_Master=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+    url += "&NOTI_SEQ=" + frame.opener.dts_Grid.getCellData(scwin.key_row, "NOTI_SEQ");
+    url += "&ISUR_CD=" + frame.opener.dts_Grid.getCellData(scwin.key_row, "ISUR_CD");
+    url += "&SCREN_ID=" + 'ULDSTF10802.xml';
+    url += "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01;
+    const sbmOptions2 = {
+        id : "sbm_dts_Sub",
+        action : "/OnlineNotice.do",
+        ref : "",
+        target : "dts_Sub=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn2 = await $c.sbm.executeDynamic(sbmOptions2);
+    // TODO Stage2: sbmRtn2 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+};
+
+/**
+ * @method
+ * @name popupCallback
+ * @description browserPopup 팝업의 callback 함수. 부모창에서 팝업 결과 값을 처리한다.
+ * @param {*} arg 팝업에서 전달받은 값
+ * @returns {void}
+ * @hidden N
+ */
+scwin.popupCallback = function (arg) {
+    // TO-DO : arg 값 확인 후 업무 로직 추가
+};
+
+///////// 5. 일반/업무 함수 영역 /////////
+/**
+ * @method
+ * @name save
+ * @description save 처리
+ * @returns {void}
+ * @hidden N
+ */
+scwin.save = function() {
+    txb_EMP_NO.setValue(scwin.gEmpNo);
+    const res = window.confirm("[저장]하시겠습니까?");
+    if (res) {
+        gLastJob = "저장";
+        let url = "/OnlineNotice.do?method=saveDetailOnlineNotice" + "&SCREN_ID=" + 'ULDSTF10802.xml' + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01;
+        // alert(dts_MASTER.Text);
+        trs_Sub.Action = url;
+        trs_Sub.KeyName = "toinb_dataid4";
+        trs_Sub.KeyValue = "JSP(I:pInputMaster=dts_Sub)";
+        trs_Sub.post();
+    }
+};
+
+/**
+ * @method
+ * @name openDiscls
+ * @description open Discls 처리
+ * @param {*} num num
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.openDiscls = async function(num) {
+    fn_SetPar = scwin.setDiscls;
+    scwin.link_num = num;
+    if (scwin.gDepCd !== '5B10' || $p.getComponentById("txb_DEP_CD" + num).getValue() === '') {
+        // alert("시장감시부에서만 공시연결할 수 있습니다.");
+        return;
+    }
+    if ($p.getComponentById("txb_ACPT_STAT" + scwin.link_num).getValue() === '접수' || $p.getComponentById("txb_ACPT_STAT" + scwin.link_num).getValue() === '반송거부') {
+        const options = {
+            id: "ULDSTF30007",
+            title: "공시선택",
+            type: "browserPopup",
+            width: "10px",
+            height: "20px",
+            callbackFn: "scwin.popupCallback"
+        };
+
+        $c.win.openPopup("/dsclmgt/ULDSTF30007.gfm", options);
+    } else {
+        await $c.win.alert("[접수],[반송거부]상태에서 공시연결 할 수 있습니다.");
+    }
+};
+
+/**
+ * @method
+ * @name setDiscls
+ * @description 공시팝업에서 공시선택시 값 셋팅.
+ * @param {Array} arrPar 팝업 파라미터 배열(참조 채움)
+ * @returns {void}
+ * @hidden N
+ */
+scwin.setDiscls = function(arrPar) {
+    // 공시팝업에서 공시선택시 값 셋팅.
+    // alert("arrPar[0] : " + arrPar[0] + " : arrPar[1] : " + arrPar[1] + " :arrPar[2] : " + arrPar[2]);
+    const acpt_no = arrPar[0];
+    const discls_title = arrPar[1];
+    let discls_date = arrPar[2];
+    discls_date = discls_date.substring(0, 4) + "-" + discls_date.substring(4, 6) + "-" + discls_date.substring(6, 8) + " " + discls_date.substring(8, 10) + ":" + discls_date.substring(10, 12) + "(" + discls_title + ")";
+    $p.getComponentById("txb_ACPT_NO" + scwin.link_num).setValue(acpt_no);
+    $p.getComponentById("txb_DISCLS_DDTM" + scwin.link_num).setValue(discls_date);
+};
+
+/**
+ * @method
+ * @name onlineAcpt
+ * @description online Acpt 처리
+ * @param {*} num num
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.onlineAcpt = async function(num) {
+    scwin.acpt_num = num;
+    const wrtr_dep_cd = $p.getComponentById("txb_DEP_CD" + num).getValue();
+    if ($p.getComponentById("txb_ACPT_STAT" + scwin.acpt_num).getValue() === '미접수') {
+        /* 기존 상세뷰(30412)에서 호출했으나 장과장님 요청으로  리스트(30410)부분에서 호출변경 여기서 호출은 반송외에는 막는다.
+        if(gDepCd == wrtr_dep_cd) {
+        	frame.CreateDialogFrame("ONLINE", "/dsclinfo/ULDSTF30413.gfm", "온라인통보 접수", 100, 100, 550, 280, "window");
+        } else {
+        	alert("담당부서만 접수할 수 있습니다.");
+        }
+         */
+    } else if ($p.getComponentById("txb_ACPT_STAT" + scwin.acpt_num).getValue() === '반송' && scwin.gDepCd === '5B10') {
+        // 반송승인페이지 작업.
+        const options = {
+            id: "ULDSTF10804",
+            title: "온라인통보 반송",
+            type: "browserPopup",
+            width: "505px",
+            height: "280px",
+            callbackFn: "scwin.popupCallback"
+        };
+
+        $c.win.openPopup("/dsclproc/ULDSTF10804.gfm", options);
+    }
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+		<!-- Tag is Not matched with wCraft2 Rule :<style/>-->
+		<xf:model>
+			<!-- Tag is Not matched with wCraft2 Rule :<mxdataset id="dts_Master" syncload="True" orgid="dts_Master" hierarchy="dts_Master"/>-->
+			<!-- Tag is Not matched with wCraft2 Rule :<mxlogicaltr id="trs_Master" orgid="trs_Master" hierarchy="trs_Master"/>-->
+			<w2:dataMap id="bnd_Master" userData2=" activebind:true; dataid:dts_Master;" baseNode="map">
+				<w2:keyInfo>
+					<w2:key id="NOTI_DDTM" ctrl="txb_NOTI_DDTM" userData2=" param:value; readonly:False;"/>
+					<w2:key id="COM_ABBRV" ctrl="txb_COM_ABBRV" userData2=" param:value; readonly:False;"/>
+					<w2:key id="INQDISCLS_REQ_CONTN" ctrl="txb_INQDISCLS_REQ_CONTN" userData2=" param:value; readonly:False;"/>
+					<w2:key id="HALT_YN" ctrl="txb_HALT_YN" userData2=" param:value; readonly:False;"/>
+					<w2:key id="FORM_KOR_NM" ctrl="txb_FORM_KOR_NM" userData2=" param:value; readonly:False;"/>
+				</w2:keyInfo>
+			</w2:dataMap>
+			<!-- Tag is Not matched with wCraft2 Rule :<mxlogicaltr id="trs_Sub" onfail="trs_Sub_OnFail" onsuccess="trs_Sub_OnSuccess" orgid="trs_Sub" hierarchy="trs_Sub"/>-->
+			<!-- Tag is Not matched with wCraft2 Rule :<mxdataset id="dts_Sub" orgid="dts_Sub" hierarchy="dts_Sub"/>-->
+			<w2:dataMap id="bnd_Sub" userData2=" activebind:true; dataid:dts_Sub;" baseNode="map">
+				<w2:keyInfo>
+					<w2:key id="NOTI_SEQ" ctrl="txb_NOTI_SEQ" userData2=" param:value; readonly:False;"/>
+					<w2:key id="ISUR_CD" ctrl="txb_ISUR_CD" userData2=" param:value; readonly:False;"/>
+					<w2:key id="EMP_NO" ctrl="txb_EMP_NO" userData2=" param:value; readonly:False;"/>
+					<w2:key id="EMP_NM1" ctrl="txb_EMP_NM1" userData2=" param:value; readonly:False;"/>
+					<w2:key id="ACPT_DDTM1" ctrl="txb_ACPT_DDTM1" userData2=" param:value; readonly:False;"/>
+					<w2:key id="DISCLS_DDTM1" ctrl="txb_DISCLS_DDTM1" userData2=" param:value; readonly:False;"/>
+					<w2:key id="REMK1" ctrl="txb_REMK1" userData2=" param:value; readonly:False;"/>
+					<w2:key id="RET_RSN1" ctrl="txb_RET_RSN1" userData2=" param:value; readonly:False;"/>
+					<w2:key id="ACPT_STAT1" ctrl="txb_ACPT_STAT1" userData2=" param:value; readonly:False;"/>
+					<w2:key id="ACPT_NO1" ctrl="txb_ACPT_NO1" userData2=" param:value; readonly:False;"/>
+					<w2:key id="DEP_CD1" ctrl="txb_DEP_CD1" userData2=" param:value; readonly:False;"/>
+					<w2:key id="EMP_NM2" ctrl="txb_EMP_NM2" userData2=" param:value; readonly:False;"/>
+					<w2:key id="ACPT_DDTM2" ctrl="txb_ACPT_DDTM2" userData2=" param:value; readonly:False;"/>
+					<w2:key id="DISCLS_DDTM2" ctrl="txb_DISCLS_DDTM2" userData2=" param:value; readonly:False;"/>
+					<w2:key id="REMK2" ctrl="txb_REMK2" userData2=" param:value; readonly:False;"/>
+					<w2:key id="RET_RSN2" ctrl="txb_RET_RSN2" userData2=" param:value; readonly:False;"/>
+					<w2:key id="ACPT_STAT2" ctrl="txb_ACPT_STAT2" userData2=" param:value; readonly:False;"/>
+					<w2:key id="ACPT_NO2" ctrl="txb_ACPT_NO2" userData2=" param:value; readonly:False;"/>
+					<w2:key id="DEP_CD2" ctrl="txb_DEP_CD2" userData2=" param:value; readonly:False;"/>
+					<w2:key id="EMP_NM3" ctrl="txb_EMP_NM3" userData2=" param:value; readonly:False;"/>
+					<w2:key id="ACPT_DDTM3" ctrl="txb_ACPT_DDTM3" userData2=" param:value; readonly:False;"/>
+					<w2:key id="DISCLS_DDTM3" ctrl="txb_DISCLS_DDTM3" userData2=" param:value; readonly:False;"/>
+					<w2:key id="REMK3" ctrl="txb_REMK3" userData2=" param:value; readonly:False;"/>
+					<w2:key id="RET_RSN3" ctrl="txb_RET_RSN3" userData2=" param:value; readonly:False;"/>
+					<w2:key id="ACPT_STAT3" ctrl="txb_ACPT_STAT3" userData2=" param:value; readonly:False;"/>
+					<w2:key id="ACPT_NO3" ctrl="txb_ACPT_NO3" userData2=" param:value; readonly:False;"/>
+					<w2:key id="DEP_CD3" ctrl="txb_DEP_CD3" userData2=" param:value; readonly:False;"/>
+					<w2:key id="EMP_NM4" ctrl="txb_EMP_NM4" userData2=" param:value; readonly:False;"/>
+					<w2:key id="ACPT_DDTM4" ctrl="txb_ACPT_DDTM4" userData2=" param:value; readonly:False;"/>
+					<w2:key id="DISCLS_DDTM4" ctrl="txb_DISCLS_DDTM4" userData2=" param:value; readonly:False;"/>
+					<w2:key id="REMK4" ctrl="txb_REMK4" userData2=" param:value; readonly:False;"/>
+					<w2:key id="RET_RSN4" ctrl="txb_RET_RSN4" userData2=" param:value; readonly:False;"/>
+					<w2:key id="ACPT_STAT4" ctrl="txb_ACPT_STAT4" userData2=" param:value; readonly:False;"/>
+					<w2:key id="ACPT_NO4" ctrl="txb_ACPT_NO4" userData2=" param:value; readonly:False;"/>
+					<w2:key id="DEP_CD4" ctrl="txb_DEP_CD4" userData2=" param:value; readonly:False;"/>
+				</w2:keyInfo>
+			</w2:dataMap>
+		</xf:model>
+		<xf:group id="panel_1" userData2=" class:TopCondition_01;" style="" class="sub_contents">
+			<xf:group id="panel_3" style="" userData2=" border-color:#808000;">
+				<xf:group id="" class="titbox mt0">
+					<w2:textbox userData2=" class:Red_Bold; font-weight:bold; border-color:#000000;" style="" id="label_5" label="통보내역"
+						tagname="h3">
+					</w2:textbox>
+				</xf:group>
+				<xf:group class="tblbox" id="" meta_snippetCategory="05_입출력테이블" meta_snippetKeyComponent="true"
+					meta_snippetName="5_01 1단테이블" style="">
+					<xf:group adaptive="layout" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+						<w2:attributes>
+							<w2:summary></w2:summary>
+						</w2:attributes>
+						<xf:group tagname="colgroup">
+							<xf:group style="width:150px;" tagname="col"></xf:group>
+							<xf:group style="" tagname="col"></xf:group>
+						</xf:group>
+						<xf:group style="" tagname="tr">
+							<xf:group class="w2tb_th" style="" tagname="th">
+								<w2:textbox id="label_3" label="일자" style="" userData2=" class:GridTitle_01;"></w2:textbox>
+							</xf:group>
+							<xf:group class="w2tb_td" style="" tagname="td">
+								<xf:input id="txb_NOTI_DDTM" maxlength="100" readOnly="true" style="width:100%;"
+									userData2=" class:TopCondition_01_write; border-color:#92b1f1;">
+								</xf:input>
+
+
+
+							</xf:group>
+						</xf:group>
+						<xf:group tagname="tr">
+							<xf:group class="w2tb_th " tagname="th">
+								<w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes>
+								<w2:textbox id="label_1" userData2=" class:GridTitle_01;" style="" label="회사명" />
+							</xf:group>
+							<xf:group class="w2tb_td" tagname="td">
+								<w2:attributes>
+									<w2:colspan>1</w2:colspan>
+									<w2:rowspan>1</w2:rowspan>
+								</w2:attributes>
+								<xf:input id="txb_COM_ABBRV" maxlength="1000" readOnly="true" ref="data:bnd_Master.COM_ABBRV"
+									style="width:100%;" tabIndex="1" userData2=" class:TopCondition_01_write; border-color:#92b1f1;">
+								</xf:input>
+							</xf:group>
+						</xf:group>
+						<xf:group tagname="tr">
+							<xf:group class="w2tb_th " tagname="th">
+								<w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes>
+								<w2:textbox id="label_2" userData2=" class:GridTitle_01;" style="" label="내용" />
+							</xf:group>
+							<xf:group class="w2tb_td" tagname="td">
+								<w2:attributes></w2:attributes>
+								<xf:input id="txb_INQDISCLS_REQ_CONTN" maxlength="1000" readOnly="true" style="width:100%;"
+									userData2=" class:TopCondition_01_write;">
+								</xf:input>
+							</xf:group>
+						</xf:group>
+						<xf:group tagname="tr">
+							<xf:group tagname="th" class="w2tb_th ">
+								<w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes>
+								<w2:textbox id="label_4" label="매매거래정지여부" style="" userData2=" class:GridTitle_01;"></w2:textbox>
+							</xf:group>
+							<xf:group tagname="td" class="w2tb_td">
+								<w2:attributes></w2:attributes>
+								<xf:input id="txb_HALT_YN" maxlength="1000" readOnly="true" style="width:100%;"
+									userData2=" class:TopCondition_01_write;">
+								</xf:input>
+							</xf:group>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+
+
+
+
+			<xf:group id="panel_2" style="" userData2=" border-color:#808000;">
+				<xf:group id="" class="titbox">
+					<w2:textbox userData2=" class:Red_Bold; font-weight:bold; border-color:#000000;" style="" id="label_20" label="접수내역"
+						tagname="h3">
+					</w2:textbox>
+					<xf:group class="tblbox" id="" meta_snippetCategory="05_입출력테이블" meta_snippetKeyComponent="true"
+						meta_snippetName="5_01 1단테이블" style="">
+						<xf:group adaptive="layout" adaptiveThreshold="768" class="w2tb tbl " id="" style="" tagname="table">
+							<w2:attributes>
+								<w2:summary></w2:summary>
+							</w2:attributes>
+							<xf:group tagname="colgroup">
+								<xf:group style="width:150px;" tagname="col"></xf:group>
+								<xf:group tagname="col"></xf:group>
+								<xf:group tagname="col"></xf:group>
+								<xf:group style="" tagname="col"></xf:group>
+							</xf:group>
+							<xf:group style="" tagname="tr">
+								<xf:group class="w2tb_th tac" style="" tagname="th">
+									<w2:attributes>
+										<w2:colspan>1</w2:colspan>
+										<w2:rowspan>2</w2:rowspan>
+									</w2:attributes>
+									<w2:textbox id="label_6" label="구분" style="" userData2=" class:GridTitle_01;"></w2:textbox>
+								</xf:group>
+								<xf:group class="w2tb_th tac" style="" tagname="th">
+									<w2:textbox id="label_16" label="통보" style="" userData2=" class:GridTitle_01;"></w2:textbox>
+								</xf:group>
+								<xf:group tagname="th" class="w2tb_th tac">
+									<w2:attributes>
+										<w2:colspan>2</w2:colspan>
+										<w2:rowspan>1</w2:rowspan>
+									</w2:attributes>
+									<w2:textbox id="label_17" label="접 수" style="" userData2=" class:GridTitle_01;"></w2:textbox>
+								</xf:group>
+							</xf:group>
+							<xf:group tagname="tr">
+								<xf:group class="w2tb_th tac" tagname="th">
+									<w2:attributes>
+										<w2:colspan>1</w2:colspan>
+										<w2:rowspan>1</w2:rowspan>
+									</w2:attributes>
+									<w2:textbox id="label_7" label="시장감시부" style="" userData2=" class:GridTitle_01;"></w2:textbox>
+								</xf:group>
+								<xf:group tagname="th" class="w2tb_th tac">
+									<w2:attributes></w2:attributes>
+									<w2:textbox id="label_15" label="공시" style="" userData2=" class:GridTitle_01;"></w2:textbox>
+								</xf:group>
+								<xf:group tagname="th" class="w2tb_th tac">
+									<w2:attributes></w2:attributes>
+									<w2:textbox id="label_9" label="채권" style="" userData2=" class:GridTitle_01;"></w2:textbox>
+								</xf:group>
+							</xf:group>
+							<xf:group tagname="tr">
+								<xf:group class="w2tb_th tac" tagname="th">
+									<w2:attributes>
+										<w2:scope>row</w2:scope>
+									</w2:attributes>
+									<w2:textbox id="label_11" label="담당자" style="" userData2=" class:GridTitle_01;"></w2:textbox>
+								</xf:group>
+								<xf:group class="w2tb_td" tagname="td">
+									<w2:attributes></w2:attributes>
+									<xf:input id="txb_EMP_NM1" maxlength="100" readOnly="true" style="width:100%;"
+										userData2=" class:TopCondition_01_write;">
+									</xf:input>
+
+
+								</xf:group>
+								<xf:group tagname="td" class="w2tb_td">
+									<w2:attributes></w2:attributes>
+									<xf:input id="txb_EMP_NM2" maxlength="100" readOnly="true" style="width:100%;"
+										userData2=" class:TopCondition_01_write;">
+									</xf:input>
+								</xf:group>
+								<xf:group tagname="td" class="w2tb_td">
+									<w2:attributes></w2:attributes>
+									<xf:input id="txb_EMP_NM3" maxlength="100" readOnly="true" style="width:100%;"
+										userData2=" class:TopCondition_01_write;">
+									</xf:input>
+								</xf:group>
+							</xf:group>
+							<xf:group tagname="tr">
+								<xf:group tagname="th" class="w2tb_th tac">
+									<w2:attributes>
+										<w2:scope>row</w2:scope>
+									</w2:attributes>
+									<w2:textbox id="label_12" label="통보.접수시각" style="" userData2=" class:GridTitle_01;"></w2:textbox>
+								</xf:group>
+								<xf:group tagname="td" class="w2tb_td">
+									<w2:attributes></w2:attributes>
+									<xf:input id="txb_ACPT_DDTM1" maxlength="100" readOnly="true" style="width:100%;"
+										userData2=" class:TopCondition_01_write;">
+									</xf:input>
+
+
+								</xf:group>
+								<xf:group tagname="td" class="w2tb_td">
+									<w2:attributes></w2:attributes>
+									<xf:input id="txb_ACPT_DDTM2" maxlength="100" readOnly="true" style="width:100%;"
+										userData2=" class:TopCondition_01_write;">
+									</xf:input>
+								</xf:group>
+								<xf:group tagname="td" class="w2tb_td">
+									<w2:attributes></w2:attributes>
+									<xf:input id="txb_ACPT_DDTM3" maxlength="100" readOnly="true" style="width:100%;"
+										userData2=" class:TopCondition_01_write;">
+									</xf:input>
+								</xf:group>
+							</xf:group>
+							<xf:group tagname="tr">
+								<xf:group tagname="th" class="w2tb_th tac">
+									<w2:attributes>
+										<w2:scope>row</w2:scope>
+									</w2:attributes>
+									<w2:textbox id="label_14" label="비고" style="" userData2=" class:GridTitle_01;"></w2:textbox>
+								</xf:group>
+								<xf:group tagname="td" class="w2tb_td">
+									<w2:attributes></w2:attributes>
+									<xf:input id="txb_REMK1" maxlength="100" readOnly="true" style="width:100%;"
+										userData2=" class:TopCondition_01_write;">
+									</xf:input>
+
+
+								</xf:group>
+								<xf:group tagname="td" class="w2tb_td">
+									<w2:attributes></w2:attributes>
+									<xf:input id="txb_REMK2" maxlength="100" readOnly="true" style="width:100%;"
+										userData2=" class:TopCondition_01_write;">
+									</xf:input>
+								</xf:group>
+								<xf:group tagname="td" class="w2tb_td">
+									<w2:attributes></w2:attributes>
+									<xf:input id="txb_REMK3" maxlength="100" readOnly="true" style="width:100%;"
+										userData2=" class:TopCondition_01_write;">
+									</xf:input>
+								</xf:group>
+							</xf:group>
+							<xf:group tagname="tr">
+								<xf:group tagname="th" class="w2tb_th tac">
+									<w2:attributes>
+										<w2:scope>row</w2:scope>
+									</w2:attributes>
+									<w2:textbox id="label_19" label="접수상태" style="" userData2=" class:GridTitle_01;"></w2:textbox>
+								</xf:group>
+								<xf:group tagname="td" class="w2tb_td">
+									<w2:attributes></w2:attributes>
+									<xf:input id="txb_ACPT_STAT1" maxlength="100" readOnly="true" style="width:100%;"
+										userData2=" class:TopCondition_01_write;" metaev_ondblclick_name="접수상태(시장감시부) 더블 클릭" metaev_ondblclick_desc="사이버정보분석팀(5B10)으로 「접수상태」 더블 클릭 시 접수상태가 '반송' 인 경우 [온라인통보 반송] 팝업 호출" ev:ondblclick="scwin.txb_ACPT_STAT1_ondblclick">
+									</xf:input>
+
+
+								</xf:group>
+								<xf:group tagname="td" class="w2tb_td">
+									<w2:attributes></w2:attributes>
+									<xf:input id="txb_ACPT_STAT2" maxlength="100" readOnly="true" style="width:100%;"
+										userData2=" class:TopCondition_01_write;" metaev_ondblclick_name="접수상태(공시) 더블 클릭" metaev_ondblclick_desc="사이버정보분석팀(5B10)으로 「접수상태」 더블 클릭 시 접수상태가 '반송' 인 경우 [온라인통보 반송] 팝업 호출" ev:ondblclick="scwin.txb_ACPT_STAT2_ondblclick">
+									</xf:input>
+								</xf:group>
+								<xf:group tagname="td" class="w2tb_td">
+									<w2:attributes></w2:attributes>
+									<xf:input id="txb_ACPT_STAT3" maxlength="100" readOnly="true" style="width:100%;"
+										userData2=" class:TopCondition_01_write;" metaev_ondblclick_name="접수상태(채권) 더블 클릭" metaev_ondblclick_desc="사이버정보분석팀(5B10)으로 「접수상태」 더블 클릭 시 접수상태가 '반송' 인 경우 [온라인통보 반송] 팝업 호출" ev:ondblclick="scwin.txb_ACPT_STAT3_ondblclick">
+									</xf:input>
+								</xf:group>
+							</xf:group>
+							<xf:group tagname="tr">
+								<xf:group tagname="th" class="w2tb_th tac">
+									<w2:attributes>
+										<w2:scope>row</w2:scope>
+									</w2:attributes>
+									<w2:textbox id="label_13" label="공시시각" style="" userData2=" class:GridTitle_01;"></w2:textbox>
+								</xf:group>
+								<xf:group tagname="td" class="w2tb_td">
+									<w2:attributes></w2:attributes>
+									<w2:textbox id="txb_DISCLS_DDTM1" label="-" maxlength="100" readOnly="true" style="width:100%;"
+										userData2=" class:TopCondition_01_write;" class="tac">
+									</w2:textbox>
+
+
+								</xf:group>
+								<xf:group tagname="td" class="w2tb_td">
+									<w2:attributes></w2:attributes>
+									<xf:input id="txb_DISCLS_DDTM2" maxlength="100" style="width:100%;"
+										userData2=" class:TopCondition_01_write;" metaev_ondblclick_name="공시시각(공시) 더블 클릭" metaev_ondblclick_desc="사이버정보분석팀(5B10)으로 「공시시각」 더블클릭 시 접수상태가 '접수','반송거부'인 경우 [공시선택] 팝업 호출" ev:ondblclick="scwin.txb_DISCLS_DDTM2_ondblclick">
+									</xf:input>
+								</xf:group>
+								<xf:group tagname="td" class="w2tb_td">
+									<w2:attributes></w2:attributes>
+									<xf:input id="txb_DISCLS_DDTM3" maxlength="100" style="width:100%;"
+										userData2=" class:TopCondition_01_write;" metaev_ondblclick_name="공시시각(채권) 더블 클릭" metaev_ondblclick_desc="사이버정보분석팀(5B10)으로 「공시시각」 더블클릭 시 접수상태가 '접수','반송거부'인 경우 [공시선택] 팝업 호출" ev:ondblclick="scwin.txb_DISCLS_DDTM3_ondblclick">
+									</xf:input>
+								</xf:group>
+							</xf:group>
+							<xf:group tagname="tr">
+								<xf:group tagname="th" class="w2tb_th tac">
+									<w2:attributes>
+										<w2:scope>row</w2:scope>
+									</w2:attributes>
+									<w2:textbox id="label_18" label="반송사유" style="" userData2=" class:GridTitle_01;"></w2:textbox>
+								</xf:group>
+								<xf:group tagname="td" class="w2tb_td">
+									<w2:attributes></w2:attributes>
+									<xf:input id="txb_RET_RSN1" maxlength="100" readOnly="true" style="width:100%;"
+										userData2=" class:TopCondition_01_write;">
+									</xf:input>
+
+
+								</xf:group>
+								<xf:group tagname="td" class="w2tb_td">
+									<w2:attributes></w2:attributes>
+									<xf:input id="txb_RET_RSN2" maxlength="100" style="width:100%;"
+										userData2=" class:TopCondition_01_write;">
+									</xf:input>
+								</xf:group>
+								<xf:group tagname="td" class="w2tb_td">
+									<w2:attributes></w2:attributes>
+									<xf:input id="txb_RET_RSN3" maxlength="100" style="width:100%;"
+										userData2=" class:TopCondition_01_write;">
+									</xf:input>
+								</xf:group>
+							</xf:group>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+				<xf:group id="" style="position: absolute;top: 420px;"></xf:group>
+			</xf:group>
+			<xf:group id="" tagname="ul" class="txt_list no_dot red"><xf:group id="" tagname="li"><w2:textbox style="" userData2=" font-family:돋움;" id="label_31" label="※ 접수상태">
+			</w2:textbox><xf:group tagname="ul" id="" class=""><xf:group id="" tagname="li"><w2:textbox style="" userData2=" font-family:돋움;" id="label_21" label=" - 접수 : 수신부서에서 접수한상태 , 미접수 : 수신부서에서 미접수한 상태, 반송 : 수신부서에서 반송한 상태">
+			</w2:textbox></xf:group><xf:group id="" tagname="li"><w2:textbox style="" userData2=" font-family:돋움;" id="label_22" label=" - 반송승인 : 수신부서에서 반송한 통보건에 대해 송신부서에서 반송승인한 상태">
+			</w2:textbox></xf:group><xf:group id="" tagname="li"><w2:textbox style="" userData2=" font-family:돋움;" id="label_23" label=" - 반송거부 : 수신부서에서 반송한 통보건에 대해 송신부서에서 반송거부한 상태">
+			</w2:textbox></xf:group></xf:group></xf:group><xf:group id="" tagname="li"><w2:textbox style="" userData2=" font-family:돋움;" id="label_24" label="※ 비고 입력가능.">
+			</w2:textbox></xf:group><xf:group id="" tagname="li"><w2:textbox style="" userData2=" font-family:돋움;" id="label_25" label="※ 공시시각입력을 위해서는 해당 칸을 더블클릭(해당팀 접수 후 입력가능) 해주세요.">
+			</w2:textbox></xf:group></xf:group><xf:group id="" class="btnbox">
+				<xf:group id="" class="rt">
+					<xf:trigger cursor="pointer" src="../img/btn_cancel.gif" ev:onclick="scwin.btn_Cancel_onclick" style="" id="btn_Cancel"
+						class="btn_cm" metaev_onclick_name="취소 버튼 클릭" metaev_onclick_desc="팝업을 닫음">
+						<xf:label><![CDATA[취소]]></xf:label>
+					</xf:trigger>
+					<xf:trigger cursor="pointer" src="../img/btn_save.gif" ev:onclick="scwin.btn_Save_onclick" style="" id="btn_Save"
+						class="btn_cm pt" metaev_onclick_name="저장 버튼 클릭" metaev_onclick_desc="수정된 값을 저장">
+						<xf:label><![CDATA[저장]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+		</xf:group>
+		<xf:group class="hide">
+
+
+
+
+
+
+
+			<xf:input id="txb_NOTI_SEQ" style="position:absolute; left:20px; top:510px; width:155px; height:22px;" maxlength="10"
+				userData2=" inputtype:text;" />
+			<xf:input id="txb_ISUR_CD" style="position:absolute; left:20px; top:531px; width:155px; height:22px;" maxlength="10"
+				userData2=" inputtype:text;" />
+			<xf:input id="txb_EMP_NO" style="position:absolute; left:20px; top:551px; width:155px; height:22px;" maxlength="10"
+				userData2=" inputtype:text;" />
+			<xf:input id="txb_DEP_CD3" maxlength="100"
+				style="position:absolute; left:534px; top:360px; width:170px; height:25px; background-color:#ffffff; text-align:center;"
+				userData2=" class:TopCondition_01_write;">
+			</xf:input>
+			<xf:input id="txb_ACPT_NO1" maxlength="100"
+				style="position:absolute; left:194px; top:335px; width:170px; height:25px; background-color:#ffffff; text-align:center;"
+				userData2=" class:TopCondition_01_write;">
+			</xf:input>
+			<xf:input id="txb_ACPT_NO2" maxlength="100"
+				style="position:absolute; left:364px; top:335px; width:170px; height:25px; background-color:#ffffff; text-align:center;"
+				userData2=" class:TopCondition_01_write;">
+			</xf:input>
+			<xf:input id="txb_ACPT_NO3" maxlength="100"
+				style="position:absolute; left:534px; top:335px; width:170px; height:25px; background-color:#ffffff; text-align:center;"
+				userData2=" class:TopCondition_01_write;">
+			</xf:input>
+			<xf:input id="txb_DEP_CD1" maxlength="100"
+				style="position:absolute; left:194px; top:360px; width:170px; height:25px; background-color:#ffffff; text-align:center;"
+				userData2=" class:TopCondition_01_write;">
+			</xf:input>
+			<xf:input id="txb_DEP_CD2" maxlength="100"
+				style="position:absolute; left:364px; top:360px; width:170px; height:25px; background-color:#ffffff; text-align:center;"
+				userData2=" class:TopCondition_01_write;">
+			</xf:input>
+		</xf:group>
+	</body>
+</html>

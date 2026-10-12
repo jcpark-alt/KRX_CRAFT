@@ -1,0 +1,1114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDBNS20004.gfm" meta_screenName="일괄채권 수수료 그룹지정" meta_screenId="ULDBNS20004">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<w2:layoutInfo/>
+		<w2:publicInfo method="scwin.onpageload,scwin.onpageunload,scwin.dts_IsurItem_OnLoadError,scwin.dts_IsurItem_OnLoadCompleted,scwin.cmb_IsurNm_onselchange,scwin.dts_List_OnLoadCompleted,scwin.btn_ToRight_onclick,scwin.btn_ToRightAll_onclick,scwin.btn_ToLeft_onclick,scwin.btn_ToLeftAll_onclick,scwin.img_ListFeeRepayDd_onclick,scwin.img_AnulfeeRepayDd_onclick,scwin.cmb_BndListFeePayYn_onselchange,scwin.cmb_YafFeePayYn_onselchange,scwin.dts_CopyList_OnLoadCompleted,scwin.dts_CopyList_OnRowDeleted,scwin.dts_CopyList_OnColumnChanged,scwin.btn_FeeReg_onclick,scwin.trs_Save_OnFail,scwin.trs_Save_OnSuccess,scwin.btn_Close_onclick,scwin.edt_ListFee_OnKillFocus,scwin.edt_BndAnulfee_OnKillFocus,scwin.edt_ListFeeRepayAmt_OnKillFocus,scwin.edt_AnulfeeRepayAmt_OnKillFocus,scwin.setParam,scwin.setComboIsurNm,scwin.setComboCode,scwin.listSync,scwin.feeSync,scwin.leftCopy,scwin.copyDuplCheck,scwin.rightDel,scwin.inputCheck,scwin.insert"/>
+		<xf:model>
+			<w2:dataCollection baseNode="map"></w2:dataCollection>
+			<w2:workflowCollection/>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+///////// 1. 변수 및 선언 영역 /////////
+scwin.vBndListProcsTpCd = "1";
+scwin.vTotAmt = 0;
+scwin.vMktactCd;
+scwin.vBndApplId, scwin.vIsurCd;
+scwin.fn_GetPar, scwin.fn_SetPar;
+scwin.arrPar = new Array();
+
+///////// 2. 초기화 영역 /////////
+/**
+ * @method
+ * @name onpageload
+ * @description 화면 로딩 시 초기 처리 — init 순차 호출
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.onpageload = async function() {
+    try {
+        // 패널라운드처리
+        $c.bns.BnsPanelToGroupBox(pnl_Item);
+        $c.bns.BnsPanelToGroupBox(pnl_Search);
+        $c.bns.BnsPanelToGroupBox(pnl_Group);
+        $c.bns.BnsPanelToGroupBox(pnl_Fee);
+
+        // 호출파라미터설정
+        scwin.setParam();
+        // 발행기관 조회
+        scwin.setComboIsurNm();
+        // 면제사유코드
+        scwin.setComboCode();
+
+        // 상장수수료 및 연부과금 면제사유 비활성화
+        cmb_BndListFeeExamCd.setDisabled(true);
+        cmb_YafExamCd.setDisabled(true);
+
+        // 가우스헤더 셋팅(그리드 행 복사 대상)
+        const sbmOptions = {
+            id : "sbm_dts_CopyList",
+            action : "/gauceSystemierAdaptor.do",
+            ref : "",
+            target : "dts_CopyList=body.content",
+            isProcessMsg : false
+        };
+
+        const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+        // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDBNS20004.onpageload" });
+    }
+};
+
+/**
+ * @method
+ * @name onpageunload
+ * @description 화면 언로드 시 정리 처리
+ * @returns {void}
+ * @hidden N
+ */
+scwin.onpageunload = function() {
+};
+
+///////// 3. 컴포넌트 이벤트 영역 /////////
+/**
+ * @method
+ * @name dts_IsurItem_OnLoadError
+ * @description dts_IsurItem 로드 오류 처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.dts_IsurItem_OnLoadError = async function() {
+    try {
+        await $c.win.alert($c.stf.getMessageParam("MSG-0002"));
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDBNS20004.dts_IsurItem_OnLoadError" });
+    }
+};
+
+/**
+ * @method
+ * @name dts_IsurItem_OnLoadCompleted
+ * @description dts_IsurItem 로드 완료 후처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @param {Number} rowcount 조회 건수
+ * @returns {void}
+ * @hidden N
+ */
+scwin.dts_IsurItem_OnLoadCompleted = function(rowcount) {
+    try {
+        dts_IsurItem.insertRow(dts_IsurItem.getRowPosition() - 1);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDBNS20004.dts_IsurItem_OnLoadCompleted" });
+    }
+};
+
+/**
+ * @method
+ * @name cmb_IsurNm_onselchange
+ * @description cmb_IsurNm onselchange 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.cmb_IsurNm_onselchange = function() {
+    try {
+        scwin.vIsurCd = cmb_IsurNm.BindColVal;
+        scwin.listSync();
+        scwin.feeSync();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDBNS20004.cmb_IsurNm_onselchange" });
+    }
+};
+
+/**
+ * @method
+ * @name dts_List_OnLoadCompleted
+ * @description dts_List 로드 완료 후처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @param {Number} rowcount 조회 건수
+ * @returns {void}
+ * @hidden N
+ */
+scwin.dts_List_OnLoadCompleted = function(rowcount) {
+    try {
+        let arrPnl = [pnl_NotAppoint];
+        $c.bns.CloseWinArrPnl(rowcount, arrPnl, grd_List1);
+        dts_CopyList.removeAll();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDBNS20004.dts_List_OnLoadCompleted" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_ToRight_onclick
+ * @description btn_ToRight 클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.btn_ToRight_onclick = async function() {
+    try {
+        await scwin.leftCopy("One");
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDBNS20004.btn_ToRight_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_ToRightAll_onclick
+ * @description btn_ToRightAll 클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.btn_ToRightAll_onclick = async function() {
+    try {
+        dts_CopyList.removeAll();
+        await scwin.leftCopy("All");
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDBNS20004.btn_ToRightAll_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_ToLeft_onclick
+ * @description btn_ToLeft 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.btn_ToLeft_onclick = function() {
+    try {
+        scwin.rightDel("One");
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDBNS20004.btn_ToLeft_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_ToLeftAll_onclick
+ * @description btn_ToLeftAll 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.btn_ToLeftAll_onclick = function() {
+    try {
+        scwin.rightDel("All");
+        // 총상장금액 설정
+        txb_TotAmt.setValue('총상장금액 : ' + 0 + ' 원');
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDBNS20004.btn_ToLeftAll_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name img_ListFeeRepayDd_onclick
+ * @description img_ListFeeRepayDd 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.img_ListFeeRepayDd_onclick = function() {
+    try {
+        popUpCalendar2(edt_ListFeeRepayDd);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDBNS20004.img_ListFeeRepayDd_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name img_AnulfeeRepayDd_onclick
+ * @description img_AnulfeeRepayDd 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.img_AnulfeeRepayDd_onclick = function() {
+    try {
+        popUpCalendar2(edt_AnulfeeRepayDd);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDBNS20004.img_AnulfeeRepayDd_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name cmb_BndListFeePayYn_onselchange
+ * @description cmb_BndListFeePayYn onselchange 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.cmb_BndListFeePayYn_onselchange = function() {
+    try {
+        if (cmb_BndListFeePayYn.getValue() === "E") {
+            cmb_BndListFeeExamCd.setDisabled(true);
+            edt_ListFee.setValue('0');
+        } else {
+            cmb_BndListFeeExamCd.setDisabled(true);
+            cmb_BndListFeeExamCd.setValue('');
+            if (scwin.vTotAmt !== 0) {
+                edt_ListFee.setValue(fn_SetComma($c.bns.fn_ListFeeCall(scwin.vTotAmt)));
+            }
+        }
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDBNS20004.cmb_BndListFeePayYn_onselchange" });
+    }
+};
+
+/**
+ * @method
+ * @name cmb_YafFeePayYn_onselchange
+ * @description cmb_YafFeePayYn onselchange 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.cmb_YafFeePayYn_onselchange = function() {
+    try {
+        if (cmb_YafFeePayYn.getValue() === "E") {
+            cmb_YafExamCd.setDisabled(true);
+        } else {
+            cmb_YafExamCd.setDisabled(true);
+            cmb_YafExamCd.setValue('');
+        }
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDBNS20004.cmb_YafFeePayYn_onselchange" });
+    }
+};
+
+/**
+ * @method
+ * @name dts_CopyList_OnLoadCompleted
+ * @description dts_CopyList 로드 완료 후처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @param {Number} rowcount 조회 건수
+ * @returns {void}
+ * @hidden N
+ */
+scwin.dts_CopyList_OnLoadCompleted = function(rowcount) {
+    try {
+        if (dts_CopyList.getRowCount() === 0) {
+            // 총상장금액 설정
+            txb_TotAmt.setValue('총상장금액 : ' + 0 + ' 원');
+        }
+        edt_ListFee.RightMargin = 5;
+        edt_BndAnulfee.RightMargin = 5;
+        edt_ListFeeRepayAmt.RightMargin = 5;
+        edt_AnulfeeRepayAmt.RightMargin = 5;
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDBNS20004.dts_CopyList_OnLoadCompleted" });
+    }
+};
+
+/**
+ * @method
+ * @name dts_CopyList_OnRowDeleted
+ * @description Copy List On Row Deleted 처리
+ * @param {Number} row 행 인덱스
+ * @returns {void}
+ * @hidden N
+ */
+scwin.dts_CopyList_OnRowDeleted = function(row) {
+    try {
+        scwin.vTotAmt = dts_CopyList.Sum(2, 1, dts_CopyList.getRowCount());
+        // 총상장금액 설정
+        txb_TotAmt.setValue('총상장금액 : ' + fn_SetComma(scwin.vTotAmt) + ' 원');
+        // 상장수수료 금액 설정
+        edt_ListFee.setValue(fn_SetComma($c.bns.fn_ListFeeCall(scwin.vTotAmt)));
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDBNS20004.dts_CopyList_OnRowDeleted" });
+    }
+};
+
+/**
+ * @method
+ * @name dts_CopyList_OnColumnChanged
+ * @description Copy List On Column Changed 처리
+ * @param {Number} row 행 인덱스
+ * @param {*} colid colid
+ * @returns {void}
+ * @hidden N
+ */
+scwin.dts_CopyList_OnColumnChanged = function(row, colid) {
+    try {
+        scwin.vTotAmt = dts_CopyList.Sum(2, 1, dts_CopyList.getRowCount());
+        // 총상장금액 설정
+        txb_TotAmt.setValue('총상장금액 : ' + fn_SetComma(scwin.vTotAmt) + ' 원');
+        // 상장수수료 금액 설정
+        edt_ListFee.setValue(fn_SetComma($c.bns.fn_ListFeeCall(scwin.vTotAmt)));
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDBNS20004.dts_CopyList_OnColumnChanged" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_FeeReg_onclick
+ * @description 「수수료등록」 클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.btn_FeeReg_onclick = async function() {
+    try {
+        await scwin.insert();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDBNS20004.btn_FeeReg_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name trs_Save_OnFail
+ * @description Save On Fail 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.trs_Save_OnFail = async function() {
+    try {
+        await $c.win.alert($c.stf.getMessageParam("MSG-0002"));
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDBNS20004.trs_Save_OnFail" });
+    }
+};
+
+/**
+ * @method
+ * @name trs_Save_OnSuccess
+ * @description Save On Success 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.trs_Save_OnSuccess = async function() {
+    try {
+        await $c.win.alert($c.stf.getMessageParam("MSG-0001"));
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDBNS20004.trs_Save_OnSuccess" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_Close_onclick
+ * @description 「닫기」 클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.btn_Close_onclick = async function() {
+    try {
+        await $c.win.closePopup();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDBNS20004.btn_Close_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name edt_ListFee_OnKillFocus
+ * @description edt_ListFee 포커스 이탈 처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @returns {void}
+ * @hidden N
+ */
+scwin.edt_ListFee_OnKillFocus = function() {
+    try {
+        edt_ListFee.RightMargin = 5;
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDBNS20004.edt_ListFee_OnKillFocus" });
+    }
+};
+
+/**
+ * @method
+ * @name edt_BndAnulfee_OnKillFocus
+ * @description edt_BndAnulfee 포커스 이탈 처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @returns {void}
+ * @hidden N
+ */
+scwin.edt_BndAnulfee_OnKillFocus = function() {
+    try {
+        edt_BndAnulfee.RightMargin = 5;
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDBNS20004.edt_BndAnulfee_OnKillFocus" });
+    }
+};
+
+/**
+ * @method
+ * @name edt_ListFeeRepayAmt_OnKillFocus
+ * @description edt_ListFeeRepayAmt 포커스 이탈 처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @returns {void}
+ * @hidden N
+ */
+scwin.edt_ListFeeRepayAmt_OnKillFocus = function() {
+    try {
+        edt_ListFeeRepayAmt.RightMargin = 5;
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDBNS20004.edt_ListFeeRepayAmt_OnKillFocus" });
+    }
+};
+
+/**
+ * @method
+ * @name edt_AnulfeeRepayAmt_OnKillFocus
+ * @description edt_AnulfeeRepayAmt 포커스 이탈 처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @returns {void}
+ * @hidden N
+ */
+scwin.edt_AnulfeeRepayAmt_OnKillFocus = function() {
+    try {
+        edt_AnulfeeRepayAmt.RightMargin = 5;
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDBNS20004.edt_AnulfeeRepayAmt_OnKillFocus" });
+    }
+};
+
+///////// 5. 일반/업무 함수 영역 /////////
+/**
+ * @method
+ * @name setParam
+ * @description 부모창에서 받은 데이터를 설정한다.
+ * @returns {void}
+ * @hidden N
+ */
+scwin.setParam = function() {
+    const prt = $c.frame.path("../");
+    if (prt !== undefined) {
+        scwin.fn_GetPar = prt.scwin.fn_GetPar;
+        scwin.fn_SetPar = prt.scwin.fn_SetPar;
+    }
+    if (scwin.fn_GetPar !== undefined) {
+        scwin.fn_GetPar(scwin.arrPar);
+        scwin.vMktactCd = scwin.arrPar[0].MKTACT_CD;
+    }
+};
+
+/**
+ * @method
+ * @name setComboIsurNm
+ * @description 콤보데이터 정의 (그룹지정할 발행기관명)
+ * @returns {void}
+ * @hidden N
+ */
+scwin.setComboIsurNm = function() {
+    let dsNm = 'BNS_COM_CD';
+    let qryId = 'lds.stf.bnscommon.select.listGroupingIsurNmIsuChg';
+    let param = '&{P}V_BND_LIST_PROCS_TP_CD=' + scwin.vBndListProcsTpCd;
+    param += '&{P}V_MKTACT_CD=' + scwin.vMktactCd;
+    $c.bns.fn_SearchBns('ULDBNS2004.xml', dts_IsurItem, dsNm, qryId, param);
+};
+
+/**
+ * @method
+ * @name setComboCode
+ * @description 콤보데이터 정의 (채권상장수수료면제사유코드)
+ * @returns {void}
+ * @hidden N
+ */
+scwin.setComboCode = function() {
+    const arrCid = [];
+    arrCid.push({
+        cid: '03385',
+        cnm: 'cmb_BndListFeeExamCd'
+    });
+    arrCid.push({
+        cid: '03484',
+        cnm: 'cmb_YafExamCd'
+    });
+    $c.bns.fn_SetBnsComboToCode('ULDBNS2004.xml', dts_Temp, arrCid);
+};
+
+/**
+ * @method
+ * @name listSync
+ * @description 리스트 데이터를 조회한다.
+ * @returns {void}
+ * @hidden N
+ */
+scwin.listSync = function() {
+    let dsNm = 'BNS_GROUPPING_PACK_ISU_INFO';
+    let qryId = 'lds.stf.bnscommon.select.listSelectedIsurNmIsuChg';
+    let param = '&{P}V_BND_LIST_PROCS_TP_CD=' + scwin.vBndListProcsTpCd;
+    param += '&{P}V_MKTACT_CD=' + scwin.vMktactCd;
+    param += '&{P}V_ISUR_CD=' + scwin.vIsurCd;
+    $c.bns.fn_SearchBns('ULDBNS2004.xml', dts_List, dsNm, qryId, param);
+    let arrPnl = [pnl_NotAppoint];
+    $c.bns.ShowWinArrPnl(arrPnl, grd_List1);
+};
+
+/**
+ * @method
+ * @name feeSync
+ * @description 수수료 데이터를 조회한다.
+ * @returns {void}
+ * @hidden N
+ */
+scwin.feeSync = function() {
+    let dsNm = 'BNS_PACK_ANULFEE_INSERT_INFO';
+    let qryId = 'lds.stf.bnscommon.select.listSelectedIsurFee';
+    let param = '&{P}V_ISUR_CD=' + scwin.vIsurCd;
+    $c.bns.fn_SearchBns('ULDBNS2004.xml', dts_InputItem, dsNm, qryId, param);
+};
+
+/**
+ * @method
+ * @name leftCopy
+ * @description 그리드 행 복사 (좌 → 우)
+ * @param {*} Type Type
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.leftCopy = async function(Type) {
+    for (let i = 1; i <= dts_List.getRowCount(); i++) {
+        if ((Type === 'One') && (dts_List.RowMark(i) === 1)) {
+            if (await scwin.copyDuplCheck() === false) return;
+            dts_CopyList.insertRow();
+            for (let j = 1; j <= dts_List.getTotalCol(); j++) {
+                dts_CopyList.setCellData(dts_CopyList.getRowPosition(), j, dts_List.getCellData(i, j));
+            }
+        }
+        if ((Type === 'All')) {
+            if (dts_CopyList.getRowCount() !== dts_List.getRowCount()) {
+                dts_CopyList.insertRow();
+                for (let j = 1; j <= dts_List.getTotalCol(); j++) {
+                    dts_CopyList.setCellData(i, j, dts_List.getCellData(i, j));
+                }
+            }
+        }
+    }
+};
+
+/**
+ * @method
+ * @name copyDuplCheck
+ * @description 그리드 행 복사 시, 중복체크 (return: String)
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.copyDuplCheck = async function() {
+    const curRowVal = dts_List.getCellData(dts_List.getRowPosition(), "BND_APPL_ID");
+    for (let i = 1; i <= dts_CopyList.getRowCount(); i++) {
+        if (curRowVal === dts_CopyList.getCellData(i, "BND_APPL_ID")) {
+            await $c.win.alert("이미 선택된 종목입니다.");
+            return false;
+        }
+    }
+};
+
+/**
+ * @method
+ * @name rightDel
+ * @description 그리드 행 제거
+ * @param {*} Type Type
+ * @returns {void}
+ * @hidden N
+ */
+scwin.rightDel = function(Type) {
+    dts_CopyList.setBroadcast(false);
+    for (let i = 1; i <= dts_CopyList.getRowCount(); i++) {
+        if ((Type === 'All') || (Type === 'One') && (dts_CopyList.RowMark(i) === 1)) {
+            if (Type === 'One') dts_CopyList.removeRow(dts_CopyList.getRowPosition());
+            if (Type === 'All') dts_CopyList.removeAll();
+        }
+    }
+    dts_CopyList.setBroadcast(true, true);
+};
+
+/**
+ * @method
+ * @name inputCheck
+ * @description 필수 입력 값을 체크한다.
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.inputCheck = async function() {
+    if (dts_CopyList.getRowCount() === 0) {
+        await $c.win.alert("지정된 종목이 없습니다.");
+        return false;
+    }
+    if (txb_FeeGrpNm.getValue() === '') {
+        await $c.win.alert("[그룹명]을 입력하십시오.");
+        txb_FeeGrpNm.focus();
+        return false;
+    }
+    // 자리수 체크
+    if (!$c.stf.checkMaxLength(txb_FeeGrpNm, txb_FeeGrpNm.maxLength, lbl_FeeGrpNm.outerText)) return false;
+    if (!$c.stf.checkMaxLength(txb_MemoContn, 200, '비고(사유)')) return false;
+    if (cmb_BndListFeePayYn.getValue() === '') {
+        await $c.win.alert("[신규상장수수료 납부여부]를 선택하십시오.");
+        return false;
+    }
+    if (cmb_BndListFeeExamCd.getValue() === "E" && cmb_BndListFeeExamCd.getValue() === '') {
+        await $c.win.alert("[신규상장수수료 면제사유를 선택하십시오.");
+        return false;
+    }
+    if (edt_ListFee.getValue() === '') {
+        await $c.win.alert("[신규상장수수료 금액]을 입력하십시오.");
+        edt_ListFee.focus();
+        return false;
+    }
+    if (cmb_YafFeePayYn.getValue() === '') {
+        await $c.win.alert("[연부과금 납부여부]를 선택하십시오.");
+        return false;
+    }
+    if (cmb_YafExamCd.getValue() === "E" && cmb_YafExamCd.getValue() === '') {
+        await $c.win.alert("[연부과금 면제사유를 선택하십시오.");
+        return false;
+    }
+    if (edt_BndAnulfee.getValue() === '') {
+        await $c.win.alert("[연부과금 수수료 금액]을 입력하십시오.");
+        edt_BndAnulfee.focus();
+        return false;
+    }
+    return true;
+};
+
+/**
+ * @method
+ * @name insert
+ * @description 상장 수수료 그룹핑 등록
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.insert = async function() {
+    if (await scwin.inputCheck() === false) return;
+    const vAnswer = confirm('지정된 종목을 수수료 그룹지정 하시겠습니까?');
+    if (vAnswer === true) {
+        let url = "/bns/ListFeeAndAnulfee.do?method=processPackBndFeeGrpDesign";
+        url += "&SCREN_ID=" + 'ULDBNS2004.xml';
+        url += "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_02;
+        trs_Save.Action = $c.lc.fn_encodeNSession(url);
+        trs_Save.KeyValue = "JSP(I:pInput=dts_InputItem, I:pInput2=dts_CopyList)";
+        trs_Save.Post();
+    }
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+		<xf:group id="pnl_Item" userData2=" class:TopCondition_01;" style="" orgid="pnl_Item" hierarchy="pnl_Item" class="pop_contents">
+			<xf:group class="tblbox" id="pnl_Search" meta_snippetCategory="05_입출력테이블" meta_snippetKeyComponent="true"
+				meta_snippetName="5_01 1단테이블" style="">
+				<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+					<w2:attributes>
+						<w2:summary></w2:summary>
+					</w2:attributes>
+					<xf:group tagname="colgroup">
+						<xf:group style="width:100px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+					</xf:group>
+					<xf:group style="" tagname="tr">
+						<xf:group class="w2tb_th" style="" tagname="th">
+							<w2:textbox hierarchy="label_47" id="label_47" label="발행기관명" orgid="label_47" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+
+						</xf:group>
+						<xf:group class="w2tb_td" style="" tagname="td">
+							<xf:select1 appearance="minimal" cbdatacolumns="VALUE,TEXT" disabled="false"
+								disabledClass="w2selectbox_disabled" ev:onchange="scwin.cmb_IsurNm_onselchange" hierarchy="cmb_IsurNm" id="cmb_IsurNm"
+								listexprformat="VALUE^1^40,TEXT^0^200" orgid="cmb_IsurNm" style="width:200px;" tabIndex="1"
+								userData2=" class:TopCondition_01; bindcolumn:VALUE; index:0; listcount:10; searchcolumn:TEXT; searchselection:False; synccombodata:False; border-color:#b9d4f7;">
+								<xf:choices>
+									<xf:itemset nodeset="data:dts_IsurItem">
+										<xf:label ref=""></xf:label>
+										<xf:value ref=""></xf:value>
+									</xf:itemset>
+								</xf:choices>
+							</xf:select1>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<xf:group id="pnl_Group" style="" userData2=" class:TopCondition_01; border-color:#C0C0C0;" orgid="pnl_Group"
+				hierarchy="pnl_Group" class="lybox horizontal">
+				<xf:group id="pnl_NotAppoint" style="" userData2=" class:TopCondition_01; border-color:#C0C0C0;" orgid="pnl_NotAppoint"
+					hierarchy="pnl_NotAppoint">
+					<xf:group id="" class="titbox mt0">
+						<w2:textbox tagname="h3" hierarchy="label_1" userData2=" class:TopCondition_01;" style="" id="label_1" label="미지정종목"
+							orgid="label_1">
+						</w2:textbox>
+					</xf:group>
+					<xf:group id="" class="gvwbox">
+						<w2:gridView id="grd_List1"
+							userData2=" class:Grid_01; blockselectmode:False; fillarea:True; fixsizing:True; gtitleheight:0; headborder:4; indwidth:0; rowheight:20; selstartrow:1; sortview:left; suppressoption:1; titleheight:30; tooltip:use=true;alt=true;createtime=300;color=#FFFFFF;backcolor=#808080;edgecolor=#333333;leftmargin=10;rightmargin=10;topmargin=10;bottommargin=10;; xtitleheight:0; font-family:돋움체; font-weight:normal;"
+							style="height:153px;" resize="true" readOnly="true" dataList="dts_List" class="gvw" orgid="grd_List1" hierarchy="grd_List1" autoFit="allColumn">
+							<w2:caption id="caption1" style="" value="this is a grid caption." />
+							<w2:header id="header1" style="">
+								<w2:row>
+									<w2:column id="h_RNUM" width="30" value="번호" textAlign="center"
+										userData2=" suppress:0; value:{CurRow},{ToString};" displayMode="label" inputType="text" />
+									<w2:column id="h_ISU_NM" width="160" value="종목명" textAlign="center" userData2=" suppress:0; sort:False;"
+										displayMode="label" inputType="text" />
+									<w2:column id="h_LIST_AMT" width="120" value="상장금액(원)" textAlign="center"
+										userData2=" color:#343434; suppress:0; bgcolor:{decode(currow-tointeger(currow/2)*2,0,'#f2f5f9',1,'#ffffff')}; sort:False; displayformat:#,##0;"
+										hidden="false" displayMode="label" inputType="text" />
+									<w2:column value="접수번호" width="100" id="h_BND_APPL_ID" userData2=" suppress:3;" textAlign="center"
+										hidden="true" displayMode="label" inputType="text" />
+								</w2:row>
+							</w2:header>
+							<w2:gBody id="gBody1" style="">
+								<w2:row id="" style="">
+									<w2:column id="RNUM" textAlign="center" width="30" inputType="text" displayMode="label" />
+									<w2:column id="ISU_NM" textAlign="center" width="160" inputType="text" displayMode="label" />
+									<w2:column id="LIST_AMT" textAlign="right" width="120" inputType="text" displayMode="label" />
+									<w2:column id="BND_APPL_ID" textAlign="center" width="100" inputType="text" displayMode="label" />
+								</w2:row>
+							</w2:gBody>
+						</w2:gridView>
+					</xf:group>
+				</xf:group>
+				<xf:group id="" class="ly_btn pt30">
+					<xf:trigger cursor="pointer" src="../img/btn_new_arrowR.gif" ev:onclick="scwin.btn_ToRight_onclick"
+						hierarchy="btn_ToRight" style="" id="btn_ToRight" class="btn_cm right" orgid="btn_ToRight">
+						<xf:label></xf:label>
+					</xf:trigger>
+					<xf:trigger cursor="pointer" src="../img/btn_new_arrowR_all.gif" ev:onclick="scwin.btn_ToRightAll_onclick"
+						hierarchy="btn_ToRightAll" style="" id="btn_ToRightAll" class="btn_cm right" orgid="btn_ToRightAll">
+						<xf:label></xf:label>
+					</xf:trigger>
+					<xf:trigger cursor="pointer" src="../img/btn_new_arrowL.gif" ev:onclick="scwin.btn_ToLeft_onclick"
+						hierarchy="btn_ToLeft" style="" id="btn_ToLeft" class="btn_cm left" orgid="btn_ToLeft">
+						<xf:label></xf:label>
+					</xf:trigger>
+					<xf:trigger cursor="pointer" src="../img/btn_new_arrowL_all.gif" ev:onclick="scwin.btn_ToLeftAll_onclick"
+						hierarchy="btn_ToLeftAll" style="" id="btn_ToLeftAll" class="btn_cm left" orgid="btn_ToLeftAll">
+						<xf:label><![CDATA[]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+				<xf:group id="pnl_Appoint" style="" userData2=" class:TopCondition_01; border-color:#C0C0C0;" orgid="pnl_Appoint"
+					hierarchy="pnl_Appoint">
+					<xf:group id="" class="titbox mt0">
+						<w2:textbox tagname="h3" hierarchy="label_2" userData2=" class:TopCondition_01;" style="" id="label_2" label="지정종목"
+							orgid="label_2">
+						</w2:textbox>
+					</xf:group>
+					<xf:group id="" class="gvwbox">
+						<w2:gridView id="grd_List2"
+							userData2=" class:Grid_01; fillarea:True; fixsizing:True; gtitleheight:0; headborder:4; indwidth:0; rowheight:20; sortview:left; suppressoption:1; titleheight:30; tooltip:use=true;alt=true;createtime=300;color=#FFFFFF;backcolor=#808080;edgecolor=#333333;leftmargin=10;rightmargin=10;topmargin=10;bottommargin=10;; xtitleheight:0; font-family:돋움체; font-weight:normal;"
+							style="height:153px;" resize="true" readOnly="true" dataList="dts_CopyList" class="gvw" orgid="grd_List2" hierarchy="grd_List2" autoFit="allColumn">
+							<w2:caption id="caption2" style="" value="this is a grid caption." />
+							<w2:header id="header2" style="">
+								<w2:row>
+									<w2:column id="h_RNUM" width="30" value="번호" textAlign="center"
+										userData2=" suppress:0; value:{CurRow},{ToString};" displayMode="label" inputType="text" />
+									<w2:column id="h_ISU_NM" width="160" value="종목명" textAlign="center" userData2=" suppress:0; sort:False;"
+										displayMode="label" inputType="text" />
+									<w2:column id="h_LIST_AMT" width="120" value="상장금액(원)" textAlign="center"
+										userData2=" color:#343434; suppress:0; bgcolor:{decode(currow-tointeger(currow/2)*2,0,'#f2f5f9',1,'#ffffff')}; sort:False; displayformat:#,##0;"
+										displayMode="label" inputType="text" />
+									<w2:column width="100" id="h_BND_APPL_ID" userData2=" suppress:3;" value="접수번호" textAlign="center"
+										hidden="true" displayMode="label" inputType="text" />
+								</w2:row>
+							</w2:header>
+							<w2:gBody id="gBody2" style="">
+								<w2:row id="" style="">
+									<w2:column id="RNUM" textAlign="center" width="30" inputType="text" displayMode="label" />
+									<w2:column id="ISU_NM" textAlign="center" width="160" inputType="text" displayMode="label" />
+									<w2:column id="LIST_AMT" textAlign="right" width="120" inputType="text" displayMode="label" />
+									<w2:column id="BND_APPL_ID" textAlign="center" width="100" inputType="text" displayMode="label" />
+								</w2:row>
+							</w2:gBody>
+						</w2:gridView>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<w2:textbox id="txb_TotAmt" style="border-width:1px; text-align:left;" label="총상장금액 : 0 원" maxlength="1000"
+				userData2=" type:text; border-color:#808080;" orgid="txb_TotAmt" hierarchy="txb_TotAmt" class="blue tar" />
+			<xf:group class="titbox" id="" meta_snippetCategory="02_타이틀" meta_snippetKeyComponent="true" meta_snippetName="2_02 서브타이틀(h3)"
+				style="">
+				<xf:group class="rt" id="" style="">
+					<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.btn_FeeReg_onclick" hierarchy="btn_FeeReg" id="btn_FeeReg"
+						orgid="btn_FeeReg" src="../img/bns/btn_34.gif" style="">
+						<xf:label><![CDATA[수수료등록]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+			<xf:group class="tblbox" id="pnl_Fee" meta_snippetCategory="05_입출력테이블" meta_snippetKeyComponent="true"
+				meta_snippetName="5_02 2단테이블" style="">
+				<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+					<w2:attributes>
+						<w2:summary></w2:summary>
+					</w2:attributes>
+					<xf:group tagname="colgroup">
+						<xf:group style="width:190px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+						<xf:group style="width:190px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+					</xf:group>
+					<xf:group style="" tagname="tr">
+						<xf:group class="w2tb_th" style="" tagname="th">
+							<w2:textbox hierarchy="lbl_FeeGrpNm" id="lbl_FeeGrpNm" label="그룹명" orgid="lbl_FeeGrpNm" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+
+
+
+
+
+
+						</xf:group>
+						<xf:group class="w2tb_td" style="" tagname="td">
+							<w2:attributes>
+								<w2:colspan>3</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:input hierarchy="txb_FeeGrpNm" id="txb_FeeGrpNm" maxlength="150" orgid="txb_FeeGrpNm"
+								style="width:200px;" tabIndex="2"
+								userData2=" class:TopCondition_01_write;">
+							</xf:input>
+
+
+
+
+
+
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_39" id="label_39" label="상장수수료 납부여부" orgid="label_39" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes>
+								<w2:colspan>1</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:select1 appearance="minimal" cbdatacolumns="VALUE,TEXT" disabledClass="w2selectbox_disabled"
+								ev:onchange="scwin.cmb_BndListFeePayYn_onselchange" hierarchy="cmb_BndListFeePayYn" id="cmb_BndListFeePayYn"
+								item="Y^Y 완납,N^N 미납,E^E 면제" listexprformat="TEXT^0^100" orgid="cmb_BndListFeePayYn"
+								style="width:100px;" tabIndex="3"
+								userData2=" class:mxcombo1; bindcolumn:VALUE; inheritcolor:True; listcount:10; synccombodata:False; xpstyle:True;">
+								<xf:choices>
+									<xf:item>
+										<xf:label><![CDATA[Y 완납]]></xf:label>
+										<xf:value><![CDATA[Y]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[N 미납]]></xf:label>
+										<xf:value><![CDATA[N]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[E 면제]]></xf:label>
+										<xf:value><![CDATA[E]]></xf:value>
+									</xf:item>
+								</xf:choices>
+							</xf:select1>
+						</xf:group>
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes></w2:attributes>
+							<w2:textbox hierarchy="label_11" id="label_11" label="연부과금 납부여부" orgid="label_11" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+
+
+
+
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes></w2:attributes>
+							<xf:select1 appearance="minimal" cbdatacolumns="VALUE,TEXT" disabledClass="w2selectbox_disabled"
+								ev:onchange="scwin.cmb_YafFeePayYn_onselchange" hierarchy="cmb_YafFeePayYn" id="cmb_YafFeePayYn" item="Y^Y 완납,N^N 미납,E^E 면제"
+								listexprformat="TEXT^0^100" orgid="cmb_YafFeePayYn" style="width:100px;" tabIndex="4"
+								userData2=" class:mxcombo1; bindcolumn:VALUE; inheritcolor:True; listcount:10; synccombodata:False; xpstyle:True;">
+								<xf:choices>
+									<xf:item>
+										<xf:label><![CDATA[Y 완납]]></xf:label>
+										<xf:value><![CDATA[Y]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[N 미납]]></xf:label>
+										<xf:value><![CDATA[N]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[E 면제]]></xf:label>
+										<xf:value><![CDATA[E]]></xf:value>
+									</xf:item>
+								</xf:choices>
+							</xf:select1>
+
+
+
+
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_42" id="label_42" label="상장수수료 면제사유" orgid="label_42" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes></w2:attributes>
+							<xf:select1 appearance="minimal" cbdatacolumns="VALUE,TEXT" disabledClass="w2selectbox_disabled"
+								hierarchy="cmb_BndListFeeExamCd" id="cmb_BndListFeeExamCd" listexprformat="TEXT^0^120" orgid="cmb_BndListFeeExamCd"
+								style="width:120px;" tabIndex="5"
+								userData2=" class:mxcombo1; bindcolumn:VALUE; inheritcolor:True; listcount:10; searchcolumn:TEXT; synccombodata:False; xpstyle:True;">
+								<xf:choices>
+									<xf:itemset nodeset="">
+										<xf:label ref=""></xf:label>
+										<xf:value ref=""></xf:value>
+									</xf:itemset>
+								</xf:choices>
+							</xf:select1>
+						</xf:group>
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_4" id="label_4" label="연부과금 면제사유" orgid="label_4" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes></w2:attributes>
+							<xf:select1 appearance="minimal" cbdatacolumns="VALUE,TEXT" disabledClass="w2selectbox_disabled"
+								hierarchy="cmb_YafExamCd" id="cmb_YafExamCd" listexprformat="TEXT^0^120" orgid="cmb_YafExamCd"
+								style="width:120px;" tabIndex="6"
+								userData2=" class:mxcombo1; bindcolumn:VALUE; inheritcolor:True; listcount:10; searchcolumn:TEXT; synccombodata:False; xpstyle:True;">
+								<xf:choices>
+									<xf:itemset nodeset="">
+										<xf:label ref=""></xf:label>
+										<xf:value ref=""></xf:value>
+									</xf:itemset>
+								</xf:choices>
+							</xf:select1>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_6" id="label_6" label="상장수수료 금액(원)" orgid="label_6" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input dataType="number" disabled="false" hierarchy="edt_ListFee" id="edt_ListFee" maxlength="18"
+								orgid="edt_ListFee" readOnly="false"
+								style="width:150px;" tabIndex="7"
+								userData2=" class:panel_maskedit_read_02; onkillfocus:edt_ListFee_OnKillFocus; generaledit:False; leftmargin:0; maxdecimalplace:0; movecaret:True; readonlybackcolor:#b9d4f7; readonlyforecolor:#15549c; showliteral:false;" class="tar">
+							</xf:input>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_5" id="label_5" label="연부과금 금액(원)" orgid="label_5" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input dataType="number" disabled="false" hierarchy="edt_BndAnulfee" id="edt_BndAnulfee" maxlength="18"
+								orgid="edt_BndAnulfee" readOnly="false" style="width:150px;" tabIndex="8"
+								userData2=" class:panel_maskedit_write_02; onkillfocus:edt_BndAnulfee_OnKillFocus; generaledit:False; leftmargin:0; maxdecimalplace:0; movecaret:True; showliteral:false;" class="tar">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_7" id="label_7" label="상장수수료 환급금액(원)" orgid="label_7" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input dataType="number" disabled="false" hierarchy="edt_ListFeeRepayAmt" id="edt_ListFeeRepayAmt"
+								maxlength="18" orgid="edt_ListFeeRepayAmt" readOnly="false"
+								style="width:150px;" tabIndex="9"
+								userData2=" class:panel_maskedit_write_02; onkillfocus:edt_ListFeeRepayAmt_OnKillFocus; generaledit:False; leftmargin:0; maxdecimalplace:0; movecaret:True; showliteral:false;" class="tar">
+							</xf:input>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_10" id="label_10" label="연부과금액 환급금액(원)" orgid="label_10" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input dataType="number" disabled="false" hierarchy="edt_AnulfeeRepayAmt" id="edt_AnulfeeRepayAmt"
+								maxlength="18" orgid="edt_AnulfeeRepayAmt" readOnly="false"
+								style="width:150px;" tabIndex="10"
+								userData2=" class:panel_maskedit_write_02; onkillfocus:edt_AnulfeeRepayAmt_OnKillFocus; generaledit:False; leftmargin:0; maxdecimalplace:0; movecaret:True; showliteral:false;" class="tar">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_8" id="label_8" label="상장수수료 환급일" orgid="label_8" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<w2:inputCalendar disabled="false" displayFormat="yyyy-MM-dd" hierarchy="edt_ListFeeRepayDd"
+								id="edt_ListFeeRepayDd" maxlength="8" orgid="edt_ListFeeRepayDd" readOnly="false"
+								style="width:120px;" tabIndex="11"
+								userData2=" class:panel_maskedit_write_01; alignment:1; generaledit:False; leftmargin:0; showliteral:false;">
+							</w2:inputCalendar>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_3" id="label_3" label="연부과금 환급일" orgid="label_3" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<w2:inputCalendar disabled="false" displayFormat="yyyy-MM-dd" hierarchy="edt_AnulfeeRepayDd"
+								id="edt_AnulfeeRepayDd" maxlength="8" orgid="edt_AnulfeeRepayDd" readOnly="false"
+								style="width:120px;" tabIndex="12"
+								userData2=" class:panel_maskedit_write_01; alignment:1; generaledit:False; leftmargin:0; showliteral:false;">
+							</w2:inputCalendar>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_9" id="label_9" label="비고(사유)" orgid="label_9" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:colspan>3</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:input hierarchy="txb_MemoContn" id="txb_MemoContn" maxlength="200" orgid="txb_MemoContn"
+								style="width:492px;" tabIndex="13"
+								userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<xf:group id="" class="btnbox">
+				<xf:group id="" class="rt">
+					<xf:trigger cursor="pointer" src="../img/bns/btn_close_n.gif" ev:onclick="scwin.btn_Close_onclick" hierarchy="btn_Close"
+						style="" id="btn_Close" text="닫기" class="btn_cm" orgid="btn_Close">
+						<xf:label><![CDATA[닫기]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+		</xf:group>
+	</body>
+</html>

@@ -642,12 +642,17 @@ def rule11_remove_include(code, report):
     (2026-09-03 보강: 블록 주석으로 감싼 include 묶음이 잔존하던 사례 대응 — ULDSTF30304).
     2026-09-22 보강: `// #include(...)`, `// //#include(...)` 처럼 **주석 접두가 여러 겹**이거나 `#` 가 붙은
     W-Craft 이중 주석 변형도 삭제한다(ULDSTF07400 계열·ULDMGT50002 잔존 사례).
+    2026-10-08 보강: W-Craft 20251209판(conversion/publish)이 남기는 **마커 접두 변형**
+    `//★Wcraft guide★ include부분 주석처리 -> include("../js/stf.js");` 도 삭제한다(ULDSTF05603 등 1,062화면·6,966줄 잔존 사례).
     라인 선두 앵커 매칭이라 문자열 내부 오탐은 사실상 없다(레거시 소스에 개행 포함 템플릿 리터럴 없음)."""
     # 주석 접두는 단일 문자클래스 [ \t/]* 로 소비한다 — (?:/+[ \t]*)* 같은 중첩 수량자는 긴 '////…' 구분선에서
     # 파국적 역추적(2^n)을 일으켜 bns_common.xml(4444행) 변환이 끝나지 않았다(2026-09-22 교정).
     pat = re.compile(r'(?m)^[ \t/]*#?include\b\s*\([^\n]*\r?\n?')
     code, removed = pat.subn('', code)
-    report["rule11"] = removed
+    # 마커 접두 변형: 주석 줄 전체가 「★Wcraft guide★ … -> include(...)」 인 경우만(마커 뒤 `->` 직후 include 호출).
+    pat_marker = re.compile(r'(?m)^[ \t/]*★Wcraft guide★[^\n]*?->\s*#?include\b\s*\([^\n]*\r?\n?')
+    code, removed2 = pat_marker.subn('', code)
+    report["rule11"] = removed + removed2
     return code
 
 
@@ -1226,6 +1231,9 @@ def rule4_structure(script, body, report):
                     if d == 0:
                         break
             j += 1
+        if j >= n:   # 본문 닫는 중괄호를 끝까지 못 찾음(원본 괄호 불균형 — publish ULDSTF05241_FILE 2026-10-08) → 범위가 스크립트 밖으로 나가므로 보류
+            report["judgment"].append("규칙4 재정렬 보류: 함수 본문 중괄호 미닫힘(원본 괄호 불균형 — 수동 검토)")
+            return script, body
         end = j + 1
         k = end
         while k < n and script[k] in " \t":

@@ -1,0 +1,1094 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDSTF05317.gfm" meta_screenName="(팝업)종목명변경관리" meta_screenId="ULDSTF05317">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<w2:layoutInfo/>
+		<w2:publicInfo method="scwin.onpageload,scwin.onpageunload,scwin.img_MKTACT_ENFORCE_DD_onclick,scwin.img_ISU_ENG_SYMBL_onclick,scwin.btn_Close_onclick,scwin.btn_RecvIsuDel_onclick,scwin.dts_Isu_OnLoadError,scwin.dts_Isu_OnLoadCompleted,scwin.trs_Save_OnFail,scwin.trs_Save_OnSuccess,scwin.bfReadSync,scwin.recvReadSync,scwin.readSync,scwin.trs,scwin.popupCallback,scwin.checkForm,scwin.checkSave,scwin.save,scwin.update,scwin.delete,scwin.recvtIsuDel,scwin.getIsuNmDisclsCtnt,scwin.dateForm,scwin.dscl,scwin.drft,scwin.parentRefresh,scwin.setComponentSymbl,scwin.removeEnter"/>
+		<xf:model>
+			<w2:dataCollection baseNode="map"></w2:dataCollection>
+			<w2:workflowCollection/>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+///////// 1. 변수 및 선언 영역 /////////
+scwin.vScrenTpCD = "";
+scwin.vBzProcsNo = "";
+scwin.vAcptNo = "";
+scwin.vIsurCd = "";
+scwin.vOpenTyp = "";
+// 세션정보를 얻기위한 함수사용
+scwin.getPar, scwin.setPar;
+scwin.TR_JOB;
+scwin.vSYMBL_INPUT_CD;
+scwin.vSecuGrpId;
+
+///////// 2. 초기화 영역 /////////
+/**
+ * @method
+ * @name onpageload
+ * @description 화면 로딩 시 초기 처리 — init 순차 호출
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.onpageload = async function() {
+    try {
+        // var parentWin = fn_GetProvider();
+        const parentWin = $c.frame.path("../");
+        // alert('[parentWin]'+parentWin);
+        scwin.vBzProcsNo = parentWin.clickBzProcsNo;
+        scwin.vAcptNo = parentWin.scwin.vAcptNo;
+        scwin.vIsurCd = parentWin.scwin.vIsurCd;
+        scwin.vOpenTyp = parentWin.scwin.vOpenTyp;
+        scwin.vSecuGrpId = parentWin.fr_SecuGrpId;
+        txb_ISU_CD.setValue(parentWin.txb_ISU_CD.getValue());
+        txb_ISU_NM.setValue(parentWin.txb_ISU_NM.getValue());
+        $c.libRoundPanel.PanelToGroupBox(panel_Item);
+        scwin.vSYMBL_INPUT_CD = js_market;
+        scwin.setComponentSymbl();
+
+        /* buttonSet의 초기화를 수행한다.  각 용도에 맞게 이미지ID와 onclick event시 수행할 function을 지정한다. */
+        buttonSet.setSaveInfo(btn_Save, scwin.save); // 저장
+        buttonSet.setUpdateInfo(btn_Update, scwin.update); // 수정
+        buttonSet.setDeleteInfo(btn_Delete, scwin.delete); // 삭제
+        buttonSet.setDsclInfo(btn_Dscl, scwin.dscl); // 안내문작성s
+        // buttonSet.setDrftInfo( btn_Drft, fn_drft );            // 기안
+
+        // 2010.12.30 ETF 종목명 변경
+        if (scwin.vOpenTyp === "R") {
+            await scwin.recvReadSync();
+            if (dts_Isu.getCellData(1, "AFCHG_ISU_KOR_NM") === "-") {
+                dts_Isu.setCellData(1, "AFCHG_ISU_KOR_NM", "");
+            }
+            if (dts_Isu.getCellData(1, "AFCHG_ISU_KOR_ABBRV") === "-") {
+                dts_Isu.setCellData(1, "AFCHG_ISU_KOR_ABBRV", "");
+            }
+            if (dts_Isu.getCellData(1, "AFCHG_ISU_ENG_NM") === "-") {
+                dts_Isu.setCellData(1, "AFCHG_ISU_ENG_NM", "");
+            }
+            if (dts_Isu.getCellData(1, "AFCHG_ISU_ENG_ABBRV") === "-") {
+                dts_Isu.setCellData(1, "AFCHG_ISU_ENG_ABBRV", "");
+            }
+            if (dts_Isu.getCellData(1, "AFCHG_ISU_ENG_SYMBL") === "-") {
+                dts_Isu.setCellData(1, "AFCHG_ISU_ENG_SYMBL", "");
+            }
+        } else if (scwin.vOpenTyp === "H") {
+            await scwin.readSync();
+        } else if (scwin.vOpenTyp === "N") {
+            await scwin.bfReadSync();
+        }
+        if (scwin.vSecuGrpId === SECUGRP_ID_EF) {
+            txb_memo.setDisabled(false);
+            txb_memo.setValue("* '변경후' 종목명에 값이 없을 경우 '변경전' 종목명 값으로 저장됩니다.");
+        } else {
+            txb_memo.setDisabled(true);
+        }
+        buttonSet.setButtonSecugrpDepCd(dts_ByCorpDepCd, scwin.vSecuGrpId, scwin.vIsurCd, js_dep_cd);
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF05317.onpageload" });
+    }
+};
+
+/**
+ * @method
+ * @name onpageunload
+ * @description 화면 언로드 시 정리 처리
+ * @returns {void}
+ * @hidden N
+ */
+scwin.onpageunload = function() {
+};
+
+///////// 3. 컴포넌트 이벤트 영역 /////////
+/**
+ * @method
+ * @name img_MKTACT_ENFORCE_DD_onclick
+ * @description img_MKTACT_ENFORCE_DD 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.img_MKTACT_ENFORCE_DD_onclick = function() {
+    try {
+        popUpCalendar2(edt_MKTACT_ENFORCE_DD);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF05317.img_MKTACT_ENFORCE_DD_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name img_ISU_ENG_SYMBL_onclick
+ * @description 「중복체크」 클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.img_ISU_ENG_SYMBL_onclick = async function() {
+    try {
+        if (edt_AFCHG_ISU_ENG_SYMBL.getValue() === "") {
+            await $c.win.alert("[영문종목심볼]을 입력하세요.");
+            edt_AFCHG_ISU_ENG_SYMBL.focus();
+            return false;
+        } else {
+            $c.lc.fn_chkIsuSymblDoubleInput(edt_AFCHG_ISU_ENG_SYMBL.getValue(), txb_ISU_CD.getValue(), dts_Symbl);
+            if (!$c.ut.isEmpty(MSG_SYMBL_DOUBLE_INPUT)) {
+                await $c.win.alert(MSG_SYMBL_DOUBLE_INPUT);
+            }
+        }
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF05317.img_ISU_ENG_SYMBL_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_Close_onclick
+ * @description 「닫기」 클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.btn_Close_onclick = async function() {
+    try {
+        await $c.win.closePopup();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF05317.btn_Close_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_RecvIsuDel_onclick
+ * @description 「신청종목삭제」 클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.btn_RecvIsuDel_onclick = async function() {
+    try {
+        await scwin.recvtIsuDel();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF05317.btn_RecvIsuDel_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name dts_Isu_OnLoadError
+ * @description dts_Isu 로드 오류 처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.dts_Isu_OnLoadError = async function() {
+    try {
+        await $c.win.alert(dts_Isu);
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF05317.dts_Isu_OnLoadError" });
+    }
+};
+
+/**
+ * @method
+ * @name dts_Isu_OnLoadCompleted
+ * @description dts_Isu 로드 완료 후처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @param {Number} rowcount 조회 건수
+ * @returns {void}
+ * @hidden N
+ */
+scwin.dts_Isu_OnLoadCompleted = function(rowcount) {
+    try {
+        if (scwin.vOpenTyp === "N" || (scwin.vOpenTyp === "R")) {
+            buttonSet.setInsertStatus();
+        } else {
+            $c.stf.setButtonSetWithDate(edt_MKTACT_ENFORCE_DD, false);
+            $c.stf.setButtonSetWithDate2(dts_Isu.getCellData(1, "DISCLS_YN"));
+        }
+        if (scwin.vOpenTyp === "R") {
+            btn_RecvIsuDel.setBackgroundImage("../img/btn_RcvdocDel.gif");
+            btn_RecvIsuDel.setDisabled(false);
+        } else {
+            btn_RecvIsuDel.setBackgroundImage("../img/btn_RcvdocDel_d.gif");
+            btn_RecvIsuDel.setDisabled(true);
+        }
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF05317.dts_Isu_OnLoadCompleted" });
+    }
+};
+
+/**
+ * @method
+ * @name trs_Save_OnFail
+ * @description Save On Fail 처리
+ * @returns {void}
+ * @hidden N
+ */
+scwin.trs_Save_OnFail = function() {
+    try {
+        $c.lc.fn_alertMsg('F');
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF05317.trs_Save_OnFail" });
+    }
+};
+
+/**
+ * @method
+ * @name trs_Save_OnSuccess
+ * @description Save On Success 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.trs_Save_OnSuccess = async function() {
+    try {
+        $c.lc.fn_alertMsg('S');
+        scwin.parentRefresh();
+        if (buttonSet.status === "D") {
+            // 삭제처리의 응답인 경우
+            await $c.win.closePopup();
+        } else {
+            scwin.vOpenTyp = "H";
+            await scwin.readSync();
+        }
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF05317.trs_Save_OnSuccess" });
+    }
+};
+
+///////// 4. 서브미션 콜백 영역 /////////
+/**
+ * @method
+ * @name bfReadSync
+ * @description bf Read Sync 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.bfReadSync = async function() {
+    url += "?SCREN_ID=" + "ULDSTF05317.xml" + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01;
+    url += "&method=searchIsuNmChgList&DIV_IDX=" + DIV_IDX_ISU_NM_BF_INFO + "&ISU_CD=" + txb_ISU_CD.getValue();
+    const sbmOptions = {
+        id : "sbm_dts_Isu",
+        action : "/Listing.do",
+        ref : "",
+        target : "dts_Isu=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+};
+
+/**
+ * @method
+ * @name recvReadSync
+ * @description recv Read Sync 처리
+ * @param {Number} row 행 인덱스
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.recvReadSync = async function(row) {
+    url += "?SCREN_ID=" + "ULDSTF05317.xml" + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01;
+    url += "&method=searchIsuNmChgList&DIV_IDX=" + DIV_IDX_ISU_NM_RECV_READ + "&ACPT_NO=" + scwin.vAcptNo;
+    const sbmOptions = {
+        id : "sbm_dts_Isu",
+        action : "/Listing.do",
+        ref : "",
+        target : "dts_Isu=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+};
+
+/**
+ * @method
+ * @name readSync
+ * @description read Sync 처리
+ * @param {Number} row 행 인덱스
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.readSync = async function(row) {
+    url += "?SCREN_ID=" + "ULDSTF05317.xml" + "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01;
+    url += "&method=searchIsuNmChgList&DIV_IDX=" + DIV_IDX_ISU_NM_HIST_READ + "&BZ_PROCS_NO=" + scwin.vBzProcsNo;
+    const sbmOptions = {
+        id : "sbm_dts_Isu",
+        action : "/Listing.do",
+        ref : "",
+        target : "dts_Isu=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+};
+
+/**
+ * @method
+ * @name trs
+ * @description trs 처리
+ * @param {*} trsIdx trsIdx
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.trs = async function(trsIdx) {
+    if (scwin.TR_JOB === 'I') {
+        scwin.vScrenTpCD = SCREN_PROCS_TP_CD_02;
+    } else if (scwin.TR_JOB === 'U') {
+        scwin.vScrenTpCD = SCREN_PROCS_TP_CD_03;
+    } else if (scwin.TR_JOB === 'D') {
+        scwin.vScrenTpCD = SCREN_PROCS_TP_CD_04;
+    }
+    trs_Save.KeyName = "toinb_dataid4";
+    // [전환검토] trs_Save.Parameters → 동적 파라미터(필요 시 sbmOptions 에 반영)
+    // const sbmParams = {
+    //     TRS_IDX : trsIdx,
+    //     ACPT_NO : scwin.vAcptNo,
+    //     BZ_PROCS_NO : scwin.vBzProcsNo,
+    //     COUNT : "1",
+    //     LIST_BZ_TP_CD : scwin.VListBzTpCd + ",DIV_IDX[0]=" + DIV_IDX_ISUNM_CHG
+    // };
+    const sbmOptions = {
+        id : "sbm_trs_Save",
+        action : "/Listing.do",
+        ref : "dts_Isu",
+        target : "trs_Save=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+};
+
+/**
+ * @method
+ * @name popupCallback
+ * @description browserPopup 팝업의 callback 함수. 부모창에서 팝업 결과 값을 처리한다.
+ * @param {*} arg 팝업에서 전달받은 값
+ * @returns {void}
+ * @hidden N
+ */
+scwin.popupCallback = function (arg) {
+    // TO-DO : arg 값 확인 후 업무 로직 추가
+};
+
+///////// 5. 일반/업무 함수 영역 /////////
+/**
+ * @method
+ * @name checkForm
+ * @description check Form 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.checkForm = async function() {
+    scwin.removeEnter();
+    const vCurDate = $c.ut.cGetToday("yyyymmdd");
+    if (txb_ISU_CD.getValue() === "") {
+        await $c.win.alert("[종목]을 선택하세요.");
+        txb_ISU_CD.focus();
+        return false;
+    }
+    if (edt_MKTACT_ENFORCE_DD.getValue() === "") {
+        await $c.win.alert("[변경일]을 입력하세요.");
+        edt_MKTACT_ENFORCE_DD.focus();
+        return false;
+    }
+    if (vCurDate >= edt_MKTACT_ENFORCE_DD.getValue()) {
+        await $c.win.alert("[변경일]을 현재일이후로 입력하세요.");
+        edt_MKTACT_ENFORCE_DD.focus();
+        return false;
+    }
+
+    // (3264)2010.12.27 ETF 종목명 변경
+    if (scwin.vSecuGrpId === SECUGRP_ID_EF) {
+        if (txb_AFCHG_ISU_KOR_NM.getValue() !== "") {
+            if (!$c.stf.checkMaxLength(txb_AFCHG_ISU_KOR_NM, 80, "한글종목명")) return false;
+        }
+        if (txb_AFCHG_ISU_KOR_ABBRV.getValue() !== "") {
+            if (!$c.stf.checkMaxLength(txb_AFCHG_ISU_KOR_ABBRV, 40, "한글종목약명")) return false;
+        }
+        if (edt_AFCHG_ISU_ENG_NM.getValue() !== "") {
+            if (!$c.stf.checkMaxLength(edt_AFCHG_ISU_ENG_NM, 80, "영문종목명")) return false;
+        }
+        if (edt_AFCHG_ISU_ENG_ABBRV.getValue() !== "") {
+            if (!$c.stf.checkMaxLength(edt_AFCHG_ISU_ENG_ABBRV, 40, "영문종목약명")) return false;
+        }
+        if (scwin.vSYMBL_INPUT_CD === '1') {
+            if (scwin.vSecuGrpId === SECUGRP_ID_EF || scwin.vSecuGrpId === SECUGRP_ID_FE) {
+                if (edt_AFCHG_ISU_ENG_SYMBL.getValue() !== "") {
+                    if (!$c.lc.fn_chkIsuSymblDoubleInput(edt_AFCHG_ISU_ENG_SYMBL.getValue(), txb_ISU_CD.getValue(), dts_Symbl)) {
+                        await $c.win.alert(MSG_SYMBL_DOUBLE_INPUT);
+                        return false;
+                    }
+                }
+            }
+        }
+    } else {
+        if (txb_AFCHG_ISU_KOR_NM.getValue() === "") {
+            await $c.win.alert("[한글종목명]을 입력하세요.");
+            txb_AFCHG_ISU_KOR_NM.focus();
+            return false;
+        }
+        if (!$c.stf.checkMaxLength(txb_AFCHG_ISU_KOR_NM, 80, "한글종목명")) return false;
+        if (txb_AFCHG_ISU_KOR_ABBRV.getValue() === "") {
+            await $c.win.alert("[한글종목약명]을 입력하세요.");
+            txb_AFCHG_ISU_KOR_ABBRV.focus();
+            return false;
+        }
+        if (!$c.stf.checkMaxLength(txb_AFCHG_ISU_KOR_ABBRV, 40, "한글종목약명")) return false;
+        if (edt_AFCHG_ISU_ENG_NM.getValue() === "") {
+            await $c.win.alert("[영문종목명]을 입력하세요.");
+            edt_AFCHG_ISU_ENG_NM.focus();
+            return false;
+        }
+        if (!$c.stf.checkMaxLength(edt_AFCHG_ISU_ENG_NM, 80, "영문종목명")) return false;
+        if (edt_AFCHG_ISU_ENG_ABBRV.getValue() === "") {
+            await $c.win.alert("[영문종목약명]을 입력하세요.");
+            edt_AFCHG_ISU_ENG_ABBRV.focus();
+            return false;
+        }
+        if (!$c.stf.checkMaxLength(edt_AFCHG_ISU_ENG_ABBRV, 40, "영문종목약명")) return false;
+        if (scwin.vSYMBL_INPUT_CD === '1') {
+            if (scwin.vSecuGrpId === SECUGRP_ID_EF || scwin.vSecuGrpId === SECUGRP_ID_FE) {
+                if (edt_AFCHG_ISU_ENG_SYMBL.getValue() === "") {
+                    await $c.win.alert("[영문종목심볼]을 입력하세요.");
+                    edt_AFCHG_ISU_ENG_SYMBL.focus();
+                    return false;
+                }
+                if (!$c.lc.fn_chkIsuSymblDoubleInput(edt_AFCHG_ISU_ENG_SYMBL.getValue(), txb_ISU_CD.getValue(), dts_Symbl)) {
+                    await $c.win.alert(MSG_SYMBL_DOUBLE_INPUT);
+                    return false;
+                }
+            }
+        }
+    }
+
+    /* 2009-04-24 종목명변경으로 중복입력체크 */
+    ///*
+    if (!$c.lc.fn_check_bz_doubleinput(dts_BZ_CHECK, txb_ISU_CD.getValue(), edt_MKTACT_ENFORCE_DD.getValue(), scwin.vBzProcsNo, LIST_BZ_TP_CD_140)) {
+        return false;
+    }
+    return true;
+};
+
+/**
+ * @method
+ * @name checkSave
+ * @description (3264) 2010.12.27 ETF 종목명 변경
+ * @returns {void}
+ * @hidden N
+ */
+scwin.checkSave = function() {
+    if (txb_AFCHG_ISU_KOR_NM.getValue() === "" || txb_AFCHG_ISU_KOR_NM.getValue() === "-") {
+        dts_Isu.setCellData(1, "AFCHG_ISU_KOR_NM", txb_BFCHG_ISU_KOR_NM.getValue());
+    }
+    if (txb_AFCHG_ISU_KOR_ABBRV.getValue() === "" || txb_AFCHG_ISU_KOR_ABBRV.getValue() === "-") {
+        dts_Isu.setCellData(1, "AFCHG_ISU_KOR_ABBRV", txb_BFCHG_ISU_KOR_ABBRV.getValue());
+    }
+    if (edt_AFCHG_ISU_ENG_NM.getValue() === "" || edt_AFCHG_ISU_ENG_NM.getValue() === "-") {
+        dts_Isu.setCellData(1, "AFCHG_ISU_ENG_NM", txb_BFCHG_ISU_ENG_NM.getValue());
+    }
+    if (edt_AFCHG_ISU_ENG_ABBRV.getValue() === "" || edt_AFCHG_ISU_ENG_ABBRV.getValue() === "-") {
+        dts_Isu.setCellData(1, "AFCHG_ISU_ENG_ABBRV", txb_BFCHG_ISU_ENG_ABBRV.getValue());
+    }
+    if (scwin.vSYMBL_INPUT_CD === '1') {
+        if (edt_AFCHG_ISU_ENG_SYMBL.getValue() === "" || edt_AFCHG_ISU_ENG_SYMBL.getValue() === "-") {
+            dts_Isu.setCellData(1, "AFCHG_ISU_ENG_SYMBL", txb_BFCHG_ISU_ENG_SYMBL.getValue());
+        }
+    }
+};
+
+/**
+ * @method
+ * @name save
+ * @description save 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.save = async function() {
+    scwin.TR_JOB = 'I';
+    if (await scwin.checkForm()) {
+        if (!$c.lc.fn_isProcess(scwin.TR_JOB)) return;
+        if (scwin.vBzProcsNo === "") {
+            scwin.vBzProcsNo = await $c.stf.getNewBzProcNo(dts_BzProcsNo);
+        }
+        if (scwin.vBzProcsNo.length !== 14) {
+            await $c.win.alert($c.stf.getMessageParam("MSG-0010", ""));
+        } else {
+            dts_Isu.setCellData(1, "BZ_PROCS_NO", scwin.vBzProcsNo);
+
+            // (3264) 2010.12.27 ETF 종목명 변경
+            if (scwin.vSecuGrpId === SECUGRP_ID_EF) {
+                scwin.checkSave();
+            }
+            //-
+
+            await scwin.trs(TRS_IDX_INSERT);
+        }
+    }
+};
+
+/**
+ * @method
+ * @name update
+ * @description update 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.update = async function() {
+    scwin.TR_JOB = 'U';
+    if (await scwin.checkForm()) {
+        if (!$c.lc.fn_isProcess(scwin.TR_JOB)) return;
+
+        // (3264) 2010.12.27 ETF 종목명 변경
+        if (scwin.vSecuGrpId === SECUGRP_ID_EF) {
+            scwin.checkSave();
+        }
+        //-
+
+        await scwin.trs(TRS_IDX_UPDATE);
+    }
+};
+
+/**
+ * @method
+ * @name delete
+ * @description delete 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.delete = async function() {
+    scwin.TR_JOB = 'D';
+    if (!$c.lc.fn_isProcess(scwin.TR_JOB)) return;
+    buttonSet.setDeleteStatus(); // buttonSet에 CRUD상태를 저장하여 이용하는 사례, TR의 응답event에서 사용.
+
+    await scwin.trs(TRS_IDX_DELETE);
+};
+
+/**
+ * @method
+ * @name recvtIsuDel
+ * @description recvt Isu Del 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.recvtIsuDel = async function() {
+    if (scwin.vAcptNo === "") {
+        await $c.win.alert('변경예정내역에서 대상종목을 선택하세요');
+        return;
+    }
+    scwin.vAcptNo = ''; // biz단에서 체크하기때문에 초기화 필수 .
+
+    await scwin.delete(TRS_IDX_DELETE);
+};
+
+/**
+ * @method
+ * @name getIsuNmDisclsCtnt
+ * @description get Isu Nm Discls Ctnt 처리
+ * @returns {void}
+ * @hidden N
+ */
+scwin.getIsuNmDisclsCtnt = function() {
+    let vCtnt = "";
+    if (scwin.vSecuGrpId === SECUGRP_ID_EF) {
+        vCtnt += "1. 변경내역(변경전 → 변경후)";
+        vCtnt += "\r\n";
+        vCtnt += "    - 한글종목명";
+        vCtnt += "\r\n";
+        vCtnt += "         o " + txb_BFCHG_ISU_KOR_NM.getValue() + " → " + txb_AFCHG_ISU_KOR_NM.getValue();
+        vCtnt += "\r\n";
+        vCtnt += "    - 영문종목명";
+        vCtnt += "\r\n";
+        vCtnt += "         o " + txb_BFCHG_ISU_ENG_NM.getValue() + " → " + edt_AFCHG_ISU_ENG_NM.getValue();
+        vCtnt += "\r\n";
+        vCtnt += "2. 변경상장일: " + scwin.dateForm(edt_MKTACT_ENFORCE_DD.getValue());
+        vCtnt += "\r\n";
+        vCtnt += "3. 변경사유: 신탁계약 변경에 따른 종목명 변경";
+        vCtnt += "\r\n";
+        vCtnt += "4. 운용사(위탁사): " + dts_Isu.getCellData(1, "TRST_COM_NM");
+        vCtnt += "\r\n";
+    } else {
+        vCtnt += "1. 변경내역(변경전 → 변경후)";
+        vCtnt += "\r\n";
+        vCtnt += "    - 한글종목명";
+        vCtnt += "\r\n";
+        vCtnt += "         o " + txb_BFCHG_ISU_KOR_NM.getValue() + " → " + txb_AFCHG_ISU_KOR_NM.getValue();
+        vCtnt += "\r\n";
+        vCtnt += "    - 영문종목명";
+        vCtnt += "\r\n";
+        vCtnt += "         o " + txb_BFCHG_ISU_ENG_NM.getValue() + " → " + edt_AFCHG_ISU_ENG_NM.getValue();
+        vCtnt += "\r\n";
+        vCtnt += "2. 변경일자: " + scwin.dateForm(edt_MKTACT_ENFORCE_DD.getValue());
+        vCtnt += "\r\n";
+        vCtnt += "3. 변경사유: ★★★★★★★★★★★★";
+        vCtnt += "\r\n";
+    }
+    return vCtnt;
+};
+
+/**
+ * @method
+ * @name dateForm
+ * @description date Form 처리
+ * @param {String} pStr pStr
+ * @returns {void}
+ * @hidden N
+ */
+scwin.dateForm = function(pStr) {
+    let str = "";
+    if (pStr === "") {
+        str = "★★★★년" + "★★월" + "★★일";
+    } else {
+        str = pStr.substring(0, 4) + "년" + pStr.substring(4, 6) + "월" + pStr.substring(6, 8) + "일";
+    }
+    return str;
+};
+
+/**
+ * @method
+ * @name dscl
+ * @description dscl 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.dscl = async function() {
+    if (scwin.vBzProcsNo === '') {
+        await $c.win.alert("공시안내문 생성 처리할 대상자료가 선택되지 않았거나, 없습니다.");
+    }
+    if ($c.cp.isModified(dts_Isu)) {
+        await $c.win.alert($c.stf.getMessageParam("MSG-0022", ""));
+        return;
+    }
+    const OldGet = scwin.getPar;
+    const OldSet = scwin.setPar;
+    scwin.getPar = function(arr, param_dts_isu, param_dts_mst, param_dts2, param_dts3) {
+        arr[0] = "68959"; // 68926:기타안내사항 -> 689599:종목명 변경) 으로 서식코드변경
+        arr[1] = scwin.vBzProcsNo;
+        arr[2] = scwin.vIsurCd;
+        arr[3] = js_market;
+        arr[4] = scwin.getIsuNmDisclsCtnt();
+        if (scwin.vSecuGrpId === SECUGRP_ID_EF) {
+            // 코스콤 전송시 접수에서 제목에 종목명을 셋팅해서 처리에서는 제외함.
+            arr[5] = '';
+        } else {
+            arr[5] = txb_ISU_NM.getValue();
+        }
+
+        // CopyDataSet( dts_Isu , param_dts_isu) ;
+        // CopyDataSet(dts_Isu , param_dts_mst);
+        param_dts_mst.setCellData(param_dts_mst.getFocusedRowIndex(), "ISU_CD", txb_ISU_CD.getValue());
+        return arr.length;
+    };
+    scwin.setPar = function(arr) {
+
+    };
+    const wth = 730 + 5;
+    const hgt = 785 + 30;
+    const pt = $c.stf.fn_getModalCenterPos(frame, wth, hgt);
+    const options = {
+        id: "ULDSTF92024",
+        title: "공시안내문작성",
+        type: "browserPopup",
+        width: wth,
+        height: hgt,
+        callbackFn: "scwin.popupCallback"
+    };
+
+    $c.win.openPopup("/listingcommon/ULDSTF92024.gfm", options);
+    scwin.getPar = OldGet;
+    scwin.setPar = OldSet;
+};
+
+/**
+ * @method
+ * @name drft
+ * @description drft 처리
+ * @returns {void}
+ * @hidden N
+ */
+scwin.drft = function() {
+
+};
+
+/**
+ * @method
+ * @name parentRefresh
+ * @description parent Refresh 처리
+ * @returns {void}
+ * @hidden N
+ */
+scwin.parentRefresh = function() {
+    const fr_fn_list_sync = $c.frame.path("../").fn_all_list_sync;
+    fr_fn_list_sync();
+};
+
+/**
+ * @method
+ * @name setComponentSymbl
+ * @description set Component Symbl 처리
+ * @returns {void}
+ * @hidden N
+ */
+scwin.setComponentSymbl = function() {
+    if (scwin.vSYMBL_INPUT_CD === '1') {
+        if (scwin.vSecuGrpId === SECUGRP_ID_EF || scwin.vSecuGrpId === SECUGRP_ID_FE) {
+            panel_SYMBL.show("");
+        } else {
+            panel_SYMBL.hide();
+        }
+    } else if (scwin.vSYMBL_INPUT_CD === '2') {
+        panel_SYMBL.hide();
+    }
+};
+
+/**
+ * @method
+ * @name removeEnter
+ * @description 종목명 개행문자 제거를 위해 변수에 담았다가 다시 셋팅 getObjectValue 하면서 제거되는듯
+ * @returns {void}
+ * @hidden N
+ */
+scwin.removeEnter = function() {
+    txb_AFCHG_ISU_KOR_NM.setValue($c.ut.trim(txb_AFCHG_ISU_KOR_NM.getValue()));
+    txb_AFCHG_ISU_KOR_ABBRV.setValue($c.ut.trim(txb_AFCHG_ISU_KOR_ABBRV.getValue()));
+    edt_AFCHG_ISU_ENG_NM.setValue($c.ut.trim(edt_AFCHG_ISU_ENG_NM.getValue()));
+    edt_AFCHG_ISU_ENG_ABBRV.setValue($c.ut.trim(edt_AFCHG_ISU_ENG_ABBRV.getValue()));
+    edt_AFCHG_ISU_ENG_SYMBL.setValue($c.ut.trim(edt_AFCHG_ISU_ENG_SYMBL.getValue()));
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+		<xf:group class="pop_contents" id="" meta_snippetCategory="00_화면시작" meta_snippetKeyComponent="true"
+			meta_snippetName="0_02 팝업페이지시작">
+			<xf:group class="tblbox" id="panel_Item" meta_snippetCategory="05_입출력테이블" meta_snippetKeyComponent="true"
+				meta_snippetName="5_02 2단테이블" style="">
+				<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+					<w2:attributes>
+						<w2:summary></w2:summary>
+					</w2:attributes>
+					<xf:group tagname="colgroup">
+						<xf:group style="width:120px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+						<xf:group style="width:120px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+					</xf:group>
+					<xf:group style="" tagname="tr">
+						<xf:group class="w2tb_th" style="" tagname="th">
+							<w2:textbox hierarchy="label_2_top" id="label_2_top" label="종목코드(명)" orgid="label_2_top" style=""
+								userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" style="" tagname="td">
+							<w2:attributes>
+								<w2:colspan>3</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:input hierarchy="txb_ISU_CD" id="txb_ISU_CD" maxlength="1000" orgid="txb_ISU_CD" readOnly="true"
+								style="width:90px;" userData2=" class:TopCondition_01_write;">
+							</xf:input>
+							<xf:input hierarchy="txb_ISU_NM" id="txb_ISU_NM" maxlength="1000" orgid="txb_ISU_NM" readOnly="true"
+								style="width:346px;" userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+								<w2:colspan>2</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_58" id="label_58" label="변경전" orgid="label_58" style=""
+								userData2=" class:TopCondition_03; font-family:돋움체; font-weight:bold; border-color:#32649f;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+								<w2:colspan>2</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_7" id="label_7" label="변경후" orgid="label_7" style=""
+								userData2=" class:TopCondition_03; font-family:돋움체; font-weight:bold; border-color:#32649f;" class="blue">
+							</w2:textbox>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox class="req" hierarchy="label_13" id="label_13" label="변경일" orgid="label_13"
+								style=""
+								userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<w2:inputCalendar displayFormat="yyyy-MM-dd" hierarchy="edt_MKTACT_ENFORCE_DD" id="edt_MKTACT_ENFORCE_DD"
+								orgid="edt_MKTACT_ENFORCE_DD"
+								style=""
+								userData2=" class:panel_maskedit_write_01; generaledit:False; numeric:False;">
+							</w2:inputCalendar>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_2" id="label_2" label="한글종목명" orgid="label_2"
+								style=""
+								userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input hierarchy="txb_BFCHG_ISU_KOR_NM" id="txb_BFCHG_ISU_KOR_NM" maxlength="1000"
+								orgid="txb_BFCHG_ISU_KOR_NM" readOnly="true"
+								style="width:275px;"
+								userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox class="req" hierarchy="label_6" id="label_6" label="한글종목명" orgid="label_6"
+								style=""
+								userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input hierarchy="txb_AFCHG_ISU_KOR_NM" id="txb_AFCHG_ISU_KOR_NM" maxlength="80" orgid="txb_AFCHG_ISU_KOR_NM"
+								style="width:366px;" tabIndex="1" userData2=" class:TopCondition_01_write;">
+							</xf:input>
+							<w2:textbox hierarchy="label_9" id="label_9" label="(한글:40자)" orgid="label_9"
+								style=""
+								userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_16" id="label_16" label="한글종목약명" orgid="label_16"
+								style=""
+								userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input hierarchy="txb_BFCHG_ISU_KOR_ABBRV" id="txb_BFCHG_ISU_KOR_ABBRV" maxlength="1000"
+								orgid="txb_BFCHG_ISU_KOR_ABBRV" readOnly="true"
+								style="width:220px;"
+								userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox class="req" hierarchy="label_1" id="label_1" label="한글종목약명" orgid="label_1"
+								style=""
+								userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input hierarchy="txb_AFCHG_ISU_KOR_ABBRV" id="txb_AFCHG_ISU_KOR_ABBRV" maxlength="40"
+								orgid="txb_AFCHG_ISU_KOR_ABBRV" style="width:320px;" tabIndex="2" userData2=" class:TopCondition_01_write;">
+							</xf:input>
+							<w2:textbox hierarchy="label_15" id="label_15" label="(한글:20자)" orgid="label_15"
+								style=""
+								userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_3" id="label_3" label="영문종목명" orgid="label_3"
+								style=""
+								userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input hierarchy="txb_BFCHG_ISU_ENG_NM" id="txb_BFCHG_ISU_ENG_NM" maxlength="1000"
+								orgid="txb_BFCHG_ISU_ENG_NM" readOnly="true"
+								style="width:275px;"
+								userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox class="req" hierarchy="label_4" id="label_4" label="영문종목명" orgid="label_4"
+								style=""
+								userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input hierarchy="edt_AFCHG_ISU_ENG_NM" id="edt_AFCHG_ISU_ENG_NM" maxlength="80" orgid="edt_AFCHG_ISU_ENG_NM"
+								style="width:366px;" tabIndex="5"
+								userData2=" class:panel_maskedit_write_02; alignment:0; datemodify:True; generaledit:False; iscomma:False; numeric:False; showliteral:false; upperflag:0; valign:1;">
+							</xf:input>
+							<w2:textbox hierarchy="label_10" id="label_10" label="(영문:80자)" orgid="label_10"
+								style=""
+								userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_8" id="label_8" label="영문종목약명" orgid="label_8"
+								style=""
+								userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input hierarchy="txb_BFCHG_ISU_ENG_ABBRV" id="txb_BFCHG_ISU_ENG_ABBRV" maxlength="1000"
+								orgid="txb_BFCHG_ISU_ENG_ABBRV" readOnly="true"
+								style="width:220px;"
+								userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox class="req" hierarchy="label_37" id="label_37" label="영문종목약명" orgid="label_37"
+								style=""
+								userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input hierarchy="edt_AFCHG_ISU_ENG_ABBRV" id="edt_AFCHG_ISU_ENG_ABBRV" maxlength="40"
+								orgid="edt_AFCHG_ISU_ENG_ABBRV" style="width:320px;" tabIndex="5"
+								userData2=" class:panel_maskedit_write_02; alignment:0; datemodify:True; generaledit:False; iscomma:False; numeric:False; showliteral:false; upperflag:1; valign:1;">
+							</xf:input>
+							<w2:textbox hierarchy="label_12" id="label_12" label="(영문:40자)" orgid="label_12"
+								style=""
+								userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="td" class="w2tb_td in_tbl">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+								<w2:colspan>4</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:group class="tblbox" id="panel_SYMBL" meta_snippetCategory="05_입출력테이블" meta_snippetKeyComponent="true"
+								meta_snippetName="5_02 2단테이블" style="">
+								<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+									<w2:attributes>
+										<w2:summary></w2:summary>
+									</w2:attributes>
+									<xf:group tagname="colgroup">
+										<xf:group style="width:120px;" tagname="col"></xf:group>
+										<xf:group style="" tagname="col"></xf:group>
+										<xf:group style="width:120px;" tagname="col"></xf:group>
+										<xf:group style="" tagname="col"></xf:group>
+									</xf:group>
+									<xf:group tagname="tr">
+										<xf:group class="w2tb_th " tagname="th">
+											<w2:attributes>
+												<w2:scope>row</w2:scope>
+											</w2:attributes>
+											<w2:textbox hierarchy="label_38" id="label_38" label="영문종목심볼" orgid="label_38"
+												style=""
+												userData2=" class:TopCondition_01; border-color:#0000FF;">
+											</w2:textbox>
+										</xf:group>
+										<xf:group class="w2tb_td" tagname="td">
+											<w2:attributes></w2:attributes>
+											<xf:input hierarchy="txb_BFCHG_ISU_ENG_SYMBL" id="txb_BFCHG_ISU_ENG_SYMBL" maxlength="1000"
+												orgid="txb_BFCHG_ISU_ENG_SYMBL" readOnly="true"
+												style="width:100px;"
+												userData2=" class:TopCondition_01_write;">
+											</xf:input>
+										</xf:group>
+										<xf:group class="w2tb_th " tagname="th">
+											<w2:attributes>
+												<w2:scope>row</w2:scope>
+											</w2:attributes>
+											<w2:textbox class="req" hierarchy="label_36" id="label_36" label="종목심볼" orgid="label_36"
+												style="" userData2=" class:TopCondition_01;">
+											</w2:textbox>
+										</xf:group>
+										<xf:group class="w2tb_td" tagname="td">
+											<w2:attributes></w2:attributes>
+											<xf:input displayFormat="#######" hierarchy="edt_AFCHG_ISU_ENG_SYMBL"
+												id="edt_AFCHG_ISU_ENG_SYMBL" maxlength="10" orgid="edt_AFCHG_ISU_ENG_SYMBL" style="width:100px;" tabIndex="5"
+												userData2=" class:panel_maskedit_write_02; alignment:0; datemodify:True; generaledit:False; iscomma:False; numeric:False; showliteral:false; upperflag:1; valign:1;">
+											</xf:input>
+											<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.img_ISU_ENG_SYMBL_onclick"
+												hierarchy="img_ISU_ENG_SYMBL" id="img_ISU_ENG_SYMBL" orgid="img_ISU_ENG_SYMBL" src="../img/btn_Smbl.gif"
+												style="">
+												<xf:label><![CDATA[중복체크]]></xf:label>
+											</xf:trigger>
+										</xf:group>
+									</xf:group>
+								</xf:group>
+							</xf:group>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<xf:group class="btnbox" id="" meta_snippetCategory="08_버튼" meta_snippetKeyComponent="true" meta_snippetName="8_05 팝업전체제어버튼"
+				style="">
+				<xf:group class="rt" id="" style="">
+					<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.btn_RecvIsuDel_onclick" hierarchy="btn_RecvIsuDel"
+						id="btn_RecvIsuDel" orgid="btn_RecvIsuDel" src="../img/btn_RcvdocDel.gif" style="">
+						<xf:label><![CDATA[신청종목삭제]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm" cursor="pointer" hierarchy="btn_Dscl" id="btn_Dscl" orgid="btn_Dscl"
+						src="../img/btn_make_info.gif" style="" userData2=" border-color:#C0C0C0;">
+						<xf:label><![CDATA[안내문작성]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm" cursor="pointer" hierarchy="btn_Update" id="btn_Update" orgid="btn_Update"
+						src="../img/btn_modify.gif" style="" text="수정" userData2=" border-color:#C0C0C0;">
+						<xf:label><![CDATA[수정]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm" cursor="pointer" hierarchy="btn_Delete" id="btn_Delete" orgid="btn_Delete"
+						src="../img/btn_delete.gif" style="" text="삭제" userData2=" border-color:#C0C0C0;">
+						<xf:label><![CDATA[삭제]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.btn_Close_onclick" hierarchy="btn_Close" id="btn_Close"
+						orgid="btn_Close" src="../img/btn_close.gif" style="" text="닫기">
+						<xf:label><![CDATA[닫기]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm pt" cursor="pointer" hierarchy="btn_Save" id="btn_Save" orgid="btn_Save"
+						src="../img/btn_save.gif" style="" text="저장" userData2=" border-color:#C0C0C0;">
+						<xf:label><![CDATA[저장]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+		<xf:group class="hide" id="" style="">
+				<xf:input hierarchy="txb_memo" id="txb_memo" maxlength="80" orgid="txb_memo" style="width:370px;" tabIndex="1" userData2=" class:TopCondition_01_write;">
+				</xf:input>
+			</xf:group></xf:group>
+	</body>
+</html>

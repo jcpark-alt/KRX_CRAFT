@@ -1,0 +1,351 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDSTF08066.gfm" meta_screenName="발행인/보증인 신용등급현황" meta_screenId="ULDSTF08066">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<w2:layoutInfo/>
+		<w2:publicInfo method="scwin.onpageload,scwin.onpageunload,scwin.getCode,scwin.search,scwin.popCreditDetail"/>
+		<xf:model>
+			<w2:dataCollection baseNode="map"></w2:dataCollection>
+			<w2:workflowCollection/>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+///////// 1. 변수 및 선언 영역 /////////
+// 호출메뉴ID를 식별하기 위한 함수사용
+// 세션정보를 얻기위한 함수사용
+// 상장관련공통함수
+scwin.gAcptNo;
+
+///////// 2. 초기화 영역 /////////
+/**
+ * @method
+ * @name onpageload
+ * @description 화면 로딩 시 초기 처리 — init 순차 호출
+ * @returns {void}
+ * @hidden N
+ */
+scwin.onpageload = function() {
+
+};
+
+/**
+ * @method
+ * @name onpageunload
+ * @description 화면 언로드 시 정리 처리
+ * @returns {void}
+ * @hidden N
+ */
+scwin.onpageunload = function() {
+};
+
+///////// 4. 서브미션 콜백 영역 /////////
+/**
+ * @method
+ * @name getCode
+ * @description etn발행사
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.getCode = async function() {
+    // etn발행사
+    const sbmOptions = {
+        id : "sbm_dts_EtnInst",
+        action : "/etn/EtnCodeAct.do",
+        ref : "",
+        target : "dts_EtnInst=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+    const sbmOptions2 = {
+        id : "sbm_dts_EtnSrty",
+        action : "/etn/EtnCodeAct.do",
+        ref : "",
+        target : "dts_EtnSrty=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn2 = await $c.sbm.executeDynamic(sbmOptions2);
+    // TODO Stage2: sbmRtn2 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+};
+
+/**
+ * @method
+ * @name search
+ * @description search 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.search = async function() {
+    url += "&inputMessageId=ETN_ISUR_SRTY_CREDIT_INOUT&outputMessageId=ETN_ISUR_SRTY_CREDIT_INOUT";
+    url += "&ISUR_SRTY_CD=" + cbo_inst_srty.BindColVal;
+    url += "&GUBUN=" + rdo_gubun.getValue();
+    url += "&S_DATE=" + edt_SDate.getValue();
+    url += "&E_DATE=" + edt_EDate.getValue();
+    const sbmOptions = {
+        id : "sbm_dts",
+        action : "/etn/EtnStatMgt.do",
+        ref : "",
+        target : "dts=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+};
+
+///////// 5. 일반/업무 함수 영역 /////////
+/**
+ * @method
+ * @name popCreditDetail
+ * @description pop Credit Detail 처리
+ * @param {Number} row 행 인덱스
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.popCreditDetail = async function(row) {
+    // frame.CreateDialogFrame("ULDSTF08061",".ULDSTF08061.gfm", "영업용순자본비율", 30, 50, 430, 575, "window");
+    if (dts.getCellData(Number(row), "ACPT_NO") === "") return;
+    // 2017-11-27 KBoY 비공개 첨부서류 볼 수 없음.
+    await $c.stf.openDisclViewer(dts.setCellData(eval(row, function(edtSDate, edtEDate) {
+        const vCurDate = $c.ut.cGetToday("yyyymmdd");
+        edtSDate.setValue($c.ut.cGetMinusYear(vCurDate, 3));
+        edtEDate.setValue(vCurDate);
+    }, async function() {
+        if (rdo_gubun.getValue() === "2") {
+            cbo_inst_srty.setDisabled(true);
+            cbo_inst_srty.ComboDataID = "dts_EtnInst";
+        } else if (rdo_gubun.getValue() === "3") {
+            cbo_inst_srty.setDisabled(true);
+            cbo_inst_srty.ComboDataID = "dts_EtnSrty";
+        } else if (rdo_gubun.getValue() === "1") cbo_inst_srty.setDisabled(true);
+        cbo_inst_srty.setSelectedIndex(0);
+        await scwin.search();
+    }, async function() {
+        /*		if( cbo_inst_srty.index == 0 ) {
+        			alert(getMessageParam("MSG-0016", ""));
+        			cbo_inst_srty.focus();
+        			return ;
+        		}
+         */
+        await scwin.search();
+    }, async function() {
+        await $c.win.alert(dts);
+    }, function(rowcount) {
+        txb_TotCnt.setValue("총건수 : " + rowcount);
+        //    FillGridHeaderTotalCnt(rowcount, panel_page);
+        //    FillGridHeaderTotalCnt(rowcount);
+    }, async function(row, colid) {
+        await scwin.popCreditDetail(row);
+    }, async function() {
+        $c.pre_newlisting.fn_initSearchDate(edt_SDate, edt_EDate);
+        const usrCBData = "1주일전^1,1개월전^2,3개월전^3,6개월전^4,1년전^5,2년전^6";
+        cmb_PeriodTp.CBData = usrCBData; // 사용자CBData 지정
+
+        rdo_gubun.setValue("1");
+        await scwin.getCode();
+        await scwin.search();
+    }, async function() {
+        await scwin.search();
+    }, function() {
+        window.close();
+    }, function() {
+        popUpCalendar2(edt_SDate);
+    }, function() {
+        popUpCalendar2(edt_EDate);
+    }, function() {
+        const vTp = $c.cp.valueOfIndex(cmb_PeriodTp, "VALUE", cmb_PeriodTp.getSelectedIndex());
+        $c.stf.setFromToDate(vTp, edt_SDate, edt_EDate);
+    })));
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+		<!-- Tag is Not matched with wCraft2 Rule :<style/>-->
+		<xf:model>
+			<!-- Tag is Not matched with wCraft2 Rule :<mxdataset id="dts" onloaderror="dts_OnLoadError" usechangeinfo="False" userData2=" onloadcompleted:dts_OnLoadCompleted;" orgid="dts" hierarchy="dts"/>-->
+			<!-- Tag is Not matched with wCraft2 Rule :<mxdataset id="dts_EtnInst" syncload="True" orgid="dts_EtnInst" hierarchy="dts_EtnInst"/>-->
+			<!-- Tag is Not matched with wCraft2 Rule :<mxdataset id="dts_EtnSrty" syncload="True" orgid="dts_EtnSrty" hierarchy="dts_EtnSrty"/>-->
+		</xf:model>
+		<xf:group class="sub_contents" id="" meta_snippetCategory="00_화면시작" meta_snippetKeyComponent="true" meta_snippetName="0_01 페이지시작"
+			style="">
+			<xf:group class="pgtbox" id="" meta_snippetCategory="02_타이틀" meta_snippetKeyComponent="true" meta_snippetName="2_01 페이지타이틀"
+				style="">
+				<w2:textbox class="pgt_tit" id="" label="발행인/보증인 신용등급현황" style="" tagname=""></w2:textbox>
+				<xf:group class="breadcrumb" id="" style="">
+					<xf:group id="" style="" tagname="ul">
+						<xf:group class="home" id="" style="" tagname="li">
+							<w2:anchor id="" outerDiv="false" style="">
+								<xf:label><![CDATA[Home]]></xf:label>
+							</w2:anchor>
+						</xf:group>
+						<xf:group id="" style="" tagname="li">
+							<w2:anchor id="" outerDiv="false" style="">
+								<xf:label><![CDATA[1Depth Menu]]></xf:label>
+							</w2:anchor>
+						</xf:group>
+						<xf:group id="" style="" tagname="li">
+							<w2:anchor id="" outerDiv="false" style="">
+								<xf:label><![CDATA[2Depth Menu]]></xf:label>
+							</w2:anchor>
+						</xf:group>
+						<xf:group id="" style="" tagname="li">
+							<w2:span id="" label="3Depth Menu" style=""></w2:span>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+				<xf:trigger class="btn_fav" id="" style="" type="button">
+					<xf:label></xf:label>
+				</xf:trigger>
+			</xf:group>
+			<xf:group class="schbox" id="pan_Cnd" meta_snippetCategory="03_조회영역" meta_snippetKeyComponent="true"
+				meta_snippetName="3_01 조회조건1행" style="">
+				<xf:group class="schbox_inner" id="" style="">
+					<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl " id="" style="" tagname="table">
+						<w2:attributes>
+							<w2:summary></w2:summary>
+						</w2:attributes>
+						<xf:group tagname="colgroup">
+							<xf:group style="width:100px;" tagname="col"></xf:group>
+							<xf:group style="" tagname="col"></xf:group>
+							<xf:group style="width:100px;" tagname="col"></xf:group>
+							<xf:group style="" tagname="col"></xf:group>
+						</xf:group>
+						<xf:group class="" id="" style="" tagname="tr">
+							<xf:group class="w2tb_th" style="" tagname="th">
+								<w2:attributes>
+									<w2:colspan>2</w2:colspan>
+									<w2:rowspan>1</w2:rowspan>
+								</w2:attributes>
+								<xf:group id="" class="flex flex_no">
+									<xf:select1 item="1^전  체,2^발행회사,3^보증인" appearance="full" style=""
+										userData2=" cols:3; font-family:돋움;" id="rdo_gubun" renderType="radiogroup">
+										<xf:choices>
+											<xf:item>
+												<xf:label><![CDATA[전  체]]></xf:label>
+												<xf:value><![CDATA[1]]></xf:value>
+											</xf:item>
+											<xf:item>
+												<xf:label><![CDATA[발행회사]]></xf:label>
+												<xf:value><![CDATA[2]]></xf:value>
+											</xf:item>
+											<xf:item>
+												<xf:label><![CDATA[보증인]]></xf:label>
+												<xf:value><![CDATA[3]]></xf:value>
+											</xf:item>
+										</xf:choices>
+									</xf:select1>
+									<xf:select1 selectedData="true" ref="data:dts_EtnInst" appearance="minimal"
+										disabledClass="w2selectbox_disabled" style="width:160px;"
+										userData2=" class:TopCondition_01; bindcolumn:VALUE; index:0; listcount:10; listexprformat:TEXT^0^140; searchcolumn:TEXT;"
+										id="cbo_inst_srty" displayMode="label">
+									</xf:select1>
+								</xf:group>
+							</xf:group>
+							<xf:group class="w2tb_th" style="" tagname="th">
+								<w2:textbox id="label_23" label="기간(변경일)" style=""></w2:textbox>
+							</xf:group>
+							<xf:group class="w2tb_td" id="" style="" tagname="td">
+								<xf:group id="" class="flex flex_no">
+									<w2:inputCalendar displayFormat="yyyy-MM-dd" readOnly="false" style=""
+										userData2=" class:panel_maskedit_write_01; border:False; generaledit:False; numeric:False; valign:1; border-color:#92b1f1;"
+										id="edt_SDate">
+									</w2:inputCalendar>
+									<w2:textbox style="" id="label_24" label="~"></w2:textbox>
+									<w2:inputCalendar displayFormat="yyyy-MM-dd" readOnly="false" style=""
+										userData2=" class:panel_maskedit_write_01; border:False; generaledit:False; numeric:False; valign:1; border-color:#92b1f1;"
+										id="edt_EDate">
+									</w2:inputCalendar>
+									<xf:select1 selectedData="true" appearance="minimal" disabledClass="w2selectbox_disabled" maxlength="20"
+										style="width:100px;"
+										userData2=" bindcolumn:disp; defaultstring:기간선택; inheritcolor:False; listcount:10; listexprformat:disp^0^70; xpstyle:True;"
+										id="cmb_PeriodTp" displayMode="label">
+									</xf:select1>
+								</xf:group>
+							</xf:group>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+				<xf:group class="btn_schbox" id="" style="">
+					<xf:trigger class="btn_cm sch" disabled="" escape="false" id="img_search" style="" type="button">
+						<xf:label><![CDATA[조회]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+			<xf:group class="titbox" id="" meta_snippetCategory="02_타이틀" meta_snippetKeyComponent="true" meta_snippetName="2_02 서브타이틀(h3)"
+				style="">
+				<xf:group class="rt" id="" style="">
+					<xf:group class="count" id="" style="">
+						<w2:textbox class="" id="" label="총" style=""></w2:textbox>
+						<w2:textbox class="num" id="txb_TotCnt" label="0" style=""></w2:textbox>
+						<w2:textbox class="" id="" label="건" style=""></w2:textbox>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<xf:group class="gvwbox" id="" style="">
+				<w2:gridView class="gvw" dataList="data:dts" hierarchy="grd_list" id="grd_list" orgid="grd_list" style="height: 153px;"
+					userData2=" class:Grid_01; borderstyle:0; colsizing:True; fillarea:True; gtitleheight:0; headborder:4; indicatorbkcolor:#C0C0C0; indwidth:0; linecolor:#C0C0C0; titleheight:40; xtitleheight:0; font-family:돋움체; font-weight:normal; border-color:#c0c0c0; ondblclick:grd_list_OnDblClick;"
+					autoFit="allColumn">
+					<w2:caption id="caption1" style="" value="this is a grid caption."></w2:caption>
+					<w2:header id="header1" style="">
+						<w2:row>
+							<w2:column displayMode="label" id="NO_H" inputType="text" textAlign="center"
+								userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; value:{CurRow},{ToString}; sumbgcolor:#fefaef; sumcolor:#343434; bgcolor:{decode(currow-tointeger(currow/2)*2,0,'#f2f5f9',1,'#ffffff')};"
+								value="번호" width="50" fixColumnWidth="true">
+							</w2:column>
+							<w2:column displayMode="label" id="COM_ABBRV_H" inputType="text" textAlign="center"
+								userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; sumbgcolor:#fefaef; sumcolor:#343434; bgcolor:{decode(currow-tointeger(currow/2)*2,0,'#f2f5f9',1,'#ffffff')};"
+								value="발행회사/보증인명" width="200">
+							</w2:column>
+							<w2:column displayMode="label" id="DISCLS_PUBL_DD_H" inputType="text" rowInfo="0" textAlign="center"
+								userData2=" mask:XXXX-XX-XX; headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; sumbgcolor:#fefaef; sumcolor:#343434; bgcolor:{decode(currow-tointeger(currow/2)*2,0,'#f2f5f9',1,'#ffffff')};"
+								value="공시일자" width="120">
+							</w2:column>
+							<w2:column displayMode="label" id="AFCHG_CREDIT_VALU_INST_TP_NM_H" inputType="text" rowInfo="0" textAlign="center"
+								userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; sumbgcolor:#fefaef; sumcolor:#343434; bgcolor:{decode(currow-tointeger(currow/2)*2,0,'#f2f5f9',1,'#ffffff')};"
+								value="신용평가기관" width="180">
+							</w2:column>
+							<w2:column displayMode="label" id="AFCHG_CREDIT_GRD_CONTN_H" inputType="text" rowInfo="0" textAlign="center"
+								userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; sumbgcolor:#fefaef; sumcolor:#343434; bgcolor:{decode(currow-tointeger(currow/2)*2,0,'#f2f5f9',1,'#ffffff')};"
+								value="등급" width="105">
+							</w2:column>
+							<w2:column displayMode="label" id="CREDIT_GRD_CHG_DD_H" inputType="text" rowInfo="0" textAlign="center"
+								userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; sumbgcolor:#fefaef; sumcolor:#343434; bgcolor:{decode(currow-tointeger(currow/2)*2,0,'#f2f5f9',1,'#ffffff')}; mask:XXXX-XX-XX;"
+								value="변경일" width="120">
+							</w2:column>
+							<w2:column displayMode="label" id="CHG_RSN_CONTN_H" inputType="text" rowInfo="0" textAlign="center"
+								userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; sumbgcolor:#fefaef; sumcolor:#343434; bgcolor:{decode(currow-tointeger(currow/2)*2,0,'#f2f5f9',1,'#ffffff')};"
+								value="변경사유" width="240">
+							</w2:column>
+						</w2:row>
+					</w2:header>
+					<w2:gBody id="gBody1" style="">
+						<w2:row id="" style="">
+							<w2:column displayMode="label" id="NO" inputType="text" textAlign="center" width="50"></w2:column>
+							<w2:column displayMode="label" id="COM_ABBRV" inputType="text" textAlign="center" width="200"></w2:column>
+							<w2:column displayMode="label" id="DISCLS_PUBL_DD" inputType="text" textAlign="center" width="120"></w2:column>
+							<w2:column displayMode="label" id="AFCHG_CREDIT_VALU_INST_TP_NM" inputType="text" textAlign="center"
+								width="180">
+							</w2:column>
+							<w2:column displayMode="label" id="AFCHG_CREDIT_GRD_CONTN" inputType="text" textAlign="left" width="105"></w2:column>
+							<w2:column displayMode="label" id="CREDIT_GRD_CHG_DD" inputType="text" textAlign="center" width="120"></w2:column>
+							<w2:column displayMode="label" id="CHG_RSN_CONTN" inputType="text" textAlign="left" width="240"></w2:column>
+						</w2:row>
+					</w2:gBody>
+				</w2:gridView>
+			</xf:group>
+			<xf:group class="btnbox" id="" meta_snippetCategory="08_버튼" meta_snippetKeyComponent="true" meta_snippetName="8_04 전체제어버튼"
+				style="">
+				<xf:group class="rt" id="" style="">
+					<xf:trigger class="btn_cm " id="img_Close" style="" type="button">
+						<xf:label><![CDATA[닫기]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+		</xf:group>
+	</body>
+</html>

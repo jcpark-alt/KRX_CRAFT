@@ -1,0 +1,516 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDSTF35006.gfm" meta_screenName="통보내역" meta_screenId="ULDSTF35006">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<w2:layoutInfo/>
+		<w2:publicInfo method="scwin.onpageload,scwin.onpageunload,scwin.grd_Grid_OnClick,scwin.btn_Search_onclick,scwin.btn_Excel_onclick,scwin.img_FromCal_onclick,scwin.img_ToCal_onclick,scwin.edt_SDate_OnLastChar,scwin.edt_EDate_OnLastChar,scwin.cmb_PeriodTp_onselchange,scwin.dts_list_OnLoadCompleted,scwin.dts_list_OnLoadError,scwin.search,scwin.popupCallback,scwin.setCode,scwin.validCheck,scwin.setContnId"/>
+		<xf:model>
+			<w2:workflowCollection/>
+			<w2:dataCollection baseNode="map"/>
+			<xf:submission id="sbm_dts_list" userData2=" syncload:False;" mode="asynchronous" method="post" encoding="UTF-8" mediatype="application/json" ev:submitdone="scwin.dts_list_OnLoadCompleted" ev:submiterror="scwin.dts_list_OnLoadError"/>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+
+// 화면 리사이징
+
+scwin.pSndNo;
+scwin.pMktCd;
+scwin.pSndlocCd;
+scwin.gLdMktTp = js_market;
+scwin.gDate;
+scwin.gSndloc = js_sndloc; // 송신처구분코드
+
+///////// 2. 초기화 영역 /////////
+/**
+ * @method
+ * @name onpageload
+ * @description 화면 로딩 시 초기 처리 — init 순차 호출
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.onpageload = async function() {
+    try {
+        // 패널라운드 처리
+        $c.cm.PanelToGroupBox(panel_1);
+        pnl_type.hide();
+        if (scwin.gLdMktTp === '1' || scwin.gLdMktTp === '2') {
+            rdo_MktTpCd.setValue(scwin.gLdMktTp);
+            rdo_SndLocTpCd.setValue(scwin.gSndloc);
+            $c.cm.setColumnProp(grd_Grid, "LD_MKT_TP_NM", "show", false);
+            $c.cm.setColumnProp(grd_Grid, "SNDLOC_TP_NM", "show", false);
+        } else {
+            pnl_type.show("");
+            rdo_MktTpCd.setValue('9');
+            rdo_SndLocTpCd.setValue('AA');
+            $c.cm.setColumnProp(grd_Grid, "LD_MKT_TP_NM", "show", true);
+            $c.cm.setColumnProp(grd_Grid, "SNDLOC_TP_NM", "show", true);
+        }
+        scwin.setCode();
+        await scwin.search();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF35006.onpageload" });
+    }
+};
+
+/**
+ * @method
+ * @name onpageunload
+ * @description 화면 언로드 시 정리 처리
+ * @returns {void}
+ * @hidden N
+ */
+scwin.onpageunload = function() {
+};
+
+///////// 3. 컴포넌트 이벤트 영역 /////////
+/**
+ * @method
+ * @name grd_Grid_OnClick
+ * @description grd_Grid 클릭 처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @param {Number} row 행 인덱스
+ * @param {*} colid colid
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.grd_Grid_OnClick = async function(row, colid) {
+    try {
+        // 클릭된 값 변수에 셋팅
+        scwin.setContnId(row);
+        if (row >= 1) {
+            const options = {
+                id: "ULDSTF35006_POP",
+                title: "보낸곳 목록",
+                type: "browserPopup",
+                width: "630px",
+                height: "240px",
+                callbackFn: "scwin.popupCallback"
+            };
+
+            $c.win.openPopup("/dscltrend/ULDSTF35006_POP.gfm", options);
+        }
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF35006.grd_Grid_OnClick" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_Search_onclick
+ * @description 「조회」 클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.btn_Search_onclick = async function() {
+    try {
+        await scwin.search();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF35006.btn_Search_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_Excel_onclick
+ * @description 「엑셀다운로드」 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.btn_Excel_onclick = function() {
+    try {
+        $c.stf.doLogSave('ULDSTF35006.xml', SCREN_PROCS_TP_CD_07);
+
+        // var file_name = "통보내역";
+        // var today = cGetToday('yyyymmddhhmmss');
+        // var xls_path = getExcelDownPath()+today+"_"+file_name+".xlsx";
+        $c.data.downloadGridViewExcel(grd_Grid, {fileName: "통보내역", type: "8"});
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF35006.btn_Excel_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name img_FromCal_onclick
+ * @description img_FromCal 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.img_FromCal_onclick = function() {
+    try {
+        popUpCalendar4(edt_SDate, 1);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF35006.img_FromCal_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name img_ToCal_onclick
+ * @description img_ToCal 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.img_ToCal_onclick = function() {
+    try {
+        popUpCalendar4(edt_EDate, 2);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF35006.img_ToCal_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name edt_SDate_OnLastChar
+ * @description edt SDate On Last Char 처리
+ * @param {*} ch ch
+ * @returns {void}
+ * @hidden N
+ */
+scwin.edt_SDate_OnLastChar = function(ch) {
+    try {
+        afterPopUpCalendar(1); // if(시작일>종료일) 종료일=시작일;
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF35006.edt_SDate_OnLastChar" });
+    }
+};
+
+/**
+ * @method
+ * @name edt_EDate_OnLastChar
+ * @description edt EDate On Last Char 처리
+ * @param {*} ch ch
+ * @returns {void}
+ * @hidden N
+ */
+scwin.edt_EDate_OnLastChar = function(ch) {
+    try {
+        afterPopUpCalendar(2); // if(시작일>종료일) 시작일=종료일;
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF35006.edt_EDate_OnLastChar" });
+    }
+};
+
+/**
+ * @method
+ * @name cmb_PeriodTp_onselchange
+ * @description cmb_PeriodTp onselchange 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.cmb_PeriodTp_onselchange = function() {
+    try {
+        const vTp = $c.cp.valueOfIndex(cmb_PeriodTp, "VALUE", cmb_PeriodTp.getSelectedIndex());
+        $c.stf.setFromToDate(vTp, edt_SDate, edt_EDate);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF35006.cmb_PeriodTp_onselchange" });
+    }
+};
+
+/**
+ * @method
+ * @name dts_list_OnLoadCompleted
+ * @description dts_list 로드 완료 후처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @param {Number} rowcount 조회 건수
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.dts_list_OnLoadCompleted = async function(rowcount) {
+    try {
+        if (dts_list.errorMsg) {
+            await $c.win.alert("조회할 수 없습니다. 시스템 관리자에게 문의하세요");
+        } else {
+            txb_TotalCnt.setValue("총건수 : " + rowcount);
+        }
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF35006.dts_list_OnLoadCompleted" });
+    }
+};
+
+/**
+ * @method
+ * @name dts_list_OnLoadError
+ * @description dts_list 로드 오류 처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.dts_list_OnLoadError = async function() {
+    try {
+        await $c.win.alert("조회할 수 없습니다. 시스템 관리자에게 문의하세요");
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF35006.dts_list_OnLoadError" });
+    }
+};
+
+///////// 4. 서브미션 콜백 영역 /////////
+/**
+ * @method
+ * @name search
+ * @description search 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.search = async function() {
+    if (!await scwin.validCheck()) return;
+    txb_TotalCnt.setValue("총건수 : ");
+
+    // 그리드의 데이타 조회
+    const sbmOptions = {
+        id : "sbm_dts_list",
+        action : "/AtsContactInfo.do",
+        ref : "",
+        target : "dts_list=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+};
+
+/**
+ * @method
+ * @name popupCallback
+ * @description browserPopup 팝업의 callback 함수. 부모창에서 팝업 결과 값을 처리한다.
+ * @param {*} arg 팝업에서 전달받은 값
+ * @returns {void}
+ * @hidden N
+ */
+scwin.popupCallback = function (arg) {
+    // TO-DO : arg 값 확인 후 업무 로직 추가
+};
+
+///////// 5. 일반/업무 함수 영역 /////////
+/**
+ * @method
+ * @name setCode
+ * @description 기간 from~ to  셋팅
+ * @returns {void}
+ * @hidden N
+ */
+scwin.setCode = function() {
+    //  기간 from~ to  셋팅
+    edt_SDate.setValue($c.ut.cGetToday("yyyymmdd"));
+    edt_EDate.setValue($c.ut.cGetToday("yyyymmdd")); // 현재날짜
+
+    $c.stf.comboCbDataSetPeriod(cmb_PeriodTp);
+};
+
+/**
+ * @method
+ * @name validCheck
+ * @description 일자자 체크
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.validCheck = async function() {
+    // 일자자 체크
+    if (edt_SDate.getValue().length < 8) {
+        await $c.win.alert("일자를 올바르게 입력하십시오.");
+        edt_SDate.focus();
+        return false;
+    }
+
+    // 일자 체크
+    if (edt_EDate.getValue().length < 8) {
+        await $c.win.alert("일자를 올바르게 입력하십시오.");
+        edt_EDate.focus();
+        return false;
+    }
+    if ($c.stf.compareFromToDate2(edt_SDate, edt_EDate) === false) {
+        return false;
+    }
+    return true;
+};
+
+/**
+ * @method
+ * @name setContnId
+ * @description 그리드에서 클릭 row의 변수셋팅
+ * @param {Object} obj 컴포넌트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.setContnId = function(obj) {
+    scwin.pSndNo = dts_list.getCellData(Number(obj), "SND_NO");
+    scwin.pMktCd = dts_list.getCellData(Number(obj), "LD_MKT_TP_CD");
+    scwin.pSndlocCd = dts_list.getCellData(Number(obj), "SNDLOC_TP_CD");
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+		<xf:group class="sub_contents" id="" meta_componentContainer="true" style="">
+			<xf:group class="schbox" id="" style="">
+				<xf:group class="schbox_inner" id="" style="">
+					<xf:group adaptive="layout" adaptiveThreshold="768" class="w2tb tbl " id="" style="" tagname="table">
+						<w2:attributes>
+							<w2:summary></w2:summary>
+						</w2:attributes>
+						<xf:group tagname="colgroup">
+							<xf:group style="width:80px;" tagname="col"></xf:group>
+							<xf:group style="" tagname="col"></xf:group>
+							<xf:group style="width:80px;" tagname="col"></xf:group>
+							<xf:group tagname="col"></xf:group>
+							<xf:group tagname="col" style="width:85px;"></xf:group>
+							<xf:group style="" tagname="col"></xf:group>
+						</xf:group>
+						<xf:group class="" id="" style="" tagname="tr">
+							<xf:group class="w2tb_th" style="" tagname="th">
+								<w2:textbox hierarchy="lbl_tmp_1" id="lbl_tmp_1" label="전송일자" orgid="lbl_tmp_1" style=""
+									userData2=" class:TopCondition_01; font-family:돋움;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group class="w2tb_td" style="" tagname="td">
+								<w2:inputCalendar calendarValueType="yearMonthDate" focusOnDateSelect="false" footerDiv="true"
+									id="edt_SDate" renderDiv="true" renderType="" rightAlign="false" style="width: 120px;">
+								</w2:inputCalendar>
+								<w2:span id="" label="~" style=""></w2:span>
+								<w2:inputCalendar calendarValueType="yearMonthDate" focusOnDateSelect="false" footerDiv="true"
+									id="edt_EDate" renderDiv="true" renderType="" rightAlign="false" style="width: 120px;">
+								</w2:inputCalendar>
+								<xf:select1 appearance="minimal" cbdatacolumns="disp,value" disabledClass="w2selectbox_disabled"
+									ev:onchange="scwin.cmb_PeriodTp_onselchange" hierarchy="cmb_PeriodTp" id="cmb_PeriodTp" item="1주일^1,1개월^2,3개월^3,6개월^4,1년^5,2년^6"
+									listexprformat="disp^0^70" maxlength="20" orgid="cmb_PeriodTp" style="width:108px;"
+									userData2=" bindcolumn:disp; defaultstring:기간선택; inheritcolor:False; listcount:10; xpstyle:True; font-family:돋움;">
+									<xf:choices>
+										<xf:item>
+											<xf:label><![CDATA[1주일]]></xf:label>
+											<xf:value><![CDATA[1]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[1개월]]></xf:label>
+											<xf:value><![CDATA[2]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[3개월]]></xf:label>
+											<xf:value><![CDATA[3]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[6개월]]></xf:label>
+											<xf:value><![CDATA[4]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[1년]]></xf:label>
+											<xf:value><![CDATA[5]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[2년]]></xf:label>
+											<xf:value><![CDATA[6]]></xf:value>
+										</xf:item>
+									</xf:choices>
+								</xf:select1>
+							</xf:group>
+							<xf:group class="w2tb_th" style="" tagname="th">
+								<w2:textbox hierarchy="label_29" id="label_29" label="시장구분" orgid="label_29" style=""
+									userData2=" class:TopCondition_01;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group class="w2tb_td" id="" style="" tagname="td">
+								<xf:select1 appearance="full" hierarchy="rdo_MktTpCd" id="rdo_MktTpCd" item="9^전체,1^유가,2^코스닥"
+									orgid="rdo_MktTpCd" renderType="radiogroup" selectedIndex="0" style=""
+									userData2=" class:TopCondition_Blue; automargin:True; cols:4; font-family:돋움체;">
+									<xf:choices>
+										<xf:item>
+											<xf:label><![CDATA[전체]]></xf:label>
+											<xf:value><![CDATA[9]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[유가]]></xf:label>
+											<xf:value><![CDATA[1]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[코스닥]]></xf:label>
+											<xf:value><![CDATA[2]]></xf:value>
+										</xf:item>
+									</xf:choices>
+								</xf:select1>
+							</xf:group>
+							<xf:group tagname="th" id="" class="w2tb_th"><w2:attributes></w2:attributes><w2:textbox hierarchy="lbl_1" id="lbl_1" label="송신처구분" orgid="lbl_1" style=""
+									userData2=" class:TopCondition_01;">
+								</w2:textbox></xf:group>
+							<xf:group tagname="td" id="" class="w2tb_td">
+								<w2:attributes></w2:attributes>
+								<xf:select1 appearance="full" hierarchy="rdo_SndLocTpCd" id="rdo_SndLocTpCd" item="AA^전체,11^공시,13^시장"
+									orgid="rdo_SndLocTpCd" renderType="radiogroup" selectedIndex="0" style=""
+									userData2=" class:TopCondition_Blue; automargin:False; cols:3; font-family:돋움체;">
+									<xf:choices>
+										<xf:item>
+											<xf:label><![CDATA[전체]]></xf:label>
+											<xf:value><![CDATA[AA]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[공시]]></xf:label>
+											<xf:value><![CDATA[11]]></xf:value>
+										</xf:item>
+										<xf:item>
+											<xf:label><![CDATA[시장]]></xf:label>
+											<xf:value><![CDATA[13]]></xf:value>
+										</xf:item>
+									</xf:choices>
+								</xf:select1>
+							</xf:group>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+				<xf:group class="btn_schbox" id="" style="">
+					<xf:trigger class="btn_cm sch" cursor="pointer" id="btn_Search"
+						src="../img/btn_select.gif" style="">
+						<xf:label><![CDATA[조회]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+			<xf:group class="titbox" id="" style="">
+				<xf:group class="rt" id="" style="">
+					<xf:group class="count" id="" style="">
+						<w2:textbox class="" id="" label="총" style=""></w2:textbox>
+						<w2:textbox class="num" id="" label="0" style=""></w2:textbox>
+						<w2:textbox class="" id="" label="건" style=""></w2:textbox>
+					</xf:group>
+					<xf:trigger class="btn_cm download" cursor="pointer" ev:onclick="scwin.btn_Excel_onclick" hierarchy="btn_Excel"
+						id="btn_Excel" orgid="btn_Excel" src="../img/btn_excelsave.gif" style="" text="엑셀다운로드">
+						<xf:label><![CDATA[엑셀다운로드]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+			<xf:group class="gvwbox" id="" style="">
+				<w2:gridView class="gvw" dataList="dts_list" hierarchy="grd_Grid" id="grd_Grid" orgid="grd_Grid" readOnly="true"
+					resize="true" style="height: 153px;"
+					userData2=" class:Grid_01; fillarea:True; fixsizing:True; focusrect:False; gtitleheight:0; headborder:4; indwidth:0; sortview:left; suppressoption:3; titleheight:25; tooltip:use=true;alt=true;createtime=300;color=#FFFFFF;backcolor=#808080;edgecolor=#333333;leftmargin=10;rightmargin=10;topmargin=10;bottommargin=10;; xtitleheight:0; font-family:돋움; onclick:grd_Grid_OnClick;">
+					<w2:caption id="caption1" style="" value="this is a grid caption."></w2:caption>
+					<w2:header id="header1" style="">
+						<w2:row>
+							<w2:column displayMode="label" id="h_NO" inputType="text" textAlign="center" userData2=" value:{currow};"
+								value="번호" width="50">
+							</w2:column>
+							<w2:column displayMode="label" id="h_LD_MKT_TP_NM" inputType="text" textAlign="center" userData2=" sort:True;"
+								value="시장" width="70">
+							</w2:column>
+							<w2:column displayMode="label" id="h_SNDLOC_TP_NM" inputType="text" textAlign="center" userData2=" sort:True;"
+								value="송신처" width="80">
+							</w2:column>
+							<w2:column displayMode="label" id="h_NOTI_CONTN" inputType="text" textAlign="center" userData2=" sort:True;"
+								value="보낸내용" width="750">
+							</w2:column>
+							<w2:column displayMode="label" id="h_SND_DDTM" inputType="text" textAlign="center" userData2=" sort:True;"
+								value="보낸시간" width="150">
+							</w2:column>
+							<w2:column displayMode="label" id="h_CNTNO" inputType="text" textAlign="center" value="보낸갯수" width="100"></w2:column>
+							<w2:column displayMode="label" hidden="true" id="h_SND_NO" inputType="text" textAlign="center" value="송신번호"></w2:column>
+						</w2:row>
+					</w2:header>
+					<w2:gBody id="gBody1" style="">
+						<w2:row id="" style="">
+							<w2:column displayMode="label" id="NO" inputType="text" textAlign="center" width="50"></w2:column>
+							<w2:column displayMode="label" id="LD_MKT_TP_NM" inputType="text" textAlign="center" width="70"></w2:column>
+							<w2:column displayMode="label" id="SNDLOC_TP_NM" inputType="text" textAlign="center" width="80"></w2:column>
+							<w2:column displayMode="label" id="NOTI_CONTN" inputType="text" textAlign="left" width="750"></w2:column>
+							<w2:column displayMode="label" id="SND_DDTM" inputType="text" textAlign="center" width="150"></w2:column>
+							<w2:column displayMode="label" id="CNTNO" inputType="text" textAlign="center" width="100"></w2:column>
+							<w2:column displayMode="label" id="SND_NO" inputType="text" textAlign="center" width=""></w2:column>
+						</w2:row>
+					</w2:gBody>
+				</w2:gridView>
+			</xf:group>
+		</xf:group>
+	</body>
+</html>

@@ -1,0 +1,548 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDBNS05502.gfm" meta_screenName="일별매출내역신고수정" meta_screenId="ULDBNS05502">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<w2:layoutInfo/>
+		<w2:publicInfo method="scwin.onpageload,scwin.onpageunload,scwin.dts_ModInfo_OnLoadError,scwin.dts_ModInfo_OnLoadCompleted,scwin.dts_CheckDupl_OnLoadCompleted,scwin.img_StrtDd_onclick,scwin.img_Saledd_onclick,scwin.btn_Mod_onclick,scwin.trs_Update_OnFail,scwin.trs_Update_OnSuccess,scwin.btn_Close_onclick,scwin.edt_BndSaleTotamt_OnKillFocus,scwin.edt_RedmptAmt_OnKillFocus,scwin.duplCnt,scwin.setParam,scwin.inputCheck,scwin.update"/>
+		<xf:model>
+			<w2:dataCollection baseNode="map"></w2:dataCollection>
+			<w2:workflowCollection/>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+///////// 1. 변수 및 선언 영역 /////////
+scwin.vMktactCd = "320";
+scwin.pBndApplId = '';
+scwin.pBndListProcsTpCd = '2';
+scwin.vModInfoRowCount = 0, scwin.vChkDuplRowCount = 0;
+scwin.fn_GetPar, scwin.fn_SetPar;
+
+///////// 2. 초기화 영역 /////////
+/**
+ * @method
+ * @name onpageload
+ * @description 화면 로딩 시 초기 처리 — init 순차 호출
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.onpageload = async function() {
+    try {
+        // 패널라운드처리
+        $c.bns.BnsPanelToGroupBox(pnl_Item);
+
+        // 호출파라미터설정
+        scwin.setParam();
+
+        // 일별매출내역신고수정(일별금액조정) 조회
+        url += "&service=krx.lds.stf.listingcommon.services.ListingCommonApp";
+        url += "&outputMessageId=BNS_DAY_SALES_UPDATE_INFO";
+        url += "&queryId=lds.stf.bnsisuchg.select.listAcptUpdateListPop";
+        url += "&SCREN_ID=" + 'ULDBNS05502.xml';
+        url += "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01;
+        url += "&{P}V_BND_LIST_PROCS_TP_CD=" + scwin.pBndListProcsTpCd;
+        url += "&{P}V_BND_APPL_ID=" + scwin.pBndApplId;
+        const sbmOptions = {
+            id : "sbm_dts_ModInfo",
+            action : "/listingCommon.do",
+            ref : "",
+            target : "dts_ModInfo=body.content",
+            isProcessMsg : false
+        };
+
+        const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+        // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDBNS05502.onpageload" });
+    }
+};
+
+/**
+ * @method
+ * @name onpageunload
+ * @description 화면 언로드 시 정리 처리
+ * @returns {void}
+ * @hidden N
+ */
+scwin.onpageunload = function() {
+};
+
+///////// 3. 컴포넌트 이벤트 영역 /////////
+/**
+ * @method
+ * @name dts_ModInfo_OnLoadError
+ * @description dts_ModInfo 로드 오류 처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.dts_ModInfo_OnLoadError = async function() {
+    try {
+        await $c.win.alert($c.stf.getMessageParam("MSG-0002"));
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDBNS05502.dts_ModInfo_OnLoadError" });
+    }
+};
+
+/**
+ * @method
+ * @name dts_ModInfo_OnLoadCompleted
+ * @description dts_ModInfo 로드 완료 후처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @param {Number} rowcount 조회 건수
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.dts_ModInfo_OnLoadCompleted = async function(rowcount) {
+    try {
+        scwin.vModInfoRowCount = rowcount;
+        await scwin.duplCnt();
+
+        // 매출초일여부 체크 설정
+        if (dts_ModInfo.getCellData(1, "FST_SALE_DD_YN") === 'Y') {
+            chk_FstSaleDdYn.setValue(1);
+        } else {
+            chk_FstSaleDdYn.setValue(0);
+        }
+        edt_BndSaleTotamt.RightMargin = 5;
+        edt_RedmptAmt.RightMargin = 5;
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDBNS05502.dts_ModInfo_OnLoadCompleted" });
+    }
+};
+
+/**
+ * @method
+ * @name dts_CheckDupl_OnLoadCompleted
+ * @description dts_CheckDupl 로드 완료 후처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @param {Number} rowcount 조회 건수
+ * @returns {void}
+ * @hidden N
+ */
+scwin.dts_CheckDupl_OnLoadCompleted = function(rowcount) {
+    try {
+        scwin.vChkDuplRowCount = dts_CheckDupl.getCellData(1, "TEXT");
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDBNS05502.dts_CheckDupl_OnLoadCompleted" });
+    }
+};
+
+/**
+ * @method
+ * @name img_StrtDd_onclick
+ * @description img_StrtDd 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.img_StrtDd_onclick = function() {
+    try {
+        if (scwin.vModInfoRowCount === 0) return;
+        popUpCalendar2(edt_StrtDd);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDBNS05502.img_StrtDd_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name img_Saledd_onclick
+ * @description img_Saledd 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.img_Saledd_onclick = function() {
+    try {
+        if (scwin.vModInfoRowCount === 0) return;
+        popUpCalendar2(edt_SaleDd);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDBNS05502.img_Saledd_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_Mod_onclick
+ * @description 「수정」 클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.btn_Mod_onclick = async function() {
+    try {
+        if (scwin.vModInfoRowCount === 0) return;
+        await scwin.update();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDBNS05502.btn_Mod_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name trs_Update_OnFail
+ * @description Update On Fail 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.trs_Update_OnFail = async function() {
+    try {
+        await $c.win.alert($c.stf.getMessageParam("MSG-A002", "수정"));
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDBNS05502.trs_Update_OnFail" });
+    }
+};
+
+/**
+ * @method
+ * @name trs_Update_OnSuccess
+ * @description Update On Success 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.trs_Update_OnSuccess = async function() {
+    try {
+        await $c.win.alert($c.stf.getMessageParam("MSG-A001", "수정"));
+        let arrPar = new Array();
+        arrPar[0] = {
+            SUCCESS_YN: 'Y',
+            STRT_DD: edt_StrtDd.getValue()
+        };
+        const parentFrame = $c.frame.path("../");
+        scwin.fn_SetPar = parentFrame.fn_SetReturnMod;
+        scwin.fn_SetPar(arrPar);
+        await $c.win.closePopup();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDBNS05502.trs_Update_OnSuccess" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_Close_onclick
+ * @description 「닫기」 클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.btn_Close_onclick = async function() {
+    try {
+        await $c.win.closePopup();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDBNS05502.btn_Close_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name edt_BndSaleTotamt_OnKillFocus
+ * @description edt_BndSaleTotamt 포커스 이탈 처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @returns {void}
+ * @hidden N
+ */
+scwin.edt_BndSaleTotamt_OnKillFocus = function() {
+    try {
+        edt_BndSaleTotamt.RightMargin = 5;
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDBNS05502.edt_BndSaleTotamt_OnKillFocus" });
+    }
+};
+
+/**
+ * @method
+ * @name edt_RedmptAmt_OnKillFocus
+ * @description edt_RedmptAmt 포커스 이탈 처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @returns {void}
+ * @hidden N
+ */
+scwin.edt_RedmptAmt_OnKillFocus = function() {
+    try {
+        edt_RedmptAmt.RightMargin = 5;
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDBNS05502.edt_RedmptAmt_OnKillFocus" });
+    }
+};
+
+///////// 4. 서브미션 콜백 영역 /////////
+/**
+ * @method
+ * @name duplCnt
+ * @description 일별금액조정 시 동일종목에 대한 적용일이 다른 접수내역에 있는지 체크
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.duplCnt = async function() {
+    url += "&service=krx.lds.stf.listingcommon.services.ListingCommonApp";
+    url += "&outputMessageId=BNS_CHECK_ACPT_DUPL";
+    url += "&queryId=lds.stf.bnsisuchg.select.checkAcptDupl";
+    url += "&SCREN_ID=" + 'ULDBNS05502.xml';
+    url += "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01;
+    url += "&{P}V_ISU_CD=" + dts_ModInfo.getCellData(1, "ISU_CD");
+    dts_CheckDupl.SyncLoad = "true";
+    const sbmOptions = {
+        id : "sbm_dts_CheckDupl",
+        action : "/listingCommon.do",
+        ref : "",
+        target : "dts_CheckDupl=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+};
+
+///////// 5. 일반/업무 함수 영역 /////////
+/**
+ * @method
+ * @name setParam
+ * @description 부모창에서 받은 데이터를 설정한다.
+ * @returns {void}
+ * @hidden N
+ */
+scwin.setParam = function() {
+    const prt = $c.frame.path("../");
+    if (prt !== undefined) {
+        scwin.fn_GetPar = prt.scwin.fn_GetPar;
+        scwin.fn_SetPar = prt.scwin.fn_SetPar;
+    }
+    if (scwin.fn_GetPar !== undefined) {
+        let arrPar = new Array();
+        scwin.fn_GetPar(arrPar);
+        scwin.pBndApplId = arrPar[1].BND_APPL_ID;
+        scwin.pBndListProcsTpCd = arrPar[1].BND_LIST_PROCS_TP_CD;
+    }
+};
+
+/**
+ * @method
+ * @name inputCheck
+ * @description 필수 입력 값을 체크한다.
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.inputCheck = async function() {
+    if (edt_StrtDd.getValue() === '') {
+        await $c.win.alert("[적용일]을 입력하십시오.");
+        edt_StrtDd.focus();
+        return false;
+    }
+
+    // 적용일,매매일,마감일,채권마감 체크
+    if ($c.bns.fn_CheckCmData('ULDBNS05502.xml', dts_CheckCmData, edt_StrtDd.getValue(), scwin.pBndApplId) > 0) return false;
+    if (edt_SaleDd.getValue() === '') {
+        await $c.win.alert("[매출일]을 입력하십시오.");
+        edt_SaleDd.focus();
+        return false;
+    }
+    if (edt_BndSaleTotamt.getValue() === '') {
+        await $c.win.alert("[일중 매출총액]을 입력하십시오.");
+        edt_BndSaleTotamt.focus();
+        return false;
+    }
+    if (edt_RedmptAmt.getValue() === '') {
+        await $c.win.alert("[일중 중도상환액]을 입력하십시오.");
+        edt_RedmptAmt.focus();
+        return false;
+    }
+    if (scwin.vChkDuplRowCount > 1) {
+        await $c.win.alert("동일종목에 대하여 적용일이 다른 접수내역이 있습니다.\n각 접수내역의 적용일을 일치시켜 주시기 바랍니다.");
+    }
+    return true;
+};
+
+/**
+ * @method
+ * @name update
+ * @description 접수내역 수정
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.update = async function() {
+    if (await scwin.inputCheck() === false) return;
+    let url = "/bns/IsuChgAmt.do?method=updateAcpt";
+    url += "&SCREN_ID=" + 'ULDBNS05502.xml';
+    url += "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_03;
+    url += "&MKTACT_TP_CD=" + scwin.vMktactCd;
+    dts_ModInfo.UseChangeInfo = "False";
+    trs_Update.Action = $c.lc.fn_encodeNSession(url);
+    trs_Update.KeyName = "toinb_dataid4";
+    trs_Update.KeyValue = "JSP(I:pInput=dts_ModInfo)";
+    trs_Update.Post();
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+		<xf:group class="pop_contents" id="" meta_componentContainer="true" meta_snippetCategory="00_화면시작" meta_snippetKeyComponent="true"
+			meta_snippetName="0_02 팝업페이지시작">
+			<xf:group class="tblbox" id="pnl_Item" meta_snippetCategory="05_입출력테이블" meta_snippetKeyComponent="true"
+				meta_snippetName="5_01 1단테이블" style="">
+				<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+					<w2:attributes>
+						<w2:summary></w2:summary>
+					</w2:attributes>
+					<xf:group tagname="colgroup">
+						<xf:group style="width:170px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+					</xf:group>
+					<xf:group style="" tagname="tr">
+						<xf:group class="w2tb_th" style="" tagname="th">
+							<w2:textbox hierarchy="label_6" id="label_6" label="접수번호" orgid="label_6"
+								style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+							
+							
+							
+							
+							
+							
+						</xf:group>
+						<xf:group class="w2tb_td" style="" tagname="td">
+							<xf:input hierarchy="txb_BndApplId" id="txb_BndApplId" maxlength="12" orgid="txb_BndApplId" readOnly="true"
+								style="width:100px;" tabIndex="2"
+								userData2=" class:TopCondition_01_write;">
+							</xf:input>
+							
+							
+							
+							
+							
+							
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_7" id="label_7" label="표준코드" orgid="label_7"
+								style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes>
+								<w2:colspan>1</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<w2:autoComplete hierarchy="txb_IsuCd" id="txb_IsuCd" maxlength="12" orgid="txb_IsuCd" readOnly="true"
+								style="width:100px;" tabIndex="4"
+								userData2=" class:TopCondition_01_write;">
+							</w2:autoComplete>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_1" id="label_1" label="매출기관" orgid="label_1"
+								style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes></w2:attributes>
+							<xf:input hierarchy="txb_SalesComNm" id="txb_SalesComNm" maxlength="2000" orgid="txb_SalesComNm" readOnly="true"
+								style="width:250px;" tabIndex="4"
+								userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_8" id="label_8" label="적용일" orgid="label_8"
+								style=""
+								userData2=" class:TopCondition_01;" class="blue">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<w2:inputCalendar displayFormat="yyyy-MM-dd" hierarchy="edt_StrtDd" id="edt_StrtDd" maxlength="8"
+								orgid="edt_StrtDd"
+								style="width:120px;" tabIndex="6"
+								userData2=" class:panel_maskedit_write_01; alignment:1; generaledit:False; numeric:False;">
+							</w2:inputCalendar>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_9" id="label_9" label="매출일" orgid="label_9"
+								style=""
+								userData2=" class:TopCondition_01;" class="blue">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<w2:inputCalendar displayFormat="yyyy-MM-dd" hierarchy="edt_SaleDd" id="edt_SaleDd" maxlength="8"
+								orgid="edt_SaleDd"
+								style="width:120px;" tabIndex="8"
+								userData2=" class:panel_maskedit_write_01; alignment:1; generaledit:False; numeric:False;">
+							</w2:inputCalendar>
+							<xf:select appearance="full" disabled="true" disabledClass="w2selectbox_disabled" displayMode="label"
+								hierarchy="chk_FstSaleDdYn" id="chk_FstSaleDdYn" item="Y^" orgid="chk_FstSaleDdYn" renderType="checkboxgroup" selectedData="true"
+								style="" tabIndex="0" userData2=" class:CheckBox_01;" cols="" rows="" ref="">
+								<xf:choices>
+									<xf:item>
+										<xf:label><![CDATA[매출초일여부]]></xf:label>
+										<xf:value><![CDATA[Y]]></xf:value>
+									</xf:item>
+								</xf:choices>
+							</xf:select>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_10" id="label_10" label="일중 매출총액(원)" orgid="label_10"
+								style=""
+								userData2=" class:TopCondition_01;" class="blue">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input hierarchy="edt_BndSaleTotamt" id="edt_BndSaleTotamt" maxlength="18" orgid="edt_BndSaleTotamt"
+								readOnly="false" style="width:150px;"
+								tabIndex="9"
+								userData2=" class:panel_maskedit_write_02; onkillfocus:edt_BndSaleTotamt_OnKillFocus; alignment:2; datemodify:True; generaledit:False; maxdecimalplace:0; numeric:True; rightmargin:5; selectall:True; showliteral:false; valign:1;" class="tar">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_11" id="label_11" label="일중 중도상환액(원)" orgid="label_11"
+								style=""
+								userData2=" class:TopCondition_01;" class="blue">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input hierarchy="edt_RedmptAmt" id="edt_RedmptAmt" maxlength="18" orgid="edt_RedmptAmt" readOnly="false"
+								style="width:150px;" tabIndex="11"
+								userData2=" class:panel_maskedit_write_02; onkillfocus:edt_RedmptAmt_OnKillFocus; alignment:2; datemodify:True; generaledit:False; maxdecimalplace:0; numeric:True; rightmargin:5; selectall:True; showliteral:false; valign:1;" class="tar">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<xf:group class="btnbox" id="" meta_snippetCategory="08_버튼" meta_snippetKeyComponent="true" meta_snippetName="8_05 팝업전체제어버튼"
+				style="">
+				<xf:group class="rt" id="" style="">
+					<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.btn_Mod_onclick" hierarchy="btn_Mod" id="btn_Mod"
+						orgid="btn_Mod" src="../img/bns/btn_modify_n.gif" style="">
+						<xf:label><![CDATA[수정]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.btn_Close_onclick" hierarchy="btn_Close" id="btn_Close"
+						orgid="btn_Close" src="../img/bns/btn_close_n.gif" style="" text="닫기">
+						<xf:label><![CDATA[닫기]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+		</xf:group>
+	</body>
+</html>

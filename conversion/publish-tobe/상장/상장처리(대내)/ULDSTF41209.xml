@@ -1,0 +1,651 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDSTF41209.gfm" meta_screenName="ELW 조기종료발생현황" meta_screenId="ULDSTF41209">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<w2:layoutInfo/>
+		<w2:publicInfo method="scwin.onpageload,scwin.onpageunload,scwin.sleep,scwin.OnSized,scwin.OnSizedMax,scwin.OnWinStat,scwin.GauceObjResize,scwin.refreshForm,scwin.getParIsuCd,scwin.setParIsuCd,scwin.getDate,scwin.listSync,scwin.save,scwin.btn_Search_onclick,scwin.img_ISU_NM_onclick,scwin.txb_ISU_CD_onblur,scwin.dts_List_OnLoadError,scwin.dts_List_OnLoadCompleted,scwin.cmb_PeriodTp_onselchange,scwin.img_SDate_onclick,scwin.img_EDate_onclick,scwin.btn_Close_onclick,scwin.btn_Excel_onclick,scwin.gform_onload,scwin.grd_List_oncheckclick,scwin.trs_Save_OnFail,scwin.trs_Save_OnSuccess,scwin.dts_List_OnColumnChanged,scwin.grd_List_CanColumnPosChange,scwin.popupCallback"/>
+		<xf:model>
+			<w2:workflowCollection/>
+			<w2:dataCollection baseNode="map"/>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+///////// 1. 변수 및 선언 영역 /////////
+scwin.iTimer = 0;
+scwin.maxval = 0;
+scwin.gNewWidthSize = 0;
+// showObj(ObjID, flag) SetWindowPos(ObjID, nTop, nLeft, nWidth, nHeight)
+// grid resize 시작부
+frame.SetEvent("onwinstat", OnWinStat);
+scwin.gOldWidthSize = frame.width;
+
+/**
+ * @method
+ * @name onpageload
+ * @description 화면 로딩 시 초기 처리 — init 순차 호출
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.onpageload = async function() {
+    await scwin.gform_onload();
+};
+
+/**
+ * @method
+ * @name onpageunload
+ * @description 화면 언로드 시 정리 처리
+ * @returns {void}
+ * @hidden N
+ */
+scwin.onpageunload = function() {
+};
+
+/**
+ * @method
+ * @name sleep
+ * @description sleep 처리
+ * @param {*} numberMillis numberMillis
+ * @returns {void}
+ * @hidden N
+ */
+scwin.sleep = function(numberMillis) {
+    let now = new Date();
+    const exitTime = now.getTime() + numberMillis;
+    while (true) {
+        now = new Date();
+        if (now.getTime() > exitTime) return;
+    }
+
+};
+
+/**
+ * @method
+ * @name OnSized
+ * @description On Sized 처리
+ * @param {String} winID winID
+ * @returns {void}
+ * @hidden N
+ */
+scwin.OnSized = function(winID) {
+    if (scwin.iTimer > 0) window.clearInterval(scwin.iTimer);
+    scwin.iTimer = 0;
+    scwin.gNewWidthSize = frame.width;
+    scwin.GauceObjResize(frame.width, frame.height);
+};
+
+/**
+ * @method
+ * @name OnSizedMax
+ * @description On Sized Max 처리
+ * @param {String} winID winID
+ * @returns {void}
+ * @hidden N
+ */
+scwin.OnSizedMax = function(winID) {
+    if (scwin.iTimer > 0) window.clearInterval(scwin.iTimer);
+    scwin.iTimer = 0;
+    scwin.maxval = 0;
+    scwin.GauceObjResize($c.frame.path("/").width, frame.height);
+};
+
+/**
+ * @method
+ * @name OnWinStat
+ * @description On Win Stat 처리
+ * @param {String} winID winID
+ * @param {*} statmsg statmsg
+ * @returns {void}
+ * @hidden N
+ */
+scwin.OnWinStat = function(winID, statmsg) {
+    if (statmsg === "activate" && winID.substring(0, 6) === "Child_") {
+        $c.frame.path("/").WinActive(winID, statmsg);
+    }
+    if (statmsg === "maximize") {
+        scwin.maxval = 1;
+    } else if (statmsg === "size") {
+        if (scwin.maxval === 0) {
+            const strFnc = "OnSized('" + winID + "')";
+            if (scwin.iTimer > 0) {
+                window.clearInterval(scwin.iTimer);
+                scwin.iTimer = 0;
+            }
+            scwin.iTimer = window.setInterval(strFnc, 300);
+        } else if (scwin.maxval === 1) {
+            scwin.OnSizedMax(winID);
+            scwin.gOldWidthSize = $c.frame.path("/").width - 10;
+        }
+    }
+};
+
+/**
+ * @method
+ * @name GauceObjResize
+ * @description 그리드메인
+ * @param {*} a a
+ * @param {*} b b
+ * @returns {void}
+ * @hidden N
+ */
+scwin.GauceObjResize = function(a, b) {
+    // 그리드메인
+    const gw = (a - parseInt(grd_List.getStyle("width")) - 30);
+    grd_List.ReDraw = "false";
+    grd_List.setGridWidth(parseInt(grd_List.getStyle("width")) + gw);
+    grd_List.ReDraw = "true";
+    scwin.gOldWidthSize = frame.width;
+
+    // 탭패널
+    const pnl_main_grp = document.all("__GROUPBOX_BACKGROUND__" + "panel_Top");
+    pnl_main_grp.style.setGridWidth(parseInt(pnl_main_grp.style.width.replace("px", "")) + gw); // 상단패널
+    panel_Top.style.width = parseInt(panel_Top.style.width.replace("px", "")) + gw;
+    // 조회버튼
+    btn_Search.style.left = parseInt(btn_Search.style.left.replace("px", "")) + gw;
+    // 저장버튼
+    btn_Close.style.left = parseInt(btn_Close.style.left.replace("px", "")) + gw;
+    btn_Excel.style.left = parseInt(btn_Excel.style.left.replace("px", "")) + gw;
+};
+
+// grid resize 종료부
+
+scwin.fr_SecuGrpId = SECUGRP_ID_EW;
+
+/**
+ * @method
+ * @name refreshForm
+ * @description refresh Form 처리
+ * @param {*} interval interval
+ * @returns {void}
+ * @hidden N
+ */
+scwin.refreshForm = function(interval) {
+    setInterval("fn_list_sync();", interval);
+};
+
+/**
+ * @method
+ * @name getParIsuCd
+ * @description 넘길 인수를 지정하는 펑션
+ * @param {Array} arrPar 팝업 파라미터 배열(참조 채움)
+ * @returns {void}
+ * @hidden N
+ */
+scwin.getParIsuCd = function(arrPar) {
+    // 넘길 인수를 지정하는 펑션
+    arrPar[0] = ""; // 코드값을 포함할 컨트롤
+    arrPar[1] = ""; // 명칭값을 포함할 컨트롤
+    arrPar[2] = scwin.fr_SecuGrpId;
+    return
+    // ********************************************************************
+    // [WebSquare 전환 추가] 원본 소스와 비교 필요
+    //
+    // ********************************************************************
+    arrPar, length;
+};
+
+/**
+ * @method
+ * @name setParIsuCd
+ * @description set Par Isu Cd 처리
+ * @param {Array} arrPar 팝업 파라미터 배열(참조 채움)
+ * @returns {void}
+ * @hidden N
+ */
+scwin.setParIsuCd = function(arrPar) {
+    txb_ISU_CD.setValue(arrPar[0].ISU_CD);
+    txb_ISU_NM.setValue(arrPar[0].ISU_KOR_NM);
+};
+
+/**
+ * @method
+ * @name getDate
+ * @description 직전영업일 가져옴
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.getDate = async function() {
+    const sbmOptions = {
+        id : "sbm_dts_getDate",
+        action : "/listingCommon.do",
+        ref : "",
+        target : "dts_getDate=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+};
+
+/**
+ * @method
+ * @name listSync
+ * @description list Sync 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.listSync = async function() {
+    url += "&SDATE=" + edt_SDate.getValue();
+    url += "&EDATE=" + edt_EDate.getValue();
+    url += "&ISU_CD=" + txb_ISU_CD.getValue();
+
+    // alert(getObjectValue(edt_SDate)+"//"+getObjectValue(edt_EDate)+"//"+getObjectValue(txb_ISU_CD));
+    const sbmOptions = {
+        id : "sbm_dts_List",
+        action : "/ELWEaryEnd.do",
+        ref : "",
+        target : "dts_List=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+};
+
+/**
+ * @method
+ * @name save
+ * @description save 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.save = async function() {
+    const res = window.confirm("[ " + dts_List.getCellData(dts_List.getRowPosition(), 'ISU_KOR_ABBRV') + " ] 확인 저장 하겠습니까?");
+    // alert(js_id+"//"+dts_List.NameString(dts_List.RowPosition,'ISU_CD')+"//"+dts_List.NameString(dts_List.RowPosition,'OCCR_DD')+"//"+dts_List.NameString(dts_List.RowPosition,'OCCR_TM'));
+    if (res) {
+        url += "&USR_ID=" + js_id;
+        url += "&ISU_CD=" + dts_List.getCellData(dts_List.getRowPosition(), 'ISU_CD');
+        url += "&OCCR_DD=" + dts_List.getCellData(dts_List.getRowPosition(), 'OCCR_DD');
+        url += "&OCCR_TM=" + dts_List.getCellData(dts_List.getRowPosition(), 'OCCR_TM');
+        const sbmOptions = {
+            id : "sbm_dts_parameter",
+            action : "/ELWEaryEnd.do",
+            ref : "",
+            target : "dts_parameter=body.content",
+            isProcessMsg : false
+        };
+
+        const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+        // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+    }
+    await scwin.listSync();
+};
+
+/**
+ * @method
+ * @name btn_Search_onclick
+ * @description 「조회」 클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.btn_Search_onclick = async function() {
+    await scwin.listSync();
+};
+
+/**
+ * @method
+ * @name img_ISU_NM_onclick
+ * @description img_ISU_NM 클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.img_ISU_NM_onclick = async function() {
+    fn_GetPar = scwin.getParIsuCd;
+    fn_SetPar = scwin.setParIsuCd;
+    //    fn_PopFindIsu(fr_SecuGrpId);
+    const options = {
+        id: "ULDSTF92017_elwko",
+        title: "종목선택",
+        type: "browserPopup",
+        width: "410px",
+        height: "580px",
+        callbackFn: "scwin.popupCallback"
+    };
+
+    $c.win.openPopup("../listingcommon/ULDSTF92017_elwko.gfm", options);
+};
+
+/**
+ * @method
+ * @name txb_ISU_CD_onblur
+ * @description txb_ISU_CD 포커스 이탈 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.txb_ISU_CD_onblur = function() {
+    if (txb_ISU_CD.getValue() === "") {
+        txb_ISU_NM.setValue("");
+    }
+};
+
+/**
+ * @method
+ * @name dts_List_OnLoadError
+ * @description dts_List 로드 오류 처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.dts_List_OnLoadError = async function() {
+    await $c.win.alert(dts_List);
+};
+
+/**
+ * @method
+ * @name dts_List_OnLoadCompleted
+ * @description dts_List 로드 완료 후처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @param {Number} rowcount 조회 건수
+ * @returns {void}
+ * @hidden N
+ */
+scwin.dts_List_OnLoadCompleted = function(rowcount) {
+    $c.stf.fillGridHeaderTotalCnt(rowcount, panel_page);
+};
+
+/**
+ * @method
+ * @name cmb_PeriodTp_onselchange
+ * @description cmb_PeriodTp onselchange 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.cmb_PeriodTp_onselchange = function() {
+    const vTp = $c.cp.valueOfIndex(cmb_PeriodTp, "VALUE", cmb_PeriodTp.getSelectedIndex());
+    $c.stf.setFromToDate(vTp, edt_SDate, edt_EDate);
+};
+
+/**
+ * @method
+ * @name img_SDate_onclick
+ * @description img_SDate 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.img_SDate_onclick = function() {
+    popUpCalendar2(edt_SDate);
+};
+
+/**
+ * @method
+ * @name img_EDate_onclick
+ * @description img_EDate 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.img_EDate_onclick = function() {
+    popUpCalendar2(edt_EDate);
+};
+
+/**
+ * @method
+ * @name btn_Close_onclick
+ * @description 「닫기」 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.btn_Close_onclick = function() {
+    self.close();
+};
+
+/**
+ * @method
+ * @name btn_Excel_onclick
+ * @description 엑셀 로그
+ * @returns {void}
+ * @hidden N
+ */
+scwin.btn_Excel_onclick = function() {
+    // 엑셀 로그
+    $c.stf.doLogSave("ULDSTF41209.xml", SCREN_PROCS_TP_CD_07);
+    $c.data.downloadGridViewExcel(grd_List, {fileName: "ELW 조기종료발생현황", type: "8"});
+};
+
+/**
+ * @method
+ * @name gform_onload
+ * @description gform onload 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.gform_onload = async function() {
+    $c.cm.PanelToGroupBox(panel_Top);
+    const vCurDate = $c.ut.cGetToday("yyyymmdd");
+    //    edt_SDate.text = cGetMinusDate2(vCurDate, 1);     // 일주일전 날짜
+    await scwin.getDate();
+    edt_SDate.setValue(dts_getDate.getCellData(1, "CALND_DD"));
+    //    edt_SDate.text = vCurDate;     // 일주일전 날짜
+    edt_EDate.setValue($c.ut.cGetToday("yyyymmdd")); // 현재날짜
+
+    await scwin.listSync();
+    $c.stf.comboCbDataSetPeriod(cmb_PeriodTp);
+    scwin.refreshForm(60000);
+};
+
+/**
+ * @method
+ * @name grd_List_oncheckclick
+ * @description grd_List oncheckclick 이벤트
+ * @param {*} col col
+ * @param {*} colid colid
+ * @param {*} bCheck bCheck
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.grd_List_oncheckclick = async function(col, colid, bCheck) {
+    if (bCheck !== 0) {
+        await scwin.save();
+    }
+};
+
+/**
+ * @method
+ * @name trs_Save_OnFail
+ * @description Save On Fail 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.trs_Save_OnFail = async function() {
+    await $c.win.alert(trs_Save);
+};
+
+/**
+ * @method
+ * @name trs_Save_OnSuccess
+ * @description Save On Success 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.trs_Save_OnSuccess = async function() {
+    await scwin.listSync();
+    dts_List.reset();
+};
+
+/**
+ * @method
+ * @name dts_List_OnColumnChanged
+ * @description List On Column Changed 처리
+ * @param {Number} row 행 인덱스
+ * @param {*} colid colid
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.dts_List_OnColumnChanged = async function(row, colid) {
+    if ((dts_List.getCellData(row, 'CHRG_CONFRM_YN') === 'T') &&
+        (dts_List.OrgNameString(row, colid) !== dts_List.getCellData(row, colid)) &&
+        (colid < 9)) {
+        await $c.win.alert('변경불가');
+        dts_List.undoRow(row);
+    }
+
+};
+
+/**
+ * @method
+ * @name grd_List_CanColumnPosChange
+ * @description grd List Can Column Pos Change 처리
+ * @param {Number} row 행 인덱스
+ * @param {*} colid colid
+ * @returns {void}
+ * @hidden N
+ */
+scwin.grd_List_CanColumnPosChange = function(row, colid) {
+    return true;
+};
+
+/**
+ * @method
+ * @name popupCallback
+ * @description browserPopup 팝업의 callback 함수. 부모창에서 팝업 결과 값을 처리한다.
+ * @param {*} arg 팝업에서 전달받은 값
+ * @returns {void}
+ * @hidden N
+ */
+scwin.popupCallback = function (arg) {
+    // TO-DO : arg 값 확인 후 업무 로직 추가
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+		<xf:group userData2=" version:1.5; arfsrc:../js/arf.vbs; componentset:unicode;"
+			style="" class="sub_contents" ev:onpageload="scwin.gform_onload">
+			<xf:group class="schbox" id="" style="">
+				<xf:group class="schbox_inner" id="" style="">
+					<xf:group adaptive="layout" adaptiveThreshold="768" class="w2tb tbl " id="" style="" tagname="table">
+						<w2:attributes>
+							<w2:summary></w2:summary>
+						</w2:attributes>
+						<xf:group tagname="colgroup">
+							<xf:group style="width:100px;" tagname="col"></xf:group>
+							<xf:group style="" tagname="col"></xf:group>
+							<xf:group style="width:100px;" tagname="col"></xf:group>
+							<xf:group style="" tagname="col"></xf:group>
+						</xf:group>
+						<xf:group class="" id="" style="" tagname="tr">
+							<xf:group class="w2tb_th" style="" tagname="th">
+								<w2:textbox id="label_2_top" label="종목코드(명)" style=""
+									userData2=" class:TopCondition_01; border-color:#0000FF;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group class="w2tb_td" style="" tagname="td">
+								<xf:input id="txb_ISU_CD" maxlength="1000" style="width:90px;"
+									userData2=" class:TopCondition_01_write; onblur:txb_ISU_CD_onblur;">
+								</xf:input>
+								<xf:input id="txb_ISU_NM" maxlength="1000" readOnly="true" style="width:272px;"
+									userData2=" class:TopCondition_01_write;">
+								</xf:input>
+								<xf:trigger class="btn_cm icon search" cursor="pointer" ev:onclick="scwin.img_ISU_NM_onclick"
+									id="img_ISU_NM" src="../img/btn_search.gif" style="">
+									<xf:label><![CDATA[]]></xf:label>
+								</xf:trigger>
+							</xf:group>
+							<xf:group class="w2tb_th" style="" tagname="th">
+								<w2:textbox id="label_1" label="조회기간" style="" userData2=" class:TopCondition_01; border-color:#0000FF;">
+								</w2:textbox>
+							</xf:group>
+							<xf:group class="w2tb_td" id="" style="" tagname="td">
+								<w2:inputCalendar displayFormat="yyyy-MM-dd" id="edt_SDate" style=""
+									userData2=" class:panel_maskedit_write_01; generaledit:False; numeric:False; valign:1;">
+								</w2:inputCalendar>
+								<w2:textbox id="label_4" label="~"
+									style="   width:20px; height:20px; font-size:12; color:#343434; text-align:center;"
+									userData2=" class:TopCondition_01; border-color:#0000FF;">
+								</w2:textbox>
+								<w2:inputCalendar displayFormat="yyyy-MM-dd" id="edt_EDate" style=""
+									userData2=" class:panel_maskedit_write_01; generaledit:False; numeric:False; valign:1;">
+								</w2:inputCalendar>
+								<xf:select1 appearance="minimal" disabledClass="w2selectbox_disabled" displayMode="label" id="cmb_PeriodTp"
+									maxlength="20" selectedData="true" style="width: 100px;"
+									userData2=" bindcolumn:disp; defaultstring:기간선택; inheritcolor:False; listcount:10; listexprformat:disp^0^70; xpstyle:True; font-family:돋움;" ev:onchange="scwin.cmb_PeriodTp_onselchange">
+								</xf:select1>
+							</xf:group>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+				<xf:group class="btn_schbox" id="" style="">
+					<xf:trigger class="btn_cm sch" cursor="pointer" ev:onclick="scwin.btn_Search_onclick" id="btn_Search"
+						src="../img/btn_select.gif" style="" text="조회">
+						<xf:label><![CDATA[조회]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+			<xf:group class="titbox" id="" style="">
+				<xf:group class="rt" id="" style="">
+					<xf:group class="count" id="">
+						<w2:textbox class="" id="" label="총" style=""></w2:textbox>
+						<w2:textbox class="num" id="" label="0" style=""></w2:textbox>
+						<w2:textbox class="" id="" label="건" style=""></w2:textbox>
+					</xf:group>
+					<xf:trigger class="btn_cm download" cursor="pointer" id="btn_Excel"
+						src="../img/btn_excelsave.gif" style="">
+						<xf:label><![CDATA[엑셀다운로드]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+			<xf:group id="" class="gvwbox">
+				<w2:gridView id="grd_List"
+					userData2=" class:Grid_01; cancolumnposchange:grd_List_CanColumnPosChange; colsizing:True; editable:True; fillarea:True; fixsizing:True; gtitleheight:0; sortview:left; tooltip:use=true; xtitleheight:0; font-family:돋움체; font-weight:normal; border-color:#c0c0c0;"
+					style="height: 153px;" dataList="data:dts_List" class="gvw" orgid="grd_List" hierarchy="grd_List" ev:oncellclick="scwin.grd_List_oncheckclick">
+					<w2:caption id="caption1" style="" value="this is a grid caption." />
+					<w2:header id="header1" style="">
+						<w2:row>
+							<w2:column id="ISU_CD_H" width="120"
+								userData2=" sort:True; headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; sumbgcolor:#fefaef; sumcolor:#343434; edit:none;"
+								value="종목코드" textAlign="center" style="color:#343434;" displayMode="label" inputType="text" rowspan="2" rowInfo="0" />
+							<w2:column id="ISU_KOR_ABBRV_H" width="230"
+								userData2=" sort:True; headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; sumbgcolor:#fefaef; sumcolor:#343434; edit:none;"
+								value="종목명" textAlign="center" style="color:#343434;" displayMode="label" inputType="text" rowspan="2" rowInfo="0" />
+							<w2:column id="ELW_RGHT_TP_NM_H" width="70"
+								userData2=" sort:True; headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; sumbgcolor:#fefaef; sumcolor:#343434; edit:none;"
+								value="권리유형" textAlign="center" style="color:#343434;" displayMode="label" inputType="text" rowspan="2" rowInfo="0" />
+							<w2:column id="COM_ABBRV_H" width="150"
+								userData2=" sort:True; headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; sumbgcolor:#fefaef; sumcolor:#343434; edit:none;"
+								value="발행사" textAlign="center" style="color:#343434;" displayMode="label" inputType="text" rowspan="2" rowInfo="0" />
+							<w2:column id="PRSNT_PRC_H" width="130"
+								userData2=" sort:True; headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; decao:3; sumbgcolor:#fefaef; sumcolor:#343434; edit:none;"
+								value="조기종료&lt;/br&gt;발생기준가격" textAlign="center" style="color:#343434;" displayMode="label" inputType="text" rowspan="2"
+								rowInfo="0" />
+							<w2:column id="LP_MBR_NM_H" width="170"
+								userData2=" sort:True; headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; sumbgcolor:#fefaef; sumcolor:#343434; edit:none;"
+								value="LP" style="color:#343434;" displayMode="label" inputType="text" rowspan="2" rowInfo="0" textAlign="center" />
+							<w2:column value="조기종료발생" displayMode="label" inputType="text" rowInfo="0" multiheader="true" textAlign="center"
+								colSpan="2" />
+							<w2:column id="CHRG_CONFRM_YN_H" width="67"
+								userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; sumbgcolor:#fefaef; sumcolor:#343434; editstyle:checkbox; edit:{IF(CHRG_CONFRM_YN='F', 'true','false')};"
+								value="확인" textAlign="center" style="color:#343434;" displayMode="label" inputType="text" rowspan="2" rowInfo="0" />
+						</w2:row>
+						<w2:row id="" style="">
+							<w2:column id="OCCR_DD_H" width="142"
+								userData2=" sort:True; headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; mask:XXXX-XX-XX; sumbgcolor:#fefaef; sumcolor:#343434; edit:none;"
+								value="일자" textAlign="center" style="color:#343434;" displayMode="label" inputType="text" rowInfo="1" />
+							<w2:column id="OCCR_TM_H" width="133"
+								userData2=" sort:True; headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; mask:XX:XX:XX; sumbgcolor:#fefaef; sumcolor:#343434; edit:none;"
+								value="시간" textAlign="center" style="color:#343434;" displayMode="label" inputType="text" rowInfo="1" />
+						</w2:row>
+					</w2:header>
+					<w2:gBody id="gBody1" style="">
+						<w2:row id="" style="">
+							<w2:column id="ISU_CD" textAlign="center" width="120" inputType="text" displayMode="label" />
+							<w2:column id="ISU_KOR_ABBRV" textAlign="left" width="230" inputType="text" displayMode="label" />
+							<w2:column id="ELW_RGHT_TP_NM" textAlign="center" width="70" inputType="text" displayMode="label" />
+							<w2:column id="COM_ABBRV" textAlign="left" width="150" inputType="text" displayMode="label" />
+							<w2:column id="PRSNT_PRC" textAlign="right" width="130" inputType="text" displayMode="label" />
+							<w2:column id="LP_MBR_NM" textAlign="center" width="170" inputType="text" displayMode="label" />
+							<w2:column id="CHRG_CONFRM_YN" textAlign="center" width="67" inputType="text" displayMode="label" />
+							<w2:column id="OCCR_DD" textAlign="center" width="142" inputType="text" displayMode="label" />
+							<w2:column id="OCCR_TM" textAlign="center" width="133" inputType="text" displayMode="label" />
+						</w2:row>
+					</w2:gBody>
+				</w2:gridView>
+			</xf:group>
+			<xf:group class="btnbox" id="" style="">
+				<xf:group class="rt" id="">
+					<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.btn_Close_onclick" id="btn_Close"
+						src="../img/btn_close.gif" style="" text="닫기">
+						<xf:label><![CDATA[닫기]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+		</xf:group>
+	</body>
+</html>

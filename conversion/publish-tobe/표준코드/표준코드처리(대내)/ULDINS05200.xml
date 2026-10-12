@@ -1,0 +1,708 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDINS05200.gfm" meta_screenName="지표발행기관관리" meta_screenId="ULDINS05200" meta_screenDesc="지표발행기관 정보를 관리한다." meta_author="임경환" meta_date="2026.03.04" meta_memo="1. 자동조회\n1.1 화면진입 시 지표기관이 조회된다.\n1.2 조회된 그리드 목록 선택 시 하단에 수정내역 및 상세정보가 조회된다.\n1.3 재 조회 필요 시 「조회」 버튼을 클릭한다.\n2. 지표기관 상세 정보 수정 후 「수정」 버튼을 클릭한다.\n2.1 기존데이터 수정 시 이력정보가 저장된다.\n3. 지표기관 신규 입력 시 「신규」 버튼을 클릭 후 지표기관 정보를 입력한 다음 「저장」 버튼을 클릭한다." meta_type="유지">
+		<w2:historyInfo>
+			<w2:history meta_no="1" meta_desc="최초" meta_date="20260304" meta_user="임경환"></w2:history>
+		</w2:historyInfo>
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<w2:layoutInfo/>
+		<w2:publicInfo method="scwin.onpageload,scwin.onpageunload,scwin.dts_List_OnLoadCompleted,scwin.dts_List_OnLoadError,scwin.trs_save_OnSuccess,scwin.trs_save_OnFail,scwin.btn_save_onclick,scwin.btn_modify_onclick,scwin.grd_Grid1_OnClick,scwin.dts_HistList_OnLoadCompleted,scwin.dts_HistList_OnLoadError,scwin.btn_new_onclick,scwin.dts_List_OnRowPosChanged,scwin.btn_Search_onclick,scwin.txb_INDIC_ISUR_CD_onkeyup,scwin.ins_search,scwin.ins_HistSearch,scwin.ins_process,scwin.new,scwin.dup"/>
+		<xf:model>
+			<w2:workflowCollection/>
+			<w2:dataCollection baseNode="map">
+				<w2:dataMap id="bnd_List" userData2=" activebind:true; dataid:dts_List;" baseNode="map">
+					<w2:keyInfo>
+						<w2:key id="INDIC_ISUR_CD" ctrl="txb_INDIC_ISUR_CD" userData2=" param:value; readonly:False;"/>
+						<w2:key id="INDIC_ISUR_NM" ctrl="txb_INDIC_ISUR_NM" userData2=" param:value; readonly:False;"/>
+						<w2:key id="INDIC_ISUR_ENG_NM" ctrl="edt_INDIC_ISUR_ENG_NM" userData2=" param:text; readonly:False;"/>
+						<w2:key id="INDIC_ISUR_ENG_ABBRV" ctrl="edt_INDIC_ISUR_ENG_ABBRV" userData2=" param:text; readonly:False;"/>
+						<w2:key id="ACTIV_YN" ctrl="cmb_ACTIV_YN" userData2=" param:BindColVal; readonly:False;"/>
+					</w2:keyInfo>
+				</w2:dataMap>
+			</w2:dataCollection>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+///////// 1. 변수 및 선언 영역 /////////
+scwin.prevRow = -1;
+
+// TB_BC120    지표종류    표준지표구분코드
+// 는 메타이므로 화면에서 삭제
+
+// TB_BC130    지표발행기관    지표기관    TBLD_B_INDIC_INST
+// 만 구현한다.
+
+///////// 2. 초기화 영역 /////////
+/**
+ * @method
+ * @name onpageload
+ * @description 화면 로딩 시 초기 처리 — init 순차 호출
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.onpageload = async function() {
+    try {
+        $c.cm.PanelToGroupBox(panel_1);
+        await scwin.ins_search();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDINS05200.onpageload" });
+    }
+};
+
+/**
+ * @method
+ * @name onpageunload
+ * @description 화면 언로드 시 정리 처리
+ * @returns {void}
+ * @hidden N
+ */
+scwin.onpageunload = function() {
+};
+
+///////// 3. 컴포넌트 이벤트 영역 /////////
+/**
+ * @method
+ * @name dts_List_OnLoadCompleted
+ * @description dts_List 로드 완료 후처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @param {Number} rowcount 조회 건수
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.dts_List_OnLoadCompleted = async function(rowcount) {
+    try {
+        if (dts_List.errorMsg) {
+            await $c.win.alert(dts_List.errorMsg);
+        } else {
+            txb_TotalCnt.setValue("총 " + rowcount + "건");
+        }
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDINS05200.dts_List_OnLoadCompleted" });
+    }
+};
+
+/**
+ * @method
+ * @name dts_List_OnLoadError
+ * @description dts_List 로드 오류 처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.dts_List_OnLoadError = async function() {
+    try {
+        await $c.win.alert(dts_List);
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDINS05200.dts_List_OnLoadError" });
+    }
+};
+
+/**
+ * @method
+ * @name trs_save_OnSuccess
+ * @description save On Success 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.trs_save_OnSuccess = async function() {
+    try {
+        await $c.win.alert($c.stf.getMessageParam("MSG-A001", "지표발행기관"));
+        await scwin.ins_search();
+        //    frame.CloseFrame();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDINS05200.trs_save_OnSuccess" });
+    }
+};
+
+/**
+ * @method
+ * @name trs_save_OnFail
+ * @description save On Fail 처리
+ * @returns {void}
+ * @hidden N
+ */
+scwin.trs_save_OnFail = function() {
+    try {
+        alert_tr_error(trs_save);
+        refresh();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDINS05200.trs_save_OnFail" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_save_onclick
+ * @description 「저장」 클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.btn_save_onclick = async function() {
+    try {
+        await scwin.ins_process("02");
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDINS05200.btn_save_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_modify_onclick
+ * @description 「수정」 클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.btn_modify_onclick = async function() {
+    try {
+        await scwin.ins_process("03");
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDINS05200.btn_modify_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name grd_Grid1_OnClick
+ * @description grd_Grid1 클릭 처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @param {Number} row 행 인덱스
+ * @param {*} colid colid
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.grd_Grid1_OnClick = async function(row, colid) {
+    try {
+        let INDIC_ISUR_CD = dts_List.getCellData(row, "INDIC_ISUR_CD");
+        await scwin.ins_HistSearch(INDIC_ISUR_CD);
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDINS05200.grd_Grid1_OnClick" });
+    }
+};
+
+/**
+ * @method
+ * @name dts_HistList_OnLoadCompleted
+ * @description dts_HistList 로드 완료 후처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @param {Number} rowcount 조회 건수
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.dts_HistList_OnLoadCompleted = async function(rowcount) {
+    try {
+        if (dts_HistList.errorMsg) {
+            await $c.win.alert(dts_HistList.errorMsg);
+        } else {
+            txb_TotalCnt2.setValue("총 " + rowcount + "건");
+        }
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDINS05200.dts_HistList_OnLoadCompleted" });
+    }
+};
+
+/**
+ * @method
+ * @name dts_HistList_OnLoadError
+ * @description dts_HistList 로드 오류 처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.dts_HistList_OnLoadError = async function() {
+    try {
+        await $c.win.alert(dts_HistList);
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDINS05200.dts_HistList_OnLoadError" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_new_onclick
+ * @description 「신규」 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.btn_new_onclick = function() {
+    try {
+        scwin.new();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDINS05200.btn_new_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name dts_List_OnRowPosChanged
+ * @description List On Row Pos Changed 처리
+ * @param {Number} row 행 인덱스
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.dts_List_OnRowPosChanged = async function(row) {
+    try {
+        dts_List.undoRow(scwin.prevRow);
+        scwin.prevRow = row;
+        fn_CtrlBtn("update");
+        let INDIC_ISUR_CD = dts_List.getCellData(row, "INDIC_ISUR_CD");
+        await scwin.ins_HistSearch(INDIC_ISUR_CD);
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDINS05200.dts_List_OnRowPosChanged" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_Search_onclick
+ * @description 「조회」 클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.btn_Search_onclick = async function() {
+    try {
+        await scwin.ins_search();
+        await scwin.ins_HistSearch("");
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDINS05200.btn_Search_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name txb_INDIC_ISUR_CD_onkeyup
+ * @description txb_INDIC_ISUR_CD 키 입력 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.txb_INDIC_ISUR_CD_onkeyup = function() {
+    try {
+        fn_DelChar(this);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDINS05200.txb_INDIC_ISUR_CD_onkeyup" });
+    }
+};
+
+///////// 4. 서브미션 콜백 영역 /////////
+/**
+ * @method
+ * @name ins_search
+ * @description 지표발행기관 조회한다.
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.ins_search = async function() {
+    const sbmOptions = {
+        id : "sbm_dts_List",
+        action : "/listingCommon.do",
+        ref : "",
+        target : "dts_List=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+};
+
+/**
+ * @method
+ * @name ins_HistSearch
+ * @description 지표발행기관 내역 조회한다.
+ * @param {String} INDIC_ISUR_CD INDIC_ISUR_CD
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.ins_HistSearch = async function(INDIC_ISUR_CD) {
+    const sbmOptions = {
+        id : "sbm_dts_HistList",
+        action : "/listingCommon.do",
+        ref : "",
+        target : "dts_HistList=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+};
+
+/**
+ * @method
+ * @name ins_process
+ * @description 지표발행기관 저장 , 수정 한다. screenProcsTpCd 02,03
+ * @param {String} screenProcsTpCd screenProcsTpCd
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.ins_process = async function(screenProcsTpCd) {
+    // alert("dts_Out.Text " +dts_Out.Text);
+    // alert("dts_Out.ISUR_CD " +dts_Out.NameValue(dts_Out.RowPosition,"ISUR_NM"));
+
+    if (!$c.cp.isModified(dts_List)) {
+        await $c.win.alert("변경된 데이터가 없습니다.");
+        return;
+    }
+    if (txb_INDIC_ISUR_CD.getValue().length === 3) {
+
+    } else {
+        await $c.win.alert("지표발행기관코드는 3자리 입니다.");
+        txb_INDIC_ISUR_CD.focus();
+        return;
+    }
+    if (screenProcsTpCd === "02") {
+        // 등록시 중복체크
+        if (scwin.dup() === false) {
+            await $c.win.alert("지표발행기관코드 중복입니다.");
+            txb_INDIC_ISUR_CD.focus();
+            return;
+        }
+    }
+    if (txb_INDIC_ISUR_CD.getValue() === "" || txb_INDIC_ISUR_CD.getValue().indexOf(" ") === "") {
+        await $c.win.alert($c.stf.getMessageParam("MSG-A005", "지표발행기관코드"));
+        txb_INDIC_ISUR_CD.focus();
+        return;
+    }
+    if (txb_INDIC_ISUR_NM.getValue() === "" || txb_INDIC_ISUR_NM.getValue().indexOf(" ") === "") {
+        await $c.win.alert($c.stf.getMessageParam("MSG-A005", "지표발행기관명"));
+        txb_INDIC_ISUR_NM.focus();
+        return;
+    }
+    if (!$c.stf.checkMaxLength(txb_INDIC_ISUR_NM, 80, "지표발행기관명")) {
+        // txb_INDIC_ISUR_NM.value = "";
+        txb_INDIC_ISUR_NM.focus();
+        return false;
+    }
+    if (edt_INDIC_ISUR_ENG_NM.getValue() === "" || edt_INDIC_ISUR_ENG_NM.text.indexOf(" ") === "") {
+        await $c.win.alert($c.stf.getMessageParam("MSG-A005", "지표발행기관영문명"));
+        edt_INDIC_ISUR_ENG_NM.focus();
+        return;
+    }
+    if (!$c.stf.checkMaxLength(edt_INDIC_ISUR_ENG_NM, 60, "지표발행기관영문명")) {
+        // edt_INDIC_ISUR_ENG_NM.text = "";
+        edt_INDIC_ISUR_ENG_NM.focus();
+        return false;
+    }
+    if (edt_INDIC_ISUR_ENG_ABBRV.getValue() === "" || edt_INDIC_ISUR_ENG_ABBRV.text.indexOf(" ") === "") {
+        await $c.win.alert($c.stf.getMessageParam("MSG-A005", "지표발행기관영문약명"));
+        edt_INDIC_ISUR_ENG_ABBRV.focus();
+        return;
+    }
+    if (!$c.stf.checkMaxLength(edt_INDIC_ISUR_ENG_ABBRV, 40, "지표발행기관영문약명")) {
+        // edt_INDIC_ISUR_ENG_ABBRV.text = "";
+        edt_INDIC_ISUR_ENG_ABBRV.focus();
+        return false;
+    }
+    trs_save.KeyName = "toinb_dataid4";
+    // [전환검토] trs_save.Parameters → 동적 파라미터(필요 시 sbmOptions 에 반영)
+    // const sbmParams = {
+    //     EMP_NO : js_emp_no,
+    //     EMP_NM : js_emp_nm
+    // };
+    const sbmOptions = {
+        id : "sbm_trs_save",
+        action : "/OrgInfoAction.do",
+        ref : "dts_List",
+        target : "trs_save=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+};
+
+///////// 5. 일반/업무 함수 영역 /////////
+/**
+ * @method
+ * @name new
+ * @description 신규 등록
+ * @returns {void}
+ * @hidden N
+ */
+scwin.new = function() {
+    dts_List.insertRow();
+    // dts_List.NameValue(dts_List.RowPosition,"ISUR_CD") = param1;
+    fn_CtrlBtn("insert");
+    cmb_ACTIV_YN.setSelectedIndex(0);
+};
+
+/**
+ * @method
+ * @name dup
+ * @description 지표발행기관코드 중복검사
+ * @returns {void}
+ * @hidden N
+ */
+scwin.dup = function() {
+    let dupcnt = 0;
+    for (let i = 1; i <= dts_List.getRowCount(); i++) {
+        if (dts_List.getCellData(i, "INDIC_ISUR_CD") === txb_INDIC_ISUR_CD.getValue()) {
+            dupcnt++;
+        }
+    }
+    // alert("dupcnt " +dupcnt);
+    if (Number(dupcnt) < 2) {
+        return true;
+    } // 중복아님
+    else {
+        return false;
+    } // 중복
+
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+		<xf:group userData2=" version:1.5; arfsrc:../js/arf.vbs; componentset:unicode;" style=""
+			class="sub_contents">
+			<xf:group class="titbox mt0" id="" meta_snippetCategory="02_타이틀" meta_snippetKeyComponent="true"
+				meta_snippetName="2_02 서브타이틀(h3)" style="">
+				<w2:textbox id="label_13" label="지표 발행기관" style=""
+					userData2=" class:Blue_Bold; font-weight:bold;" tagname="h3">
+				</w2:textbox>
+				<xf:group class="rt" id="" style="">
+					<xf:group class="count" id="" style="">
+						<w2:span class="" id="" label="전체" style=""></w2:span>
+						<w2:span class="num" id="txb_TotalCnt" label="0" style=""></w2:span>
+						<w2:span id="" label="건" style=""></w2:span>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<xf:group id="" class="gvwbox">
+				<w2:gridView dataList="data:dts_List" hierarchy="grd_Grid1"
+					userData2=" class:Grid_01; autoresizing:True; autoresizingallcol:True; autoresizingwithheader:True; colselect:True; colsizing:True; editable:False; fillarea:True; gtitleheight:0; headborder:0; sortview:right; tooltip:use=true;alt=true;leftmargin=10;rightmargin=10;topmargin=10;bottommargin=10;; xtitleheight:0; font-weight:normal; onclick:grd_Grid1_OnClick;"
+					style="height:153px;" id="grd_Grid1" class="gvw" orgid="grd_Grid1" autoFit="allColumn" meta_name="지표기관 그리드" metaev_oncellclick_name="상세정보 조회" metaev_oncellclick_desc="행 선택 시 지표기관 수정이력 정보와 상세정보가 조회된다.">
+					<w2:caption style="" id="caption1" value="this is a grid caption."></w2:caption>
+					<w2:header style="" id="header1">
+						<w2:row>
+							<w2:column textAlign="center" width="130" userData2=" sort:True;" inputType="text" id="INDIC_ISUR_CD_H"
+								value="지표발행기관코드" displayMode="label" asisType="column">
+							</w2:column>
+							<w2:column hidden="false" textAlign="center" width="150" userData2=" sort:True;" inputType="text"
+								id="INDIC_ISUR_NM_H" value="지표발행기관명" displayMode="label" asisType="column">
+							</w2:column>
+							<w2:column hidden="false" textAlign="center" width="80" userData2=" sort:True;" inputType="text"
+								id="ACTIV_YN_NM_H" value="활성여부" displayMode="label" asisType="column">
+							</w2:column>
+							<w2:column hidden="false" textAlign="center" width="80" userData2=" sort:True;" inputType="text" id="REG_ID_H"
+								value="등록자" displayMode="label" asisType="column">
+							</w2:column>
+							<w2:column hidden="false" textAlign="center" width="80" userData2=" mask:XXXX-XX-XX; sort:True;"
+								inputType="text" id="REG_DDTM_H" value="등록일" displayMode="label" asisType="column">
+							</w2:column>
+							<w2:column hidden="false" textAlign="center" width="80" userData2=" sort:True;" inputType="text" id="ADJPRN_ID_H"
+								value="수정자" displayMode="label" asisType="column">
+							</w2:column>
+							<w2:column hidden="false" textAlign="center" width="80" userData2=" mask:XXXX-XX-XX; sort:True;"
+								inputType="text" id="ADJ_DDTM_H" value="수정일" displayMode="label" asisType="column">
+							</w2:column>
+						</w2:row>
+					</w2:header>
+					<w2:gBody style="" id="gBody1">
+						<w2:row style="" id="">
+							<w2:column textAlign="center" width="130" inputType="text" id="INDIC_ISUR_CD" displayMode="label"></w2:column>
+							<w2:column textAlign="left" width="150" inputType="text" id="INDIC_ISUR_NM" displayMode="label"></w2:column>
+							<w2:column textAlign="center" width="80" inputType="text" id="ACTIV_YN_NM" displayMode="label"></w2:column>
+							<w2:column textAlign="center" width="80" inputType="text" id="REG_ID" displayMode="label"></w2:column>
+							<w2:column textAlign="center" width="80" inputType="text" id="REG_DDTM" displayMode="label"></w2:column>
+							<w2:column textAlign="center" width="80" inputType="text" id="ADJPRN_ID" displayMode="label"></w2:column>
+							<w2:column textAlign="center" width="80" inputType="text" id="ADJ_DDTM" displayMode="label"></w2:column>
+						</w2:row>
+					</w2:gBody>
+				</w2:gridView>
+			</xf:group>
+			<xf:group class="titbox" id="" meta_snippetCategory="02_타이틀" meta_snippetKeyComponent="true" meta_snippetName="2_02 서브타이틀(h3)"
+				style="">
+				<w2:textbox id="label_1" label="지표 발행기관 수정 내역" style=""
+					userData2=" class:Blue_Bold; font-weight:bold;" tagname="h3">
+				</w2:textbox>
+				<xf:group class="rt" id="" style="">
+					<xf:group class="count" id="" style="">
+						<w2:span class="" id="" label="전체" style=""></w2:span>
+						<w2:span class="num" id="txb_TotalCnt2" label="0" style=""></w2:span>
+						<w2:span id="" label="건" style=""></w2:span>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<xf:group id="" class="gvwbox">
+				<w2:gridView dataList="data:dts_HistList" hierarchy="grd_Grid2"
+					userData2=" class:Grid_01; autoresizing:True; autoresizingallcol:True; autoresizingwithheader:True; colsizing:True; editable:False; fillarea:True; gtitleheight:0; headborder:0; tooltip:use=true;alt=true;leftmargin=10;rightmargin=10;topmargin=10;bottommargin=10;; xtitleheight:0; font-weight:normal;"
+					style="height:153px;" id="grd_Grid2" class="gvw" orgid="grd_Grid2" autoFit="allColumn">
+					<w2:caption style="" id="caption2" value="this is a grid caption."></w2:caption>
+					<w2:header style="" id="header2">
+						<w2:row>
+							<w2:column textAlign="center" width="110" userData2=" sort:True;" inputType="text" id="INDIC_ISUR_CD_H"
+								value="지표발행기관코드" displayMode="label" asisType="column">
+							</w2:column>
+							<w2:column hidden="false" textAlign="center" width="250" inputType="text" id="INDIC_ISUR_NM_H" value="지표발행기관명"
+								displayMode="label" asisType="column">
+							</w2:column>
+							<w2:column hidden="false" textAlign="center" width="80" inputType="text" id="ACTIV_YN_NM_H" value="활성여부"
+								displayMode="label" asisType="column">
+							</w2:column>
+							<w2:column hidden="false" textAlign="center" width="100" inputType="text" id="REG_ID_H" value="등록자"
+								displayMode="label" asisType="column">
+							</w2:column>
+							<w2:column hidden="false" textAlign="center" width="100" userData2=" mask:XXXX-XX-XX;" inputType="text"
+								id="REG_DDTM_H" value="등록일" displayMode="label" asisType="column">
+							</w2:column>
+							<w2:column hidden="true" textAlign="center" width="80" inputType="text" id="ADJPRN_ID_H" value="수정자"
+								displayMode="label" asisType="column">
+							</w2:column>
+							<w2:column hidden="true" textAlign="center" width="80" userData2=" mask:XXXX-XX-XX;" inputType="text"
+								id="ADJ_DDTM_H" value="수정일" displayMode="label" asisType="column">
+							</w2:column>
+						</w2:row>
+					</w2:header>
+					<w2:gBody style="" id="gBody2">
+						<w2:row style="" id="">
+							<w2:column textAlign="center" width="110" inputType="text" id="INDIC_ISUR_CD" displayMode="label"></w2:column>
+							<w2:column textAlign="left" width="250" inputType="text" id="INDIC_ISUR_NM" displayMode="label"></w2:column>
+							<w2:column textAlign="center" width="80" inputType="text" id="ACTIV_YN_NM" displayMode="label"></w2:column>
+							<w2:column textAlign="center" width="100" inputType="text" id="REG_ID" displayMode="label"></w2:column>
+							<w2:column textAlign="center" width="100" inputType="text" id="REG_DDTM" displayMode="label"></w2:column>
+							<w2:column textAlign="center" width="80" inputType="text" id="ADJPRN_ID" displayMode="label"></w2:column>
+							<w2:column textAlign="center" width="80" inputType="text" id="ADJ_DDTM" displayMode="label"></w2:column>
+						</w2:row>
+					</w2:gBody>
+				</w2:gridView>
+			</xf:group>
+			<xf:group class="titbox" id="" meta_snippetCategory="02_타이틀" meta_snippetKeyComponent="true" meta_snippetName="2_02 서브타이틀(h3)"
+				style="">
+				<w2:textbox id="label_3" label="지표발행기관상세" style=""
+					userData2=" class:Blue_Bold; font-weight:bold;" tagname="h3">
+				</w2:textbox>
+				<xf:group class="rt" id="" style="">
+					<xf:trigger class="btn_cm sch" cursor="pointer" ev:onclick="scwin.btn_Search_onclick" id="btn_Search"
+						src="../img/btn_select.gif" style="" text="조회" meta_name="조회" metaev_onclick_name="조회" metaev_onclick_desc="지표기관을 조회한다.">
+						<xf:label><![CDATA[조회]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.btn_new_onclick" id="btn_new" src="../img/btn_new.gif"
+						style="" meta_name="신규" metaev_onclick_name="신규" metaev_onclick_desc="새로운 지표기관 등록 시 사용한다.">
+						<xf:label><![CDATA[신규]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.btn_save_onclick" id="btn_save" src="../img/btn_save.gif"
+						style="" text="저장" meta_name="저장" metaev_onclick_name="저장" metaev_onclick_desc="지표기관 정보를 신규 입력 후 저장한다.\n\n지표기관 테이블\n: TBLD_B_INDIC_INST\n">
+						<xf:label><![CDATA[저장]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.btn_modify_onclick" id="btn_modify"
+						src="../img/btn_modify.gif" style="" meta_name="수정" metaev_onclick_name="수정" metaev_onclick_desc="기존 지표기관 정보 수정한다.\n\n: 기존 데이터 수정 시 이력테이블 insert\n &gt; TBLD_B_INDIC_INST_CHG_HIST">
+						<xf:label><![CDATA[수정]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+			<xf:group class="tblbox" id="" meta_snippetCategory="05_입출력테이블" meta_snippetKeyComponent="true" meta_snippetName="5_01 1단테이블"
+				style="">
+				<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+					<w2:attributes>
+						<w2:summary></w2:summary>
+					</w2:attributes>
+					<xf:group tagname="colgroup">
+						<xf:group style="width:180px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+					</xf:group>
+					<xf:group style="" tagname="tr">
+						<xf:group class="w2tb_th" style="" tagname="th">
+							<w2:textbox id="label_6" label="지표발행기관코드" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+							
+							
+							
+							
+						</xf:group>
+						<xf:group class="w2tb_td" style="" tagname="td">
+							<xf:input id="txb_INDIC_ISUR_CD" maxlength="3" style="width:120px;"
+								userData2=" class:TopCondition_01_write;" ev:onkeyup="scwin.txb_INDIC_ISUR_CD_onkeyup">
+							</xf:input>
+							<w2:textbox id="label_4" label="일련번호숫자-세자리" style=""
+								userData2=" class:TopCondition_01; vertical-align:bottom;" class="txt_info">
+							</w2:textbox>
+							
+							
+							
+							
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_7" label="지표발행기관명" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes>
+								<w2:colspan>1</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:input id="txb_INDIC_ISUR_NM" maxlength="100" style="width:502px;" tabIndex="1"
+								userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_8" label="지표발행기관영문명" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes></w2:attributes>
+							<xf:input displayFormat="ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ" id="edt_INDIC_ISUR_ENG_NM" maxlength="15"
+								readOnly="false" style="width:500px;" tabIndex="2"
+								userData2=" class:panel_maskedit_write_02; alignment:2; datemodify:True; generaledit:False; iscomma:True; language:0; maxdecimalplace:0; numeric:False; selectall:True; showliteral:false; valign:1;">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_9" label="지표발행기관영문약명"
+								style="" userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes></w2:attributes>
+							<xf:input displayFormat="ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ" id="edt_INDIC_ISUR_ENG_ABBRV" maxlength="15"
+								readOnly="false" style="width:500px;" tabIndex="3"
+								userData2=" class:panel_maskedit_write_02; alignment:2; datemodify:True; generaledit:False; iscomma:True; language:0; maxdecimalplace:0; numeric:False; selectall:True; showliteral:false; valign:1;">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_10" label="활성여부" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes></w2:attributes>
+							<xf:select1 appearance="minimal" disabled="false" disabledClass="w2selectbox_disabled" displayMode="label"
+								id="cmb_ACTIV_YN" item="^,Y^활성,N^비활성" selectedData="true" style="width:92px;" tabIndex="4"
+								userData2=" class:TopCondition_01; bindcolumn:VALUE; listcount:10; listexprformat:TEXT^0^120; searchcolumn:TEXT; synccombodata:False;">
+								<xf:choices>
+									<xf:item>
+										<xf:label><![CDATA[]]></xf:label>
+										<xf:value><![CDATA[]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[활성]]></xf:label>
+										<xf:value><![CDATA[Y]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[비활성]]></xf:label>
+										<xf:value><![CDATA[N]]></xf:value>
+									</xf:item>
+								</xf:choices>
+							</xf:select1>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+		</xf:group>
+	</body>
+</html>

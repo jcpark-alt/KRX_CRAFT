@@ -1,0 +1,425 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDMGT10200.gfm" meta_screenName="지분" meta_screenId="ULDMGT10200">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<w2:layoutInfo/>
+		<w2:publicInfo method="scwin.onpageload,scwin.onpageunload,scwin.MxDataSet_OnLoadCompleted,scwin.btn_cal_onclick,scwin.btn_sys_search_onclick,scwin.btn_toExcel_onclick,scwin.MxDataSet_OnFilter,scwin.MxComResult_onselchange,scwin.MxGrid_1_onlbuttondblclk,scwin.code1Sync,scwin.listSync,scwin.doDelete,scwin.doDelete1,scwin.setCountBox"/>
+		<xf:model>
+			<w2:dataCollection baseNode="map"></w2:dataCollection>
+			<w2:workflowCollection/>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+///////// 1. 변수 및 선언 영역 /////////
+scwin.jFilter = ''; // 전체, 성공, 실패, 우편함
+scwin.allCnt = 0;
+
+///////// 2. 초기화 영역 /////////
+/**
+ * @method
+ * @name onpageload
+ * @description 화면 로딩 시 초기 처리 — init 순차 호출
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.onpageload = async function() {
+    try {
+        // MxDataSet_code1.DataID = "/gauceSystemierAdaptor.do?method=getGauceDataHeader&messageId=tbmccdval";
+        // MxDataSet_code1.reset();
+        const sbmOptions = {
+            id : "sbm_MxDataSet",
+            action : "/gauceSystemierAdaptor.do",
+            ref : "",
+            target : "MxDataSet=body.content",
+            isProcessMsg : false
+        };
+
+        const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+        // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+        const sbmOptions2 = {
+            id : "sbm_mdsDel",
+            action : "/gauceSystemierAdaptor.do",
+            ref : "",
+            target : "mdsDel=body.content",
+            isProcessMsg : false
+        };
+
+        const sbmRtn2 = await $c.sbm.executeDynamic(sbmOptions2);
+        // TODO Stage2: sbmRtn2 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+        // fn_code1_sync();
+        $c.cm.PanelToGroupBox_01(panel_1);
+        // PanelToGroupBox_02(panel_2);
+        toDaySet(txb_date);
+        MxDataSet.UseFilter = "true";
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDMGT10200.onpageload" });
+    }
+};
+
+/**
+ * @method
+ * @name onpageunload
+ * @description 화면 언로드 시 정리 처리
+ * @returns {void}
+ * @hidden N
+ */
+scwin.onpageunload = function() {
+};
+
+///////// 3. 컴포넌트 이벤트 영역 /////////
+/**
+ * @method
+ * @name MxDataSet_OnLoadCompleted
+ * @description MxDataSet 로드 완료 후처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @param {Number} rowcount 조회 건수
+ * @returns {void}
+ * @hidden N
+ */
+scwin.MxDataSet_OnLoadCompleted = function(rowcount) {
+    try {
+        textbox_1.setValue("총 " + rowcount + "건");
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDMGT10200.MxDataSet_OnLoadCompleted" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_cal_onclick
+ * @description btn_cal 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.btn_cal_onclick = function() {
+    try {
+        popUpCalendar(txb_date_bg, 'txb_date', 'yyyymmdd'); // alert('image_2.onclick');
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDMGT10200.btn_cal_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_sys_search_onclick
+ * @description 「조회」 클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.btn_sys_search_onclick = async function() {
+    try {
+        if (txb_date.getValue() !== "") {
+            await scwin.listSync(); // alert();
+
+        } else {
+            await $c.win.alert("일자를 지정하십시요");
+        }
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDMGT10200.btn_sys_search_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_toExcel_onclick
+ * @description 「엑셀다운로드」 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.btn_toExcel_onclick = function() {
+    try {
+        $c.data.downloadGridViewExcel(MxGrid_1, {fileName: "지분추출현황", type: "8"});
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDMGT10200.btn_toExcel_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name MxDataSet_OnFilter
+ * @description Mx Data Set On Filter 처리
+ * @param {Number} row 행 인덱스
+ * @returns {void}
+ * @hidden N
+ */
+scwin.MxDataSet_OnFilter = function(row) {
+    try {
+        if (scwin.jFilter === '') {
+            scwin.allCnt++;
+            return true;
+        } else {
+            if (MxDataSet.getCellData(row, "SUC_GUBN") === scwin.jFilter) {
+                scwin.allCnt++;
+                return true;
+            } else {
+                return false;
+            }
+        }
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDMGT10200.MxDataSet_OnFilter" });
+    }
+};
+
+/**
+ * @method
+ * @name MxComResult_onselchange
+ * @description MxComResult onselchange 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.MxComResult_onselchange = function() {
+    try {
+        scwin.allCnt = 0;
+        scwin.jFilter = MxComResult.BindColVal;
+        if (scwin.jFilter === '전체') scwin.jFilter = '';
+        MxDataSet.Filter();
+        scwin.setCountBox();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDMGT10200.MxComResult_onselchange" });
+    }
+};
+
+/**
+ * @method
+ * @name MxGrid_1_onlbuttondblclk
+ * @description MxGrid_1 onlbuttondblclk 이벤트
+ * @param {Number} row 행 인덱스
+ * @param {*} colid colid
+ * @param {*} xpos xpos
+ * @param {*} ypos ypos
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.MxGrid_1_onlbuttondblclk = async function(row, colid, xpos, ypos) {
+    try {
+        if (colid === 'SUC_GUBN' && row <= MxDataSet.getRowCount() && row > 0) {
+            if (MxDataSet.getCellData(MxDataSet.getRowPosition(), "SUC_GUBN") === '실패') await scwin.doDelete(MxDataSet.getCellData(MxDataSet.getRowPosition(), "FORM_CD"), MxDataSet.getCellData(MxDataSet.getRowPosition(), "ACPT_NO"));
+        }
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDMGT10200.MxGrid_1_onlbuttondblclk" });
+    }
+};
+
+///////// 4. 서브미션 콜백 영역 /////////
+/**
+ * @method
+ * @name code1Sync
+ * @description 리스트 개수
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.code1Sync = async function() {
+    const sbmOptions = {
+        id : "sbm_MxDataSet_code1",
+        action : "/tbmccdval.do",
+        ref : "",
+        target : "MxDataSet_code1=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+};
+
+/**
+ * @method
+ * @name listSync
+ * @description list Sync 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.listSync = async function() {
+    const sbmOptions = {
+        id : "sbm_MxDataSet",
+        action : "/shrextrc.do",
+        ref : "",
+        target : "MxDataSet=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+};
+
+/**
+ * @method
+ * @name doDelete
+ * @description do Delete 처리
+ * @param {*} form_cd form_cd
+ * @param {*} acpt_no acpt_no
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.doDelete = async function(form_cd, acpt_no) {
+    const param = "FORM_CD=" + form_cd + ",ACPT_NO=" + acpt_no;
+    await $c.win.alert(acpt_no + ":" + param);
+    trDel.KeyName = "toinb_dataid4";
+    // [전환검토] trDel.Parameters → 동적 파라미터(필요 시 sbmOptions 에 반영)
+    // const sbmParams = {
+    // };
+    const sbmOptions = {
+        id : "sbm_trDel",
+        action : "/shrextrc.do",
+        ref : "MxDataSet",
+        target : "trDel=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+};
+
+/**
+ * @method
+ * @name doDelete1
+ * @description do Delete1 처리
+ * @param {*} form_cd form_cd
+ * @param {*} acpt_no acpt_no
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.doDelete1 = async function(form_cd, acpt_no) {
+    await $c.win.alert(acpt_no);
+    mdsDel.removeAll();
+    mdsDel.insertRow();
+    mdsDel.setCellData(mdsDel.getRowPosition(), "FORM_CD", form_cd);
+    mdsDel.setCellData(mdsDel.getRowPosition(), "ACPT_NO", acpt_no);
+    trDel.KeyName = "toinb_dataid4";
+    const sbmOptions = {
+        id : "sbm_trDel",
+        action : "/shrextrc.do",
+        ref : "mdsDel",
+        target : "trDel=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+};
+
+///////// 5. 일반/업무 함수 영역 /////////
+/**
+ * @method
+ * @name setCountBox
+ * @description set Count Box 처리
+ * @returns {void}
+ * @hidden N
+ */
+scwin.setCountBox = function() {
+    textbox_1.setValue("총 " + scwin.allCnt + "건");
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+	<xf:group id="" class="sub_contents"><xf:group meta_snippetCategory="03_조회영역" meta_snippetName="3_01 조회조건1행" meta_snippetKeyComponent="true" style="" id="panel_1" class="schbox">
+			<xf:group style="" id="" class="schbox_inner">
+				<xf:group adaptive="" adaptiveThreshold="768" tagname="table" style="" id="" class="w2tb tbl ">
+					<w2:attributes>
+						<w2:summary></w2:summary>
+					</w2:attributes>
+					<xf:group tagname="colgroup">
+						<xf:group tagname="col" style="width:90px;"></xf:group>
+						<xf:group tagname="col" style=""></xf:group>
+					</xf:group>
+					<xf:group tagname="tr" style="" id="" class="">
+						<xf:group tagname="th" style="" class="w2tb_th"><w2:textbox hierarchy="label_2" style="" userData2=" class:TopCondition_01; font-weight:normal; border-color:#ece9d8;" id="label_2" label="수신기준일" orgid="label_2">
+							</w2:textbox></xf:group>
+						<xf:group tagname="td" style="" class="w2tb_td">
+							<w2:inputCalendar style="" id="txb_date" calendarValueType="yearMonthDate"></w2:inputCalendar>
+							<xf:select1 selectedData="true" item="전체^0,성공^1,실패^2,우편함^3" ev:onchange="scwin.MxComResult_onselchange" hierarchy="MxComResult" chooseOption="" userData2=" bindcolumn:Column1; combostyle:3; index:0; listcount:10; listexprformat:Column1^1^70;" allOption="" displayMode="label" orgid="MxComResult" ref="" appearance="minimal" disabledClass="w2selectbox_disabled" style="width:150px;" id="MxComResult" class="ml20">
+								<xf:choices>
+									<xf:item>
+										<xf:label><![CDATA[전체]]></xf:label>
+										<xf:value><![CDATA[0]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[성공]]></xf:label>
+										<xf:value><![CDATA[1]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[실패]]></xf:label>
+										<xf:value><![CDATA[2]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[우편함]]></xf:label>
+										<xf:value><![CDATA[3]]></xf:value>
+									</xf:item>
+								</xf:choices>
+							</xf:select1>
+							
+						</xf:group>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<xf:group style="" id="" class="btn_schbox">
+				<xf:trigger ev:onclick="scwin.btn_sys_search_onclick" style="" id="btn_sys_search" type="button" class="btn_cm sch">
+					<xf:label><![CDATA[조회]]></xf:label>
+				</xf:trigger>
+			</xf:group>
+		</xf:group><xf:group style="" id="" class="titbox">
+			<xf:group id="" class="rt">
+				<xf:group meta_snippetCategory="02_타이틀" meta_snippetName="총건수" meta_snippetKeyComponent="true" id="" class="count">
+					<w2:span style="" id="" label="총"></w2:span>
+					<w2:textbox tagname="span" style="" id="textbox_1" label="" class="num"></w2:textbox>
+					<w2:span style="" id="" label="건"></w2:span>
+				</xf:group>
+				<xf:trigger ev:onclick="scwin.btn_toExcel_onclick" style="" id="btn_toExcel" type="button" class="btn_cm download">
+					<xf:label><![CDATA[엑셀다운로드]]></xf:label>
+				</xf:trigger>
+			</xf:group>
+		</xf:group><xf:group id="" class="gvwbox">
+			<w2:gridView dataList="data:MxDataSet" hierarchy="MxGrid_1" userData2=" class:Grid_01; colsizing:True; editable:True; fillarea:True; gtitleheight:0; sortview:right; titleheight:40; tooltip:use=true;alt=true;createtime=300;color=#FFFFFF;backcolor=#808080;edgecolor=#333333;leftmargin=10;rightmargin=10;topmargin=10;bottommargin=10;; xtitleheight:0;" style="height:153px;" id="MxGrid_1" ev:oncelldblclick="scwin.MxGrid_1_onlbuttondblclk" autoFit="allColumn" class="gvw" orgid="MxGrid_1" autoFitMinWidth="1500">
+				<w2:caption style="" id="caption1" value="this is a grid caption."></w2:caption>
+				<w2:header style="" id="header1">
+					<w2:row>
+						<w2:column textAlign="center" edit="any" width="40" userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; color:#343434; value:{currow}; sumbgcolor:#fefaef; sumcolor:#343434; namemask:삭제;" inputType="text" id="column1" value="NO" displayMode="label"></w2:column>
+						<w2:column textAlign="center" edit="any" width="90" userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#FFFFFF; color:{Decode(SUC_GUBN,'우편함','#00CC66','실패','#FF0099')}; sort:True;" inputType="text" id="h_RCV_BAS_DD" value="공시&lt;/br&gt;배포일자" displayMode="label"></w2:column>
+						<w2:column textAlign="center" edit="any" width="55" userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#FFFFFF; color:{Decode(SUC_GUBN,'우편함','#00CC66','실패','#FF0099')}; sort:True;" inputType="text" id="h_FORM_CD" value="서식&lt;/br&gt;코드" displayMode="label"></w2:column>
+						<w2:column textAlign="center" edit="any" width="80" userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#FFFFFF; color:{Decode(SUC_GUBN,'우편함','#00CC66','실패','#FF0099')};" inputType="text" id="h_FORM_KOR_NM" value="서식명" displayMode="label"></w2:column>
+						<w2:column textAlign="center" edit="any" width="55" userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#FFFFFF; color:{Decode(SUC_GUBN,'우편함','#00CC66','실패','#FF0099')}; sort:True;" inputType="text" id="h_DISCLS_OBJ_CORP_ISUR_CD" value="발행&lt;/br&gt;기관" displayMode="label"></w2:column>
+						<w2:column textAlign="center" edit="any" width="70" userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#FFFFFF; color:{Decode(SUC_GUBN,'우편함','#00CC66','실패','#FF0099')}; sort:True;" inputType="text" id="h_COM_ABBRV" value="회사약명" displayMode="label"></w2:column>
+						<w2:column textAlign="center" edit="any" width="60" userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#FFFFFF; color:{Decode(SUC_GUBN,'우편함','#00CC66','실패','#FF0099')};" inputType="text" id="h_FSS_RCV_FILE_NO" value="수신&lt;/br&gt;파일명" displayMode="label"></w2:column>
+						<w2:column textAlign="center" edit="any" width="90" userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#FFFFFF; color:{Decode(SUC_GUBN,'우편함','#00CC66','실패','#FF0099')}; sort:True;" inputType="text" id="h_SHR_WRTRPT_ACPT_NO" value="지분접수&lt;/br&gt;(종감 Tbl)" displayMode="label"></w2:column>
+						<w2:column textAlign="center" edit="any" width="90" userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#FFFFFF; color:{Decode(SUC_GUBN,'우편함','#00CC66','실패','#FF0099')}; sort:True;" inputType="text" id="h_FSS_ACPT_NO_RLT" value="지분접수&lt;/br&gt;(최종)" displayMode="label"></w2:column>
+						<w2:column textAlign="center" edit="any" width="90" userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#FFFFFF; color:{Decode(SUC_GUBN,'우편함','#00CC66','실패','#FF0099')}; sort:True;" inputType="text" id="h_ACPT_NO" value="접수번호" displayMode="label"></w2:column>
+						<w2:column textAlign="center" edit="any" width="90" userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#FFFFFF; color:{Decode(SUC_GUBN,'우편함','#00CC66','실패','#FF0099')}; sort:True;" inputType="text" id="h_MOD_OBJ_ACPT_NO" value="정정대상&lt;/br&gt;접수번호" displayMode="label"></w2:column>
+						<w2:column textAlign="center" edit="any" width="90" userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#FFFFFF; color:{Decode(SUC_GUBN,'우편함','#00CC66','실패','#FF0099')}; sort:True;" inputType="text" id="h_MOD_ORGN_DISCLS_ACPT_NO" value="정정원공시&lt;/br&gt;접수번호" displayMode="label"></w2:column>
+						<w2:column textAlign="center" edit="any" width="90" userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#FFFFFF; color:{Decode(SUC_GUBN,'우편함','#00CC66','실패','#FF0099')}; sort:True;" inputType="text" id="h_FSS_ACPT_NO" value="금감원&lt;/br&gt;접수번호" displayMode="label"></w2:column>
+						<w2:column textAlign="center" edit="any" width="80" userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#FFFFFF; color:{Decode(SUC_GUBN,'우편함','#00CC66','실패','#FF0099')};" inputType="text" id="h_MOD_ADD_SEQ" value="정정추가&lt;/br&gt;일련번호" displayMode="label"></w2:column>
+						<w2:column hidden="true" textAlign="center" edit="any" width="80" userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#FFFFFF; color:{Decode(SUC_GUBN,'우편함','#00CC66','실패','#FF0099')};" inputType="text" id="h_DISCLS_ACPT_TP_CD" value="공시접수&lt;/br&gt;유형코드" displayMode="label"></w2:column>
+						<w2:column textAlign="center" edit="any" width="60" userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#FFFFFF; color:{Decode(SUC_GUBN,'우편함','#00CC66','실패','#FF0099')}; sort:True;" inputType="text" id="h_DISCLS_ACPT_TP_CD_NM" value="접수&lt;/br&gt;유형명" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="80" userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#FFFFFF; color:{Decode(SUC_GUBN,'우편함','#00CC66','실패','#FF0099')}; sort:True; data:10:거래소,11:공시총괄,12:상장총괄,13:시장총괄,14:선물시장,15:시장감시,16:증권상품,20:금감원,30:상장법인;" readOnly="true" inputType="text" id="h_SNDLOC_TP_CD" value="송신처&lt;/br&gt;구분" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="70" userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#FFFFFF; color:{Decode(SUC_GUBN,'우편함','#00CC66','실패','#FF0099')}; data:1:익일,2:당일,3:익당,4:익수; sort:True;" readOnly="true" inputType="text" id="h_NXTDD_TDD_TP_CD" value="익일&lt;/br&gt;당일" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="70" userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#FFFFFF; color:{Decode(SUC_GUBN,'우편함','#00CC66','실패','#FF0099')}; sort:True;" readOnly="true" inputType="text" id="h_SUC_GUBN" value="추출&lt;/br&gt;성공" displayMode="label"></w2:column>
+					</w2:row>
+				</w2:header>
+				<w2:gBody style="" id="gBody1">
+					<w2:row style="" id="">
+						<w2:column textAlign="center" width="40" inputType="text" id="column2" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="90" inputType="text" id="RCV_BAS_DD" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="55" inputType="text" id="FORM_CD" displayMode="label"></w2:column>
+						<w2:column textAlign="left" width="80" inputType="text" id="FORM_KOR_NM" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="55" inputType="text" id="DISCLS_OBJ_CORP_ISUR_CD" displayMode="label"></w2:column>
+						<w2:column textAlign="left" width="70" inputType="text" id="COM_ABBRV" displayMode="label"></w2:column>
+						<w2:column textAlign="left" width="60" inputType="text" id="FSS_RCV_FILE_NO" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="90" inputType="text" id="SHR_WRTRPT_ACPT_NO" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="90" inputType="text" id="FSS_ACPT_NO_RLT" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="90" inputType="text" id="ACPT_NO" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="90" inputType="text" id="MOD_OBJ_ACPT_NO" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="90" inputType="text" id="MOD_ORGN_DISCLS_ACPT_NO" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="90" inputType="text" id="FSS_ACPT_NO" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="80" inputType="text" id="MOD_ADD_SEQ" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="80" inputType="text" id="DISCLS_ACPT_TP_CD" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="60" inputType="text" id="DISCLS_ACPT_TP_CD_NM" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="80" inputType="select" id="SNDLOC_TP_CD" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="70" inputType="select" id="NXTDD_TDD_TP_CD" displayMode="label"></w2:column>
+						<w2:column textAlign="center" width="70" inputType="text" id="SUC_GUBN" displayMode="label"></w2:column>
+					</w2:row>
+				</w2:gBody>
+			</w2:gridView>
+		</xf:group><w2:textbox hierarchy="label_9" userData2=" class:Blue_Bold;" style="position:absolute; left:800px; top:720px; width:460px; height:21px; text-align:right;" id="label_9" label="※ 익일당일구분   익당: 익일공시를 당일로 처리, 익수:익일수동처리" class="txt_info" orgid="label_9">
+		</w2:textbox></xf:group><xf:group id="" class="hide"><xf:input maxlength="1000" hierarchy="txb_date_bg" userData2=" class:TopCondition_01_write;" style="position:absolute; left:81px; top:8px; width:76px; height:22px;" id="txb_date_bg" orgid="txb_date_bg"></xf:input></xf:group></body>
+</html>

@@ -1,0 +1,578 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDSTF26602.gfm" meta_screenName="제출기한관리" meta_screenId="ULDSTF26602">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<w2:layoutInfo/>
+		<w2:publicInfo method="scwin.onpageload,scwin.onpageunload,scwin.btn_Close_onclick,scwin.btn_Search_onclick,scwin.dts_Grid_OnLoadCompleted,scwin.btn_Excel_onclick,scwin.grd_Grid_OnDblClick,scwin.dts_Grid_OnLoadError,scwin.search,scwin.popupCallback,scwin.setCode,scwin.read,scwin.readForView,scwin.setParam,scwin.hideDebugCtrls"/>
+		<xf:model>
+			<w2:dataCollection baseNode="map"></w2:dataCollection>
+			<w2:workflowCollection/>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+
+// 화면 리사이징
+
+scwin.gDepCd;
+scwin.gEmpNo;
+scwin.gLdMktTp;
+scwin.gBondYn = js_bond_yn;
+scwin.gParamObj = new Array(8);
+scwin.gDepCd = js_dep_cd;
+scwin.gEmpNo = js_emp_no;
+scwin.gLdMktTp = js_market;
+
+///////// 2. 초기화 영역 /////////
+/**
+ * @method
+ * @name onpageload
+ * @description 화면 로딩 시 초기 처리 — init 순차 호출
+ * @returns {void}
+ * @hidden N
+ */
+scwin.onpageload = function() {
+    try {
+        scwin.hideDebugCtrls();
+        $c.cm.PanelToGroupBox(panel_1);
+        scwin.setCode();
+        $c.cm.setColumnProp(grd_Grid, "STK_CO_COUNT", "Show", false);
+        $c.cm.setColumnProp(grd_Grid, "KSQ_CO_COUNT", "Show", false);
+        $c.cm.setColumnProp(grd_Grid, "BND_CO_COUNT", "Show", false);
+        $c.cm.setColumnProp(grd_Grid, "CO_SUM_CNT", "Show", false);
+        if (scwin.gBondYn === 'Y') {
+            $c.cm.setColumnProp(grd_Grid, "BND_CO_COUNT", "Show", true);
+        } else {
+            if (scwin.gLdMktTp === '1') {
+                $c.cm.setColumnProp(grd_Grid, "STK_CO_COUNT", "Show", true);
+            } else if (scwin.gLdMktTp === '2') {
+                $c.cm.setColumnProp(grd_Grid, "KSQ_CO_COUNT", "Show", true);
+            } else if (scwin.gLdMktTp === '9') {
+                $c.cm.setColumnProp(grd_Grid, "STK_CO_COUNT", "Show", true);
+                $c.cm.setColumnProp(grd_Grid, "KSQ_CO_COUNT", "Show", true);
+                $c.cm.setColumnProp(grd_Grid, "BND_CO_COUNT", "Show", true);
+                $c.cm.setColumnProp(grd_Grid, "CO_SUM_CNT", "Show", true);
+                $c.cm.setColumnProp(grd_Grid, "STK_CO_COUNT", "Name", '유가;상장회사수');
+                $c.cm.setColumnProp(grd_Grid, "KSQ_CO_COUNT", "Name", '코스닥;상장회사수');
+            }
+        }
+        const gYYYY = $c.ut.cGetToday("yyyymmdd").substring(0, 4);
+        let gMemo = '※ 상장회사수는 주권에 한하며, ' + gYYYY + '년도 기준 데이터 입니다.';
+        if (scwin.gBondYn === 'Y') {
+            $c.cm.setColumnProp(grd_Grid, "CO_COUNT", "Name", '채권공시;법인수');
+            gMemo = '※ 채권공시법인 회사수는  ' + gYYYY + '년도 기준 데이터 입니다.(채권의 경우 결산월이 여러개인 경우 결산월마다 count 됩니다.)';
+        }
+        txb_memo.setValue(gMemo);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF26602.onpageload" });
+    }
+};
+
+/**
+ * @method
+ * @name onpageunload
+ * @description 화면 언로드 시 정리 처리
+ * @returns {void}
+ * @hidden N
+ */
+scwin.onpageunload = function() {
+};
+
+///////// 3. 컴포넌트 이벤트 영역 /////////
+/**
+ * @method
+ * @name btn_Close_onclick
+ * @description 「닫기」 클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.btn_Close_onclick = async function() {
+    try {
+        await $c.win.closePopup();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF26602.btn_Close_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_Search_onclick
+ * @description 「조회」 클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.btn_Search_onclick = async function() {
+    try {
+        await scwin.search();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF26602.btn_Search_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name dts_Grid_OnLoadCompleted
+ * @description dts_Grid 로드 완료 후처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @param {Number} rowcount 조회 건수
+ * @returns {void}
+ * @hidden N
+ */
+scwin.dts_Grid_OnLoadCompleted = function(rowcount) {
+    // if (rowcount > 0)
+    //    grd_Grid.AutoResizeAllCol(true);
+};
+
+/**
+ * @method
+ * @name btn_Excel_onclick
+ * @description 「엑셀다운로드」 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.btn_Excel_onclick = function() {
+    try {
+        $c.stf.doLogSave('ULDSTF26602.xml', SCREN_PROCS_TP_CD_07);
+        $c.data.downloadGridViewExcel(grd_Grid, {fileName: "제출기한관리목록", type: "8"});
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF26602.btn_Excel_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name grd_Grid_OnDblClick
+ * @description grd_Grid 더블클릭 처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @param {Number} row 행 인덱스
+ * @param {*} colid colid
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.grd_Grid_OnDblClick = async function(row, colid) {
+    try {
+        if (js_svrGubun !== 'dr') {
+            await scwin.read(grd_Grid, row, colid);
+        }
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF26602.grd_Grid_OnDblClick" });
+    }
+};
+
+/**
+ * @method
+ * @name dts_Grid_OnLoadError
+ * @description dts_Grid 로드 오류 처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.dts_Grid_OnLoadError = async function() {
+    try {
+        await $c.win.alert(dts_Grid);
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF26602.dts_Grid_OnLoadError" });
+    }
+};
+
+///////// 4. 서브미션 콜백 영역 /////////
+/**
+ * @method
+ * @name search
+ * @description search 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.search = async function() {
+    const vYYYY = cmb_YYYY.getValue();
+    // url += "&MKT_ID=" + vMKT_ID;
+    url += "&BAS_YYYY=" + vYYYY;
+    // url += "&BOND_YN=" + gBondYn;
+    url += "&SCREN_ID=" + 'ULDSTF26602.xml';
+    url += "&SCREN_PROCES_TP_CD=" + SCREN_PROCS_TP_CD_01;
+    const sbmOptions = {
+        id : "sbm_dts_Grid",
+        action : "/SubmitStatus.do",
+        ref : "",
+        target : "dts_Grid=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+};
+
+/**
+ * @method
+ * @name popupCallback
+ * @description browserPopup 팝업의 callback 함수. 부모창에서 팝업 결과 값을 처리한다.
+ * @param {*} arg 팝업에서 전달받은 값
+ * @returns {void}
+ * @hidden N
+ */
+scwin.popupCallback = function (arg) {
+    // TO-DO : arg 값 확인 후 업무 로직 추가
+};
+
+///////// 5. 일반/업무 함수 영역 /////////
+/**
+ * @method
+ * @name setCode
+ * @description set Code 처리
+ * @returns {void}
+ * @hidden N
+ */
+scwin.setCode = function() {
+    const ToDay = new Date();
+    const yyyy = parseInt(ToDay.getYear(), 10) + 2;
+    let str = "";
+    for (let i = yyyy; i >= 1980; i--) {
+        str += i + "^" + i + ",";
+    }
+    str = str.substring(0, str.length - 1);
+    cmb_YYYY.CBData = str;
+    cmb_YYYY.setValue(ToDay.getYear());
+};
+
+/**
+ * @method
+ * @name read
+ * @description read 처리
+ * @param {String} GridID GridID
+ * @param {Number} row 행 인덱스
+ * @param {*} colid colid
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.read = async function(GridID, row, colid) {
+    let objDataID = document.all(GridID.DataID); // 가져오는 방식이 좀 특이하다..
+
+    // var vIBAS_ACNTCLS_MM = objDataID.NameString(row, "BAS_ACNTCLS_MM");
+
+    if (row < 1) return;
+    if (colid === "WRTRPT_SUBMIT_SCHDL_DD1") {
+        const vIWRTRPT_SUBMIT_SCHDL_DD1 = objDataID.getCellData(row, "WRTRPT_SUBMIT_SCHDL_DD1");
+        const vIBAS_YY1 = objDataID.getCellData(row, "BAS_YY1");
+        if (vIWRTRPT_SUBMIT_SCHDL_DD1 === "") {
+            return;
+        } else {
+            await scwin.readForView(GridID, row, 1, vIBAS_YY1);
+        }
+    } else if (colid === "WRTRPT_SUBMIT_SCHDL_DD2") {
+        const vIWRTRPT_SUBMIT_SCHDL_DD2 = objDataID.getCellData(row, "WRTRPT_SUBMIT_SCHDL_DD2");
+        const vIBAS_YY2 = objDataID.getCellData(row, "BAS_YY2");
+        if (vIWRTRPT_SUBMIT_SCHDL_DD2 === "") {
+            return;
+        } else {
+            await scwin.readForView(GridID, row, 2, vIBAS_YY2);
+        }
+    } else if (colid === "WRTRPT_SUBMIT_SCHDL_DD3") {
+        const vIWRTRPT_SUBMIT_SCHDL_DD3 = objDataID.getCellData(row, "WRTRPT_SUBMIT_SCHDL_DD3");
+        const vIBAS_YY3 = objDataID.getCellData(row, "BAS_YY3");
+        if (vIWRTRPT_SUBMIT_SCHDL_DD3 === "") {
+            return;
+        } else {
+            await scwin.readForView(GridID, row, 3, vIBAS_YY3);
+        }
+    } else if (colid === "WRTRPT_SUBMIT_SCHDL_DD4") {
+        const vIWRTRPT_SUBMIT_SCHDL_DD4 = objDataID.getCellData(row, "WRTRPT_SUBMIT_SCHDL_DD4");
+        const vIBAS_YY4 = objDataID.getCellData(row, "BAS_YY4");
+        if (vIWRTRPT_SUBMIT_SCHDL_DD4 === "") {
+            return;
+        } else {
+            await scwin.readForView(GridID, row, 4, vIBAS_YY4);
+        }
+    } else if (colid === "WRTRPT_SUBMIT_SCHDL_DD5") {
+        const vIWRTRPT_SUBMIT_SCHDL_DD5 = objDataID.getCellData(row, "WRTRPT_SUBMIT_SCHDL_DD5");
+        const vIBAS_YY5 = objDataID.getCellData(row, "BAS_YY5");
+        if (vIWRTRPT_SUBMIT_SCHDL_DD5 === "") {
+            return;
+        } else {
+            await scwin.readForView(GridID, row, 5, vIBAS_YY5);
+        }
+    } else if (colid === "WRTRPT_SUBMIT_SCHDL_DD6") {
+        const vIWRTRPT_SUBMIT_SCHDL_DD6 = objDataID.getCellData(row, "WRTRPT_SUBMIT_SCHDL_DD6");
+        const vIBAS_YY6 = objDataID.getCellData(row, "BAS_YY6");
+        if (vIWRTRPT_SUBMIT_SCHDL_DD6 === "") {
+            return;
+        } else {
+            await scwin.readForView(GridID, row, 6, vIBAS_YY6);
+        }
+    } else if (colid === "WRTRPT_SUBMIT_SCHDL_DD7") {
+        const vIWRTRPT_SUBMIT_SCHDL_DD7 = objDataID.getCellData(row, "WRTRPT_SUBMIT_SCHDL_DD7");
+        const vIBAS_YY7 = objDataID.getCellData(row, "BAS_YY7");
+        if (vIWRTRPT_SUBMIT_SCHDL_DD7 === "") {
+            return;
+        } else {
+            await scwin.readForView(GridID, row, 7, vIBAS_YY7);
+        }
+    } else if (colid === "WRTRPT_SUBMIT_SCHDL_DD8") {
+        const vIWRTRPT_SUBMIT_SCHDL_DD8 = objDataID.getCellData(row, "WRTRPT_SUBMIT_SCHDL_DD8");
+        const vIBAS_YY8 = objDataID.getCellData(row, "BAS_YY8");
+        if (vIWRTRPT_SUBMIT_SCHDL_DD8 === "") {
+            return;
+        } else {
+            await scwin.readForView(GridID, row, 8, vIBAS_YY8);
+        }
+    } else if (colid === "WRTRPT_SUBMIT_SCHDL_DDA") {
+        const vIWRTRPT_SUBMIT_SCHDL_DDA = objDataID.getCellData(row, "WRTRPT_SUBMIT_SCHDL_DDA");
+        const vIBAS_YYA = objDataID.getCellData(row, "BAS_YYA");
+        if (vIWRTRPT_SUBMIT_SCHDL_DDA === "") {
+            return;
+        } else {
+            await scwin.readForView(GridID, row, 'A', vIBAS_YYA);
+        }
+    } else if (colid === "WRTRPT_SUBMIT_SCHDL_DDB") {
+        const vIWRTRPT_SUBMIT_SCHDL_DDB = objDataID.getCellData(row, "WRTRPT_SUBMIT_SCHDL_DDB");
+        const vIBAS_YYB = objDataID.getCellData(row, "BAS_YYB");
+        if (vIWRTRPT_SUBMIT_SCHDL_DDB === "") {
+            return;
+        } else {
+            await scwin.readForView(GridID, row, 'B', vIBAS_YYB);
+        }
+    } else if (colid === "WRTRPT_SUBMIT_SCHDL_DDC") {
+        const vIWRTRPT_SUBMIT_SCHDL_DDC = objDataID.getCellData(row, "WRTRPT_SUBMIT_SCHDL_DDC");
+        const vIBAS_YYC = objDataID.getCellData(row, "BAS_YYC");
+        if (vIWRTRPT_SUBMIT_SCHDL_DDC === "") {
+            return;
+        } else {
+            await scwin.readForView(GridID, row, 'C', vIBAS_YYC);
+        }
+    } else if (colid === "WRTRPT_SUBMIT_SCHDL_DDD") {
+        const vIWRTRPT_SUBMIT_SCHDL_DDD = objDataID.getCellData(row, "WRTRPT_SUBMIT_SCHDL_DDD");
+        const vIBAS_YYD = objDataID.getCellData(row, "BAS_YYD");
+        if (vIWRTRPT_SUBMIT_SCHDL_DDD === "") {
+            return;
+        } else {
+            await scwin.readForView(GridID, row, 'D', vIBAS_YYD);
+        }
+    } else {
+
+    }
+};
+
+/**
+ * @method
+ * @name readForView
+ * @description 수정팝업
+ * @param {String} GridID GridID
+ * @param {Number} row 행 인덱스
+ * @param {*} gubun gubun
+ * @param {*} vBAS_YY vBAS_YY
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.readForView = async function(GridID, row, gubun, vBAS_YY) {
+    const CMD = "R";
+    let objDataID = document.all(GridID.DataID); // 가져오는 방식이 좀 특이하다..
+    const vIBAS_ACNTCLS_MM = objDataID.getCellData(row, "BAS_ACNTCLS_MM");
+    const vIGUBUN = gubun;
+    if (await scwin.setParam(CMD, vBAS_YY, vIBAS_ACNTCLS_MM, vIGUBUN)) {
+        // formal arguments
+        const options = {
+            id: "ULDSTF26604",
+            title: "상세조회",
+            type: "browserPopup",
+            width: "480px",
+            height: "190px",
+            callbackFn: "scwin.popupCallback"
+        };
+
+        $c.win.openPopup("/dsclsrch/ULDSTF26604.gfm", options);
+    }
+};
+
+/**
+ * @method
+ * @name setParam
+ * @description paramObj Update
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.setParam = async function() {
+    // child에 param을 넘긴다.
+    if (typeof(scwin.gParamObj) === "undefined") {
+        await $c.win.alert("전역변수 gParamObj를 선언하세요.");
+        return false;
+    }
+    const argv = scwin.setParam.arguments;
+    const argc = scwin.setParam.arguments.length;
+    scwin.gParamObj = new Array(argc); // 초기화
+    for (let i = 0; i < argc; i++) {
+        // actual arguments
+        eval("gParamObj.param" + i + " = argv[" + i + "]");
+    }
+    return true;
+};
+
+/**
+ * @method
+ * @name hideDebugCtrls
+ * @description hide Debug Ctrls 처리
+ * @returns {void}
+ * @hidden N
+ */
+scwin.hideDebugCtrls = function() {
+
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+		<!-- Tag is Not matched with wCraft2 Rule :<style/>-->
+		<xf:model>
+			<!-- Tag is Not matched with wCraft2 Rule :<mxdataset id="dts_Grid" onloaderror="dts_Grid_OnLoadError" syncload="False" userData2=" onloadcompleted:dts_Grid_OnLoadCompleted;" orgid="dts_Grid" hierarchy="dts_Grid"/>-->
+		</xf:model>
+		<xf:group class="sub_contents">
+			<xf:group class="schbox" id="panel_1" meta_snippetCategory="03_조회영역" meta_snippetKeyComponent="true"
+				meta_snippetName="3_01 조회조건1행" style="">
+				<xf:group class="schbox_inner" id="" style="">
+					<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl " id="" style="" tagname="table">
+						<w2:attributes>
+							<w2:summary></w2:summary>
+						</w2:attributes>
+						<xf:group tagname="colgroup">
+							<xf:group style="width:100px;" tagname="col"></xf:group>
+							<xf:group style="" tagname="col"></xf:group>
+						</xf:group>
+						<xf:group class="" id="" style="" tagname="tr">
+							<xf:group class="w2tb_th" style="" tagname="th">
+								<w2:textbox id="label_3" label="제출년도" style="" userData2=" class:TopCondition_01;"></w2:textbox>
+							</xf:group>
+							<xf:group class="w2tb_td" style="" tagname="td">
+								<xf:select1 appearance="minimal" disabledClass="w2selectbox_disabled" displayMode="label" id="cmb_YYYY"
+									selectedData="true" style="width:90px;"
+									userData2=" index:0; inheritcolor:False; listcount:10; listexprformat:text^1^70; xpstyle:True; font-family:돋움;">
+								</xf:select1>
+							</xf:group>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+				<xf:group class="btn_schbox" id="" style="">
+					<xf:trigger class="btn_cm sch" cursor="pointer" ev:onclick="scwin.btn_Search_onclick" id="btn_Search"
+						src="../img/btn_select.gif" style="" text="조회">
+						<xf:label><![CDATA[조회]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+			<xf:group id="" class="titbox">
+				<xf:group id="" class="rt">
+					<xf:trigger cursor="pointer" src="../img/btn_excelsave.gif" ev:onclick="scwin.btn_Excel_onclick" style="" id="btn_Excel"
+						text="엑셀다운로드" class="btn_cm download">
+						<xf:label><![CDATA[엑셀다운로드]]></xf:label>
+					</xf:trigger>
+					<xf:trigger cursor="pointer" src="../img/btn_close.gif" ev:onclick="scwin.btn_Close_onclick" style="" id="btn_Close"
+						text="닫기" class="btn_cm">
+						<xf:label><![CDATA[닫기]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+			<xf:group id="" class="gvwbox">
+				<w2:gridView id="grd_Grid"
+					userData2=" class:Grid_01; autoresizing:True; autoresizingallcol:True; autoresizingwithheader:True; colsizing:True; fillarea:True; gtitleheight:0; headborder:0; titleheight:40; xtitleheight:0; ondblclick:grd_Grid_OnDblClick;"
+					style="height:153px" dataList="data:dts_Grid" class="gvw" orgid="grd_Grid" hierarchy="grd_Grid" autoFit="allColumn"
+					autoFitMinWidth="1300">
+					<w2:caption id="caption1" style="" value="this is a grid caption." />
+					<w2:header id="header1" style="">
+						<w2:row>
+							<w2:column id="BAS_ACNTCLS_MM_YY_H" width="50" value="결산월" textAlign="center" displayMode="label" inputType="text"
+								rowInfo="0" />
+							<w2:column id="STK_CO_COUNT_H" width="70" value="상장&lt;/br&gt;회사수" textAlign="center" displayMode="label"
+								inputType="text" rowInfo="0" />
+							<w2:column id="KSQ_CO_COUNT_H" width="70" value="상장&lt;/br&gt;회사수" textAlign="center" displayMode="label"
+								inputType="text" rowInfo="0" />
+							<w2:column id="BND_CO_COUNT_H" width="70" value="채권공시&lt;/br&gt;회사수" textAlign="center" displayMode="label"
+								inputType="text" rowInfo="0" />
+							<w2:column id="CO_SUM_CNT_H" width="60" userData2=" value:{STK_CO_COUNT+KSQ_CO_COUNT+BND_CO_COUNT};" value="합계"
+								textAlign="center" displayMode="label" inputType="text" rowInfo="0" />
+							<w2:column id="WRTRPT_SUBMIT_SCHDL_DD8_H" width="80" value="주식배당&lt;/br&gt;예고일" textAlign="center"
+								userData2=" cursor:hand; bgcolor:#ffff99; mask:XXXX-XX-XX;" displayMode="label" inputType="text" rowInfo="0" />
+							<w2:column id="WRTRPT_SUBMIT_SCHDL_DD7_H" width="80" value="감사&lt;/br&gt;보고서" textAlign="center"
+								userData2=" cursor:hand; bgcolor:#ffff99; mask:XXXX-XX-XX;" displayMode="label" inputType="text" rowInfo="0" />
+							<w2:column id="WRTRPT_SUBMIT_SCHDL_DD1_H" width="80" value="사업&lt;/br&gt;보고서" textAlign="center"
+								userData2=" cursor:hand; bgcolor:#ffff99; mask:XXXX-XX-XX;" displayMode="label" inputType="text" rowInfo="0" />
+							<w2:column id="WRTRPT_SUBMIT_SCHDL_DDA_H" width="80" value="사업(연결)&lt;/br&gt;보고서" textAlign="center"
+								userData2=" cursor:hand; bgcolor:#ffff99; mask:XXXX-XX-XX;" displayMode="label" inputType="text" rowInfo="0" />
+							<w2:column id="WRTRPT_SUBMIT_SCHDL_DD2_H" width="80" value="연결사업&lt;/br&gt;보고서" textAlign="center"
+								userData2=" cursor:hand; bgcolor:#ffff99; mask:XXXX-XX-XX;" displayMode="label" inputType="text" rowInfo="0" />
+							<w2:column id="WRTRPT_SUBMIT_SCHDL_DD3_H" width="80" value="1분기&lt;/br&gt;보고서" textAlign="center"
+								userData2=" cursor:hand; bgcolor:#ffff99; mask:XXXX-XX-XX;" displayMode="label" inputType="text" rowInfo="0" />
+							<w2:column id="WRTRPT_SUBMIT_SCHDL_DDB_H" width="80" value="1분기(연결)&lt;/br&gt;보고서" textAlign="center"
+								userData2=" cursor:hand; bgcolor:#ffff99; mask:XXXX-XX-XX;" displayMode="label" inputType="text" rowInfo="0" />
+							<w2:column id="WRTRPT_SUBMIT_SCHDL_DD4_H" width="80" value="결합사업&lt;/br&gt;보고서" textAlign="center"
+								userData2=" cursor:hand; bgcolor:#ffff99; mask:XXXX-XX-XX;" displayMode="label" inputType="text" rowInfo="0" />
+							<w2:column id="WRTRPT_SUBMIT_SCHDL_DD5_H" width="80" value="반기&lt;/br&gt;보고서" textAlign="center"
+								userData2=" cursor:hand; bgcolor:#ffff99; mask:XXXX-XX-XX;" displayMode="label" inputType="text" rowInfo="0" />
+							<w2:column id="WRTRPT_SUBMIT_SCHDL_DDC_H" width="80" value="반기(연결)&lt;/br&gt;보고서" textAlign="center"
+								userData2=" cursor:hand; bgcolor:#ffff99; mask:XXXX-XX-XX;" displayMode="label" inputType="text" rowInfo="0" />
+							<w2:column id="WRTRPT_SUBMIT_SCHDL_DD6_H" width="80" value="3분기&lt;/br&gt;보고서" textAlign="center"
+								userData2=" cursor:hand; bgcolor:#ffff99; mask:XXXX-XX-XX;" displayMode="label" inputType="text" rowInfo="0" />
+							<w2:column id="WRTRPT_SUBMIT_SCHDL_DDD_H" width="80" value="3분기(연결)&lt;/br&gt;보고서" textAlign="center"
+								userData2=" cursor:hand; bgcolor:#ffff99; mask:XXXX-XX-XX;" displayMode="label" inputType="text" rowInfo="0" />
+							<w2:column id="BAS_ACNTCLS_MM_H" width="60" hidden="true" value="BAS_ACNTCLS_MM_YY" displayMode="label"
+								inputType="text" rowInfo="0" textAlign="center" />
+							<w2:column id="BAS_YY1_H" width="60" hidden="true" value="BAS_YY1" displayMode="label" inputType="text"
+								rowInfo="0" textAlign="center" />
+							<w2:column id="BAS_YY2_H" width="60" hidden="true" value="BAS_YY2" displayMode="label" inputType="text"
+								rowInfo="0" textAlign="center" />
+							<w2:column id="BAS_YY3_H" width="60" hidden="true" value="BAS_YY3" displayMode="label" inputType="text"
+								rowInfo="0" textAlign="center" />
+							<w2:column id="BAS_YY4_H" width="60" hidden="true" value="BAS_YY4" displayMode="label" inputType="text"
+								rowInfo="0" textAlign="center" />
+							<w2:column id="BAS_YY5_H" width="60" hidden="true" value="BAS_YY5" displayMode="label" inputType="text"
+								rowInfo="0" textAlign="center" />
+							<w2:column id="BAS_YY6_H" width="60" hidden="true" value="BAS_YY6" displayMode="label" inputType="text"
+								rowInfo="0" textAlign="center" />
+							<w2:column id="BAS_YY7_H" width="60" hidden="true" value="BAS_YY7" displayMode="label" inputType="text"
+								rowInfo="0" textAlign="center" />
+							<w2:column id="BAS_YY8_H" width="60" hidden="true" value="BAS_YY7" displayMode="label" inputType="text"
+								rowInfo="0" textAlign="center" />
+							<w2:column id="BAS_YYA_H" width="60" hidden="true" value="BAS_YYA" displayMode="label" inputType="text"
+								rowInfo="0" textAlign="center" />
+							<w2:column id="BAS_YYB_H" width="60" hidden="true" value="BAS_YYB" displayMode="label" inputType="text"
+								rowInfo="0" textAlign="center" />
+							<w2:column id="BAS_YYC_H" width="60" hidden="true" value="BAS_YYC" displayMode="label" inputType="text"
+								rowInfo="0" textAlign="center" />
+							<w2:column id="BAS_YYD_H" width="60" hidden="true" value="BAS_YYD" displayMode="label" inputType="text"
+								rowInfo="0" textAlign="center" />
+						</w2:row>
+					</w2:header>
+					<w2:gBody id="gBody1" style="">
+						<w2:row id="" style="">
+							<w2:column id="BAS_ACNTCLS_MM_YY" textAlign="center" width="50" inputType="text" displayMode="label" />
+							<w2:column id="STK_CO_COUNT" textAlign="center" width="70" inputType="text" displayMode="label" />
+							<w2:column id="KSQ_CO_COUNT" textAlign="center" width="70" inputType="text" displayMode="label" />
+							<w2:column id="BND_CO_COUNT" textAlign="center" width="70" inputType="text" displayMode="label" />
+							<w2:column id="CO_SUM_CNT" textAlign="center" width="60" inputType="text" displayMode="label" />
+							<w2:column id="WRTRPT_SUBMIT_SCHDL_DD8" textAlign="center" width="80" inputType="text" displayMode="label" />
+							<w2:column id="WRTRPT_SUBMIT_SCHDL_DD7" textAlign="center" width="80" inputType="text" displayMode="label" />
+							<w2:column id="WRTRPT_SUBMIT_SCHDL_DD1" textAlign="center" width="80" inputType="text" displayMode="label" />
+							<w2:column id="WRTRPT_SUBMIT_SCHDL_DDA" textAlign="center" width="80" inputType="text" displayMode="label" />
+							<w2:column id="WRTRPT_SUBMIT_SCHDL_DD2" textAlign="center" width="80" inputType="text" displayMode="label" />
+							<w2:column id="WRTRPT_SUBMIT_SCHDL_DD3" textAlign="center" width="80" inputType="text" displayMode="label" />
+							<w2:column id="WRTRPT_SUBMIT_SCHDL_DDB" textAlign="center" width="80" inputType="text" displayMode="label" />
+							<w2:column id="WRTRPT_SUBMIT_SCHDL_DD4" textAlign="center" width="80" inputType="text" displayMode="label" />
+							<w2:column id="WRTRPT_SUBMIT_SCHDL_DD5" textAlign="center" width="80" inputType="text" displayMode="label" />
+							<w2:column id="WRTRPT_SUBMIT_SCHDL_DDC" textAlign="center" width="80" inputType="text" displayMode="label" />
+							<w2:column id="WRTRPT_SUBMIT_SCHDL_DD6" textAlign="center" width="80" inputType="text" displayMode="label" />
+							<w2:column id="WRTRPT_SUBMIT_SCHDL_DDD" textAlign="center" width="80" inputType="text" displayMode="label" />
+							<w2:column id="BAS_ACNTCLS_MM" textAlign="center" width="60" inputType="text" displayMode="label" />
+							<w2:column id="BAS_YY1" textAlign="center" width="60" inputType="text" displayMode="label" />
+							<w2:column id="BAS_YY2" textAlign="center" width="60" inputType="text" displayMode="label" />
+							<w2:column id="BAS_YY3" textAlign="center" width="60" inputType="text" displayMode="label" />
+							<w2:column id="BAS_YY4" textAlign="center" width="60" inputType="text" displayMode="label" />
+							<w2:column id="BAS_YY5" textAlign="center" width="60" inputType="text" displayMode="label" />
+							<w2:column id="BAS_YY6" textAlign="center" width="60" inputType="text" displayMode="label" />
+							<w2:column id="BAS_YY7" textAlign="center" width="60" inputType="text" displayMode="label" />
+							<w2:column id="BAS_YY8" textAlign="center" width="60" inputType="text" displayMode="label" />
+							<w2:column id="BAS_YYA" textAlign="center" width="60" inputType="text" displayMode="label" />
+							<w2:column id="BAS_YYB" textAlign="center" width="60" inputType="text" displayMode="label" />
+							<w2:column id="BAS_YYC" textAlign="center" width="60" inputType="text" displayMode="label" />
+							<w2:column id="BAS_YYD" textAlign="center" width="60" inputType="text" displayMode="label" />
+						</w2:row>
+					</w2:gBody>
+				</w2:gridView>
+			</xf:group>
+			
+			<w2:textbox id="txb_memo" label="" style="" class="txt_info bold"></w2:textbox>
+
+
+		</xf:group>
+<xf:group id="" class="hide"><xf:input maxlength="20" userData2=" class:TopCondition_01_read; font-family:돋움; font-weight:bold; border-color:#808080;" style="width:100%" readOnly="true" id="" class="txt_info"></xf:input></xf:group></body>
+</html>

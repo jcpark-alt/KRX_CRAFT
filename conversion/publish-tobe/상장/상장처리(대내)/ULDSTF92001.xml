@@ -1,0 +1,2287 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDSTF92001.gfm" meta_screenName="(팝업)신규상장종목등록" meta_screenId="ULDSTF92001">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<w2:layoutInfo/>
+		<w2:publicInfo method="scwin.onpageload,scwin.onpageunload,scwin.edt_PARVAL_OnKillFocus,scwin.cmb_STK_ISU_RSN_CD_onselchange,scwin.edt_ISU_SHRS_OnKillFocus,scwin.edt_ISU_CAP_OnKillFocus,scwin.img_ISU_CD_onclick,scwin.chk_PREFSTK_TP_CD_onclick,scwin.chk_INDEFINPD_YN_onclick,scwin.img_IsuNmGuide_onclick,scwin.img_ISU_ENG_SYMBL_onclick,scwin.img_ISU_DD_onclick,scwin.img_DIV_RECK_DD1_onclick,scwin.img_DIV_RECK_DD2_onclick,scwin.img_DIV_RECK_DD3_onclick,scwin.img_DIV_RECK_DD4_onclick,scwin.dts_NEWPREFSTK_OnLoadError,scwin.dts_DoubleChk_OnLoadError,scwin.dts_BfData_OnLoadError,scwin.dts_Isu_OnLoadError,scwin.dts_Isu_OnLoadCompleted,scwin.trs_Save_OnFail,scwin.trs_Save_OnSuccess,scwin.btn_Close_onclick,scwin.cmb_NPARVALSTK_YN_onselchange,scwin.searchCode,scwin.setComboCode,scwin.nprefstkReadSync,scwin.readSync,scwin.disclsYn,scwin.trs,scwin.resizeToWin,scwin.initForm,scwin.setSumblComponent,scwin.setInitLabel,scwin.getParIsuCd,scwin.setParIsuCd,scwin.bfReadSync,scwin.setPREFSTKEvent,scwin.setPanelPREFSTK,scwin.setPREFSTKItem,scwin.setCheckboxData,scwin.getCheckboxData,scwin.checkForm,scwin.checkNumber,scwin.save,scwin.update,scwin.getCheckboxNprefStk,scwin.delete,scwin.parentRefresh,scwin.calcuAccIsuShrs,scwin.calcusuCap,scwin.calcuAccIsuCap"/>
+		<xf:model>
+			<w2:dataCollection baseNode="map"></w2:dataCollection>
+			<w2:workflowCollection/>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+///////// 1. 변수 및 선언 영역 /////////
+scwin.visuShrsLabelNm = "주식";
+scwin.strCbd_NPARVALSTK_YN = "N^아니오,Y^예";
+// 세션정보를 얻기위한 함수사용
+scwin.fn_GetPar, scwin.fn_SetPar;
+scwin.vBzProcsNo;
+scwin.vSecugrpID, scwin.vSPOT_ISU_TRD_MKT_TP_CD;
+scwin.TR_JOB;
+
+///////// 2. 초기화 영역 /////////
+/**
+ * @method
+ * @name onpageload
+ * @description 화면 로딩 시 초기 처리 — init 순차 호출
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.onpageload = async function() {
+    try {
+        let parentWin = $c.frame.path("../");
+        const vCoBzProcsNo = parentWin.scwin.vBzProcsNo;
+        scwin.vBzProcsNo = parentWin.clickBzProcsNo;
+        scwin.vSecugrpID = parentWin.cmb_SECUGRP_ID.getValue();
+        scwin.vSPOT_ISU_TRD_MKT_TP_CD = parentWin.cmb_SPOT_ISU_TRD_MKT_TP_CD.getValue();
+        txb_ISUR_CD.setValue(parentWin.txb_ISUR_CD.getValue());
+        txb_COM_NM.setValue(parentWin.txb_COM_NM.getValue());
+        rowPos = parentWin.dts_Isu.getFocusedRowIndex();
+
+        /* buttonSet의 초기화를 수행한다.  각 용도에 맞게 이미지ID와 onclick event시 수행할 function을 지정한다. */
+        buttonSet.setSaveInfo(btn_Save, scwin.save); // 저장
+        buttonSet.setUpdateInfo(btn_Update, scwin.update); // 수정
+        buttonSet.setDeleteInfo(btn_Delete, scwin.delete); // 삭제
+
+        // resizeToWin() ;
+        await scwin.searchCode();
+        await scwin.setComboCode();
+        $c.cm.PanelToGroupBox(panel_Item);
+        scwin.setInitLabel();
+        scwin.setSumblComponent();
+        scwin.setPanelPREFSTK(false); // 일단 false;
+        scwin.setPREFSTKItem(false); // 일단 false;
+
+        if (scwin.vBzProcsNo !== "") {
+            await scwin.readSync();
+            await scwin.disclsYn();
+
+            // 공시여부가 Y인 경우 삭제를 못하도록 막음..(2015.11.26)
+            if (dts_DisclsYn.getRowCount() > 0) {
+                buttonSet.setObjImgSource(buttonSet.deleteInfo, "../img/btn_delete_d.gif");
+            }
+        } else {
+            const sbmOptions = {
+                id : "sbm_dts_Isu",
+                action : "/gauceSystemierAdaptor.do",
+                ref : "",
+                target : "dts_Isu=body.content",
+                isProcessMsg : false
+            };
+
+            const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+            // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+            dts_Isu.insertRow();
+            if (vCoBzProcsNo === "") {
+                await $c.win.alert("먼저 회사정보를 입력후 종목정보를 입력바랍니다.");
+                buttonSet.setErrorStatus(); // disable 시킨다.
+
+            } else {
+                edt_LIST_DD.setValue(parentWin.edt_LIST_DD.getValue());
+                const vlistClssCd = parentWin.cmb_LIST_CLSS_CD.getValue();
+                let vListMethdTpCd;
+                const vListMethdTpUpCd = vlistClssCd.substring(0, 1);
+                if (vListMethdTpUpCd === '1') {
+                    vListMethdTpCd = LIST_METHD_TP_CD_4;
+                } else if (vListMethdTpUpCd === '2') {
+                    vListMethdTpCd = LIST_METHD_TP_CD_5;
+                }
+                cmb_LIST_METHD_TP_CD.setValue(vListMethdTpCd);
+            }
+            let vCurDate = $c.ut.cGetToday("yyyymmdd");
+            if (edt_LIST_DD.getValue() <= vCurDate) {
+                buttonSet.setErrorStatus(); // disable 시킨다.
+
+            }
+            if (scwin.vSPOT_ISU_TRD_MKT_TP_CD === '1') {
+                // 자동 settiong
+                panel_ISU_ENG_SYMBL.show("");
+                txb_ISU_ENG_SYMBL.setValue(parentWin.txb_ISUR_SYMBL.getValue());
+            } else if (scwin.vSPOT_ISU_TRD_MKT_TP_CD === '2') {
+                panel_ISU_ENG_SYMBL.hide();
+            }
+        }
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF92001.onpageload" });
+    }
+};
+
+/**
+ * @method
+ * @name onpageunload
+ * @description 화면 언로드 시 정리 처리
+ * @returns {void}
+ * @hidden N
+ */
+scwin.onpageunload = function() {
+};
+
+///////// 3. 컴포넌트 이벤트 영역 /////////
+/**
+ * @method
+ * @name edt_PARVAL_OnKillFocus
+ * @description edt_PARVAL 포커스 이탈 처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.edt_PARVAL_OnKillFocus = async function() {
+    try {
+        if (cmb_NPARVALSTK_YN.getValue() === 'N' || cmb_NPARVALSTK_YN.getValue() === '') {
+            await scwin.calcusuCap();
+            await scwin.calcuAccIsuCap();
+        }
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF92001.edt_PARVAL_OnKillFocus" });
+    }
+};
+
+/**
+ * @method
+ * @name cmb_STK_ISU_RSN_CD_onselchange
+ * @description cmb_STK_ISU_RSN_CD onselchange 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.cmb_STK_ISU_RSN_CD_onselchange = async function() {
+    try {
+        await scwin.calcuAccIsuShrs();
+        if (cmb_NPARVALSTK_YN.getValue() === 'N' || cmb_NPARVALSTK_YN.getValue() === '') {
+            await scwin.calcuAccIsuCap();
+        }
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF92001.cmb_STK_ISU_RSN_CD_onselchange" });
+    }
+};
+
+/**
+ * @method
+ * @name edt_ISU_SHRS_OnKillFocus
+ * @description edt_ISU_SHRS 포커스 이탈 처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.edt_ISU_SHRS_OnKillFocus = async function() {
+    try {
+        await scwin.calcuAccIsuShrs();
+        if (cmb_NPARVALSTK_YN.getValue() === 'N' || cmb_NPARVALSTK_YN.getValue() === '') {
+            await scwin.calcusuCap();
+            await scwin.calcuAccIsuCap();
+        }
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF92001.edt_ISU_SHRS_OnKillFocus" });
+    }
+};
+
+/**
+ * @method
+ * @name edt_ISU_CAP_OnKillFocus
+ * @description edt_ISU_CAP 포커스 이탈 처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.edt_ISU_CAP_OnKillFocus = async function() {
+    try {
+        if (cmb_NPARVALSTK_YN.getValue() === 'N' || cmb_NPARVALSTK_YN.getValue() === '') {
+            await scwin.calcuAccIsuCap();
+        }
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF92001.edt_ISU_CAP_OnKillFocus" });
+    }
+};
+
+/**
+ * @method
+ * @name img_ISU_CD_onclick
+ * @description img_ISU_CD 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.img_ISU_CD_onclick = function() {
+    try {
+        scwin.fn_GetPar = scwin.getParIsuCd;
+        scwin.fn_SetPar = scwin.setParIsuCd;
+        $c.lc.fn_PopFindNewIsuOfIsur();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF92001.img_ISU_CD_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name chk_PREFSTK_TP_CD_onclick
+ * @description chk_PREFSTK_TP_CD 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.chk_PREFSTK_TP_CD_onclick = function() {
+    try {
+        if (chk_PREFSTK_TP_CD.checked) {
+            scwin.setPanelPREFSTK(true);
+        } else {
+            scwin.setPanelPREFSTK(false);
+        }
+        panel_Item.focus();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF92001.chk_PREFSTK_TP_CD_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name chk_INDEFINPD_YN_onclick
+ * @description chk_INDEFINPD_YN 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.chk_INDEFINPD_YN_onclick = function() {
+    try {
+        if (chk_PREFSTK_TP_CD.checked) {
+            edt_PREFSTK_CONTIN_DEADLINE_YYS.setValue('');
+            edt_PREFSTK_CONTIN_DEADLINE_MM.setValue('');
+            edt_PREFSTK_CONTIN_DEADLINE_DYS.setValue('');
+            edt_PREFSTK_END_DD.setValue('');
+        }
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF92001.chk_INDEFINPD_YN_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name img_IsuNmGuide_onclick
+ * @description 「종목명 입력기준안내」 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.img_IsuNmGuide_onclick = function() {
+    try {
+        $c.lic.fn_OpenDetailInputGuide();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF92001.img_IsuNmGuide_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name img_ISU_ENG_SYMBL_onclick
+ * @description 「중복체크」 클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.img_ISU_ENG_SYMBL_onclick = async function() {
+    try {
+        if (txb_ISU_ENG_SYMBL.getValue() === "") {
+            await $c.win.alert("[영문종목심볼]을 입력하세요.");
+            txb_ISU_ENG_SYMBL.focus();
+            return false;
+        } else {
+            if ($c.lc.fn_eng_symbl_check(txb_ISU_ENG_SYMBL.getValue())) {
+                $c.lc.fn_chkCorpSymblDoubleInput(txb_ISU_ENG_SYMBL.getValue(), txb_ISUR_CD.getValue(), dts_Symbl);
+                if (!$c.ut.isEmpty(MSG_SYMBL_DOUBLE_INPUT)) {
+                    await $c.win.alert(MSG_SYMBL_DOUBLE_INPUT);
+                }
+            } else {
+                txb_ISU_ENG_SYMBL.focus();
+                return false;
+            }
+        }
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF92001.img_ISU_ENG_SYMBL_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name img_ISU_DD_onclick
+ * @description img_ISU_DD 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.img_ISU_DD_onclick = function() {
+    try {
+        popUpCalendar2(edt_ISU_DD);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF92001.img_ISU_DD_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name img_DIV_RECK_DD1_onclick
+ * @description img_DIV_RECK_DD1 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.img_DIV_RECK_DD1_onclick = function() {
+    try {
+        popUpCalendar2(edt_DIV_RECK_DD1);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF92001.img_DIV_RECK_DD1_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name img_DIV_RECK_DD2_onclick
+ * @description img_DIV_RECK_DD2 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.img_DIV_RECK_DD2_onclick = function() {
+    try {
+        popUpCalendar2(edt_DIV_RECK_DD2);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF92001.img_DIV_RECK_DD2_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name img_DIV_RECK_DD3_onclick
+ * @description img_DIV_RECK_DD3 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.img_DIV_RECK_DD3_onclick = function() {
+    try {
+        popUpCalendar2(edt_DIV_RECK_DD3);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF92001.img_DIV_RECK_DD3_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name img_DIV_RECK_DD4_onclick
+ * @description img_DIV_RECK_DD4 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.img_DIV_RECK_DD4_onclick = function() {
+    try {
+        popUpCalendar2(edt_DIV_RECK_DD4);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF92001.img_DIV_RECK_DD4_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name dts_NEWPREFSTK_OnLoadError
+ * @description dts_NEWPREFSTK 로드 오류 처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.dts_NEWPREFSTK_OnLoadError = async function() {
+    try {
+        await $c.win.alert(dts_NEWPREFSTK);
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF92001.dts_NEWPREFSTK_OnLoadError" });
+    }
+};
+
+/**
+ * @method
+ * @name dts_DoubleChk_OnLoadError
+ * @description dts_DoubleChk 로드 오류 처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.dts_DoubleChk_OnLoadError = async function() {
+    try {
+        await $c.win.alert(dts_DoubleChk);
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF92001.dts_DoubleChk_OnLoadError" });
+    }
+};
+
+/**
+ * @method
+ * @name dts_BfData_OnLoadError
+ * @description dts_BfData 로드 오류 처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.dts_BfData_OnLoadError = async function() {
+    try {
+        await $c.win.alert(dts_BfData);
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF92001.dts_BfData_OnLoadError" });
+    }
+};
+
+/**
+ * @method
+ * @name dts_Isu_OnLoadError
+ * @description dts_Isu 로드 오류 처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.dts_Isu_OnLoadError = async function() {
+    try {
+        await $c.win.alert(dts_Isu);
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF92001.dts_Isu_OnLoadError" });
+    }
+};
+
+/**
+ * @method
+ * @name dts_Isu_OnLoadCompleted
+ * @description dts_Isu 로드 완료 후처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @param {Number} rowcount 조회 건수
+ * @returns {void}
+ * @hidden N
+ */
+scwin.dts_Isu_OnLoadCompleted = function(rowcount) {
+    try {
+        if (scwin.vBzProcsNo === "") {
+            buttonSet.setInsertStatus();
+            scwin.initForm('C');
+        } else {
+            scwin.initForm('X');
+            let vCurDate = $c.ut.cGetToday("yyyymmdd");
+            if (edt_LIST_DD.getValue() > vCurDate) {
+                buttonSet.setUpdateStatus();
+            } else {
+                buttonSet.setErrorStatus(); // disable 시킨다.
+
+            }
+        }
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF92001.dts_Isu_OnLoadCompleted" });
+    }
+};
+
+/**
+ * @method
+ * @name trs_Save_OnFail
+ * @description Save On Fail 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.trs_Save_OnFail = async function() {
+    try {
+        $c.lc.fn_alertMsg('F');
+        await $c.win.alert(trs_Save);
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF92001.trs_Save_OnFail" });
+    }
+};
+
+/**
+ * @method
+ * @name trs_Save_OnSuccess
+ * @description Save On Success 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.trs_Save_OnSuccess = async function() {
+    try {
+        $c.lc.fn_alertMsg('S');
+        scwin.parentRefresh();
+        if (buttonSet.status === "U") {
+            let parentWin = $c.frame.path("../");
+            parentWin.dts_Isu.setFocusedCell(rowPos, 0);
+        }
+        if (buttonSet.status === "D") {
+            // 삭제처리의 응답인 경우
+            await $c.win.closePopup();
+        } else {
+            await scwin.readSync();
+            await scwin.disclsYn();
+
+            // 공시여부가 Y인 경우 삭제를 못하도록 막음..(2015.11.26)
+            if (dts_DisclsYn.getRowCount() > 0) {
+                buttonSet.setObjImgSource(buttonSet.deleteInfo, "../img/btn_delete_d.gif");
+            }
+        }
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF92001.trs_Save_OnSuccess" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_Close_onclick
+ * @description 「닫기」 클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.btn_Close_onclick = async function() {
+    try {
+        await $c.win.closePopup();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF92001.btn_Close_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name cmb_NPARVALSTK_YN_onselchange
+ * @description cmb_NPARVALSTK_YN onselchange 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.cmb_NPARVALSTK_YN_onselchange = function() {
+    try {
+        if (cmb_NPARVALSTK_YN.getValue() === "Y") {
+            edt_PARVAL.hide();
+            edt_PER1STK_CAP.show("");
+            edt_PARVAL.setValue("0");
+        } else {
+            edt_PARVAL.show("");
+            edt_PER1STK_CAP.hide();
+            edt_PER1STK_CAP.setValue("0");
+        }
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF92001.cmb_NPARVALSTK_YN_onselchange" });
+    }
+};
+
+///////// 4. 서브미션 콜백 영역 /////////
+/**
+ * @method
+ * @name searchCode
+ * @description search Code 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.searchCode = async function() {
+    /*
+    00443 - 통화ISO코드
+     */
+    const arrCid = [{
+        cid: "CURR_ISO_CD",
+        cnm: "cmb_CURR_ISO_CD"
+    }];
+    let objCod;
+    const sbmOptions = {
+        id : "sbm_dts_Cod",
+        action : "/CodeAction.do",
+        ref : "",
+        target : "dts_Cod=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+    let strCbd = "",
+        i, j;
+    for (i = 0; i < arrCid.length; i++) {
+        objCod = document.getElementById(arrCid[i].cnm);
+        // alert('[objCod]'+objCod);
+        if (objCod === null) {
+            await $c.win.alert(arrCid[i].cnm);
+        }
+        strCbd = "";
+        for (j = 1; j <= dts_Cod.getRowCount(); j++) {
+            if (dts_Cod.getCellData(j, "CD_ENG_NM") === arrCid[i].cid) {
+                strCbd = strCbd + (strCbd === "" ? "" : ",") + dts_Cod.getCellData(j, "VALUE") + "^" + dts_Cod.getCellData(j, "TEXT");
+            }
+        }
+        objCod.CBData = strCbd;
+    }
+};
+
+/**
+ * @method
+ * @name setComboCode
+ * @description set Combo Code 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.setComboCode = async function() {
+    cmb_NPARVALSTK_YN.CBData = scwin.strCbd_NPARVALSTK_YN;
+    cmb_NPARVALSTK_YN.setSelectedIndex(0);
+    edt_PARVAL.show("");
+    edt_PER1STK_CAP.hide();
+    edt_PER1STK_CAP.setValue("0");
+    url += "&LD_MKT_TP_CD=" + scwin.vSPOT_ISU_TRD_MKT_TP_CD;
+    // 발행사유코드
+    const sbmOptions = {
+        id : "sbm_dts_STK_ISU_RSN_CD",
+        action : "/CodeAction.do",
+        ref : "",
+        target : "dts_STK_ISU_RSN_CD=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+};
+
+/**
+ * @method
+ * @name nprefstkReadSync
+ * @description nprefstk Read Sync 처리
+ * @param {*} isucd isucd
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.nprefstkReadSync = async function(isucd) {
+    const sbmOptions = {
+        id : "sbm_dts_NEWPREFSTK",
+        action : "/Listing.do",
+        ref : "",
+        target : "dts_NEWPREFSTK=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+    if (dts_NEWPREFSTK.getRowCount() > 0) {
+        dts_Isu.setCellData(1, "PREFSTK_ISU_DD", dts_NEWPREFSTK.getCellData(1, "ISU_DD"));
+        dts_Isu.setCellData(1, "PREFSTK_DIV_RT", dts_NEWPREFSTK.getCellData(1, "PREFSTK_DIV_RT"));
+        dts_Isu.setCellData(1, "PREFSTK_CONTIN_DEADLINE_YYS", dts_NEWPREFSTK.getCellData(1, "PREFSTK_CONTIN_DEADLINE_YYS"));
+        dts_Isu.setCellData(1, "PREFSTK_CONTIN_DEADLINE_MM", dts_NEWPREFSTK.getCellData(1, "PREFSTK_CONTIN_DEADLINE_MM"));
+        dts_Isu.setCellData(1, "PREFSTK_CONTIN_DEADLINE_DYS", dts_NEWPREFSTK.getCellData(1, "PREFSTK_CONTIN_DEADLINE_DYS"));
+        dts_Isu.setCellData(1, "PREFSTK_END_DD", dts_NEWPREFSTK.getCellData(1, "PREFSTK_END_DD"));
+        dts_Isu.setCellData(1, "INDEFINPD_YN", dts_NEWPREFSTK.getCellData(1, "INDEFINPD_YN"));
+        dts_Isu.setCellData(1, "PARTCTP_YN", dts_NEWPREFSTK.getCellData(1, "PARTCTP_YN"));
+        dts_Isu.setCellData(1, "ACCTP_YN", dts_NEWPREFSTK.getCellData(1, "ACCTP_YN"));
+        dts_Isu.setCellData(1, "NDIVTM_VOTERGHT_YN", dts_NEWPREFSTK.getCellData(1, "NDIVTM_VOTERGHT_YN"));
+        dts_Isu.setCellData(1, "NEWPREFSTK_REMK", dts_NEWPREFSTK.getCellData(1, "NEWPREFSTK_REMK"));
+        chk_PREFSTK_TP_CD.setValue(1);
+        scwin.setPREFSTKItem(true);
+        scwin.setPanelPREFSTK(true);
+        // alert(dts_NEWPREFSTK.Text);
+
+    } else {
+        dts_Isu.setCellData(1, "PREFSTK_ISU_DD", '');
+        dts_Isu.setCellData(1, "PREFSTK_DIV_RT", '');
+        dts_Isu.setCellData(1, "PREFSTK_CONTIN_DEADLINE_YYS", '');
+        dts_Isu.setCellData(1, "PREFSTK_CONTIN_DEADLINE_MM", '');
+        dts_Isu.setCellData(1, "PREFSTK_CONTIN_DEADLINE_DYS", '');
+        dts_Isu.setCellData(1, "PREFSTK_END_DD", '');
+        dts_Isu.setCellData(1, "INDEFINPD_YN", '');
+        dts_Isu.setCellData(1, "PARTCTP_YN", '');
+        dts_Isu.setCellData(1, "ACCTP_YN", '');
+        dts_Isu.setCellData(1, "NDIVTM_VOTERGHT_YN", '');
+        dts_Isu.setCellData(1, "NEWPREFSTK_REMK", '');
+        chk_PREFSTK_TP_CD.setValue(0);
+        scwin.setPanelPREFSTK(false);
+        scwin.setPREFSTKEvent();
+        // dts_NEWPREFSTK.DeleteRow(1);
+
+    }
+};
+
+/**
+ * @method
+ * @name readSync
+ * @description read Sync 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.readSync = async function() {
+    url += "&DIV_IDX=" + DIV_R_LISTING_ST_ISU_DTL;
+    url += "&BZ_PROCS_NO=" + scwin.vBzProcsNo;
+    const sbmOptions = {
+        id : "sbm_dts_Isu",
+        action : "/Newlisting.do",
+        ref : "",
+        target : "dts_Isu=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+    if (dts_Isu.getCellData(1, "PREFSTK_TP_CD") === '2') {
+        chk_PREFSTK_TP_CD.setValue(1);
+        scwin.setPREFSTKItem(true);
+        scwin.setPanelPREFSTK(true);
+    } else {
+        scwin.setPREFSTKEvent();
+    }
+    scwin.setCheckboxData(chk_INDEFINPD_YN, dts_Isu.getCellData(1, "INDEFINPD_YN"));
+    scwin.setCheckboxData(chk_PARTCTP_YN, dts_Isu.getCellData(1, "PARTCTP_YN"));
+    scwin.setCheckboxData(chk_ACCTP_YN, dts_Isu.getCellData(1, "ACCTP_YN"));
+    scwin.setCheckboxData(chk_NDIVTM_VOTERGHT_YN, dts_Isu.getCellData(1, "NDIVTM_VOTERGHT_YN"));
+    if (dts_Isu.getCellData(1, "NPARVALSTK_YN") === 'Y') {
+        edt_PARVAL.hide();
+        edt_PER1STK_CAP.show("");
+        edt_PARVAL.setValue("0");
+    } else {
+        edt_PARVAL.show("");
+        edt_PER1STK_CAP.hide();
+        edt_PER1STK_CAP.setValue("0");
+    }
+};
+
+/**
+ * @method
+ * @name disclsYn
+ * @description discls Yn 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.disclsYn = async function() {
+    url += "&method=listGeneral&outputMessageId=STKCERT_NEWLIST_DISCLSYN_INOUT";
+    url += "&service=krx.lds.stf.listingcommon.services.ListingCommonApp";
+    url += "&queryId=lds.stf.lstproc.stkcert.newlist.disclsYn.confrm.condition";
+    url += "&{P}param01=" + scwin.vBzProcsNo;
+    const sbmOptions = {
+        id : "sbm_dts_DisclsYn",
+        action : "/listingCommon.do",
+        ref : "",
+        target : "dts_DisclsYn=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+};
+
+/**
+ * @method
+ * @name trs
+ * @description trs 처리
+ * @param {*} trsIdx trsIdx
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.trs = async function(trsIdx) {
+    let vScrenProcTpCd;
+    if (scwin.TR_JOB === "I") {
+        vScrenProcTpCd = SCREN_PROCS_TP_CD_02;
+    } else if (scwin.TR_JOB === "U") {
+        vScrenProcTpCd = SCREN_PROCS_TP_CD_03;
+    } else if (scwin.TR_JOB === "D") {
+        vScrenProcTpCd = SCREN_PROCS_TP_CD_04;
+    }
+    let VListBzTpCd;
+    if (cmb_LIST_METHD_TP_CD.getValue() === LIST_METHD_TP_CD_4) {
+        VListBzTpCd = LIST_BZ_TP_CD_100; // 신규상장
+
+    } else if (cmb_LIST_METHD_TP_CD.getValue() === LIST_METHD_TP_CD_5) {
+        VListBzTpCd = LIST_BZ_TP_CD_110; // 재상장
+
+    }
+    dts_Isu.setCellData(1, "LIST_BZ_TP_CD", VListBzTpCd);
+    dts_Isu.setCellData(1, "ISUR_CD", txb_ISUR_CD.getValue());
+    dts_Isu.setCellData(1, "PREFSTK_TP_CD", scwin.getCheckboxNprefStk(chk_PREFSTK_TP_CD, cmb_STKCERT_KIND_CD.getValue()));
+    dts_Isu.setCellData(1, "INDEFINPD_YN", scwin.getCheckboxData(chk_INDEFINPD_YN));
+    dts_Isu.setCellData(1, "PARTCTP_YN", scwin.getCheckboxData(chk_PARTCTP_YN));
+    dts_Isu.setCellData(1, "ACCTP_YN", scwin.getCheckboxData(chk_ACCTP_YN));
+    dts_Isu.setCellData(1, "NDIVTM_VOTERGHT_YN", scwin.getCheckboxData(chk_NDIVTM_VOTERGHT_YN));
+
+    // alert('[dts_Isu]'+dts_Isu.text);
+
+    trs_Save.KeyName = "toinb_dataid4";
+    // [전환검토] trs_Save.Parameters → 동적 파라미터(필요 시 sbmOptions 에 반영)
+    // const sbmParams = {
+    //     TRS_IDX : trsIdx,
+    //     BZ_PROCS_NO : scwin.vBzProcsNo,
+    //     COUNT : "1",
+    //     GUBUN_CD : $c.stf.getObjectValue(cmb_LIST_METHD_TP_CD),
+    //     LIST_BZ_TP_CD : VListBzTpCd + ",DIV_IDX[0]=" + DIV_IDX_ISS_STK_HIST
+    // };
+    const sbmOptions = {
+        id : "sbm_trs_Save",
+        action : "/Listing.do",
+        ref : "dts_Isu",
+        target : "trs_Save=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+};
+
+///////// 5. 일반/업무 함수 영역 /////////
+/**
+ * @method
+ * @name resizeToWin
+ * @description resize To Win 처리
+ * @returns {void}
+ * @hidden N
+ */
+scwin.resizeToWin = function() {
+    // frame.Width = 280;
+    // frame.Height = 420;
+    $c.stf.MoveCenterOfParent();
+};
+
+/**
+ * @method
+ * @name initForm
+ * @description init Form 처리
+ * @param {*} initTyp initTyp
+ * @returns {void}
+ * @hidden N
+ */
+scwin.initForm = function(initTyp) {
+    if (initTyp === 'I') {
+        img_ISU_CD.setBackgroundImage("../img/btn_search.gif");
+        img_ISU_CD.setDisabled(false);
+    } else if (initTyp === 'X') {
+        img_ISU_CD.setBackgroundImage("../img/btn_search_d.gif");
+        img_ISU_CD.setDisabled(true);
+    }
+};
+
+/**
+ * @method
+ * @name setSumblComponent
+ * @description set Sumbl Component 처리
+ * @returns {void}
+ * @hidden N
+ */
+scwin.setSumblComponent = function() {
+    if (scwin.vSPOT_ISU_TRD_MKT_TP_CD === '1') {
+        txb_ISU_ENG_SYMBL.setReadOnly(false);
+        txb_ISU_ENG_SYMBL.style.backgroundColor = '#ffffff';
+        img_ISU_ENG_SYMBL.show("");
+    } else {
+        txb_ISU_ENG_SYMBL.setReadOnly(true);
+        txb_ISU_ENG_SYMBL.style.backgroundColor = '#b9d4f7';
+        img_ISU_ENG_SYMBL.hide();
+    }
+};
+
+/**
+ * @method
+ * @name setInitLabel
+ * @description set Init Label 처리
+ * @returns {void}
+ * @hidden N
+ */
+scwin.setInitLabel = function() {
+    if (scwin.vSecugrpID === SECUGRP_ID_DR) {
+        scwin.visuShrsLabelNm = "DR";
+        lb_PARVAL.setValue('DR당액면가/주당자본금');
+        lb_BF_ACC_ISU_SHRS.setValue('변경전 상장DR수');
+        lb_ISU_SHRS.setValue('증감상장DR수');
+        lb_ACC_ISU_SHRS.setValue('변경후 상장DR수');
+
+        // showObj(panel_PARVAL, false);
+        if (scwin.vSPOT_ISU_TRD_MKT_TP_CD === '1') {
+            panel_ISU_CAP.hide();
+        }
+    } else {
+        scwin.visuShrsLabelNm = "주식";
+        panel_PARVAL.show("");
+        panel_ISU_CAP.show("");
+    }
+    if (scwin.vSecugrpID === SECUGRP_ID_DR || scwin.vSecugrpID === SECUGRP_ID_FS) {
+        edt_PARVAL.MaxDecimalPlace = 3;
+        edt_ISU_CAP.MaxDecimalPlace = 3;
+    } else {
+        edt_PARVAL.MaxDecimalPlace = 0;
+        edt_ISU_CAP.MaxDecimalPlace = 0;
+    }
+};
+
+/**
+ * @method
+ * @name getParIsuCd
+ * @description 넘길 인수를 지정하는 펑션
+ * @param {Array} arrPar 팝업 파라미터 배열(참조 채움)
+ * @returns {void}
+ * @hidden N
+ */
+scwin.getParIsuCd = function(arrPar) {
+    // 넘길 인수를 지정하는 펑션
+    arrPar[0] = scwin.vSecugrpID;
+    arrPar[1] = txb_ISUR_CD.getValue(); // 코드값을 포함할 컨트롤
+    return
+    // ********************************************************************
+    // [WebSquare 전환 추가] 원본 소스와 비교 필요
+    //
+    // ********************************************************************
+    arrPar, length;
+};
+
+/**
+ * @method
+ * @name setParIsuCd
+ * @description set Par Isu Cd 처리
+ * @param {Array} arrPar 팝업 파라미터 배열(참조 채움)
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.setParIsuCd = async function(arrPar) {
+    // var dbClickYn =  arrPar[0].DBCLICKYN;
+    if (arrPar[0].ISU_CD !== "") {
+        txb_ISU_CD.setValue(arrPar[0].ISU_CD);
+        txb_ISU_KOR_NM.setValue(arrPar[0].ISU_KOR_NM);
+        txb_ISU_KOR_ABBRV.setValue(arrPar[0].ISU_KOR_ABBRV);
+        txb_ISU_ENG_NM.setValue(arrPar[0].ISU_ENG_NM);
+        txb_ISU_ENG_ABBRV.setValue(arrPar[0].ISU_ENG_ABBRV);
+        txb_ISU_SRT_CD.setValue(arrPar[0].ISU_SRT_CD);
+        txb_ISU_ENG_SYMBL.setValue(arrPar[0].ISU_ENG_SYMBL);
+        cmb_CURR_ISO_CD.setValue(arrPar[0].CURR_ISO_CD);
+        if (scwin.vSecugrpID === SECUGRP_ID_DR) {
+            cmb_STKCERT_KIND_CD.setValue('KDR'); // 주식의종류코드를 셋팅
+
+        } else if (scwin.vSecugrpID === SECUGRP_ID_FS) {
+            cmb_STKCERT_KIND_CD.setValue('000'); // 주식의종류코드를 셋팅
+
+        } else {
+            cmb_STKCERT_KIND_CD.setValue(txb_ISU_CD.getValue().substring(8, 11)); // 주식의종류코드를 셋팅
+
+        }
+        scwin.setPREFSTKEvent();
+        await scwin.nprefstkReadSync(txb_ISU_CD.getValue());
+        scwin.bfReadSync();
+    }
+};
+
+/**
+ * @method
+ * @name bfReadSync
+ * @description 변경전 주식수, 자본금 가져오기
+ * @returns {void}
+ * @hidden N
+ */
+scwin.bfReadSync = function() {
+    $c.lic.fn_bf_read_sync1(dts_BfData, txb_ISU_CD, edt_LIST_DD, edt_BF_ACC_ISU_SHRS, edt_BF_ACC_ISU_CAP);
+};
+
+/**
+ * @method
+ * @name setPREFSTKEvent
+ * @description set PREFSTKEvent 처리
+ * @returns {void}
+ * @hidden N
+ */
+scwin.setPREFSTKEvent = function() {
+    if (scwin.vSecugrpID === SECUGRP_ID_ST) {
+        if (cmb_STKCERT_KIND_CD.getValue() === '000') {
+            scwin.setPREFSTKItem(false);
+        } else {
+            scwin.setPREFSTKItem(true);
+        }
+    } else {
+        scwin.setPREFSTKItem(false);
+    }
+};
+
+/**
+ * @method
+ * @name setPanelPREFSTK
+ * @description set Panel PREFSTK 처리
+ * @param {*} isTrue isTrue
+ * @returns {void}
+ * @hidden N
+ */
+scwin.setPanelPREFSTK = function(isTrue) {
+    $c.stf.showObj(panel_PREFSTK, isTrue);
+};
+
+/**
+ * @method
+ * @name setPREFSTKItem
+ * @description set PREFSTKItem 처리
+ * @param {*} isTrue isTrue
+ * @returns {void}
+ * @hidden N
+ */
+scwin.setPREFSTKItem = function(isTrue) {
+    $c.stf.showObj(chk_PREFSTK_TP_CD, isTrue);
+    $c.stf.showObj(label_PREFSTK_TP_CD, isTrue);
+};
+
+/**
+ * @method
+ * @name setCheckboxData
+ * @description set Checkbox Data 처리
+ * @param {Object} obj 컴포넌트
+ * @param {*} val val
+ * @returns {void}
+ * @hidden N
+ */
+scwin.setCheckboxData = function(obj, val) {
+    if (val === 'Y') {
+        obj.setValue(1);
+    } else {
+        obj.setValue(0);
+    }
+};
+
+/**
+ * @method
+ * @name getCheckboxData
+ * @description get Checkbox Data 처리
+ * @param {Object} obj 컴포넌트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.getCheckboxData = function(obj) {
+    if (obj.checked) {
+        return 'Y';
+    } else {
+        return 'N';
+    }
+};
+
+/**
+ * @method
+ * @name checkForm
+ * @description check Form 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.checkForm = async function() {
+    let vCurDate = $c.ut.cGetToday("yyyymmdd");
+    if (txb_ISUR_CD.getValue() === "") {
+        await $c.win.alert("[법인코드] 항목값이  없습니다.");
+        txb_ISUR_CD.focus();
+        return false;
+    }
+    if (cmb_LIST_METHD_TP_CD.getValue() === "") {
+        await $c.win.alert("[상장방식]을 선택하세요.");
+        cmb_LIST_METHD_TP_CD.focus();
+        return false;
+    }
+    if (txb_ISU_CD.getValue() === "") {
+        await $c.win.alert("[종목]을 선택하세요.");
+        img_ISU_CD.focus();
+        return false;
+    }
+    if (scwin.TR_JOB === 'I') {
+        // 유가일경우에는 푼다.
+
+        // if ( fn_checkDoubleInput(getObjectValue(txb_ISU_CD)) )  return false;
+
+    }
+
+    // if (getObjectValue(cmb_LIST_METHD_TP_CD) == LIST_METHD_TP_CD_1) {
+    if (txb_ISU_SRT_CD.getValue() === "") {
+        await $c.win.alert("[종목단축코드]항목값이  없습니다."); // txb_ISU_SRT_CD.focus();return false;
+
+    }
+    if (txb_ISU_KOR_NM.getValue() === "") {
+        await $c.win.alert("[한글종목명]을 입력하세요.");
+        txb_ISU_KOR_NM.focus();
+        return false;
+    }
+    if (!$c.stf.checkMaxLength(txb_ISU_KOR_NM, 60, "한글종목명")) return false;
+    if (txb_ISU_KOR_ABBRV.getValue() === "") {
+        await $c.win.alert("[한글종목약명]을 입력하세요.");
+        txb_ISU_KOR_ABBRV.focus();
+        return false;
+    }
+    if (!$c.stf.checkMaxLength(txb_ISU_KOR_ABBRV, 30, "한글종목약명")) return false;
+    if (txb_ISU_ENG_NM.getValue() === "") {
+        await $c.win.alert("[영문종목명]을 입력하세요.");
+        txb_ISU_ENG_NM.focus();
+        return false;
+    }
+    if (!$c.stf.checkMaxLength(txb_ISU_ENG_NM, 60, "영문종목명")) return false;
+    if (txb_ISU_ENG_ABBRV.getValue() === "") {
+        await $c.win.alert("[영문종목약명]을 입력하세요.");
+        txb_ISU_ENG_ABBRV.focus();
+        return false;
+    }
+    if (!$c.stf.checkMaxLength(txb_ISU_ENG_ABBRV, 30, "영문종목약명")) return false;
+    if (scwin.vSPOT_ISU_TRD_MKT_TP_CD === "1") {
+        if (txb_ISU_ENG_SYMBL.getValue() === "") {
+            await $c.win.alert("[영문종목심볼]을 입력하세요.");
+            txb_ISU_ENG_SYMBL.focus();
+            return false;
+        }
+        if ($c.lc.fn_eng_symbl_check(txb_ISU_ENG_SYMBL.getValue())) {
+            if (!$c.lc.fn_chkCorpSymblDoubleInput(txb_ISU_ENG_SYMBL.getValue(), txb_ISUR_CD.getValue(), dts_Symbl)) {
+                await $c.win.alert(MSG_SYMBL_DOUBLE_INPUT);
+                return false;
+            }
+        } else {
+            txb_ISU_ENG_SYMBL.focus();
+            return false;
+        }
+    }
+    // }
+
+    if (edt_LIST_DD.getValue() === "") {
+        await $c.win.alert("[상장일]을 입력하세요.");
+        edt_LIST_DD.focus();
+        return false;
+    }
+    if (vCurDate >= edt_LIST_DD.getValue()) {
+        await $c.win.alert("[상장일]을 현재일이후로 입력하세요.");
+        edt_LIST_DD.focus();
+        return false;
+    }
+    if (edt_ISU_DD.getValue() === "") {
+        await $c.win.alert("[발행일]을 입력하세요.");
+        edt_ISU_DD.focus();
+        return false;
+    }
+    if (edt_ISU_RND.getValue() === "") {
+        await $c.win.alert("[발행회차]를 입력하세요.");
+        edt_ISU_RND.focus();
+        return false;
+    }
+    if (cmb_STKCERT_KIND_CD.getValue() === "") {
+        await $c.win.alert("[주식의종류]를 선택하세요.");
+        cmb_STKCERT_KIND_CD.focus();
+        return false;
+    }
+    if (cmb_STK_ISU_RSN_CD.getValue() === "") {
+        await $c.win.alert("[주식발행사유]를 선택하세요.");
+        cmb_STK_ISU_RSN_CD.focus();
+        return false;
+    }
+
+    ///*
+    if (scwin.vSecugrpID !== SECUGRP_ID_MF && scwin.vSecugrpID !== SECUGRP_ID_IF && scwin.vSecugrpID !== SECUGRP_ID_DR) {
+        if (edt_PARVAL.getValue() === "") {
+            await $c.win.alert("[액면가]을 입력하세요.");
+            edt_PARVAL.focus();
+            return false;
+        }
+        if (!scwin.checkNumber(edt_PARVAL, '액면가')) return false;
+    }
+    if (edt_ISU_PRC.getValue() === "") {
+        await $c.win.alert("[발행가]을 입력하세요.");
+        edt_ISU_PRC.focus();
+        return false;
+    }
+    if (edt_ISU_SHRS.getValue() === "") {
+        await $c.win.alert("[증감" + scwin.visuShrsLabelNm + "수]을 입력하세요.");
+        edt_ISU_SHRS.focus();
+        return false;
+    }
+    if (scwin.vSecugrpID !== SECUGRP_ID_DR) {
+        /*
+        		if (getObjectValue(edt_ACC_ISU_SHRS) == "") {
+        			alert("[상장주식수]을 입력하세요.");edt_ACC_ISU_SHRS.focus();return false;
+        		}
+        		if (! fn_checkNumber(edt_ACC_ISU_SHRS, '상장주식수')) return false;
+         */
+        if (edt_ISU_CAP.getValue() === "") {
+            await $c.win.alert("[증감 상장자본금]을 입력하세요.");
+            edt_ISU_CAP.focus();
+            return false;
+        }
+        // if (! fn_checkNumber(edt_ISU_CAP, '증감 상장자본금')) return false;
+
+        if (edt_ACC_ISU_SHRS.getValue() === "") {
+            await $c.win.alert("[변경후 상장" + scwin.visuShrsLabelNm + "수]을 입력하세요.");
+            edt_ACC_ISU_SHRS.focus();
+            return false;
+        }
+        if (edt_ACC_ISU_SHRS.getValue() === "0") {
+            await $c.win.alert("[변경후 상장" + scwin.visuShrsLabelNm + "수]값이 '0' 입니다. \n[증감 상장" + scwin.visuShrsLabelNm + "수]가 올바르게 입력되었는지 확인바랍니다.");
+            edt_ACC_ISU_SHRS.focus();
+            return false;
+        }
+        if (edt_ACC_ISU_CAP.getValue() === "") {
+            await $c.win.alert("[변경후 상장자본금]을 입력하세요.");
+            edt_ACC_ISU_CAP.focus();
+            return false;
+        }
+        if (edt_ACC_ISU_CAP.getValue() === "0") {
+            await $c.win.alert("[변경후 상장자본금]값이 '0' 입니다. '\n[증감 상장자본금]이 올바르게 입력되었는지 확인바랍니다.");
+            edt_ACC_ISU_CAP.focus();
+            return false;
+        }
+    }
+    if (edt_DIV_RECK_DD1.getValue() === "") {
+        await $c.win.alert("[배당기산일1]을 입력하세요.");
+        edt_DIV_RECK_DD1.focus();
+        return false;
+    }
+    //*/
+    if (cmb_STKCERT_KIND_CD.getValue() === "000" || cmb_STKCERT_KIND_CD.getValue() === "KDR") {
+        if (chk_PREFSTK_TP_CD.checked) {
+            await $c.win.alert("[신형우선주여부]는 우선주일 경우에만 선택하십시요.");
+            chk_PREFSTK_TP_CD.focus();
+            return false;
+        }
+    }
+    if (chk_PREFSTK_TP_CD.checked) {
+        if (edt_PREFSTK_DIV_RT.getValue() === "") {
+            await $c.win.alert("[우선주배당률]을 입력하세요.");
+            edt_PREFSTK_DIV_RT.focus();
+            return false;
+        }
+    }
+
+    // 보통주일경우 한글회사약명, 종목약명이 같지 않으면 메시지 출력 (YSH, 2012/02/02)
+    const stkKindCd = dts_Isu.getCellData(1, "STKCERT_KIND_CD");
+    if (stkKindCd !== undefined) {
+        if ("000" === stkKindCd) {
+            // 보통주
+            let parentWin = $c.frame.path("../");
+            if (txb_ISU_KOR_ABBRV.getValue() !== parentWin.txb_COM_ABBRV.getValue()) {
+                await $c.win.alert("보통주일경우 한글회사약명 과 종목약명이 동일해야 합니다. 확인하시기 바랍니다.");
+                txb_ISU_KOR_ABBRV.focus();
+                return false;
+            }
+        }
+    }
+    /* 2012.12.10 이세민(050899,상장제도팀) 요청으로 검증로직 주석처리
+		if( getObjectValue(cmb_NPARVALSTK_YN) ==  "Y" ){
+		    var PER1STK_CAP =  eval(parseFloat(getObjectValue(edt_PER1STK_CAP)));
+			var ISU_PRC =  eval(parseFloat(getObjectValue(edt_ISU_PRC)));
+            if(  PER1STK_CAP >  ISU_PRC ){
+			     alert('주당자본계상금은  발행가 이하로 입력해 주십시오.');
+				  edt_PER1STK_CAP.focus();return false;
+			}
+			if( PER1STK_CAP < (ISU_PRC*0.5) ){
+			      alert('주당자본계상금은 발행가의 50% 이상으로 입력해 주십시오');
+				  edt_PER1STK_CAP.focus();return false;
+			}
+		}
+     */
+    return true;
+};
+
+/**
+ * @method
+ * @name checkNumber
+ * @description check Number 처리
+ * @param {Object} obj 컴포넌트
+ * @param {String} str str
+ * @returns {void}
+ * @hidden N
+ */
+scwin.checkNumber = function(obj, str) {
+    /*
+    if (vSecugrpID == SECUGRP_ID_ST) {
+    	if (getObjectValue(obj) <= 10) {
+    		alert("["+str+"]를 '"+getObjectValue(obj)+"'으로 입력하셨습니다. 확인 후 재입력바랍니다.");obj.focus();return false;
+    	}
+    }
+     */
+    return true;
+};
+
+/**
+ * @method
+ * @name save
+ * @description save 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.save = async function() {
+    scwin.TR_JOB = 'I';
+    if (await scwin.checkForm()) {
+        if (!$c.lc.fn_isProcess(scwin.TR_JOB)) return;
+        scwin.vBzProcsNo = await $c.stf.getNewBzProcNo(dts_BzProcsNo);
+
+        // alert("[bz_procs_no]"+bz_procs_no);
+        if (scwin.vBzProcsNo.length !== 14) {
+            await $c.win.alert($c.stf.getMessageParam("MSG-0010", ""));
+        } else {
+            dts_Isu.setCellData(1, "BZ_PROCS_NO", scwin.vBzProcsNo);
+            await scwin.trs(TRS_IDX_INSERT);
+        }
+    }
+};
+
+/**
+ * @method
+ * @name update
+ * @description update 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.update = async function() {
+    scwin.TR_JOB = 'U';
+    if (await scwin.checkForm()) {
+        // alert('[BZ_PROCS_NO]'+dts_Isu.NameValue(1, "BZ_PROCS_NO"));
+        // alert('[PRELM_INVSTG_BZ_PROCS_NO]'+dts_Isu.NameValue(1, "PRELM_INVSTG_BZ_PROCS_NO"));
+        if (!$c.lc.fn_isProcess(scwin.TR_JOB)) return;
+        await scwin.trs(TRS_IDX_UPDATE);
+    }
+};
+
+/**
+ * @method
+ * @name getCheckboxNprefStk
+ * @description get Checkbox Npref Stk 처리
+ * @param {Object} obj 컴포넌트
+ * @param {*} stk_knd stk_knd
+ * @returns {void}
+ * @hidden N
+ */
+scwin.getCheckboxNprefStk = function(obj, stk_knd) {
+    let val;
+    if (obj.checked) {
+        val = '2';
+    } else {
+        if (stk_knd === "000" || stk_knd === "KDR") {
+            val = '0';
+        } else {
+            val = '1';
+        }
+    }
+    return val;
+};
+
+/**
+ * @method
+ * @name delete
+ * @description delete 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.delete = async function() {
+    scwin.TR_JOB = 'D';
+    if (!$c.lc.fn_isProcess(scwin.TR_JOB)) return;
+    buttonSet.setDeleteStatus(); // buttonSet에 CRUD상태를 저장하여 이용하는 사례, TR의 응답event에서 사용.
+    await scwin.trs(TRS_IDX_DELETE);
+};
+
+/**
+ * @method
+ * @name parentRefresh
+ * @description parent Refresh 처리
+ * @returns {void}
+ * @hidden N
+ */
+scwin.parentRefresh = function() {
+    const fr_fn_read_sync = $c.frame.path("../").fn_read_sync;
+    fr_fn_read_sync();
+};
+
+/**
+ * @method
+ * @name calcuAccIsuShrs
+ * @description calcu Acc Isu Shrs 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.calcuAccIsuShrs = async function() {
+    try {
+        let vsum = parseInt(edt_BF_ACC_ISU_SHRS.getValue()) + parseInt(edt_ISU_SHRS.getValue());
+        // alert( "[vsum]"+vsum);
+        edt_ACC_ISU_SHRS.setValue(vsum);
+    } catch (err) {
+        await $c.win.alert("[변경후 상장증권수 계산 중 오류]" + err);
+    }
+};
+
+/**
+ * @method
+ * @name calcusuCap
+ * @description calcusu Cap 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.calcusuCap = async function() {
+    if (scwin.vSecugrpID === SECUGRP_ID_DR) {
+        edt_ISU_CAP.setValue('');
+    } else {
+        try {
+            let vRsnCd = cmb_STK_ISU_RSN_CD.getValue();
+            let vsum = 0;
+            if (vRsnCd === '118' || // 이익소각
+                vRsnCd === '160' || // 상호변경
+                vRsnCd === '170' || // 약면변합
+                vRsnCd === '171') {
+                // 액면분할
+                vsum = 0; // 유가
+
+            } else if (vRsnCd === '626' || // 이익소각
+                vRsnCd === '643' || // 상호변경
+                vRsnCd === '640' || // 약면변합
+                vRsnCd === '641') {
+                // 액면분할
+                vsum = 0; // 코스닥
+
+            } else {
+                if (scwin.vSecugrpID === SECUGRP_ID_MF || scwin.vSecugrpID === SECUGRP_ID_IF) {
+                    vsum = parseFloat(edt_ISU_PRC.getValue()) * parseFloat(edt_ISU_SHRS.getValue());
+                } else {
+                    vsum = parseFloat(edt_PARVAL.getValue()) * parseFloat(edt_ISU_SHRS.getValue());
+                }
+            }
+            // alert( "[증감자본금 vsum]"+vsum);
+            edt_ISU_CAP.setValue(vsum);
+        } catch (err) {
+            await $c.win.alert("[증감 상장자본금 계산 중  오류]" + err);
+        }
+    }
+};
+
+/**
+ * @method
+ * @name calcuAccIsuCap
+ * @description calcu Acc Isu Cap 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.calcuAccIsuCap = async function() {
+    if (scwin.vSecugrpID === SECUGRP_ID_DR) {
+        edt_ACC_ISU_CAP.setValue('');
+    } else {
+        try {
+            let vRsnCd = cmb_STK_ISU_RSN_CD.getValue();
+            let vsum = '';
+            if (vRsnCd === '118' || // 이익소각
+                vRsnCd === '160' || // 상호변경
+                vRsnCd === '170' || // 약면변합
+                vRsnCd === '171') {
+                // 액면분할
+                vsum = edt_BF_ACC_ISU_CAP.getValue(); // 유가
+                edt_ISU_CAP.setValue(0); // 유가
+
+            } else if (vRsnCd === '626' || // 이익소각
+                vRsnCd === '643' || // 상호변경
+                vRsnCd === '640' || // 약면변합
+                vRsnCd === '641') {
+                // 액면분할
+                vsum = edt_BF_ACC_ISU_CAP.getValue(); // 코스닥
+                edt_ISU_CAP.setValue(0); // 코스닥
+
+            } else {
+                await scwin.calcusuCap();
+                vsum = parseFloat(edt_BF_ACC_ISU_CAP.getValue()) + parseFloat(edt_ISU_CAP.getValue());
+            }
+            edt_ACC_ISU_CAP.setValue(vsum);
+        } catch (err) {
+            await $c.win.alert("[변경후 상장자본금 계산 중  오류]" + err);
+        }
+    }
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+		<xf:group class="pop_contents" id="" meta_componentContainer="true" style="">
+			<w2:textbox hierarchy="label_45" id="label_45" label="- 항목 앞에 * 표시는 필수 항목 입니다." orgid="label_45" style=""
+				userData2=" class:Comment_02;" class="txt_info">
+			</w2:textbox>
+			<w2:textbox hierarchy="label_42" id="label_42" label="- 상장자본금은 종목을 기준으로 기재 !!!" orgid="label_42" style=""
+				userData2=" class:Comment_02; border-color:#d3d3d3;" class="red txt_info">
+			</w2:textbox>
+			<w2:textbox hierarchy="label_21" id="label_21" label="- 외국주의 금액단위는 나라별 통화 참조" orgid="label_21" style=""
+				userData2=" class:Comment_02;" class="txt_info">
+			</w2:textbox>
+			<xf:group class="tblbox" id="" style="">
+				<xf:group adaptive="layout" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+					<w2:attributes>
+						<w2:summary></w2:summary>
+					</w2:attributes>
+					<xf:group tagname="colgroup">
+						<xf:group style="width:120px;" tagname="col"></xf:group>
+						<xf:group style="width:155px;" tagname="col"></xf:group>
+						<xf:group style="width:160px;" tagname="col"></xf:group>
+						<xf:group style="width:170px;" tagname="col"></xf:group>
+						<xf:group style="width:120px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_1" id="label_1" label="법인코드(명)" orgid="label_1" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:colspan>3</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<w2:autoComplete hierarchy="txb_ISUR_CD" id="txb_ISUR_CD" maxlength="1000" orgid="txb_ISUR_CD" readOnly="true"
+								style="width:60px;" userData2=" class:TopCondition_01_write;">
+							</w2:autoComplete>
+							<xf:input hierarchy="txb_COM_NM" id="txb_COM_NM" maxlength="1000" orgid="txb_COM_NM" readOnly="true"
+								style="color:#343434;width:339px;" userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_20" id="label_20" label="통화표시" orgid="label_20" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:select1 appearance="minimal" disabled="true" disabledClass="w2selectbox_disabled" displayMode="label"
+								hierarchy="cmb_CURR_ISO_CD" id="cmb_CURR_ISO_CD" orgid="cmb_CURR_ISO_CD" selectedData="true" style="width:93px;"
+								userData2=" class:TopCondition_01; bindcolumn:VALUE; listcount:10; listexprformat:TEXT^0^120; searchcolumn:TEXT; border-color:#b9d4f7;">
+							</xf:select1>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr" style="">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_59" id="label_59" label="종목코드" orgid="label_59" style=""
+								userData2=" class:TopCondition_01;" class="req">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td"><w2:attributes></w2:attributes><xf:input hierarchy="txb_ISU_CD" id="txb_ISU_CD" maxlength="12" orgid="txb_ISU_CD" readOnly="true"
+								style="width:100px;" userData2=" class:TopCondition_01_write;">
+							</xf:input><xf:trigger class="btn_cm icon search" cursor="pointer" ev:onclick="scwin.img_ISU_CD_onclick"
+								hierarchy="img_ISU_CD" id="img_ISU_CD" orgid="img_ISU_CD" src="../img/btn_search.gif" style="">
+								<xf:label><![CDATA[]]></xf:label>
+							</xf:trigger></xf:group>
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_2" id="label_2" label="종목단축코드" orgid="label_2" style=""
+								userData2=" class:TopCondition_01;" class="req">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:colspan>3</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:input hierarchy="txb_ISU_SRT_CD" id="txb_ISU_SRT_CD" maxlength="7" orgid="txb_ISU_SRT_CD" readOnly="true"
+								style="width:80px;" userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_61" id="label_61" label="한글종목명" orgid="label_61" style=""
+								userData2=" class:TopCondition_01;" class="req">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:colspan>5</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:group id="" class="flex flex_no">
+								<xf:input maxlength="40" hierarchy="txb_ISU_KOR_NM" style="width:348px;"
+									userData2=" class:TopCondition_01_write;" id="txb_ISU_KOR_NM" orgid="txb_ISU_KOR_NM">
+								</xf:input>
+								<w2:textbox hierarchy="label_56" style="" userData2=" class:TopCondition_01; border-color:#0000FF;"
+									id="label_56" label="(한글30자)" orgid="label_56">
+								</w2:textbox>
+								<w2:textbox hierarchy="label_51" style="" userData2=" class:Comment_02; border-color:#d3d3d3;" id="label_51"
+									label="* 한글종목명에 '(주)' 또는 '주식회사' 입력금지" orgid="label_51">
+								</w2:textbox>
+							</xf:group>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_62" id="label_62" label="한글종목약명" orgid="label_62" style=""
+								userData2=" class:TopCondition_01;" class="req">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:colspan>5</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:input hierarchy="txb_ISU_KOR_ABBRV" id="txb_ISU_KOR_ABBRV" maxlength="20" orgid="txb_ISU_KOR_ABBRV"
+								style="width:223px;" userData2=" class:TopCondition_01_write;">
+							</xf:input>
+							<w2:textbox hierarchy="label_57" id="label_57" label="(한글15자)" orgid="label_57" style="width:68px;"
+								userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+							<xf:trigger class="btn_cm" id="img_IsuNmGuide" style="" type="button"
+								ev:onclick="scwin.img_IsuNmGuide_onclick">
+								<xf:label><![CDATA[종목명 입력기준안내]]></xf:label>
+							</xf:trigger>
+							<w2:textbox hierarchy="label_52" id="label_52" label="- 입력예 : 삼성전자보통주" orgid="label_52" style=""
+								userData2=" class:Comment_02; border-color:#d3d3d3;">
+							</w2:textbox>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_74" id="label_74" label="영문종목명" orgid="label_74" style=""
+								userData2=" class:TopCondition_01;" class="req">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:colspan>5</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:group id="" class="flex flex_no">
+								<xf:input maxlength="80" hierarchy="txb_ISU_ENG_NM" style="width:348px;"
+									userData2=" class:TopCondition_01_write;" id="txb_ISU_ENG_NM" orgid="txb_ISU_ENG_NM">
+								</xf:input>
+								<w2:textbox hierarchy="label_55" style="" userData2=" class:TopCondition_01; border-color:#0000FF;"
+									id="label_55" label="(영문60자)" orgid="label_55">
+								</w2:textbox>
+								<w2:textbox hierarchy="label_53" style="" userData2=" class:Comment_02;" id="label_53"
+									label="- 상세내용은 [종목명 입력기준안내] 참조" orgid="label_53">
+								</w2:textbox>
+							</xf:group>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_14" id="label_14" label="영문종목약명" orgid="label_14" style=""
+								userData2=" class:TopCondition_01;" class="req">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:colspan>5</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:input hierarchy="txb_ISU_ENG_ABBRV" id="txb_ISU_ENG_ABBRV" maxlength="40" orgid="txb_ISU_ENG_ABBRV"
+								style="width:223px;" userData2=" class:TopCondition_01_write;">
+							</xf:input>
+							<w2:textbox hierarchy="label_54" id="label_54" label="(영문30자)" orgid="label_54" style=""
+								userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_4" id="label_4" label="종목심볼" orgid="label_4" style=""
+								userData2=" class:TopCondition_01;" class="req">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:colspan>5</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:input hierarchy="txb_ISU_ENG_SYMBL" id="txb_ISU_ENG_SYMBL" maxlength="10" orgid="txb_ISU_ENG_SYMBL"
+								readOnly="true" style="width:101px;" tabIndex="0" userData2=" class:TopCondition_01_write;">
+							</xf:input>
+							<xf:trigger class="btn_cm" ev:onclick="scwin.img_ISU_ENG_SYMBL_onclick" id="img_ISU_ENG_SYMBL" style=""
+								type="button">
+								<xf:label><![CDATA[중복체크]]></xf:label>
+							</xf:trigger>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_3" id="label_3" label="상장방식" orgid="label_3" style=""
+								userData2=" class:TopCondition_01;" class="req">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:select1 appearance="minimal" disabled="true" disabledClass="w2selectbox_disabled" displayMode="label"
+								hierarchy="cmb_LIST_METHD_TP_CD" id="cmb_LIST_METHD_TP_CD" item="4^신규상장,5^재상장" orgid="cmb_LIST_METHD_TP_CD" selectedData="true"
+								style="width:112px;" tabIndex="1"
+								userData2=" class:TopCondition_01; bindcolumn:VALUE; listcount:10; listexprformat:TEXT^0^130; searchcolumn:TEXT;">
+								<xf:choices>
+									<xf:item>
+										<xf:label><![CDATA[신규상장]]></xf:label>
+										<xf:value><![CDATA[4]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[재상장]]></xf:label>
+										<xf:value><![CDATA[5]]></xf:value>
+									</xf:item>
+								</xf:choices>
+							</xf:select1>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_63" id="label_63" label="발행회차" orgid="label_63" style=""
+								userData2=" class:TopCondition_01;" class="req">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input hierarchy="edt_ISU_RND" id="edt_ISU_RND" maxlength="8" orgid="edt_ISU_RND" style="width:65px;"
+								tabIndex="2"
+								userData2=" class:panel_maskedit_write_02; alignment:2; datemodify:True; generaledit:False; numeric:True; showliteral:false; valign:1;">
+							</xf:input>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+								<w2:colspan>2</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:select appearance="full" cols="" disabledClass="w2selectbox_disabled" displayMode="label"
+								ev:onclick="scwin.chk_PREFSTK_TP_CD_onclick" hierarchy="chk_PREFSTK_TP_CD" id="chk_PREFSTK_TP_CD" item="Y^"
+								orgid="chk_PREFSTK_TP_CD" ref="" renderType="checkboxgroup" rows="" selectedData="true" style="" userData2=" class:CheckBox_01;">
+								<xf:choices>
+									<xf:item>
+										<xf:label><![CDATA[신형우선주여부]]></xf:label>
+										<xf:value><![CDATA[Y]]></xf:value>
+									</xf:item>
+								</xf:choices>
+							</xf:select>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_64" id="label_64" label="상장일" orgid="label_64" style=""
+								userData2=" class:TopCondition_01;" class="req">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<w2:inputCalendar displayFormat="yyyy-MM-dd" hierarchy="edt_LIST_DD" id="edt_LIST_DD" orgid="edt_LIST_DD"
+								readOnly="true" style="" tabIndex="3"
+								userData2=" class:panel_maskedit_write_01; generaledit:False; numeric:False; readonlybackcolor:#b9d4f7;">
+							</w2:inputCalendar>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_17" id="label_17" label="주식의종류" orgid="label_17" style=""
+								userData2=" class:TopCondition_01;" class="req">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:select1 appearance="minimal" disabled="true" disabledClass="w2selectbox_disabled" displayMode="label"
+								hierarchy="cmb_STKCERT_KIND_CD" id="cmb_STKCERT_KIND_CD"
+								item="000^보통주,100^1우선주,200^2우선주,300^3우선주,400^4우선주,500^5우선주,600^6우선주,700^7우선주,800^8우선주,900^9우선주,KDR^KDR" orgid="cmb_STKCERT_KIND_CD"
+								selectedData="true" style="width:112px;"
+								userData2=" class:TopCondition_01; bindcolumn:VALUE; listcount:10; listexprformat:TEXT^0^130; searchcolumn:TEXT;">
+								<xf:choices>
+									<xf:item>
+										<xf:label><![CDATA[보통주]]></xf:label>
+										<xf:value><![CDATA[000]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[1우선주]]></xf:label>
+										<xf:value><![CDATA[100]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[2우선주]]></xf:label>
+										<xf:value><![CDATA[200]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[3우선주]]></xf:label>
+										<xf:value><![CDATA[300]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[4우선주]]></xf:label>
+										<xf:value><![CDATA[400]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[5우선주]]></xf:label>
+										<xf:value><![CDATA[500]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[6우선주]]></xf:label>
+										<xf:value><![CDATA[600]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[7우선주]]></xf:label>
+										<xf:value><![CDATA[700]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[8우선주]]></xf:label>
+										<xf:value><![CDATA[800]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[9우선주]]></xf:label>
+										<xf:value><![CDATA[900]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[KDR]]></xf:label>
+										<xf:value><![CDATA[KDR]]></xf:value>
+									</xf:item>
+								</xf:choices>
+							</xf:select1>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td in_tbl" style="vertical-align: top;">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+								<w2:colspan>2</w2:colspan>
+								<w2:rowspan>4</w2:rowspan>
+							</w2:attributes>
+							<xf:group class="tblbox" id="panel_PREFSTK" style="">
+								<xf:group adaptive="layout" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+									<w2:attributes>
+										<w2:summary></w2:summary>
+									</w2:attributes>
+									<xf:group tagname="colgroup">
+										<xf:group style="width:110px;" tagname="col"></xf:group>
+										<xf:group style="" tagname="col"></xf:group>
+										<xf:group style="width:110px;" tagname="col"></xf:group>
+										<xf:group style="" tagname="col"></xf:group>
+									</xf:group>
+									<xf:group style="" tagname="tr">
+										<xf:group class="w2tb_th" style="" tagname="th">
+											<w2:textbox hierarchy="label_7" id="label_7" label="우선주배당률" orgid="label_7" style=""
+												userData2=" class:TopCondition_01;" class="req">
+											</w2:textbox>
+										</xf:group>
+										<xf:group class="w2tb_td" style="" tagname="td">
+											<xf:input hierarchy="edt_PREFSTK_DIV_RT" id="edt_PREFSTK_DIV_RT" maxlength="5"
+												orgid="edt_PREFSTK_DIV_RT" style="width:65px;"
+												userData2=" class:panel_maskedit_write_02; alignment:2; datemodify:True; generaledit:False; maxdecimalplace:6; numeric:True; selectall:True; showliteral:false; valign:1;">
+											</xf:input>
+										</xf:group>
+										<xf:group class="w2tb_th " tagname="th">
+											<w2:attributes></w2:attributes>
+											<w2:textbox hierarchy="label_50" id="label_50" label="우선주발행일" orgid="label_50" style=""
+												userData2=" class:TopCondition_01;">
+											</w2:textbox>
+										</xf:group>
+										<xf:group class="w2tb_td" tagname="td">
+											<w2:attributes></w2:attributes>
+											<w2:inputCalendar displayFormat="yyyy-MM-dd" hierarchy="edt_PREFSTK_ISU_DD"
+												id="edt_PREFSTK_ISU_DD" orgid="edt_PREFSTK_ISU_DD" readOnly="true" style=""
+												userData2=" class:panel_maskedit_write_01; generaledit:False; numeric:False; readonlybackcolor:#b9d4f7;">
+											</w2:inputCalendar>
+										</xf:group>
+									</xf:group>
+									<xf:group tagname="tr" style="">
+										<xf:group class="w2tb_th " tagname="th">
+											<w2:attributes>
+												<w2:scope>row</w2:scope>
+											</w2:attributes>
+											<w2:textbox hierarchy="label_8" id="label_8" label="존속기한" orgid="label_8" style=""
+												userData2=" class:TopCondition_01;" class="req">
+											</w2:textbox>
+										</xf:group>
+										<xf:group class="w2tb_td" tagname="td">
+											<w2:attributes>
+												<w2:colspan>3</w2:colspan>
+												<w2:rowspan>1</w2:rowspan>
+											</w2:attributes>
+											<xf:input hierarchy="edt_PREFSTK_CONTIN_DEADLINE_YYS" id="edt_PREFSTK_CONTIN_DEADLINE_YYS"
+												maxlength="4" orgid="edt_PREFSTK_CONTIN_DEADLINE_YYS" style="width:35px;"
+												userData2=" class:panel_maskedit_write_02; alignment:2; datemodify:True; generaledit:False; numeric:True; showliteral:false; valign:1;">
+											</xf:input>
+											<w2:textbox hierarchy="label_9" id="label_9" label="년" orgid="label_9" style=""
+												userData2=" class:TopCondition_01;">
+											</w2:textbox>
+											<xf:input hierarchy="edt_PREFSTK_CONTIN_DEADLINE_MM" id="edt_PREFSTK_CONTIN_DEADLINE_MM"
+												maxlength="2" orgid="edt_PREFSTK_CONTIN_DEADLINE_MM" style="width:35px;"
+												userData2=" class:panel_maskedit_write_02; alignment:2; datemodify:True; generaledit:False; numeric:True; showliteral:false; valign:1;">
+											</xf:input>
+											<w2:textbox hierarchy="label_10" id="label_10" label="월" orgid="label_10" style=""
+												userData2=" class:TopCondition_01;">
+											</w2:textbox>
+											<xf:input hierarchy="edt_PREFSTK_CONTIN_DEADLINE_DYS" id="edt_PREFSTK_CONTIN_DEADLINE_DYS"
+												maxlength="2" orgid="edt_PREFSTK_CONTIN_DEADLINE_DYS" style="width:35px;"
+												userData2=" class:panel_maskedit_write_02; alignment:2; datemodify:True; generaledit:False; numeric:True; showliteral:false; valign:1;">
+											</xf:input>
+											<w2:textbox hierarchy="label_11" id="label_11" label="일" orgid="label_11" style=""
+												userData2=" class:TopCondition_01;">
+											</w2:textbox>
+										</xf:group>
+									</xf:group>
+									<xf:group tagname="tr">
+										<xf:group class="w2tb_th " tagname="th">
+											<w2:attributes>
+												<w2:scope>row</w2:scope>
+												<w2:colspan>1</w2:colspan>
+												<w2:rowspan>2</w2:rowspan>
+											</w2:attributes>
+											<w2:textbox hierarchy="label_12" id="label_12" label="만료일" orgid="label_12" style=""
+												userData2=" class:TopCondition_01;" class="req">
+											</w2:textbox>
+										</xf:group>
+										<xf:group class="w2tb_td" tagname="td">
+											<w2:attributes>
+												<w2:colspan>3</w2:colspan>
+												<w2:rowspan>2</w2:rowspan>
+											</w2:attributes>
+											<w2:inputCalendar displayFormat="yyyy-MM-dd" hierarchy="edt_PREFSTK_END_DD"
+												id="edt_PREFSTK_END_DD" orgid="edt_PREFSTK_END_DD" readOnly="true" style=""
+												userData2=" class:panel_maskedit_write_01; generaledit:False; numeric:False; readonlybackcolor:#b9d4f7;">
+											</w2:inputCalendar>
+											<xf:select appearance="full" cols="" disabledClass="w2selectbox_disabled" displayMode="label"
+												ev:onclick="scwin.chk_INDEFINPD_YN_onclick" hierarchy="chk_INDEFINPD_YN" id="chk_INDEFINPD_YN" item="Y^"
+												orgid="chk_INDEFINPD_YN" ref="" renderType="checkboxgroup" rows="" selectedData="true" style=""
+												userData2=" class:CheckBox_01;">
+												<xf:choices>
+													<xf:item>
+														<xf:label><![CDATA[무기한여부]]></xf:label>
+														<xf:value><![CDATA[Y]]></xf:value>
+													</xf:item>
+												</xf:choices>
+											</xf:select>
+											<xf:select appearance="full" cols="" disabledClass="w2selectbox_disabled" displayMode="label"
+												hierarchy="chk_PARTCTP_YN" id="chk_PARTCTP_YN" item="Y^" orgid="chk_PARTCTP_YN" ref="" renderType="checkboxgroup" rows=""
+												selectedData="true" style="" userData2=" class:CheckBox_01;">
+												<xf:choices>
+													<xf:item>
+														<xf:label><![CDATA[참가형여부]]></xf:label>
+														<xf:value><![CDATA[Y]]></xf:value>
+													</xf:item>
+												</xf:choices>
+											</xf:select>
+											<xf:select appearance="full" cols="" disabledClass="w2selectbox_disabled" displayMode="label"
+												hierarchy="chk_ACCTP_YN" id="chk_ACCTP_YN" item="Y^" orgid="chk_ACCTP_YN" ref="" renderType="checkboxgroup" rows=""
+												selectedData="true" style="" userData2=" class:CheckBox_01;">
+												<xf:choices>
+													<xf:item>
+														<xf:label><![CDATA[누적형여부]]></xf:label>
+														<xf:value><![CDATA[Y]]></xf:value>
+													</xf:item>
+												</xf:choices>
+											</xf:select>
+											<xf:select appearance="full" cols="" disabledClass="w2selectbox_disabled" displayMode="label"
+												hierarchy="chk_NDIVTM_VOTERGHT_YN" id="chk_NDIVTM_VOTERGHT_YN" item="Y^" orgid="chk_NDIVTM_VOTERGHT_YN" ref=""
+												renderType="checkboxgroup" rows="" selectedData="true" style="" userData2=" class:CheckBox_01;">
+												<xf:choices>
+													<xf:item>
+														<xf:label><![CDATA[무배당시의결권여부]]></xf:label>
+														<xf:value><![CDATA[Y]]></xf:value>
+													</xf:item>
+												</xf:choices>
+											</xf:select>
+										</xf:group>
+									</xf:group>
+									<xf:group tagname="tr"></xf:group>
+									<xf:group tagname="tr">
+										<xf:group tagname="th" class="w2tb_th ">
+											<w2:attributes>
+												<w2:scope>row</w2:scope>
+											</w2:attributes>
+											<w2:textbox hierarchy="label_6" id="label_6" label="비고" orgid="label_6" style=""
+												userData2=" class:TopCondition_01;">
+											</w2:textbox>
+										</xf:group>
+										<xf:group tagname="td" class="w2tb_td">
+											<w2:attributes>
+												<w2:colspan>3</w2:colspan>
+												<w2:rowspan>1</w2:rowspan>
+											</w2:attributes>
+											<xf:input hierarchy="txb_NEWPREFSTK_REMK" id="txb_NEWPREFSTK_REMK" maxlength="100"
+												orgid="txb_NEWPREFSTK_REMK" style="width:100%;" userData2=" class:TopCondition_01_write;">
+											</xf:input>
+										</xf:group>
+									</xf:group>
+								</xf:group>
+							</xf:group>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr" style="">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_65" id="label_65" label="발행일" orgid="label_65" style=""
+								userData2=" class:TopCondition_01;" class="req">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<w2:inputCalendar displayFormat="yyyy-MM-dd" hierarchy="edt_ISU_DD" id="edt_ISU_DD" orgid="edt_ISU_DD" style=""
+								tabIndex="4" userData2=" class:panel_maskedit_write_01; generaledit:False; numeric:False;">
+							</w2:inputCalendar>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_5" id="label_5" label="주식발행사유" orgid="label_5" style=""
+								userData2=" class:TopCondition_01;" class="req">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:select1 appearance="minimal" disabled="false" disabledClass="w2selectbox_disabled" displayMode="label"
+								ev:onchange="scwin.cmb_STK_ISU_RSN_CD_onselchange" hierarchy="cmb_STK_ISU_RSN_CD" id="cmb_STK_ISU_RSN_CD" orgid="cmb_STK_ISU_RSN_CD"
+								ref="data:dts_STK_ISU_RSN_CD" selectedData="true" style="width:152px;" tabIndex="5"
+								userData2=" class:TopCondition_01; bindcolumn:VALUE; listcount:10; listexprformat:TEXT^0^300; searchcolumn:TEXT;">
+							</xf:select1>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr" style="">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_60" id="label_60" label="무액면주식" orgid="label_60" style=""
+								userData2=" class:TopCondition_01;" class="req">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:select1 appearance="minimal" disabledClass="w2selectbox_disabled" displayMode="label"
+								ev:onchange="scwin.cmb_NPARVALSTK_YN_onselchange" hierarchy="cmb_NPARVALSTK_YN" id="cmb_NPARVALSTK_YN" orgid="cmb_NPARVALSTK_YN"
+								selectedData="true" style="width:110px;" userData2=" bindcolumn:VALUE; listcount:10; listexprformat:TEXT^0^100;">
+							</xf:select1>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="lb_PARVAL" id="lb_PARVAL" label="액면가/개별주당자본금" maxlength="1000" orgid="lb_PARVAL"
+								readOnly="true" style="" userData2=" class:TopCondition_01_write;" class="red req">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input hierarchy="edt_PARVAL" id="edt_PARVAL" maxlength="9" orgid="edt_PARVAL" style="width:121px;"
+								tabIndex="10"
+								userData2=" class:panel_maskedit_write_02; onkillfocus:edt_PARVAL_OnKillFocus; alignment:2; datemodify:True; generaledit:False; maxdecimalplace:0; numeric:True; selectall:True; showliteral:false; valign:1;">
+							</xf:input>
+							<xf:input hierarchy="edt_PER1STK_CAP" id="edt_PER1STK_CAP" maxlength="9" orgid="edt_PER1STK_CAP"
+								style="width:121px;display: none;" tabIndex="10"
+								userData2=" class:panel_maskedit_write_02; alignment:2; datemodify:True; generaledit:False; maxdecimalplace:0; numeric:True; selectall:True; showliteral:false; valign:1;">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr" style="">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+								<w2:colspan>1</w2:colspan>
+								<w2:rowspan>2</w2:rowspan>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_67" id="label_67" label="발행가(원)" orgid="label_67" style=""
+								userData2=" class:TopCondition_01;" class="req">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:colspan>1</w2:colspan>
+								<w2:rowspan>2</w2:rowspan>
+							</w2:attributes>
+							<xf:input hierarchy="edt_ISU_PRC" id="edt_ISU_PRC" maxlength="9" orgid="edt_ISU_PRC" readOnly="false"
+								style="width:99px;" tabIndex="11"
+								userData2=" class:panel_maskedit_write_02; alignment:2; datemodify:True; generaledit:False; maxdecimalplace:3; numeric:True; selectall:True; showliteral:false; valign:1;">
+							</xf:input>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="lb_BF_ACC_ISU_SHRS" id="lb_BF_ACC_ISU_SHRS" label="변경전 상장주식수" maxlength="1000"
+								orgid="lb_BF_ACC_ISU_SHRS" readOnly="true" style="" userData2=" class:TopCondition_01_write;" class="req">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input hierarchy="edt_BF_ACC_ISU_SHRS" id="edt_BF_ACC_ISU_SHRS" maxlength="15" orgid="edt_BF_ACC_ISU_SHRS"
+								readOnly="true" style="width:130px;" tabIndex="13"
+								userData2=" class:panel_maskedit_write_02; readonlybackcolor:#b9d4f7; selectall:True;">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="lb_ISU_SHRS" id="lb_ISU_SHRS" label="증감주식수" maxlength="1000" orgid="lb_ISU_SHRS"
+								readOnly="true" style="" userData2=" class:TopCondition_01_write;" class="red req">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input hierarchy="edt_ISU_SHRS" id="edt_ISU_SHRS" maxlength="15" orgid="edt_ISU_SHRS" style="width:130px;"
+								tabIndex="13" userData2=" class:panel_maskedit_write_02; onkillfocus:edt_ISU_SHRS_OnKillFocus; selectall:True;">
+							</xf:input>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td in_tbl">
+							<w2:attributes><w2:colspan>2</w2:colspan><w2:rowspan>7</w2:rowspan></w2:attributes>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_69" id="label_69" label="배당기산일_1" orgid="label_69" style=""
+								userData2=" class:TopCondition_01;" class="req">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<w2:inputCalendar displayFormat="yyyy-MM-dd" hierarchy="edt_DIV_RECK_DD1" id="edt_DIV_RECK_DD1"
+								orgid="edt_DIV_RECK_DD1" style="" tabIndex="6" userData2=" class:panel_maskedit_write_01; generaledit:False; numeric:False;">
+							</w2:inputCalendar>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="lb_ACC_ISU_SHRS" id="lb_ACC_ISU_SHRS" label="변경후 상장주식수" maxlength="1000"
+								orgid="lb_ACC_ISU_SHRS" readOnly="true" style="" userData2=" class:TopCondition_01_write;" class="req">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input hierarchy="edt_ACC_ISU_SHRS" id="edt_ACC_ISU_SHRS" maxlength="15" orgid="edt_ACC_ISU_SHRS"
+								readOnly="true" style="width:130px;" tabIndex="13"
+								userData2=" class:panel_maskedit_write_02; readonlybackcolor:#b9d4f7; selectall:True;">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_70" id="label_70" label="배당기산일_2" orgid="label_70" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<w2:inputCalendar displayFormat="yyyy-MM-dd" hierarchy="edt_DIV_RECK_DD2" id="edt_DIV_RECK_DD2"
+								orgid="edt_DIV_RECK_DD2" style="" tabIndex="7" userData2=" class:panel_maskedit_write_01; generaledit:False; numeric:False;">
+							</w2:inputCalendar>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_49" id="label_49" label="변경전 상장자본금" orgid="label_49" style=""
+								userData2=" class:TopCondition_01;" class="req">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input hierarchy="edt_BF_ACC_ISU_CAP" id="edt_BF_ACC_ISU_CAP" orgid="edt_BF_ACC_ISU_CAP" readOnly="true"
+								style="width:130px;" tabIndex="14"
+								userData2=" class:panel_maskedit_write_02; alignment:2; datemodify:True; generaledit:False; maxdecimalplace:0; numeric:True; readonlybackcolor:#b9d4f7; selectall:True; showliteral:false; valign:1;">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_71" id="label_71" label="배당기산일_3" orgid="label_71" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<w2:inputCalendar displayFormat="yyyy-MM-dd" hierarchy="edt_DIV_RECK_DD3" id="edt_DIV_RECK_DD3"
+								orgid="edt_DIV_RECK_DD3" style="" tabIndex="8" userData2=" class:panel_maskedit_write_01; generaledit:False; numeric:False;">
+							</w2:inputCalendar>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_68" id="label_68" label="증감상장자본금" orgid="label_68" style=""
+								userData2=" class:TopCondition_01;" class="red req">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input hierarchy="edt_ISU_CAP" id="edt_ISU_CAP" orgid="edt_ISU_CAP" style="width:130px;" tabIndex="14"
+								userData2=" class:panel_maskedit_write_02; onkillfocus:edt_ISU_CAP_OnKillFocus; alignment:2; datemodify:True; generaledit:False; maxdecimalplace:0; numeric:True; selectall:True; showliteral:false; valign:1;">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_72" id="label_72" label="배당기산일_4" orgid="label_72" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<w2:inputCalendar displayFormat="yyyy-MM-dd" hierarchy="edt_DIV_RECK_DD4" id="edt_DIV_RECK_DD4"
+								orgid="edt_DIV_RECK_DD4" style="" tabIndex="9" userData2=" class:panel_maskedit_write_01; generaledit:False; numeric:False;">
+							</w2:inputCalendar>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_44" id="label_44" label="변경후 상장자본금" orgid="label_44" style=""
+								userData2=" class:TopCondition_01;" class="req">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input hierarchy="edt_ACC_ISU_CAP" id="edt_ACC_ISU_CAP" orgid="edt_ACC_ISU_CAP" style="width:130px;"
+								tabIndex="14"
+								userData2=" class:panel_maskedit_write_02; alignment:2; datemodify:True; generaledit:False; maxdecimalplace:0; numeric:True; selectall:True; showliteral:false; valign:1;">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_73" id="label_73" label="주금납입처" orgid="label_73" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:colspan>3</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:input hierarchy="txb_SKTAMT_PAYLOC_NM" id="txb_SKTAMT_PAYLOC_NM" maxlength="40" orgid="txb_SKTAMT_PAYLOC_NM"
+								style="width:385px;" tabIndex="17" userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox hierarchy="label_75" id="label_75" label="비고" orgid="label_75" style=""
+								userData2=" class:TopCondition_01;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:colspan>3</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:textarea hierarchy="txa_REMK" id="txa_REMK" orgid="txa_REMK" readOnly="false" style="width:383px;"
+								tabIndex="18" userData2=" class:TextArea_01; cacheload:True; wantreturn:True;">
+							</xf:textarea>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<xf:group class="btnbox" id="">
+				<xf:group class="rt" id="">
+					<xf:trigger class="btn_cm" cursor="pointer" hierarchy="btn_Delete" id="btn_Delete" orgid="btn_Delete"
+						src="../img/btn_delete.gif" style="" text="삭제">
+						<xf:label><![CDATA[삭제]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm" cursor="pointer" hierarchy="btn_Update" id="btn_Update" orgid="btn_Update"
+						src="../img/btn_modify.gif" style="" text="수정">
+						<xf:label><![CDATA[수정]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm pt" cursor="pointer" hierarchy="btn_Save" id="btn_Save" orgid="btn_Save"
+						src="../img/btn_save.gif" style="" text="저장">
+						<xf:label><![CDATA[저장]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm" cursor="pointer" ev:onclick="scwin.btn_Close_onclick" id="btn_Close"
+						src="../img/btn_close.gif" style="" text="닫기">
+						<xf:label><![CDATA[닫기]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+		</xf:group>
+	</body>
+</html>

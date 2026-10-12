@@ -1,0 +1,1747 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_convertType="Craft" meta_craftVer="20251209" meta_convertVer="1" meta_convertRuleVer="1" meta_asisFileNm="ULDSTF05235.gfm" meta_screenName="소속부변경관리" meta_screenId="ULDSTF05235">
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate/>
+		<w2:layoutInfo/>
+		<w2:publicInfo method="scwin.onpageload,scwin.onpageunload,scwin.dts_Report_OnLoadError,scwin.dts_File_OnLoadError,scwin.dts_Item_OnLoadError,scwin.dts_Item_OnLoadCompleted,scwin.trs_Save_OnFail,scwin.trs_Save_OnSuccess,scwin.trs_Log_OnFail,scwin.trs_Log_OnSuccess,scwin.img_SECT_STRT_DD_onclick,scwin.img_SECT_END_DD_onclick,scwin.img_CHG_DD_onclick,scwin.grd_ATTACH_FILE_OnDblClick,scwin.btn_Close_onclick,scwin.btn_Revwr_onclick,scwin.btn_Approve_onclick,scwin.btn_Print_onclick,scwin.inf_find_OnClick,scwin.btn_lineadd_onclick,scwin.btn_linedelete_onclick,scwin.searchCode,scwin.extrReadSync,scwin.fileReadSync,scwin.readSync,scwin.duplicateCheck,scwin.ahthAdm,scwin.bfSectInvstgTpCd,scwin.trs,scwin.popopSW,scwin.trslog,scwin.print,scwin.printOld,scwin.checkForm,scwin.save,scwin.update,scwin.delete,scwin.revwr,scwin.approve,scwin.parentRefresh,scwin.filedown"/>
+		<xf:model>
+			<w2:dataCollection baseNode="map"></w2:dataCollection>
+			<w2:workflowCollection/>
+		</xf:model>
+		<script type="text/javascript" lazy="false"><![CDATA[
+///////// 1. 변수 및 선언 영역 /////////
+scwin.vSECT_CHG_TP_CD = "";
+scwin.type = "";
+scwin.pLogType = "";
+// showObj(ObjID, flag) SetWindowPos(ObjID, nTop, nLeft, nWidth, nHeight)
+// 세션정보를 얻기위한 함수사용
+scwin.fn_GetPar, scwin.fn_SetPar;
+scwin.vBzProcsNo;
+scwin.vListProcsStatCd;
+scwin.vAcptNo;
+scwin.vSPOT_ISU_TRD_MKT_TP_CD;
+scwin.TR_JOB;
+
+///////// 2. 초기화 영역 /////////
+/**
+ * @method
+ * @name onpageload
+ * @description 화면 로딩 시 초기 처리 — init 순차 호출
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.onpageload = async function() {
+    try {
+        $c.cm.PanelToGroupBox(panel_Item);
+        $c.elw.fn_searchCode();
+        const parentWin = $c.frame.path("../");
+        scwin.vBzProcsNo = parentWin.gBzProcsNo;
+        scwin.vAcptNo = parentWin.gAcptNo;
+        scwin.vListProcsStatCd = parentWin.gListProcsStatCd;
+        const dstOjb = parentWin.dts_List_2;
+        const row = dstOjb.getFocusedRowIndex();
+        scwin.vSPOT_ISU_TRD_MKT_TP_CD = '2';
+        txb_ISUR_CD.setValue(dstOjb.getCellData(row, "ISUR_CD"));
+        txb_COM_NM.setValue(dstOjb.getCellData(row, "COM_ABBRV"));
+
+        /* buttonSet의 초기화를 수행한다.  각 용도에 맞게 이미지ID와 onclick event시 수행할 function을 지정한다. */
+        buttonSet.setSaveInfo(btn_Save, scwin.save); // 저장
+        buttonSet.setUpdateInfo(btn_Update, scwin.update); // 수정
+        buttonSet.setDeleteInfo(btn_Delete, scwin.delete); // 삭제
+
+        // dts_File.setDataHeader(); // W-Craft 주석처리 및 필요시 asis 파라미터 확인
+        file_name.hide();
+        if (scwin.vListProcsStatCd === "10") {
+            // 미처리
+            await scwin.extrReadSync();
+            await scwin.ahthAdm("1");
+            buttonSet.setInsertStatus();
+            btn_Revwr.setBackgroundImage("../img/btn_study_d.gif");
+            btn_Revwr.setDisabled(true);
+            btn_Approve.setBackgroundImage("../img/btn_approval_d.gif");
+            btn_Approve.setDisabled(true);
+        } else {
+            // 090720-팀원은 컴토만, 팀장은 승인만
+            if (js_jobtitl === "03") {
+                // 팀원'03'
+                btn_Revwr.setBackgroundImage("../img/btn_study.gif");
+                btn_Revwr.setDisabled(false);
+                btn_Approve.setBackgroundImage("../img/btn_approval_d.gif");
+                btn_Approve.setDisabled(true);
+            } else {
+                btn_Revwr.setBackgroundImage("../img/btn_study_d.gif");
+                btn_Revwr.setDisabled(true);
+                btn_Approve.setBackgroundImage("../img/btn_approval.gif");
+                btn_Approve.setDisabled(false);
+            }
+            await scwin.readSync();
+            await scwin.ahthAdm("2");
+        }
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF05235.onpageload" });
+    }
+};
+
+/**
+ * @method
+ * @name onpageunload
+ * @description 화면 언로드 시 정리 처리
+ * @returns {void}
+ * @hidden N
+ */
+scwin.onpageunload = function() {
+};
+
+///////// 3. 컴포넌트 이벤트 영역 /////////
+/**
+ * @method
+ * @name dts_Report_OnLoadError
+ * @description dts_Report 로드 오류 처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.dts_Report_OnLoadError = async function() {
+    try {
+        await $c.win.alert(dts_Report);
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF05235.dts_Report_OnLoadError" });
+    }
+};
+
+/**
+ * @method
+ * @name dts_File_OnLoadError
+ * @description dts_File 로드 오류 처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.dts_File_OnLoadError = async function() {
+    try {
+        await $c.win.alert(dts_File);
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF05235.dts_File_OnLoadError" });
+    }
+};
+
+/**
+ * @method
+ * @name dts_Item_OnLoadError
+ * @description dts_Item 로드 오류 처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.dts_Item_OnLoadError = async function() {
+    try {
+        await $c.win.alert(dts_Item);
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF05235.dts_Item_OnLoadError" });
+    }
+};
+
+/**
+ * @method
+ * @name dts_Item_OnLoadCompleted
+ * @description dts_Item 로드 완료 후처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @param {Number} rowcount 조회 건수
+ * @returns {void}
+ * @hidden N
+ */
+scwin.dts_Item_OnLoadCompleted = function(rowcount) {
+    try {
+        let vCurDate = $c.ut.cGetToday("yyyymmdd");
+        scwin.vSECT_CHG_TP_CD = dts_Item.getCellData(1, "SECT_CHG_TP_CD");
+        if (edt_CHG_DD.getValue() > vCurDate) {
+            buttonSet.setUpdateStatus();
+
+            /*
+            btn_Revwr.src = "../img/btn_study.gif";
+            	btn_Revwr.disabled = false;
+
+            	btn_Approve.src = "../img/btn_approval.gif";
+            	btn_Approve.disabled = false;
+
+            	if (getObjectValue(edt_REVW_DDTM) != "") {
+            		btn_Revwr.src = "../img/btn_study_d.gif";
+            		btn_Revwr.disabled = true;
+            	}
+
+            	if (getObjectValue(edt_APPROV_DDTM) != "") {
+            		btn_Approve.src = "../img/btn_approval_d.gif";
+            		btn_Approve.disabled = true;
+            	}
+             */
+
+            // 090720-팀원은 컴토만, 팀장은 승인만
+
+            if (js_jobtitl === "03") {
+                // 팀원'03'
+
+                btn_Revwr.setBackgroundImage("../img/btn_study.gif");
+                btn_Revwr.setDisabled(false);
+                btn_Approve.setBackgroundImage("../img/btn_approval_d.gif");
+                btn_Approve.setDisabled(true);
+                if (edt_REVW_DDTM.getValue() !== "") {
+                    btn_Revwr.setBackgroundImage("../img/btn_study_d.gif");
+                    btn_Revwr.setDisabled(true);
+                }
+                if (edt_APPROV_DDTM.getValue() !== "") {
+                    btn_Approve.setBackgroundImage("../img/btn_approval_d.gif");
+                    btn_Approve.setDisabled(true);
+                }
+            } else {
+                // 팀장 외
+
+                btn_Revwr.setBackgroundImage("../img/btn_study_d.gif");
+                btn_Revwr.setDisabled(true);
+                btn_Approve.setBackgroundImage("../img/btn_approval.gif");
+                btn_Approve.setDisabled(false);
+                if (edt_REVW_DDTM.getValue() !== "") {
+                    btn_Revwr.setBackgroundImage("../img/btn_study_d.gif");
+                    btn_Revwr.setDisabled(true);
+                }
+                if (edt_APPROV_DDTM.getValue() !== "") {
+                    btn_Approve.setBackgroundImage("../img/btn_approval_d.gif");
+                    btn_Approve.setDisabled(true);
+                }
+            }
+            // 승인이 되면 수정,삭제버튼 비활성화
+            if (edt_APPROV_DDTM.getValue() !== "") {
+                buttonSet.setErrorStatus(); // disable 시킨다.
+                btn_lineadd.src = "../img/btn_fileadd_dis.gif";
+                btn_lineadd.setDisabled(true);
+                btn_linedelete.src = "../img/btn_filedelete_dis.gif";
+                btn_linedelete.setDisabled(true);
+            }
+        } else {
+            buttonSet.setErrorStatus(); // disable 시킨다.
+            btn_lineadd.src = "../img/btn_fileadd_dis.gif";
+            btn_lineadd.setDisabled(true);
+            btn_linedelete.src = "../img/btn_filedelete_dis.gif";
+            btn_linedelete.setDisabled(true);
+            if (edt_REVW_DDTM.getValue() !== "") {
+                btn_Revwr.setBackgroundImage("../img/btn_study_d.gif");
+                btn_Revwr.setDisabled(true);
+            }
+            if (edt_APPROV_DDTM.getValue() !== "") {
+                btn_Approve.setBackgroundImage("../img/btn_approval_d.gif");
+                btn_Approve.setDisabled(true);
+            }
+        }
+        if (scwin.vAcptNo !== "") {
+            // 컨버젼하기가 어려워 제외됨..
+            btn_lineadd.src = "../img/btn_fileadd_dis.gif";
+            btn_lineadd.setDisabled(true);
+            btn_linedelete.src = "../img/btn_filedelete_dis.gif";
+            btn_linedelete.setDisabled(true);
+        }
+        if (edt_CHG_DD.getValue() !== "") {
+            // 인쇄버튼 활성화
+            btn_Print.setBackgroundImage("../img/btn_print.gif");
+            btn_Print.setDisabled(false);
+        } else {
+            // 인쇄버튼 비활성화
+            btn_Print.setBackgroundImage("../img/btn_print_d.gif");
+            btn_Print.setDisabled(true);
+        }
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF05235.dts_Item_OnLoadCompleted" });
+    }
+};
+
+/**
+ * @method
+ * @name trs_Save_OnFail
+ * @description Save On Fail 처리
+ * @returns {void}
+ * @hidden N
+ */
+scwin.trs_Save_OnFail = function() {
+    try {
+        $c.lc.fn_alertMsg('F');
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF05235.trs_Save_OnFail" });
+    }
+};
+
+/**
+ * @method
+ * @name trs_Save_OnSuccess
+ * @description Save On Success 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.trs_Save_OnSuccess = async function() {
+    try {
+        $c.lc.fn_alertMsg('S');
+        scwin.parentRefresh();
+        if (buttonSet.status === "D") {
+            // 삭제처리의 응답인 경우
+            await $c.win.closePopup();
+        } else {
+            await scwin.readSync();
+        }
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF05235.trs_Save_OnSuccess" });
+    }
+};
+
+/**
+ * @method
+ * @name trs_Log_OnFail
+ * @description Log On Fail 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.trs_Log_OnFail = async function() {
+    try {
+        await $c.win.alert($c.stf.getMessageParam("MSG-A002", scwin.TR_JOB));
+        await $c.win.alert(trs_Log);
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF05235.trs_Log_OnFail" });
+    }
+};
+
+/**
+ * @method
+ * @name trs_Log_OnSuccess
+ * @description Log On Success 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.trs_Log_OnSuccess = async function() {
+    try {
+        await $c.win.alert($c.stf.getMessageParam("MSG-0001", scwin.TR_JOB));
+        scwin.parentRefresh();
+        await scwin.readSync();
+
+        // 검토시 신주인수권증권 있는지 확인
+        if (scwin.pLogType === "1") {
+            await scwin.popopSW();
+            if (dts_sw.getCellData(1, "CNT") > 0) {
+                await $c.win.alert("신주인수권증권있습니다. 소속부변경 시장조치를 해주십시오.");
+            }
+        }
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF05235.trs_Log_OnSuccess" });
+    }
+};
+
+/**
+ * @method
+ * @name img_SECT_STRT_DD_onclick
+ * @description img_SECT_STRT_DD 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.img_SECT_STRT_DD_onclick = function() {
+    try {
+        popUpCalendar2(edt_SECT_STRT_DD);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF05235.img_SECT_STRT_DD_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name img_SECT_END_DD_onclick
+ * @description img_SECT_END_DD 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.img_SECT_END_DD_onclick = function() {
+    try {
+        popUpCalendar2(edt_SECT_END_DD);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF05235.img_SECT_END_DD_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name img_CHG_DD_onclick
+ * @description img_CHG_DD 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.img_CHG_DD_onclick = function() {
+    try {
+        popUpCalendar2(edt_CHG_DD);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF05235.img_CHG_DD_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name grd_ATTACH_FILE_OnDblClick
+ * @description grd_ATTACH_FILE 더블클릭 처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @param {Number} row 행 인덱스
+ * @param {*} colid colid
+ * @returns {void}
+ * @hidden N
+ */
+scwin.grd_ATTACH_FILE_OnDblClick = function(row, colid) {
+    try {
+        if (row === 0) return;
+        if (dts_File.getRowStatus(dts_File.getRowPosition()) === 0) {
+            $c.elw.fn_filedown(dts_File);
+        }
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF05235.grd_ATTACH_FILE_OnDblClick" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_Close_onclick
+ * @description 「닫기」 클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.btn_Close_onclick = async function() {
+    try {
+        await $c.win.closePopup();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF05235.btn_Close_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_Revwr_onclick
+ * @description 「검토」 클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.btn_Revwr_onclick = async function() {
+    try {
+        await scwin.revwr();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF05235.btn_Revwr_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_Approve_onclick
+ * @description 「승인」 클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.btn_Approve_onclick = async function() {
+    try {
+        await scwin.approve();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF05235.btn_Approve_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_Print_onclick
+ * @description 「인쇄」 클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.btn_Print_onclick = async function() {
+    try {
+        /*
+        if (getObjectValue(edt_REVW_DDTM) == "") {
+        	alert("저장후 인쇄하십시요.");
+        } else {
+        }
+         */
+        await scwin.print();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF05235.btn_Print_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name inf_find_OnClick
+ * @description inf_find 클릭 처리(레거시 Gauce 이벤트명 — 화면 내부 호출용)
+ * @returns {void}
+ * @hidden N
+ */
+scwin.inf_find_OnClick = function() {
+    try {
+        const filenm = file_name.getValue();
+        dts_File.setCellData(dts_File.getRowPosition(), "fileInfo", inf_find.getValue());
+        file_name.setValue(inf_find.getValue());
+        if (inf_find.getValue() === "") {
+            file_name.setValue(filenm);
+        }
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF05235.inf_find_OnClick" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_lineadd_onclick
+ * @description btn_lineadd 클릭 이벤트
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.btn_lineadd_onclick = async function() {
+    try {
+        if (dts_File.getRowCount() === 5) {
+            await $c.win.alert("더이상 추가하실 수 없습니다.");
+            return;
+        }
+        dts_File.insertRow();
+        inf_find.open();
+        if (inf_find.getValue() !== "") {
+            dts_File.setCellData(dts_File.getRowPosition(), "fileInfo", inf_find.getValue());
+            file_name.setValue(inf_find.getValue());
+        } else {
+            dts_File.removeRow(dts_File.getRowPosition());
+        }
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF05235.btn_lineadd_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name btn_linedelete_onclick
+ * @description btn_linedelete 클릭 이벤트
+ * @returns {void}
+ * @hidden N
+ */
+scwin.btn_linedelete_onclick = function() {
+    try {
+        dts_File.removeRow(dts_File.getRowPosition());
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF05235.btn_linedelete_onclick" });
+    }
+};
+
+///////// 4. 서브미션 콜백 영역 /////////
+/**
+ * @method
+ * @name searchCode
+ * @description search Code 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.searchCode = async function() {
+    /*
+    00726 - 소속부유형코드
+    01361 - 소속부변경구분코드
+    01362 - 벤처유형코드
+     */
+    const arrCid = [{
+        cid: "SECT_TP_CD",
+        cnm: "cmb_BFCHG_SECT_TP_CD"
+    }, {
+        cid: "SECT_TP_CD",
+        cnm: "cmb_AFCHG_SECT_TP_CD"
+    }, {
+        cid: "SECT_CHG_TP_CD",
+        cnm: "cmb_SECT_CHG_TP_CD"
+    }, {
+        cid: "SECT_INVSTG_TP_CD",
+        cnm: "cmb_AFCHG_SECT_INVSTG_TP_CD"
+    }, {
+        cid: "SECT_CHG_RSN_CD",
+        cnm: "cmb_SECT_CHG_RSN"
+    }];
+    let objCod;
+    const sbmOptions = {
+        id : "sbm_dts_Cod",
+        action : "/CodeAction.do",
+        ref : "",
+        target : "dts_Cod=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+    let strCbd = "",
+        i, j;
+    for (i = 0; i < arrCid.length; i++) {
+        objCod = document.getElementById(arrCid[i].cnm);
+        // alert('[objCod]'+objCod);
+        if (objCod === null) {
+            await $c.win.alert(arrCid[i].cnm);
+        }
+        strCbd = "";
+        for (j = 1; j <= dts_Cod.getRowCount(); j++) {
+            if (dts_Cod.getCellData(j, "CD_ENG_NM") === arrCid[i].cid) {
+                if (arrCid[i].cid === "01362") {
+                    if (dts_Cod.getCellData(j, "VALUE") === "10") {
+                        strCbd = strCbd + "^-----------------------------------------------------";
+                    }
+                }
+                strCbd = strCbd + (strCbd === "" ? "" : ",") + dts_Cod.getCellData(j, "VALUE") + "^" + dts_Cod.getCellData(j, "TEXT");
+            }
+        }
+        objCod.CBData = strCbd;
+    }
+};
+
+/**
+ * @method
+ * @name extrReadSync
+ * @description extr Read Sync 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.extrReadSync = async function() {
+    const sbmOptions = {
+        id : "sbm_dts_Item",
+        action : "/listingCommon.do",
+        ref : "",
+        target : "dts_Item=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+    await scwin.fileReadSync();
+};
+
+/**
+ * @method
+ * @name fileReadSync
+ * @description file Read Sync 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.fileReadSync = async function() {
+    if (scwin.vAcptNo !== "") {
+        // 컨버젼하기가 어려워 제외됨..
+        const sbmOptions = {
+            id : "sbm_dts_File",
+            action : "/listingCommon.do",
+            ref : "",
+            target : "dts_File=body.content",
+            isProcessMsg : false
+        };
+
+        const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+        // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+    } else {
+        const sbmOptions = {
+            id : "sbm_dts_File",
+            action : "/listingCommon.do",
+            ref : "",
+            target : "dts_File=body.content",
+            isProcessMsg : false
+        };
+
+        const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+        // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+    }
+};
+
+/**
+ * @method
+ * @name readSync
+ * @description read Sync 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.readSync = async function() {
+    url += "&BZ_PROCS_NO=" + scwin.vBzProcsNo;
+    const sbmOptions = {
+        id : "sbm_dts_Item",
+        action : "/SectionTypeChange.do",
+        ref : "",
+        target : "dts_Item=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+    await scwin.fileReadSync();
+};
+
+/**
+ * @method
+ * @name duplicateCheck
+ * @description duplicate Check 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.duplicateCheck = async function() {
+    url += "&ISUR_CD=" + txb_ISUR_CD.getValue();
+    url += "&CHG_DD=" + edt_CHG_DD.getValue();
+    const sbmOptions = {
+        id : "sbm_dts_DUP_CHK",
+        action : "/SectionTypeChange.do",
+        ref : "",
+        target : "dts_DUP_CHK=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+    return dts_DUP_CHK.getCellData(1, "DUP_CHK");
+};
+
+/**
+ * @method
+ * @name ahthAdm
+ * @description 인증자격
+ * @param {*} type type
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.ahthAdm = async function(type) {
+    if (scwin.type === "1") {
+        const sbmOptions = {
+            id : "sbm_dts_AhthAdm",
+            action : "/listingCommon.do",
+            ref : "",
+            target : "dts_AhthAdm=body.content",
+            isProcessMsg : false
+        };
+
+        const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+        // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+    } else {
+        const sbmOptions = {
+            id : "sbm_dts_AhthAdm",
+            action : "/listingCommon.do",
+            ref : "",
+            target : "dts_AhthAdm=body.content",
+            isProcessMsg : false
+        };
+
+        const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+        // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+    }
+};
+
+/**
+ * @method
+ * @name bfSectInvstgTpCd
+ * @description bf Sect Invstg Tp Cd 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.bfSectInvstgTpCd = async function() {
+    const sbmOptions = {
+        id : "sbm_dts_bfSectInvstg",
+        action : "/listingCommon.do",
+        ref : "",
+        target : "dts_bfSectInvstg=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+};
+
+/**
+ * @method
+ * @name trs
+ * @description 소속부 변경전 심사코드
+ * @param {*} jobType jobType
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.trs = async function(jobType) {
+    // 소속부 변경전 심사코드
+    await scwin.bfSectInvstgTpCd();
+    dts_Item.setCellData(1, "JOB_TYPE", jobType);
+    dts_Item.setCellData(1, "ISUR_CD", txb_ISUR_CD.getValue());
+    dts_Item.setCellData(1, "LIST_BZ_TP_CD", LIST_BZ_TP_CD_234);
+    dts_Item.setCellData(1, "SPOT_ISU_TRD_MKT_TP_CD", scwin.vSPOT_ISU_TRD_MKT_TP_CD);
+    dts_Item.setCellData(1, "BFCHG_SECT_INVSTG_TP_CD", dts_bfSectInvstg.getCellData(1, "AFCHG_SECT_INVSTG_TP_CD"));
+    let vScrenProcTpCd;
+    if (scwin.TR_JOB === "I") {
+        vScrenProcTpCd = SCREN_PROCS_TP_CD_02;
+    } else if (scwin.TR_JOB === "U") {
+        vScrenProcTpCd = SCREN_PROCS_TP_CD_03;
+    } else if (scwin.TR_JOB === "D") {
+        vScrenProcTpCd = SCREN_PROCS_TP_CD_04;
+    }
+
+    // alert('[dts_Item]'+dts_Item.text);
+    trs_Save.KeyName = "toinb_dataid4";
+    const sbmOptions = {
+        id : "sbm_trs_Save",
+        action : "/SectionTypeChange.do",
+        ref : "dts_Item,dts_File",
+        target : "trs_Save=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+};
+
+/**
+ * @method
+ * @name popopSW
+ * @description popop SW 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.popopSW = async function() {
+    const sbmOptions = {
+        id : "sbm_dts_sw",
+        action : "/listingCommon.do",
+        ref : "",
+        target : "dts_sw=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+};
+
+/**
+ * @method
+ * @name trslog
+ * @description trslog 처리
+ * @param {*} logTyp logTyp
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.trslog = async function(logTyp) {
+    dts_Item.setCellData(1, "APPROV_TYPE", logTyp);
+    dts_Item.setCellData(1, "REVWR_EMP_NO", js_emp_no);
+    dts_Item.setCellData(1, "APPROV_EMP_NO", js_emp_no);
+    dts_Item.setCellData(1, "BZ_PROCS_NO", scwin.vBzProcsNo);
+
+    // alert('[dts_Item]'+dts_Item.text);
+    trs_Log.KeyName = "toinb_dataid4";
+    const sbmOptions = {
+        id : "sbm_trs_Log",
+        action : "/SectionTypeChange.do",
+        ref : "dts_Item",
+        target : "trs_Log=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+};
+
+/**
+ * @method
+ * @name print
+ * @description 화면을 인쇄한다.
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.print = async function() {
+    url += "&BZ_PROCS_NO=" + scwin.vBzProcsNo;
+    const sbmOptions = {
+        id : "sbm_dts_Report",
+        action : "/SectionTypeChange.do",
+        ref : "",
+        target : "dts_Report=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+    const pdf_rptname = "RLDSTF00009";
+    let userParam = [{
+        uid: "ISU_SRT_CD",
+        unm: dts_Report.getCellData(1, "ISU_SRT_CD")
+    }, {
+        uid: "ISU_KOR_ABBRV",
+        unm: dts_Report.getCellData(1, "ISU_KOR_ABBRV")
+    }, {
+        uid: "FST_EXAMPRN_EMP_NM",
+        unm: dts_Report.getCellData(1, "FST_EXAMPRN_EMP_NM")
+    }, {
+        uid: "APPL_DD",
+        unm: $c.stf.FormatDateEx(dts_Report.getCellData(1, "APPL_DD"))
+    }, {
+        uid: "CHG_DD",
+        unm: $c.stf.FormatDateEx(dts_Report.getCellData(1, "CHG_DD"))
+    }, {
+        uid: "SECT_CHG_TP_NM",
+        unm: dts_Report.getCellData(1, "SECT_CHG_TP_NM")
+    }, {
+        uid: "BFCHG_SECT_TP_NM",
+        unm: dts_Report.getCellData(1, "BFCHG_SECT_TP_NM")
+    }, {
+        uid: "AFCHG_SECT_TP_NM",
+        unm: dts_Report.getCellData(1, "AFCHG_SECT_TP_NM")
+    }, {
+        uid: "SECT_STRT_DD",
+        unm: $c.stf.FormatDateEx(dts_Report.getCellData(1, "SECT_STRT_DD"))
+    }, {
+        uid: "SECT_END_DD",
+        unm: $c.stf.FormatDateEx(dts_Report.getCellData(1, "SECT_END_DD"))
+    }, {
+        uid: "AFCHG_SECT_INVSTG_TP_NM",
+        unm: dts_Report.getCellData(1, "AFCHG_SECT_INVSTG_TP_NM")
+    }, {
+        uid: "SECT_CHG_RSN",
+        unm: dts_Report.getCellData(1, "SECT_CHG_RSN")
+    }, {
+        uid: "REMK",
+        unm: dts_Report.getCellData(1, "REMK")
+    }, {
+        uid: "PROCS_DDTM",
+        unm: dts_Report.getCellData(1, "PROCS_DDTM")
+    }, {
+        uid: "DISCLS_TRANSTR_EMP_NM",
+        unm: dts_Report.getCellData(1, "DISCLS_TRANSTR_EMP_NM")
+    }, {
+        uid: "REVW_DDTM",
+        unm: dts_Report.getCellData(1, "REVW_DDTM")
+    }, {
+        uid: "REVWR_EMP_NM",
+        unm: dts_Report.getCellData(1, "REVWR_EMP_NM")
+    }, {
+        uid: "APPROV_DDTM",
+        unm: dts_Report.getCellData(1, "APPROV_DDTM")
+    }, {
+        uid: "APPROV_EMP_NM",
+        unm: dts_Report.getCellData(1, "APPROV_EMP_NM")
+    }, {
+        uid: "FNL_DDTM",
+        unm: dts_Report.getCellData(1, "FNL_DDTM")
+    }, {
+        uid: "FNL_EMP_NM",
+        unm: dts_Report.getCellData(1, "FNL_EMP_NM")
+    }];
+
+    // PDF Convert
+    $c.rpt.fn_open_report_pdf(pdf_rptname, userParam);
+};
+
+/**
+ * @method
+ * @name printOld
+ * @description 화면을 인쇄한다. (- ASIS rexpert-bak 2018-04-03)
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.printOld = async function() {
+    url += "&BZ_PROCS_NO=" + scwin.vBzProcsNo;
+    const sbmOptions = {
+        id : "sbm_dts_Report",
+        action : "/SectionTypeChange.do",
+        ref : "",
+        target : "dts_Report=body.content",
+        isProcessMsg : false
+    };
+
+    const sbmRtn = await $c.sbm.executeDynamic(sbmOptions);
+    // TODO Stage2: sbmRtn 응답 처리 로직 작성 (구 submitDoneHandler 자리)
+
+    // dts_Print.setDataHeader(); // W-Craft 주석처리 및 필요시 asis 파라미터 확인
+    // 껍데기만 만들고 사용자필드를 사용함
+    dts_Print.insertRow();
+    // dts_Print.NameValue(1, "TEST") = dtsObj.NameValue(1, "COM_NM");
+
+    // 데이타셋
+    // var testDateSet = rex_gfGetGauceCsvStrAll(dts_TempPrint, MxDataSet_emp_data );
+    const testDateSet = rex_gfGetGauceCsvStr(dts_Print);
+    // alert('[testDateSet]'+testDateSet);
+
+    // Rexpert리포트 파일명
+    // var rex_rptname = "test/sample4";
+    const rex_rptname = "RLDSTF00009";
+    let userParam = [{
+        uid: "ISU_SRT_CD",
+        unm: dts_Report.getCellData(1, "ISU_SRT_CD")
+    }, {
+        uid: "ISU_KOR_ABBRV",
+        unm: dts_Report.getCellData(1, "ISU_KOR_ABBRV")
+    }, {
+        uid: "FST_EXAMPRN_EMP_NM",
+        unm: dts_Report.getCellData(1, "FST_EXAMPRN_EMP_NM")
+    }, {
+        uid: "APPL_DD",
+        unm: dts_Report.getCellData(1, "APPL_DD")
+    }, {
+        uid: "CHG_DD",
+        unm: dts_Report.getCellData(1, "CHG_DD")
+    }, {
+        uid: "SECT_CHG_TP_NM",
+        unm: dts_Report.getCellData(1, "SECT_CHG_TP_NM")
+    }, {
+        uid: "BFCHG_SECT_TP_NM",
+        unm: dts_Report.getCellData(1, "BFCHG_SECT_TP_NM")
+    }, {
+        uid: "AFCHG_SECT_TP_NM",
+        unm: dts_Report.getCellData(1, "AFCHG_SECT_TP_NM")
+    }, {
+        uid: "SECT_STRT_DD",
+        unm: dts_Report.getCellData(1, "SECT_STRT_DD")
+    }, {
+        uid: "SECT_END_DD",
+        unm: dts_Report.getCellData(1, "SECT_END_DD")
+    }, {
+        uid: "AFCHG_SECT_INVSTG_TP_NM",
+        unm: dts_Report.getCellData(1, "AFCHG_SECT_INVSTG_TP_NM")
+    }, {
+        uid: "SECT_CHG_RSN",
+        unm: dts_Report.getCellData(1, "SECT_CHG_RSN")
+    }, {
+        uid: "REMK",
+        unm: dts_Report.getCellData(1, "REMK")
+    }, {
+        uid: "PROCS_DDTM",
+        unm: dts_Report.getCellData(1, "PROCS_DDTM")
+    }, {
+        uid: "DISCLS_TRANSTR_EMP_NM",
+        unm: dts_Report.getCellData(1, "DISCLS_TRANSTR_EMP_NM")
+    }, {
+        uid: "REVW_DDTM",
+        unm: dts_Report.getCellData(1, "REVW_DDTM")
+    }, {
+        uid: "REVWR_EMP_NM",
+        unm: dts_Report.getCellData(1, "REVWR_EMP_NM")
+    }, {
+        uid: "APPROV_DDTM",
+        unm: dts_Report.getCellData(1, "APPROV_DDTM")
+    }, {
+        uid: "APPROV_EMP_NM",
+        unm: dts_Report.getCellData(1, "APPROV_EMP_NM")
+    }, {
+        uid: "FNL_DDTM",
+        unm: dts_Report.getCellData(1, "FNL_DDTM")
+    }, {
+        uid: "FNL_EMP_NM",
+        unm: dts_Report.getCellData(1, "FNL_EMP_NM")
+    }];
+
+    // Rexpert 미리보기 호출
+    $c.rpt.fn_open_report(testDateSet, rex_rptname, userParam);
+};
+
+///////// 5. 일반/업무 함수 영역 /////////
+/**
+ * @method
+ * @name checkForm
+ * @description check Form 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.checkForm = async function() {
+    let vCurDate = $c.ut.cGetToday("yyyymmdd");
+    if (txb_ISUR_CD.getValue() === "") {
+        await $c.win.alert("[회사코드] 항목값이  없습니다.");
+        txb_ISUR_CD.focus();
+        return false;
+    }
+    if (cmb_SECT_CHG_TP_CD.getValue() === "") {
+        await $c.win.alert("[소속부변경구분]을 선택하세요.");
+        cmb_SECT_CHG_TP_CD.focus();
+        return false;
+    }
+    if (scwin.vSECT_CHG_TP_CD === 'N') {
+        if (scwin.vSECT_CHG_TP_CD !== cmb_SECT_CHG_TP_CD.getValue()) {
+            await $c.win.alert("[소속부변경구분]값이 '신규상장'이면 [소속부변경구분]항목을 변경할 수 없습니다.");
+            cmb_SECT_CHG_TP_CD.focus();
+            return false;
+            // 심사팀에서 신규상장시 입력한 자료라서 수정 불가.
+        }
+    }
+    if (cmb_SECT_CHG_TP_CD.getValue() === "") {
+        await $c.win.alert("[소속부변경구분]을 선택하세요.");
+        cmb_SECT_CHG_TP_CD.focus();
+        return false;
+    }
+    if (cmb_SECT_CHG_TP_CD.getValue() !== "N") {
+        // 신규상장
+        if (cmb_BFCHG_SECT_TP_CD.getValue() === "") {
+            await $c.win.alert("[변경전 소속부] 항목값이  없습니다.");
+            cmb_BFCHG_SECT_TP_CD.focus();
+            return false;
+        }
+    }
+    if (cmb_AFCHG_SECT_TP_CD.getValue() === "") {
+        await $c.win.alert("[변경후 소속부]를 선택하세요.");
+        cmb_AFCHG_SECT_TP_CD.focus();
+        return false;
+    }
+    if (edt_CHG_DD.getValue() === "") {
+        await $c.win.alert("[변경일]을 입력하세요.");
+        edt_CHG_DD.focus();
+        return false;
+    }
+    if (vCurDate >= edt_CHG_DD.getValue()) {
+        await $c.win.alert("[변경일]을 현재일이후로 입력하세요.");
+        edt_CHG_DD.focus();
+        return false;
+    }
+    if (edt_SECT_STRT_DD.getValue() === "") {
+        if (edt_SECT_END_DD.getValue() !== "") {
+            await $c.win.alert("[소속부유효시작일]을 입력하세요.");
+            edt_SECT_STRT_DD.focus();
+            return false;
+        }
+    } else {
+        if (edt_SECT_END_DD.getValue() === "") {
+            await $c.win.alert("[소속부유효종료일]을 입력하세요.");
+            edt_SECT_END_DD.focus();
+            return false;
+        }
+        if (parseInt(edt_SECT_STRT_DD.getValue(), 10) > parseInt(edt_SECT_END_DD.getValue(), 10)) {
+            await $c.win.alert("[소속부유효종료일]은 [소속부유효시작일]보다 작아야 합니다. 다시 입력해주세요");
+            return false;
+        }
+    }
+    if (cmb_AFCHG_SECT_INVSTG_TP_CD.getValue() === "") {
+        await $c.win.alert("[소속부 심사구분]를 선택하세요.");
+        cmb_AFCHG_SECT_INVSTG_TP_CD.focus();
+        return false;
+    }
+    if (cmb_BFCHG_SECT_TP_CD.getValue() === "4") {
+        // 기술성장기업부
+        if (cmb_AFCHG_SECT_TP_CD.getValue() === "2" || cmb_AFCHG_SECT_TP_CD.getValue() === "3") {
+            await $c.win.alert("변경전 소속부가 기술성장기업부일 경우 우량기업부로 변경만 가능합니다.");
+            cmb_AFCHG_SECT_TP_CD.focus();
+            return false;
+        }
+    }
+    if (cmb_BFCHG_SECT_TP_CD.getValue() === "2" || // 벤처
+        cmb_BFCHG_SECT_TP_CD.getValue() === "3") {
+        // 중견
+        if (cmb_AFCHG_SECT_TP_CD.getValue() === "4") {
+            await $c.win.alert("변경전 소속부가 벤처나 중견일 경우 우량기업부로 변경만 가능합니다.");
+            cmb_AFCHG_SECT_TP_CD.focus();
+            return false;
+        }
+    }
+    return true;
+};
+
+/**
+ * @method
+ * @name save
+ * @description save 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.save = async function() {
+    scwin.TR_JOB = 'I';
+    if (await scwin.checkForm()) {
+        if (await scwin.duplicateCheck() === 'Y') {
+            await $c.win.alert("[변경일]이 동일한 일자로 이미  입력되었습니다.");
+            return;
+        }
+        if (!$c.lc.fn_isProcess(scwin.TR_JOB)) return;
+        await scwin.trs(TR_JOB_INSERT);
+
+        /*
+        vBzProcsNo = fn_getNewBzProcNo( dts_BzProcsNo );
+
+        if (vBzProcsNo.length != 14) {
+        	alert(getMessageParam("MSG-0010", ""));
+        } else {
+
+            //dts_Item.NameValue(1, "BZ_PROCS_NO") = vBzProcsNo;
+            //alert('[JOB_TYPE]'+dts_Item.NameValue(1, "JOB_TYPE") );
+            //alert('[vSPOT_ISU_TRD_MKT_TP_CD]'+vSPOT_ISU_TRD_MKT_TP_CD );
+
+        	fn_trs(TR_JOB_INSERT);
+        }
+         */
+
+    }
+};
+
+/**
+ * @method
+ * @name update
+ * @description update 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.update = async function() {
+    scwin.TR_JOB = 'U';
+    if (await scwin.checkForm()) {
+        if (!$c.lc.fn_isProcess(scwin.TR_JOB)) return;
+        await scwin.trs(TR_JOB_UPDATE);
+    }
+};
+
+/**
+ * @method
+ * @name delete
+ * @description delete 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.delete = async function() {
+    if (edt_APPROV_DDTM.getValue() !== "") {
+        await $c.win.alert("승인처리가 완료된 후 삭제 할 수 없습니다.");
+        return;
+    }
+    scwin.TR_JOB = 'D';
+    if (scwin.vSECT_CHG_TP_CD === 'N') {
+        await $c.win.alert("[소속부변경구분]값이 '신규상장'이면 삭제 할 수 없습니다.");
+        cmb_SECT_CHG_TP_CD.focus();
+        return;
+        // 심사팀에서 신규상장시 입력한 자료라서 삭제 불가(신규상장한건도 삭제처리됨.).
+    }
+    if (!$c.lc.fn_isProcess(scwin.TR_JOB)) return;
+    buttonSet.setDeleteStatus(); // buttonSet에 CRUD상태를 저장하여 이용하는 사례, TR의 응답event에서 사용.
+
+    await scwin.trs(TR_JOB_DELETE);
+};
+
+/**
+ * @method
+ * @name revwr
+ * @description revwr 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.revwr = async function() {
+    scwin.TR_JOB = '검토처리';
+    scwin.pLogType = "1";
+    let res = window.confirm($c.stf.getMessageParam('MSG-A006', scwin.TR_JOB));
+    if (res) {
+        await scwin.trslog('1');
+    }
+};
+
+/**
+ * @method
+ * @name approve
+ * @description approve 처리
+ * @returns {Promise<void>}
+ * @hidden N
+ */
+scwin.approve = async function() {
+    if (edt_REVW_DDTM.getValue() === "") {
+        await $c.win.alert("검토처리가 완료된 후 승인처리를 할 수 있습니다.");
+        return;
+    }
+    scwin.TR_JOB = '승인처리';
+    scwin.pLogType = "2";
+    let res = window.confirm($c.stf.getMessageParam('MSG-A006', scwin.TR_JOB));
+    if (res) {
+        await scwin.trslog('2');
+    }
+};
+
+/**
+ * @method
+ * @name parentRefresh
+ * @description parent Refresh 처리
+ * @returns {void}
+ * @hidden N
+ */
+scwin.parentRefresh = function() {
+    const fr_fn_list_sync = $c.frame.path("../").fn_Search;
+    fr_fn_list_sync();
+};
+
+/**
+ * @method
+ * @name filedown
+ * @description filedown 처리
+ * @param {*} dtsObj dtsObj
+ * @returns {void}
+ * @hidden N
+ */
+scwin.filedown = function(dtsObj) {
+    const vKey = dtsObj.getCellData(dtsObj.getFocusedRowIndex(), "DISCLS_DOC_NO");
+    const attach_seq = dtsObj.getCellData(dtsObj.getFocusedRowIndex(), "ATTACH_SEQ");
+    if (scwin.vAcptNo !== "") {
+        location.href = "/filedownload.do?file_id=" + vKey + "&attach_seq=" + attach_seq + "&gubun=12";
+    } else {
+        location.href = "/filedownload.do?file_id=" + vKey + "&attach_seq=" + attach_seq + "&gubun=23";
+    }
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+		<!-- Tag is Not matched with wCraft2 Rule :<style/>-->
+		<xf:model>
+			<!-- Tag is Not matched with wCraft2 Rule :<mxdataset id="dts_Cod" syncload="True" orgid="dts_Cod" hierarchy="dts_Cod"/>-->
+			<!-- Tag is Not matched with wCraft2 Rule :<mxdataset id="dts_Item" onloaderror="dts_Item_OnLoadError" syncload="True" usechangeinfo="True" userData2=" onloadcompleted:dts_Item_OnLoadCompleted;" orgid="dts_Item" hierarchy="dts_Item"/>-->
+			<!-- Tag is Not matched with wCraft2 Rule :<mxdataset id="dts_File" onloaderror="dts_File_OnLoadError" syncload="True" orgid="dts_File" hierarchy="dts_File"/>-->
+			<w2:dataMap id="bnd_fileList" userData2=" activebind:true; dataid:dts_File;" baseNode="map">
+				<w2:keyInfo>
+					<w2:key id="fileInfo" ctrl="inf_find" userData2=" param:Value; readonly:False;"/>
+					<w2:key id="FILEURL" ctrl="inf_find" userData2=" param:Value; readonly:False;"/>
+					<w2:key id="SAVE_FILE_NM" ctrl="file_name" userData2=" param:Value; readonly:False;"/>
+					<w2:key id="ATTACH_SEQ" userData2=" readonly:False;"/>
+				</w2:keyInfo>
+			</w2:dataMap>
+			<w2:dataMap id="bnd_Item" userData2=" activebind:true; dataid:dts_Item;" baseNode="map">
+				<w2:keyInfo>
+					<w2:key id="CHG_DD" ctrl="edt_CHG_DD" userData2=" param:text; readonly:False;"/>
+					<w2:key id="SECT_STRT_DD" ctrl="edt_SECT_STRT_DD" userData2=" param:text; readonly:False;"/>
+					<w2:key id="SECT_END_DD" ctrl="edt_SECT_END_DD" userData2=" param:text; readonly:False;"/>
+					<w2:key id="BFCHG_SECT_TP_CD" ctrl="cmb_BFCHG_SECT_TP_CD" userData2=" param:BindColVal; readonly:False;"/>
+					<w2:key id="AFCHG_SECT_TP_CD" ctrl="cmb_AFCHG_SECT_TP_CD" userData2=" param:BindColVal; readonly:False;"/>
+					<w2:key id="SECT_CHG_TP_CD" ctrl="cmb_SECT_CHG_TP_CD" userData2=" param:BindColVal; readonly:False;"/>
+					<w2:key id="AFCHG_SECT_INVSTG_TP_CD" ctrl="cmb_AFCHG_SECT_INVSTG_TP_CD" userData2=" param:BindColVal; readonly:False;"/>
+					<w2:key id="SECT_CHG_RSN_CD" ctrl="cmb_SECT_CHG_RSN" userData2=" param:BindColVal; readonly:False;"/>
+					<w2:key id="REMK" ctrl="txa_REMK" userData2=" param:text; readonly:False;"/>
+					<w2:key id="APPL_DD" ctrl="edt_APPL_DD" userData2=" param:text; readonly:False;"/>
+					<w2:key id="PROCS_DDTM" ctrl="edt_PROCS_DDTM" userData2=" param:text; readonly:False;"/>
+					<w2:key id="REVW_DDTM" ctrl="edt_REVW_DDTM" userData2=" param:text; readonly:False;"/>
+					<w2:key id="APPROV_DDTM" ctrl="edt_APPROV_DDTM" userData2=" param:text; readonly:False;"/>
+					<w2:key id="DISCLS_TRANSTR_EMP_NM" ctrl="txb_DISCLS_TRANSTR_EMP_NM" userData2=" param:value; readonly:False;"/>
+					<w2:key id="REVWR_EMP_NM" ctrl="txb_REVWR_EMP_NM" userData2=" param:value; readonly:False;"/>
+					<w2:key id="APPROV_EMP_NM" ctrl="txb_APPROV_EMP_NM" userData2=" param:value; readonly:False;"/>
+				</w2:keyInfo>
+			</w2:dataMap>
+			<!-- Tag is Not matched with wCraft2 Rule :<mxlogicaltr id="trs_Save" onfail="trs_Save_OnFail" onsuccess="trs_Save_OnSuccess" orgid="trs_Save" hierarchy="trs_Save"/>-->
+			<!-- Tag is Not matched with wCraft2 Rule :<mxdataset id="dts_DUP_CHK" syncload="True" orgid="dts_DUP_CHK" hierarchy="dts_DUP_CHK"/>-->
+			<!-- Tag is Not matched with wCraft2 Rule :<mxdataset id="dts_BzProcsNo" syncload="True" orgid="dts_BzProcsNo" hierarchy="dts_BzProcsNo"/>-->
+			<!-- Tag is Not matched with wCraft2 Rule :<mxdataset id="dts_Print" orgid="dts_Print" hierarchy="dts_Print"/>-->
+			<!-- Tag is Not matched with wCraft2 Rule :<mxdataset id="dts_Report" onloaderror="dts_Report_OnLoadError" syncload="True" orgid="dts_Report" hierarchy="dts_Report"/>-->
+			<!-- Tag is Not matched with wCraft2 Rule :<mxlogicaltr id="trs_Log" onfail="trs_Log_OnFail" onsuccess="trs_Log_OnSuccess" orgid="trs_Log" hierarchy="trs_Log"/>-->
+			<!-- Tag is Not matched with wCraft2 Rule :<mxdataset id="dts_bfSectInvstg" orgid="dts_bfSectInvstg" hierarchy="dts_bfSectInvstg"/>-->
+			<!-- Tag is Not matched with wCraft2 Rule :<mxdataset id="dts_AhthAdm" syncload="True" orgid="dts_AhthAdm" hierarchy="dts_AhthAdm"/>-->
+			<!-- Tag is Not matched with wCraft2 Rule :<mxdataset id="dts_sw" syncload="True" orgid="dts_sw" hierarchy="dts_sw"/>-->
+		</xf:model>
+		<xf:group class="pop_contents">
+			<xf:group class="tblbox" id="" meta_snippetCategory="05_입출력테이블" meta_snippetKeyComponent="true" meta_snippetName="5_01 1단테이블"
+				style="">
+				<xf:group adaptive="layout" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+					<w2:attributes>
+						<w2:summary></w2:summary>
+					</w2:attributes>
+					<xf:group tagname="colgroup">
+						<xf:group style="width:170px;" tagname="col"></xf:group>
+						<xf:group tagname="col" style="width:15%;"></xf:group><xf:group tagname="col" style="width:170px;"></xf:group><xf:group style="" tagname="col"></xf:group>
+					</xf:group>
+					<xf:group style="" tagname="tr">
+						<xf:group class="w2tb_th" style="" tagname="th">
+							<w2:textbox id="label_2" label="1. 법인명" style="" userData2=" class:TopCondition_01;"></w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" style="" tagname="td">
+							<w2:attributes><w2:colspan>3</w2:colspan><w2:rowspan>1</w2:rowspan></w2:attributes><xf:input id="txb_ISUR_CD" maxlength="1000" readOnly="true" ref="data:bnd_Corp.ISUR_CD"
+								style="width:60px;" userData2=" class:TopCondition_01_read;">
+							</xf:input>
+							<xf:input id="txb_COM_NM" maxlength="1000" readOnly="true" ref="data:bnd_Corp.COM_NM"
+								style="width:210px;" userData2=" class:TopCondition_01_write;">
+							</xf:input>
+						</xf:group></xf:group>
+					<xf:group tagname="tr">
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_6" label="2. 변경구분" style="" userData2=" class:TopCondition_01; border-color:#0000FF;"
+								class="req">
+							</w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes>
+								<w2:colspan>3</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:select1 appearance="minimal" disabled="false" disabledClass="w2selectbox_disabled" displayMode="label"
+								id="cmb_SECT_CHG_TP_CD" selectedData="true" style="width:130px;"
+								userData2=" class:TopCondition_01; bindcolumn:VALUE; index:0; listcount:10; listexprformat:TEXT^0^100; searchcolumn:TEXT; border-color:#b9d4f7;">
+							</xf:select1>
+						</xf:group></xf:group>
+					<xf:group tagname="tr">
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+								<w2:colspan>4</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<w2:textbox id="label_5" label="3. 소속부유형 변경내용" style=""
+								userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group></xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th tar">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_1" label="가. 변경전" style="" userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes><w2:colspan>3</w2:colspan><w2:rowspan>1</w2:rowspan></w2:attributes>
+							<xf:select1 appearance="minimal" disabled="false" disabledClass="w2selectbox_disabled" displayMode="label"
+								id="cmb_BFCHG_SECT_TP_CD" selectedData="true" style="width:180px;"
+								userData2=" class:TopCondition_01; bindcolumn:VALUE; index:0; listcount:10; listexprformat:TEXT^0^150; searchcolumn:TEXT; border-color:#b9d4f7;">
+							</xf:select1>
+						</xf:group></xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th tar">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_3" label="나. 변경후" style="" userData2=" class:TopCondition_01; border-color:#0000FF;"
+								class="req">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes><w2:colspan>3</w2:colspan><w2:rowspan>1</w2:rowspan></w2:attributes>
+							<xf:select1 appearance="minimal" disabled="false" disabledClass="w2selectbox_disabled" displayMode="label"
+								id="cmb_AFCHG_SECT_TP_CD" selectedData="true" style="width:180px;"
+								userData2=" class:TopCondition_01; bindcolumn:VALUE; index:0; listcount:10; listexprformat:TEXT^0^150; searchcolumn:TEXT; border-color:#b9d4f7;">
+							</xf:select1>
+						</xf:group></xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_8" label="4. 소속부 유효기간" style="" userData2=" class:TopCondition_01; border-color:#0000FF;"
+								class="req">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes><w2:colspan>3</w2:colspan><w2:rowspan>1</w2:rowspan></w2:attributes>
+							<w2:inputCalendar calendarValueType="yearMonthDate" focusOnDateSelect="false" footerDiv="true" id=""
+								meta_snippetCategory="10_입력폼" meta_snippetKeyComponent="true" meta_snippetName="10_11 기간조회" renderDiv="true" renderType=""
+								rightAlign="false" style="width: 120px;">
+							</w2:inputCalendar>
+							<w2:span id="" label="~" meta_snippetCategory="10_입력폼" meta_snippetName="10_11 기간조회" style=""></w2:span>
+							<w2:inputCalendar calendarValueType="yearMonthDate" focusOnDateSelect="false" footerDiv="true" id=""
+								meta_snippetCategory="10_입력폼" meta_snippetName="10_11 기간조회" renderDiv="true" renderType="" rightAlign="false"
+								style="width: 120px;">
+							</w2:inputCalendar>
+						</xf:group></xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_11" label="5. 소속부 심사구분" style="" userData2=" class:TopCondition_01; border-color:#0000FF;"
+								class="req">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes><w2:colspan>3</w2:colspan><w2:rowspan>1</w2:rowspan></w2:attributes>
+							<xf:select1 appearance="minimal" disabled="false" disabledClass="w2selectbox_disabled" displayMode="label"
+								id="cmb_AFCHG_SECT_INVSTG_TP_CD" selectedData="true" style="width:120px;"
+								userData2=" class:TopCondition_01; bindcolumn:VALUE; index:0; listcount:10; listexprformat:TEXT^0^100; searchcolumn:TEXT;">
+							</xf:select1>
+						</xf:group></xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_4" label="6. 변경일" style="" userData2=" class:TopCondition_01; border-color:#0000FF;"
+								class="req">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<w2:inputCalendar calendarValueType="yearMonthDate" focusOnDateSelect="false" footerDiv="true" id=""
+								meta_snippetCategory="10_입력폼" meta_snippetKeyComponent="true" meta_snippetName="10_11 기간조회" renderDiv="true" renderType=""
+								rightAlign="false" style="width: 120px;">
+							</w2:inputCalendar>
+						</xf:group>
+						<xf:group tagname="th" class="w2tb_th">
+							<w2:attributes></w2:attributes>
+							<w2:textbox id="label_21" label="신청일" style=""
+								userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input id="edt_APPL_DD" readOnly="true"
+								style="width:120px;"
+								userData2=" class:panel_maskedit_write_01; alignment:1; numeric:False; readonlybackcolor:#b9d4f7; valign:1;">
+							</xf:input>
+						</xf:group></xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_12" label="7. 변경사유" style="" userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:colspan>3</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:select1 appearance="minimal" disabled="false" disabledClass="w2selectbox_disabled" displayMode="label"
+								id="cmb_SECT_CHG_RSN" selectedData="true" style="width:280px;"
+								userData2=" class:TopCondition_01; bindcolumn:VALUE; index:0; listcount:10; listexprformat:TEXT^0^250; searchcolumn:TEXT;">
+							</xf:select1>
+						</xf:group></xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_7" label="8. 기타" style="" userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:colspan>3</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:textarea id="txa_REMK" readOnly="false"
+								style="width:100%; height:49px;"
+								userData2=" class:TextArea_01; cacheload:True; wantreturn:True;">
+							</xf:textarea>
+						</xf:group></xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_22" label="9.첨부파일" style="" userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:colspan>3</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:group class="lybox" id="" meta_snippetCategory="01_화면분할" meta_snippetKeyComponent="true"
+								meta_snippetName="1_05 좌측 고정 2단 분할_width값 200px" style="">
+								<xf:group adaptiveThreshold="" class="" id="" meta_componentContainer="true" style="">
+									<xf:group style="" id="" class="gvwbox">
+										<w2:gridView dataList="data:dts_File" hierarchy="grd_ATTACH_FILE" style="height:153px;" tabIndex="0"
+											userData2=" class:Grid_01; borderstyle:0; colselect:True; colsizing:True; fillarea:True; gtitleheight:0; headborder:4; indwidth:0; rowheight:20; sortview:left; titleheight:25; usingoneclick:1; xtitleheight:0; enablefixedcolumn:True; fixedheadbgcolor:#FFCC00; font-family:돋움체; font-weight:normal; border-color:#c0c0c0; ondblclick:grd_ATTACH_FILE_OnDblClick;"
+											id="grd_ATTACH_FILE" autoFit="allColumn" class="gvw" orgid="grd_ATTACH_FILE">
+											<w2:caption style="" id="caption1" value="this is a grid caption."></w2:caption>
+											<w2:header style="" id="header1">
+												<w2:row>
+													<w2:column textAlign="center" width="50" inputType="text"
+														userData2=" value:{ToString(CurRow)};" value="번호" displayMode="label">
+													</w2:column>
+													<w2:column textAlign="center" width="315" inputType="text" userData2=" cursor:hand;"
+														id="SAVE_FILE_NM_H" value="첨부파일명" displayMode="label">
+													</w2:column>
+													<w2:column hidden="true" textAlign="center" width="64" inputType="text"
+														id="DISCLS_DOC_NO_H" value="DISCLS_DOC_NO" displayMode="label">
+													</w2:column>
+													<w2:column hidden="true" textAlign="center" width="60" inputType="text" id="ATTACH_SEQ_H"
+														value="ATTACH_SEQ" displayMode="label">
+													</w2:column>
+												</w2:row>
+											</w2:header>
+											<w2:gBody style="" id="gBody1">
+												<w2:row style="" id="">
+													<w2:column textAlign="center" width="50" inputType="text" id="undefined"
+														displayMode="label">
+													</w2:column>
+													<w2:column textAlign="center" width="315" inputType="text" id="SAVE_FILE_NM"
+														displayMode="label">
+													</w2:column>
+													<w2:column textAlign="center" width="64" inputType="text" id="DISCLS_DOC_NO"
+														displayMode="label">
+													</w2:column>
+													<w2:column textAlign="center" width="60" inputType="text" id="ATTACH_SEQ"
+														displayMode="label">
+													</w2:column>
+												</w2:row>
+											</w2:gBody>
+										</w2:gridView>
+									</xf:group>
+								</xf:group>
+								<xf:group class="col_fix flex flex_column" id="" meta_componentContainer="true" style="width:150px;">
+									<xf:trigger class="btn_cm" id="" meta_snippetCategory="08_버튼" meta_snippetKeyComponent="true"
+										meta_snippetName="8_01 기본버튼" style="width:100%;" type="button">
+										<xf:label><![CDATA[파일추가]]></xf:label>
+									</xf:trigger>
+									<xf:trigger class="btn_cm" id="" meta_snippetCategory="08_버튼" meta_snippetKeyComponent="true"
+										meta_snippetName="8_01 기본버튼" style="width:100%;" type="button">
+										<xf:label><![CDATA[파일삭제]]></xf:label>
+									</xf:trigger>
+								</xf:group>
+							</xf:group>
+						</xf:group></xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+								<w2:colspan>4</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<w2:textbox id="label_23" label="10.인증자격 현황" style=""
+								userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group></xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+								<w2:colspan>4</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:group style="" id="" class="gvwbox">
+								<w2:gridView dataList="data:dts_AhthAdm" hierarchy="grd_AhthAdm" style="height:153px;" tabIndex="0"
+									userData2=" class:Grid_01; borderstyle:0; colsizing:True; fillarea:True; gtitleheight:21; headborder:4; indwidth:0; rowheight:20; titleheight:19; xtitleheight:0; font-family:돋움체; font-weight:normal; border-color:#c0c0c0;"
+									id="grd_AhthAdm" autoFit="allColumn" class="gvw" orgid="grd_AhthAdm">
+									<w2:caption style="" id="caption2" value="this is a grid caption."></w2:caption>
+									<w2:header style="" id="header2">
+										<w2:row>
+											<w2:column textAlign="center" width="95" inputType="text" style="color:#343434;"
+												userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; sumbgcolor:#fefaef; sumcolor:#343434;"
+												id="SECT_AHTH_QUAL_TP_NM_H" value="인증자격" displayMode="label" rowSpan="2">
+											</w2:column>
+											<w2:column textAlign="center" width="100" inputType="text" style="color:#343434;"
+												userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; sumbgcolor:#fefaef; sumcolor:#343434;"
+												id="SECT_AHTH_QUAL_NM_H" value="인증내역" displayMode="label" rowSpan="2">
+											</w2:column>
+											<w2:column textAlign="center" width="100" inputType="text" style="color:#343434;"
+												userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; sumbgcolor:#fefaef; sumcolor:#343434;"
+												id="SECT_AHTH_INST_NM_H" value="인증기관" displayMode="label" rowSpan="2">
+											</w2:column>
+											<w2:column textAlign="center" width="75" inputType="text" style="color:#343434;"
+												userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; sumbgcolor:#fefaef; sumcolor:#343434;" id="DESIGN_DD_H"
+												value="인증일자" displayMode="label" rowSpan="2">
+											</w2:column>
+											<w2:column width="140" inputType="text" id="column9" value="유효기간" displayMode="label"
+												colSpan="2">
+											</w2:column>
+											<w2:column textAlign="center" width="200" inputType="text" style="color:#343434;"
+												userData2=" headalign:center; headbgcolor:#598fd5; headcolor:#ffffff; sumbgcolor:#fefaef; sumcolor:#343434;" id="REMK_H"
+												value="기타" displayMode="label" rowSpan="2">
+											</w2:column>
+										</w2:row>
+										<w2:row style="" id="row1">
+											<w2:column width="70" inputType="text" id="column10" value="시작일" displayMode="label"></w2:column>
+											<w2:column width="70" inputType="text" id="column7" value="종료일" displayMode="label"></w2:column>
+										</w2:row>
+									</w2:header>
+									<w2:gBody style="" id="gBody2">
+										<w2:row style="" id="">
+											<w2:column textAlign="center" width="95" inputType="text" id="SECT_AHTH_QUAL_TP_NM"
+												displayMode="label">
+											</w2:column>
+											<w2:column textAlign="left" width="100" inputType="text" id="SECT_AHTH_QUAL_NM"
+												displayMode="label">
+											</w2:column>
+											<w2:column textAlign="left" width="100" inputType="text" id="SECT_AHTH_INST_NM"
+												displayMode="label">
+											</w2:column>
+											<w2:column textAlign="center" width="75" inputType="text" id="DESIGN_DD" displayMode="label">
+											</w2:column>
+											<w2:column width="70" inputType="text" id="column11" displayMode="label"></w2:column>
+											<w2:column width="70" inputType="text" id="column8" displayMode="label"></w2:column>
+											<w2:column textAlign="left" width="200" inputType="text" id="REMK" displayMode="label">
+											</w2:column>
+										</w2:row>
+									</w2:gBody>
+								</w2:gridView>
+							</xf:group>
+						</xf:group></xf:group>
+				</xf:group>
+			</xf:group>
+			<xf:group class="tblbox" id="" meta_snippetCategory="05_입출력테이블" meta_snippetKeyComponent="true" meta_snippetName="5_01 1단테이블"
+				style="">
+				<xf:group adaptive="layout" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+					<w2:attributes>
+						<w2:summary></w2:summary>
+					</w2:attributes>
+					<xf:group tagname="colgroup">
+						<xf:group style="width:170px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+					</xf:group>
+					<xf:group style="" tagname="tr">
+						<xf:group class="w2tb_th" style="" tagname="th">
+							<w2:textbox id="label_18" label="접수" style="" userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" style="" tagname="td">
+							<xf:input displayFormat="####-##-## ##:##:##" id="edt_PROCS_DDTM" readOnly="true" style="width:183px;"
+								userData2=" class:panel_maskedit_write_01; alignment:1; generaledit:False; numeric:False; readonlybackcolor:#b9d4f7; valign:1;">
+							</xf:input>
+							<xf:input id="txb_DISCLS_TRANSTR_EMP_NM" maxlength="1000" readOnly="true" style="width:110px;"
+								userData2=" class:TopCondition_01_read;">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_19" label="검토" style="" userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes>
+								<w2:colspan>1</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:input displayFormat="####-##-## ##:##:##" id="edt_REVW_DDTM" readOnly="true" style="width:183px;"
+								userData2=" class:panel_maskedit_write_01; alignment:1; generaledit:False; numeric:False; readonlybackcolor:#b9d4f7; valign:1;">
+							</xf:input>
+							<xf:input id="txb_REVWR_EMP_NM" maxlength="1000" readOnly="true" style="width:110px;"
+								userData2=" class:TopCondition_01_read;">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_20" label="승인" style="" userData2=" class:TopCondition_01; border-color:#0000FF;">
+							</w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes></w2:attributes>
+							<xf:input displayFormat="####-##-## ##:##:##" id="edt_APPROV_DDTM" readOnly="true" style="width:183px;"
+								userData2=" class:panel_maskedit_write_01; alignment:1; generaledit:False; numeric:False; readonlybackcolor:#b9d4f7; valign:1;">
+							</xf:input>
+							<xf:input id="txb_APPROV_EMP_NM" maxlength="1000" readOnly="true" style="width:110px;"
+								userData2=" class:TopCondition_01_read;">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<xf:group id="" class="btnbox mt10">
+				<xf:group id="" class="lt">
+					<w2:textbox style="" userData2=" class:Comment_02;" id="label_9" label="주1) 등록기업의 시장소속부가 변경 때"></w2:textbox>
+				</xf:group>
+				<xf:group id="" class="rt">
+					<xf:trigger cursor="pointer" src="../img/btn_modify.gif" style="" userData2=" border-color:#C0C0C0;" id="btn_Update"
+						class="btn_cm">
+						<xf:label><![CDATA[수정]]></xf:label>
+					</xf:trigger>
+					<xf:trigger cursor="pointer" src="../img/btn_delete.gif" style="" userData2=" border-color:#C0C0C0;" id="btn_Delete"
+						class="btn_cm">
+						<xf:label><![CDATA[삭제]]></xf:label>
+					</xf:trigger>
+					<xf:trigger cursor="pointer" src="../img/btn_study.gif" ev:onclick="scwin.btn_Revwr_onclick" style="" id="btn_Revwr"
+						class="btn_cm">
+						<xf:label><![CDATA[검토]]></xf:label>
+					</xf:trigger>
+					<xf:trigger cursor="pointer" src="../img/btn_approval.gif" ev:onclick="scwin.btn_Approve_onclick" style=""
+						id="btn_Approve" class="btn_cm">
+						<xf:label><![CDATA[승인]]></xf:label>
+					</xf:trigger>
+					<xf:trigger cursor="pointer" src="../img/btn_print.gif" ev:onclick="scwin.btn_Print_onclick" style="" id="btn_Print"
+						class="btn_cm">
+						<xf:label><![CDATA[인쇄]]></xf:label>
+					</xf:trigger>
+					<xf:trigger cursor="pointer" src="../img/btn_close.gif" ev:onclick="scwin.btn_Close_onclick" style="" id="btn_Close"
+						class="btn_cm">
+						<xf:label><![CDATA[닫기]]></xf:label>
+					</xf:trigger>
+					<xf:trigger cursor="pointer" src="../img/btn_save.gif" style="" userData2=" border-color:#C0C0C0;" id="btn_Save"
+						class="btn_cm pt">
+						<xf:label><![CDATA[저장]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+		</xf:group>
+	</body>
+</html>
