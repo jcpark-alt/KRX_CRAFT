@@ -33,6 +33,7 @@ try:
 except ImportError:  # 1단계에서 신설 — 없으면 건너뛴다
     pn = None
 import publish_merge as pm  # noqa: E402
+import ui_restyle as ur  # noqa: E402
 
 _PUB_IDX = None
 _OVERRIDES = None
@@ -133,6 +134,14 @@ def run(name, publish=True, gate=True, inventory=None, merge=True):
     elif merge and name.lower() in idx:
         rep["merge"] = {"verdict": "mismatch", "skip": ov["skip"]}
         rep["merge_rep"] = {"name": name, "verdict": "mismatch", "matched": 0, "pub_items": 0, "missing_refs": [], "unmatched_vendor": [], "todo": 0, "log": ["override skip: " + ov["skip"]], "ambiguous": False}
+    # 5c ui_restyle(V49) — body 를 sample-front 꼴로(2026-10-13). 병합 뒤에 두어 overrides 의 공급사 id(img_N) 짝짓기가 깨지지 않게 한다.
+    _raw3, eol3, reg3 = st.read_xml(dst)
+    if reg3 is not None:
+        h3, s3, b3, ulog = ur.apply(reg3["head"], reg3["script"], reg3["body"])
+        if ulog and "error" not in ulog:
+            st.write_xml(dst, h3, reg3["script_open"], s3, reg3["script_close"], b3, eol3)
+            _, rep["idem_after_restyle"] = _settle(dst, name, st.pcc_for(name), async_common)
+        rep["restyle"] = ulog
     # 7 gate
     if gate:
         ok, g = gate_screen.gate_file(str(dst), inventory or st.common_inventory(st.pcc_for(name)))

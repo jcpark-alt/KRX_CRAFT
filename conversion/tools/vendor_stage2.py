@@ -1408,11 +1408,12 @@ def apply(head, script, body):
 
 
 def main(argv=None):
-    """제자리 적용 CLI(frozen 화면 등): python conversion/tools/vendor_stage2.py --v37|--v38|--v39|--v40|--v41|--v42|--v43|--v44|--v45|--v46|--v47|--v48 [--dry] <xml|폴더> ..."""
+    """제자리 적용 CLI(frozen 화면 등): python conversion/tools/vendor_stage2.py --v37|--v38|--v39|--v40|--v41|--v42|--v43|--v44|--v45|--v46|--v47|--v48|--v49 [--dry] <xml|폴더> ...
+    (--v49 = ui_restyle.apply · body 를 sample-front 꼴로 정리, conversion/tools/ui_restyle.py)"""
     sys.stdout.reconfigure(encoding="utf-8")
     args = argv if argv is not None else sys.argv[1:]
-    files, fl, _ = st.parse_cli([a for a in args if a not in ("--v37", "--v38", "--v39", "--v40", "--v41", "--v42", "--v43", "--v44", "--v45", "--v46", "--v47", "--v48")], flags=("--dry",), opts=())
-    which = next((w for w in ("--v48", "--v47", "--v46", "--v45", "--v44", "--v43", "--v42", "--v41", "--v40", "--v39", "--v38", "--v37") if w in args), None)
+    files, fl, _ = st.parse_cli([a for a in args if a not in ("--v37", "--v38", "--v39", "--v40", "--v41", "--v42", "--v43", "--v44", "--v45", "--v46", "--v47", "--v48", "--v49")], flags=("--dry",), opts=())
+    which = next((w for w in ("--v49", "--v48", "--v47", "--v46", "--v45", "--v44", "--v43", "--v42", "--v41", "--v40", "--v39", "--v38", "--v37") if w in args), None)
     if not which or not files:
         print(main.__doc__); return 2
     changed = 0; tot = {}
@@ -1443,6 +1444,9 @@ def main(argv=None):
             head, new, body, log = key_filter_to_allowchar(reg["head"], reg["script"], reg["body"])
         elif which == "--v48":
             head, new, body, log = normalize_deploy_paths(reg["head"], reg["script"], reg["body"])
+        elif which == "--v49":
+            import ui_restyle
+            head, new, body, log = ui_restyle.apply(reg["head"], reg["script"], reg["body"])
         else:
             head, new, body, log = inline_fn_aliases(reg["head"], reg["script"], reg["body"])
         if new != reg["script"] or head != reg["head"] or body != reg["body"]:

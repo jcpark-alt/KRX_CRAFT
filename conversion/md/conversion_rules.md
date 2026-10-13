@@ -707,7 +707,7 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
 * id 참조 판정은 스크립트의 **문자열 리터럴·`#id` 셀렉터**(주석 제외)로 한다 — `init_attrReals` 의 `td_16`·`ul_186` 처럼 생성 id 로
   보여도 스크립트가 쥐고 있는 것은 보존한다.
 
-### 파이프라인 — `jspfront_pipeline.py` (규칙 33 → convert → 컨벤션 → convert 수렴 → 규칙 34 → convert 수렴 → 게이트)
+### 파이프라인 — `jspfront_pipeline.py` (규칙 33 → convert → 컨벤션 → convert 수렴 → 규칙 34 → 규칙 35 병합 → 규칙 36 body 정리 → convert 수렴 → 게이트)
 
 * convert 는 결과가 안 바뀔 때까지(최대 3회) 돌린다 — 컨벤션 단계가 규칙 4 보류 원인을 치우면 다음 회차에서야 재정렬된다.
 * convert 는 `keep_nullish=True` 로 부른다 — 규칙 5a 가 `x != null` 을 `!== null` 로 바꾸면 `undefined` 가 가드를 통과해 페이징 건수
@@ -781,6 +781,26 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
 * **승격(2026-10-06, 사용자 확정)**: 병합은 `jspfront_pipeline.py` **5b 단계**가 수행하고 결과는 `ui-tobe/` 에 바로 쓴다(별도 `ui-pub/` 없음). 닫힘(auto/todo/manual)이면 병합본 + convert 수렴, review/mismatch 면 병합 전 본 유지, `frozen` 은 파이프라인이 건너뜀(ui-tobe 파일이 정본). 리포트는 파이프라인이 행 단위로 갱신.
 * **실행**: 재생성은 `python conversion/tools/jspfront_pipeline.py <name|폴더>`; `publish_merge.py` CLI 단독은 `--vendor-dir <병합 전 본 폴더>` 가 있을 때만 의미 있다(`--out` 이 같은 폴더면 report-only 강제).
   기준(2026-10-06): 이름 일치 260화면 → auto 89 · todo 160(표지 1,576) · manual 3 · mismatch 8(override skip: 같은 이름에 다른 화면 6·퍼블리싱 빈 자리표 2) · review 0, `ui-pub` 252본 게이트·lint 0/0, 고정점. 테스트 `test_jspfront_tools.py::test_publish_merge_*`.
+
+### 규칙 36: body 샘플 꼴 정리 — `ui_restyle.py` (U1~U11, lxml · body + 버튼 개명분 script/publicInfo)
+
+공급사 body 를 sample-front 규약(titbox h3 · txt_info 안내 · tblbox 2단 테이블 · 입력+아이콘조회버튼 한 칸 · btnbox rt)으로 기계 정리한다(2026-10-13, 정답지 `ui-tobe/JLDFIL01030`). 파이프라인 5c(규칙 35 병합 뒤·게이트 앞)이며 `vendor_stage2.py --v49` 로 제자리 적용할 수 있다. 모든 규칙은 스크립트 참조 검사로 지켜지고 멱등이다.
+
+| 규칙 | 내용 | 지키는 것 |
+| --- | --- | --- |
+| U1 | `sub_contents` 그룹에 `id=""`·`style=""` | — |
+| U2 | `inputType="hidden"` 입력 삭제(앞의 「hidden 'x' 유지」 주석 포함) | 스크립트가 id 를 참조하거나 `value` 가 있으면 유지(값은 dataMap 키가 지닌다) |
+| U3 | `display:none` iframe(`w2:tag`) 삭제 | id·name 어느 쪽이든 참조되면 유지 |
+| U4 | `table.lybox` 1행·첫 칸 icon_N.gif(또는 "아이콘 이미지" span) 안내표 → `w2:textbox.txt_info`; 버튼 칸이 있으면 `titbox(p.txt_info + rt)`; 바로 앞 tblbox 위로 옮김 | — |
+| U5 | td/th/li/p/div/span 의 생 텍스트(자식 없음) → `w2:textbox label` (`&` 포함이면 escape=false) | — |
+| U6 | `img_N` 버튼 → `btn_<핸들러가 부르는 첫 scwin 함수>`(없으면 close/move·ASCII 라벨·아이콘 class); body id·ev:onclick, script 정의·문자열·JSDoc·context, publicInfo 함께. span 꼴 textbox 버튼 → `xf:trigger`(스크립트가 show/hide/setDisabled 외로 쓰면 유지). 아이콘 전용 trigger 에 `xf:label` | 핸들러 개명은 body 가 가리키는 핸들러 이름에 old id 가 들어 있을 때만(`__ev_5_img_99_onclick` 변형 포함) — 공용 핸들러·고아 정의는 그대로. 같은 줄기는 `name` 속성(ASCII)·번호로 가른다 |
+| U7 | `table.w2tb` 1행 1빈칸 간격 표 삭제 | — |
+| U8 | 배치 테이블 평탄화 — 모든 행이 th 없는 td 한 칸이고 칸이 블록(xf:group 하나 이상 또는 버튼만)만 품으면 표를 걷고 내용만; 버튼 칸은 `btnbox > rt`(save icon → `btn_cm pt`) | ref·id 있는 표, id 있는 tblbox 래퍼·행·칸, 직계에 행/colgroup 외 요소가 있거나 `c_choose_*` 조건 그룹을 품은 표는 제외 |
+| U9 | colgroup col 2개 표: [th, td(입력/선택), td(버튼만)] → 버튼을 입력 칸에 합침; th+td 두 칸 행의 `colspan=2` 제거(한 칸 행의 colspan 은 열 병합이라 유지); th `scope=row`; 입력의 `tagname`/`inputType="text"`/`name` 제거, `width:Nch` → `N*12px`, `class=""` | — |
+| U10 | 2단 표 th 라벨 공통 접두(글자 LCP, 낱말 경계: 뒤가 공백이거나 라벨 거의 전부) → `titbox h3` 제목(앞의 txt_info 보다 위), 라벨에서 접두를 뗀다(남는 글자 3자 미만이면 유지) | 제목이 이미 있으면 건너뜀 |
+| U11 | `setCorpInfo*` 함수 안 `getComponent("id").setValue(` 대상 입력 → `readOnly="true"` | — |
+
+검증 절차: `ui_restyle.py --dry` 재실행 무변경 → 내용 보존 검사(git HEAD 대비 ref·라벨 문구·입력/선택/그리드/달력/업로드 수·id — hidden/iframe/img_N 소실만 허용) → `wsxml_lint` → `gate_screen.py`. 실제로 잡힌 결함: 요소 삭제 시 `parent.text` 생 텍스트 덮어씀, 한 칸 행 colspan 제거, 고아 핸들러 때문에 body 가 정의 없는 핸들러를 가리킴, id 있는 행·래퍼 평탄화, th 생 텍스트가 scope 삽입에 덮임 — 모두 위 "지키는 것" 으로 닫혔다. 기계로 못 닫는 잔여: 스크립트가 DOM 으로 참조하는 hidden input, c_choose 조건 표, 이미지 장식 팝업(JLDFIL00019/00024 류), onclick 없는 span 버튼.
 
 ## 규칙 6 보충: Submission 변환 상세
 

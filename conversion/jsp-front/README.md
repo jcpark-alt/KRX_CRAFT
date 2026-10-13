@@ -38,6 +38,7 @@ ui/<name>.xml
   5 publish_normalize.py   body 퍼블리싱 정규화 P1~P11 (규칙 34, lxml)
      (1 안에서 vendor_stage2.py V27~V36 — V36 = dom_rules.py 규칙 19 기계 가능분)
   5b publish_merge.py      KRX 퍼블리싱 XML 이 있으면 병합(규칙 35) → 판정 auto/todo/manual 만 쓰고 review/mismatch 는 병합 전 본 유지; frozen 화면은 run() 입구에서 건너뜀
+  5c ui_restyle.py         body 를 sample-front 꼴로 U1~U11 (V49, lxml) — 병합 뒤에 두어 overrides 의 공급사 id(img_N) 짝짓기를 깨지 않는다
   6 convert 수렴
   7 gate_screen.py         정적 게이트(node --check·publicInfo↔정의·ev:on↔정의·컴포넌트 참조↔id·미정의 $c·미사용 전역·레거시 토큰)
 → ui-tobe/<name>.xml
@@ -153,9 +154,15 @@ eval 대괄호(V42) · 미사용 폼 변수(V43) · fn_SelEmail(V44) · formatNu
 
 **폼 의존 as-is 공통의 처리 방침(2026-10-08 확정, 사용자 위임)**: 전역 `form` 필드를 읽고 쓰는 as-is 공통(`fn_chkSaveElwPrc`·prelist 계산 `fn_Calc*`·`fn_UserCheckValues` 등)은 pcc 로 반입하지 않는다 — WebSquare 에서 그 필드는 dataMap 키(`dma_X.get/set`)이고 focus 는 바인딩 컴포넌트인데, 실측(`form_dep_worklist.md`)에서 (함수, 화면) 쌍 252(email 필터 흡수 뒤 222) 중 동적/DOM 104·필드가 dataMap 0곳/여럿에 걸치는 미해결 90 이라 기계로도 손으로도 지금은 못 정한다. **퍼블리싱·dataMap 확정 뒤 화면 안에서 재작성**하며, 그때 필요한 사실(필드 → dataMap 키, focus → 컴포넌트, 산술·중첩 여부)은 워크리스트에 화면별로 뽑아 두었다. 산술 함수(`fn_RmComma(a) + fn_RmComma(b)` — as-is 가 문자열 덧셈일 수 있음)는 재작성 전에 as-is 동작 확인이 필요(회신 항목). 그 과정에서 드러난 공급사 오매핑 `fn_emailFrontCheck/BackCheck`(키 입력 필터를 `$c.str.isEmail()` 빈 호출로 바꿔 둔 것)은 V47 로 `allowChar` 에 흡수(19화면 72핸들러 → allowChar).
 
+**UI 재작성 축(V49 `ui_restyle.py`, 2026-10-13, 사용자 지시 "A 묶음 jldfil 10본부터 D 까지")**: body 를 sample-front 규약(titbox h3 · txt_info 안내 · tblbox 2단 테이블 · 입력+아이콘조회버튼 한 칸 · btnbox rt)으로 기계 정리한다. 정답지는 손 재작성 `JLDFIL01030`(입력 readOnly 는 사용자 지시) + A 묶음 jldfil 10본(00003·00011·00016·00025·00028·00034·00047·00150·01000·00015 — 도구 적용 뒤 구역 제목 h3·th 라벨만 손으로 확정, 전부 frozen 37본).
+규칙 U1~U11: sub_contents 속성 · 미참조 hidden input 삭제(스크립트 참조·`value` 보유는 유지) · 미참조 숨김 iframe 삭제 · lybox 아이콘 안내표 → `txt_info`(버튼 칸이 있으면 titbox+rt) · 생 텍스트(td/th/li/p/div/span) → textbox · `img_N` 버튼 → `btn_<핸들러가 부르는 함수>`(body 가 가리키는 핸들러·publicInfo·JSDoc·context 함께, 고아·공용 핸들러는 그대로, span 꼴 버튼 → trigger, 아이콘 전용 라벨 보강) · 간격 표 삭제 · 배치 테이블 평탄화(id 있는 표·행·칸·래퍼와 c_choose 조건 표는 제외, 버튼 행은 btnbox rt) · 2단 표 정규화([th,입력,조회] 합치기·th+td 행의 colspan=2 제거·scope=row·입력 속성 정리·ch→px) · th 공통 접두 → h3 제목(낱말 경계) · 팝업 회신 전용 입력(setCorpInfo* 의 setValue 대상) readOnly.
+적용: frozen 제외 **1,619본 전량**(A 327·B 179·C 120·D 126·P 867 — P 도 5c 가 재생성 때 적용하므로 고정점 유지를 위해 함께) 제자리 적용 → 재실행 무변경 · 내용 보존 검사(ref·라벨 문구·입력/선택/그리드 수·id, git HEAD 대비) 0건 · `wsxml_lint` 0/0 · 게이트 전건 · 파이프라인 재생성본 == 제자리 본(md5) · 테스트 154(+`test_ui_restyle.py` 6).
+집계(1,677본): `img_N` 버튼 보유 152 → 13화면(남은 22개는 공용 핸들러·onclick 없는 것), 미참조 hidden input 2,149 → 0(참조 1,513·value 476 은 유지), 숨김 iframe 미참조 64 → 0, 생 텍스트 보유 556 → 266화면(남은 것은 자식 요소와 섞인 텍스트·font 태그 안), lybox 아이콘 안내표 → 0. 스코어카드는 스크립트 지표라 변동 없음(38,160).
+기계로 못 닫는 잔여: 스크립트가 DOM 으로 참조하는 hidden input(요청 전문 접근으로 고치면 U2 가 지운다) · c_choose 조건 표(`init_conds` 가 tr_* id 로 토글) · 이미지 장식 팝업(JLDFIL00019/00024 회사명 찾기 류 — 재설계 대상) · span 꼴 버튼 424개(스크립트가 setValue 등으로 쓰거나 onclick 없음).
+
 **결정 대기(사용자)**: 병합 도구(규칙 35)의 타 모듈 확장. (`fn_70000Table_*` 2건은 2026-10-08 손작업으로 닫음 — 아래 이력.)
 
-**작업 요령**: 규칙을 더하면 `jspfront_pipeline.py <names>` 로 재생성(frozen 은 `vendor_stage2.py --vNN` 제자리), 뒤에 `gate_screen.py ui-tobe`·`wsxml_lint`·`screen_scorecard.py`. 이름 목록 파일은 LF.
+**작업 요령**: 규칙을 더하면 `jspfront_pipeline.py <names>` 로 재생성(frozen 은 `vendor_stage2.py --vNN` 제자리), 뒤에 `gate_screen.py ui-tobe`·`wsxml_lint`·`screen_scorecard.py`. 이름 목록 파일은 LF. body 규칙(V49)은 `ui_restyle.py [--dry] <xml|폴더>` 로 제자리 적용(긴 목록은 `xargs -n 150`); 화면을 손질할 때는 먼저 ui_restyle 을 돌리고 제목·라벨만 고친 뒤 frozen 등록.
 
 ## Stage 2 수작업 이력
 
@@ -216,6 +223,7 @@ PowerShell 5.1 `Out-File` 의 BOM 이 커밋 제목에 섞인다.
 
 ## 이력
 
+- 2026-10-13 UI 재작성 축 — `ui_restyle.py`(V49, 파이프라인 5c) 신설, 정답지 `JLDFIL01030` + A 묶음 jldfil 10본 손 재작성(frozen 37본), frozen 제외 1,619본 전량 제자리 적용(재실행 무변경·내용 보존 0건·lint 0/0·게이트 전건), `test_ui_restyle.py` 6건.
 - 2026-09-07 `jsp_소스전환` 31화면 정비 종결(브라우저 확인까지). 2026-09-21 규칙 재적용 + 공급사 확장 7종·`$c.cm.fn_*` 9종 치환.
 - 2026-10-01 r13 전달본 반입(`ui/`·`r13/`), `convert_all.py` 등록, 잡 tmp 도구 5종 `conversion/tools` 승격
   (`screen_tools` · `gate_screen` · `scan_mixed_compare` · `screen_convention` · `init_restructure`) — 0단계.
