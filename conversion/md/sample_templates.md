@@ -1,6 +1,6 @@
 # gcc 공통함수 활용 최종 샘플 카탈로그 (sample-front)
 
-전환(Stage 2) 보강·신규 화면 개발 시 **화면 유형을 매칭해 그대로 참조하는 표준 템플릿 18종**을 정리한다.
+전환(Stage 2) 보강·신규 화면 개발 시 **화면 유형을 매칭해 그대로 참조하는 표준 템플릿 22종**을 정리한다.
 모든 샘플은 [code-convention.md](../../cm/docs/code-convention/code-convention.md)의 **5단계 정형화 구조**(`///////// n. 영역명 /////////`)와
 **서브미션 async/await 순차 실행** 원칙을 따르며, gcc 공통함수(`$c.*`)만으로 화면을 구성한 최종 결과물이다. (2026-08-21 기준)
 
@@ -13,6 +13,7 @@
 |-----------|------------|-----------|-----------|
 | `JLDFIL25900.xml` | 신고 목록 + 작성 진입 | JLDFIL25900 배당기준일자 신고 | `/ui/sample/template/JLDFIL25900.xml` |
 | `JLDFIL25910.xml` | 신고 저장·수정 | JLDFIL25910 배당기준일자 신고 저장 및 수정 | `/ui/sample/template/JLDFIL25910.xml` |
+| `JLDFIL00170.xml` | 선택 팝업으로 채우는 대상 선택 + 등록 후 화면 이동 | JLDFIL00170 공시서류 작성 대상회사·대상종목 선택 (화면 이미지 기준 — 디지털 구분 없는 분기 한 벌) | `/ui/sample/template/JLDFIL00170.xml` |
 | `ULDFIL35700.xml` | 탭 + 입력 계산 + 기간조회 | ULDFIL35700 상장수수료 | `/ui/sample/template/ULDFIL35700.xml` |
 | `ULDFIL52100.xml` | 입력폼 + 팝업조회 + 첨부저장 | ULDFIL52100 의무보유주식의 처분 작성화면 | `/ui/sample/template/ULDFIL52100.xml` |
 | `ULDFIL52110.xml` | 법인명 찾기 팝업화면 | ULDFIL52110 법인명 찾기 팝업화면 | `/ui/sample/template/ULDFIL52110.xml` |
@@ -47,6 +48,7 @@
 | 조회조건 가변 + 기간검색 | `ULDINF20000` | 검색구분별 조건 토글, 기간 버튼(`$c.date.addDate/addMonth/addYear` + `getServerDateTime`), `compareFromToDate` 기간 검증 |
 | 작성(등록·수정 겸용) | `JLDFIL25910` | 파라미터 유무로 등록/수정 분기(`$c.data.getParameter`), `$c.data.isModified` 이탈 확인, `validateGroup` + 저장 confirm→await 저장→이동 |
 | 입력폼 + 팝업조회 + 첨부저장 | `ULDFIL52100` | 모드(신규/수정/조회) 분기, `$c.win.openPopup` 값 채움, `$c.util.onUploadClick`/`checkFileExtension` 첨부, `$c.data.downFile` |
+| 선택 팝업으로만 채우는 대상 선택 화면(읽기전용 입력 + 돋보기) | `JLDFIL00170` | 이전 화면 파라미터(`$c.data.getParameter`) + 로그인 사용자 정보(`$c.session.getUserInfo`)로 기본값, 값을 돌려주는 선택 팝업 2종 `$c.win.openPopup` await 수신(취소는 필요한 키 유무로 판정), 선행 선택(회사)이 바뀌면 후행 선택(종목) 비움, 읽기전용 칸의 `validateDataCollect`(`focus` 옵션으로 돋보기 버튼 포커스), 등록 `executeDynamic` 응답(접수번호 14자리) 검사 후 `$c.win.moveUrl` 작성 화면 이동 |
 | 대형 작성화면(다구역) | `ULDFIL59410` | 구역별 검증(`validateGroup`+`$c.str.isEmail/isPhone/isBizID`), 코드 팝업, 반복입력, 다중 첨부슬롯, 상태별 버튼, `setCommonCode` |
 | 탭 구성 + 입력 계산 | `ULDFIL35700` | 탭별 독립 로직, `$c.num.formatNumber/unFormatNumber/round` 합산 계산, `$c.win.print`/`openReportPdf` 출력 |
 | 조회 팝업(값 반환) | `ULDFIL52110` | 팝업 내 페이징 조회, 선택값 `$c.win.closePopup(param)` 반환 (부모는 callbackFn 수신) |
