@@ -11,6 +11,7 @@
   4 _settle               컨벤션 ↔ convert 를 둘 다 안 바뀔 때까지(convert 의 async 승격 뒤 JSDoc·await 가 따라오도록, 2026-10-08)
   5 publish_normalize    body 퍼블리싱 정규화(있을 때)
   6 convert.convert      재실행 → 5 의 결과가 다시 바뀌면 IDEM FAIL 로 보고
+  5d V50                이름 중간 fn_ 마디 삭제(tx_fn_X → tx_X, 2026-10-14) — 맨 끝
   5b publish_merge       KRX 퍼블리싱 XML 이 있는 화면은 퍼블리싱 body 에 공급사 id·이벤트·바인딩을 옮겨 심는다(규칙 35) — 판정 auto/todo/manual 이면
                          병합 결과를 쓰고(남은 jQuery 문장엔 규칙 19 힌트 TODO), review/mismatch 면 병합 전 본을 그대로 둔다. 리포트 행 갱신
   7 gate_screen          정적 게이트(--no-gate 로 생략)
@@ -34,6 +35,7 @@ except ImportError:  # 1단계에서 신설 — 없으면 건너뛴다
     pn = None
 import publish_merge as pm  # noqa: E402
 import ui_restyle as ur  # noqa: E402
+import vendor_stage2 as vs2  # noqa: E402
 
 _PUB_IDX = None
 _OVERRIDES = None
@@ -142,6 +144,14 @@ def run(name, publish=True, gate=True, inventory=None, merge=True):
             st.write_xml(dst, h3, reg3["script_open"], s3, reg3["script_close"], b3, eol3)
             _, rep["idem_after_restyle"] = _settle(dst, name, st.pcc_for(name), async_common)
         rep["restyle"] = ulog
+    # 5d V50 이름 중간 fn_ 마디 삭제(사용자 확정 2026-10-14) — 맨 끝: 병합·재작성이 만든 id·핸들러 이름까지 함께 줄인다
+    _raw4, eol4, reg4 = st.read_xml(dst)
+    if reg4 is not None:
+        h4, s4, b4, flog = vs2.strip_fn_segment(reg4["head"], reg4["script"], reg4["body"])
+        if flog.get("renamed"):
+            st.write_xml(dst, h4, reg4["script_open"], s4, reg4["script_close"], b4, eol4)
+            _, rep["idem_after_v50"] = _settle(dst, name, st.pcc_for(name), async_common)
+        rep["v50"] = flog
     # 7 gate
     if gate:
         ok, g = gate_screen.gate_file(str(dst), inventory or st.common_inventory(st.pcc_for(name)))
@@ -184,7 +194,7 @@ def main(argv=None):
             merge_reps.append({"name": n, "verdict": "frozen", "matched": 0, "pub_items": 0, "missing_refs": [], "unmatched_vendor": [],
                                "todo": io.open(TOBE / st.jsp_tobe_file(n), encoding="utf-8").read().count("TODO Stage2(퍼블리싱 병합)"), "log": ["override frozen: " + r["frozen"]], "ambiguous": False})
         print("=== %s" % n)
-        for k in ("fatal", "frozen", "vendor", "convert", "convention", "convert_passes", "idem_after_convention", "publish", "idem_after_publish", "merge", "idem_after_merge", "gate", "todo"):
+        for k in ("fatal", "frozen", "vendor", "convert", "convention", "convert_passes", "idem_after_convention", "publish", "idem_after_publish", "merge", "idem_after_merge", "v50", "idem_after_v50", "gate", "todo"):
             if k in r:
                 print("  %-24s %s" % (k, r[k]))
     if merge_reps:

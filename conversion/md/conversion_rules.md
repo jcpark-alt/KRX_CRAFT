@@ -690,6 +690,11 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
 * **V42 eval 동적 멤버 접근(P3, 2026-10-07, `vendor_stage2.de_eval_member`, CLI `--v42`)**: `eval("document.all.span" + month)`·`eval('form.isurCd' + obj1)`·`eval('obj.x_' + idx + '.value')` 는
   이름을 문자열로 조립한 멤버 접근이라 대괄호 접근과 의미가 같다 → `document.all["span" + month]`·`form['isurCd' + obj1]`·`obj['x_' + idx].value`. eval 만 걷고 DOM 참조(document.all 등)는 그대로(B-7).
   첫 조각이 "경로.접두" 문자열이고 마지막 조각이 `.식별자` 꼬리면 속성 접근으로 잇는다; 조각에 `.`·`[`·`(` 가 든 문자열(옵션 색인 꼬리), 문장 eval(`eval("var r = " + d)`·대입), 주석 안은 손대지 않는다. 결과: 26화면 83자리 → 대괄호 접근, eval 148 → 65(27화면: 문장 eval·옵션 색인 꼬리·JSON eval).
+* **V50 이름 중간 `fn_` 마디 삭제(사용자 확정 2026-10-14 'fn_ 개명 전부', `vendor_stage2.strip_fn_segment`, CLI `--v50`)**: V38 뒤에도 남은 `fn_` 은 공급사 tx 함수 `tx_fn_X` 와 거기서 파생된 컴포넌트 id·핸들러(`txt_h3334_fn_delRow_onclick`)·지역 변수(`fr_fn_Search`)였다.
+  식별자 토큰 안의 `<영숫자>_fn_` 을 `<영숫자>_` 로 줄인다(`tx_fn_Search` → `tx_Search`) — head·script·body 전부, 문자열·주석 포함(sbmOptions id·handleError context·JSDoc @name 이 함께 따라가게).
+  `fn_` 으로 **시작하는** 토큰(미정의 as-is 전역 `fn_getFileNm`·부모 프로퍼티 `.fn_list_sync`)은 정의가 생기는 pcc 반입·화면 재작성 때 camelCase 로 정하므로 건드리지 않는다.
+  바뀔 이름이 같은 화면에 이미 있으면 건너뛰고 기록한다. 파이프라인 5d(UI 재작성 V49 뒤, 맨 끝)에서 돈다 — 병합·재작성이 만든 id 까지 줄이기 위해.
+  결과(2026-10-14, 제자리 적용 = 맨 끝 순수 개명이라 재생성과 같음): 753화면 · 화면별 이름 1,912(tx 1,835) · 충돌 건너뜀 0 · 남은 `_fn_` 마디 0. 멱등.
 
 ### 규칙 34: 퍼블리싱 정규화 — `publish_normalize.py` (P1~P11, lxml · body 만)
 

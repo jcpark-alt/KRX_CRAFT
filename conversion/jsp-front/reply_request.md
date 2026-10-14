@@ -568,51 +568,51 @@
 
 | action | 화면 수 | 화면(최대 6) |
 | --- | ---: | --- |
-| `self_submit:tx_fn_List_xhr` | 15 | uldmgt50100, uldmgt50200, uldmgt50202, uldmgt50204, uldmgt50206, uldmgt50208 |
-| `self_submit:tx_fn_PrelistPageSearch` | 12 | jldfil51010, jldfil51010n, jldfil51010n2, jldfil51020, jldfil51020n, jldfil51020n2 |
-| `self_submit:tx_fn_Delete_xhr` | 10 | uldmgt50200, uldmgt50202, uldmgt50204, uldmgt50206, uldmgt50208, uldmgt50210 |
-| `self_submit:tx_fn_CheckCode_xhr` | 6 | uldmgt50201, uldmgt50203, uldmgt50205, uldmgt50207, uldmgt50209, uldmgt50211 |
+| `self_submit:tx_List_xhr` | 15 | uldmgt50100, uldmgt50200, uldmgt50202, uldmgt50204, uldmgt50206, uldmgt50208 |
+| `self_submit:tx_PrelistPageSearch` | 12 | jldfil51010, jldfil51010n, jldfil51010n2, jldfil51020, jldfil51020n, jldfil51020n2 |
+| `self_submit:tx_Delete_xhr` | 10 | uldmgt50200, uldmgt50202, uldmgt50204, uldmgt50206, uldmgt50208, uldmgt50210 |
+| `self_submit:tx_CheckCode_xhr` | 6 | uldmgt50201, uldmgt50203, uldmgt50205, uldmgt50207, uldmgt50209, uldmgt50211 |
 | `bbs.do` | 3 | jldstf07230, jldstf07231, jldstf07232 |
 | `eduChrgStaff.do` | 3 | jldfil16507, jldfil16508, jldfil16510 |
 | `eduRspnStaff.do` | 3 | jldfil16507, jldfil16508, jldfil16509 |
 | `null` | 3 | jlddst36500, jlddst37004, jlddst37005 |
-| `self_submit:tx_fn_findSchedules_xhr` | 3 | jldfil30800, jldfil30801, jldfil35600 |
-| `self_submit:tx_fn_searchList` | 3 | jldfil10000, jldfil30105c, jldfil45502 |
+| `self_submit:tx_findSchedules_xhr` | 3 | jldfil30800, jldfil30801, jldfil35600 |
 | `self_submit:tx_list_xhr` | 3 | uldmgt50000, uldmgt50011, uldmgt50600 |
+| `self_submit:tx_searchList` | 3 | jldfil10000, jldfil30105c, jldfil45502 |
 | `disclosureCommon.do` | 2 | jldods70005, jldods70006 |
 | `educationStaff.do` | 2 | jldfil16507, jldfil16508 |
 | `self_submit:sbm_trs_Save` | 2 | jldbns30000, jldstf30006 |
+| `self_submit:tx_Cal1` | 2 | jldstf31200, jldstf32200 |
+| `self_submit:tx_Cal10` | 2 | jldstf31203, jldstf32203 |
+| `self_submit:tx_Cal11` | 2 | jldstf31203, jldstf32203 |
+| `self_submit:tx_Cal12` | 2 | jldstf31203, jldstf32203 |
+| `self_submit:tx_Cal13` | 2 | jldstf31204, jldstf32204 |
+| `self_submit:tx_Cal14` | 2 | jldstf31205, jldstf32205 |
+| `self_submit:tx_Cal15` | 2 | jldstf31205, jldstf32205 |
+| `self_submit:tx_Cal16` | 2 | jldstf31206, jldstf32206 |
+| `self_submit:tx_Cal17` | 2 | jldstf31206, jldstf32206 |
+| `self_submit:tx_Cal2` | 2 | jldstf31201, jldstf32201 |
+| `self_submit:tx_Cal4` | 2 | jldstf31202, jldstf32202 |
+| `self_submit:tx_Cal5` | 2 | jldstf31202, jldstf32202 |
+| `self_submit:tx_Cal6` | 2 | jldstf31202, jldstf32202 |
+| `self_submit:tx_Cal7` | 2 | jldstf31202, jldstf32202 |
+| `self_submit:tx_Cal8` | 2 | jldstf31202, jldstf32202 |
+| `self_submit:tx_Calc_xhr` | 2 | jldstf31207, jldstf31208 |
+| `self_submit:tx_ExcelDown_xhr` | 2 | jldstf31207, jldstf31209 |
+| `self_submit:tx_GetLawDtruleItemContents_xhr` | 2 | jlddst36910, jldfil15302 |
+| `self_submit:tx_GetLawItemContents_xhr` | 2 | jlddst36910, jldfil15302 |
+| `self_submit:tx_Search_xhr` | 2 | uldmgt50006, uldmgt50009 |
+| `self_submit:tx_ViewSysInfo_xhr` | 2 | jlddst35400, jldfil15400 |
+| `self_submit:tx_bzCalndCheck_xhr` | 2 | jldfil05012c, jldfil05022c |
+| `self_submit:tx_chkChrgWork_xhr` | 2 | jldfil30700, jldfil45100 |
 | `self_submit:tx_doProcs_xhr` | 2 | jldstf07220, jldstf07410 |
 | `self_submit:tx_findContent_xhr` | 2 | uldmgt50002, uldmgt50400 |
 | `self_submit:tx_findRsnClasses_xhr` | 2 | uldmgt50001, uldmgt50003 |
-| `self_submit:tx_fn_Cal1` | 2 | jldstf31200, jldstf32200 |
-| `self_submit:tx_fn_Cal10` | 2 | jldstf31203, jldstf32203 |
-| `self_submit:tx_fn_Cal11` | 2 | jldstf31203, jldstf32203 |
-| `self_submit:tx_fn_Cal12` | 2 | jldstf31203, jldstf32203 |
-| `self_submit:tx_fn_Cal13` | 2 | jldstf31204, jldstf32204 |
-| `self_submit:tx_fn_Cal14` | 2 | jldstf31205, jldstf32205 |
-| `self_submit:tx_fn_Cal15` | 2 | jldstf31205, jldstf32205 |
-| `self_submit:tx_fn_Cal16` | 2 | jldstf31206, jldstf32206 |
-| `self_submit:tx_fn_Cal17` | 2 | jldstf31206, jldstf32206 |
-| `self_submit:tx_fn_Cal2` | 2 | jldstf31201, jldstf32201 |
-| `self_submit:tx_fn_Cal4` | 2 | jldstf31202, jldstf32202 |
-| `self_submit:tx_fn_Cal5` | 2 | jldstf31202, jldstf32202 |
-| `self_submit:tx_fn_Cal6` | 2 | jldstf31202, jldstf32202 |
-| `self_submit:tx_fn_Cal7` | 2 | jldstf31202, jldstf32202 |
-| `self_submit:tx_fn_Cal8` | 2 | jldstf31202, jldstf32202 |
-| `self_submit:tx_fn_Calc_xhr` | 2 | jldstf31207, jldstf31208 |
-| `self_submit:tx_fn_ExcelDown_xhr` | 2 | jldstf31207, jldstf31209 |
-| `self_submit:tx_fn_GetLawDtruleItemContents_xhr` | 2 | jlddst36910, jldfil15302 |
-| `self_submit:tx_fn_GetLawItemContents_xhr` | 2 | jlddst36910, jldfil15302 |
-| `self_submit:tx_fn_Search_xhr` | 2 | uldmgt50006, uldmgt50009 |
-| `self_submit:tx_fn_ViewSysInfo_xhr` | 2 | jlddst35400, jldfil15400 |
-| `self_submit:tx_fn_bzCalndCheck_xhr` | 2 | jldfil05012c, jldfil05022c |
-| `self_submit:tx_fn_chkChrgWork_xhr` | 2 | jldfil30700, jldfil45100 |
-| `self_submit:tx_fn_isuSubmit_xhr` | 2 | jldfil00010, jldfil00030 |
-| `self_submit:tx_fn_replaceFormForm_xhr` | 2 | uldmgt50002, uldmgt50600 |
-| `self_submit:tx_fn_restoreFormForm_xhr` | 2 | uldmgt50002, uldmgt50600 |
 | `self_submit:tx_getChrgList_xhr` | 2 | jldfil40203, jldfil40208 |
 | `self_submit:tx_init_xhr` | 2 | jldstf31207, jldstf31208 |
+| `self_submit:tx_isuSubmit_xhr` | 2 | jldfil00010, jldfil00030 |
+| `self_submit:tx_replaceFormForm_xhr` | 2 | uldmgt50002, uldmgt50600 |
+| `self_submit:tx_restoreFormForm_xhr` | 2 | uldmgt50002, uldmgt50600 |
 | `self_submit:tx_showDetail_xhr` | 2 | jldfil16000, jldfil73000 |
 | `../ajax/chg_int_data.jsp` | 1 | jldbnf05007 |
 | `../ajax/exer_dd_data.jsp?OPTDIV=` | 1 | jldbnf05004 |
@@ -631,12 +631,42 @@
 | `pop_emergency_nprotect.jsp` | 1 | jldbnf00000 |
 | `pop_emergency_tls.jsp` | 1 | jldbnf00000 |
 | `sample.do` | 1 | jldods70008 |
+| `self_submit:tx_AddFavorite_xhr` | 1 | jldfil35400 |
+| `self_submit:tx_Cal3` | 1 | jldstf31202 |
+| `self_submit:tx_Cal9` | 1 | jldstf32203 |
+| `self_submit:tx_Cal_xhr` | 1 | jldstf31209 |
+| `self_submit:tx_ChangeUsrId_xhr` | 1 | jldfil45300 |
+| `self_submit:tx_Confirm_xhr` | 1 | jldfil40400 |
+| `self_submit:tx_DelDetail_xhr` | 1 | uldmgt50316 |
+| `self_submit:tx_DelDisclosureLaw_xhr` | 1 | uldmgt50300 |
+| `self_submit:tx_DeleteFavorite_xhr` | 1 | jldfil35400 |
+| `self_submit:tx_DetailList_xhr` | 1 | uldmgt50316 |
+| `self_submit:tx_Down_xhr` | 1 | uldmgt50210 |
+| `self_submit:tx_ElementList_xhr` | 1 | uldmgt50101 |
+| `self_submit:tx_GetFavorite_xhr` | 1 | jldfil35400 |
+| `self_submit:tx_LawAll_xhr` | 1 | uldmgt50308 |
+| `self_submit:tx_LoadNfaithDesignAdvnoti_xhr` | 1 | jldfil10200 |
+| `self_submit:tx_LoadNfaithDesign_xhr` | 1 | jldfil10200 |
+| `self_submit:tx_PopDelAttach_xhr` | 1 | uldmgt50002 |
+| `self_submit:tx_PopDelByformApproval_xhr` | 1 | uldmgt50002 |
+| `self_submit:tx_PopDelByformAuth_xhr` | 1 | uldmgt50002 |
+| `self_submit:tx_PopDelByformType_xhr` | 1 | uldmgt50002 |
+| `self_submit:tx_PopDelEditor_xhr` | 1 | uldmgt50002 |
+| `self_submit:tx_PopDelForm_xhr` | 1 | uldmgt50002 |
+| `self_submit:tx_PopDelLibrary_xhr` | 1 | uldmgt50002 |
+| `self_submit:tx_PopDelProcess_xhr` | 1 | uldmgt50002 |
+| `self_submit:tx_Search` | 1 | jldfil05039 |
+| `self_submit:tx_Up_xhr` | 1 | uldmgt50210 |
+| `self_submit:tx_ViewContents_xhr` | 1 | jldfil25400 |
+| `self_submit:tx_ViewSubmitManual_xhr` | 1 | jldfil35400 |
 | `self_submit:tx_addAuthForm_xhr` | 1 | uldmgt50400 |
 | `self_submit:tx_afterExce_xhr` | 1 | jldstf31207 |
 | `self_submit:tx_callProcessCalculateRelatedDisclosure9ToExcel_xhr` | 1 | jldstf31203 |
 | `self_submit:tx_callProcessCalculateRelatedDisclosure9_xhr` | 1 | jldstf31203 |
 | `self_submit:tx_delAuthForm_xhr` | 1 | uldmgt50400 |
 | `self_submit:tx_downEditClass_xhr` | 1 | uldmgt50002 |
+| `self_submit:tx_excel` | 1 | jldfil05039 |
+| `self_submit:tx_existYn_xhr` | 1 | jldfil25720 |
 | `self_submit:tx_findAuthForm_xhr` | 1 | uldmgt50400 |
 | `self_submit:tx_findAuthUser_xhr` | 1 | uldmgt50400 |
 | `self_submit:tx_findDetailLaw_xhr` | 1 | uldmgt50309 |
@@ -645,39 +675,9 @@
 | `self_submit:tx_findMainLaw_xhr` | 1 | uldmgt50309 |
 | `self_submit:tx_findTypeTpClsses_xhr` | 1 | uldmgt50017 |
 | `self_submit:tx_fnSubmit` | 1 | jldinf05900 |
-| `self_submit:tx_fn_AddFavorite_xhr` | 1 | jldfil35400 |
-| `self_submit:tx_fn_Cal3` | 1 | jldstf31202 |
-| `self_submit:tx_fn_Cal9` | 1 | jldstf32203 |
-| `self_submit:tx_fn_Cal_xhr` | 1 | jldstf31209 |
-| `self_submit:tx_fn_ChangeUsrId_xhr` | 1 | jldfil45300 |
-| `self_submit:tx_fn_Confirm_xhr` | 1 | jldfil40400 |
-| `self_submit:tx_fn_DelDetail_xhr` | 1 | uldmgt50316 |
-| `self_submit:tx_fn_DelDisclosureLaw_xhr` | 1 | uldmgt50300 |
-| `self_submit:tx_fn_DeleteFavorite_xhr` | 1 | jldfil35400 |
-| `self_submit:tx_fn_DetailList_xhr` | 1 | uldmgt50316 |
-| `self_submit:tx_fn_Down_xhr` | 1 | uldmgt50210 |
-| `self_submit:tx_fn_ElementList_xhr` | 1 | uldmgt50101 |
-| `self_submit:tx_fn_GetFavorite_xhr` | 1 | jldfil35400 |
-| `self_submit:tx_fn_LawAll_xhr` | 1 | uldmgt50308 |
-| `self_submit:tx_fn_LoadNfaithDesignAdvnoti_xhr` | 1 | jldfil10200 |
-| `self_submit:tx_fn_LoadNfaithDesign_xhr` | 1 | jldfil10200 |
-| `self_submit:tx_fn_PopDelAttach_xhr` | 1 | uldmgt50002 |
-| `self_submit:tx_fn_PopDelByformApproval_xhr` | 1 | uldmgt50002 |
-| `self_submit:tx_fn_PopDelByformAuth_xhr` | 1 | uldmgt50002 |
-| `self_submit:tx_fn_PopDelByformType_xhr` | 1 | uldmgt50002 |
-| `self_submit:tx_fn_PopDelEditor_xhr` | 1 | uldmgt50002 |
-| `self_submit:tx_fn_PopDelForm_xhr` | 1 | uldmgt50002 |
-| `self_submit:tx_fn_PopDelLibrary_xhr` | 1 | uldmgt50002 |
-| `self_submit:tx_fn_PopDelProcess_xhr` | 1 | uldmgt50002 |
-| `self_submit:tx_fn_Search` | 1 | jldfil05039 |
-| `self_submit:tx_fn_Up_xhr` | 1 | uldmgt50210 |
-| `self_submit:tx_fn_ViewContents_xhr` | 1 | jldfil25400 |
-| `self_submit:tx_fn_ViewSubmitManual_xhr` | 1 | jldfil35400 |
-| `self_submit:tx_fn_excel` | 1 | jldfil05039 |
-| `self_submit:tx_fn_existYn_xhr` | 1 | jldfil25720 |
-| `self_submit:tx_fn_search` | 1 | jldods70015 |
 | `self_submit:tx_preDataCheckValues_xhr` | 1 | jldbnf05001 |
 | `self_submit:tx_script_MxDataSet_code1` | 1 | jldmgt90400 |
+| `self_submit:tx_search` | 1 | jldods70015 |
 | `self_submit:tx_setFormVer_xhr` | 1 | uldmgt50001 |
 | `self_submit:tx_setRecentVersionInfo_xhr` | 1 | uldmgt50001 |
 | `self_submit:tx_test_xhr` | 1 | jldstf31200 |

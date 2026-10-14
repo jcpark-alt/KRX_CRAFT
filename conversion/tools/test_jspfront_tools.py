@@ -1432,3 +1432,28 @@ def test_v39_drop_redundant_console():
     assert out.count("console.error(e.message);") == 2
     out2, log2 = vs.drop_redundant_console(out)
     assert out2 == out and log2 == {}
+
+
+def test_v50_strip_fn_segment():
+    head = '<head><w2:publicInfo method="scwin.tx_fn_Search"></w2:publicInfo>\n'
+    src = (
+        '/**\n * @name tx_fn_Search\n */\n'
+        'scwin.tx_fn_Search = async function () {\n'
+        '    const sbmOptions = { id: "tx_fn_Search", action: "/a.do" };\n'
+        '    const fr_fn_Search = $c.win.getParent().fn_list_sync;\n'
+        '    fn_getFileNm(1);\n'
+        '};\n'
+        'scwin.txt_h1_fn_delRow_onclick = async function () { await scwin.tx_fn_Search(); };\n'
+        'scwin.tx_fn_dup = 1; scwin.tx_dup = 2;\n'
+    )
+    body = '<w2:trigger id="txt_h1_fn_delRow" ev:onclick="scwin.txt_h1_fn_delRow_onclick"/>'
+    h2, s2, b2, log = vs.strip_fn_segment(head, src, body)
+    assert "tx_fn_" not in h2 and 'method="scwin.tx_Search"' in h2
+    assert "scwin.tx_Search = async function" in s2 and 'id: "tx_Search"' in s2 and "@name tx_Search" in s2
+    assert "const fr_Search = $c.win.getParent().fn_list_sync;" in s2      # 부모 프로퍼티 fn_ 은 그대로
+    assert "fn_getFileNm(1);" in s2                                         # fn_ 시작 토큰(미정의 as-is)은 그대로
+    assert "scwin.txt_h1_delRow_onclick" in s2 and b2 == '<w2:trigger id="txt_h1_delRow" ev:onclick="scwin.txt_h1_delRow_onclick"/>'
+    assert "scwin.tx_fn_dup = 1; scwin.tx_dup = 2;" in s2                   # 충돌은 건너뜀
+    assert log["skipped"] == ["tx_fn_dup(tx_dup 이미 있음)"] and log["renamed"] == 4 and log["tx"] == 1
+    h3, s3, b3, log3 = vs.strip_fn_segment(h2, s2, b2)
+    assert (h3, s3, b3) == (h2, s2, b2) and "renamed" not in log3          # 멱등

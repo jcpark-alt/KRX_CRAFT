@@ -1392,6 +1392,42 @@ def drop_redundant_console(script):
     return script, ({"dropped": n} if n else {})
 
 
+# ---------------------------------------------------------------- V50 fn_ 마디 삭제 (사용자 확정 2026-10-14 'fn_ 개명 전부')
+# V38 이 별칭 `scwin.fn_X` 를 걷은 뒤에도 이름 중간에 `fn_` 마디가 남는다 — 공급사 tx 함수 `tx_fn_X`(→ `tx_X`), 그 이름에서 파생된
+# 컴포넌트 id·핸들러(`txt_h3334_fn_delRow_onclick` → `txt_h3334_delRow_onclick`), 지역 변수(`fr_fn_Search` → `fr_Search`).
+# 식별자 토큰 안의 `<영숫자>_fn_` 만 `<영숫자>_` 로 줄인다(head·script·body, 문자열·주석 포함 — V38 과 같은 이유로 sbmOptions id·context 문자열도).
+# `fn_` 으로 **시작하는** 토큰(미정의 as-is 전역 `fn_getFileNm`·부모 프로퍼티 `.fn_list_sync`)은 정의가 생길 때 개명하므로 건드리지 않는다.
+# 바뀔 이름이 같은 화면에 이미 있으면(개명 대상이 아닌 토큰으로) 그 토큰은 건너뛰고 기록한다. 맨 끝 단계(UI 재작성 V49 뒤)에서 돈다.
+_FN_TOKEN_RE = re.compile(r'(?<![\w$])[A-Za-z_$][\w$]*(?![\w$])')
+_FN_SEG_RE = re.compile(r'(?<=[A-Za-z0-9])_fn_')
+
+
+def strip_fn_segment(head, script, body):
+    text = head + "\n" + script + "\n" + body
+    tokens = set(_FN_TOKEN_RE.findall(text))
+    olds = sorted(t for t in tokens if not t.startswith("fn_") and _FN_SEG_RE.search(t))
+    if not olds:
+        return head, script, body, {}
+    old_set = set(olds)
+    mapping = {}; skipped = []
+    for t in olds:
+        n = _FN_SEG_RE.sub("_", t)
+        if (n in tokens and n not in old_set) or n in mapping.values():
+            skipped.append("%s(%s 이미 있음)" % (t, n)); continue
+        mapping[t] = n
+    if mapping:
+        def rep(m):
+            return mapping.get(m.group(0), m.group(0))
+        head, script, body = (_FN_TOKEN_RE.sub(rep, x) for x in (head, script, body))
+    log = {}
+    if mapping:
+        log["renamed"] = len(mapping)
+        log["tx"] = sum(1 for t in mapping if t.startswith("tx_fn_"))
+    if skipped:
+        log["skipped"] = skipped
+    return head, script, body, log
+
+
 def apply(head, script, body):
     log = {}
     body_ids = set(re.findall(r'\sid="([^"]+)"', body))
@@ -1408,12 +1444,12 @@ def apply(head, script, body):
 
 
 def main(argv=None):
-    """제자리 적용 CLI(frozen 화면 등): python conversion/tools/vendor_stage2.py --v37|--v38|--v39|--v40|--v41|--v42|--v43|--v44|--v45|--v46|--v47|--v48|--v49 [--dry] <xml|폴더> ...
-    (--v49 = ui_restyle.apply · body 를 sample-front 꼴로 정리, conversion/tools/ui_restyle.py)"""
+    """제자리 적용 CLI(frozen 화면 등): python conversion/tools/vendor_stage2.py --v37|--v38|--v39|--v40|--v41|--v42|--v43|--v44|--v45|--v46|--v47|--v48|--v49|--v50 [--dry] <xml|폴더> ...
+    (--v49 = ui_restyle.apply · body 를 sample-front 꼴로 정리, conversion/tools/ui_restyle.py · --v50 = 이름 중간 fn_ 마디 삭제)"""
     sys.stdout.reconfigure(encoding="utf-8")
     args = argv if argv is not None else sys.argv[1:]
-    files, fl, _ = st.parse_cli([a for a in args if a not in ("--v37", "--v38", "--v39", "--v40", "--v41", "--v42", "--v43", "--v44", "--v45", "--v46", "--v47", "--v48", "--v49")], flags=("--dry",), opts=())
-    which = next((w for w in ("--v49", "--v48", "--v47", "--v46", "--v45", "--v44", "--v43", "--v42", "--v41", "--v40", "--v39", "--v38", "--v37") if w in args), None)
+    files, fl, _ = st.parse_cli([a for a in args if a not in ("--v37", "--v38", "--v39", "--v40", "--v41", "--v42", "--v43", "--v44", "--v45", "--v46", "--v47", "--v48", "--v49", "--v50")], flags=("--dry",), opts=())
+    which = next((w for w in ("--v50", "--v49", "--v48", "--v47", "--v46", "--v45", "--v44", "--v43", "--v42", "--v41", "--v40", "--v39", "--v38", "--v37") if w in args), None)
     if not which or not files:
         print(main.__doc__); return 2
     changed = 0; tot = {}
@@ -1444,6 +1480,8 @@ def main(argv=None):
             head, new, body, log = key_filter_to_allowchar(reg["head"], reg["script"], reg["body"])
         elif which == "--v48":
             head, new, body, log = normalize_deploy_paths(reg["head"], reg["script"], reg["body"])
+        elif which == "--v50":
+            head, new, body, log = strip_fn_segment(reg["head"], reg["script"], reg["body"])
         elif which == "--v49":
             import ui_restyle
             head, new, body, log = ui_restyle.apply(reg["head"], reg["script"], reg["body"])
