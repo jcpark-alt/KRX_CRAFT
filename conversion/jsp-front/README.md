@@ -162,6 +162,8 @@ eval 대괄호(V42) · 미사용 폼 변수(V43) · fn_SelEmail(V44) · formatNu
 
 **결정 대기(사용자)**: 병합 도구(규칙 35)의 타 모듈 확장. (`fn_70000Table_*` 2건은 2026-10-08 손작업으로 닫음 — 아래 이력.)
 
+**확정(사용자 2026-10-14)**: `== null`/`!= null` 관용구와 `$c.util.getComponent("id")` 참조는 **보존**한다. `== null` 은 null·undefined 를 함께 거르는 관용구라 `=== null` 로 바꾸면 undefined 가 가드를 통과한다(convert `keep_nullish=True`, 인계 회귀 1번). `getComponent` 를 컴포넌트 id 직접 참조로 바꾸지 않는다. 둘 다 스코어카드에서 점수 없이 정보로만 센다.
+
 **작업 요령**: 규칙을 더하면 `jspfront_pipeline.py <names>` 로 재생성(frozen 은 `vendor_stage2.py --vNN` 제자리), 뒤에 `gate_screen.py ui-tobe`·`wsxml_lint`·`screen_scorecard.py`. 이름 목록 파일은 LF. body 규칙(V49)은 `ui_restyle.py [--dry] <xml|폴더>` 로 제자리 적용(긴 목록은 `xargs -n 150`); 화면을 손질할 때는 먼저 ui_restyle 을 돌리고 제목·라벨만 고친 뒤 frozen 등록.
 
 ## Stage 2 수작업 이력
@@ -257,3 +259,4 @@ PowerShell 5.1 `Out-File` 의 BOM 이 커밋 제목에 섞인다.
 - 2026-10-08 폼 의존 as-is 공통 방침: 반입 없음·화면별 재작성(form_dep_worklist.md), email 키 필터 V47 흡수(19화면 72핸들러 → allowChar).
 - 2026-10-08 전량 검증(고정점·컨벤션): 1,677본 중 1,280 고정점 · 397본은 컨벤션 단계 차이(convert 가 함수를 async 로 올린 뒤 JSDoc `@returns {void}` 가 `{Promise<void>}` 로 따라오지 못한 700자리 등, frozen 18 포함) · 1본 convert 차이(uldmgt76101 opener 가드) → 전부 반영해 고정점. 원인은 파이프라인이 컨벤션을 한 번만 돌리던 것이라 `_settle`(컨벤션 ↔ convert 를 둘 다 안 바뀔 때까지) 로 고쳐 표본 재생성이 반영본과 동일함을 확인; V39 보강(중복 console 3)·JSDoc 2 보완, 스코어카드 38,158.
 - 2026-10-14 P4 회신 반영 착수 점검 — 받은 공급사·KRX 회신 없음(반영 보류). 회신 요청 명부 `reply_request.md` 를 V39~V49 뒤 `ui-tobe` 기준으로 재생성: B-1 컨텍스트 키 368종/522화면 → 410종/531화면, B-2~B-6 수치 변동 없음, B-7 jQuery 5,948/510 → 5,849/490·원시 폼 DOM 430/144 → 216/103. 회신이 오면 이 명부 기준으로 규칙 반영 → 전량 재생성.
+- 2026-10-14 `== null` 관용구·`getComponent` 참조 보존 확정(사용자) — 변환 규칙·스코어카드의 기존 보존 처리 유지, 코드 변경 없음.
