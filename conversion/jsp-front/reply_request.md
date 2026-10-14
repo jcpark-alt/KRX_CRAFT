@@ -4,37 +4,37 @@
 
 ## B-1 컨텍스트 키 — as-is EL 이 서버 렌더로 채우던 값의 출처(회신 A-3)
 
-키 368종 · 화면 522. 근거 열은 화면 안에 같은 이름이 있는 화면 수(조회 전문 후보 / 입력 컴포넌트 후보 / 세션 후보).
+키 410종 · 화면 531. 근거 열은 화면 안에 같은 이름이 있는 화면 수(조회 전문 후보 / 입력 컴포넌트 후보 / 세션 후보).
 
 | 키 | 화면 수 | dataMap/dataList 같은 이름 | body 컴포넌트 같은 이름 | 세션 키 같은 이름 | 화면(최대 5) |
 | --- | ---: | ---: | ---: | ---: | --- |
-| `stdCdApctTpCdList` | 27 | 24 | 27 | 0 | jldinf10000, jldinf10100, jldinf10200, jldinf10300, jldinf10400 |
-| `isOk` | 25 | 0 | 0 | 0 | jldfil05107, jldfil50000, jldfil50000n, jldfil50100, jldfil50100n |
+| `stdCdApctTpCdList` | 27 | 24 | 26 | 0 | jldinf10000, jldinf10100, jldinf10200, jldinf10300, jldinf10400 |
+| `isOk` | 26 | 0 | 0 | 0 | jldfil05107, jldfil25050, jldfil50000, jldfil50000n, jldfil50100 |
+| `uploadCode` | 25 | 0 | 0 | 0 | jldfil05014c, jldfil05019c, jldfil05024c, jldfil05029c, jldfil17301 |
 | `listProcsStatCd` | 23 | 23 | 6 | 0 | jldfil51000_menu, jldfil51000n2_menu, jldfil51000n_menu, jldfil51050, jldfil51050n |
-| `cfiCdGroupList` | 21 | 20 | 21 | 0 | jldinf10100, jldinf10200, jldinf10300, jldinf10400, jldinf10500 |
+| `cfiCdGroupList` | 21 | 20 | 20 | 0 | jldinf10100, jldinf10200, jldinf10300, jldinf10400, jldinf10500 |
 | `fileList` | 21 | 9 | 21 | 0 | jldbnf35001, jldbnf35002, jldbnf35003, jldbnf35004, jldbnf35005 |
 | `formKey` | 21 | 10 | 5 | 0 | jldfil00032, jldfil00036, jldfil00050, jldfil00051, jldfil00060 |
 | `keyValue` | 21 | 10 | 5 | 0 | jldfil00032, jldfil00036, jldfil00050, jldfil00051, jldfil00060 |
-| `page` | 21 | 3 | 20 | 0 | jldinf25000, jldinf25100, jldinf25200, jldinf25300, jldinf25400 |
+| `loadTp` | 21 | 10 | 4 | 0 | jldfil05504, jldfil17301, jldfil21212, jldfil50100, jldfil50100n |
+| `page` | 21 | 3 | 19 | 0 | jldinf25000, jldinf25100, jldinf25200, jldinf25300, jldinf25400 |
 | `returnKey` | 21 | 10 | 5 | 0 | jldfil00032, jldfil00036, jldfil00050, jldfil00051, jldfil00060 |
-| `uploadCode` | 20 | 0 | 0 | 0 | jldfil05014c, jldfil05019c, jldfil05024c, jldfil05029c, jldfil17301 |
 | `bndMktactTpCd` | 18 | 18 | 5 | 0 | jldbnf05000, jldbnf05001, jldbnf05101, jldbnf10000, jldbnf10400 |
-| `loadTp` | 18 | 8 | 6 | 0 | jldfil05504, jldfil17301, jldfil21212, jldfil50100, jldfil50100n |
 | `param.method` | 16 | 16 | 0 | 0 | jldfil00005, jldfil30203, jldinf91000_reportresult, jldinf91100_reportresult, jldinf91200_reportresult |
 | `bbsList` | 15 | 0 | 0 | 0 | jldfil51310, jldfil51310n, jldfil51310n2, jldfil51320, jldfil51320n |
 | `modifyYn` | 14 | 14 | 3 | 0 | jldfil53100, jldfil53100n, jldfil53200, jldfil53200n, jldfil55100 |
+| `result` | 14 | 4 | 9 | 0 | jldinf05800, jldinf20000, jldinf20000p, jldinf30000, jldinf30100 |
 | `feeProcsStatCd` | 13 | 12 | 0 | 0 | jldinf10000, jldinf10100, jldinf10200, jldinf10300, jldinf10400 |
-| `result` | 13 | 4 | 9 | 0 | jldinf05800, jldinf20000, jldinf20000p, jldinf30000, jldinf30100 |
 | `acntNo` | 12 | 12 | 0 | 0 | jldinf10000, jldinf10100, jldinf10200, jldinf10300, jldinf10400 |
 | `applId` | 12 | 12 | 0 | 0 | jldinf10000, jldinf10100, jldinf10200, jldinf10300, jldinf10400 |
 | `excelCheckList` | 12 | 12 | 12 | 0 | jldfil70212, jldfil70312, jldfil70412, jldfil70512, jldfil70812 |
 | `pageContext.psDepCd` | 12 | 12 | 0 | 0 | jldstf70000, jldstf70010, jldstf71000, jldstf72000, jldstf72020 |
-| `pageContext.usrTpCd` | 12 | 12 | 2 | 0 | jldstf70000, jldstf70010, jldstf70030, jldstf71000, jldstf75100 |
+| `pageContext.usrTpCd` | 12 | 12 | 1 | 0 | jldstf70000, jldstf70010, jldstf70030, jldstf71000, jldstf75100 |
 | `param.listTpClssCd` | 12 | 12 | 6 | 0 | jldfil51000_menu, jldfil51040, jldfil51040n, jldfil51040n2, jldstf07100_menu |
-| `corpUsrTpCd` | 10 | 10 | 1 | 0 | jldfil00018, jldfil30400, jldfil30401, jldfil30402, jldfil30403 |
-| `pageContext.ldMktTpCd` | 10 | 10 | 10 | 0 | jldstf70000, jldstf70010, jldstf71000, jldstf72000, jldstf72020 |
-| `spotIsuTrdMktTpCd` | 10 | 10 | 4 | 0 | jldfil00018, jldfil10200, jldfil25105, jldfil25106, jldfil25107 |
-| `today` | 10 | 9 | 3 | 0 | jldfil05502, jldfil30401, jldfil30402, jldfil30403, jldfil30404 |
+| `today` | 11 | 9 | 3 | 0 | jldfil05502, jldfil30401, jldfil30402, jldfil30403, jldfil30404 |
+| `corpUsrTpCd` | 10 | 10 | 0 | 0 | jldfil00018, jldfil30400, jldfil30401, jldfil30402, jldfil30403 |
+| `pageContext.ldMktTpCd` | 10 | 10 | 6 | 0 | jldstf70000, jldstf70010, jldstf71000, jldstf72000, jldstf72020 |
+| `spotIsuTrdMktTpCd` | 10 | 10 | 3 | 0 | jldfil00018, jldfil10200, jldfil25105, jldfil25106, jldfil25107 |
 | `DST_URL` | 9 | 2 | 0 | 0 | jldfil21000, jldods16520, jldods60001, jldods60101, jldods60301 |
 | `param.ldMktTpCd` | 8 | 8 | 8 | 0 | jldfil51000_menu, jldfil51040, jldfil51040n, jldfil51040n2, jldstf07100_menu |
 | `param.modifyYn` | 8 | 8 | 0 | 0 | jldfil17301, jldfil51310, jldfil51310n, jldfil51310n2, jldfil57001 |
@@ -43,8 +43,10 @@
 | `param.mode` | 7 | 7 | 0 | 0 | uldmgt50201, uldmgt50203, uldmgt50205, uldmgt50207, uldmgt50209 |
 | `param.returnKey` | 7 | 7 | 0 | 0 | jldfil00036, jldfil00046, jldfil00051, jldfil00090, jldfil00176 |
 | `서버 응답/세션에서 받도록 연결` | 7 | 0 | 0 | 0 | jldstf07090, jldstf07091, jldstf07181, jldstf07304, jldstf07321 |
+| `flag` | 6 | 2 | 0 | 0 | jldbnf05001, jldbnf10000, jldfil51030, jldfil51030n, jldfil51030n2 |
 | `invstgStatCode` | 6 | 6 | 6 | 0 | jlddst71021, jlddst71022, jlddst71023, jlddst71024, jlddst71110 |
-| `menuDiv` | 6 | 6 | 6 | 0 | jldfil00021, jldfil00023, jldfil00100, jldfil00200, jldfil00400 |
+| `isExaService` | 6 | 5 | 1 | 0 | jlddst10400, jlddst50000, jlddst50100, jlddst60205, jlddst60206 |
+| `menuDiv` | 6 | 6 | 1 | 0 | jldfil00021, jldfil00023, jldfil00100, jldfil00200, jldfil00400 |
 | `process` | 6 | 6 | 2 | 0 | jldfil55100, jldfil55100n, jldfil55200, jldfil55320, jldfil55320n |
 | `resultDiv` | 6 | 6 | 0 | 0 | jldfil00014, jldfil00015, jldfil00053, jldfil10606, jldfil10610 |
 | `resultList` | 6 | 0 | 6 | 0 | jldinf05100, jldinf05200, jldinf05300, jldinf15000, jldinf35100 |
@@ -52,8 +54,8 @@
 | `errorCode` | 5 | 1 | 0 | 0 | jldbnf00000, jldfil25305, jldfil45000, jldinf00000, jldods10000 |
 | `index` | 5 | 3 | 0 | 0 | jlddst50000, jlddst90000, jldods25000, jldods27000, jldods29000 |
 | `invstgStatDate` | 5 | 5 | 0 | 0 | jlddst71021, jlddst71022, jlddst71023, jlddst71024, jlddst71110 |
-| `isExaService` | 5 | 5 | 1 | 0 | jlddst10400, jlddst50000, jlddst60205, jlddst60206, jlddst90000 |
 | `kclicUsrTpId` | 5 | 4 | 1 | 0 | jldods10000, jldods15000, jldods60201, jldods60301, jldods70207 |
+| `listStatCd` | 5 | 5 | 1 | 5 | jlddst50100, jldfil25900, jldfil25910, jldfil30200, jldfil30300 |
 | `messageStr` | 5 | 4 | 0 | 0 | jldfil00005, jldfil00012, jldfil00053, jldfil10604, jldods70006_r0 |
 | `param.kk` | 5 | 5 | 0 | 0 | jldfil35701, jldfil35702, jldfil35714, jldfil35715, jldfil35716 |
 | `param.page` | 5 | 5 | 5 | 0 | jldfil51000_menu, jldfil51000n2_menu, jldfil51000n_menu, jldfil55200n2, jldfil55310n2 |
@@ -63,28 +65,30 @@
 | `curDate` | 4 | 4 | 0 | 0 | jldinf05800, jldinf20000, jldinf20000p, jldinf40000 |
 | `disableYn` | 4 | 0 | 0 | 0 | jldfil16403, jldfil16403n, jldfil16404, jldfil16404n |
 | `isurCd` | 4 | 4 | 0 | 4 | jldfil25106, jldfil25107, jldfil25114, jldfil40202 |
-| `listStatCd` | 4 | 4 | 0 | 4 | jldfil25900, jldfil25910, jldfil30200, jldfil30300 |
 | `loginFailCnt` | 4 | 0 | 0 | 0 | jldbnf00000, jldfil45000, jldinf00000, jldods10000 |
 | `registYn` | 4 | 3 | 0 | 0 | jldfil00005, jldfil00053, jldods70006_r0, jldods70006_r0i0 |
 | `status` | 4 | 2 | 0 | 0 | jldstf71000, jldstf76120, jldstf76220, jldstf76320 |
 | `sys_today` | 4 | 4 | 0 | 0 | jldinf05001, jldinf11100, jldinf11200, jldinf92600 |
 | `transstkAgntCdList` | 4 | 3 | 0 | 0 | jldinf05000, jldinf05400, jldinf05700, jldinf90701 |
 | `type` | 4 | 4 | 3 | 0 | jlddst90000, jldfil51000, jldfil51000n, jldfil51000n2 |
-| `befLogin` | 3 | 3 | 3 | 0 | jldfil15001, jldfil25300, jldfil25304 |
+| `applDd` | 3 | 3 | 3 | 0 | jldfil30402, jldfil30404, jldfil30407 |
+| `befLogin` | 3 | 3 | 0 | 0 | jldfil15001, jldfil25300, jldfil25304 |
 | `briefDir` | 3 | 0 | 0 | 0 | jldfil15600, jldfil45202, jldfil45203 |
-| `corpUserTpCd` | 3 | 3 | 2 | 0 | jldfil16400n, jldfil16403n, jldfil16404n |
+| `corpUserTpCd` | 3 | 3 | 0 | 0 | jldfil16400n, jldfil16403n, jldfil16404n |
 | `count` | 3 | 0 | 0 | 0 | jldfil16403, jldfil16403n, jldfil16405 |
 | `crtvlList` | 3 | 1 | 1 | 0 | jldinf91100, jldinf91100_reportresult, jldinf91110 |
 | `gongMo` | 3 | 3 | 1 | 0 | jldfil51000n2_menu, jldfil51000n_menu, jldfil51010n |
+| `isur_cd` | 3 | 1 | 0 | 0 | jldbnf90004, jldbnf90010, jldinf20000 |
 | `lang` | 3 | 3 | 0 | 0 | jldfil20700, jldfil20800, jldfil20900 |
 | `lastResvDay` | 3 | 3 | 0 | 0 | jldfil30401, jldfil30403, jldfil30406 |
-| `ldMktTpCd` | 3 | 3 | 3 | 0 | jldfil16500, jldfil16501, jldstf70000 |
+| `ldMktTpCd` | 3 | 3 | 1 | 0 | jldfil16500, jldfil16501, jldstf70000 |
 | `loginYn` | 3 | 3 | 3 | 0 | jldbnf00500, jldbnf00600, jldinf50000 |
-| `pageContext.ssMarket` | 3 | 3 | 3 | 0 | jldstf75200, jldstf75500, jldstf75600 |
+| `pageContext.ssMarket` | 3 | 3 | 0 | 0 | jldstf75200, jldstf75500, jldstf75600 |
 | `param.corpUsrTpCd` | 3 | 3 | 0 | 0 | jldfil40201, jldfil40203, jldfil40208 |
 | `putList` | 3 | 1 | 0 | 0 | jldinf91100, jldinf91101, jldinf91110 |
 | `regYn` | 3 | 3 | 0 | 0 | jldfil16403n, jldfil16505, jldfil16509 |
-| `repIdYn` | 3 | 3 | 2 | 0 | jldfil50200, jldfil50200_kn, jldfil71401 |
+| `repIdYn` | 3 | 3 | 1 | 0 | jldfil50200, jldfil50200_kn, jldfil71401 |
+| `returnVal` | 3 | 0 | 0 | 0 | jldfil52700, jldfil59400, jldfil59410 |
 | `sMessage` | 3 | 0 | 0 | 0 | jldfil25200, jldods10010, jldods16010 |
 | `sType` | 3 | 0 | 0 | 0 | jldfil25200, jldods10010, jldods16010 |
 | `save` | 3 | 0 | 0 | 0 | jldfil51030, jldfil51030n, jldfil51030n2 |
@@ -101,7 +105,7 @@
 | `attachFileList` | 2 | 0 | 2 | 0 | jldfil53100, jldfil53100n |
 | `bkHoldyDdIntPayDecsnCdList` | 2 | 1 | 2 | 0 | jldinf10100, jldinf91110 |
 | `bndIntPayDdBasTpCdList` | 2 | 1 | 0 | 0 | jldinf10100, jldinf91110 |
-| `bndListStatYn` | 2 | 2 | 2 | 0 | jldfil25101, jldfil25105 |
+| `bndListStatYn` | 2 | 2 | 0 | 0 | jldfil25101, jldfil25105 |
 | `bndSaleTpCdList` | 2 | 1 | 1 | 0 | jldinf10100, jldinf91110 |
 | `bnd_mktact_tp_cd` | 2 | 0 | 0 | 0 | jldbnf05001, jldbnf05101 |
 | `bzProcsNo` | 2 | 2 | 0 | 0 | jldfil54100, jldfil54100n |
@@ -109,14 +113,18 @@
 | `certifyYN` | 2 | 2 | 0 | 0 | jldfil00010, jldfil00030 |
 | `cfiCdGroupList5` | 2 | 1 | 2 | 0 | jldinf10000, jldinf91010 |
 | `cfiCdGroupList6` | 2 | 1 | 0 | 0 | jldinf10000, jldinf91010 |
+| `checkYnCnt` | 2 | 0 | 0 | 0 | jldinf05401, jldinf90702 |
 | `codCapSecuTpList` | 2 | 1 | 0 | 0 | jldinf10100, jldinf91110 |
 | `completeYn` | 2 | 2 | 0 | 0 | jldfil55220, jldfil55230 |
 | `coupnPayMethdCdList` | 2 | 1 | 2 | 0 | jldinf10100, jldinf91110 |
+| `crtvl_sf1` | 2 | 1 | 0 | 0 | jldinf91100, jldinf91100_reportresult |
+| `crtvl_sf2` | 2 | 1 | 0 | 0 | jldinf91100, jldinf91100_reportresult |
+| `crtvl_sf3` | 2 | 1 | 0 | 0 | jldinf91100, jldinf91100_reportresult |
+| `crtvl_sf4` | 2 | 1 | 0 | 0 | jldinf91100, jldinf91100_reportresult |
 | `debtRepayRankTpList` | 2 | 1 | 2 | 0 | jldinf10100, jldinf91110 |
 | `dutyYn` | 2 | 2 | 0 | 0 | jldfil11050, jldfil11070 |
 | `editClassList` | 2 | 2 | 0 | 0 | jldfil00000, jldfil00001 |
 | `exmptObjDisclsYn` | 2 | 2 | 0 | 0 | jldfil00005, jldods70006_r0 |
-| `flag` | 2 | 2 | 0 | 0 | jldbnf05001, jldbnf10000 |
 | `fssFileInfo` | 2 | 0 | 2 | 0 | jldods70202, jldods70208 |
 | `gubun` | 2 | 2 | 0 | 0 | jldbnf05008, jldbnf05010 |
 | `helpClssId` | 2 | 2 | 0 | 0 | jldfil16300, jldfil16301 |
@@ -124,12 +132,12 @@
 | `insertYn` | 2 | 0 | 0 | 0 | jldstf72020, jldstf73020 |
 | `ipt_isurCd` | 2 | 0 | 2 | 0 | jldods60201, jldods60301 |
 | `ipt_updateYn` | 2 | 0 | 2 | 0 | jldstf72020, jldstf73020 |
-| `isur_cd` | 2 | 0 | 0 | 0 | jldbnf90004, jldinf20000 |
 | `j` | 2 | 0 | 1 | 0 | jldfil40204, jldfil40206 |
 | `kosreq` | 2 | 2 | 2 | 0 | jlddst00100, jlddst01600 |
+| `langTpCd` | 2 | 2 | 2 | 0 | jlddst90002, jldfil00044 |
 | `list_stat_cd` | 2 | 0 | 0 | 0 | jldinf05401, jldinf90702 |
 | `mainnumber` | 2 | 0 | 2 | 0 | jldfil00020, jldods70009 |
-| `marketType` | 2 | 2 | 2 | 0 | jlddst00000, jlddst05602 |
+| `marketType` | 2 | 2 | 1 | 0 | jlddst00000, jlddst05602 |
 | `msgStr` | 2 | 2 | 0 | 0 | jldbnf55201, jldinf00009 |
 | `noForms` | 2 | 0 | 2 | 0 | uldmgt50008, uldmgt50012 |
 | `nowYear` | 2 | 2 | 2 | 0 | jlddst60100, jlddst70300 |
@@ -154,6 +162,7 @@
 | `param.isur_eng_nm` | 2 | 0 | 0 | 0 | jldinf05401, jldinf90702 |
 | `param.isur_ind_contn` | 2 | 0 | 0 | 0 | jldinf05401, jldinf90702 |
 | `param.isur_nm` | 2 | 0 | 0 | 0 | jldinf05401, jldinf90702 |
+| `param.keyword` | 2 | 2 | 2 | 0 | jldfil15400, jldfil35400 |
 | `param.lang` | 2 | 2 | 0 | 0 | jldfil00900, jldfil00910 |
 | `param.lei_nm` | 2 | 0 | 0 | 0 | jldinf05401, jldinf90702 |
 | `param.listProcsStatCd` | 2 | 2 | 0 | 0 | jldfil05105, jldfil05106 |
@@ -165,22 +174,24 @@
 | `param.tel_no` | 2 | 0 | 0 | 0 | jldinf05401, jldinf90702 |
 | `param.transstk_agnt_cd` | 2 | 0 | 0 | 0 | jldinf05401, jldinf90702 |
 | `param.zipcd` | 2 | 2 | 2 | 0 | jldinf05401, jldinf90702 |
-| `prtDepoNo` | 2 | 2 | 1 | 0 | jldfil52100, jldfil52101 |
+| `prtDepoNo` | 2 | 2 | 0 | 0 | jldfil52100, jldfil52101 |
 | `pubofrWrtYn` | 2 | 2 | 0 | 0 | jldfil55300, jldfil55300n |
 | `qnaList` | 2 | 0 | 0 | 0 | jldfil17301, jldfil17302 |
-| `quesCnt` | 2 | 2 | 2 | 0 | jldfil16200, jldfil16201 |
+| `quesCnt` | 2 | 2 | 0 | 0 | jldfil16200, jldfil16201 |
 | `resultVo` | 2 | 0 | 2 | 0 | jldfil00173, jldfil01085 |
 | `rowCount` | 2 | 2 | 2 | 0 | jldfil05012c, jldfil05022c |
+| `sesOut` | 2 | 0 | 2 | 0 | jldfil45000, jldods10000 |
 | `speclListTpCd` | 2 | 2 | 2 | 0 | jldfil51010n, jldfil51010n2 |
 | `std_cd_grnt_end_dd` | 2 | 0 | 0 | 0 | jldinf20000, jldinf20000p |
 | `std_cd_grnt_start_dd` | 2 | 0 | 0 | 0 | jldinf20000, jldinf20000p |
 | `submittedDocumentList` | 2 | 1 | 2 | 0 | jldfil45100, jldfil45101 |
 | `successYn` | 2 | 2 | 0 | 0 | jldbnf55201, jldinf00009 |
-| `tempSaveYn` | 2 | 2 | 2 | 0 | jldfil00020, jldods70009 |
-| `totalSize` | 2 | 2 | 2 | 0 | jldstf72000, jldstf73000 |
+| `tempSaveYn` | 2 | 2 | 0 | 0 | jldfil00020, jldods70009 |
+| `timeOut` | 2 | 0 | 0 | 0 | jldfil45000, jldods10000 |
+| `totalSize` | 2 | 2 | 0 | 0 | jldstf72000, jldstf73000 |
 | `updateComplete` | 2 | 0 | 0 | 0 | jldfil53100, jldfil53100n |
 | `uploadCodeFile` | 2 | 0 | 0 | 0 | jldfil05504, jldfil21212 |
-| `usrId` | 2 | 2 | 2 | 0 | jldfil45000, jldods10000 |
+| `usrId` | 2 | 2 | 0 | 0 | jldfil45000, jldods10000 |
 | `viewYear` | 2 | 0 | 0 | 0 | jlddst60100, jlddst70300 |
 | `writingDocumentList` | 2 | 1 | 2 | 0 | jldfil45100, jldfil45101 |
 | `DeclPopupYn` | 1 | 1 | 0 | 0 | jldbnf05201 |
@@ -211,14 +222,16 @@
 | `attach_file_seq` | 1 | 0 | 0 | 0 | jldfil55400 |
 | `audtWrtrptConn` | 1 | 1 | 1 | 0 | jldods60101 |
 | `audtWrtrptIndvdl` | 1 | 0 | 1 | 0 | jldods60101 |
+| `authYn` | 1 | 0 | 0 | 0 | jldstf72000 |
 | `availableModify` | 1 | 1 | 0 | 0 | jldfil25001 |
 | `bdchrgApplStatCd` | 1 | 1 | 0 | 0 | jldbnf55400 |
 | `befDocTpCd` | 1 | 0 | 1 | 0 | jldfil45100 |
 | `briefList` | 1 | 0 | 0 | 0 | jldfil45202 |
 | `c` | 1 | 0 | 1 | 0 | jlddst90000 |
+| `candidateValSeq` | 1 | 0 | 0 | 0 | jldfil16200 |
 | `certification` | 1 | 1 | 0 | 0 | jldfil25303 |
 | `changeCompanyInfo` | 1 | 1 | 0 | 0 | jldfil25002 |
-| `checkModifiyDate` | 1 | 1 | 1 | 0 | jldfil25910 |
+| `checkModifiyDate` | 1 | 1 | 0 | 0 | jldfil25910 |
 | `checkPointList` | 1 | 0 | 0 | 0 | jldfil45202 |
 | `closeYn` | 1 | 1 | 0 | 0 | jldfil71302 |
 | `cntlength` | 1 | 0 | 0 | 0 | jldstf30360 |
@@ -228,12 +241,13 @@
 | `consultVOVal` | 1 | 0 | 0 | 0 | jldfil11010 |
 | `contnVal` | 1 | 1 | 0 | 0 | jldfil45500 |
 | `corpCode` | 1 | 1 | 0 | 0 | jldfil00045 |
-| `corpDisclsChrg4` | 1 | 1 | 1 | 0 | jldfil25108 |
-| `corpUsrNm` | 1 | 1 | 1 | 0 | jldfil40201 |
+| `corpDisclsChrg4` | 1 | 1 | 0 | 0 | jldfil25108 |
+| `corpUsrNm` | 1 | 1 | 0 | 0 | jldfil40201 |
 | `corp_usr_tp_cd` | 1 | 0 | 0 | 0 | jldbnf00000 |
 | `detail2` | 1 | 1 | 1 | 0 | jlddst90005 |
 | `digitalType` | 1 | 1 | 0 | 0 | jldfil00170 |
 | `disTypename` | 1 | 0 | 0 | 0 | jlddst00300 |
+| `disclsAcptTpCd` | 1 | 1 | 0 | 0 | jldfil00013 |
 | `disclsUser` | 1 | 1 | 1 | 0 | jldods16001 |
 | `divReckDdTpCdList` | 1 | 0 | 0 | 0 | jldinf10101 |
 | `docType` | 1 | 1 | 0 | 0 | jldods70007_2 |
@@ -245,7 +259,7 @@
 | `emailChkMsg` | 1 | 0 | 0 | 0 | jldfil40213 |
 | `encryp_pw` | 1 | 0 | 0 | 0 | jldbnf00000 |
 | `engMandatory1Yn` | 1 | 0 | 0 | 0 | jldfil00014 |
-| `entityVal` | 1 | 0 | 1 | 0 | jldfil11010 |
+| `entityVal` | 1 | 0 | 0 | 0 | jldfil11010 |
 | `estiPrfmList` | 1 | 0 | 1 | 0 | jldfil55300 |
 | `etfIdxMktInfo` | 1 | 1 | 1 | 0 | jlddst01401 |
 | `etfOvrvw` | 1 | 0 | 1 | 0 | jlddst01401 |
@@ -254,21 +268,39 @@
 | `etnOvrvw` | 1 | 1 | 1 | 0 | jlddst01411 |
 | `etnProdInfo` | 1 | 1 | 0 | 0 | jlddst01411 |
 | `etpProdTpCdList` | 1 | 1 | 0 | 0 | jldinf11100 |
+| `fail` | 1 | 0 | 0 | 0 | jldods10025 |
 | `faqvo[1]` | 1 | 0 | 0 | 0 | jldfil45201 |
 | `fileCnt` | 1 | 0 | 0 | 0 | jldfil05506 |
+| `formUpclssCd` | 1 | 1 | 1 | 0 | jlddst00300 |
 | `formcd` | 1 | 1 | 0 | 0 | jldfil00171 |
+| `fromDd` | 1 | 1 | 0 | 0 | jldfil45100 |
 | `fsttrmAudtWrtrptConn` | 1 | 1 | 0 | 0 | jldods60101 |
 | `fsttrmAudtWrtrptIndvdl` | 1 | 0 | 1 | 0 | jldods60101 |
 | `goView` | 1 | 0 | 0 | 0 | jldinf30000 |
 | `grnt_fee_procs_cd` | 1 | 0 | 0 | 0 | jldinf50100 |
 | `gubunRadio` | 1 | 1 | 0 | 0 | jldinf20000 |
+| `htmlA` | 1 | 1 | 0 | 0 | jldstf60016 |
+| `htmlB` | 1 | 1 | 0 | 0 | jldstf60016 |
+| `htmlC` | 1 | 1 | 0 | 0 | jldstf60016 |
+| `htmlD` | 1 | 1 | 0 | 0 | jldstf60016 |
+| `htmlE` | 1 | 1 | 0 | 0 | jldstf60016 |
+| `htmlF` | 1 | 1 | 0 | 0 | jldstf60016 |
+| `htmlG` | 1 | 1 | 0 | 0 | jldstf60016 |
+| `htmlH` | 1 | 1 | 0 | 0 | jldstf60016 |
+| `htmlI` | 1 | 1 | 0 | 0 | jldstf60016 |
+| `htmlJ` | 1 | 1 | 0 | 0 | jldstf60016 |
+| `htmlK` | 1 | 1 | 0 | 0 | jldstf60016 |
+| `htmlL` | 1 | 1 | 0 | 0 | jldstf60016 |
+| `htmlM` | 1 | 1 | 0 | 0 | jldstf60016 |
+| `htmlN` | 1 | 1 | 0 | 0 | jldstf60016 |
 | `idChgApplRsltCd` | 1 | 1 | 0 | 0 | jldbnf55300 |
 | `imbdoptCorpbndCd` | 1 | 1 | 1 | 0 | jldbnf05004 |
 | `imbdopt_corpbnd_cd` | 1 | 0 | 0 | 0 | jldbnf05004 |
 | `initDepCd` | 1 | 0 | 0 | 0 | jldfil16000 |
 | `inqOrgnDisclsAcptNo` | 1 | 1 | 0 | 0 | jldods60401_pop |
+| `inqTpCd` | 1 | 1 | 0 | 0 | jldfil45100 |
 | `inquiredDisclosureList` | 1 | 0 | 0 | 0 | jldfil45100 |
-| `integSrchNo` | 1 | 1 | 1 | 0 | jldstf70010 |
+| `integSrchNo` | 1 | 1 | 0 | 0 | jldstf70010 |
 | `integUsrId` | 1 | 1 | 0 | 1 | jldods70009 |
 | `integ_usr_id` | 1 | 0 | 0 | 0 | jldbnf00000 |
 | `invstgClmTpCd` | 1 | 1 | 1 | 0 | jldfil05003c |
@@ -283,15 +315,16 @@
 | `isExaServiced` | 1 | 1 | 0 | 0 | jldods70006 |
 | `isFirst` | 1 | 0 | 0 | 0 | jldfil45100 |
 | `isLogin` | 1 | 1 | 0 | 0 | jldfil35400 |
-| `isMaindoc` | 1 | 0 | 1 | 0 | uldmgt50002 |
+| `isMaindoc` | 1 | 0 | 0 | 0 | uldmgt50002 |
 | `isPop` | 1 | 1 | 1 | 0 | jldfil15400 |
+| `isView` | 1 | 0 | 0 | 0 | jldfil16300 |
 | `issueDataList` | 1 | 0 | 0 | 0 | jldfil45202 |
 | `isur_nm` | 1 | 0 | 0 | 0 | jldinf20000 |
 | `item` | 1 | 0 | 0 | 0 | jldbnf35023 |
 | `itemSearch` | 1 | 1 | 1 | 0 | jldstf30601 |
+| `kind` | 1 | 1 | 0 | 0 | jldbnf90010 |
 | `kosdaqSegment` | 1 | 1 | 1 | 0 | jlddst05602 |
 | `kwd` | 1 | 1 | 1 | 0 | jlddst60201 |
-| `langTpCd` | 1 | 1 | 1 | 0 | jldfil00044 |
 | `language` | 1 | 1 | 0 | 0 | jlddst90002 |
 | `lawList` | 1 | 0 | 1 | 0 | jldfil15303 |
 | `lawvo[1]` | 1 | 0 | 0 | 0 | jldfil45201 |
@@ -301,9 +334,13 @@
 | `mailSuc` | 1 | 1 | 0 | 0 | jldods10025 |
 | `manualvo[0]` | 1 | 0 | 0 | 0 | jldfil45201 |
 | `manualvo[4]` | 1 | 0 | 0 | 0 | jldfil45201 |
+| `menuId` | 1 | 1 | 0 | 0 | jldbnf90010 |
 | `modYn` | 1 | 1 | 1 | 0 | jlddst90002 |
 | `mode` | 1 | 1 | 1 | 0 | uldmgt60102 |
-| `modulus` | 1 | 0 | 1 | 0 | jldfil16200 |
+| `modulus` | 1 | 0 | 0 | 0 | jldfil16200 |
+| `movieCnt` | 1 | 0 | 1 | 0 | jldfil05506 |
+| `msg` | 1 | 1 | 0 | 0 | jldbnf90010 |
+| `msg_cd` | 1 | 1 | 0 | 0 | jldbnf90010 |
 | `newYn` | 1 | 1 | 0 | 0 | jldbnf55000 |
 | `notiResult` | 1 | 0 | 1 | 0 | jldods15000 |
 | `noticeDetail` | 1 | 0 | 0 | 0 | uldmgt76101 |
@@ -312,6 +349,7 @@
 | `nowIndInfo` | 1 | 1 | 0 | 0 | jldods70015 |
 | `occsnlDisclsSchedules` | 1 | 0 | 1 | 0 | jldfil45100 |
 | `odsDisclsProcsStatCd` | 1 | 1 | 0 | 0 | jldods70009 |
+| `outsvcno` | 1 | 1 | 1 | 0 | jlddst00100 |
 | `packDeclIsurFrn` | 1 | 1 | 1 | 0 | jldbnf90011 |
 | `packDeclIsurPriorredmpt` | 1 | 1 | 1 | 0 | jldbnf90004 |
 | `pageContext.mktTpCd` | 1 | 1 | 1 | 0 | jldstf76300 |
@@ -323,6 +361,7 @@
 | `param.bzProcsNo` | 1 | 1 | 1 | 0 | jldfil05106 |
 | `param.dtruleLawNo` | 1 | 1 | 1 | 0 | jlddst36910 |
 | `param.follwBzProcsNo` | 1 | 1 | 0 | 0 | jldfil05106 |
+| `param.isur_cd` | 1 | 1 | 0 | 0 | jldbnf90010 |
 | `param.keyValue` | 1 | 1 | 1 | 0 | jldods70005 |
 | `param.optionType` | 1 | 1 | 1 | 0 | jldinf10102 |
 | `param.pubforYn` | 1 | 1 | 1 | 0 | jldstf07301_menu |
@@ -353,10 +392,10 @@
 | `sprtRoomDtl` | 1 | 1 | 0 | 0 | jldods20011 |
 | `srchMyWrtrptInfo` | 1 | 0 | 1 | 0 | jldfil25050 |
 | `stockDuty` | 1 | 1 | 0 | 0 | jldfil05105 |
-| `subcomList` | 1 | 0 | 1 | 0 | jldfil25800 |
+| `subcomList` | 1 | 0 | 0 | 0 | jldfil25800 |
 | `submitManual` | 1 | 0 | 1 | 0 | jldfil35401 |
 | `submitManualClssId` | 1 | 1 | 0 | 0 | jldfil35400 |
-| `submitManualList` | 1 | 0 | 1 | 0 | jldfil35400 |
+| `submitManualList` | 1 | 0 | 0 | 0 | jldfil35400 |
 | `svcRunYN` | 1 | 0 | 0 | 0 | jldfil00000 |
 | `svrGubun` | 1 | 1 | 1 | 0 | jlddst50000 |
 | `sysInfoList` | 1 | 0 | 1 | 0 | jldfil15400 |
@@ -367,10 +406,13 @@
 | `thisMonth` | 1 | 0 | 0 | 0 | jldfil35600 |
 | `thisServer` | 1 | 1 | 0 | 0 | jldinf20000 |
 | `threePerson` | 1 | 1 | 1 | 0 | jldstf30601 |
+| `toDd` | 1 | 1 | 0 | 0 | jldfil45100 |
+| `typeCode` | 1 | 0 | 0 | 0 | jlddst00300 |
 | `uploadCodeMovie` | 1 | 0 | 0 | 0 | jldfil05504 |
+| `url` | 1 | 1 | 0 | 0 | jldbnf90010 |
 | `useYn` | 1 | 1 | 1 | 0 | jldfil55400 |
 | `usrTpCd` | 1 | 1 | 0 | 0 | jldfil00018 |
-| `viewMode` | 1 | 1 | 1 | 0 | uldmgt50303 |
+| `viewMode` | 1 | 1 | 0 | 0 | uldmgt50303 |
 | `votedisclsSubmitprn` | 1 | 0 | 0 | 0 | jldfil25103 |
 | `voterghtExerFlag` | 1 | 1 | 1 | 0 | jlddst60203 |
 | `waringchVal` | 1 | 1 | 1 | 0 | jldods70012_doc |
@@ -799,13 +841,13 @@
 | jlddst90000 | `sitemap_init` | 1344 | `});` |
 | jlddst90000 | `sitemap_init` | 1347 | `});` |
 | jldfil16605 | `init_pageBody` | 168 | `scwin.filePlusMinus.setStyle("display", "none");` |
-| jldfil25910 | `init_pageBody` | 146 | `} else {` |
-| jldfil25910 | `init_pageBody` | 149 | `}` |
-| jldfil25910 | `basDRadio` | 734 | `} else {` |
-| jldfil25910 | `basDRadio` | 736 | `}` |
+| jldfil25910 | `init_pageBody` | 148 | `} else {` |
+| jldfil25910 | `init_pageBody` | 151 | `}` |
+| jldfil25910 | `basDRadio` | 747 | `} else {` |
+| jldfil25910 | `basDRadio` | 749 | `}` |
 | jldinf00003 | `viewMv` | 113 | `};` |
-| jldinf26300 | `toggleSearch` | 324 | `($c.util.getComponent('dma_hiddenStore') && $c.util.getComponent('dma_hiddenStore').set ? $c.util.getComponent` |
-| jldinf26300 | `toggleSearch` | 327 | `($c.util.getComponent('dma_hiddenStore') && $c.util.getComponent('dma_hiddenStore').set ? $c.util.getComponent` |
+| jldinf26300 | `toggleSearch` | 325 | `$c.util.getComponent('dma_hiddenStore').set('ipt_hiddenCheck', "Y");` |
+| jldinf26300 | `toggleSearch` | 328 | `$c.util.getComponent('dma_hiddenStore').set('ipt_hiddenCheck', "N");` |
 | jldinf90400 | `send_form` | 308 | `}` |
 | jldinf90400 | `send_form` | 317 | `}` |
 
@@ -816,25 +858,25 @@
 | jlddst10001 | `init_pageBody` | 33 | `$c.util.getComponent("ipt_method").setValue("searchTotalInfo");` |
 | jlddst15400 | `fnAddStock` | 599 | `scwin.addSearch.setStyle("display", "none");` |
 | jlddst60205 | `init_pageBody` | 84 | `await scwin.fnSearch();` |
-| jldfil40204 | `addRegisterPersonal` | 259 | `($c.util.getComponent('dma_hiddenStore') && $c.util.getComponent('dma_hiddenStore').set ? $c.util.getComponent` |
-| jldfil40204 | `addRegisterPersonal` | 269 | `$("#inputContents2").find("input").val("");` |
-| jldfil40204 | `addRegisterPersonal` | 282 | `($c.util.getComponent('dma_hiddenStore') && $c.util.getComponent('dma_hiddenStore').set ? $c.util.getComponent` |
-| jldfil40204 | `addRegisterPersonal` | 288 | `$("#inputContents3").find("input").val("");` |
-| jldfil40205 | `addRegisterPersonal` | 433 | `($c.util.getComponent('dma_hiddenStore') && $c.util.getComponent('dma_hiddenStore').set ? $c.util.getComponent` |
-| jldfil40205 | `addRegisterPersonal` | 443 | `$("#inputContents2").find("input").val("");` |
-| jldfil40205 | `addRegisterPersonal` | 456 | `($c.util.getComponent('dma_hiddenStore') && $c.util.getComponent('dma_hiddenStore').set ? $c.util.getComponent` |
-| jldfil40205 | `addRegisterPersonal` | 462 | `$("#inputContents3").find("input").val("");` |
-| jldfil40206 | `addRegisterPersonal` | 323 | `($c.util.getComponent('dma_hiddenStore') && $c.util.getComponent('dma_hiddenStore').set ? $c.util.getComponent` |
-| jldfil40206 | `addRegisterPersonal` | 329 | `$("#inputContents3").find("input").val("");` |
-| jldfil40206 | `addRegisterPersonal` | 342 | `($c.util.getComponent('dma_hiddenStore') && $c.util.getComponent('dma_hiddenStore').set ? $c.util.getComponent` |
-| jldfil40206 | `addRegisterPersonal` | 352 | `$("#inputContents4").find("input").val("");` |
-| jldfil40206 | `addRegisterPersonal` | 365 | `($c.util.getComponent('dma_hiddenStore') && $c.util.getComponent('dma_hiddenStore').set ? $c.util.getComponent` |
-| jldfil40206 | `addRegisterPersonal` | 371 | `$("#inputContents5").find("input").val("");` |
-| jldinf20000 | `cgSearch` | 947 | `$c.util.getComponent("ipt_isurNm1").focus();` |
-| jldinf20000 | `cgSearch` | 954 | `} else {` |
-| jldinf20000 | `cgSearch` | 963 | `} else {` |
-| jldinf20000 | `cgSearch` | 968 | `}` |
-| jldinf40000 | `cgSearch` | 681 | `$c.util.getComponent('ipt_dnldInstTpCd').setValue(scwin.LPAD(idx));` |
+| jldfil40204 | `addRegisterPersonal` | 257 | `$c.util.getComponent('dma_hiddenStore').set('isInputContents2', "Y");` |
+| jldfil40204 | `addRegisterPersonal` | 267 | `$("#inputContents2").find("input").val("");` |
+| jldfil40204 | `addRegisterPersonal` | 280 | `$c.util.getComponent('dma_hiddenStore').set('isInputContents3', "Y");` |
+| jldfil40204 | `addRegisterPersonal` | 286 | `$("#inputContents3").find("input").val("");` |
+| jldfil40205 | `addRegisterPersonal` | 430 | `$c.util.getComponent('dma_hiddenStore').set('isInputContents2', "Y");` |
+| jldfil40205 | `addRegisterPersonal` | 440 | `$("#inputContents2").find("input").val("");` |
+| jldfil40205 | `addRegisterPersonal` | 453 | `$c.util.getComponent('dma_hiddenStore').set('isInputContents3', "Y");` |
+| jldfil40205 | `addRegisterPersonal` | 459 | `$("#inputContents3").find("input").val("");` |
+| jldfil40206 | `addRegisterPersonal` | 321 | `$c.util.getComponent('dma_hiddenStore').set('isInputContents3', "Y");` |
+| jldfil40206 | `addRegisterPersonal` | 327 | `$("#inputContents3").find("input").val("");` |
+| jldfil40206 | `addRegisterPersonal` | 340 | `$c.util.getComponent('dma_hiddenStore').set('isInputContents4', "Y");` |
+| jldfil40206 | `addRegisterPersonal` | 350 | `$("#inputContents4").find("input").val("");` |
+| jldfil40206 | `addRegisterPersonal` | 363 | `$c.util.getComponent('dma_hiddenStore').set('isInputContents5', "Y");` |
+| jldfil40206 | `addRegisterPersonal` | 369 | `$("#inputContents5").find("input").val("");` |
+| jldinf20000 | `cgSearch` | 948 | `$c.util.getComponent("ipt_isurNm1").focus();` |
+| jldinf20000 | `cgSearch` | 955 | `} else {` |
+| jldinf20000 | `cgSearch` | 964 | `} else {` |
+| jldinf20000 | `cgSearch` | 969 | `}` |
+| jldinf40000 | `cgSearch` | 682 | `$c.util.getComponent('ipt_dnldInstTpCd').setValue(scwin.LPAD(idx));` |
 | jldods70012 | `print` | 404 | `}` |
 | jldods70012_admin | `print` | 335 | `}` |
 
@@ -842,28 +884,28 @@
 
 | 화면 | 함수 | 줄 | 다음 문장 |
 | --- | --- | ---: | --- |
-| jldbnf00600 | `checkData` | 733 | `return false;` |
-| jldbnf05001 | `PopUp_FeeCal_appl` | 3895 | `return;` |
-| jldbnf05002 | `data_Chk` | 235 | `return false;` |
-| jldbnf05003 | `data_Chk` | 235 | `return false;` |
-| jldbnf05004 | `opt_send_form` | 578 | `return;` |
-| jldbnf05004 | `opt_send_form` | 628 | `return;` |
-| jldbnf05005 | `checkInput` | 838 | `return false;` |
-| jldbnf05005 | `checkSelect` | 860 | `return false;` |
-| jldbnf05006 | `stk_send_form` | 641 | `return;` |
-| jldbnf05006 | `stk_send_form` | 647 | `return;` |
-| jldbnf05006 | `calc_data_Chk` | 793 | `return false;` |
-| jldbnf05007 | `data_Chk` | 853 | `return false;` |
-| jldbnf05007 | `data_Chk` | 893 | `return false;` |
-| jldbnf05007 | `data_Chk` | 910 | `return;` |
-| jldbnf05007 | `data_Chk` | 915 | `return;` |
-| jldbnf05008 | `div_send_form` | 428 | `return;` |
-| jldbnf05008 | `div_send_form` | 434 | `return;` |
-| jldbnf05010 | `div_send_form` | 361 | `return;` |
-| jldbnf05010 | `div_send_form` | 367 | `return;` |
-| jldbnf05011 | `princint_send_form` | 445 | `return;` |
-| jldbnf05011 | `princint_send_form` | 450 | `return;` |
-| jldbnf10000 | `CheckValues` | 2034 | `return;` |
+| jldbnf00600 | `checkData` | 730 | `return false;` |
+| jldbnf05001 | `PopUp_FeeCal_appl` | 3670 | `return;` |
+| jldbnf05002 | `data_Chk` | 232 | `return false;` |
+| jldbnf05003 | `data_Chk` | 232 | `return false;` |
+| jldbnf05004 | `opt_send_form` | 577 | `return;` |
+| jldbnf05004 | `opt_send_form` | 627 | `return;` |
+| jldbnf05005 | `checkInput` | 793 | `return false;` |
+| jldbnf05005 | `checkSelect` | 815 | `return false;` |
+| jldbnf05006 | `stk_send_form` | 640 | `return;` |
+| jldbnf05006 | `stk_send_form` | 646 | `return;` |
+| jldbnf05006 | `calc_data_Chk` | 790 | `return false;` |
+| jldbnf05007 | `data_Chk` | 851 | `return false;` |
+| jldbnf05007 | `data_Chk` | 891 | `return false;` |
+| jldbnf05007 | `data_Chk` | 908 | `return;` |
+| jldbnf05007 | `data_Chk` | 913 | `return;` |
+| jldbnf05008 | `div_send_form` | 427 | `return;` |
+| jldbnf05008 | `div_send_form` | 433 | `return;` |
+| jldbnf05010 | `div_send_form` | 360 | `return;` |
+| jldbnf05010 | `div_send_form` | 366 | `return;` |
+| jldbnf05011 | `princint_send_form` | 443 | `return;` |
+| jldbnf05011 | `princint_send_form` | 448 | `return;` |
+| jldbnf10000 | `CheckValues` | 1848 | `return;` |
 | jldbnf10001 | `isu_check` | 2980 | `return false;` |
 | jldbnf10001 | `isu_check` | 2985 | `return false;` |
 | jldbnf10001 | `isu_check` | 2990 | `return false;` |
@@ -873,35 +915,35 @@
 | jldbnf10001 | `isu_check` | 3011 | `return false;` |
 | jldbnf10001 | `isu_check` | 3016 | `return false;` |
 | jldbnf10001 | `isu_check` | 3022 | `return false;` |
-| jldbnf15000 | `CheckChgIsuNm` | 540 | `isNull = true;` |
-| jldbnf15000 | `CheckChgIsuNm` | 545 | `isNull = true;` |
-| jldbnf15100 | `CheckChgIsuNm` | 462 | `isNull = true;` |
-| jldbnf15100 | `CheckChgIsuNm` | 467 | `isNull = true;` |
-| jldbnf20300 | `checkData` | 548 | `return false;` |
-| jldbnf20300 | `checkData` | 554 | `return false;` |
-| jldbnf20300 | `checkData` | 560 | `return false;` |
-| jldbnf20300 | `checkData` | 566 | `return false;` |
-| jldbnf25700 | `chkData` | 377 | `return false;` |
+| jldbnf15000 | `CheckChgIsuNm` | 538 | `isNull = true;` |
+| jldbnf15000 | `CheckChgIsuNm` | 543 | `isNull = true;` |
+| jldbnf15100 | `CheckChgIsuNm` | 460 | `isNull = true;` |
+| jldbnf15100 | `CheckChgIsuNm` | 465 | `isNull = true;` |
+| jldbnf20300 | `checkData` | 544 | `return false;` |
+| jldbnf20300 | `checkData` | 550 | `return false;` |
+| jldbnf20300 | `checkData` | 556 | `return false;` |
+| jldbnf20300 | `checkData` | 562 | `return false;` |
+| jldbnf25700 | `chkData` | 374 | `return false;` |
 | jldbnf30002 | `checkData` | 222 | `return false;` |
 | jldbnf30002 | `checkData` | 228 | `return false;` |
 | jldbnf30002 | `checkData` | 234 | `return false;` |
-| jldbnf35023 | `doSave` | 207 | `return;` |
-| jldbnf35023 | `doSave` | 212 | `return;` |
-| jldbnf40000 | `doSave` | 298 | `return;` |
-| jldbnf40000 | `doSave` | 303 | `return;` |
-| jldbnf45000 | `chkData` | 818 | `return false;` |
+| jldbnf35023 | `doSave` | 208 | `return;` |
+| jldbnf35023 | `doSave` | 213 | `return;` |
+| jldbnf40000 | `doSave` | 300 | `return;` |
+| jldbnf40000 | `doSave` | 305 | `return;` |
+| jldbnf45000 | `chkData` | 783 | `return false;` |
 | jldbnf50001 | `init_pageBody` | 79 | `} catch (_ex) { $c.exception.handleError(_ex, { context: 'jldbnf50001.onpageload' }); }` |
-| jldbnf55001 | `chkData` | 953 | `return false;` |
-| jldbnf55001 | `chkData` | 958 | `return false;` |
-| jldbnf55001 | `chkData` | 963 | `return false;` |
-| jldbnf55001 | `chkData` | 968 | `return false;` |
-| jldbnf55001 | `chkData` | 973 | `return false;` |
-| jldbnf55001 | `chkData` | 978 | `return false;` |
-| jldbnf55001 | `chkData` | 983 | `return false;` |
-| jldbnf55001 | `chkData` | 988 | `return false;` |
-| jldbnf55001 | `chkData` | 993 | `return false;` |
-| jldbnf55001 | `chkData` | 998 | `return false;` |
-| jldbnf55001 | `chkData` | 1003 | `return false;` |
+| jldbnf55001 | `chkData` | 873 | `return false;` |
+| jldbnf55001 | `chkData` | 878 | `return false;` |
+| jldbnf55001 | `chkData` | 883 | `return false;` |
+| jldbnf55001 | `chkData` | 888 | `return false;` |
+| jldbnf55001 | `chkData` | 893 | `return false;` |
+| jldbnf55001 | `chkData` | 898 | `return false;` |
+| jldbnf55001 | `chkData` | 903 | `return false;` |
+| jldbnf55001 | `chkData` | 908 | `return false;` |
+| jldbnf55001 | `chkData` | 913 | `return false;` |
+| jldbnf55001 | `chkData` | 918 | `return false;` |
+| jldbnf55001 | `chkData` | 923 | `return false;` |
 | … | (나머지 291자리는 `jspfront_summary.py --tsv` 와 코드의 `미실현 동작: set_focus` 로 찾는다) | | |
 
 ### delete_row — 1자리 / 1화면
@@ -914,44 +956,44 @@
 
 > `dom_rules.py`(V36) 가 body 의 컴포넌트 하나로 확정되는 셀렉터(`#id`·`[id=X]`·`[name=X]`, 접미 없음)의 `.val/.attr·prop(disabled|readonly)/.show/.hide/.focus` 만 컴포넌트 API 로 바꿨다. 남은 것은 (1) 공급사가 라디오 한 칸마다 `select1` 을 따로 그려 `name` 이 여럿인 `:checked` 류, (2) body 에 없는 id(그리드 헤더 체크·서버 렌더), (3) `.find/.each/.append/.empty/.html/.css/.addClass/.bind/.submit` 같은 DOM 구조 조작 — 퍼블리싱 병합(ui-pub) 뒤 컴포넌트 설계에 맞춰 화면별로 다시 쓴다.
 
-잔여 jQuery 호출 5948 · 화면 510 / 원시 폼 DOM(`fm.*`·`document.<form>.*`) 430자리 · 화면 144 — action 217, target 107, value 85, elements 13, submit 4, checked 4
+잔여 jQuery 호출 5849 · 화면 490 / 원시 폼 DOM(`fm.*`·`document.<form>.*`) 216자리 · 화면 103 — value 85, action 83, target 27, elements 13, submit 4, checked 4
 
 | 셀렉터 유형 | 메서드 | 자리 | 화면 | 처방 |
 | --- | --- | ---: | ---: | --- |
-| #id | `.-` | 881 | 105 | 참조만(인자로 넘김·length·[0]) — 호출부를 보고 컴포넌트 참조로 |
+| #id | `.-` | 814 | 96 | 참조만(인자로 넘김·length·[0]) — 호출부를 보고 컴포넌트 참조로 |
 | 복합 셀렉터 | `.-` | 388 | 68 | 참조만(인자로 넘김·length·[0]) — 호출부를 보고 컴포넌트 참조로 |
 | :checked | `.val` | 280 | 50 | 라디오/체크 그룹 → 병합 뒤 그룹 컴포넌트 getValue/setValue |
-| [name] | `.attr` | 261 | 64 | 속성 조작 → set*(disabled/readOnly/style) 또는 삭제 |
+| [name] | `.attr` | 260 | 63 | 속성 조작 → set*(disabled/readOnly/style) 또는 삭제 |
 | #id | `.find` | 248 | 60 | 컨테이너 안 탐색 → 대상 컴포넌트 직접 참조 |
-| #id | `.attr` | 208 | 70 | 속성 조작 → set*(disabled/readOnly/style) 또는 삭제 |
-| 동적 결합 | `.-` | 186 | 59 | 참조만(인자로 넘김·length·[0]) — 호출부를 보고 컴포넌트 참조로 |
+| #id | `.attr` | 206 | 68 | 속성 조작 → set*(disabled/readOnly/style) 또는 삭제 |
+| 동적 결합 | `.-` | 184 | 58 | 참조만(인자로 넘김·length·[0]) — 호출부를 보고 컴포넌트 참조로 |
 | [name] | `.-` | 157 | 57 | 참조만(인자로 넘김·length·[0]) — 호출부를 보고 컴포넌트 참조로 |
 | #id | `.empty` | 153 | 102 | innerHTML 비우기 → 컴포넌트 setValue('')/removeAll |
 | [name] | `.val` | 150 | 35 | 라디오/체크 그룹 → 병합 뒤 그룹 컴포넌트 getValue/setValue |
-| 동적 결합 | `.val` | 113 | 25 | 라디오/체크 그룹 → 병합 뒤 그룹 컴포넌트 getValue/setValue |
-| $(this) | `.val` | 106 | 49 | 라디오/체크 그룹 → 병합 뒤 그룹 컴포넌트 getValue/setValue |
+| 동적 결합 | `.val` | 111 | 24 | 라디오/체크 그룹 → 병합 뒤 그룹 컴포넌트 getValue/setValue |
+| $(this) | `.val` | 105 | 48 | 라디오/체크 그룹 → 병합 뒤 그룹 컴포넌트 getValue/setValue |
 | 복합 셀렉터 | `.addClass` | 93 | 84 | class 토글 → addClass/removeClass 는 컴포넌트 API 동일(확인 뒤 유지) |
 | 변수 | `.find` | 90 | 5 | 컨테이너 안 탐색 → 대상 컴포넌트 직접 참조 |
 | [name] | `.eq` | 88 | 8 | n번째 → 병합 뒤 단일 컴포넌트 |
 | :필터 | `.-` | 85 | 27 | 참조만(인자로 넘김·length·[0]) — 호출부를 보고 컴포넌트 참조로 |
-| 동적 결합 | `.attr` | 72 | 15 | 속성 조작 → set*(disabled/readOnly/style) 또는 삭제 |
 | [name] | `.prop` | 71 | 13 | checked/disabled → setValue/setDisabled |
+| 동적 결합 | `.attr` | 71 | 14 | 속성 조작 → set*(disabled/readOnly/style) 또는 삭제 |
 | :필터 | `.attr` | 67 | 19 | 속성 조작 → set*(disabled/readOnly/style) 또는 삭제 |
-| #id | `.bind` | 63 | 20 | 스크립트 바인딩 → ev:on* 속성(규칙 3) |
-| #id | `.is` | 59 | 32 | `:checked`/`:hidden` 판정 → getValue/getVisible |
+| #id | `.bind` | 62 | 19 | 스크립트 바인딩 → ev:on* 속성(규칙 3) |
 | 변수 | `.attr` | 59 | 38 | 속성 조작 → set*(disabled/readOnly/style) 또는 삭제 |
+| #id | `.is` | 58 | 31 | `:checked`/`:hidden` 판정 → getValue/getVisible |
 | 복합 셀렉터 | `.val` | 58 | 40 | 라디오/체크 그룹 → 병합 뒤 그룹 컴포넌트 getValue/setValue |
 | 복합 셀렉터 | `.remove` | 56 | 14 | DOM 삭제 → 컴포넌트 hide/removeAll |
 | $(this) | `.attr` | 55 | 32 | 속성 조작 → set*(disabled/readOnly/style) 또는 삭제 |
 | $(document) | `.find` | 55 | 31 | 컨테이너 안 탐색 → 대상 컴포넌트 직접 참조 |
 | $(this) | `.find` | 51 | 13 | 컨테이너 안 탐색 → 대상 컴포넌트 직접 참조 |
-| [name] | `.is` | 51 | 44 | `:checked`/`:hidden` 판정 → getValue/getVisible |
 | #id | `.prop` | 48 | 7 | checked/disabled → setValue/setDisabled |
 | #id | `.submit` | 48 | 36 | 폼 제출 → $c.sbm(규칙 6, B-4 회신) |
 | #id | `.contents` | 46 | 5 | iframe 내부 → 프레임 재설계(B-3) |
 | 변수 | `.-` | 44 | 34 | 참조만(인자로 넘김·length·[0]) — 호출부를 보고 컴포넌트 참조로 |
-| 복합 셀렉터 | `.attr` | 41 | 22 | 속성 조작 → set*(disabled/readOnly/style) 또는 삭제 |
+| [name] | `.is` | 44 | 37 | `:checked`/`:hidden` 판정 → getValue/getVisible |
 | $(this) | `.removeClass` | 39 | 35 | addClass 와 같음 |
+| 복합 셀렉터 | `.attr` | 39 | 21 | 속성 조작 → set*(disabled/readOnly/style) 또는 삭제 |
 | :checked | `.length` | 38 | 16 | 존재/개수 → getRowCount·null 검사 |
 | 복합 셀렉터 | `.removeClass` | 37 | 12 | addClass 와 같음 |
 | #id | `.select` | 37 | 25 | 화면별 |
