@@ -39,7 +39,7 @@ function loadWindow(overrides = {}) {
     $c: {
       util: { isEmpty, getJSON: (x) => x, getCallBackFunction: () => undefined, setTimeout: (fn) => fn() },
       num: { parseInt: (v) => parseInt(v, 10) },
-      sbm: { getContextPath: () => "" },
+      sbm: { getContextPath: () => (overrides.contextPath !== undefined ? overrides.contextPath : "") },
       str: { serialize: (v) => JSON.stringify(v) },
       data: { getParameter: () => "" },
       win: {}, // 로드 후 scwin 으로 연결
@@ -192,5 +192,23 @@ describe("openPopup options.disableCloseButton (cm/gcc/win.xml)", () => {
     expect(w.state.openedPopup.options.disableCloseButton).toBe(false);
     w.scwin._openPopup("/tmp/pop04.xml", { type: "pageFramePopup", disableCloseButton: "true" }, {}, () => true);
     expect(w.state.openedPopup.options.disableCloseButton).toBe(false);
+  });
+});
+
+describe("_openPopup contextPath 합치기 — _joinContextPath 회귀 (cm/gcc/win.xml)", () => {
+  test("contextPath 가 비루트(/ctx) 면 엔진에 합쳐진 경로를 전달", () => {
+    const w = loadWindow({ contextPath: "/ctx" });
+    w.scwin._openPopup("/ui/lst/aaa.xml", { type: "pageFramePopup" }, {}, () => true);
+    expect(w.state.openedPopup.url).toBe("/ctx/ui/lst/aaa.xml");
+  });
+
+  test("contextPath 가 \"\" 또는 \"/\"(루트 배포) 면 이중 슬래시 없이 그대로 전달", () => {
+    const w1 = loadWindow({ contextPath: "" });
+    w1.scwin._openPopup("/ui/lst/aaa.xml", { type: "pageFramePopup" }, {}, () => true);
+    expect(w1.state.openedPopup.url).toBe("/ui/lst/aaa.xml");
+
+    const w2 = loadWindow({ contextPath: "/" });
+    w2.scwin._openPopup("/ui/lst/aaa.xml", { type: "pageFramePopup" }, {}, () => true);
+    expect(w2.state.openedPopup.url).toBe("/ui/lst/aaa.xml"); // "//ui/lst/aaa.xml" 로 겹치면 안 된다
   });
 });

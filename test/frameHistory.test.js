@@ -205,13 +205,23 @@ describe("moveUrl/setPageFrameSrc 히스토리 기록·복원 (cm/gcc/win.xml)",
     await h.scwin.moveUrl("/board/list.xml", null, { restoreData: true });
 
     const back = frame.setSrcCalls[1];
-    expect(back.url).toBe("/board/list.xml"); // setSrc 는 엔진이 contextPath 를 자체 해석하므로 moveUrl 을 그대로 받는다(의도된 변경)
+    expect(back.url).toBe("/ctx/board/list.xml");
     const paramData = back.param.dataObject.data;
     expect(paramData._isHistoryRestore).toBe(true);
     expect(paramData.srchKey).toBe("A"); // 원래 entry 파라미터 유지
     expect(paramData.dataInfo._pagingInfo).toEqual({ currentPage: 3, totalCnt: 135 }); // 예약 키 전달
     expect(dma.applied).toEqual([{ k: "A" }]); // 컴포넌트 자동 적용
     expect(dlt.applied).toEqual([]); // 스냅샷에 없던 컴포넌트는 미적용, _pagingInfo 는 적용 시도 안 함
+  });
+
+  test("moveUrl: contextPath 가 \"/\"(루트 배포) 여도 이중 슬래시 없이 setSrc 호출 — _joinContextPath 회귀", async () => {
+    const h = loadHarness("/");
+    const frame = makeFrame("pfm_current", "/ui/lst/old.xml");
+    h.state.frames.pfm_current = frame;
+
+    await h.scwin.moveUrl("/ui/lst/aaa.xml");
+
+    expect(frame.setSrcCalls[0].url).toBe("/ui/lst/aaa.xml"); // "//ui/lst/aaa.xml" 로 겹치면 안 된다
   });
 
   test("restoreData: 스냅샷이 없으면 일반 이동 (paramObj 그대로, _isHistoryRestore 없음)", async () => {
