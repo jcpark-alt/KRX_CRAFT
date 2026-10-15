@@ -205,7 +205,7 @@ describe("moveUrl/setPageFrameSrc 히스토리 기록·복원 (cm/gcc/win.xml)",
     await h.scwin.moveUrl("/board/list.xml", null, { restoreData: true });
 
     const back = frame.setSrcCalls[1];
-    expect(back.url).toBe("/ctx/board/list.xml");
+    expect(back.url).toBe("/board/list.xml"); // setSrc 는 엔진이 contextPath 를 자체 해석하므로 moveUrl 을 그대로 받는다(의도된 변경)
     const paramData = back.param.dataObject.data;
     expect(paramData._isHistoryRestore).toBe(true);
     expect(paramData.srchKey).toBe("A"); // 원래 entry 파라미터 유지
