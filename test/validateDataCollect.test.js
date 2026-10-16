@@ -11,7 +11,6 @@
  */
 const fs = require("fs");
 const vm = require("vm");
-const path = require("path");
 
 const XML_FILE = "cm/gcc/validate.xml";
 
@@ -47,10 +46,10 @@ function loadHarness() {
         isMobilePhone: (s) => /^01\d-\d{3,4}-\d{4}$/.test(s),
         isSSN: (s) => /^\d{6}-\d{7}$/.test(s),
       },
-      win: { alert: (msg, cb, opts) => { state.alerts.push(msg); } },
+      win: { alert: (msg) => { state.alerts.push(msg); } },
       num: {},
     },
-    $p: { getComponentById: (id) => null },
+    $p: { getComponentById: () => null },
   };
   vm.createContext(sandbox);
   vm.runInContext(extractCdata(XML_FILE), sandbox, { filename: "validate.xml.cdata.js" });
@@ -231,7 +230,7 @@ describe("validateDataCollect (cm/gcc/validate.xml)", () => {
     const rows = [{ MONTH: "03" }, { MONTH: "03" }];
     const grid = {
       getPluginName: () => "gridView",
-      getCellData: (r, c) => rows[r].MONTH,
+      getCellData: (r) => rows[r].MONTH,
       setCellClass: () => {},
       addClass: () => {},
     };
@@ -462,7 +461,7 @@ describe("validateDataCollect (cm/gcc/validate.xml)", () => {
     const h = loadHarness();
     const grid = {
       getPluginName: () => "gridView",
-      getCellData: (r, c) => "bad-email",
+      getCellData: () => "bad-email",
       setCellClass: () => {},
       addClass: () => {},
     };
