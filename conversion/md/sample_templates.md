@@ -84,4 +84,4 @@
 
 - 샘플 파일을 추가·갱신하면 **이 문서의 표와 매칭 가이드를 함께 갱신**한다.
 - 샘플은 항상 최신 conversion 규칙(규칙 1~23)과 code-convention을 만족한 상태를 유지한다 — 샘플이 곧 Stage 2의 "정답지"다.
-- 관련 문서: [conversion_process_overview.md](conversion_process_overview.md) · [conversion_rules.md](conversion_rules.md) · [stage2_todo_worklist.md](stage2_todo_worklist.md) · [conversion_playbook.md](conversion_playbook.md)
+- 관련 문서: [conversion_process_overview.md](report/conversion_process_overview.md) · [conversion_rules.md](conversion_rules.md) · [stage2_todo_worklist.md](stage2_todo_worklist.md) · [conversion_playbook.md](conversion_playbook.md)

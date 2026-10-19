@@ -1,7 +1,7 @@
 # 전환 프로젝트 적용 플레이북 (Conversion Playbook)
 
 본 저장소의 **W-Craft → WebSquare(gcc) 전환 프로세스를 다른 전환 프로젝트에 그대로 적용**하기 위한 착수 절차서다.
-프로세스 원리·규칙 상세는 [conversion_process_overview.md](conversion_process_overview.md) 이하 문서를 참조하고, 이 문서는 **순서와 체크리스트**만 담는다. (2026-08-21)
+프로세스 원리·규칙 상세는 [conversion_process_overview.md](report/conversion_process_overview.md) 이하 문서를 참조하고, 이 문서는 **순서와 체크리스트**만 담는다. (2026-08-21)
 
 ## 0. 전제 조건 체크리스트
 

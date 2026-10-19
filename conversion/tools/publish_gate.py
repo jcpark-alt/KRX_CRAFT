@@ -4,7 +4,7 @@
     python conversion/tools/publish_gate.py [--rev <git-rev> | --before <xml>] [--pcc fil|stf|mgt|tms]
                                             [--host <xml> ...] [--allow P12,P20] [--no-node] [--no-lint] [--no-gate] <xml> ...
 
-근거: conversion/md/publishing_model_detailed_report.html §7(하네스 & Skills) — 규칙 원문은
+근거: conversion/md/report/publishing_model_detailed_report.html §7(하네스 & Skills) — 규칙 원문은
 .claude/skills/websquare-publishing/SKILL.md. 검사 단계(화면마다):
 
   [1] lint      python -m wsxml_lint <xml>                       — 오류·경고 0

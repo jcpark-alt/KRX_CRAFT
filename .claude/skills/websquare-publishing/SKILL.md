@@ -5,7 +5,7 @@ description: WebSquare 화면 XML 에 퍼블리싱(화면 캡처·KRX 퍼블리�
 
 # WebSquare 퍼블리싱 하네스
 
-근거: `conversion/md/publishing_model_detailed_report.html` §6(Table/gridView 매핑)·§7(하네스 & Skills).
+근거: `conversion/md/report/publishing_model_detailed_report.html` §6(Table/gridView 매핑)·§7(하네스 & Skills).
 목표는 **모델에 관계없이 같은 품질**이다. 참조 범위 밖의 코드를 만들지 않고, 컴포넌트 선택을 규칙대로 하고, 게이트를 통과한 결과만 반영한다.
 
 ## 절차 (① → ⑥, 건너뛰지 않는다)

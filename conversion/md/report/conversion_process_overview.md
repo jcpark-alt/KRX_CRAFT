@@ -6,15 +6,15 @@ W-Craft 로 1차 변환된 레거시 WebSquare XML(Gauce/X-Internet 유래)을 *
 >
 > | 문서 | 내용 |
 > | --- | --- |
-> | [websquare_conversion_guide.md](websquare_conversion_guide.md) | 변환 목표·규칙 인덱스 |
-> | [conversion_pipeline.md](conversion_pipeline.md) | 2단계 하이브리드 파이프라인 본문(규칙별 Python 처리 방식) |
-> | [conversion_rules.md](conversion_rules.md) | 규칙 1~23 상세 정의 |
-> | [substitution_map.md](substitution_map.md) | 레거시 → gcc 치환 매핑표 |
-> | [dynamic_submission_guide.md](dynamic_submission_guide.md) | 규칙 12 동적 Submission 상세 |
-> | [createdialogframe_popup_guide.md](createdialogframe_popup_guide.md) | 규칙 17 팝업 변환 상세 |
-> | [stage2_todo_worklist.md](stage2_todo_worklist.md) | 단계 2 잔여 TODO 집계 |
-> | [sample_templates.md](sample_templates.md) | 최종 샘플 13종 카탈로그 + 화면 유형 매칭 가이드 (단계 2 정답지) |
-> | [conversion_playbook.md](conversion_playbook.md) | 다른 전환 프로젝트 적용 절차(착수 체크리스트) |
+> | [websquare_conversion_guide.md](../websquare_conversion_guide.md) | 변환 목표·규칙 인덱스 |
+> | [conversion_pipeline.md](../conversion_pipeline.md) | 2단계 하이브리드 파이프라인 본문(규칙별 Python 처리 방식) |
+> | [conversion_rules.md](../conversion_rules.md) | 규칙 1~23 상세 정의 |
+> | [substitution_map.md](../substitution_map.md) | 레거시 → gcc 치환 매핑표 |
+> | [dynamic_submission_guide.md](../dynamic_submission_guide.md) | 규칙 12 동적 Submission 상세 |
+> | [createdialogframe_popup_guide.md](../createdialogframe_popup_guide.md) | 규칙 17 팝업 변환 상세 |
+> | [stage2_todo_worklist.md](../stage2_todo_worklist.md) | 단계 2 잔여 TODO 집계 |
+> | [sample_templates.md](../sample_templates.md) | 최종 샘플 13종 카탈로그 + 화면 유형 매칭 가이드 (단계 2 정답지) |
+> | [conversion_playbook.md](../conversion_playbook.md) | 다른 전환 프로젝트 적용 절차(착수 체크리스트) |
 
 ---
 
@@ -47,7 +47,7 @@ W-Craft 로 1차 변환된 레거시 WebSquare XML(Gauce/X-Internet 유래)을 *
 conversion/
 │
 ├── md/                              ← 프로세스·규칙 문서 (본 문서 포함)
-│   ├── conversion_process_overview.md   (본 문서)
+│   ├── report/conversion_process_overview.md (본 문서)
 │   ├── websquare_conversion_guide.md    (규칙 인덱스)
 │   ├── conversion_pipeline.md           (2단계 파이프라인 본문)
 │   ├── conversion_rules.md              (규칙 1~23 상세)
@@ -89,7 +89,7 @@ conversion/
 
 - gcc 공통함수(`$c.*`)만으로 화면을 구성한 **최종 샘플 13종**을 보관한다 — 목록 조회+페이징, 작성(등록·수정), 탭+입력 계산, 입력폼+팝업조회+첨부저장, 조회 팝업, 메일 발송 팝업, 엑셀 다운로드 등 **화면 유형별 표준 템플릿**.
 - 모든 샘플은 5단계 정형화 구조와 서브미션 async/await 순차 실행 규약을 따르는 **단계 2 보강의 도달 목표(정답지)**다. 전환 대상 화면의 유형을 샘플에 매칭해 구조·공통함수 사용을 정렬한다.
-- WebSquare 서버 배포 경로는 `/ui/sample/template/*.xml`. 파일 목록·원본 화면·유형 매칭 표·표준 패턴 상세는 [sample_templates.md](sample_templates.md) 참조.
+- WebSquare 서버 배포 경로는 `/ui/sample/template/*.xml`. 파일 목록·원본 화면·유형 매칭 표·표준 패턴 상세는 [sample_templates.md](../sample_templates.md) 참조.
 
 ---
 
@@ -145,7 +145,7 @@ WebSquare XML 은 `head → script(CDATA) → body` 구조이며, 영역마다 �
 
 ## 4. 변환 규칙 요약 (규칙 1~23)
 
-각 규칙의 상세 정의는 [conversion_rules.md](conversion_rules.md), Python 처리 방식은 [conversion_pipeline.md](conversion_pipeline.md) 참조.
+각 규칙의 상세 정의는 [conversion_rules.md](../conversion_rules.md), Python 처리 방식은 [conversion_pipeline.md](../conversion_pipeline.md) 참조.
 
 | 규칙 | 영역 | AS-IS → TO-BE |
 | --- | --- | --- |
@@ -212,9 +212,9 @@ Python 이 남긴 **"추가 작업 목록"만** 사람/AI 판단으로 처리합
    운영 반영 대상 ui-tobe/*.xml
 ```
 
-**잔여 TODO 추적** — 화면 실행(런타임)·업무 로직 판단이 필요해 보류한 항목은 코드에 `// TODO Stage2:` 주석으로 남기고 모듈·유형·파일·라인별로 [stage2_todo_worklist.md](stage2_todo_worklist.md) 에 집계합니다(자동 생성). 항목 해결 시 코드 주석 제거 + 워크리스트 갱신.
+**잔여 TODO 추적** — 화면 실행(런타임)·업무 로직 판단이 필요해 보류한 항목은 코드에 `// TODO Stage2:` 주석으로 남기고 모듈·유형·파일·라인별로 [stage2_todo_worklist.md](../stage2_todo_worklist.md) 에 집계합니다(자동 생성). 항목 해결 시 코드 주석 제거 + 워크리스트 갱신.
 
-**샘플 기준 보강(⑧)** — 단계 2 보강의 도달 목표는 [sample_templates.md](sample_templates.md) 의 최종 샘플 13종입니다. 전환 대상 화면의 유형(목록+페이징, 작성, 팝업, 탭, 엑셀 등)을 매칭 표에서 찾아 해당 샘플의 5단계 구조·async/await 서브미션·검증(`$c.validate.*`)·페이징(`setPagingInfo`) 사용 방식과 일치하도록 정렬합니다.
+**샘플 기준 보강(⑧)** — 단계 2 보강의 도달 목표는 [sample_templates.md](../sample_templates.md) 의 최종 샘플 13종입니다. 전환 대상 화면의 유형(목록+페이징, 작성, 팝업, 탭, 엑셀 등)을 매칭 표에서 찾아 해당 샘플의 5단계 구조·async/await 서브미션·검증(`$c.validate.*`)·페이징(`setPagingInfo`) 사용 방식과 일치하도록 정렬합니다.
 
 ---
 
@@ -250,7 +250,7 @@ npm run lint:xml        # cm/gcc 엄격 + cm/as-is 레거시(WS111~113 무시) �
 
 1. **(Python)** 대상 파일을 HEAD/SCRIPT/BODY 3영역으로 분리.
 2. **(Python)** 단계 1 결정적 규칙 일괄 적용 → 변환본 + 미처리 리포트 생성.
-3. **(Claude)** 리포트의 검토·대체 항목을 [substitution_map.md](substitution_map.md) 와 `gcc/index.html` 시그니처 기준으로 보강.
+3. **(Claude)** 리포트의 검토·대체 항목을 [substitution_map.md](../substitution_map.md) 와 `gcc/index.html` 시그니처 기준으로 보강.
 4. **(Claude)** 잔존 레거시 호출을 grep 으로 점검, 의미 검증 후 `npm run lint:xml` 로 마무리.
 
 > `convert_all.py` 는 이미 존재하는 `ui-tobe/` 출력은 **건너뛰어 단계 2 수작업을 보존**합니다. 새 규칙을 반영할 때는 기존 정리본 위에 규칙을 적용하는 것이 원칙이며, `--force` 재생성은 **수기 보강이 없음을 확인한 경우에만** 사용하세요(2026-08-21 4개 모듈 전체 재생성이 그 사례 — 당시 ui-tobe 는 구버전 기계 산출물뿐이었음).
