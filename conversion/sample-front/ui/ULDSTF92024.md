@@ -179,7 +179,7 @@ AS-IS 는 모든 호출에 `SCREN_ID=ULDSTF92024.gfm` 과 화면처리구분(`01
 | # | 내용 | 전환본 처리 |
 |---|---|---|
 | 1 | `stKeyTit` 미선언(선언은 `sKeyTit`) — 암묵 전역으로 동작 | `scwin.keyTit` 로 선언 |
-| 2 | `btn_send` 가 이미지 경로 `btn_send_dscl_d.gif` 로 중복전송을 막으려 했으나 그 경로로 바꾸는 코드가 주석 처리됨 → 가드 무효 | 가드 삭제(전송 성공 시 창이 닫히므로 중복전송 경로 없음) |
+| 2 | `btn_send` 가 이미지 경로 `btn_send_dscl_d.gif` 로 중복전송을 막으려 했으나 그 경로로 바꾸는 코드가 주석 처리됨 → 가드 무효 | 전송 요청 직전 `btn_send.setDisabled(true)`, 실패 응답·오류 시 다시 풂(전송은 비동기라 응답 전 재클릭으로 두 번 전송될 수 있음) |
 | 3 | 시장이 1·2·6 어느 것도 아니면 `tar`·`pan` 이 겹쳐 보이고 본문을 채우지 않음 | 기본 텍스트 모드, 본문 비움(원본과 같이 채우지 않음) |
 | 4 | 영문공시 미리보기 진입점이 사실상 없음(§2) | 옮기지 않음. 필요하면 `ULDSTF92024_EN` 전환 후 버튼 추가 |
 | 5 | `fn_print` 의 본문은 `tar.text` 기준이라 HTML 모드에서는 빈 본문으로 인쇄됨 — 단 HTML 변환 서식은 인쇄 버튼을 숨기고, 코스닥 사용자는 인쇄 버튼이 없으므로 실사용 경로는 텍스트 모드뿐 | editor 텍스트 기준으로 같게 처리 |
@@ -192,24 +192,25 @@ AS-IS 는 모든 호출에 `SCREN_ID=ULDSTF92024.gfm` 과 화면처리구분(`01
 |---|---|
 | `gform onload` | `scwin.onpageload` → `scwin.init` |
 | `frame.Provider("../").fn_GetPar` | `$c.win.getParent()?.scwin.getPar` (전환된 호출부 이름) |
-| `stKey*`, `isNoGen`, `formTrnsCodeYN` | `scwin.key*`, `scwin.isNoGen`, `scwin.isHtmlTrnsForm` |
+| `stKey*`, `isNoGen`, `formTrnsCodeYN` | `scwin.key*`(원본 느슨한 비교를 살리려 `String()` 정규화), `scwin.isNoGen`, `scwin.isHtmlTrnsForm` |
 | `tar` / `pan` + `style.display` | `edt_contn` + `scwin.contentMode`(text/html) — 텍스트는 `scwin.setContentText`/`getContentText`(문단·nbsp 변환) |
 | `tar.text = s` / `pan.innerHTML = s` | `scwin.setContentText(s)` / `edt_contn.setHTML(s)` |
 | `fn_genDisclsTotal` / `OnSuccessAfterSearch` | `scwin.genDiscls` / `scwin.showDiscls` |
-| `fn_sendDisclsTotal` / `OnSuccessAfterSave` | `scwin.sendDisclsTotal` / `scwin.mpd_Fil_onComplete` |
-| `trs.Post()` + `OnSuccessAfter` 함수 포인터 | `await $c.sbm.executeDynamic` (생성), `mpd_Fil.startUpload` (전송) |
-| `trs OnFail` → MSG-0002 | 조회·생성은 공통 오류 핸들러, 전송은 `scwin.mpd_Fil_onerror` |
+| `fn_sendDisclsTotal` / `OnSuccessAfterSave` | `scwin.sendDisclsTotal` / `scwin.afterSend` (첨부 있으면 `mpd_Fil_onComplete` 경유) |
+| `trs.Post()` + `OnSuccessAfter` 함수 포인터 | `await $c.sbm.executeDynamic` (생성, 첨부 없는 전송), `mpd_Fil.startUpload` (첨부 있는 전송 — `cm/udc/fileMultiUpload.xml` 과 같은 분기) |
+| `trs OnFail` → MSG-0002 | 조회·생성은 공통 오류 핸들러, 전송은 응답 `success:false` 면 `scwin.afterSend` 가 MSG-0002, 업로드 오류는 `scwin.mpd_Fil_onerror` |
 | `dts_*.DataID + reset()` (동기 조회) | `await $c.sbm.executeDynamic` |
 | `fn_getCrtInfo` (모달) + 이어서 재생성 | `await scwin.openCrtInfo()`(`$c.win.openPopup`, pageFramePopup) → `scwin.genDiscls` |
 | `fn_getParCrt` / `fn_setParCrt` | `scwin.fn_getPar` / `scwin.fn_setPar` — 하위 팝업이 부르는 이름이라 원본 이름 유지(게이트 `fn_ def` 보고 2건은 의도) |
 | `txt2dts` | `scwin.textToRows` |
+| 정정공시 체크 클릭 → 재생성 | 생성 동안 체크박스 잠금(연속 클릭 시 두 번째 생성이 중복 방지로 건너뛰어져 본문과 정정구분이 어긋나는 것 방지) |
 | `fn_print`, `js_dep_cd` 분기 | `scwin.printDiscls` + `scwin.getApprovalNames($c.session.getUserInfo("depCd"))` |
 | `fn_open_report_pdf` | `$c.print.openReportPdf` |
 | `js_market` | `$c.session.getUserInfo("market")` |
 | `getMessageParam` | `$c.stf.getMessageParam` |
 | `alert` / `confirm` | `await $c.win.alert` / `await $c.win.confirm` |
 | `frame.CloseFrame()` | `$c.win.closePopup()` |
-| `fil.open()` + `dts_Fil(fileUrl:URL)` | `$c.util.onUploadClick(mpd_Fil)` + `scwin.mpd_Fil_selectCallback` (ULDSTF07404 패턴) |
+| `fil.open()` + `dts_Fil(fileUrl:URL)` | `$c.util.onUploadClick(mpd_Fil)` + `scwin.mpd_Fil_selectCallback`(전송 대기열 전체로 목록 재구성 — 여러 파일 동시 선택 대응) |
 | `cGetToday2()` | `$c.date.getServerDateTime()` |
 | `fnSplitString` | 삭제 — 정의만 있고 호출 없음 |
 | `log.Text = dts_Rst.Text` | 삭제 — 보이지 않는 디버그 영역 |
@@ -221,6 +222,8 @@ AS-IS 는 모든 호출에 `SCREN_ID=ULDSTF92024.gfm` 과 화면처리구분(`01
 3. **`$c.stf.copyDataSet` 은 아직 Gauce API**(`ClearData`/`ImportData`/`ExportData`) 기반이라 WebSquare dataList 에서 동작하지 않는다 — 호출부가 원천 자료를 팝업 dataList 로 넘기는 경로 전체가 이 공통함수에 달려 있다.
 4. **ULDSTF92019(정정공시정보입력) 전환** — 경로(`/ui/lst/common/ULDSTF92019.xml` 가정)와, 하위 팝업이 `$c.win.getParent().scwin.fn_getPar` 로 dlt_Inf 를 받아 정정 정보 컬럼을 채우는 규약을 맞춰야 한다. 정정 정보 컬럼이 `INF_INOUT` 에 더 있으면 `dlt_Inf`/`dlt_InfEng` 에 추가한다.
 5. **HTML 모드 editor 읽기전용** — 원본 `pan` 은 보기 전용이었다. HTML 모드에서 editor 를 고쳐도 전송에 반영되지 않으므로, editor 의 읽기전용 API 를 확인해 HTML 모드에서 잠그는 것이 맞다(이 저장소 엔진 번들에 editor 플러그인이 없어 확인 못 함).
-6. **텍스트 왕복 확인** — 텍스트 모드는 원문을 `<p>` + `&nbsp;` 로 넣고 꺼낼 때 문단을 줄바꿈으로 되돌린다. CKEditor 가 빈 문단·연속 공백을 어떻게 저장하는지 실화면에서 원문과 전송 원문이 같은지 확인한다.
+6. **텍스트 왕복 확인** — 텍스트 모드는 원문을 `<p>` + `&nbsp;` 로 넣고 꺼낼 때 문단을 줄바꿈으로 되돌린다(블록 사이 원시 줄바꿈은 버림, nbsp 만 있는 문단은 빈 줄). 단위 확인은 했으나 CKEditor 가 빈 문단·연속 공백을 실제로 어떻게 저장하는지 실화면에서 원문과 전송 원문이 같은지 확인한다.
 7. **화면처리구분·세션 파라미터** — §5 끝 참조.
 8. **영문공시 미리보기** — 필요하면 `ULDSTF92024_EN` 전환 후 진입 버튼 추가(§7-4).
+9. **multiupload 완료 응답 형식** — `mpd_Fil_onComplete` 인자를 `scwin.parseUploadResult` 로 읽어 `success:false` 만 실패로 본다. 서버 응답 형식 확정 후 맞춘다.
+10. **인쇄 창 팝업 차단** — 원본은 회사명 조회가 동기였으나 전환본은 `await` 뒤에 `$c.print.openReportPdf`(window.open)를 부른다. 조회가 길어 브라우저 사용자 동작 유효시간을 넘기면 팝업 차단될 수 있다. 실화면에서 막히면 회사명을 진입 시 미리 조회하도록 바꾼다.

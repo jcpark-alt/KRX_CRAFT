@@ -94,7 +94,7 @@
 			<w2:workflowCollection />
 		</xf:model>
 		<w2:layoutInfo />
-		<w2:publicInfo method="scwin.onpageload,scwin.init,scwin.btn_Print_onclick,scwin.chk_CorrctYn_onviewchange,scwin.btn_crt_onclick,scwin.btn_send_onclick,scwin.btn_close_onclick,scwin.btn_ins_onclick,scwin.btn_del_onclick,scwin.selectOriDiscls,scwin.selectDisclsName,scwin.generateDisclsTotal,scwin.sendDisclsTotal,scwin.mpd_Fil_selectCallback,scwin.mpd_Fil_onComplete,scwin.mpd_Fil_onerror,scwin.selectPrintCondition,scwin.fn_getPar,scwin.fn_setPar,scwin.genDiscls,scwin.showDiscls,scwin.openCrtInfo,scwin.printDiscls,scwin.getApprovalNames,scwin.setInfRow,scwin.textToRows,scwin.getLstMktId,scwin.isEditableDiscls,scwin.getCorrctYn,scwin.setContentText,scwin.getContentText,scwin.textToHtml,scwin.htmlToText" />
+		<w2:publicInfo method="scwin.onpageload,scwin.init,scwin.btn_Print_onclick,scwin.chk_CorrctYn_onviewchange,scwin.btn_crt_onclick,scwin.btn_send_onclick,scwin.btn_close_onclick,scwin.btn_ins_onclick,scwin.btn_del_onclick,scwin.selectOriDiscls,scwin.selectDisclsName,scwin.generateDisclsTotal,scwin.sendDisclsTotal,scwin.afterSend,scwin.parseUploadResult,scwin.mpd_Fil_selectCallback,scwin.mpd_Fil_onComplete,scwin.mpd_Fil_onerror,scwin.selectPrintCondition,scwin.fn_getPar,scwin.fn_setPar,scwin.genDiscls,scwin.showDiscls,scwin.openCrtInfo,scwin.printDiscls,scwin.getApprovalNames,scwin.setInfRow,scwin.textToRows,scwin.getLstMktId,scwin.isEditableDiscls,scwin.getCorrctYn,scwin.setContentText,scwin.getContentText,scwin.textToHtml,scwin.htmlToText" />
 		<script lazy="false" type="text/javascript"><![CDATA[// 원본 : /listingcommon/ULDSTF92024.gfm (공시안내문작성) — 업무 분석은 같은 폴더의 ULDSTF92024.md
 /*
  * 화면 동작
@@ -201,13 +201,14 @@ scwin.init = async function () {
     parentScwin.getPar(arr, dlt_Isu, dlt_Mst, dlt_2, dlt_3, dlt_4, dlt_IsuEng, dlt_MstEng, dlt_DtlEng, dlt_RsnAllEng, dlt_RsnRelEng,
         dlt_5, dlt_6, dlt_7, dlt_8, dlt_9);
 
-    scwin.keyFrm = arr[0] ?? "";
-    scwin.keyBiz = arr[1] ?? "";
-    scwin.keyIsurCd = arr[2] ?? "";
-    scwin.keyMktId = arr[3] ?? "";
+    // 원본은 느슨한 비교(==)였다. 부모가 숫자로 넘겨도 같게 동작하도록 문자열로 맞춘다.
+    scwin.keyFrm = String(arr[0] ?? "");
+    scwin.keyBiz = String(arr[1] ?? "");
+    scwin.keyIsurCd = String(arr[2] ?? "");
+    scwin.keyMktId = String(arr[3] ?? "");
     scwin.isNoGen = (arr.length >= 5);
-    scwin.keyMsg = arr[4] ?? "";
-    scwin.keyTit = arr[5] ?? "";
+    scwin.keyMsg = String(arr[4] ?? "");
+    scwin.keyTit = String(arr[5] ?? "");
 
     // BDC BB 신규상장은 본문 문구를 넘겨도 서버에서 생성한다.
     if (scwin.keyFrm.startsWith("73033")) {
@@ -294,7 +295,14 @@ scwin.btn_Print_onclick = async function (e) {
  */
 scwin.chk_CorrctYn_onviewchange = async function (info) {
     try {
-        await scwin.genDiscls();
+        // 생성 중에 다시 바꾸면 두 번째 생성이 건너뛰어져 본문과 정정구분이 어긋난다. 생성이 끝날 때까지 잠근다.
+        // 사용자가 방금 바꾼 것이므로 원래 활성 상태다.
+        chk_CorrctYn.setDisabled(true);
+        try {
+            await scwin.genDiscls();
+        } finally {
+            chk_CorrctYn.setDisabled(false);
+        }
     } catch (ex) {
         await $c.exception.handleError(ex, { context : "ULDSTF92024.chk_CorrctYn_onviewchange" });
     }
@@ -588,9 +596,79 @@ scwin.sendDisclsTotal = async function () {
         fileCnt : dlt_Fil.getRowCount()
     };
 
-    mpd_Fil.changeAction("/api/listing/listingcommon/disclosure/send");
-    mpd_Fil.setParam(0, "sendDisclosureRequestDto", JSON.stringify(requestDto));
-    mpd_Fil.startUpload();
+    // 응답 전에 다시 눌러 두 번 전송되지 않도록 막는다. 실패하면 다시 풀어 준다.
+    btn_send.setDisabled(true);
+
+    // 첨부가 있으면 파일과 함께 multiupload 로 보낸다. 결과는 mpd_Fil_onComplete / mpd_Fil_onerror 에서 받는다.
+    if (mpd_Fil.getFileInfos().length > 0) {
+        mpd_Fil.changeAction("/api/listing/listingcommon/disclosure/send");
+        mpd_Fil.setParam(0, "sendDisclosureRequestDto", JSON.stringify(requestDto));
+        mpd_Fil.startUpload();
+        return;
+    }
+
+    // 첨부가 없으면 보낼 파일이 없어 multiupload 가 요청하지 않을 수 있으므로 JSON 통신으로 보낸다
+    // (cm/udc/fileMultiUpload.xml startFileUpload 와 같은 분기).
+    const sbmOptions = {
+        id : "sbm_sendDisclsTotal",
+        method : "post",
+        action : "/api/listing/listingcommon/disclosure/send",
+        mediatype : "application/json",
+        isProcessMsg : true
+    };
+
+    try {
+        const result = await $c.sbm.executeDynamic(sbmOptions, requestDto);
+        await scwin.afterSend(result.responseJSON);
+    } catch (ex) {
+        btn_send.setDisabled(false);
+        throw ex;
+    }
+};
+
+/**
+ * @method
+ * @name scwin.afterSend
+ * @author Inswave
+ * @date 2026. 10. 20
+ * @description 공시검토전송 응답 처리 (원본 OnSuccessAfterSave / trs OnFail).
+ * 응답이 실패(success false)면 MSG-0002 후 전송 버튼을 다시 풀고, 아니면 MSG-0001 후 팝업을 닫는다.
+ * @param {Object} res 응답 JSON (모르는 형식이면 null)
+ * @returns
+ * @hidden N
+ */
+scwin.afterSend = async function (res) {
+    if (res?.success === false) {
+        // "MSG-0002" : 작업처리 중 오류가 발생하였습니다.
+        await $c.win.alert($c.stf.getMessageParam("MSG-0002", ""));
+        btn_send.setDisabled(false);
+        return;
+    }
+
+    // "MSG-0001" : 성공적으로 처리되었습니다.
+    await $c.win.alert($c.stf.getMessageParam("MSG-0001", ""));
+    await $c.win.closePopup();
+};
+
+/**
+ * @method
+ * @name scwin.parseUploadResult
+ * @author Inswave
+ * @date 2026. 10. 20
+ * @description multiupload 완료 이벤트가 넘긴 응답을 객체로 바꾼다. 문자열이면 JSON 으로 읽고, 읽을 수 없으면 null 을 돌려준다.
+ * TODO : 서버 API 확정 후 응답 형식에 맞춘다
+ * @param {Object|String} data 완료 이벤트 인자
+ * @returns {Object} 응답 객체 또는 null
+ * @hidden N
+ */
+scwin.parseUploadResult = function (data) {
+    if (typeof data !== "string") return data ?? null;
+
+    try {
+        return JSON.parse(data);
+    } catch (e) {
+        return null;
+    }
 };
 
 /**
@@ -598,22 +676,21 @@ scwin.sendDisclsTotal = async function () {
  * @name scwin.mpd_Fil_selectCallback
  * @author Inswave
  * @date 2026. 10. 20
- * @description 첨부파일 선택 완료. 방금 고른 파일을 첨부파일 목록에 추가한다.
+ * @description 첨부파일 선택 완료. 전송 대기열의 파일 전체를 첨부파일 목록에 보여 준다.
  * @param {Array} fileInfoArr 선택한 파일 정보
  * @returns
  * @hidden N
  */
 scwin.mpd_Fil_selectCallback = function (fileInfoArr) {
-    const fileInfos = mpd_Fil.getFileInfos();
+    const fileInfos = mpd_Fil.getFileInfos() ?? [];
 
-    if ($c.util.isEmpty(fileInfos)) return;
-
-    // 방금 추가된 파일은 항상 목록의 마지막이다.
-    const fileInfo = fileInfos[fileInfos.length - 1];
-    const rowIndex = dlt_Fil.insertRow(dlt_Fil.getRowCount());
-
-    dlt_Fil.setCellData(rowIndex, "fileInfo", fileInfo.name);
-    dlt_Fil.setCellData(rowIndex, "fileSz", fileInfo.size);
+    // 한 번에 여러 파일을 고를 수 있으므로 전송 대기열 전체로 목록을 다시 만든다.
+    dlt_Fil.removeAll();
+    for (let i = 0; i < fileInfos.length; i++) {
+        const rowIndex = dlt_Fil.insertRow(dlt_Fil.getRowCount());
+        dlt_Fil.setCellData(rowIndex, "fileInfo", fileInfos[i].name);
+        dlt_Fil.setCellData(rowIndex, "fileSz", fileInfos[i].size);
+    }
 };
 
 /**
@@ -621,16 +698,14 @@ scwin.mpd_Fil_selectCallback = function (fileInfoArr) {
  * @name scwin.mpd_Fil_onComplete
  * @author Inswave
  * @date 2026. 10. 20
- * @description 공시검토전송 완료. 처리 완료를 알리고 팝업을 닫는다.
- * @param
+ * @description 첨부파일과 함께 보낸 공시검토전송 완료. 응답 결과에 따라 완료 처리한다(scwin.afterSend).
+ * @param {Object|String} data 응답
  * @returns
  * @hidden N
  */
-scwin.mpd_Fil_onComplete = async function () {
+scwin.mpd_Fil_onComplete = async function (data) {
     try {
-        // "MSG-0001" : 성공적으로 처리되었습니다.
-        await $c.win.alert($c.stf.getMessageParam("MSG-0001", ""));
-        await $c.win.closePopup();
+        await scwin.afterSend(scwin.parseUploadResult(data));
     } catch (ex) {
         await $c.exception.handleError(ex, { context : "ULDSTF92024.mpd_Fil_onComplete" });
     }
@@ -641,7 +716,7 @@ scwin.mpd_Fil_onComplete = async function () {
  * @name scwin.mpd_Fil_onerror
  * @author Inswave
  * @date 2026. 10. 20
- * @description 공시검토전송 실패.
+ * @description 첨부파일과 함께 보낸 공시검토전송 실패. 안내 후 전송 버튼을 다시 푼다.
  * @param {Object} data 오류 정보
  * @returns
  * @hidden N
@@ -650,6 +725,7 @@ scwin.mpd_Fil_onerror = async function (data) {
     try {
         // "MSG-0002" : 작업처리 중 오류가 발생하였습니다.
         await $c.win.alert($c.stf.getMessageParam("MSG-0002", ""));
+        btn_send.setDisabled(false);
     } catch (ex) {
         await $c.exception.handleError(ex, { context : "ULDSTF92024.mpd_Fil_onerror" });
     }
@@ -747,7 +823,7 @@ scwin.genDiscls = async function () {
         }
     } else if (scwin.isNoGen) {
         await scwin.selectDisclsName();
-        dma_disclsInf.set("DISCLS_NM", dlt_Tit.getCellData(0, "DISCLS_TITLE"));
+        dma_disclsInf.set("DISCLS_NM", dlt_Tit.getCellData(0, "DISCLS_TITLE") ?? "");
         scwin.setContentText(scwin.keyMsg);
     } else {
         await $c.win.alert($c.stf.getMessageParam("MSG-0908", ""));
@@ -788,7 +864,7 @@ scwin.showDiscls = function () {
         edt_contn.setHTML(contn);
     }
 
-    dma_disclsInf.set("DISCLS_NM", dlt_Tit.getCellData(0, "DISCLS_TITLE"));
+    dma_disclsInf.set("DISCLS_NM", dlt_Tit.getCellData(0, "DISCLS_TITLE") ?? "");
 };
 
 /**
@@ -897,7 +973,7 @@ scwin.setInfRow = function (dataList, formCd) {
 
     dataList.setCellData(0, "ISUR_CD", scwin.keyIsurCd);
     dataList.setCellData(0, "BZ_PROCS_NO", scwin.keyBiz);
-    dataList.setCellData(0, "ACPT_NO", dlt_Ori.getCellData(0, "ACPT_NO"));
+    dataList.setCellData(0, "ACPT_NO", dlt_Ori.getCellData(0, "ACPT_NO") ?? "");
     dataList.setCellData(0, "SPOT_ISU_TRD_MKT_TP_CD", scwin.getLstMktId());
     dataList.setCellData(0, "DISCLS_TITLE", dma_disclsInf.get("DISCLS_TITLE"));
     dataList.setCellData(0, "FORM_CD", formCd);
@@ -939,7 +1015,8 @@ scwin.getLstMktId = function () {
     if (["1", "2", "6"].includes(scwin.keyMktId)) {
         return scwin.keyMktId;
     }
-    return dlt_Ori.getCellData(0, "SPOT_ISU_TRD_MKT_TP_CD");
+    // 원공시가 없으면 빈 값 (Gauce NameString 과 같게)
+    return dlt_Ori.getCellData(0, "SPOT_ISU_TRD_MKT_TP_CD") ?? "";
 };
 
 /**
@@ -1031,12 +1108,15 @@ scwin.textToHtml = function (text) {
  */
 scwin.htmlToText = function (html) {
     // nbsp 하나뿐인 문단은 textToHtml 이 빈 줄 자리에 넣은 것이라 빈 문단으로 되돌린다.
+    // getHTML 은 블록 사이에 줄바꿈을 넣는다. 원문 줄바꿈은 문단·br 로만 나타내므로 먼저 지운다
+    // (textToHtml 은 원시 줄바꿈을 만들지 않고, 공백은 nbsp 로 바뀌어 있다).
     const marked = html
-        .replace(/<p([^>]*)>(?:&nbsp;|&#160;| )<\/p>/gi, "<p$1></p>")
+        .replace(/[\r\n]+/g, "")
+        .replace(/<p([^>]*)>(?:&nbsp;|&#160;|\u00a0)<\/p>/gi, "<p$1></p>")
         .replace(/<br\s*\/?>/gi, "\n")
         .replace(/<\/(p|div|li|h[1-6])>/gi, "\n");
     const doc = new DOMParser().parseFromString(marked, "text/html");
-    const text = (doc.body.textContent ?? "").replaceAll(" ", " ");
+    const text = (doc.body.textContent ?? "").replaceAll("\u00a0", " ");
 
     // 마지막 문단 뒤에 붙은 줄바꿈 하나는 원문에 없던 것이다.
     return text.endsWith("\n") ? text.slice(0, -1) : text;
