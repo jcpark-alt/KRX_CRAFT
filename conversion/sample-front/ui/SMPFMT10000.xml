@@ -25,11 +25,20 @@
                         <w2:column id="f93a" name="float maxLength 9.3 displayFormatter (A안)" dataType="number"></w2:column>
                     </w2:columnInfo>
                 </w2:dataList>
+                <w2:dataList baseNode="list" repeatNode="map" id="dlt_cut">
+                    <w2:columnInfo>
+                        <w2:column id="org" name="원본(비교 기준)" dataType="number"></w2:column>
+                        <w2:column id="n9" name="number maxLength 9" dataType="number"></w2:column>
+                        <w2:column id="n93" name="number maxLength 9.3" dataType="number"></w2:column>
+                        <w2:column id="n14" name="number maxLength 14 useMaxLength" dataType="number"></w2:column>
+                        <w2:column id="f93" name="float maxLength 9.3" dataType="number"></w2:column>
+                    </w2:columnInfo>
+                </w2:dataList>
             </w2:dataCollection>
             <w2:workflowCollection/>
         </xf:model>
         <w2:layoutInfo/>
-        <w2:publicInfo method="scwin.onpageload,scwin.btn_set1_onclick,scwin.btn_set2_onclick,scwin.btn_set3_onclick,scwin.btn_set4_onclick,scwin.btn_set5_onclick,scwin.btn_set6_onclick,scwin.btn_check_onclick,scwin.btn_gridReset_onclick,scwin.grd_num_onafteredit,scwin.setAmt,scwin.showResult,scwin.initGrid,scwin.fmtIntFloor"/>
+        <w2:publicInfo method="scwin.onpageload,scwin.btn_set1_onclick,scwin.btn_set2_onclick,scwin.btn_set3_onclick,scwin.btn_set4_onclick,scwin.btn_set5_onclick,scwin.btn_set6_onclick,scwin.btn_check_onclick,scwin.btn_gridReset_onclick,scwin.grd_num_onafteredit,scwin.setAmt,scwin.showResult,scwin.initGrid,scwin.fmtIntFloor,scwin.btn_cutCheck_onclick,scwin.btn_cutReset_onclick,scwin.initCutGrid,scwin.showCutResult"/>
         <script lazy="false" type="text/javascript"><![CDATA[// 가이드 : 소수 데이터 정수 표시 샘플 (합성 화면 — 원본 없음)
 
 /*
@@ -41,6 +50,8 @@
  * 3. 입력란에 포커스를 주면 원본(소수 포함) 값이 보이고, 수정 후 포커스를 빼면 다시 정수로 표시된다
  * 4. 그리드도 같은 비교를 컬럼별로 보여주며, 어느 컬럼을 편집해도 행의 다른 컬럼에 같은 원본 값이 복사된다
  * 5. 「getValue 확인」 으로 표시값과 무관하게 컴포넌트·DataMap·DataList 에 원본 소수 값이 남아 있음을 확인한다
+ * 6. [잘림 재현] 두 번째 그리드는 maxLength 를 넘는 기존 데이터를 담는다. 셀을 편집 모드로 열었다가 값을 바꾸지 않고
+ *    나오기만 해도 편집기 validator 가 자른 값이 dataList 에 기록된다. 「변경 확인」 으로 원본 대비 바뀐 셀을 표시한다
  *
  * 담긴 패턴 — 엔진 실측(websquare-engine.js) 결과
  * - dataType="number" + displayFormat="#,###[round|ceil|floor]" : 정수부만 표시, 예약어로 처리 방식 선택(생략 시 [round])
@@ -60,6 +71,13 @@
  *   · 버림은 Math.trunc(0 방향) — $c.num.floor(Math.floor)는 음수가 -1234.5 → -1235 로 엔진 [floor] 와 다르다
  *   · 저장 시점 검증으로 충분하면 B안 : number + "#,###[floor]" + validateDataCollect { num:"f", maxLengthF:"9.3" } (키 입력 제한 없음)
  * - gridView 는 셀 편집기가 포맷 없이 원본 값을 편집·저장한다 → 컬럼 applyFormat 은 지정하지 않는다
+ * - [잘림 재현] 편집 가능한 그리드 컬럼의 maxLength 는 한도를 넘는 기존 데이터를 편집 종료 시 잘라 기록한다
+ *   · 편집 종료(handleBlurEventBasic)가 c = validator.validateString(getValue()) 후 변경 비교 없이 __setCellData(c)
+ *   · number : maxLength 는 parseInt — "9"·"9.3" 모두 소수점·부호 포함 전체 9글자. 123456789.123 → 123456789 / 1234567890 → 123456789 / -123456789 → -12345678
+ *   · number + useMaxLength="true" : 부호 제외·쉼표 무시로 센다(-123456789 유지). 글자 수는 서버 데이터 최대 길이 이상으로 준다(정수 9·소수 3 → "14")
+ *   · float : maxFloatLengthCommand 가 정수·소수 자리별로 자른다. 123456789.1234 → 123456789.123 / 1234567890 → 123456789 (A안 컬럼도 같은 위험)
+ *   · 일반 input(applyFormat="display")은 바인딩·블러 때 validateString 을 타지 않아 기존 값을 자르지 않는다 — 그리드 편집 경로만의 문제
+ *   · 권장 : 편집 컬럼의 정수.소수 자리 검사는 저장 시 validateDataCollect { num:"f", maxLengthF:"9.3" }, 읽기 전용 컬럼은 영향 없음
  *
  * 예약어 주의(엔진 동작)
  * - [ceil] 은 잘리는 첫째 소수 자리만 본다 : 1234.01 → 1,234 (정확한 올림이 필요하면 displayFormatter 로 Math.ceil)
@@ -75,6 +93,12 @@ scwin.GRID_COLS = ["org", "flt", "rnd", "cel", "flr", "f93", "f93i", "f93a"];
 // 그리드 초기 데이터 — 반올림·올림·버림 경계 값 + 소수 4자리 이상·maxLength 9.3 한도 값
 scwin.GRID_SAMPLE = [1234.4, 1234.5, 1234.56, 1234.01, 1234.09, -1234.5, 1234.999, 1234.5678, 123456789.123];
 
+// 잘림 재현 그리드 — 편집 후 원본(org)과 비교할 컬럼
+scwin.CUT_COLS = ["n9", "n93", "n14", "f93"];
+
+// 잘림 재현 데이터 — 서버에서 maxLength 를 넘는 값이 내려온 상황
+scwin.CUT_SAMPLE = [123456789.123, 1234567890, -123456789, 12345.6789, 123456789.1234];
+
 ///////// 2. 초기화 영역 /////////
 
 /**
@@ -88,6 +112,7 @@ scwin.GRID_SAMPLE = [1234.4, 1234.5, 1234.56, 1234.01, 1234.09, -1234.5, 1234.99
 scwin.onpageload = function () {
     try {
         scwin.initGrid();
+        scwin.initCutGrid();
         scwin.setAmt(1234.56);
     } catch (ex) {
         $c.exception.handleError(ex, { context : "SMPFMT10000.onpageload" });
@@ -165,6 +190,34 @@ scwin.btn_gridReset_onclick = function () {
         scwin.initGrid();
     } catch (ex) {
         $c.exception.handleError(ex, { context : "SMPFMT10000.btn_gridReset_onclick" });
+    }
+};
+
+/**
+ * @event
+ * @name scwin.btn_cutCheck_onclick
+ * @description [잘림 재현] 원본(org) 대비 값이 바뀐 셀을 표시한다.
+ * @hidden N
+*/
+scwin.btn_cutCheck_onclick = function () {
+    try {
+        scwin.showCutResult();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "SMPFMT10000.btn_cutCheck_onclick" });
+    }
+};
+
+/**
+ * @event
+ * @name scwin.btn_cutReset_onclick
+ * @description [잘림 재현] 그리드를 한도 초과 원본 데이터로 되돌린다.
+ * @hidden N
+*/
+scwin.btn_cutReset_onclick = function () {
+    try {
+        scwin.initCutGrid();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "SMPFMT10000.btn_cutReset_onclick" });
     }
 };
 
@@ -278,6 +331,50 @@ scwin.fmtIntFloor = function (value) {
         return value;
     }
     return $c.num.formatMoney(String(Math.trunc(num)));
+};
+
+/**
+ * @method
+ * @name scwin.initCutGrid
+ * @author Inswave
+ * @date 2026. 10. 21
+ * @description [잘림 재현] 원본(org)과 비교 컬럼 전부에 maxLength 를 넘는 같은 값을 넣고 결과 표시를 초기화한다.
+ * @hidden N
+*/
+scwin.initCutGrid = function () {
+    const rows = scwin.CUT_SAMPLE.map(function (value) {
+        const row = { org : value };
+        scwin.CUT_COLS.forEach(function (colId) {
+            row[colId] = value;
+        });
+        return row;
+    });
+    dlt_cut.setJSON(rows);
+    scwin.showCutResult();
+};
+
+/**
+ * @method
+ * @name scwin.showCutResult
+ * @author Inswave
+ * @date 2026. 10. 21
+ * @description [잘림 재현] 행마다 비교 컬럼 값을 원본(org)과 견줘 바뀐 셀 목록을 화면에 표시한다.
+ * @hidden N
+*/
+scwin.showCutResult = function () {
+    const changes = [];
+    for (let rowIndex = 0; rowIndex < dlt_cut.getRowCount(); rowIndex++) {
+        const org = dlt_cut.getCellData(rowIndex, "org");
+        scwin.CUT_COLS.forEach(function (colId) {
+            const value = dlt_cut.getCellData(rowIndex, colId);
+            if (Number(value) !== Number(org)) {
+                changes.push((rowIndex + 1) + "행 " + colId + " : " + org + " → " + value);
+            }
+        });
+    }
+    spn_cutResult.setValue(changes.length === 0
+        ? "변경 없음 — 비교 컬럼 셀을 편집 모드로 열었다가 값을 바꾸지 않고 다른 셀로 나온 뒤 「변경 확인」 을 누르세요."
+        : "잘린 셀 " + changes.length + "건 : " + changes.join(" / "));
 };
 ]]></script>
     </head>
@@ -473,6 +570,43 @@ scwin.fmtIntFloor = function (value) {
                 </w2:gridView>
             </xf:group>
             <w2:span id="spn_gridResult" label="" style="display:block;margin-top:8px;font-size:12px;color:#1c5dd9;"/>
+
+            <!-- ── gridView 잘림 재현 ── -->
+            <xf:group class="titbox" id="" style="margin-top:20px;">
+                <w2:textbox class="tit" id="" label="[잘림 재현] 편집 그리드 컬럼 maxLength — 한도를 넘는 기존 데이터가 편집 종료 시 잘려 기록됨" style="" tagname="h3"></w2:textbox>
+            </xf:group>
+            <w2:textbox class="txt_info red" id="" label="비교 컬럼 셀을 편집 모드로 열었다가 값을 바꾸지 않고 다른 셀로 나온 뒤 「변경 확인」 을 누르세요. number 의 maxLength 는 소수점·부호 포함 전체 글자 수(&quot;9.3&quot; = 9글자), float 은 정수.소수 자리별로 자릅니다. 편집 컬럼의 자릿수 검사는 저장 시 validateDataCollect maxLengthF 로 하세요." style="" tagname=""></w2:textbox>
+            <xf:group class="btnbox" id="" style="">
+                <xf:group class="rt" id="" style="">
+                    <xf:trigger class="btn_cm" id="btn_cutCheck" type="button" ev:onclick="scwin.btn_cutCheck_onclick"><xf:label><![CDATA[변경 확인]]></xf:label></xf:trigger>
+                    <xf:trigger class="btn_cm" id="btn_cutReset" type="button" ev:onclick="scwin.btn_cutReset_onclick"><xf:label><![CDATA[초기화]]></xf:label></xf:trigger>
+                </xf:group>
+            </xf:group>
+            <xf:group class="grdbox" id="" style="">
+                <w2:gridView autoFit="allColumn" class="gvw row5" dataList="data:dlt_cut" focusMode="cell" id="grd_cut"
+                    keepDefaultColumnWidth="false" rowNumHeaderValue="번호" rowNumVisible="true" rowNumWidth="60"
+                    scrollByColumn="false" style="" visibleRowNum="5">
+                    <w2:header id="header_cut" style="">
+                        <w2:row id="row_cutHead" style="">
+                            <w2:column displayMode="label" id="hCutOrg" inputType="text" value="원본 (읽기 전용)" width="170"></w2:column>
+                            <w2:column displayMode="label" id="hCutN9" inputType="text" value="[위험] number maxLength 9" width="170"></w2:column>
+                            <w2:column displayMode="label" id="hCutN93" inputType="text" value="[위험] number maxLength 9.3" width="170"></w2:column>
+                            <w2:column displayMode="label" id="hCutN14" inputType="text" value="[안전] number 14 + useMaxLength" width="190"></w2:column>
+                            <w2:column displayMode="label" id="hCutF93" inputType="text" value="[위험] float maxLength 9.3" width="170"></w2:column>
+                        </w2:row>
+                    </w2:header>
+                    <w2:gBody id="gBody_cut" style="">
+                        <w2:row id="row_cutBody" style="">
+                            <w2:column id="org" inputType="text" width="170" textAlign="right" readOnly="true" dataType="number" displayFormat="#,###.####"></w2:column>
+                            <w2:column id="n9" inputType="text" width="170" textAlign="right" dataType="number" maxLength="9" displayFormat="#,###.####"></w2:column>
+                            <w2:column id="n93" inputType="text" width="170" textAlign="right" dataType="number" maxLength="9.3" displayFormat="#,###.####"></w2:column>
+                            <w2:column id="n14" inputType="text" width="190" textAlign="right" dataType="number" maxLength="14" useMaxLength="true" displayFormat="#,###.####"></w2:column>
+                            <w2:column id="f93" inputType="text" width="170" textAlign="right" dataType="float" maxLength="9.3" displayFormat="#,###.####"></w2:column>
+                        </w2:row>
+                    </w2:gBody>
+                </w2:gridView>
+            </xf:group>
+            <w2:span id="spn_cutResult" label="" style="display:block;margin-top:8px;font-size:12px;color:#c0392b;"/>
         </xf:group>
     </body>
 </html>
