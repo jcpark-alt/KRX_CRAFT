@@ -1,6 +1,6 @@
 # gcc 공통함수 활용 최종 샘플 카탈로그 (sample-front)
 
-전환(Stage 2) 보강·신규 화면 개발 시 **화면 유형을 매칭해 그대로 참조하는 표준 템플릿 22종**을 정리한다.
+전환(Stage 2) 보강·신규 화면 개발 시 **화면 유형을 매칭해 그대로 참조하는 표준 템플릿 23종**을 정리한다.
 모든 샘플은 [code-convention.md](../../cm/docs/code-convention/code-convention.md)의 **5단계 정형화 구조**(`///////// n. 영역명 /////////`)와
 **서브미션 async/await 순차 실행** 원칙을 따르며, gcc 공통함수(`$c.*`)만으로 화면을 구성한 최종 결과물이다. (2026-08-21 기준)
 
@@ -33,6 +33,7 @@
 | `SMPPRT10000.xml` | 화면 인쇄·PDF 저장 호출 화면 ($c.win.print — 메인·팝업 공통) | (합성 가이드 — 원본 없음, 참고: WebSquare 샘플 `pdf저장/sample01.xml`) | `/ui/sample/template/SMPPRT10000.xml` |
 | `SMPPRT10001.xml` | 레이어 팝업 안에서 인쇄·PDF 저장 ($c.win.print type/target/fileName/orientation) | (합성 가이드 — 원본 없음) | `/ui/sample/template/SMPPRT10001.xml` |
 | `SMPIFR10001.xml` | iframe 내부 페이지에서 닫는 팝업 (postMessage 수신) | (합성 가이드 — iframe 페이지 `sample-front/ui/iframe-popup-close-sample.html`, 배포 `/ui/sample/template/`) | `/ui/sample/template/SMPIFR10001.xml` |
+| `SMPFMT10000.xml` | 소수 데이터 정수·소수 자리 표시 (displayFormat `[round]`/`[ceil]`/`[floor]`, float `maxLength` 입력 제한 — input·gridView) | (합성 가이드 — 원본 없음) | `/ui/sample/template/SMPFMT10000.xml` |
 
 > 소스↔원본은 파일 head(`meta_screenName`의 "원본 …" 표기) 기준 **1:1 매핑**이다.
 > `ULDSTF30702`만 배포 파일명이 `ULDSTF30710.xml`로 다르므로 배포 시 주의한다.
@@ -61,6 +62,7 @@
 | 공동인증서(전자서명) 연동이 있는 화면 | `SMPCRT10000` | `$c.cert.loadModule`(벤더 준비 확인 — 스크립트는 config.xml engine 모듈이 정적 로드, crosswebex6 의 document.write 때문에 동적 로드 금지 — + 모듈 초기화 `onStatus` + 키패드 z-index 보정)·`$c.cert.auth(url, callback, { params, useTranskey })` 전자서명 호출(벤더 콜백은 2xx 에서만 호출 → 4구역에 수신 배치, Promise 대기 금지)·`$c.cert.openManager({ useTranskey, taskNm })` 인증서 관리 화면·`validateDataCollect`(required/`maxLengthB`/`format` phone·email)로 동봉 파라미터 검증·라온 가상키보드 사용 여부(`$c.cert.setTranskeyUse`) 전환 + `$c.util.setSessionStorage` 보관·`$c.win.reload` 새로고침 안내. 키패드 id 는 `$c.cert.INITECH_INFO`·스크립트 경로는 config.xml 보유, 통신은 벤더 `$.ajax`(FormData) 라 `$c.sbm` 미사용 |
 | 화면(메인 content·레이어 팝업)을 인쇄하거나 PDF 로 저장하는 화면 | `SMPPRT10000` + `SMPPRT10001` | `window.print` 는 문서 전체를 인쇄해 메인은 헤더·사이드가, 레이어 팝업은 뒤의 메인 화면까지 나오므로 `$c.win.print(options)` 를 쓴다(종전 `mainPrint`·`popupPrint` 통합) — html2canvas 로 호출 화면 frame DOM(`$p.getFrame().render`)만 캡처해 숨김 iframe 에서 인쇄(`type: "print"`)하거나 html2pdf 로 A4 PDF 저장(`type: "pdf"`, `fileName`·`orientation`·`margin`), `target` 에 컴포넌트 객체·DOM id·DOM 요소를 주면 그 영역만 출력(버튼 영역 제외 패턴), 스크롤로 가려진 영역까지 캡처, 라이브러리(`/cm/js/html2canvas.min.js`·`html2pdf.bundle.min.js`, `$c.win.PRINT_LIB_INFO`)는 `websquare/config.xml` 의 `<engine><module>` 로 정적 로드(화면에 `<script src>` 불필요, 동적 로드 없음 — 미등록이면 print 가 등록 안내 Error), 실패는 진입점 `handleError` 로. 호출 화면 frame 이 대상이라 메인·팝업 어디서 불러도 같은 함수(`/cm/css/print.css` 는 window.print 직접 사용 시의 보조). 팝업은 실행 횟수를 `closePopup(result)` 로 돌려준다. 회귀 테스트 `test/print.test.js` |
 | iframe(외부 페이지)을 품은 팝업 | `SMPIFR10000` + `SMPIFR10001` | 팝업이 `$c.win.getPopupId()` 를 iframe 쿼리로 넘기고 window `message` 리스너를 **onpageload 등록·onpageunload 해제**(scwin 에 보관한 같은 참조), 수신 필터 출처→형태→`execution`→`popupId`(엔진의 `{_wq_type}` 전파 메시지 배제), `$c.win.closePopup(result)` 로 자기 팝업을 닫아 호출 화면의 `await openPopup` 결과로 반환(취소는 undefined). iframe 정적 페이지는 `sendPopupMessage()` 로 `window.parent.postMessage` 만 한다 |
+| 소수 데이터를 정수로만(또는 지정 소수 자리까지) 보여주는 입력란·그리드 컬럼 | `SMPFMT10000` | 소수 자리 버림 + 입력 자릿수 제한은 `dataType="float"` + `maxLength="9.3"`(정수 9·소수 3자리 키 입력 제한, 바인딩된 초과 값은 자르지 않음) + `displayFormat="#,###.###[floor]"` — 소수가 있는 패턴이면 float 에도 예약어 적용, 표시 소수 자릿수는 `displayFormat` 이 정하므로 `maxLength` 와 일치시킴(`#,###.##[floor]` 면 1234.567 → 1,234.56 표시), 쉼표 묶음은 `#,###`(`#,##` 는 두 자리마다 쉼표), 자릿수 고정은 `0`(`#,##0.000`). 정수 표시는 `dataType="number"` + `displayFormat="#,###[round]"`(`[ceil]`·`[floor]`) 로 정수부만 표시하고 처리 방식 선택(생략 시 `[round]`) — `dataType="float"` 은 예약어를 무시하고 항상 버림, input 은 `applyFormat="display"` 필수(`all` 은 표시값↔원본 매핑이 남지 않아 `getValue` 가 소수를 잃을 수 있음), float 에 소수 자릿수 `maxLength` 금지, gridView 는 셀 편집기가 포맷 없이 원본을 편집·저장하므로 컬럼 `applyFormat` 미지정. 함정: `[ceil]` 은 첫째 소수 자리만 판단(1234.01 → 1,234)·음수는 절대값 기준. 표시만 바뀌고 DataMap/DataList 는 원본 소수 유지 — 정수 저장은 `$c.num.round/floor/ceil` 명시 변환 |
 
 ## 3. 샘플에 구현된 표준 패턴 (공통)
 

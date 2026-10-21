@@ -1,0 +1,414 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:ev="http://www.w3.org/2001/xml-events"
+    xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+    <head meta_screenName="[가이드] 소수 데이터 정수·소수 자리 표시 (displayFormat [round]/[ceil]/[floor])" meta_screenId="SMPFMT10000" meta_screenDesc="소수점을 가진 숫자 데이터를 input·gridView 에서 정수부만 또는 지정 소수 자리까지 표시하고, displayFormat 예약어로 반올림·올림·버림을 선택하는 방법(float maxLength 정수.소수 입력 제한 병행 포함)과 원본 값 보존을 시연하는 가이드." meta_author="Inswave" meta_type="가이드" meta_date="2026.10.21">
+        <w2:type>COMPONENT</w2:type>
+        <w2:buildDate/>
+        <w2:MSA/>
+        <xf:model>
+            <w2:dataCollection baseNode="map">
+                <w2:dataMap id="dma_num" baseNode="map">
+                    <w2:keyInfo>
+                        <w2:key id="amt" name="금액(소수 포함 원본)" dataType="number"></w2:key>
+                    </w2:keyInfo>
+                </w2:dataMap>
+                <w2:dataList baseNode="list" repeatNode="map" id="dlt_num">
+                    <w2:columnInfo>
+                        <w2:column id="org" name="원본" dataType="number"></w2:column>
+                        <w2:column id="flt" name="float #,###" dataType="number"></w2:column>
+                        <w2:column id="rnd" name="number [round]" dataType="number"></w2:column>
+                        <w2:column id="cel" name="number [ceil]" dataType="number"></w2:column>
+                        <w2:column id="flr" name="number [floor]" dataType="number"></w2:column>
+                        <w2:column id="f93" name="float maxLength 9.3 [floor]" dataType="number"></w2:column>
+                    </w2:columnInfo>
+                </w2:dataList>
+            </w2:dataCollection>
+            <w2:workflowCollection/>
+        </xf:model>
+        <w2:layoutInfo/>
+        <w2:publicInfo method="scwin.onpageload,scwin.btn_set1_onclick,scwin.btn_set2_onclick,scwin.btn_set3_onclick,scwin.btn_set4_onclick,scwin.btn_set5_onclick,scwin.btn_set6_onclick,scwin.btn_check_onclick,scwin.btn_gridReset_onclick,scwin.grd_num_onafteredit,scwin.setAmt,scwin.showResult,scwin.initGrid"/>
+        <script lazy="false" type="text/javascript"><![CDATA[// 가이드 : 소수 데이터 정수 표시 샘플 (합성 화면 — 원본 없음)
+
+/*
+ * 화면 동작
+ * 1. 같은 DataMap 키(dma_num.amt)에 묶인 입력란 8개가 같은 소수 값을 각자의 displayFormat 으로 표시한다
+ * 2. 「값 설정」 버튼으로 대표 값(1234.4 / 1234.5 / 1234.01 / -1234.5 / 1234.5678 / 123456789.123)을 넣어
+ *    반올림·올림·버림 차이와 float maxLength="9.3" 소수 자리 버림 표시를 비교한다
+ * 2-1. float maxLength="9.3" 입력란은 정수 9자리·소수 3자리를 넘는 키 입력을 막는다(서버에서 받은 초과 값은 자르지 않는다)
+ * 3. 입력란에 포커스를 주면 원본(소수 포함) 값이 보이고, 수정 후 포커스를 빼면 다시 정수로 표시된다
+ * 4. 그리드도 같은 비교를 컬럼별로 보여주며, 어느 컬럼을 편집해도 행의 다른 컬럼에 같은 원본 값이 복사된다
+ * 5. 「getValue 확인」 으로 표시값과 무관하게 컴포넌트·DataMap·DataList 에 원본 소수 값이 남아 있음을 확인한다
+ *
+ * 담긴 패턴 — 엔진 실측(websquare-engine.js) 결과
+ * - dataType="number" + displayFormat="#,###[round|ceil|floor]" : 정수부만 표시, 예약어로 처리 방식 선택(생략 시 [round])
+ * - dataType="float"  + displayFormat="#,###"                  : 예약어 무시, 항상 버림 표시(floatFormatter 가 정수부만 잘라 포맷)
+ * - input 은 applyFormat="display" 필수 — "all" 이면 표시값↔원본 매핑이 안 남아 getValue 가 소수를 잃을 수 있다
+ * - 정수만 표시하는 float input/컬럼에 소수 자릿수 maxLength("13.2" 등)를 주면 소수가 다시 표시된다 → 지정하지 않는다
+ * - float + maxLength="9.3" + displayFormat="#,###.###[floor]" : 정수 9·소수 3자리 입력 제한 + 소수 셋째 자리까지 버림 표시
+ *   · displayFormat 에 소수가 있으면 예약어가 float 에도 적용된다(formatCurrency 경로) — 표시 자릿수는 maxLength 가 아니라 displayFormat 이 정한다
+ *   · 입력 자릿수(maxLength 소수 3)와 표시 자릿수를 맞춘다. "#,###.##[floor]" 이면 1234.567 입력이 1,234.56 으로 보인다(저장값은 1234.567)
+ *   · 쉼표 묶음은 쉼표 뒤 # 개수다. "#,##.##" 는 두 자리마다 쉼표(12,34.56) → 반드시 "#,###"
+ *   · 자릿수 고정 표시(1,234.50)가 필요하면 # 대신 0 : "#,##0.000[floor]"
+ * - gridView 는 셀 편집기가 포맷 없이 원본 값을 편집·저장한다 → 컬럼 applyFormat 은 지정하지 않는다
+ *
+ * 예약어 주의(엔진 동작)
+ * - [ceil] 은 잘리는 첫째 소수 자리만 본다 : 1234.01 → 1,234 (정확한 올림이 필요하면 displayFormatter 로 Math.ceil)
+ * - 음수는 절대값 기준 : [floor] -1234.5 → -1,234 / [round] -1234.5 → -1,235
+ * - 표시만 바뀐다. 서버에 정수를 보내야 하면 저장 직전에 $c.num.round/floor/ceil 로 명시 변환한다
+ */
+
+///////// 1. 변수 및 선언 영역 /////////
+
+// 그리드 비교 컬럼 — 한 컬럼을 편집하면 같은 행의 나머지 컬럼에 같은 원본 값을 복사한다
+scwin.GRID_COLS = ["org", "flt", "rnd", "cel", "flr", "f93"];
+
+// 그리드 초기 데이터 — 반올림·올림·버림 경계 값 + 소수 4자리 이상·maxLength 9.3 한도 값
+scwin.GRID_SAMPLE = [1234.4, 1234.5, 1234.56, 1234.01, 1234.09, -1234.5, 1234.999, 1234.5678, 123456789.123];
+
+///////// 2. 초기화 영역 /////////
+
+/**
+ * @method
+ * @name scwin.onpageload
+ * @author Inswave
+ * @date 2026. 10. 21
+ * @description 페이지 로드. 입력란 기본 값과 그리드 비교 데이터를 설정한다.
+ * @hidden N
+*/
+scwin.onpageload = function () {
+    try {
+        scwin.initGrid();
+        scwin.setAmt(1234.56);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "SMPFMT10000.onpageload" });
+    }
+};
+
+///////// 3. 컴포넌트 이벤트 영역 /////////
+
+// ── 값 설정 버튼 (thin — 값만 넘긴다) ──
+scwin.btn_set1_onclick = function () {
+    try {
+        scwin.setAmt(1234.4);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "SMPFMT10000.btn_set1_onclick" });
+    }
+};
+scwin.btn_set2_onclick = function () {
+    try {
+        scwin.setAmt(1234.5);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "SMPFMT10000.btn_set2_onclick" });
+    }
+};
+scwin.btn_set3_onclick = function () {
+    try {
+        scwin.setAmt(1234.01);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "SMPFMT10000.btn_set3_onclick" });
+    }
+};
+scwin.btn_set4_onclick = function () {
+    try {
+        scwin.setAmt(-1234.5);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "SMPFMT10000.btn_set4_onclick" });
+    }
+};
+scwin.btn_set5_onclick = function () {
+    try {
+        scwin.setAmt(1234.5678);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "SMPFMT10000.btn_set5_onclick" });
+    }
+};
+scwin.btn_set6_onclick = function () {
+    try {
+        scwin.setAmt(123456789.123);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "SMPFMT10000.btn_set6_onclick" });
+    }
+};
+
+/**
+ * @event
+ * @name scwin.btn_check_onclick
+ * @description 각 입력란의 getValue() 와 DataMap·DataList 값을 표시해 원본 소수 값이 보존됨을 확인한다.
+ * @hidden N
+*/
+scwin.btn_check_onclick = function () {
+    try {
+        scwin.showResult();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "SMPFMT10000.btn_check_onclick" });
+    }
+};
+
+/**
+ * @event
+ * @name scwin.btn_gridReset_onclick
+ * @description 그리드 비교 데이터를 초기 값으로 되돌린다.
+ * @hidden N
+*/
+scwin.btn_gridReset_onclick = function () {
+    try {
+        scwin.initGrid();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "SMPFMT10000.btn_gridReset_onclick" });
+    }
+};
+
+/**
+ * @event
+ * @name scwin.grd_num_onafteredit
+ * @description 편집한 셀의 원본 값을 같은 행의 다른 비교 컬럼에 복사한다(편집 후에도 소수가 보존되는지 확인용).
+ * @param {Number} rowIndex 편집한 행 인덱스
+ * @param {Number} columnIndex 편집한 컬럼 인덱스
+ * @hidden N
+*/
+scwin.grd_num_onafteredit = function (rowIndex, columnIndex) {
+    try {
+        const value = dlt_num.getCellData(rowIndex, grd_num.getColumnID(columnIndex));
+        scwin.GRID_COLS.forEach(function (colId) {
+            dlt_num.setCellData(rowIndex, colId, value);
+        });
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "SMPFMT10000.grd_num_onafteredit" });
+    }
+};
+
+///////// 5. 일반/업무 함수 영역 /////////
+
+/**
+ * @method
+ * @name scwin.setAmt
+ * @author Inswave
+ * @date 2026. 10. 21
+ * @description 입력란 비교용 원본 값을 DataMap 에 설정하고 확인 결과를 갱신한다.
+ * @param {Number} value 설정할 소수 포함 값
+ * @hidden N
+*/
+scwin.setAmt = function (value) {
+    dma_num.set("amt", value);
+    scwin.showResult();
+};
+
+/**
+ * @method
+ * @name scwin.showResult
+ * @author Inswave
+ * @date 2026. 10. 21
+ * @description 각 입력란의 getValue() 와 DataMap·DataList(포커스 행) 값을 화면에 표시한다.
+ * @hidden N
+*/
+scwin.showResult = function () {
+    const inputs = [
+        ["float #,###", ibx_float],
+        ["number [round]", ibx_round],
+        ["number [ceil]", ibx_ceil],
+        ["number [floor]", ibx_floor],
+        ["number #,###.##", ibx_dec2],
+        ["float 9.3 #,###.###[floor]", ibx_f93],
+        ["float 9.3 #,###.##[floor]", ibx_f93d2]
+    ];
+    const inputText = inputs.map(function (item) {
+        return item[0] + " = " + item[1].getValue();
+    }).join(" / ");
+    spn_inputResult.setValue("input getValue() : " + inputText + "  |  dma_num.amt = " + dma_num.get("amt"));
+
+    const rowIndex = Math.max(grd_num.getFocusedRowIndex(), 0);
+    const gridText = scwin.GRID_COLS.map(function (colId) {
+        return colId + " = " + dlt_num.getCellData(rowIndex, colId);
+    }).join(" / ");
+    spn_gridResult.setValue("grid " + (rowIndex + 1) + "행 getCellData() : " + gridText);
+};
+
+/**
+ * @method
+ * @name scwin.initGrid
+ * @author Inswave
+ * @date 2026. 10. 21
+ * @description 그리드 비교 데이터를 구성한다. 행마다 모든 컬럼에 같은 원본 값을 넣는다.
+ * @hidden N
+*/
+scwin.initGrid = function () {
+    const rows = scwin.GRID_SAMPLE.map(function (value) {
+        const row = {};
+        scwin.GRID_COLS.forEach(function (colId) {
+            row[colId] = value;
+        });
+        return row;
+    });
+    dlt_num.setJSON(rows);
+};
+]]></script>
+    </head>
+
+    <body ev:onpageload="scwin.onpageload">
+        <xf:group class="sub_contents" id="" meta_componentContainer="true" style="">
+            <w2:pageFrame id="pfmContentHeader" src="/cm/xml/contentHeader.xml" style=""></w2:pageFrame>
+            <w2:textbox class="txt_info blue bold" id="" label="소수점을 가진 숫자 데이터를 정수부만, 또는 지정한 소수 자리까지 표시하는 가이드입니다. 표시만 바뀌고 컴포넌트·DataMap·DataList 에는 원본 소수 값이 그대로 남습니다." style="" tagname=""></w2:textbox>
+            <w2:textbox class="txt_info" id="" label="반올림·올림·버림은 dataType=&quot;number&quot; + displayFormat=&quot;#,###[round|ceil|floor]&quot; 로 선택합니다(생략 시 [round]). dataType=&quot;float&quot; 은 예약어를 무시하고 항상 버림으로 표시합니다." style="" tagname=""></w2:textbox>
+            <w2:textbox class="txt_info red" id="" label="input 은 applyFormat=&quot;display&quot; 필수, 정수만 표시하는 float 에는 소수 자릿수 maxLength 를 주지 않습니다. [ceil] 은 첫째 소수 자리만 보므로 1234.01 → 1,234 입니다." style="" tagname=""></w2:textbox>
+            <w2:textbox class="txt_info" id="" label="소수 자리까지 버림 표시 + 입력 자릿수 제한이 필요하면 dataType=&quot;float&quot; maxLength=&quot;9.3&quot; displayFormat=&quot;#,###.###[floor]&quot; 를 씁니다(정수 9·소수 3자리 입력 제한). 표시 소수 자릿수는 displayFormat 이 정하므로 maxLength 와 맞추고, 쉼표 묶음은 &quot;#,###&quot; 로 씁니다(&quot;#,##&quot; 는 두 자리마다 쉼표)." style="" tagname=""></w2:textbox>
+
+            <!-- ── input 비교 ── -->
+            <xf:group class="titbox" id="" style="">
+                <w2:textbox class="tit" id="" label="input — 같은 값(dma_num.amt)을 서로 다른 displayFormat 으로 표시" style="" tagname="h3"></w2:textbox>
+            </xf:group>
+            <xf:group class="btnbox" id="" style="">
+                <xf:group class="lt" id="" style="">
+                    <w2:span label="값 설정 :" style="margin-right:8px;font-weight:bold;"/>
+                    <xf:trigger class="btn_cm" id="btn_set1" type="button" ev:onclick="scwin.btn_set1_onclick"><xf:label><![CDATA[1234.4]]></xf:label></xf:trigger>
+                    <xf:trigger class="btn_cm" id="btn_set2" type="button" ev:onclick="scwin.btn_set2_onclick"><xf:label><![CDATA[1234.5]]></xf:label></xf:trigger>
+                    <xf:trigger class="btn_cm" id="btn_set3" type="button" ev:onclick="scwin.btn_set3_onclick"><xf:label><![CDATA[1234.01]]></xf:label></xf:trigger>
+                    <xf:trigger class="btn_cm" id="btn_set4" type="button" ev:onclick="scwin.btn_set4_onclick"><xf:label><![CDATA[-1234.5]]></xf:label></xf:trigger>
+                    <xf:trigger class="btn_cm" id="btn_set5" type="button" ev:onclick="scwin.btn_set5_onclick"><xf:label><![CDATA[1234.5678]]></xf:label></xf:trigger>
+                    <xf:trigger class="btn_cm" id="btn_set6" type="button" ev:onclick="scwin.btn_set6_onclick"><xf:label><![CDATA[123456789.123]]></xf:label></xf:trigger>
+                </xf:group>
+                <xf:group class="rt" id="" style="">
+                    <xf:trigger class="btn_cm" id="btn_check" type="button" ev:onclick="scwin.btn_check_onclick"><xf:label><![CDATA[getValue 확인]]></xf:label></xf:trigger>
+                </xf:group>
+            </xf:group>
+            <xf:group class="tblbox" id="" style="">
+                <xf:group adaptive="layout" adaptiveThreshold="768" class="w2tb tbl" id="grp_form" style="" tagname="table">
+                    <w2:attributes>
+                        <w2:summary></w2:summary>
+                    </w2:attributes>
+                    <xf:group tagname="colgroup">
+                        <xf:group style="width:240px;" tagname="col"></xf:group>
+                        <xf:group style="width:200px;" tagname="col"></xf:group>
+                        <xf:group style="" tagname="col"></xf:group>
+                    </xf:group>
+                    <xf:group tagname="tr">
+                        <xf:group class="w2tb_th" tagname="th">
+                            <w2:textbox id="" label="원본 값 (포맷 없음)" style=""></w2:textbox>
+                        </xf:group>
+                        <xf:group class="w2tb_td" tagname="td">
+                            <xf:input id="ibx_org" class="tar" ref="data:dma_num.amt" allowChar="0-9-." style="width:100%;" title="원본 값"></xf:input>
+                        </xf:group>
+                        <xf:group class="w2tb_td" tagname="td">
+                            <w2:textbox id="" label="여기에 소수를 직접 입력하면 아래 입력란이 각자의 규칙으로 다시 표시됩니다." style=""></w2:textbox>
+                        </xf:group>
+                    </xf:group>
+                    <xf:group tagname="tr">
+                        <xf:group class="w2tb_th" tagname="th">
+                            <w2:textbox id="" label="float · #,###" style=""></w2:textbox>
+                        </xf:group>
+                        <xf:group class="w2tb_td" tagname="td">
+                            <xf:input id="ibx_float" class="tar" ref="data:dma_num.amt" dataType="float" displayFormat="#,###" applyFormat="display" style="width:100%;" title="float #,###"></xf:input>
+                        </xf:group>
+                        <xf:group class="w2tb_td" tagname="td">
+                            <w2:textbox id="" label="항상 버림. [round]/[ceil]/[floor] 를 붙여도 무시됩니다." style=""></w2:textbox>
+                        </xf:group>
+                    </xf:group>
+                    <xf:group tagname="tr">
+                        <xf:group class="w2tb_th" tagname="th">
+                            <w2:textbox id="" label="number · #,###[round]" style=""></w2:textbox>
+                        </xf:group>
+                        <xf:group class="w2tb_td" tagname="td">
+                            <xf:input id="ibx_round" class="tar" ref="data:dma_num.amt" dataType="number" displayFormat="#,###[round]" applyFormat="display" style="width:100%;" title="number #,###[round]"></xf:input>
+                        </xf:group>
+                        <xf:group class="w2tb_td" tagname="td">
+                            <w2:textbox id="" label="반올림(기본값 — 예약어 생략과 동일). -1234.5 → -1,235" style=""></w2:textbox>
+                        </xf:group>
+                    </xf:group>
+                    <xf:group tagname="tr">
+                        <xf:group class="w2tb_th" tagname="th">
+                            <w2:textbox id="" label="number · #,###[ceil]" style=""></w2:textbox>
+                        </xf:group>
+                        <xf:group class="w2tb_td" tagname="td">
+                            <xf:input id="ibx_ceil" class="tar" ref="data:dma_num.amt" dataType="number" displayFormat="#,###[ceil]" applyFormat="display" style="width:100%;" title="number #,###[ceil]"></xf:input>
+                        </xf:group>
+                        <xf:group class="w2tb_td" tagname="td">
+                            <w2:textbox id="" label="올림. 첫째 소수 자리만 판단 — 1234.4 → 1,235 / 1234.01 → 1,234" style=""></w2:textbox>
+                        </xf:group>
+                    </xf:group>
+                    <xf:group tagname="tr">
+                        <xf:group class="w2tb_th" tagname="th">
+                            <w2:textbox id="" label="number · #,###[floor]" style=""></w2:textbox>
+                        </xf:group>
+                        <xf:group class="w2tb_td" tagname="td">
+                            <xf:input id="ibx_floor" class="tar" ref="data:dma_num.amt" dataType="number" displayFormat="#,###[floor]" applyFormat="display" style="width:100%;" title="number #,###[floor]"></xf:input>
+                        </xf:group>
+                        <xf:group class="w2tb_td" tagname="td">
+                            <w2:textbox id="" label="버림(0 방향). -1234.5 → -1,234" style=""></w2:textbox>
+                        </xf:group>
+                    </xf:group>
+                    <xf:group tagname="tr">
+                        <xf:group class="w2tb_th" tagname="th">
+                            <w2:textbox id="" label="number · #,###.## (참고)" style=""></w2:textbox>
+                        </xf:group>
+                        <xf:group class="w2tb_td" tagname="td">
+                            <xf:input id="ibx_dec2" class="tar" ref="data:dma_num.amt" dataType="number" displayFormat="#,###.##" applyFormat="display" style="width:100%;" title="number #,###.##"></xf:input>
+                        </xf:group>
+                        <xf:group class="w2tb_td" tagname="td">
+                            <w2:textbox id="" label="소수 둘째 자리까지 반올림 표시 — 정수 표시와의 비교용" style=""></w2:textbox>
+                        </xf:group>
+                    </xf:group>
+                    <xf:group tagname="tr">
+                        <xf:group class="w2tb_th" tagname="th">
+                            <w2:textbox id="" label="float · maxLength 9.3 · #,###.###[floor]" style=""></w2:textbox>
+                        </xf:group>
+                        <xf:group class="w2tb_td" tagname="td">
+                            <xf:input id="ibx_f93" class="tar" ref="data:dma_num.amt" dataType="float" maxLength="9.3" displayFormat="#,###.###[floor]" applyFormat="display" style="width:100%;" title="float maxLength 9.3 #,###.###[floor]"></xf:input>
+                        </xf:group>
+                        <xf:group class="w2tb_td" tagname="td">
+                            <w2:textbox id="" label="권장 — 입력·표시 모두 소수 3자리. 1234.5678 → 1,234.567 / 정수 10자리·소수 4자리 키 입력은 막힘(바인딩된 초과 값은 그대로 유지)" style=""></w2:textbox>
+                        </xf:group>
+                    </xf:group>
+                    <xf:group tagname="tr">
+                        <xf:group class="w2tb_th" tagname="th">
+                            <w2:textbox id="" label="float · maxLength 9.3 · #,###.##[floor]" style=""></w2:textbox>
+                        </xf:group>
+                        <xf:group class="w2tb_td" tagname="td">
+                            <xf:input id="ibx_f93d2" class="tar" ref="data:dma_num.amt" dataType="float" maxLength="9.3" displayFormat="#,###.##[floor]" applyFormat="display" style="width:100%;" title="float maxLength 9.3 #,###.##[floor]"></xf:input>
+                        </xf:group>
+                        <xf:group class="w2tb_td" tagname="td">
+                            <w2:textbox id="" label="주의 — 입력은 소수 3자리, 표시는 2자리 버림. 1234.567 을 입력하면 1,234.56 으로 보이고 저장값은 1234.567" style=""></w2:textbox>
+                        </xf:group>
+                    </xf:group>
+                </xf:group>
+            </xf:group>
+            <w2:span id="spn_inputResult" label="" style="display:block;margin:8px 0 20px;font-size:12px;color:#1c5dd9;"/>
+
+            <!-- ── gridView 비교 ── -->
+            <xf:group class="titbox" id="" style="">
+                <w2:textbox class="tit" id="" label="gridView — 컬럼별 displayFormat 비교 (셀을 편집하면 같은 행 전체에 원본 값 복사)" style="" tagname="h3"></w2:textbox>
+            </xf:group>
+            <xf:group class="btnbox" id="" style="">
+                <xf:group class="rt" id="" style="">
+                    <xf:trigger class="btn_cm" id="btn_gridReset" type="button" ev:onclick="scwin.btn_gridReset_onclick"><xf:label><![CDATA[초기화]]></xf:label></xf:trigger>
+                </xf:group>
+            </xf:group>
+            <xf:group class="grdbox" id="" style="">
+                <w2:gridView autoFit="allColumn" class="gvw row10" dataList="data:dlt_num" focusMode="row" id="grd_num"
+                    keepDefaultColumnWidth="false" rowNumHeaderValue="번호" rowNumVisible="true" rowNumWidth="60"
+                    scrollByColumn="false" style="" visibleRowNum="10" ev:onafteredit="scwin.grd_num_onafteredit">
+                    <w2:header id="header_num" style="">
+                        <w2:row id="row_numHead" style="">
+                            <w2:column displayMode="label" id="hOrg" inputType="text" value="원본 (포맷 없음)" width="140"></w2:column>
+                            <w2:column displayMode="label" id="hFlt" inputType="text" value="float #,###" width="140"></w2:column>
+                            <w2:column displayMode="label" id="hRnd" inputType="text" value="number #,###[round]" width="160"></w2:column>
+                            <w2:column displayMode="label" id="hCel" inputType="text" value="number #,###[ceil]" width="160"></w2:column>
+                            <w2:column displayMode="label" id="hFlr" inputType="text" value="number #,###[floor]" width="160"></w2:column>
+                            <w2:column displayMode="label" id="hF93" inputType="text" value="float 9.3 #,###.###[floor]" width="180"></w2:column>
+                        </w2:row>
+                    </w2:header>
+                    <w2:gBody id="gBody_num" style="">
+                        <w2:row id="row_numBody" style="">
+                            <w2:column id="org" inputType="text" width="140" textAlign="right"></w2:column>
+                            <w2:column id="flt" inputType="text" width="140" textAlign="right" dataType="float" displayFormat="#,###"></w2:column>
+                            <w2:column id="rnd" inputType="text" width="160" textAlign="right" dataType="number" displayFormat="#,###[round]"></w2:column>
+                            <w2:column id="cel" inputType="text" width="160" textAlign="right" dataType="number" displayFormat="#,###[ceil]"></w2:column>
+                            <w2:column id="flr" inputType="text" width="160" textAlign="right" dataType="number" displayFormat="#,###[floor]"></w2:column>
+                            <w2:column id="f93" inputType="text" width="180" textAlign="right" dataType="float" maxLength="9.3" displayFormat="#,###.###[floor]"></w2:column>
+                        </w2:row>
+                    </w2:gBody>
+                </w2:gridView>
+            </xf:group>
+            <w2:span id="spn_gridResult" label="" style="display:block;margin-top:8px;font-size:12px;color:#1c5dd9;"/>
+        </xf:group>
+    </body>
+</html>
