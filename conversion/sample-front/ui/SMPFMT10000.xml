@@ -21,18 +21,20 @@
                         <w2:column id="cel" name="number [ceil]" dataType="number"></w2:column>
                         <w2:column id="flr" name="number [floor]" dataType="number"></w2:column>
                         <w2:column id="f93" name="float maxLength 9.3 [floor]" dataType="number"></w2:column>
+                        <w2:column id="f93i" name="float maxLength 9.3 #,###[floor] (재현)" dataType="number"></w2:column>
+                        <w2:column id="f93a" name="float maxLength 9.3 displayFormatter (A안)" dataType="number"></w2:column>
                     </w2:columnInfo>
                 </w2:dataList>
             </w2:dataCollection>
             <w2:workflowCollection/>
         </xf:model>
         <w2:layoutInfo/>
-        <w2:publicInfo method="scwin.onpageload,scwin.btn_set1_onclick,scwin.btn_set2_onclick,scwin.btn_set3_onclick,scwin.btn_set4_onclick,scwin.btn_set5_onclick,scwin.btn_set6_onclick,scwin.btn_check_onclick,scwin.btn_gridReset_onclick,scwin.grd_num_onafteredit,scwin.setAmt,scwin.showResult,scwin.initGrid"/>
+        <w2:publicInfo method="scwin.onpageload,scwin.btn_set1_onclick,scwin.btn_set2_onclick,scwin.btn_set3_onclick,scwin.btn_set4_onclick,scwin.btn_set5_onclick,scwin.btn_set6_onclick,scwin.btn_check_onclick,scwin.btn_gridReset_onclick,scwin.grd_num_onafteredit,scwin.setAmt,scwin.showResult,scwin.initGrid,scwin.fmtIntFloor"/>
         <script lazy="false" type="text/javascript"><![CDATA[// 가이드 : 소수 데이터 정수 표시 샘플 (합성 화면 — 원본 없음)
 
 /*
  * 화면 동작
- * 1. 같은 DataMap 키(dma_num.amt)에 묶인 입력란 8개가 같은 소수 값을 각자의 displayFormat 으로 표시한다
+ * 1. 같은 DataMap 키(dma_num.amt)에 묶인 입력란 10개가 같은 소수 값을 각자의 displayFormat 으로 표시한다
  * 2. 「값 설정」 버튼으로 대표 값(1234.4 / 1234.5 / 1234.01 / -1234.5 / 1234.5678 / 123456789.123)을 넣어
  *    반올림·올림·버림 차이와 float maxLength="9.3" 소수 자리 버림 표시를 비교한다
  * 2-1. float maxLength="9.3" 입력란은 정수 9자리·소수 3자리를 넘는 키 입력을 막는다(서버에서 받은 초과 값은 자르지 않는다)
@@ -50,6 +52,13 @@
  *   · 입력 자릿수(maxLength 소수 3)와 표시 자릿수를 맞춘다. "#,###.##[floor]" 이면 1234.567 입력이 1,234.56 으로 보인다(저장값은 1234.567)
  *   · 쉼표 묶음은 쉼표 뒤 # 개수다. "#,##.##" 는 두 자리마다 쉼표(12,34.56) → 반드시 "#,###"
  *   · 자릿수 고정 표시(1,234.50)가 필요하면 # 대신 0 : "#,##0.000[floor]"
+ * - [결함 재현] float + maxLength="9.3" + displayFormat="#,###[floor]" : 버림 미적용, 원본 소수 그대로 표시(1234.5678 → 1,234.5678)
+ *   · floatFormatter 는 패턴에 소수점이 없으면 정수부만 포맷한 뒤, maxLength 소수 자리가 0 초과("9.3"·"*.*")면 원본 소수부를 다시 붙인다
+ *   · number + maxLength="9.3" 은 대안이 아니다 — number 의 maxLength 는 parseInt("9.3") = 소수점 포함 전체 9글자 제한
+ * - [A안] float + maxLength="9.3" + displayFormatter="scwin.fmtIntFloor" : 정수 9·소수 3자리 입력 제한 + 정수 버림 표시
+ *   · displayFormatter 는 formatterAdapter 로 생성되지만 기본 format() 을 거쳐 표시값↔원본 매핑이 남는다 → getValue 는 원본 소수
+ *   · 버림은 Math.trunc(0 방향) — $c.num.floor(Math.floor)는 음수가 -1234.5 → -1235 로 엔진 [floor] 와 다르다
+ *   · 저장 시점 검증으로 충분하면 B안 : number + "#,###[floor]" + validateDataCollect { num:"f", maxLengthF:"9.3" } (키 입력 제한 없음)
  * - gridView 는 셀 편집기가 포맷 없이 원본 값을 편집·저장한다 → 컬럼 applyFormat 은 지정하지 않는다
  *
  * 예약어 주의(엔진 동작)
@@ -61,7 +70,7 @@
 ///////// 1. 변수 및 선언 영역 /////////
 
 // 그리드 비교 컬럼 — 한 컬럼을 편집하면 같은 행의 나머지 컬럼에 같은 원본 값을 복사한다
-scwin.GRID_COLS = ["org", "flt", "rnd", "cel", "flr", "f93"];
+scwin.GRID_COLS = ["org", "flt", "rnd", "cel", "flr", "f93", "f93i", "f93a"];
 
 // 그리드 초기 데이터 — 반올림·올림·버림 경계 값 + 소수 4자리 이상·maxLength 9.3 한도 값
 scwin.GRID_SAMPLE = [1234.4, 1234.5, 1234.56, 1234.01, 1234.09, -1234.5, 1234.999, 1234.5678, 123456789.123];
@@ -210,7 +219,9 @@ scwin.showResult = function () {
         ["number [floor]", ibx_floor],
         ["number #,###.##", ibx_dec2],
         ["float 9.3 #,###.###[floor]", ibx_f93],
-        ["float 9.3 #,###.##[floor]", ibx_f93d2]
+        ["float 9.3 #,###.##[floor]", ibx_f93d2],
+        ["float 9.3 #,###[floor](재현)", ibx_f93int],
+        ["float 9.3 displayFormatter(A안)", ibx_f93fmt]
     ];
     const inputText = inputs.map(function (item) {
         return item[0] + " = " + item[1].getValue();
@@ -242,6 +253,32 @@ scwin.initGrid = function () {
     });
     dlt_num.setJSON(rows);
 };
+
+/**
+ * @method
+ * @name scwin.fmtIntFloor
+ * @author Inswave
+ * @date 2026. 10. 21
+ * @description [A안] displayFormatter — 소수부를 버리고(0 방향) 천 단위 쉼표를 붙여 표시한다. displayFormat [floor] 와 같은 결과.
+ *              float + maxLength="9.3" 과 함께 쓰면 정수 9·소수 3자리 입력 제한을 유지하면서 정수만 표시한다.
+ * @param {String} value 원본 값
+ * @returns {String} 표시 문자열 (빈 값은 "", 숫자가 아니면 원본 그대로)
+ * @hidden N
+ * @example
+ * <xf:input dataType="float" maxLength="9.3" applyFormat="display" displayFormatter="scwin.fmtIntFloor"/>
+ * scwin.fmtIntFloor("1234.5678"); // "1,234"
+ * scwin.fmtIntFloor("-1234.567"); // "-1,234"
+*/
+scwin.fmtIntFloor = function (value) {
+    if (value === "" || value === null || value === undefined) {
+        return "";
+    }
+    const num = Number(value);
+    if (isNaN(num)) {
+        return value;
+    }
+    return $c.num.formatMoney(String(Math.trunc(num)));
+};
 ]]></script>
     </head>
 
@@ -252,6 +289,7 @@ scwin.initGrid = function () {
             <w2:textbox class="txt_info" id="" label="반올림·올림·버림은 dataType=&quot;number&quot; + displayFormat=&quot;#,###[round|ceil|floor]&quot; 로 선택합니다(생략 시 [round]). dataType=&quot;float&quot; 은 예약어를 무시하고 항상 버림으로 표시합니다." style="" tagname=""></w2:textbox>
             <w2:textbox class="txt_info red" id="" label="input 은 applyFormat=&quot;display&quot; 필수, 정수만 표시하는 float 에는 소수 자릿수 maxLength 를 주지 않습니다. [ceil] 은 첫째 소수 자리만 보므로 1234.01 → 1,234 입니다." style="" tagname=""></w2:textbox>
             <w2:textbox class="txt_info" id="" label="소수 자리까지 버림 표시 + 입력 자릿수 제한이 필요하면 dataType=&quot;float&quot; maxLength=&quot;9.3&quot; displayFormat=&quot;#,###.###[floor]&quot; 를 씁니다(정수 9·소수 3자리 입력 제한). 표시 소수 자릿수는 displayFormat 이 정하므로 maxLength 와 맞추고, 쉼표 묶음은 &quot;#,###&quot; 로 씁니다(&quot;#,##&quot; 는 두 자리마다 쉼표)." style="" tagname=""></w2:textbox>
+            <w2:textbox class="txt_info red" id="" label="[결함] float + maxLength=&quot;9.3&quot; + displayFormat=&quot;#,###[floor]&quot; 는 버림이 적용되지 않고 원본 소수가 그대로 보입니다(1234.5678 → 1,234.5678). 입력 제한과 정수 버림 표시가 모두 필요하면 [A안] displayFormat 대신 displayFormatter=&quot;scwin.fmtIntFloor&quot;(Math.trunc 버림)를 씁니다." style="" tagname=""></w2:textbox>
 
             <!-- ── input 비교 ── -->
             <xf:group class="titbox" id="" style="">
@@ -369,6 +407,28 @@ scwin.initGrid = function () {
                             <w2:textbox id="" label="주의 — 입력은 소수 3자리, 표시는 2자리 버림. 1234.567 을 입력하면 1,234.56 으로 보이고 저장값은 1234.567" style=""></w2:textbox>
                         </xf:group>
                     </xf:group>
+                    <xf:group tagname="tr">
+                        <xf:group class="w2tb_th" tagname="th">
+                            <w2:textbox id="" label="[재현] float · maxLength 9.3 · #,###[floor]" style=""></w2:textbox>
+                        </xf:group>
+                        <xf:group class="w2tb_td" tagname="td">
+                            <xf:input id="ibx_f93int" class="tar" ref="data:dma_num.amt" dataType="float" maxLength="9.3" displayFormat="#,###[floor]" applyFormat="display" style="width:100%;" title="float maxLength 9.3 #,###[floor]"></xf:input>
+                        </xf:group>
+                        <xf:group class="w2tb_td" tagname="td">
+                            <w2:textbox id="" label="결함 — 버림 미적용. 1234.5678 → 1,234.5678 (maxLength 소수 자리가 0 초과면 floatFormatter 가 원본 소수부를 다시 붙임)" style="color:#c0392b;"></w2:textbox>
+                        </xf:group>
+                    </xf:group>
+                    <xf:group tagname="tr">
+                        <xf:group class="w2tb_th" tagname="th">
+                            <w2:textbox id="" label="[A안] float · maxLength 9.3 · displayFormatter" style=""></w2:textbox>
+                        </xf:group>
+                        <xf:group class="w2tb_td" tagname="td">
+                            <xf:input id="ibx_f93fmt" class="tar" ref="data:dma_num.amt" dataType="float" maxLength="9.3" displayFormatter="scwin.fmtIntFloor" applyFormat="display" style="width:100%;" title="float maxLength 9.3 displayFormatter scwin.fmtIntFloor"></xf:input>
+                        </xf:group>
+                        <xf:group class="w2tb_td" tagname="td">
+                            <w2:textbox id="" label="해결 — 정수 9·소수 3자리 입력 제한 + 정수 버림 표시. 1234.5678 → 1,234 / -1234.567 → -1,234 (getValue 는 원본 소수)" style="color:#0a7a52;"></w2:textbox>
+                        </xf:group>
+                    </xf:group>
                 </xf:group>
             </xf:group>
             <w2:span id="spn_inputResult" label="" style="display:block;margin:8px 0 20px;font-size:12px;color:#1c5dd9;"/>
@@ -394,6 +454,8 @@ scwin.initGrid = function () {
                             <w2:column displayMode="label" id="hCel" inputType="text" value="number #,###[ceil]" width="160"></w2:column>
                             <w2:column displayMode="label" id="hFlr" inputType="text" value="number #,###[floor]" width="160"></w2:column>
                             <w2:column displayMode="label" id="hF93" inputType="text" value="float 9.3 #,###.###[floor]" width="180"></w2:column>
+                            <w2:column displayMode="label" id="hF93i" inputType="text" value="[재현] float 9.3 #,###[floor]" width="180"></w2:column>
+                            <w2:column displayMode="label" id="hF93a" inputType="text" value="[A안] float 9.3 displayFormatter" width="180"></w2:column>
                         </w2:row>
                     </w2:header>
                     <w2:gBody id="gBody_num" style="">
@@ -404,6 +466,8 @@ scwin.initGrid = function () {
                             <w2:column id="cel" inputType="text" width="160" textAlign="right" dataType="number" displayFormat="#,###[ceil]"></w2:column>
                             <w2:column id="flr" inputType="text" width="160" textAlign="right" dataType="number" displayFormat="#,###[floor]"></w2:column>
                             <w2:column id="f93" inputType="text" width="180" textAlign="right" dataType="float" maxLength="9.3" displayFormat="#,###.###[floor]"></w2:column>
+                            <w2:column id="f93i" inputType="text" width="180" textAlign="right" dataType="float" maxLength="9.3" displayFormat="#,###[floor]"></w2:column>
+                            <w2:column id="f93a" inputType="text" width="180" textAlign="right" dataType="float" maxLength="9.3" displayFormatter="scwin.fmtIntFloor"></w2:column>
                         </w2:row>
                     </w2:gBody>
                 </w2:gridView>
