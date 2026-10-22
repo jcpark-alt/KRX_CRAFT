@@ -52,7 +52,8 @@ PYTHONUTF8=1 python conversion/tools/publish_gate.py --rev HEAD <수정한 xml> 
 | 다단 배치 | `xf:group.lybox` > `xf:group.col_N` > `xf:group.tblbox` > table |
 | 표 | `xf:group tagname="table" class="w2tb tbl"` + `w2:attributes/w2:summary`, **colgroup 직속 col 수 = 각 행 실제 칸 수**(colspan/rowspan 은 `w2:attributes/w2:colspan`·`w2:rowspan`), th 는 `class="w2tb_th"` + `w2:scope row`, td 는 `class="w2tb_td"` |
 | 그리드 | `xf:group.gvwbox` > `w2:gridView class="gvw rowN" dataList="data:dlt_*"` — gBody column id = dataList 컬럼 id |
-| 탭 | host 는 `xf:group.tbcbox` > `w2:tabControl` > `w2:content` > `w2:pageFrame src` |
+| 탭 | host 는 `xf:group.tbcbox` > `w2:tabControl` > `w2:content` > `w2:pageFrame src`. 선택 탭 속성은 엔진 옵션명 `selectedIndex`(`selectedTabIndex` 는 엔진이 읽지 않음) |
+| 탭 안의 탭 | 탭 본문(`w2:content`) 안에 다시 두는 하위 tabControl 도 상단 탭과 **같은 형태** — `xf:group.tbcbox` > `w2:tabControl class="tbc"`. `tbc_sub`(template 4_02 서브탭, 밑줄형)로 바꾸지 않는다(요청자 확정 2026-10-22). `tbcbox` 래퍼를 빼면 `.tbc::before` 테두리 오버레이가 바깥 탭 기준으로 붙어 깨진다 |
 | contentHeader | windowContainer 로 여는 화면(host)에는 넣고, **tabControl 탭 본문에는 넣지 않는다** |
 | 속성명 | `readOnly`(대문자 O) — `readonly` 는 무시된다 |
 
