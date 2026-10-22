@@ -160,7 +160,7 @@
 </xf:group>
 ```
 - 높이 class `rowN` 은 **`row5`·`row10`·`row15`·`row20`·`row25` 만** CSS 가 있고(`cm/css/base.css` `.gvwbox .w2grid.rowN`), `gvwbox` 안에서만 먹는다. 그 밖의 행 수는 class 없이 `visibleRowNum` 으로 맞춘다.
-- 감싸는 group 은 `gvwbox` 다. `grdbox` 는 CSS 가 없다(SMPDLT10000·SMPFMT10000·SMPVAL10000 이 잘못 쓰고 있음).
+- 감싸는 group 은 `gvwbox` 다. `grdbox` 는 CSS 가 없다(SMPDLT10000·SMPFMT10000·SMPVAL10000 에 있던 것을 2026-10-22 정정).
 - 컬럼 id 는 dataList 컬럼 id 와 같게, 날짜 컬럼은 `dataType="date" displayFormat="yyyy-MM-dd"`, 숫자 컬럼은 `textAlign="right"` + `displayFormat`.
 
 ### 5.3 페이징 「6_03 페이지리스트」 (11)
@@ -195,12 +195,12 @@
 
 ## 8. 쓰지 않는 class·속성 (CSS·엔진이 인식하지 않음)
 
-| 쓰지 말 것 | 대신 | 발견 위치 |
+| 쓰지 말 것 | 대신 | 있던 위치 (2026-10-22 정정 완료) |
 |---|---|---|
 | `grdbox` | `gvwbox` | SMPDLT10000·SMPFMT10000·SMPVAL10000 |
 | `row3`·`row4`·`row6` 등 5/10/15/20/25 외 `rowN` | class 없이 `visibleRowNum` | ULDSTF05927~29·ULDSTF92024 |
-| `w95`·`w520` | 인라인 `style="width:…"` 또는 colgroup 폭 | JLDFIL05013C·JLDFIL05012C |
-| `selectedTabIndex` | `selectedIndex` | JLDFIL05012 |
+| `w95`·`w520` 같은 폭 class (CSS 에 `wNN` 폭 class 없음) | 인라인 `style="width:…"` 또는 colgroup 폭 | JLDFIL05013C(→ 120px, 같은 표 입력칸 폭)·JLDFIL05012C(→ 100%, 같은 표 위 칸 폭) |
+| `selectedTabIndex` | `selectedIndex` | JLDFIL05012·JLDFIL05012C |
 | `readonly`(소문자) | `readOnly` | (P02 가 차단) |
 | `userData2`·`hierarchy`·`orgid`·`comp_par_seqId` | 옮기지 않음(W-Craft 잔여) | stf·fil 보조 샘플 다수 |
 
