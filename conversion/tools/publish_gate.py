@@ -12,6 +12,8 @@
   [3] markup    P01 colgroup 열 수 = 행의 실제 칸 수(colspan/rowspan 점유 격자)
                 P02 속성명 대소문자(readonly → readOnly)
                 P03 tabControl 탭 본문에 contentHeader 금지(host 의 w2:content>pageFrame src 로 판정)
+                P04 body 의 class 가 cm/css/*.css 에 정의 없음 — 경고(화면 효과 없는 class·오타 감지,
+                    스크립트 훅 class 처럼 의도된 것이면 리뷰 후 그대로 둔다)
   [4] preserve  (--rev/--before 가 있을 때) 작업 전 대비
                 P10 ref 바인딩 누락 · P11 ev:on* 핸들러 누락 · P12 라벨 텍스트 누락 — 실패
                 P13 컴포넌트 id 누락 — 경고
@@ -52,6 +54,9 @@ CONTENT_HEADER_RE = re.compile(r'contentHeader\.xml$', re.I)
 # P23(새 요소 종류)에서 빼는 레이아웃·표 마크업 — 퍼블리싱 재배치로 늘어나는 게 정상인 요소
 LAYOUT_KINDS = {"group", "attributes", "summary", "scope", "colspan", "rowspan", "caption", "textbox", "label"}
 MARKUP_CODES = ("P01", "P02", "P03")
+CSS_DIR = st.ROOT / "cm" / "css"
+CSS_CLASS_RE = re.compile(r'\.(-?[A-Za-z_][\w-]*)')
+_CSS_CACHE = {}
 PRESERVE_CODES = ("P10", "P11", "P12", "P20", "P21")
 
 
@@ -206,6 +211,37 @@ def check_tab_content_header(root, path, tab_bodies):
             for pf in root.iter(W2 + "pageFrame") if CONTENT_HEADER_RE.search(pf.get("src") or "")]
 
 
+def css_classes(css_dir=CSS_DIR):
+    """css_dir 의 *.css 에서 선택자로 쓰인 class 이름 집합(주석 제외). 폴더가 없으면 None(검사 생략)."""
+    key = str(css_dir)
+    if key not in _CSS_CACHE:
+        files = sorted(Path(css_dir).glob("*.css")) if Path(css_dir).is_dir() else []
+        if not files:
+            _CSS_CACHE[key] = None
+        else:
+            text = "".join(f.read_text(encoding="utf-8", errors="replace") for f in files)
+            _CSS_CACHE[key] = set(CSS_CLASS_RE.findall(re.sub(r'/\*.*?\*/', "", text, flags=re.S)))
+    return _CSS_CACHE[key]
+
+
+def check_css_classes(root, defined=None):
+    """P04 — body 요소의 class 중 CSS 정의가 없는 것(경고). class 마다 한 줄, 줄 번호를 모아 보인다."""
+    defined = css_classes() if defined is None else defined
+    body = root.find("h:body", NS)
+    if defined is None or body is None:
+        return []
+    lines = {}
+    for el in body.iter():
+        if not isinstance(el.tag, str):
+            continue
+        for c in (el.get("class") or "").split():
+            if c not in defined:
+                lines.setdefault(c, []).append(el.sourceline)
+    return ["P04 class '%s' — cm/css 에 정의 없음(화면 효과 없음) %s" % (
+        c, ", ".join("L%d" % ln for ln in ls[:6]) + (" …(+%d)" % (len(ls) - 6) if len(ls) > 6 else ""))
+        for c, ls in sorted(lines.items())]
+
+
 # ---------------------------------------------------------------- [4][5] 작업 전 대비
 def inventory(root):
     refs, handlers, labels, ids, kinds, ext = Counter(), Counter(), Counter(), set(), set(), []
@@ -325,7 +361,7 @@ def check_file(path, before_text=None, tab_bodies=(), lint=True, gate=True, node
         return res
     cg_fails, cg_warns = check_colgroup(root)
     res["fails"].extend(cg_fails + check_attr_case(root) + check_tab_content_header(root, str(path), tab_bodies))
-    res["warns"].extend(cg_warns)
+    res["warns"].extend(cg_warns + check_css_classes(root))
     if before_text is not None:
         f, w = compare(parse(before_text), root)
         res["fails"].extend(f)

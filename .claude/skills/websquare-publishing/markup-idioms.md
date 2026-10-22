@@ -205,3 +205,4 @@
 | `userData2`·`hierarchy`·`orgid`·`comp_par_seqId` | 옮기지 않음(W-Craft 잔여) | stf·fil 보조 샘플 다수 |
 
 - 새 class 를 쓰기 전에 `cm/css/base.css`·`contents.css` 에 정의가 있는지 확인한다: `grep -n "\.클래스명" cm/css/*.css`.
+- `publish_gate.py` 가 정의 없는 class 를 **P04 경고**로 알린다(class 마다 한 줄 + 줄 번호). 오타·무효 class 면 고치고, 스크립트 훅처럼 의도한 class 면 보고에 사유를 남긴다.

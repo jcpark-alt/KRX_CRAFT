@@ -29,10 +29,10 @@ description: WebSquare 화면 XML 에 퍼블리싱(화면 캡처·KRX 퍼블리�
 PYTHONUTF8=1 python conversion/tools/publish_gate.py --rev HEAD <수정한 xml> ...
 ```
 - 신규 화면(이전 버전 없음)은 `--rev` 없이 실행한다(보존·범위 검사는 자동 생략).
-- 단계: lint(`wsxml_lint` 0/0) → gate(`gate_screen.py`) → markup(P01 colgroup·P02 속성 대소문자·P03 탭 본문 contentHeader) → preserve/scope(P10~P13 보존, P20~P24 범위).
+- 단계: lint(`wsxml_lint` 0/0) → gate(`gate_screen.py`) → markup(P01 colgroup·P02 속성 대소문자·P03 탭 본문 contentHeader·P04 CSS 미정의 class 경고) → preserve/scope(P10~P13 보존, P20~P24 범위).
 - **FAIL 이 하나라도 있으면 반영하지 않는다.** 원인을 고쳐 다시 돌린다.
 - `--allow <코드>` 는 요청자가 승인한 변경에만 쓴다(예: 캡처 문구대로 라벨 교체 → `P12`, 로직 변경 승인 → `P11,P20`). 쓴 경우 보고에 근거를 적는다.
-- WARN(P13 id 누락, P22 스크립트 변경, P23 새 컴포넌트, P24 바인딩·핸들러 추가)은 하나씩 의도된 것인지 확인하고 보고에 남긴다.
+- WARN(P04 CSS 미정의 class, P13 id 누락, P22 스크립트 변경, P23 새 컴포넌트, P24 바인딩·핸들러 추가)은 하나씩 의도된 것인지 확인하고 보고에 남긴다.
 
 ### ⑤ 리뷰
 - `websquare-code-reviewer` 에이전트로 변경분을 리뷰한다.

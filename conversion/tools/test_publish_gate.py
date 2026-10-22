@@ -4,7 +4,7 @@
 실행:
     pytest conversion/tools/test_publish_gate.py
 
-markup(P01~P03)·보존(P10~P13)·범위(P20~P24)·--allow 의 판정만 고정한다(lint/gate_screen 단계는 각 도구 테스트 소관).
+markup(P01~P04)·보존(P10~P13)·범위(P20~P24)·--allow 의 판정만 고정한다(lint/gate_screen 단계는 각 도구 테스트 소관).
 """
 import os
 import sys
@@ -96,6 +96,45 @@ def test_tab_body_content_header(tmp_path):
     assert len(pg.check_tab_content_header(pg.parse(body), str(tmp_path / "BODY.xml"), names)) == 1
     # host 자체(탭 본문 아님)는 contentHeader 를 가져도 된다
     assert pg.check_tab_content_header(pg.parse(body), str(host), names) == []
+
+
+# ---------------------------------------------------------------- P04 CSS 미정의 class
+DEFINED = {"gvwbox", "gvw", "row10", "btn_cm", "pt"}
+
+
+def test_css_class_undefined_warns_once_per_class():
+    body = ('<xf:group class="grdbox"><w2:gridView id="g1" class="gvw row4"/></xf:group>'
+            '<xf:group class="grdbox"/><xf:trigger id="b" class="btn_cm pt"/>')
+    w = pg.check_css_classes(pg.parse(doc(body)), DEFINED)
+    assert [x.split("'")[1] for x in w] == ["grdbox", "row4"]
+    assert all(x.startswith("P04") for x in w)
+    assert w[0].count("L") >= 2   # grdbox 두 곳의 줄 번호를 한 줄에 모은다
+
+
+def test_css_class_all_defined_no_warning():
+    body = '<xf:group class="gvwbox"><w2:gridView id="g1" class="gvw row10"/></xf:group>'
+    assert pg.check_css_classes(pg.parse(doc(body)), DEFINED) == []
+
+
+def test_css_class_head_ignored_and_missing_css_skips():
+    head = '<w2:dataMap id="dma" class="nope"/>'
+    assert pg.check_css_classes(pg.parse(doc("", head=head)), DEFINED) == []
+    assert pg.css_classes(os.path.join(_HERE, "__no_such_css_dir__")) is None
+
+
+def test_css_class_rules_parsed(tmp_path):
+    (tmp_path / "a.css").write_text("/* .commented {} */\n.gvwbox .w2grid.row5 {height:1px}\n.btn_cm:hover, .pt {color:red}\n",
+                                    encoding="utf-8")
+    got = pg.css_classes(tmp_path)
+    assert {"gvwbox", "w2grid", "row5", "btn_cm", "pt"} <= got and "commented" not in got
+
+
+def test_css_class_warning_does_not_fail_markup(tmp_path):
+    f = tmp_path / "A.xml"
+    f.write_text(doc('<xf:group class="definitely_not_a_css_class_xyz"/>'), encoding="utf-8")
+    res = pg.check_file(str(f), lint=False, gate=False)
+    assert res["fails"] == [] and res["stages"]["markup"] == "OK"
+    assert any(x.startswith("P04 class 'definitely_not_a_css_class_xyz'") for x in res["warns"])
 
 
 # ---------------------------------------------------------------- 보존 / 범위
