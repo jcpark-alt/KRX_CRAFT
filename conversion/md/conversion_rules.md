@@ -701,6 +701,12 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
 * **P1 확장(헤더 표준, 사용자 확정 2026-10-06)**: 본화면(`sub_contents`)은 `pfmContentHeader` pageFrame 을 첫 자식으로 보장(없으면 추가 `P1_pageframe_added`),
   팝업(`pop_contents`)은 pageFrame 제거(`P1_pageframe_removed`). 퍼블리싱 관례(본화면 pgtbox 658/648, 팝업 헤더 없음 607/5)와 sample-front 혼재를 하나로 묶은 결정. 멱등.
   **2026-10-23 변경(사용자 지시)**: 팝업도 contentHeader 필수 — 팝업(`pop_contents`)도 본화면과 같이 pageFrame 을 유지하고 없으면 첫 자식으로 추가(`P1_pageframe_added`). `P1_pageframe_removed` 폐기.
+
+* **P12(2026-10-23 추가, 사용자 지시)**: 팝업 「닫기」·「창닫기」 버튼 삭제(팝업 창의 닫기를 쓴다). 핸들러가 **순수 닫기**
+  (try/catch 를 걷으면 `$c.win.closePopup()` 인자 없음 한 문장, 인자 없는 함수 한 번 호출이면 한 단계 따라감)이거나 핸들러가 없을 때만 지우고,
+  비게 된 `rt`/`lt`/`btnbox` 도 지운다(빈 table 은 이어지는 P4). 남기는 경우(`P12_close_kept`): 부모 화면 갱신(`close_pop` 의 `setPageFrameSrc`)·
+  opener 표지(`cancel`/`close` 의 `calcelYn`) 등 다른 일을 하는 닫기, 제목줄(`titbox`) 닫기, 스크립트가 id 를 참조하는 닫기. 핸들러 함수는 스크립트에 남는다.
+  2026-10-23 ui-tobe 팝업 128본 실측(dry): 삭제 72(70본)·유지 19.
   소급은 `publish_normalize.py <폴더>` 제자리 재실행(2026-10-06 jsp-front `ui-tobe` 966본 적용, 그 밖의 P 규칙 변경 0).
 
 * sample-front 가이드 골격으로 접는 1:1 구조 치환만 한다. P1 `pgtbox`(제목+breadcrumb) → `w2:pageFrame contentHeader` ·

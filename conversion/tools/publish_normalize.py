@@ -19,6 +19,10 @@
   P10 `xf:trigger` 인라인 style 삭제, class 없으면 `btn_cm`, type 없으면 `button`
   P11 생성 id(`td_16`·`tr_63`·`colgroup_10`·`div_24`·`txt_text89`·`label_12` …) 중 스크립트가 참조하지 않는 것은 `id=""`
       (스크립트 본문에 그 id 문자열이 한 번이라도 나오면 보존 — init_attrReals 의 `td_16`·`ul_186` 류가 여기에 걸린다)
+  P12 팝업(`pop_contents`) 「닫기」 버튼 삭제(사용자 지시 2026-10-23 — 팝업 창의 닫기를 쓴다). 핸들러가 순수 닫기
+      (`$c.win.closePopup()` 인자 없음 한 문장, 인자 없는 함수 호출이면 한 단계 따라감)이거나 핸들러가 없을 때만.
+      부모 갱신·opener 표지 등 다른 일을 하는 닫기·제목줄(titbox) 닫기·스크립트가 id 를 참조하는 닫기는 남긴다(`P12_close_kept`).
+      비게 된 `rt`/`lt`/`btnbox` 도 지운다. 핸들러 함수는 스크립트에 그대로 남는다(head·script 무변경 원칙)
 
 lxml 왕복으로 `<x></x>` 가 `<x/>` 로, 속성 안 `>` 가 `&gt;` 로 바뀐다(의미 동일). head·script 영역은 텍스트 그대로 둔다.
 """
@@ -204,6 +208,73 @@ def p3_meta(body, log):
     log["P3_meta_removed"] = n
 
 
+CLOSE_LABELS = {"닫기", "창닫기"}
+PURE_CLOSE_RE = re.compile(r'^(?:await\s+)?\$c\.win\.closePopup\(\s*\)$')
+CALL_RE = re.compile(r'^(?:await\s+)?(?:scwin\.)?([\w$]+)\(\s*\)$')
+TRY_RE = re.compile(r'^try\s*\{([^{}]*)\}\s*catch\s*\(\s*[\w$]*\s*\)\s*\{.*\}$', re.S)
+
+
+def _trigger_label(t):
+    lb = t.find("{%s}label" % XF)
+    return re.sub(r"\s+", "", "".join(lb.itertext())) if lb is not None else ""
+
+
+def _pure_close(name, funcs, depth=0):
+    """scwin.<name> 본문이 try/catch 를 걷어내면 `$c.win.closePopup()`(인자 없음) 한 문장뿐인가.
+    인자 없는 함수 한 번 호출이면 그 함수를 한 단계 더 따라간다(`scwin.close()` → closePopup)."""
+    body = funcs.get(name)
+    if body is None or depth > 2:
+        return False
+    body = body.strip()
+    m = TRY_RE.match(body)
+    if m:
+        body = m.group(1)
+    stmts = [s.strip() for s in body.split(";") if s.strip()]
+    if len(stmts) != 1:
+        return False
+    if PURE_CLOSE_RE.match(stmts[0]):
+        return True
+    c = CALL_RE.match(stmts[0])
+    return bool(c) and _pure_close(c.group(1), funcs, depth + 1)
+
+
+def p12_popup_close(body, script, log):
+    """팝업(pop_contents)의 「닫기」 버튼 삭제(퍼블리싱 규칙, 사용자 지시 2026-10-23 — 팝업 창의 닫기를 쓴다).
+    핸들러가 순수 닫기(closePopup 인자 없음)이거나 핸들러가 없을 때만 지운다. 부모 갱신·opener 표지 등
+    다른 일을 하는 닫기, 제목줄(titbox)의 닫기, 스크립트가 id 를 참조하는 닫기는 남기고 P12_close_kept 로 센다.
+    비게 된 rt/lt/btnbox 는 함께 지운다(빈 table 은 뒤의 P4 가 지운다)."""
+    removed = kept = 0
+    top = next((g for g in body.iter(GROUP) if _has_class(g, "pop_contents")), None)
+    if top is None:
+        log["P12_close_removed"] = 0
+        return
+    funcs = {name: script[b + 1:e] for name, _s, b, e, _a in st.func_spans(script)}
+    for t in list(top.iter(TRIGGER)):
+        if _trigger_label(t) not in CLOSE_LABELS or t.getparent() is None:
+            continue
+        if _ancestor_has_class(t, ("titbox",)):
+            kept += 1; continue
+        tid = t.get("id") or ""
+        if tid and _referenced(tid, script):
+            kept += 1; continue
+        oc = t.get("{%s}onclick" % EV)
+        if oc is not None and oc.strip():
+            m = re.match(r'^\s*scwin\.([\w$]+)', oc)
+            if not m or not _pure_close(m.group(1), funcs):
+                kept += 1; continue
+        par = t.getparent()
+        _remove(t); removed += 1
+        while (par is not None and par.tag == GROUP and par.getparent() is not None
+               and any(_has_class(par, c) for c in ("rt", "lt", "btnbox"))
+               and len(par) == 0 and not (par.text or "").strip()):
+            gp = par.getparent()
+            _remove(par)
+            par = gp
+    log["P12_close_removed"] = removed
+    if kept:
+        log["P12_close_kept"] = kept
+
+
 def p4_spacers(body, script, log):
     n = 0
     for g in list(body.iter(GROUP)):
@@ -362,6 +433,7 @@ def normalize_body(body_text, script):
     p1_pageframe(body, log)
     p2_unwrap_containers(body, script, log)
     p3_meta(body, log)
+    p12_popup_close(body, script, log)  # P4 앞 — 닫기만 들었던 table 이 비면 P4 가 간격 표로 지운다
     p4_spacers(body, script, log)
     p7_grid(body, log)        # 그리드를 먼저 감싸야 P5 가 「다음 형제가 그리드」를 볼 수 있다
     p5_button_rows(body, log)

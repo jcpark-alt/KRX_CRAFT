@@ -660,6 +660,34 @@ def test_p1_header_standard():
     assert out4.count("pfmContentHeader") == 1 and "pgtbox" not in out4
 
 
+def test_p12_popup_close():
+    """팝업 「닫기」: 순수 닫기·핸들러 없음은 지우고(빈 rt/btnbox 도), 다른 일을 하는 닫기·titbox 닫기·본화면 닫기는 남긴다."""
+    script = ("scwin.btn_close_onclick = function(e){\n    try {\n        scwin.close()\n\n    } catch (_ex) { $c.exception.handleError(_ex, { context: 'x' }); }\n};\n"
+              "scwin.close = function () {\n    $c.win.closePopup();\n};\n"
+              "scwin.btn_cancel_onclick = async function () {\n    await $c.win.closePopup();\n};\n"
+              "scwin.btn_pop_onclick = function () {\n    try { scwin.close_pop() } catch (_ex) { $c.exception.handleError(_ex, {}); }\n};\n"
+              "scwin.close_pop = function () {\n    $c.win.setPageFrameSrc(null, '/a.xml', {});\n    $c.win.closePopup();\n};\n")
+    trig = '<xf:trigger class="btn_cm" ev:onclick="scwin.%s" id="%s" type="button"><xf:label><![CDATA[%s]]></xf:label></xf:trigger>'
+    pop = ('<body><xf:group class="pop_contents" id="">'
+           '<xf:group class="titbox" id=""><w2:textbox id="" label="t" tagname="h3"/><xf:group class="rt" id="">' + trig % ("btn_cancel_onclick", "btn_top", "닫기") + '</xf:group></xf:group>'
+           '<xf:group class="btnbox" id=""><xf:group class="rt" id="">' + trig % ("btn_close_onclick", "btn_close", "닫 기") + '</xf:group></xf:group>'
+           '<xf:group class="btnbox" id="b2"><xf:group class="rt" id="">' + trig % ("btn_save_onclick", "btn_save", "저장")
+           + trig % ("btn_cancel_onclick", "btn_cancel", "닫기") + trig % ("btn_pop_onclick", "btn_pop", "닫기")
+           + '<xf:trigger class="btn_cm" id="" type="button"><xf:label><![CDATA[창닫기]]></xf:label></xf:trigger>'
+           '</xf:group></xf:group></xf:group></body>')
+    out, log = pn.normalize_body(pop, script)
+    assert log["P12_close_removed"] == 3 and log["P12_close_kept"] == 2
+    assert 'id="btn_close"' not in out and 'id="btn_cancel"' not in out and "창닫기" not in out  # 순수 닫기(한 단계 따라감)·await·핸들러 없음
+    assert 'id="btn_pop"' in out and 'id="btn_top"' in out and 'id="btn_save"' in out   # 부모 갱신하는 닫기·제목줄 닫기·다른 버튼은 유지
+    assert out.count('class="btnbox"') == 1   # 닫기만 들었던 btnbox 는 rt 와 함께 사라진다
+    out2, log2 = pn.normalize_body(out, script)
+    assert out2 == out and log2["P12_close_removed"] == 0   # 멱등
+    out3, log3 = pn.normalize_body(pop, script + 'scwin.lock = function () { $c.util.setButtonState({ disabled: ["btn_close"] }); };\n')
+    assert 'id="btn_close"' in out3 and log3["P12_close_kept"] == 3  # 스크립트가 id 를 참조하면 유지
+    out4, _ = pn.normalize_body(pop.replace("pop_contents", "sub_contents"), script)
+    assert 'id="btn_close"' in out4   # 본화면은 대상 아님
+
+
 def test_publish_merge_match_canon_and_grid_similarity():
     """뜻 토큰(조회↔icon:search)·그리드 닮음(번호 컬럼 차이)·같은 키 개수 다름(앞에서부터) 으로 잇는다."""
     pub = ('<body><xf:group class="sub_contents" id=""><xf:group class="titbox" id=""><xf:group class="rt" id="">'
