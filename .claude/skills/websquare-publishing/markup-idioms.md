@@ -31,14 +31,16 @@
 	…
 </xf:group>
 
-<!-- 팝업 (54) : contentHeader 없음 -->
+<!-- 팝업 (54) : contentHeader 필수(2026-10-23 확정), 하단 「닫기」 버튼 없음 -->
 <xf:group class="pop_contents" id="" meta_componentContainer="true" style="">
+	<w2:pageFrame id="pfmContentHeader" src="/cm/xml/contentHeader.xml" style="" />
 	…
-	<xf:group class="btnbox" id="" style="">…</xf:group>   <!-- 3절 팝업 하단 버튼 -->
+	<xf:group class="btnbox" id="" style="">…</xf:group>   <!-- 3절 팝업 하단 버튼(닫기 제외). 남는 버튼이 없으면 btnbox 도 두지 않음 -->
 </xf:group>
 ```
 
-- 팝업에 contentHeader 를 넣은 샘플 18본은 표준(본화면 필수·팝업 없음, tabControl 탭 본문은 넣지 않음)과 어긋난 것이다. 베끼지 않는다.
+- **contentHeader 는 본화면과 팝업 모두 필수**이고, tabControl 탭 본문에만 넣지 않는다. 2026-10-23 에 종전 "팝업 없음" 표준을 바꿨다 — 팝업에 contentHeader 가 없는 샘플(약 36본)은 옛 표준이라 그 부분은 베끼지 않는다(18본은 이미 새 표준과 같다).
+- **팝업 하단에 「닫기」 버튼을 넣지 않는다**(팝업 창의 닫기를 쓴다). 샘플·캡처에 있는 닫기 버튼도 옮기지 않는다.
 
 ## 2. 조회조건 「3_01 조회조건1행」「3_02 조회조건2행」 (38)
 
@@ -67,7 +69,7 @@
 
 | class | 용도 | 예 |
 |---|---|---|
-| `btn_cm` | 모든 텍스트 버튼의 기본 (108) | 닫기, 취소 |
+| `btn_cm` | 모든 텍스트 버튼의 기본 (108) | 취소, 초기화 (팝업 「닫기」는 만들지 않음 — 3.2) |
 | `btn_cm pt` | 주요 동작 — 저장·확인·등록·접수 (62) | 저장 |
 | `btn_cm sch` | 조회조건의 조회 버튼 (36) | 조회 |
 | `btn_cm download` / `upload` | 엑셀·파일 내려받기 / 올리기 (25 / 9) | 엑셀다운로드 |
@@ -78,11 +80,12 @@
 ### 3.2 버튼 영역
 
 ```xml
-<!-- 화면·팝업 하단 「8_04 전체제어버튼」「8_05 팝업전체제어버튼」 : 주요 버튼(pt)을 맨 오른쪽(마지막)에 -->
+<!-- 화면·팝업 하단 「8_04 전체제어버튼」「8_05 팝업전체제어버튼」 : 주요 버튼(pt)을 맨 오른쪽(마지막)에.
+     팝업은 「닫기」 버튼을 넣지 않는다(팝업 창의 닫기 사용). 남는 버튼이 없으면 btnbox 자체를 생략 -->
 <xf:group class="btnbox" id="" style="">
 	<xf:group class="lt" id="" style="">…</xf:group>          <!-- 왼쪽 버튼이 있을 때만 -->
 	<xf:group class="rt" id="" style="">
-		<xf:trigger class="btn_cm" id="btn_close" type="button"><xf:label><![CDATA[닫기]]></xf:label></xf:trigger>
+		<xf:trigger class="btn_cm" id="btn_reset" type="button"><xf:label><![CDATA[초기화]]></xf:label></xf:trigger>
 		<xf:trigger class="btn_cm pt" id="btn_save" type="button"><xf:label><![CDATA[저장]]></xf:label></xf:trigger>
 	</xf:group>
 </xf:group>

@@ -48,7 +48,7 @@ PYTHONUTF8=1 python conversion/tools/publish_gate.py --rev HEAD <수정한 xml> 
 | 대상 | 규칙 |
 |---|---|
 | head | `meta_screenId`·`meta_screenName` 유지, `<w2:publicInfo>` 와 정의 동기화 |
-| 화면 골격 | 본화면 `xf:group.sub_contents` + 첫 자식 `w2:pageFrame src="/cm/xml/contentHeader.xml"`, 팝업 `xf:group.pop_contents`(contentHeader 없음) |
+| 화면 골격 | 본화면 `xf:group.sub_contents`, 팝업 `xf:group.pop_contents` — **둘 다** 첫 자식으로 `w2:pageFrame id="pfmContentHeader" src="/cm/xml/contentHeader.xml"` (팝업도 필수, 2026-10-23 확정) |
 | 조회조건 | `xf:group.schbox` > `schbox_inner` > table, 조회 버튼은 `xf:group.btn_schbox` > `btn_cm sch` (tblbox 아님) |
 | 목록 머리 | `titbox` > h3 + `rt` > 총건수 `xf:group.count`(`w2:span` 총 / `w2:span.num` / `w2:span` 건) + 버튼 |
 | 페이징 | `gvwbox` 바로 다음 `xf:group.pglbox` > `w2:pageList class="pgl"` |
@@ -56,6 +56,7 @@ PYTHONUTF8=1 python conversion/tools/publish_gate.py --rev HEAD <수정한 xml> 
 | 섹션 제목 | `xf:group.titbox` > `w2:textbox tagname="h3"` (+ 안내 `w2:textbox.txt_info`, 버튼 `xf:group.rt`) |
 | 안내문 | `w2:textbox class="txt_info"` |
 | 버튼 영역 | 섹션 버튼은 titbox 의 `rt`, 화면 하단 버튼은 `xf:group.btnbox` > `xf:group.rt` — 표 안 빈 tr/td 에 버튼을 두지 않는다(팝업 찾기 버튼처럼 입력칸에 붙는 것은 예외) |
+| 팝업 닫기 | 팝업 하단 `btnbox` 에 **「닫기」 버튼을 넣지 않는다**(팝업 창 자체의 닫기를 쓴다, 2026-10-23 확정). 캡처에 닫기가 있어도 옮기지 않는다. 하단에 남는 버튼이 없으면 `btnbox` 자체를 두지 않는다. 기존 화면의 `btn_close`(+`ev:onclick` 핸들러)를 지우는 것은 보존 규칙(P11·P13) 대상이라 요청자 승인 후 `--allow` 로 진행한다 |
 | 버튼 class | 기본 `btn_cm`, 주요 동작 `btn_cm pt`(하단 버튼줄 맨 오른쪽), 조회 `sch`, 엑셀·파일 `download`/`upload`, 행 `row_add`/`row_del`, 팝업 찾기 `btn_cm icon search`(읽기전용 입력칸과 같은 td) |
 | 입력 | 필수 라벨 `w2:textbox class="req"`, 금액 `xf:input class="tar" dataType="number" displayFormat="#,###"`, 한 칸 여러 컨트롤 `xf:group.flex`(줄바꿈 금지 `flex flex_no`), 기간 `flex flex_no` > 달력 + `w2:span "~"` + 달력 |
 | 다단 배치 | `xf:group.lybox` > `xf:group.col_N` > `xf:group.tblbox` > table |
@@ -63,10 +64,11 @@ PYTHONUTF8=1 python conversion/tools/publish_gate.py --rev HEAD <수정한 xml> 
 | 그리드 | `xf:group.gvwbox` > `w2:gridView class="gvw rowN" dataList="data:dlt_*"` — gBody column id = dataList 컬럼 id. `rowN` 은 `row5`·`row10`·`row15`·`row20`·`row25` 만 CSS 가 있고 그 밖의 행 수는 class 없이 `visibleRowNum` |
 | 탭 | host 는 `xf:group.tbcbox` > `w2:tabControl` > `w2:content` > `w2:pageFrame src`. 선택 탭 속성은 엔진 옵션명 `selectedIndex`(`selectedTabIndex` 는 엔진이 읽지 않음) |
 | 탭 안의 탭 | 탭 본문(`w2:content`) 안에 다시 두는 하위 tabControl 도 상단 탭과 **같은 형태** — `xf:group.tbcbox` > `w2:tabControl class="tbc"`. `tbc_sub`(template 4_02 서브탭, 밑줄형)로 바꾸지 않는다(요청자 확정 2026-10-22). `tbcbox` 래퍼를 빼면 `.tbc::before` 테두리 오버레이가 바깥 탭 기준으로 붙어 깨진다 |
-| contentHeader | windowContainer 로 여는 화면(host)에는 넣고, **tabControl 탭 본문과 팝업에는 넣지 않는다** |
+| contentHeader | windowContainer 로 여는 화면(host)과 **팝업에는 넣고**, **tabControl 탭 본문에만 넣지 않는다**(팝업 포함은 2026-10-23 변경 — 종전 "팝업 없음" 규칙 폐기) |
 | 속성명 | `readOnly`(대문자 O) — `readonly` 는 무시된다 |
 
 ## 금지 사항
+- 팝업 하단 「닫기」 버튼 추가, 팝업에서 contentHeader pageFrame 생략.
 - 참조 템플릿·원본 화면에 없는 **컴포넌트·스크립트·스타일 추가**(새 scwin 함수, head 의 외부 script/link/style 포함).
 - 기존 `ref` 바인딩, `ev:on*` 핸들러, 라벨 텍스트, 컴포넌트 id 의 삭제·변경(캡처 문구 교체는 요청자 승인 후 `--allow P12`).
 - `var`, `console.log`, 원시 `alert(`, `debugger`, jQuery `$(`, `innerHTML`, 느슨한 비교(`==`/`!=`).
