@@ -639,7 +639,7 @@ def test_publish_merge_grid_unique_ids_and_select_choices():
 
 
 def test_p1_header_standard():
-    """헤더 표준(2026-10-06): 본화면 sub_contents 는 pageFrame 첫 자식 보장, 팝업 pop_contents 는 pageFrame 없음."""
+    """헤더 표준(2026-10-06, 팝업 2026-10-23 변경): 본화면 sub_contents·팝업 pop_contents 모두 pageFrame 첫 자식 보장."""
     main_no = '<body><xf:group class="sub_contents" id=""><xf:group class="step_list" id=""/></xf:group></body>'
     out, log = pn.normalize_body(main_no, "")
     assert out.index('<w2:pageFrame id="pfmContentHeader"') < out.index('class="step_list"') and log.get("P1_pageframe_added") == 1
@@ -648,7 +648,12 @@ def test_p1_header_standard():
     pop_pf = ('<body><xf:group class="pop_contents" id=""><w2:pageFrame id="pfmContentHeader" src="/cm/xml/contentHeader.xml" style=""/>'
               '<xf:group class="tblbox" id=""/></xf:group></body>')
     out3, log3 = pn.normalize_body(pop_pf, "")
-    assert "pfmContentHeader" not in out3 and log3.get("P1_pageframe_removed") == 1
+    assert out3.count("pfmContentHeader") == 1 and not log3.get("P1_pageframe_removed")  # 팝업 헤더 유지
+    pop_no = '<body><xf:group class="pop_contents" id=""><xf:group class="tblbox" id=""/></xf:group></body>'
+    out5, log5 = pn.normalize_body(pop_no, "")
+    assert out5.index('<w2:pageFrame id="pfmContentHeader"') < out5.index('class="tblbox"') and log5.get("P1_pageframe_added") == 1
+    out6, log6 = pn.normalize_body(out5, "")
+    assert out6 == out5 and not log6.get("P1_pageframe_added")  # 팝업도 멱등
     pgt = ('<body><xf:group class="sub_contents" id=""><xf:group class="pgtbox" id=""><w2:textbox class="pgt_tit" id="" label="제목"/>'
            '<xf:group class="breadcrumb" id=""/></xf:group><xf:group class="tblbox" id=""/></xf:group></body>')
     out4, _ = pn.normalize_body(pgt, "")
@@ -734,7 +739,7 @@ def test_publish_merge_override_skip_and_accept(tmp_path, monkeypatch):
     rep = pm.merge_screen("jldtest00001", str(pub), out, False, {"jldtest00001": {"accept": "그리드는 끝에 TODO"}})
     assert rep["verdict"] == "manual" and rep["todo"] == 1 and (out / "JLDTEST00001.xml").exists()  # 파일명은 대문자 줄기
     text = (out / "JLDTEST00001.xml").read_text(encoding="utf-8")
-    assert "TODO Stage2(퍼블리싱 병합)" in text and 'id="grd_list"' in text and "pfmContentHeader" not in text  # 팝업은 헤더 없음
+    assert "TODO Stage2(퍼블리싱 병합)" in text and 'id="grd_list"' in text and text.count("pfmContentHeader") == 1  # 팝업도 헤더 유지(2026-10-23)
     rep = pm.merge_screen("jldtest00001", str(pub), out, True, {})
     assert rep["verdict"] == "todo"  # 닫기는 공통 버튼이라 항목 수에서 제외 → 퍼블 0·공급사 1(<5) → override 없이도 TODO 로 닫힌다
 
