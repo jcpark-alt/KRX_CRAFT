@@ -540,6 +540,7 @@ scwin.btn_confirm_onclick = async function () {
 - [ ] §8: 각 결함에 "유지/고침/옮기지 않음" 결정이 적혔다.
 - [ ] §9: 전환 후 — AS-IS 함수 전부가 TO-BE 이름 또는 "삭제(사유)"로 대응됐다.
 - [ ] §10: 가정으로 둔 것(API 경로·응답 구조·하위 팝업)이 전부 TODO 로 올라갔다.
+- [ ] 머리 표: "화면 캡처" 칸이 채워졌다(없으면 "없음"). 캡처가 있으면 TO-BE 는 §13.2 퍼블리싱본부터 만든다.
 
 ```sh
 # 누락 점검 — AS-IS 의 함수·요소 id 가 결과서에 모두 언급됐는지
@@ -550,9 +551,49 @@ for k in $(grep -oE 'function [A-Za-z_0-9]+' $F | cut -d' ' -f2) \
 done
 ```
 
-### 13.2 전환으로 넘길 때
+### 13.2 화면 캡처가 있으면 퍼블리싱본을 먼저 만든다 (필수)
 
-결과서 §9 대로 `ui/{화면ID}.xml` 을 쓴 뒤 아래를 통과시킵니다(샘플은 `convert.py` 고정점이 아니므로 수기 작성 + 게이트가 기준).
+업무 분석을 마친 화면으로 TO-BE 파일을 만들 때, 그 화면의 **캡처 이미지가 있으면** 스크립트 전환보다 먼저 **퍼블리싱 XML(마크업 전용)을 TO-BE 폴더에 생성**하고, 그 파일 위에 스크립트를 얹습니다. 마크업과 로직을 한 번에 쓰면 레이아웃 검토와 로직 검토가 섞이고, 퍼블리싱 게이트의 보존 검사(P10~P13)를 쓸 수 없기 때문입니다.
+
+**캡처 위치** — `{화면 폴더}/{화면ID}*.png|jpg` (예: `conversion/gfm-front/ui/ULDSTF05621.png`, 상태별이면 `ULDSTF05621_신규.png`). 결과서 머리 표의 "화면 캡처" 칸에 파일명과 상태를 적습니다. 캡처가 없으면 이 절을 건너뛰고 §13.3 으로 갑니다.
+
+**TO-BE 위치** — 모듈 폴더의 `ui-tobe/{화면ID}.xml` (gfm-front 는 `conversion/gfm-front/ui-tobe/{화면ID}.xml`, sample-front 샘플은 `conversion/sample-front/ui/{화면ID}.xml`).
+
+**1단계 — 퍼블리싱본 생성** ([websquare-publishing](../../.claude/skills/websquare-publishing/SKILL.md) 스킬 절차 ①~⑥ 을 따른다)
+1. **기준**: 레이아웃·영역 순서·라벨·버튼 위치는 **캡처**를 따릅니다. `conversion/publish/…/{화면ID}.xml`(KRX 퍼블리셔 XML)이 있으면 컴포넌트 종류·id 참고용으로 함께 봅니다. 둘이 다르면 캡처를 따르고 차이를 결과서 §10 에 적습니다.
+2. **id·바인딩 자리**: 컴포넌트 id 는 결과서 §2.1 의 **TO-BE 컴포넌트 id** 로 둡니다(퍼블리셔 XML 의 대문자·한글 id 는 여기서 바꿉니다). 그리드 컬럼 id 는 §2.2 의 camelCase 키, 머리글은 `h_` 접두입니다. `ref`·`ev:on*`·DataCollection·스크립트는 넣지 않습니다(빈 `<script>` 골격과 head 메타만).
+3. **필수 마크업·금지 사항**은 스킬 문서를 따릅니다 — 팝업은 contentHeader 필수·하단 「닫기」 버튼 금지, 탭 본문 contentHeader 금지, colgroup 칸 수 일치, `readOnly` 대소문자 등.
+4. **검증**: `PYTHONUTF8=1 python conversion/tools/publish_gate.py --pcc {ns} {TO-BE xml}` — 실패 0건. 새 파일이라 보존 검사(P10~P13)는 대상이 없습니다.
+5. **리뷰**: 캡처와 영역 순서·단 구성·제목·버튼 위치를 눈으로 대조합니다(정적 게이트는 렌더링을 보지 못합니다).
+6. 이 상태를 **스크립트 전환의 기준본**으로 남깁니다 — 사용자 지시가 있으면 "퍼블리싱 생성(마크업 전용)" 으로 먼저 커밋하고(선례 `ULDSTF92024` 736f185e → a5714970), 커밋 전이면 사본을 잡 임시 폴더에 둡니다.
+
+**2단계 — 스크립트 전환** (§13.3)
+- 1단계 파일 위에 결과서 §3~§9 대로 head DataCollection, `ref` 바인딩, `ev:on*` 핸들러, 스크립트를 넣습니다. **1단계의 레이아웃·라벨·id 는 바꾸지 않습니다.**
+- 마크업 보존 검사를 함께 돌립니다. 스크립트 전환은 함수를 추가하므로 P20 은 이 절차가 승인한 변경입니다.
+
+  ```sh
+  # 1단계를 커밋했으면 --rev, 아니면 --before 로 1단계 사본을 준다
+  PYTHONUTF8=1 python conversion/tools/publish_gate.py --pcc {ns} --rev HEAD --allow P20 {TO-BE xml}
+  PYTHONUTF8=1 python conversion/tools/publish_gate.py --pcc {ns} --before {1단계 사본} --allow P20 {TO-BE xml}
+  ```
+
+  P10~P12(바인딩·핸들러·라벨 누락)는 실패 0건이어야 하고, P13(id 누락)·P22·P23(새 바인딩·핸들러) 경고는 결과서 §9 와 대조해 의도한 것인지 확인합니다. 캡처에 맞춰 라벨을 바꿔야 하면 1단계에서 바꿉니다(2단계의 `--allow P12` 금지).
+
+```mermaid
+flowchart TD
+    A(["업무 분석 결과서 완료"]) --> B{"화면 캡처가 있는가?"}
+    B -- "예" --> P1["1단계: 퍼블리싱본 생성(마크업 전용)<br/>ui-tobe/{화면ID}.xml — 캡처 기준, id 는 §2.1"]
+    P1 --> P2[/"publish_gate.py — 실패 0건"/]
+    P2 --> P3["캡처 대조 리뷰 · 기준본 보관(커밋 또는 사본)"]
+    P3 --> S1["2단계: 스크립트 전환 §13.3"]
+    B -- "아니오" --> S1
+    S1 --> S2[/"gate_screen · scan_mixed_compare · wsxml_lint<br/>+ 캡처가 있었으면 publish_gate --rev/--before --allow P20"/]
+    S2 --> E(["전환 완료"])
+```
+
+### 13.3 전환으로 넘길 때
+
+결과서 §9 대로 TO-BE 파일(`ui/{화면ID}.xml`, gfm-front 는 `ui-tobe/{화면ID}.xml`)을 쓴 뒤 아래를 통과시킵니다(샘플은 `convert.py` 고정점이 아니므로 수기 작성 + 게이트가 기준). §13.2 로 퍼블리싱본을 먼저 만들었으면 그 파일 위에 씁니다.
 
 ```sh
 PYTHONUTF8=1 python conversion/tools/gate_screen.py --pcc {fil|stf|mgt|tms} conversion/sample-front/ui/{화면ID}.xml
@@ -576,7 +617,7 @@ python -m wsxml_lint conversion/sample-front/ui/{화면ID}.xml
 |---|---|
 | AS-IS | `{경로}/{파일}` ({JSP/jQuery}, {메인 화면 / W×H 팝업}) — 반입 `{반입 경로}` |
 | TO-BE | `conversion/sample-front/ui/{화면ID}.xml` (배포 경로 `/ui/{업무}/{화면ID}.xml`) |
-| 화면 캡처 | `{파일}.png`({상태}) |
+| 화면 캡처 | `{파일}.png`({상태}) — 있으면 TO-BE 는 퍼블리싱본부터 만든다(가이드 §13.2) / 없으면 "없음" |
 | 업무공통 | `$c.{ns}`({함수}) — `cm/pcc/{ns}`. 게이트는 `--pcc {ns}` 로 돌린다 |
 | 작성 | {작성자} / {YYYY-MM-DD} |
 
