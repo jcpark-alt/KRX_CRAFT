@@ -98,10 +98,41 @@
 			<w2:workflowCollection />
 		</xf:model>
 		<w2:layoutInfo />
-		<w2:publicInfo method="scwin.onpageload" />
-		<script lazy="false" type="text/javascript"><![CDATA[
+		<w2:publicInfo method="scwin.onpageload,scwin.init_recvParam,scwin.init_newForm,scwin.btn_Save_onclick,scwin.btn_Update_onclick,scwin.btn_Delete_onclick,scwin.img_SetIsuCd_onclick,scwin.btn_exelUpload_onclick,scwin.grd_isu_onfilereadend,scwin.img_Excel_onclick,scwin.selectList,scwin.saveTrs,scwin.deleteTrs,scwin.validate,scwin.isEmptyOrZero,scwin.applyHeader,scwin.applyKoEditable,scwin.getIsurCd,scwin.openIsuPopup,scwin.save,scwin.update,scwin.remove" />
+		<script lazy="false" type="text/javascript"><![CDATA[// 원본 : /lstproc/ULDSTF05911.gfm (ELW 행사가격/전환비율 변경 팝업)
+/*
+ * 화면 동작
+ *  - 부모(ULDSTF05908 변경상장)가 넘긴 업무처리번호가 없으면 신규, 있으면 수정이다.
+ *  - 종목은 종목선택 팝업(ULDSTF92023) 결과나 엑셀 업로드로 그리드를 통째로 바꾼다.
+ *  - 종목마다 변경후 행사가격·전환비율(조기종료 ELW 는 조기종료발생기준가격도)을 입력해 등록·수정·삭제한다.
+ *  - 통신·데이터 정의는 ULDSTF05911_API.txt 명세 기준(register·modify·remove·select-list-isu).
+ * 업무 분석 : conversion/gfm-front/ui/ULDSTF05911/ULDSTF05911.md (§번호는 이 문서의 절)
+ */
+
 ///////// 1. 변수 및 선언 영역 /////////
+
 scwin.screenId = "ULDSTF05911";
+scwin.API = "/api/listing/lstproc/elw/chg-listing-prc/";
+
+// 부모 화면에서 넘겨받는 값 (§1.2)
+scwin.isurCd = "";          // 발행기관코드
+scwin.bzProcsNo = "";       // 업무처리번호 — 비어 있으면 신규, 있으면 수정
+scwin.gubun = "";           // 발행사/기초자산 구분 (1 발행사 / 2 기초자산) — 종목 선택 팝업에 넘긴다
+
+// 화면 상태값
+scwin.trJob = "";           // 처리구분 I: 저장, U: 수정, D: 삭제
+scwin.curDate = "";         // 서버 현재일 (yyyyMMdd)
+
+// 고정값
+scwin.KO_KIND_CD = "3";     // ELW 권리형태종류코드 — 이 값인 행만 변경후 조기종료발생기준가격 편집 (§6.3, §10 #8)
+
+// 이 화면의 역할→버튼 매핑 — 상태별 활성 정책은 공통(BTN_STATE_MAP)이 보유한다.
+scwin.BTN_MAP = {
+    save : "btn_Save",          // [저장]
+    modify : "btn_Update",      // [수정]
+    "delete" : "btn_Delete"     // [삭제]
+};
+
 
 ///////// 2. 초기화 영역 /////////
 
@@ -110,24 +141,573 @@ scwin.screenId = "ULDSTF05911";
  * @name scwin.onpageload
  * @author Inswave
  * @date 2026. 10. 26
- * @description 페이지로드
+ * @description 페이지로드. 파라미터를 받고 업무처리번호 유무로 신규 준비 또는 수정 조회를 한다. (§3)
  * @param
  * @returns
  * @hidden N
  */
 scwin.onpageload = async function () {
     try {
+        // 로딩이 끝나거나 조회가 예외로 끝나도 버튼이 XML 기본값(전부 활성)으로 남지 않게 먼저 잠근다.
+        $c.util.setButtonState("grpBtnBox", "disabled", scwin.BTN_MAP);
 
+        scwin.init_recvParam();
+
+        if ($c.util.isEmpty(scwin.bzProcsNo)) {
+            scwin.init_newForm();
+        } else {
+            await scwin.selectList();
+        }
     } catch (ex) {
         await $c.exception.handleError(ex, { context : "ULDSTF05911.onpageload" });
     }
 };
 
+/**
+ * @method
+ * @name scwin.init_recvParam
+ * @author Inswave
+ * @date 2026. 10. 26
+ * @description 부모가 openPopup 의 data 로 넘긴 값을 받는다. (원본 frame.Provider("../").fn_GetPar(arrPar) — §1.2)
+ * @param
+ * @returns
+ * @hidden N
+ */
+scwin.init_recvParam = function () {
+    const param = $c.data.getParameter() ?? {};
+
+    scwin.isurCd = param.isurCd ?? "";          // AS-IS arr[0]
+    scwin.bzProcsNo = param.bzProcsNo ?? "";    // AS-IS arr[4]
+    scwin.gubun = param.gubun ?? "";            // AS-IS arr[5]
+
+    $c.date.checkCalendarFormat(edt_MktactEnforceDd, "yyyyMMdd");
+    scwin.curDate = $c.date.getServerDateTime("yyyyMMdd");
+};
+
+/**
+ * @method
+ * @name scwin.init_newForm
+ * @author Inswave
+ * @date 2026. 10. 26
+ * @description 신규 준비. 입력과 종목 목록을 비우고 [저장]만 켠다. (원본 fn_new_onload + dts_Isu OnLoadCompleted — §3)
+ * @param
+ * @returns
+ * @hidden N
+ */
+scwin.init_newForm = function () {
+    dma_mst.setEmptyValue();
+    dma_mst.set("isurCd", scwin.isurCd);
+    dlt_detail.removeAll();
+
+    $c.util.setButtonState("grpBtnBox", "insert", scwin.BTN_MAP);
+};
+
+
 ///////// 3. 컴포넌트 이벤트 영역 /////////
+
+/**
+ * @event
+ * @name scwin.btn_Save_onclick
+ * @author Inswave
+ * @date 2026. 10. 26
+ * @description 저장 버튼 클릭
+ * @param {Object} e 이벤트 객체
+ * @returns
+ * @hidden N
+ */
+scwin.btn_Save_onclick = async function (e) {
+    try {
+        await scwin.save();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF05911.btn_Save_onclick" });
+    }
+};
+
+/**
+ * @event
+ * @name scwin.btn_Update_onclick
+ * @author Inswave
+ * @date 2026. 10. 26
+ * @description 수정 버튼 클릭
+ * @param {Object} e 이벤트 객체
+ * @returns
+ * @hidden N
+ */
+scwin.btn_Update_onclick = async function (e) {
+    try {
+        await scwin.update();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF05911.btn_Update_onclick" });
+    }
+};
+
+/**
+ * @event
+ * @name scwin.btn_Delete_onclick
+ * @author Inswave
+ * @date 2026. 10. 26
+ * @description 삭제 버튼 클릭
+ * @param {Object} e 이벤트 객체
+ * @returns
+ * @hidden N
+ */
+scwin.btn_Delete_onclick = async function (e) {
+    try {
+        await scwin.remove();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF05911.btn_Delete_onclick" });
+    }
+};
+
+/**
+ * @event
+ * @name scwin.img_SetIsuCd_onclick
+ * @author Inswave
+ * @date 2026. 10. 26
+ * @description 종목 찾기 클릭 — 종목선택 팝업 결과로 그리드를 통째로 바꾼다. (§6.4, §1.4 업무 2)
+ * @param {Object} e 이벤트 객체
+ * @returns
+ * @hidden N
+ */
+scwin.img_SetIsuCd_onclick = async function (e) {
+    try {
+        await scwin.openIsuPopup();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF05911.img_SetIsuCd_onclick" });
+    }
+};
+
+/**
+ * @event
+ * @name scwin.btn_exelUpload_onclick
+ * @author Inswave
+ * @date 2026. 10. 26
+ * @description 엑셀업로드 클릭 — 확인 후 엑셀 자료로 그리드 전체를 바꾼다. (원본 SetDataHeader + LoadExcelData — §6.5)
+ * 업로드가 끝나면 grd_isu_onfilereadend 에서 조기종료기준가격 편집 조건을 다시 적용한다.
+ * @param {Object} e 이벤트 객체
+ * @returns
+ * @hidden N
+ */
+scwin.btn_exelUpload_onclick = async function (e) {
+    try {
+        if (!await $c.win.confirm("엑셀자료를 업로드 하시면 그리드의 내용이 엑셀 데이터로 변경됩니다.")) return;
+
+        // 원본 LoadExcelData('', 'Sheet1', 2, 0, 2) — 첫 시트, 1행 머리글 다음부터, 그리드 전체 교체
+        // TODO: $c.data.uploadGridViewExcel 은 decimal 옵션을 엔진에 넘기지 않는다 — 행사가격(소수 8)·전환비율(6)이
+        //       엔진 기본 소수 자릿수로 반올림될 수 있음. gcc 보강 또는 원본 인자 의미 확인 (§10 #7)
+        $c.data.uploadGridViewExcel(grd_isu, {
+            sheetNo : 0,
+            headerExist : "1",
+            append : "0",
+            decimal : "8"
+        });
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF05911.btn_exelUpload_onclick" });
+    }
+};
+
+/**
+ * @event
+ * @name scwin.grd_isu_onfilereadend
+ * @author Inswave
+ * @date 2026. 10. 26
+ * @description 엑셀 업로드 완료 — 조기종료기준가격 편집 조건을 다시 적용한다.
+ * 원본 업로드 머리글에는 권리형태·상장방식 열이 없어 업로드한 행은 편집할 수 없고 상장방식도 비어 있다(§8 #4).
+ * @param {Object} e 이벤트 정보
+ * @returns
+ * @hidden N
+ */
+scwin.grd_isu_onfilereadend = async function (e) {
+    try {
+        // TODO: 업로드 행의 elwRghtTpKindCd·listMethdTpCd 보강 방법 결정 (§10 #7)
+        scwin.applyKoEditable();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF05911.grd_isu_onfilereadend" });
+    }
+};
+
+/**
+ * @event
+ * @name scwin.img_Excel_onclick
+ * @author Inswave
+ * @date 2026. 10. 26
+ * @description 엑셀저장 클릭 — 그리드를 엑셀로 내려받는다. 0건 안내는 공통 함수가 한다. (원본 GridToExcel, doLogSave 삭제 — §6.6)
+ * @param {Object} e 이벤트 객체
+ * @returns
+ * @hidden N
+ */
+scwin.img_Excel_onclick = async function (e) {
+    try {
+        $c.data.downloadGridViewExcel(grd_isu, { fileName : "ELW 행사가격/전환비율 변경" });
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF05911.img_Excel_onclick" });
+    }
+};
+
 
 ///////// 4. 서브미션 콜백 영역 /////////
 
+/**
+ * @method
+ * @name scwin.selectList
+ * @author Inswave
+ * @date 2026. 10. 26
+ * @description 수정: 업무처리번호로 종목 목록을 조회하고, 첫 행의 변경상장일·변경사유를 입력란에 보이고, 변경상장일로 버튼 상태를 정한다.
+ * (원본 fn_search + dts_Isu OnLoadCompleted — §5.1)
+ * @param
+ * @returns
+ * @hidden N
+ */
+scwin.selectList = async function () {
+    const sbmOptions = {
+        id : "sbm_selectList",
+        method : "get",
+        action : scwin.API + "select-list-isu",
+        // TODO: 명세 응답은 dataMap(dma_detail)이나 종목 여러 건 — 목록인지 확인 (§10 #1)
+        target : "dlt_detail=body",
+        gridview : "grd_isu",
+        isProcessMsg : false
+    };
+
+    const result = await $c.sbm.executeDynamic(sbmOptions, { bzProcsNo : scwin.bzProcsNo });
+    if (result?.skipped) return;    // 진행 중 조회가 있어 이번 호출은 건너뜀
+
+    // 실패하면 onpageload 가 걸어 둔 잠금(disabled) 그대로 둔다.
+    if (!result.responseJSON?.success) return;
+
+    scwin.applyHeader();
+    scwin.applyKoEditable();
+
+    // 변경상장일이 오늘 이후면 update(수정·삭제), 지났으면 error(처리 버튼 없음)
+    $c.stf.setButtonSetWithDate(edt_MktactEnforceDd, false, "grpBtnBox", scwin.BTN_MAP);
+};
+
+/**
+ * @method
+ * @name scwin.saveTrs
+ * @author Inswave
+ * @date 2026. 10. 26
+ * @description 등록(I)·수정(U). 명세 요청 정의(register: dma_register·dlt_register_isuList / modify: dma_update·dlt_update_isuList)에
+ * 담아 보낸다 — setJSON 이 정의된 키만 남겨 명세 밖 값은 보내지 않는다. (원본 fn_save_trs + trs — §5.2, §5.3)
+ * @param {String} trJob 처리구분 I: 저장, U: 수정
+ * @returns
+ * @hidden N
+ */
+scwin.saveTrs = async function (trJob) {
+    const isInsert = (trJob === "I");
+    const jobNm = isInsert ? "저장" : "수정";
+    const reqMst = isInsert ? dma_register : dma_update;
+    const reqList = isInsert ? dlt_register_isuList : dlt_update_isuList;
+
+    // TODO: 원본은 LIST_BZ_TP_CD 147·SCREN_ID 등을 보냈으나 명세에 없음 (§10 #9)
+    reqMst.setEmptyValue();
+    reqMst.setJSON({
+        bzProcsNo : isInsert ? "" : scwin.bzProcsNo,     // 명세: 수정 시 필수, 등록 시 서버채번
+        isurCd : scwin.getIsurCd(),
+        chgDd : dma_mst.get("chgDd"),
+        chgRsnContn : dma_mst.get("chgRsnContn")
+    });
+    // TODO: 수정 시 행 PK(chgListMktactAdmNo·bf/afchgBybzprocsSeq)는 요청 정의에 없음 (§10 #3)
+    reqList.setJSON(dlt_detail.getAllJSON());
+
+    const sbmOptions = {
+        id : "sbm_saveTrs",
+        method : "post",
+        action : scwin.API + (isInsert ? "register" : "modify"),
+        mediatype : "application/json",
+        isProcessMsg : false
+    };
+
+    // TODO: 목록 키(isuList)는 명세 정의 이름(dlt_*_isuList)에서 추정한 가정 (§10 #1)
+    const requestData = {
+        ...reqMst.getJSON(),
+        isuList : reqList.getAllJSON()
+    };
+
+    const result = await $c.sbm.executeDynamic(sbmOptions, requestData);
+    if (result?.skipped) return;    // 진행 중 처리가 있어 이번 호출은 건너뜀
+
+    if (!result.responseJSON?.success) {
+        await $c.win.alert($c.stf.getMessageParam("MSG-A002", jobNm));
+        return;
+    }
+
+    await $c.win.alert($c.stf.getMessageParam("MSG-A001", jobNm));
+
+    if (!isInsert) {
+        await scwin.selectList();
+        return;
+    }
+
+    // 등록은 서버가 채번한다. 응답에 번호가 오면 수정 모드로 다시 조회하고, 오지 않으면 팝업을 닫아 부모가 목록을 다시 읽게 한다.
+    // TODO: register 응답에 bzProcsNo 를 받을 수 있는지 확인 (§10 #2)
+    const newNo = String(result.responseJSON.body?.bzProcsNo ?? "");
+    if ($c.util.isEmpty(newNo)) {
+        $c.win.closePopup();
+        return;
+    }
+    scwin.bzProcsNo = newNo;
+    await scwin.selectList();
+};
+
+/**
+ * @method
+ * @name scwin.deleteTrs
+ * @author Inswave
+ * @date 2026. 10. 26
+ * @description 삭제(논리삭제). 명세 dma_remove 에 담아 보내고, 성공하면 팝업을 닫는다 — 부모는 await 가 끝나면 다시 조회한다. (§5.4)
+ * @param
+ * @returns
+ * @hidden N
+ */
+scwin.deleteTrs = async function () {
+    dma_remove.setEmptyValue();
+    dma_remove.setJSON({ bzProcsNo : scwin.bzProcsNo, isurCd : scwin.getIsurCd() });
+
+    const sbmOptions = {
+        id : "sbm_deleteTrs",
+        method : "post",
+        action : scwin.API + "remove",
+        mediatype : "application/json",
+        isProcessMsg : false
+    };
+
+    const result = await $c.sbm.executeDynamic(sbmOptions, dma_remove.getJSON());
+    if (result?.skipped) return;    // 진행 중 처리가 있어 이번 호출은 건너뜀
+
+    if (!result.responseJSON?.success) {
+        await $c.win.alert($c.stf.getMessageParam("MSG-A002", "삭제"));
+        return;
+    }
+
+    await $c.win.alert($c.stf.getMessageParam("MSG-A001", "삭제"));
+    $c.win.closePopup();
+};
+
+
 ///////// 5. 일반/업무 함수 영역 /////////
+
+/**
+ * @method
+ * @name scwin.validate
+ * @author Inswave
+ * @date 2026. 10. 26
+ * @description 저장·수정 전 입력 검증. 원본 fn_CheckForm 순서를 따른다. (§6.1)
+ *  1) 변경상장일 필수·날짜, 익일 이후  2) 변경사유 필수·2000 byte  3) 종목 1건 이상  4) 종목마다 변경후 행사가격·전환비율 입력(0 불가)
+ * @param
+ * @returns {Promise<Boolean>} 검증 통과 여부
+ * @hidden N
+ */
+scwin.validate = async function () {
+    const dateOptions = {
+        validateType : "alert",     // alert|mark|all
+        checkType : "single",       // single|multi
+        fields : {
+            edt_MktactEnforceDd : { required : true, format : "date", name : "변경상장일" }
+        }
+    };
+    if (!await $c.validate.validateDataCollect(panel_3, dateOptions)) return false;
+
+    // 변경상장일은 익일 이후 (원본 checkDdTm("DD", …, "변경상장", false) — pcc 함수는 Gauce 속성 .text 를 읽어 쓰지 않는다)
+    if (dma_mst.get("chgDd") <= scwin.curDate) {
+        await $c.win.alert("[변경상장일]을 익일 이후로 입력하세요.");
+        edt_MktactEnforceDd.focus();
+        return false;
+    }
+
+    const rsnOptions = {
+        validateType : "alert",
+        checkType : "single",
+        fields : {
+            txb_ChgRsnContn : { required : true, maxLengthB : 2000, name : "변경사유" }
+        }
+    };
+    if (!await $c.validate.validateDataCollect(panel_3, rsnOptions)) return false;
+
+    const rowCount = dlt_detail.getRowCount();
+    if (rowCount === 0) {
+        await $c.win.alert("[종목]을 선택하세요.");
+        return false;
+    }
+
+    for (let i = 0; i < rowCount; i++) {
+        if (scwin.isEmptyOrZero(dlt_detail.getCellData(i, "afchgExerPrc"))
+            || scwin.isEmptyOrZero(dlt_detail.getCellData(i, "afchgConvRto"))) {
+            await $c.win.alert($c.stf.getMessageParam("MSG-0019", ""));
+            grd_isu.setFocusedCell(i, "afchgExerPrc");
+            return false;
+        }
+    }
+
+    // TODO: 조기종료 ELW 의 변경후 조기종료발생기준가격은 원본도 검증하지 않음 (§8 #3, §10 #8)
+    return true;
+};
+
+/**
+ * @method
+ * @name scwin.isEmptyOrZero
+ * @author Inswave
+ * @date 2026. 10. 26
+ * @description 값이 비었거나 0 인지. 원본의 느슨한 비교(== "" || == 0)를 숫자 비교로 옮긴다(§8 #2).
+ * @param {*} value 셀 값
+ * @returns {Boolean} 비었거나 0 이면 true
+ * @hidden N
+ */
+scwin.isEmptyOrZero = function (value) {
+    return $c.util.isEmpty(value) || Number(value) === 0;
+};
+
+/**
+ * @method
+ * @name scwin.applyHeader
+ * @author Inswave
+ * @date 2026. 10. 26
+ * @description 수정 조회 뒤 첫 행의 변경상장일·변경사유를 입력란(dma_mst)에 보인다. 행마다 다르면 첫 행이 이긴다(원본과 같음, §8 #13).
+ * @param
+ * @returns
+ * @hidden N
+ */
+scwin.applyHeader = function () {
+    dma_mst.set("bzProcsNo", scwin.bzProcsNo);
+    if (dlt_detail.getRowCount() === 0) {
+        dma_mst.set("isurCd", scwin.isurCd);
+        return;
+    }
+    dma_mst.set("isurCd", dlt_detail.getCellData(0, "isurCd") || scwin.isurCd);
+    dma_mst.set("chgDd", dlt_detail.getCellData(0, "chgDd"));
+    dma_mst.set("chgRsnContn", dlt_detail.getCellData(0, "chgRsnContn"));
+};
+
+/**
+ * @method
+ * @name scwin.applyKoEditable
+ * @author Inswave
+ * @date 2026. 10. 26
+ * @description 권리형태종류코드가 KO_KIND_CD 인 행만 변경후 조기종료발생기준가격을 편집할 수 있게 한다.
+ * (원본 그리드 edit="{IF(ELW_RGHT_TP_KIND_CD='3', 'true','false')}" — §6.3)
+ * @param
+ * @returns
+ * @hidden N
+ */
+scwin.applyKoEditable = function () {
+    const rowCount = dlt_detail.getRowCount();
+    for (let i = 0; i < rowCount; i++) {
+        const isKo = (dlt_detail.getCellData(i, "elwRghtTpKindCd") === scwin.KO_KIND_CD);
+        grd_isu.setCellReadOnly(i, "afchgElwKoOccrBasPrc", !isKo);
+    }
+};
+
+/**
+ * @method
+ * @name scwin.getIsurCd
+ * @author Inswave
+ * @date 2026. 10. 26
+ * @description 전문에 넣을 발행기관코드. 수정은 조회 값, 신규는 부모가 넘긴 값이다.
+ * @param
+ * @returns {String} 발행기관코드
+ * @hidden N
+ */
+scwin.getIsurCd = function () {
+    return dma_mst.get("isurCd") || scwin.isurCd;
+};
+
+/**
+ * @method
+ * @name scwin.openIsuPopup
+ * @author Inswave
+ * @date 2026. 10. 26
+ * @description 종목선택 팝업(ULDSTF92023)을 현재 그리드와 함께 열고, 고른 결과로 그리드를 바꾼다.
+ * (원본 fn_GetParIsu/fn_SetParIsu 바꿔 끼우기 + fn_PopFindElwCode — §6.4, 가이드 §6.5)
+ * pcc $c.lc.popFindElwCode 는 값을 넘기지 않는 콜백형이라 쓰지 않는다.
+ * @param
+ * @returns
+ * @hidden N
+ */
+scwin.openIsuPopup = async function () {
+    const data = {
+        isurCd : scwin.getIsurCd(),         // AS-IS arrPar[0]
+        gubun : scwin.gubun,                // AS-IS arrPar[1] — 1 발행사 / 2 기초자산
+        isuList : dlt_detail.getAllJSON()   // AS-IS CopyDataSet(dts_Isu, param_dts)
+    };
+    const options = {
+        id : "ULDSTF92023",
+        popupName : "종목선택",
+        width : 510,
+        height : 430,
+        type : "pageFramePopup"
+    };
+
+    // TODO: 92023 전환본이 없어 경로·반환 키(list)·행 컬럼은 가정 (§10 #5)
+    const result = await $c.win.openPopup("/ui/listingcommon/ULDSTF92023.xml", options, data);
+
+    // 취소·닫기(X)도 { isCloseButtonClick } 객체가 온다 → 목록 필드로 판정한다.
+    if (!Array.isArray(result?.list)) return;
+
+    // AS-IS fn_SetParIsu: 선택 결과로 그리드 전체를 바꾼다.
+    dlt_detail.setJSON(result.list);
+    scwin.applyKoEditable();
+};
+
+/**
+ * @method
+ * @name scwin.save
+ * @author Inswave
+ * @date 2026. 10. 26
+ * @description 등록. 검증 → 확인 → 등록 순서 (원본 fn_save — §6.7). 명세상 서버 채번이라 화면 채번은 하지 않는다(§10 #2).
+ * @param
+ * @returns
+ * @hidden N
+ */
+scwin.save = async function () {
+    scwin.trJob = "I";
+
+    if (!await scwin.validate()) return;
+
+    // "[저장] 처리를 하시겠습니까?" — 업무공통 MSG-A006
+    if (!await $c.lc.isProcess(scwin.trJob)) return;
+
+    await scwin.saveTrs(scwin.trJob);
+};
+
+/**
+ * @method
+ * @name scwin.update
+ * @author Inswave
+ * @date 2026. 10. 26
+ * @description 수정. 검증 → 확인 → 수정 순서. 원본처럼 바뀐 내용이 없어도 보낸다(§8 #10). (원본 fn_update — §6.8)
+ * @param
+ * @returns
+ * @hidden N
+ */
+scwin.update = async function () {
+    scwin.trJob = "U";
+
+    if (!await scwin.validate()) return;
+
+    // "[수정] 처리를 하시겠습니까?" — 업무공통 MSG-A006
+    if (!await $c.lc.isProcess(scwin.trJob)) return;
+
+    await scwin.saveTrs(scwin.trJob);
+};
+
+/**
+ * @method
+ * @name scwin.remove
+ * @author Inswave
+ * @date 2026. 10. 26
+ * @description 삭제. 확인을 받은 뒤 삭제한다. 입력 검증은 하지 않는다. (원본 fn_delete — §6.9)
+ * @param
+ * @returns
+ * @hidden N
+ */
+scwin.remove = async function () {
+    scwin.trJob = "D";
+
+    // "[삭제] 처리를 하시겠습니까?" — 업무공통 MSG-A006
+    if (!await $c.lc.isProcess(scwin.trJob)) return;
+
+    await scwin.deleteTrs();
+};
 ]]></script>
 	</head>
 	<body ev:onpageload="scwin.onpageload">
@@ -150,7 +730,7 @@ scwin.onpageload = async function () {
 							<w2:textbox class="req" id="label_22" label="변경상장일" style="" />
 						</xf:group>
 						<xf:group class="w2tb_td" tagname="td">
-							<w2:inputCalendar calendarValueType="yearMonthDate" focusOnDateSelect="false" footerDiv="true" id="edt_MktactEnforceDd" renderDiv="true" rightAlign="false" style="" />
+							<w2:inputCalendar calendarValueType="yearMonthDate" focusOnDateSelect="false" footerDiv="true" id="edt_MktactEnforceDd" ref="data:dma_mst.chgDd" renderDiv="true" rightAlign="false" style="" />
 						</xf:group>
 					</xf:group>
 					<xf:group tagname="tr">
@@ -161,7 +741,7 @@ scwin.onpageload = async function () {
 							<w2:textbox class="req" id="label_23" label="변경사유" style="" />
 						</xf:group>
 						<xf:group class="w2tb_td" tagname="td">
-							<xf:input id="txb_ChgRsnContn" style="width:450px;" />
+							<xf:input id="txb_ChgRsnContn" ref="data:dma_mst.chgRsnContn" style="width:450px;" />
 						</xf:group>
 					</xf:group>
 				</xf:group>
@@ -169,19 +749,19 @@ scwin.onpageload = async function () {
 			<!-- 종목 목록 : 종목 찾기(그리드 전체 교체) · 엑셀 업로드/다운로드 -->
 			<xf:group class="titbox" id="" style="">
 				<xf:group class="rt" id="" style="">
-					<xf:trigger class="btn_cm icon search" id="img_SetIsuCd" type="button">
+					<xf:trigger class="btn_cm icon search" ev:onclick="scwin.img_SetIsuCd_onclick" id="img_SetIsuCd" type="button">
 						<xf:label><![CDATA[종목 찾기]]></xf:label>
 					</xf:trigger>
-					<xf:trigger class="btn_cm upload" id="btn_exelUpload" type="button">
+					<xf:trigger class="btn_cm upload" ev:onclick="scwin.btn_exelUpload_onclick" id="btn_exelUpload" type="button">
 						<xf:label><![CDATA[엑셀업로드]]></xf:label>
 					</xf:trigger>
-					<xf:trigger class="btn_cm download" id="img_Excel" type="button">
+					<xf:trigger class="btn_cm download" ev:onclick="scwin.img_Excel_onclick" id="img_Excel" type="button">
 						<xf:label><![CDATA[엑셀저장]]></xf:label>
 					</xf:trigger>
 				</xf:group>
 			</xf:group>
 			<xf:group class="gvwbox" id="" style="">
-				<w2:gridView autoFit="allColumn" class="gvw row10" dataList="data:dlt_detail" id="grd_isu" style="">
+				<w2:gridView autoFit="allColumn" class="gvw row10" dataList="data:dlt_detail" ev:onfilereadend="scwin.grd_isu_onfilereadend" id="grd_isu" style="">
 					<w2:caption id="grd_isu_cap" style="" value="ELW 행사가격/전환비율 변경 종목" />
 					<w2:header id="grd_isu_hd" style="">
 						<w2:row id="" style="">
@@ -221,13 +801,13 @@ scwin.onpageload = async function () {
 					<w2:textbox class="txt_info" id="label_1" label="※ 엑셀업로드 에러시 체크사항 : 확장자 xls(Excel 97/2003) 확인, 암호화 해제 확인, 쉬트명 &quot;Sheet1&quot; 확인" style="" />
 				</xf:group>
 				<xf:group class="rt" id="" style="">
-					<xf:trigger class="btn_cm" id="btn_Update" type="button">
+					<xf:trigger class="btn_cm" ev:onclick="scwin.btn_Update_onclick" id="btn_Update" type="button">
 						<xf:label><![CDATA[수정]]></xf:label>
 					</xf:trigger>
-					<xf:trigger class="btn_cm" id="btn_Delete" type="button">
+					<xf:trigger class="btn_cm" ev:onclick="scwin.btn_Delete_onclick" id="btn_Delete" type="button">
 						<xf:label><![CDATA[삭제]]></xf:label>
 					</xf:trigger>
-					<xf:trigger class="btn_cm pt" id="btn_Save" type="button">
+					<xf:trigger class="btn_cm pt" ev:onclick="scwin.btn_Save_onclick" id="btn_Save" type="button">
 						<xf:label><![CDATA[저장]]></xf:label>
 					</xf:trigger>
 				</xf:group>
