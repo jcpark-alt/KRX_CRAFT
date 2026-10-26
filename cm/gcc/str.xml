@@ -658,17 +658,31 @@ scwin.trim = function (str) {
  * @method
  * @name getByteLength
  * @description 문자열의 바이트 기준 문자열 길이를 반환한다.
+ * 줄바꿈(Enter)은 2byte로 계산한다. ("\n" 단독은 2byte, "\r\n"은 합쳐서 2byte)
  * @param {String} str 문자열
  * @param {String} ignoreChar 길이 측정 시 무사할 문자열
  * @returns {Number} 문자열 길이
  * @hidden N
- * @exception 
+ * @exception
  * @example
 $c.str.getByteLength("1231aABC");  // 8
 $c.str.getByteLength("1231a한글");  // 9
+$c.str.getByteLength("ab\ncd");    // 6
 */
 scwin.getByteLength = function (str, ignoreChar) {
-    return WebSquare.util.getStringByteSize(str, ignoreChar);
+    const byteSize = WebSquare.util.getStringByteSize(str, ignoreChar);
+    if (!str) {
+        return byteSize;
+    }
+    const strVal = String(str);
+    const ignoreVal = String(ignoreChar || "");
+    if (ignoreVal.indexOf("\n") > -1) {
+        return byteSize;
+    }
+    // 엔진은 "\n"을 1byte로 계산하므로 "\r" 없이 단독으로 쓰인 "\n"마다 1byte를 더한다.
+    const lfCnt = (strVal.match(/\n/g) || []).length;
+    const crlfCnt = ignoreVal.indexOf("\r") > -1 ? 0 : (strVal.match(/\r\n/g) || []).length;
+    return byteSize + lfCnt - crlfCnt;
 };
 
 // =============================================================================
@@ -805,6 +819,7 @@ scwin.setLowercase = function (value) {
  * @name getByteSubstring
  * @description 문자열을 바이트 기준 시작/종료 위치로 잘라 부분 문자열을 반환한다.
  * 바이트 계산은 $c.str.getByteLength 와 동일하게 서버 설정 인코딩을 따르며, 경계에 걸치는 문자는 제외한다.
+ * 줄바꿈(Enter)은 2byte로 계산한다. ("\n" 단독은 2byte, "\r\n"은 합쳐서 2byte이며 분리하지 않음)
  * @param {String} str 대상 문자열
  * @param {Number} startPosLen 시작 바이트 위치 (0부터)
  * @param {Number} endPosLen 종료 바이트 위치 (생략 시 끝까지)
@@ -814,6 +829,7 @@ scwin.setLowercase = function (value) {
  * @example
 $c.str.getByteSubstring("가나다라마바사", 3); // "나다라마바사"
 $c.str.getByteSubstring("1234가나다", 3);     // "4가나다"
+$c.str.getByteSubstring("ab\ncd", 0, 3);      // "ab"
  */
 scwin.getByteSubstring = function (str, startPosLen, endPosLen) {
     str = String(str == null ? "" : str);
@@ -822,8 +838,10 @@ scwin.getByteSubstring = function (str, startPosLen, endPosLen) {
     let result = "";
     let bytePos = 0;
     for (let i = 0; i < str.length; i++) {
-        const chr = str.charAt(i);
-        const chrByte = WebSquare.util.getStringByteSize(chr);
+        // 줄바꿈은 $c.str.getByteLength 와 동일하게 2byte로 계산하고, "\r\n"은 하나의 단위로 자르지 않는다.
+        const chr = str.substr(i, 2) === "\r\n" ? "\r\n" : str.charAt(i);
+        const chrByte = (chr === "\n" || chr === "\r\n") ? 2 : WebSquare.util.getStringByteSize(chr);
+        i += chr.length - 1;
         if (hasEnd && bytePos + chrByte > Number(endPosLen)) {
             break;
         }
