@@ -47,6 +47,21 @@
 
 해당 사항이 없는 장은 지우지 말고 "해당 없음" 한 줄을 남깁니다(빠뜨린 것인지 없는 것인지 구분하기 위해).
 
+### 0.3 분석 입력 자료 — 쓰기 전에 모두 찾는다
+
+결과서를 쓰기 전에 원본 옆의 자료를 먼저 찾아 읽습니다. 있는 자료는 결과서 머리 표에 적고, 없으면 "없음"이라고 적습니다.
+
+| 자료 | 위치 (예) | 결과서에서 쓰는 곳 |
+|---|---|---|
+| AS-IS 원본 | `{폴더}/{화면ID}.gfm`·`.jsp` | 전 장 |
+| **신규 API 명세** | `{폴더}/{화면ID}_API.txt` | **§2.2 데이터 정의(키 이름·dataType), §5 서버 통신(경로·method·요청/응답 — AS-IS ↔ 명세 대응표), §1.4 흐름도의 서버 노드, §10 명세와 AS-IS 의 차이.** 이 화면ID 블록만 이 화면의 API 이고, 다른 화면ID 블록(부모·형제 화면)은 §1.1 호출 화면 설명에만 참고합니다 |
+| 화면 캡처 | `{폴더}/{화면ID}*.png` | §2.1 화면 구성, TO-BE 1단계 퍼블리싱(§13.2) |
+| KRX 퍼블리셔 XML | `conversion/publish/…/{화면ID}.xml` | §2.1 TO-BE 컴포넌트 종류·id, 부모 화면의 호출 규약(§1.1·§1.2) |
+| 부모·하위 화면 전환본 | `ui-tobe/`·`sample-front/ui/` 등 | §1.2·§1.3 호출·반환 규약 |
+
+* **API 명세가 있으면 분석 단계에서 이미 TO-BE 통신을 명세 기준으로 적습니다** — 전환 단계에서 처음 맞추면 §2.2·§5·§1.4 를 다시 써야 합니다. 명세 읽는 법과 적용 규칙은 §5 「API 명세 적용」입니다.
+* 명세가 없으면 §5 의 TO-BE 칸에 AS-IS 경로를 적고 "가정"을 표시해 §10 에 올립니다.
+
 ---
 
 ## 1. 문서 기본 정보 및 화면 개요
@@ -59,6 +74,7 @@
 | 항목 | 내용 |
 |---|---|
 | AS-IS | `{경로}/{파일}` (JSP/jQuery, {메인 화면 / W×H 팝업}) — 반입 `{반입 경로}` |
+| 신규 API 명세 | `{화면ID}_API.txt` ({n}종 — 이 화면 {m}종, 다른 화면 {k}종) / 없으면 "없음" |
 | TO-BE | `conversion/sample-front/ui/{화면ID}.xml` (배포 경로 `/ui/{업무}/{화면ID}.xml`) |
 | 화면 캡처 | `{파일}.png`({상태}) |
 | 업무공통 | `$c.{ns}`({사용 함수}) — `cm/pcc/{ns}`. 게이트는 `--pcc {ns}` 로 돌린다 |
@@ -196,6 +212,7 @@ stateDiagram-v2
 
 * 1건짜리 조건·입력은 `dma_`, 목록은 `dlt_` 입니다.
 * 컬럼 출처가 여러 곳(화면 입력·응답·전송 전문)이면 합친 목록을 쓰고, 미확정이면 "컬럼 미정(…)"으로 적어 §10 에 올립니다.
+* **API 명세가 있으면 키 이름·dataType 은 명세의 RESPONSE/REQUEST `keyInfo`·`columnInfo` 를 그대로 씁니다**(출처 칸에 "명세 `select-one` 응답" 처럼 적음). AS-IS 대문자 컬럼 → 명세 키 대응을 표 아래에 적고, 명세에 없는 AS-IS 컬럼·명세에만 있는 키는 §10 에 올립니다.
 
 ---
 
@@ -268,7 +285,37 @@ AS-IS 의 Ajax(`$.ajax`·`$.post`·axios) 또는 Form Submit 을 `$c.sbm.execute
 * 동기 통신은 없습니다. AS-IS 의 `async:false` 는 "앞 통신이 끝난 뒤 실행" 으로 적고, 전환본은 `await` 순서로 보장합니다.
 * 중복 실행(연속 클릭)은 기본적으로 건너뛰고 `{ skipped : true }` 로 돌아옵니다. 응답을 쓰기 전에 `if (result?.skipped) return;` 을 둡니다. 마지막 요청이 이겨야 하는 조회(행 클릭 상세 등)는 `{ onDuplicate : "abort" }`(4번째 인자)를 적습니다.
 * 통신 오류는 공통 오류 핸들러가 안내하고 예외를 던집니다. 화면이 따로 처리할 것은 **응답 `success:false`·업무 결과 코드** 입니다.
-* **URL 은 신규 API 경로**로 씁니다. 신규 API 매핑을 받지 못했으면 AS-IS 경로를 적고 "가정"임을 표시해 §10 에 올립니다.
+* **URL 은 신규 API 경로**로 씁니다. 신규 API 명세(`{화면ID}_API.txt`)가 있으면 아래 「API 명세 적용」을 따릅니다. 명세도 매핑도 받지 못했으면 AS-IS 경로를 적고 "가정"임을 표시해 §10 에 올립니다.
+
+**API 명세 적용 (`{화면ID}_API.txt`) — 필수**
+
+원본 옆에 `{화면ID}_API.txt`(예: `conversion/gfm-front/ui/ULDSTF05621_API.txt`)가 있으면, 결과서 §5 와 TO-BE 의 모든 통신을 **이 명세의 API 로 바꿉니다**. AS-IS URL(`*.do`, `DIV_IDX`·`TRS_IDX`·`queryId` 파라미터)은 TO-BE 코드에 남기지 않습니다.
+
+1. **명세 읽기** — 블록 하나가 API 하나입니다.
+
+   ```text
+   [화면ID][업무][제목]            ← 이 화면ID 블록만 이 화면의 대상. 다른 화면ID(부모·형제)는 그 화면 전환 때 쓴다
+   GET|POST /api/…                 ← method · 경로
+   REQUEST                         ← 요청 키 목록, 또는 <w2:dataMap>/<w2:dataList> 정의(전문 머리·목록)
+   RESPONSE                        ← 응답 <w2:dataMap>/<w2:dataList> 정의, 빈칸이면 결과 코드만
+   ```
+
+2. **AS-IS ↔ 명세 대응표** — 결과서 §5 표의 AS-IS 통신마다 대응 API 를 정합니다. 기준은 용도(조회·저장·수정·삭제·중복확인)와 입출력 dataset 입니다. 같은 URL 을 `DIV_IDX` 만 바꿔 여러 번 부르던 AS-IS 조회가 명세에서 한 API 로 합쳐졌으면(예: 마스터·상세 3회 → `select-one` 1회) 그 사실을 적습니다.
+3. **요청** — 명세 REQUEST 의 키 이름(camelCase)·구조 그대로 보냅니다. AS-IS 가 보내던 값이 명세에 없으면(예: `SCREN_ID`, `LIST_BZ_TP_CD`, 구분코드) **임의로 넣지 않고** §10 TODO 와 코드 `// TODO:` 주석으로 남깁니다.
+4. **응답** — 명세 RESPONSE 의 dataMap/dataList keyInfo 를 결과서 §2.2 데이터 정의와 TO-BE `<w2:dataCollection>` 에 그대로 옮기고(id·name·dataType), `target` 은 그 구조에 맞춥니다.
+5. **명세에 없는 AS-IS 통신** — 업무공통 함수가 대신하는지(예: 채번 `$c.stf.getNewBzProcNo`) 확인하고, 없으면 §10 TODO.
+6. **명세가 모호하거나 AS-IS 와 어긋나면** 명세를 따르되 고치지 않고 기록합니다. 예: 응답이 dataMap 인데 화면은 여러 행, 응답이 비어 재조회할 키가 없음, "등록 시 서버채번", 명세 설명과 요청 열이 다름. → §10 TODO + 코드 `// TODO:` 주석.
+7. **base 경로** — 같은 접두를 쓰면 `scwin.API = "/api/…/"` 상수 + `action : scwin.API + "select-one"` 으로 씁니다(게이트가 이 형태를 풀어 대조합니다).
+8. **게이트** — `api_spec_check.py` 로 TO-BE 의 `executeDynamic` action 을 명세와 대조합니다(§13.3).
+
+   | 코드 | 판정 | 내용 |
+   |---|---|---|
+   | A01 | FAIL | 명세에 없는 경로를 부름 |
+   | A02 | FAIL | 같은 경로인데 method 가 다름 |
+   | A03 | FAIL | 이 화면ID 의 명세 API 를 부르지 않음 — 쓰지 않는 근거가 있으면 `--allow-unused <경로>` 로 낮추고 §10 에 적음 |
+   | A04 | FAIL | 코드에 AS-IS URL(`*.do`) 이 남음(주석은 제외) |
+   | A05 | WARN | action 을 정적으로 풀 수 없음(변수 조립) — 리뷰 |
+   | A06 | INFO | 다른 화면ID 블록 |
 
 **항목 (통신마다 한 절):**
 
@@ -472,7 +519,7 @@ scwin.btn_confirm_onclick = async function () {
 ## 10. 남은 작업 (TODO)
 
 번호 목록으로, 각 항목에 **무엇이 미확정인지 + 확정되면 무엇을 바꾸는지 + 관련 장**을 적습니다.
-대표 항목: 신규 API 경로·응답 구조, 호출부 계약(부모가 넘기는 키·닫힌 뒤 재조회), 미전환 하위 팝업, 업무공통에 없는 함수,
+대표 항목: 신규 API 경로·응답 구조, **API 명세와 AS-IS 의 차이**(명세에 없는 AS-IS 값, 응답 형태·채번 주체 등 명세의 모호점), 호출부 계약(부모가 넘기는 키·닫힌 뒤 재조회), 미전환 하위 팝업, 업무공통에 없는 함수,
 실화면에서만 확인할 수 있는 동작(팝업 차단, 엔진 이벤트 순서).
 
 ---
@@ -534,13 +581,14 @@ scwin.btn_confirm_onclick = async function () {
 - [ ] §2: AS-IS 의 **모든 입력·출력 요소**가 표에 있거나 "(옮기지 않음)" 사유가 있다. DataCollection 키가 camelCase 로 정리됐다.
 - [ ] §3: onpageload 는 `init_*` 호출만 갖고, 각 단위의 순서와 await 근거가 있다.
 - [ ] §4: AS-IS 의 **모든 이벤트 바인딩**(스크립트·속성)이 TO-BE 핸들러로 대응됐다.
-- [ ] §5: 모든 Ajax/submit 이 한 절씩 있고, 신규 API 경로(또는 가정 표시)·후처리·실패 처리·중복 실행 정책이 적혔다.
+- [ ] §5: 모든 Ajax/submit 이 한 절씩 있고, 신규 API 경로(또는 가정 표시)·후처리·실패 처리·중복 실행 정책이 적혔다. `{화면ID}_API.txt` 가 있으면 AS-IS ↔ 명세 대응표가 있고, 명세 요청·응답 키가 §2.2 와 같으며, 명세와 어긋나는 점이 §10 에 올라갔다.
 - [ ] §6: 검증은 공통/업무로 나뉘었고, 팝업은 반환 형태가 적혔다. `fn_GetPar`/`fn_SetPar` 는 전부 `openPopup` data + `await` 반환(§6.5)으로 대응됐고, 취소는 필요한 필드로 판정한다.
 - [ ] §7: 분기에 쓰인 코드 값과 메시지가 빠짐없이 모였다.
 - [ ] §8: 각 결함에 "유지/고침/옮기지 않음" 결정이 적혔다.
 - [ ] §9: 전환 후 — AS-IS 함수 전부가 TO-BE 이름 또는 "삭제(사유)"로 대응됐다.
 - [ ] §10: 가정으로 둔 것(API 경로·응답 구조·하위 팝업)이 전부 TODO 로 올라갔다.
 - [ ] 머리 표: "화면 캡처" 칸이 채워졌다(없으면 "없음"). 캡처가 있으면 TO-BE 는 §13.2 퍼블리싱본부터 만든다.
+- [ ] 머리 표: "신규 API 명세" 칸이 채워졌다(없으면 "없음"). 명세가 있으면 §2.2 키와 §5 TO-BE 경로가 명세 기준이다.
 
 ```sh
 # 누락 점검 — AS-IS 의 함수·요소 id 가 결과서에 모두 언급됐는지
@@ -548,6 +596,12 @@ F={AS-IS 파일}; M=conversion/sample-front/ui/{화면ID}.md
 for k in $(grep -oE 'function [A-Za-z_0-9]+' $F | cut -d' ' -f2) \
          $(grep -oE '(id|name)="[^"]+"' $F | cut -d'"' -f2 | sort -u); do
   grep -q "$k" $M || echo "결과서 미언급: $k"
+done
+
+# API 명세가 있으면 — 이 화면ID 블록의 API 끝 경로가 결과서에 모두 언급됐는지(다른 화면ID 블록은 제외)
+A={폴더}/{화면ID}_API.txt; ID={화면ID}
+[ -f "$A" ] && for k in $(awk -v id="[$ID]" 'index($0,"[")==1{s=(index($0,id)==1)} s && /^(GET|POST|PUT|DELETE|PATCH) /{n=split($2,a,"/"); print a[n]}' $A | sort -u); do
+  grep -q "$k" $M || echo "결과서 미언급 API: $k"
 done
 ```
 
@@ -599,6 +653,7 @@ flowchart TD
 PYTHONUTF8=1 python conversion/tools/gate_screen.py --pcc {fil|stf|mgt|tms} conversion/sample-front/ui/{화면ID}.xml
 PYTHONUTF8=1 python conversion/tools/scan_mixed_compare.py conversion/sample-front/ui/{화면ID}.xml
 PYTHONUTF8=1 python conversion/tools/publish_gate.py --rev HEAD conversion/sample-front/ui/{화면ID}.xml   # 퍼블리싱본 위에 전환했으면
+PYTHONUTF8=1 python conversion/tools/api_spec_check.py conversion/gfm-front/ui-tobe/{화면ID}.xml        # {화면ID}_API.txt 가 있으면 필수(없으면 SKIP)
 python -m wsxml_lint conversion/sample-front/ui/{화면ID}.xml
 ```
 
@@ -616,6 +671,7 @@ python -m wsxml_lint conversion/sample-front/ui/{화면ID}.xml
 | 항목 | 내용 |
 |---|---|
 | AS-IS | `{경로}/{파일}` ({JSP/jQuery}, {메인 화면 / W×H 팝업}) — 반입 `{반입 경로}` |
+| 신규 API 명세 | `{화면ID}_API.txt` ({n}종 — 이 화면 {m}종) — 있으면 §2.2·§5 는 명세 기준(가이드 §0.3·§5) / 없으면 "없음" |
 | TO-BE | `conversion/sample-front/ui/{화면ID}.xml` (배포 경로 `/ui/{업무}/{화면ID}.xml`) |
 | 화면 캡처 | `{파일}.png`({상태}) — 있으면 TO-BE 는 퍼블리싱본부터 만든다(가이드 §13.2) / 없으면 "없음" |
 | 업무공통 | `$c.{ns}`({함수}) — `cm/pcc/{ns}`. 게이트는 `--pcc {ns}` 로 돌린다 |
@@ -696,6 +752,10 @@ stateDiagram-v2
 |---|---|---|---|---|
 
 ## 5. 서버 통신
+
+| # | 용도 | AS-IS | TO-BE (API 명세 — 없으면 "가정") |
+|---|---|---|---|
+| 5.1 | | | `GET …/` |
 
 ### 5.1 {용도} (`scwin.xxx`)
 
