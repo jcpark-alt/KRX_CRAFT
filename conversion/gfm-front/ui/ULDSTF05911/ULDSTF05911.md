@@ -3,7 +3,7 @@
 | 항목 | 내용 |
 |---|---|
 | AS-IS | `/lstproc/ULDSTF05911.gfm` (Gauce/X-Internet, 980×480 모달 창 — 부모가 1000×490 `window` 로 연다) — 반입 `conversion/gfm-front/ui/ULDSTF05911/ULDSTF05911.gfm` |
-| 신규 API 명세 | `conversion/gfm-front/ui/ULDSTF05911/ULDSTF05911_API.txt` — 블록 4종(이 화면 4종, 다른 화면 0종). §2.2·§5 는 명세 기준(가이드 §0.3·§5) |
+| 신규 API 명세 | `conversion/gfm-front/ui/ULDSTF05911/ULDSTF05911_API.txt` — 블록 4종(이 화면 4종, 다른 화면 0종). §2.2·§5 는 명세 기준(가이드 §0.3·§5). **2026-10-26 갱신**: `register`·`modify` 요청 전달 방식 명시(머리 dataMap 은 `ref` 없이 `requestData` 로, 목록은 `requestData.isuList`) |
 | TO-BE | `conversion/gfm-front/ui-tobe/ULDSTF05911.xml` (배포 경로 `/ui/lst/lstproc/ULDSTF05911.xml` — 가정, §10) |
 | 퍼블리싱 | `conversion/publish/상장/상장처리(대내)/ULDSTF05911.xml` — 컴포넌트 id 는 AS-IS 와 같음(`edt_MktactEnforceDd` `inputCalendar`, `txb_ChgRsnContn` `xf:input`, 버튼·`img_SetIsuCd`·`img_Excel`·`btn_exelUpload` 는 `xf:trigger`). 그리드 컬럼 id 는 대문자·한글(`번호`) 그대로 |
 | 화면 캡처 | 없음 |
@@ -362,8 +362,8 @@ scwin.onpageload = async function () {
 | # | 명세 블록 | method · 경로 | 요청 (명세 정의) | 응답 (명세 정의) | AS-IS 대응 | TO-BE 함수 |
 |---|---|---|---|---|---|---|
 | 1 | [ULDSTF05911] 종목별 상세 조회 | `GET …/select-list-isu` | `bzProcsNo` | `dma_detail` (dataMap, 17키) | `/Listing.do?method=searchChgList&DIV_IDX=3` → `dts_Isu` | `scwin.selectList` → `dlt_detail` |
-| 2 | [ULDSTF05911] 수정 | `POST …/modify` | `dma_update` + `dlt_update_isuList` | (없음) | `trs` `TRS_IDX=2` `dtsParm1=dts_Isu` | `scwin.saveTrs("U")` |
-| 3 | [ULDSTF05911] 등록 | `POST …/register` | `dma_register` + `dlt_register_isuList` | (없음) | `fn_getNewBzProcNo` + `trs` `TRS_IDX=1` | `scwin.saveTrs("I")` |
+| 2 | [ULDSTF05911] 수정 | `POST …/modify` | `dma_update` 필드를 `requestData` 최상위로 + `dlt_update_isuList` 를 `requestData.isuList` 로 (`ref` 미사용 — 명세 명시) | (없음) | `trs` `TRS_IDX=2` `dtsParm1=dts_Isu` | `scwin.saveTrs("U")` |
+| 3 | [ULDSTF05911] 등록 | `POST …/register` | `dma_register` 필드를 `requestData` 최상위로 + `dlt_register_isuList` 를 `requestData.isuList` 로 (`ref` 미사용 — 명세 명시) | (없음) | `fn_getNewBzProcNo` + `trs` `TRS_IDX=1` | `scwin.saveTrs("I")` |
 | 4 | [ULDSTF05911] 삭제(논리삭제) | `POST …/remove` | `dma_remove` (`bzProcsNo`·`isurCd`) | (없음) | `trs` `TRS_IDX=3` (그리드 전체 전송) | `scwin.deleteTrs` |
 
 명세에 없는 AS-IS 통신: 채번(`fn_getNewBzProcNo`) — 명세상 서버 채번이라 쓰지 않음, 종목 선택 팝업(ULDSTF92023)의 조회 — 팝업 소관(§6.4).
@@ -373,7 +373,7 @@ scwin.onpageload = async function () {
 | # | 차이 | 처리 | §10 |
 |---|---|---|---|
 | 1 | `select-list-isu` 응답이 dataMap(`dma_detail`)으로 적혀 있으나 종목 여러 건, 머리 정보(`chgDd`·`chgRsnContn`)도 행마다 옴 | 같은 keyInfo 의 목록 `dlt_detail` 로 받고 첫 행에서 머리 정보 표시 | #1 |
-| 2 | 요청 목록의 JSON 키 이름이 명세에 없음(정의 이름 `…_isuList` 에서 `isuList` 추정) | 가정으로 사용 | #1 |
+| 2 | ~~요청 목록의 JSON 키 이름이 명세에 없음~~ → **해소(2026-10-26 명세 갱신)**: 머리 dataMap 은 `ref` 없이 `requestData` 로, 목록은 `requestData.isuList` 로 보낸다고 명세가 명시 | 명세대로 — 현재 TO-BE 구현(`{ ...머리.getJSON(), isuList : 목록.getAllJSON() }`)과 일치 | — |
 | 3 | `register` 는 "등록 시 서버채번", 응답 없음 — AS-IS 는 화면이 채번 | 화면 채번 삭제, 저장 뒤 재조회 키 미확보 | #2 |
 | 4 | 응답 설명은 행 PK(`chgListMktactAdmNo`·`bfchg/afchgBybzprocsSeq`)를 "수정/삭제 시 그대로 전달" 이라 하나 `modify` 요청 목록에 없음 | 요청 정의대로(보내지 않음) | #3 |
 | 5 | 요청 목록의 `listMethdTpCd` 출처(조회 응답·종목 선택 결과)가 명세에 없음, 엑셀 업로드 행에는 없음 | 조회·선택 결과 값을 사용 | #4·#7 |
@@ -400,7 +400,7 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=1`, `LIST_BZ_TP_CD=147`
 |---|---|
 | `id` | `sbm_saveTrs` |
 | `method` / `action` | `post` / `…/register` (I) · `…/modify` (U), `mediatype : "application/json"` |
-| `requestData` | 명세 요청 정의에 담아 보낸다 — register 는 `dma_register` + `dlt_register_isuList`, modify 는 `dma_update` + `dlt_update_isuList`. `{ ...머리.getJSON(), isuList : 목록.getAllJSON() }` — 목록 키 이름 `isuList` 는 정의 이름(`…_isuList`)에서 추정한 **가정**(§10 #1). `setJSON` 이 정의된 키만 남기므로 `isuNm`·`elwRghtTpKindCd` 등 명세 밖 열은 보내지 않는다. 수정 시 행 PK(`chgListMktactAdmNo`·`bfchgBybzprocsSeq`·`afchgBybzprocsSeq`)는 요청 정의에 없어 §10 #3 |
+| `requestData` | 명세 요청 정의에 담아 보낸다 — register 는 `dma_register` + `dlt_register_isuList`, modify 는 `dma_update` + `dlt_update_isuList`. `{ ...머리.getJSON(), isuList : 목록.getAllJSON() }` — 명세가 명시한 전달 방식이다(머리 dataMap 은 `executeDynamic` 의 `ref` 를 쓰지 않고 `requestData` 로, 목록은 `isuList` 객체명으로). `setJSON` 이 정의된 키만 남기므로 `isuNm`·`elwRghtTpKindCd` 등 명세 밖 열은 보내지 않는다. 수정 시 행 PK(`chgListMktactAdmNo`·`bfchgBybzprocsSeq`·`afchgBybzprocsSeq`)는 요청 정의에 없어 §10 #3 |
 | 채번 | 원본은 화면이 채번(`fn_getNewBzProcNo`, 14자리 아니면 `MSG-0010`). 신규 API 명세는 "**등록 시 서버채번**" → TO-BE 는 채번하지 않는다. 다만 `register` 응답이 비어 있어 저장 뒤 재조회할 번호를 받을 수 없다(§10 #2) |
 | 후처리 | 성공: `MSG-A001` "[저장/수정] 처리 성공하였습니다." → 수정은 재조회 `await scwin.selectList()`. 등록은 응답 `body.bzProcsNo` 가 있으면 그 번호로 재조회, 없으면 `$c.win.closePopup()`(부모가 `await` 뒤 재조회 — §1.2 반환 규약) |
 | 실패 처리 | `success:false`: `MSG-A002` "[…] 처리 실패하였습니다." 신규 실패면 `scwin.bzProcsNo` 를 비운 채 신규 상태를 유지 |
@@ -595,7 +595,7 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=1`, `LIST_BZ_TP_CD=147`
 
 ## 10. 남은 작업 (TODO)
 
-1. **응답·요청 구조 확정** — `select-list-isu` 응답이 명세에는 `dma_detail`(dataMap)로 적혀 있지만 종목 여러 건이다. 목록인지, 머리 정보(`chgDd`·`chgRsnContn`)가 행마다 오는지 확인한다. `register`/`modify` 요청의 목록 키(`isuList` 가정)도 확정되면 §5.1·§5.2 를 고친다.
+1. **응답·요청 구조 확정** — `select-list-isu` 응답이 명세에는 `dma_detail`(dataMap)로 적혀 있지만 종목 여러 건이다. 목록인지, 머리 정보(`chgDd`·`chgRsnContn`)가 행마다 오는지 확인한다. (요청 쪽은 2026-10-26 명세 갱신으로 확정 — 머리는 `requestData` 최상위, 목록은 `isuList`. 남은 것은 응답 형태뿐이다.)
 2. **서버 채번 후 재조회** — 신규 API 는 "등록 시 서버채번"인데 `register` 응답이 비어 있다. **결정(2026-10-26)**: 응답에 `bzProcsNo` 가 오면 그 번호로 재조회해 수정 모드로, 오지 않으면 팝업을 닫아 부모가 다시 조회한다. 응답으로 번호를 줄 수 있는지 서버에 확인한다(§1.4 업무 5).
 3. **수정 시 행 PK** — 명세의 `chgListMktactAdmNo`·`bfchgBybzprocsSeq`·`afchgBybzprocsSeq` 는 "수정/삭제 시 그대로 전달"이라 적혀 있으나 `modify` 요청 목록에는 이 열이 없다. 전달 여부를 확인한다.
 4. **`listMethdTpCd` 출처** — 요청에 필요한 상장방식유형코드를 종목 선택 결과·조회 응답에서 받는지 확인한다. 엑셀 업로드 행에는 없다(#7).
