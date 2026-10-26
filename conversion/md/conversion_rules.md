@@ -785,7 +785,8 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
   `review` = 퍼블리싱 본문이 자리표뿐 · 공급사 body 에 있던 참조를 못 채움 · 양쪽에 항목이 있는데 하나도 못 이음(다른 구조의 퍼블리싱 파일; 공통 버튼은 항목 수에서 제외). 공급사 body 에도 없던 참조는 게이트처럼 report-only.
   `mismatch` = override `skip`(퍼블리싱 빈 자리표 — 기준으로 삼을 UI 가 없을 때만; 2026-10-07 사용자 기준으로 '같은 이름에 다른 화면'도 publish 구조를 기준으로 삼아 `accept`). override `accept` 는 정합 0 이어도 TODO 결과를 받아들여 `manual`.
 * **헤더 표준(사용자 확정 2026-10-06)**: 퍼블리싱 헤더는 `pgtbox`+breadcrumb+즐겨찾기 꼴이지만 **pageFrame 으로 통일** — 본화면(`sub_contents`)은
-  `pfmContentHeader` pageFrame 을 첫 자식으로 반드시, 팝업(`pop_contents`)은 헤더 없음(제목은 팝업 프레임). 규칙 34 P1 이 보장하므로 병합본에도 자동 적용된다.
+  `pfmContentHeader` pageFrame 을 첫 자식으로 반드시, 팝업(`pop_contents`)도 같이 첫 자식으로 반드시(**2026-10-23 변경, 사용자 지시** — 종전 "팝업은 헤더 없음(제목은 팝업 프레임)" 폐기).
+  tabControl 탭 본문에만 넣지 않는다. 규칙 34 P1 이 보장하므로 병합본에도 자동 적용된다.
   퍼블리싱 본문이 자리표뿐이면(위젯 없음) `review`. `review` 의 큰 덩어리: 퍼블리싱에만 있는 버튼·select(새 디자인 추가분), 전화번호 3분할 입력 ↔ 공급사 1칸, 라벨 없는 컨트롤 여러 개,
   EL `${…}` 라벨 버튼(공급사 미해결 표식), 공급사 보조 그리드(헤더 없는 `grd_sub…`). 같은 이름이 두 폴더에 있으면 `대외` 쪽을 고른다(⚠중복 표기).
 * **손작업 보호·jQuery 힌트(2026-10-06)**: 지시 `frozen`(ui-pub 파일을 손으로 고친 뒤 재생성에서 보호, 판정 `frozen`) · ui-pub 에 쓰기 전 남은 jQuery 문장마다 `// TODO Stage2(규칙 19): jQuery — 힌트`
