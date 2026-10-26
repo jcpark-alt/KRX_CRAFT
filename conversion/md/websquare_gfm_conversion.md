@@ -24,7 +24,8 @@
 ### 0.1 이름
 
 * 함수명은 `fn_` 접두사를 빼고 동사형 camelCase 로 씁니다(규칙 13). 예: `fn_SearchList` → `scwin.searchList`.
-  * **예외** — 하위 팝업이 부모의 함수를 원래 이름으로 부르는 경우(`opener.fn_GetPar()` 등)는 원래 이름을 유지하고, 그 이유를 §9 에 적습니다.
+  * 부모·팝업이 서로 이름으로 부르던 `fn_GetPar`/`fn_SetPar`(getPar/setPar)는 개명해 남기지 않고 **`$c.win.openPopup` + `await` 반환값 방식으로 바꿉니다**(§6.5).
+  * **예외** — 그 밖에 하위 팝업이 부모 함수를 원래 이름으로 부르는데 하위 팝업을 이번에 바꿀 수 없는 경우만 원래 이름을 유지하고, 그 이유를 §9 와 §10 에 적습니다.
 * 이벤트 핸들러는 `scwin.{컴포넌트ID}_{이벤트}` 이고 이벤트명은 소문자입니다(규칙 3). 예: `scwin.btn_search_onclick`, `scwin.grd_list_oncellclick`.
 * 컴포넌트 접두는 `btn_`·`ipt_`·`sbx_`·`ica_`·`grd_`·`tbl_`, DataCollection 은 `dma_`(1건)·`dlt_`(다건) 입니다.
 * **DataCollection 키는 camelCase** 입니다. AS-IS 의 `USER_ID` 같은 대문자 키는 `userId` 로 바꿔 적고, 화면이 실제로 그 키로 읽는지 확인합니다(대문자 키를 그대로 남기면 `undefined` 를 읽는 결함이 됩니다).
@@ -343,7 +344,8 @@ scwin.searchList = async function () {
 * **파라미터:** `deptNm` (초기 검색 부서명)
 * **Return:** 없음
 * **로직:** `const result = await $c.win.openPopup("/ui/{업무}/{팝업ID}.xml", options, { deptNm });` (규칙 17)
-  * 팝업은 콜백 함수를 지정하지 않고 **반환값으로 결과를 받습니다**. 결과가 비면 취소로 봅니다.
+  * 팝업은 콜백 함수를 지정하지 않고 **반환값으로 결과를 받습니다**(`type : "pageFramePopup"`).
+  * **취소 판정은 필요한 필드로 합니다.** 취소·닫기(X)·ESC 로 닫혀도 빈 값이 아니라 `{ isCloseButtonClick }` 객체가 돌아오므로 `$c.util.isEmpty(result)` 는 항상 false 입니다 — `if ($c.util.isEmpty(result.deptCd)) return;`. 자세한 규약은 §6.5.
   * 반환 형태(키 이름, 배열인지 객체인지)와 팝업 크기·제목을 적습니다. 팝업 전환본이 아직 없으면 "가정"으로 표시해 §10 에 올립니다.
   * 받은 값으로 `dma_search.set("deptCd", result.deptCd)` 등 무엇을 채우는지.
 
@@ -354,6 +356,82 @@ scwin.searchList = async function () {
 #### 6.4 화면 리셋 (`scwin.resetForm`) — 초기화 버튼
 * `dma_search.setEmptyValue();` 후 §3 의 조건 기본값을 다시 채움, `dlt_userList.removeAll();`, 버튼 상태를 `insert` 로.
 * AS-IS `form.reset()` 은 HTML 기본값으로 되돌리던 것이므로, 되돌릴 기본값 목록을 여기에 적습니다.
+
+#### 6.5 부모 ↔ 팝업 파라미터 전달 (getPar/setPar → `$c.win.openPopup` + `await`) — 필수
+
+AS-IS 에 `getPar`/`setPar` 계열 코드가 나오면, 파라미터는 `$c.win.openPopup` 의 `data` 로 넘기고 결과는 **`await` 로 돌려받아** 처리하는 방식으로 전환합니다. 함수를 이름으로 찾아 부르는 계약은 남기지 않습니다(규칙 17·21).
+
+**식별 신호** — 아래 중 하나라도 보이면 이 절을 적용합니다.
+* 부모: `var fn_GetPar, fn_SetPar;` 전역, 팝업을 열기 전에 `fn_GetPar = fn_GetParNew;` 처럼 함수를 바꿔 끼우기, `OldGet = fn_GetPar; … CreateDialogFrame(…); fn_GetPar = OldGet;` 처럼 되돌리기.
+* 팝업: `frame.Provider("../").fn_GetPar(arrPar)`·`opener.fn_GetPar(arr)`·`parent.fn_GetPar(...)` 로 부모 함수를 불러 배열을 채워 받기, `fn_SetPar(arr)` 로 결과를 부모에 밀어 넣기.
+* dataset 인수: `fn_GetPar(arr, param_dts1, param_dts2)` 안에서 `CopyDataSet(dts_X, param_dts1)` 로 부모 자료를 팝업 dataset 에 복사하기.
+* W-Craft 1차본·전환본의 `scwin.fn_GetPar`·`scwin.getPar`·`$c.win.getParent()?.scwin.getPar(...)` 도 같은 계약입니다.
+
+**전환 규칙**
+
+| AS-IS | TO-BE |
+|---|---|
+| 부모가 `fn_GetPar` 에서 `arr[0]`, `arr[1]` … 를 채움 | 부모가 **의미 있는 키 이름의 객체**를 만들어 `openPopup` 세 번째 인자(`data`)로 넘김. 인덱스 → 키 대응은 결과서 §1.2 표에 적음 |
+| dataset 인수 + `CopyDataSet` | `data` 의 키로 JSON 을 넘김 — `{ mst : dma_mst.getJSON(), dtlList : dlt_dtl.getAllJSON() }` |
+| 팝업이 `frame.Provider("../").fn_GetPar(arrPar)` 로 받음 | 팝업이 `const param = $c.data.getParameter() ?? {};` 로 받음 |
+| 팝업이 `fn_SetPar(arr)` 로 부모에 값을 넣음 / 부모 컴포넌트를 직접 채움 | 팝업은 **`$c.win.closePopup(결과 객체)`** 로 돌려주기만 하고, 부모가 `await` 뒤에 자기 컴포넌트를 채움 |
+| 취소·닫기 | 팝업 `$c.win.closePopup()` (인자 없음) |
+| 함수 바꿔 끼우기·되돌리기(`OldGet`/`OldSet`) | 삭제 — 팝업마다 `data` 가 따로 가므로 필요 없음 |
+| 모달 대기 뒤 부모 재조회(`CreateDialogFrame(…); fn_search();`) | `await $c.win.openPopup(...)` 바로 뒤에서 재조회 |
+
+**부모 (여는 화면)**
+
+```javascript
+scwin.openIsuPopup = async function () {
+    const data = {
+        isurCd : dma_mst.get("isurCd"),     // AS-IS arr[0]
+        bzProcsNo : scwin.bzProcsNo,        // AS-IS arr[4] (비면 신규)
+        mst : dma_mst.getJSON()             // AS-IS CopyDataSet(dts_Mst, param_dts_mst)
+    };
+    const options = { id : "ULDSTF08045", popupName : "종목선택", width : 800, height : 650, type : "pageFramePopup" };
+
+    const result = await $c.win.openPopup("/ui/lst/common/ULDSTF08045.xml", options, data);
+
+    // 취소·닫기(X)·ESC 도 { isCloseButtonClick } 객체가 온다 → 필요한 필드로 판정한다.
+    if (result.isCloseButtonClick === true || $c.util.isEmpty(result.isuCd)) return;
+
+    // AS-IS fn_SetPar(arr) 가 하던 일
+    dma_mst.set("isuCd", result.isuCd);
+    dma_mst.set("isuNm", result.isuNm);
+};
+```
+
+**팝업 (열리는 화면)**
+
+```javascript
+scwin.init_recvParam = function () {
+    const param = $c.data.getParameter() ?? {};   // AS-IS frame.Provider("../").fn_GetPar(arrPar)
+    scwin.isurCd = param.isurCd ?? "";
+    scwin.bzProcsNo = param.bzProcsNo ?? "";
+    if (param.mst) dma_mst.setJSON(param.mst);
+};
+
+scwin.btn_confirm_onclick = async function () {
+    try {
+        // AS-IS fn_SetPar(arr) — 부모에 밀어 넣지 않고 돌려준다
+        $c.win.closePopup({ isuCd : dma_sel.get("isuCd"), isuNm : dma_sel.get("isuNm") });
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "{팝업ID}.btn_confirm_onclick" });
+    }
+};
+```
+
+**결과 판정 규약** (`cm/gcc/win.xml` `openPopup` 의 `@returns`)
+* `closePopup(객체)` → 그 객체에 `isCloseButtonClick : false` 가 붙어 돌아옵니다.
+* 인자 없이 닫힘(취소 버튼) → `{ isCloseButtonClick : false }`, 닫기(X)·ESC → `{ isCloseButtonClick : true }`.
+* `closePopup("문자열")`·숫자 같은 원시값은 그대로 돌아옵니다.
+* 따라서 **`$c.util.isEmpty(result)`·`result !== ""` 로 취소를 판정하지 않습니다.** 필요한 필드(`result.isuCd`, 목록이면 `result.list?.length`)로 판정합니다. 배열을 돌려줄 때는 `closePopup({ list : rows })` 처럼 키로 감싸면 판정이 분명해집니다.
+
+**적용 조건과 예외**
+* `data` 와 `await` 반환은 **`type : "pageFramePopup"` 에서만** 됩니다. AS-IS 가 `window`·`modal` 등 어떤 타입이었든 이 규칙을 적용할 때는 `pageFramePopup` 으로 엽니다(`browserPopup` 은 `callbackFn` 콜백으로만 받음).
+* 업무공통에 `browserPopup` + 콜백형으로 만들어진 팝업 함수(예: pcc `$c.lc.popFindDraft`·`$c.lc.popFindLstRsnCd`)는 `await` 할 수 없습니다. 화면에서 `$c.win.openPopup` 을 직접 부르고(선례 `sample-front/ui` ULDSTF08052_new), 넘겨야 할 값을 공통 함수가 받지 못하면 §10 에 TODO 로 올립니다.
+* **하위 팝업 전환본이 이미 getPar 계약으로 되어 있으면**(예: `sample-front/ui/ULDSTF92024.xml` 은 `$c.win.getParent()?.scwin.getPar(arr, …)` 를 부름) 그 팝업도 `getParameter`/`closePopup` 으로 함께 바꿉니다. 이번에 바꿀 수 없으면 부모에 호환용 `scwin.getPar` 를 임시로 두고, 이유와 제거 시점을 §9·§10 에 적습니다.
+* 결과서에는 §1.2(받는 키)·반환 규약(`closePopup` 키)·§1.3 하위 팝업 표(넘기는 `data` / 받는 결과)를 이 규칙에 맞춰 적고, §9 에 `fn_GetPar`/`fn_SetPar` → `data`/`await` 행을 둡니다.
 
 ---
 
@@ -385,6 +463,7 @@ scwin.searchList = async function () {
 | `fn_SearchList()` | `scwin.searchList()` (규칙 13) |
 | `$.ajax({ url : "/user/list.do", … success : fn })` | `await $c.sbm.executeDynamic(...)` + await 뒤 후처리 |
 | `$("#searchWord").val()` | `ipt_searchWord.getValue()` 또는 `dma_search.get("searchWord")` (규칙 19) |
+| `fn_GetPar`/`fn_SetPar` + `CreateDialogFrame` / `window.open` | 부모 `await $c.win.openPopup(url, options, data)` → 결과로 처리, 팝업 `$c.data.getParameter()` / `$c.win.closePopup(결과)` (§6.5) |
 
 * 진입점, 함수 개명(원래 이름을 유지한 함수와 그 이유), 전역 변수 → `scwin.*`, 통신, 팝업(`window.open` → `$c.win.openPopup`), DOM 조작 → 컴포넌트 API, 공통함수 → `$c.*`/`$c.{pcc}.*`, `alert`/`confirm` → `await $c.win.alert`/`await $c.win.confirm`, 세션 값 → `$c.session.getUserInfo(...)`, 삭제한 것(호출 없는 함수, 디버그 코드)과 근거.
 
@@ -413,7 +492,8 @@ scwin.searchList = async function () {
 | `$(sel).click/on(...)` | 컴포넌트 `ev:on*` + `scwin.{id}_{event}` | 동적으로 붙이던 이벤트 |
 | `$.ajax` / `$.post` / `form.submit()` | `await $c.sbm.executeDynamic(sbmOptions, data)` | 동기 여부, 성공·실패 분기 |
 | `window.open(url)` | `await $c.win.openPopup(url, options, data)` | 반환값·크기 |
-| `opener.fn_X()` / `parent.fn_X()` | `$c.win.getParent()?.scwin.x()` | 부모 함수 이름 계약 |
+| `fn_GetPar`/`fn_SetPar`, `opener.fn_GetPar(arr)`, `frame.Provider("../").fn_GetPar` | 부모 `await $c.win.openPopup(url, options, data)` / 팝업 `$c.data.getParameter()` + `$c.win.closePopup(결과)` (§6.5) | 배열 인덱스 → 키 이름, dataset 인수 → JSON |
+| `opener.fn_X()` / `parent.fn_X()` (getPar 외 부모 함수 직접 호출) | 가능하면 `closePopup(결과)` 로 돌려주고 부모가 `await` 뒤에 처리. 꼭 필요하면 `$c.win.getParent()?.scwin.x()` | 부모 함수 이름 계약 |
 | `alert` / `confirm` | `await $c.win.alert` / `await $c.win.confirm` | `if (confirm(...))` 은 반드시 await |
 | 수기 날짜 계산(`new Date`, `substr`) | `$c.date.*` (`getServerDateTime`, `addDate`, `formatDate`) | 서버 시각인가 클라이언트 시각인가 |
 | `keyCode == 13` 검사 | `$c.win.setEnterKeyEvent(tbl_search, …)` (규칙 22) | |
@@ -434,7 +514,8 @@ scwin.searchList = async function () {
 | 5 | **서버 렌더링 값**(JSP EL) | 문자열로 옮길 수 없다 — 받는 경로를 새로 정한다 | §2.1, §10 |
 | 6 | **DOM 순회로 행 처리**(`$("tr").each`) | DataList 반복으로 바꿔야 한다 — 0부터, `< getRowCount()` | §6, §9 |
 | 7 | **대문자 키 / 필드명 그대로 사용** | DataCollection 키는 camelCase — 그대로 두면 `undefined` | §2.2 |
-| 8 | **부모·자식 창이 서로 이름으로 부르는 함수** | 한쪽만 개명하면 깨진다 | §1.3, §9 |
+| 8 | **부모·자식 창이 서로 이름으로 부르는 함수**(`fn_GetPar`/`fn_SetPar`) | 한쪽만 바꾸면 깨진다 — `openPopup` data + `await` 반환으로 양쪽을 함께 바꾼다 | §1.3, §6.5, §9 |
+| 8a | **`isEmpty(result)` 로 팝업 취소 판정** | 취소·X 닫기도 `{ isCloseButtonClick }` 객체가 와서 항상 통과한다 — 그 객체가 그대로 데이터로 들어간다 | §6.5 |
 | 9 | **주석 처리된 코드** | 근거로 쓰지 않는다(규칙 0) — 무효가 된 가드라는 사실만 §8 에 적는다 | §8 |
 | 10 | **보이지 않는 요소**(hidden, 항상 숨김) | 진입점 없는 기능을 옮기는 낭비 — 상태값으로 대체할지 정한다 | §2.1 |
 | 11 | **`window.open` 앞의 통신** | `await` 뒤에 열면 팝업 차단될 수 있다 | §10 |
@@ -454,7 +535,7 @@ scwin.searchList = async function () {
 - [ ] §3: onpageload 는 `init_*` 호출만 갖고, 각 단위의 순서와 await 근거가 있다.
 - [ ] §4: AS-IS 의 **모든 이벤트 바인딩**(스크립트·속성)이 TO-BE 핸들러로 대응됐다.
 - [ ] §5: 모든 Ajax/submit 이 한 절씩 있고, 신규 API 경로(또는 가정 표시)·후처리·실패 처리·중복 실행 정책이 적혔다.
-- [ ] §6: 검증은 공통/업무로 나뉘었고, 팝업은 반환 형태가 적혔다.
+- [ ] §6: 검증은 공통/업무로 나뉘었고, 팝업은 반환 형태가 적혔다. `fn_GetPar`/`fn_SetPar` 는 전부 `openPopup` data + `await` 반환(§6.5)으로 대응됐고, 취소는 필요한 필드로 판정한다.
 - [ ] §7: 분기에 쓰인 코드 값과 메시지가 빠짐없이 모였다.
 - [ ] §8: 각 결함에 "유지/고침/옮기지 않음" 결정이 적혔다.
 - [ ] §9: 전환 후 — AS-IS 함수 전부가 TO-BE 이름 또는 "삭제(사유)"로 대응됐다.
@@ -514,8 +595,8 @@ python -m wsxml_lint conversion/sample-front/ui/{화면ID}.xml
 
 ### 1.3 이 화면이 여는 하위 팝업
 
-| 팝업 | AS-IS 호출 | 넘기는 값 |
-|---|---|---|
+| 팝업 | AS-IS 호출 (getPar/setPar) | 넘기는 `data` | 받는 결과 (`closePopup`) / 취소 판정 |
+|---|---|---|---|
 
 ### 1.4 업무 프로세스 흐름
 
