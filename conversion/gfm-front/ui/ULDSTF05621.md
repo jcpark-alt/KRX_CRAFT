@@ -3,7 +3,7 @@
 | 항목 | 내용 |
 |---|---|
 | AS-IS | `/lstproc/ULDSTF05621.gfm` (Gauce/X-Internet, 610×680 모달 창 — 부모가 615×710 `window` 로 연다) — 반입 `conversion/gfm-front/ui/ULDSTF05621.gfm` |
-| 신규 API 명세 | `conversion/gfm-front/ui/ULDSTF05621_API.txt` (`/api/listing/lstproc/fund/dist-pay-basdd-change/*` 6종) |
+| 신규 API 명세 | `conversion/gfm-front/ui/ULDSTF05621_API.txt` — 블록 7종(이 화면 6종, 다른 화면 1종: ULDSTF05620 목록 조회). §2.2·§5 는 명세 기준(가이드 §0.3·§5) |
 | TO-BE | `conversion/gfm-front/ui-tobe/ULDSTF05621.xml` (배포 경로 `/ui/lst/lstproc/ULDSTF05621.xml` — 가정, §10). 가이드 §13.2 대로 퍼블리싱본(마크업 전용)을 먼저 만들고 그 위에 스크립트를 전환함 (2026-10-26) |
 | 퍼블리싱 | `conversion/publish/상장/상장처리(대내)/ULDSTF05621.xml` — 컴포넌트 id 는 AS-IS 와 같고, 날짜는 `w2:inputCalendar`, 사유는 `xf:select1`, 달력 이미지 버튼은 없음 |
 | 화면 캡처 | `ULDSTF05621.png` (신규 빈 입력 상태) — TO-BE 퍼블리싱 기준 |
@@ -341,6 +341,33 @@ scwin.onpageload = async function () {
 | 5.7 | 삭제 | 같은 `trs` `TRS_IDX=3` (데이터셋 3개를 그대로 전송) | `POST …/delete` (`bzProcsNo`) |
 
 (`…` = `/api/listing/lstproc/fund/dist-pay-basdd-change`)
+
+#### API 명세 대응 (`ULDSTF05621_API.txt`)
+
+| # | 명세 블록 | method · 경로 | 요청 (명세 정의) | 응답 (명세 정의) | AS-IS 대응 | TO-BE 함수 |
+|---|---|---|---|---|---|---|
+| 1 | [ULDSTF05621] 신규 등록 시 현재 수입분배기준일 조회 | `GET …/select-current-dist-pay-basdd` | `isurCd` | `dma_std` (dataMap — `bzProcsNo`·`bybzprocsSeq`·`isurCd`·`chgBfafTpCd`·`basMmdd`·`basMm`·`basDd`) | `DIV_IDX=3`·`TRS_IDX=5` → `dts_DtlBf` | `scwin.selectCurrentBasdd` → `dlt_resultDetail_dtlBfList` |
+| 2 | [ULDSTF05621] 예약(미래일자) 등록 중복 체크 | `GET …/select-mst-check` | `isurCd` | `boolean` | `fn_mst_check(dts_Mst_Check, "2")` (`GUBUN_CD=2`) | `scwin.checkMst` |
+| 3 | [ULDSTF05621] 상세 조회(마스터 + 변경전/후) | `GET …/select-one` | `bzProcsNo` | `dma_resultDetail` + `dlt_resultDetail_dtlBfList` + `dlt_resultDetail_dtlAfList` | 같은 URL `DIV_IDX` 0·3·4 로 3회 → `dts_Mst`·`dts_DtlBf`·`dts_DtlAf` | `scwin.selectOne` |
+| 4 | [ULDSTF05621] 삭제 | `POST …/delete` | `bzProcsNo` | (없음) | `trs` `TRS_IDX=3` (dataset 3개 전송) | `scwin.deleteTrs` |
+| 5 | [ULDSTF05621] 신규 저장 | `POST …/insert` | `dma_reqSave` + `dlt_reqSave_dtlBfList` + `dlt_reqSave_dtlAfList` | (없음) | `trs` `TRS_IDX=1` `dtsParm1=dts_Mst, dtsParm2=dts_DtlAf, dtsParm3=dts_DtlBf` | `scwin.saveTrs("I")` |
+| 6 | [ULDSTF05621] 수정 | `POST …/update` | `dma_reqUpdate` + `dlt_reqUpdate_dtlBfList` + `dlt_reqUpdate_dtlAfList` | (없음) | `trs` `TRS_IDX=2` | `scwin.saveTrs("U")` |
+| 7 | [ULDSTF05620] 목록 조회 | `GET …/select-list` | `isurCd` | `dlt_std` | 부모 ULDSTF05620 `fn_search` | **이 화면 대상 아님** — 부모 전환 때 사용(§1.1) |
+
+명세에 없는 AS-IS 통신: 채번(`fn_getNewBzProcNo`) → 업무공통 `$c.stf.getNewBzProcNo()`(§5.4).
+
+#### 명세 ↔ AS-IS 차이 (→ §10)
+
+| # | 차이 | 처리 | §10 |
+|---|---|---|---|
+| 1 | `select-current-dist-pay-basdd` 응답이 dataMap(`dma_std`)으로 적혀 있으나 변경전 기준일은 여러 행 | 변경전 목록(`dlt_resultDetail_dtlBfList`)으로 받음 | #1 |
+| 2 | `select-one`·`insert`/`update` 의 목록 JSON 키 이름이 명세에 없음(정의 이름 `…_dtlBfList` 에서 `dtlBfList` 추정) | 가정으로 사용 | #1 |
+| 3 | `insert` 요청의 `bzProcsNo` 는 "수정 시에만 전달", 응답 없음 — AS-IS 는 화면이 채번해 보냄 | 화면 채번 유지 + TODO | #2 |
+| 4 | AS-IS 가 보내던 `FISCYY_DISTR_BASDD_TP_CD="2"`·`LIST_BZ_TP_CD=232`·`DIV_IDX`·`COUNT` 가 요청 명세에 없음. 명세 응답의 구분코드는 TO-BE 컬럼 기준 `'14'` | 보내지 않음(요청 정의가 거름) | #3 |
+| 5 | `select-mst-check` 응답 boolean 의 뜻이 없음, AS-IS 의 `GUBUN_CD=2` 없음 | `true` = 예약 건 있음으로 가정 | #4 |
+| 6 | `update`·`delete` 응답이 비어 있음 | `responseJSON.success` 로 판정 | #5 |
+| 7 | AS-IS 공통 파라미터 `SCREN_ID`·`SCREN_PROCES_TP_CD`·세션(`fn_encodeNSession`) 이 명세에 없음 | 보내지 않음 | #10 |
+| 8 | 명세 응답에만 있는 키(`comNm`·`fiscyyChgRsnNm`·`fiscyyStrt/End(Yy·Mm·Dd)`·`disclsYn`·`draftYn`) | 정의에 두되 화면에 표시하지 않음(AS-IS 도 미표시) | — |
 
 AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=3`, `LIST_BZ_TP_CD=232`(분배기준일변경), `DIV_IDX[0]=0`·`DIV_IDX[1]=4`·`DIV_IDX[2]=3`. TO-BE 는 API 마다 경로가 나뉘므로 `TRS_IDX`·`DIV_IDX`·`COUNT` 는 필요 없다. `LIST_BZ_TP_CD` 는 요청 명세에 없으므로 서버가 정하는 것으로 본다(§10 #3).
 

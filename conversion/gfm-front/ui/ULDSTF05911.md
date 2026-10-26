@@ -3,7 +3,7 @@
 | 항목 | 내용 |
 |---|---|
 | AS-IS | `/lstproc/ULDSTF05911.gfm` (Gauce/X-Internet, 980×480 모달 창 — 부모가 1000×490 `window` 로 연다) — 반입 `conversion/gfm-front/ui/ULDSTF05911.gfm` |
-| 신규 API 명세 | `conversion/gfm-front/ui/ULDSTF05911_API.txt` (`/api/listing/lstproc/elw/chg-listing-prc/*` 4종) |
+| 신규 API 명세 | `conversion/gfm-front/ui/ULDSTF05911_API.txt` — 블록 4종(이 화면 4종, 다른 화면 0종). §2.2·§5 는 명세 기준(가이드 §0.3·§5) |
 | TO-BE | `conversion/gfm-front/ui-tobe/ULDSTF05911.xml` (배포 경로 `/ui/lst/lstproc/ULDSTF05911.xml` — 가정, §10) |
 | 퍼블리싱 | `conversion/publish/상장/상장처리(대내)/ULDSTF05911.xml` — 컴포넌트 id 는 AS-IS 와 같음(`edt_MktactEnforceDd` `inputCalendar`, `txb_ChgRsnContn` `xf:input`, 버튼·`img_SetIsuCd`·`img_Excel`·`btn_exelUpload` 는 `xf:trigger`). 그리드 컬럼 id 는 대문자·한글(`번호`) 그대로 |
 | 화면 캡처 | 없음 |
@@ -61,7 +61,7 @@ AS-IS 는 부모가 `fn_GetPar` 를 `fn_GetParNew3`/`fn_GetParUpdate3` 로 바�
 
 | 팝업 | AS-IS 호출 (getPar/setPar) | 넘기는 `data` (TO-BE) | 받는 결과 (`closePopup`) / 취소 판정 |
 |---|---|---|---|
-| `ULDSTF92023` ELW 종목선택 (510×430) | `fn_GetPar = fn_GetParIsu; fn_SetPar = fn_SetParIsu;` → `fn_PopFindElwCode()`. 팝업이 `fn_GetParIsu(arrPar, param_dts)` 로 `arr[0]=발행기관코드`, `arr[1]=구분` 과 **현재 그리드 전체**(`CopyDataSet(dts_Isu → param_dts)`)를 받고, 확인 때 `fn_SetParIsu(param_dts)` 로 **선택 결과 전체를 그리드에 덮어쓴다** | `{ isurCd, gubun, isuList : dlt_isu.getAllJSON() }` — §6.4 | `{ list : [종목 행 …] }` (가정 — 92023 전환본 없음, §10 #5). 취소 판정: `!Array.isArray(result.list)` 이면 그대로 둠 |
+| `ULDSTF92023` ELW 종목선택 (510×430) | `fn_GetPar = fn_GetParIsu; fn_SetPar = fn_SetParIsu;` → `fn_PopFindElwCode()`. 팝업이 `fn_GetParIsu(arrPar, param_dts)` 로 `arr[0]=발행기관코드`, `arr[1]=구분` 과 **현재 그리드 전체**(`CopyDataSet(dts_Isu → param_dts)`)를 받고, 확인 때 `fn_SetParIsu(param_dts)` 로 **선택 결과 전체를 그리드에 덮어쓴다** | `{ isurCd, gubun, isuList : dlt_detail.getAllJSON() }` — §6.4 | `{ list : [종목 행 …] }` (가정 — 92023 전환본 없음, §10 #5). 취소 판정: `!Array.isArray(result.list)` 이면 그대로 둠 |
 
 - pcc `$c.lc.popFindElwCode()` 는 `ULDSTF92023.gfm` 을 `browserPopup` + 콜백(`scwin.popupCallback`)으로 열고 값을 넘기지 않는다 → `await` 할 수 없으므로 쓰지 않는다(가이드 §6.5 예외).
 
@@ -112,7 +112,7 @@ flowchart TD
 | # | 단계 | 주체 | 내용 | 분기 · 메시지 | 관련 절 |
 |---|---|---|---|---|---|
 | 1 | 파라미터 수신 | 화면 | `$c.data.getParameter()` → `isurCd`·`bzProcsNo`·`gubun` | `bzProcsNo` 가 비면 신규 | §1.2, §3 |
-| 2a | 신규 준비 | 화면 | AS-IS 는 `CHGLIST_PRC_INOUT` 헤더만 받아 빈 그리드 → TO-BE 는 `dlt_isu.removeAll()` | — | §3 |
+| 2a | 신규 준비 | 화면 | AS-IS 는 `CHGLIST_PRC_INOUT` 헤더만 받아 빈 그리드 → TO-BE 는 `dlt_detail.removeAll()` | — | §3 |
 | 2b | 수정 조회 | 서버 | `select-list-isu` (AS-IS `searchChgList` `DIV_IDX=3`, **비동기** `syncload=False` — 결과는 `OnLoadCompleted` 에서 처리) | 실패 시 버튼 잠금(※TO-BE) | §5.1 |
 | 3 | 머리 정보 | 화면 | 첫 행의 `chgDd`·`chgRsnContn` → 입력란 | 행이 없으면 비운 채 | §8 #13 |
 | 4 | 버튼 상태 | 화면 | 신규 `insert`, 수정은 `setButtonSetWithDate(edt_MktactEnforceDd, false, …)` | 변경상장일 ≤ 오늘이면 `error` | §4 |
@@ -125,7 +125,7 @@ flowchart TD
     D --> P[["await openPopup ULDSTF92023 §6.4"]]
     P --> R{"result.list 가 배열인가?"}
     R -- "아니오(취소 · 닫기)" --> E1(["끝: 그리드 그대로"])
-    R -- "예" --> G["그리드 전체 교체<br/>dlt_isu.setJSON(result.list)"]
+    R -- "예" --> G["그리드 전체 교체<br/>dlt_detail.setJSON(result.list)"]
     G --> K["조기종료 ELW 만 조기종료기준가격 편집 허용<br/>scwin.applyKoEditable §6.3"] --> E2(["끝"])
 ```
 
@@ -255,7 +255,7 @@ stateDiagram-v2
 | 변경상장일 (*) | `edt_MktactEnforceDd` + `img_MktactEnforceDd` | `edt_MktactEnforceDd` (`inputCalendar`, `dma_mst.chgDd`) | 달력 이미지 **(옮기지 않음)** — inputCalendar 내장 달력. id 는 "시장조치시행일"이지만 값은 변경일(`CHG_DD`) |
 | 변경사유 (*) | `txb_ChgRsnContn` (2000자) | `txb_ChgRsnContn` (`xf:input`, `dma_mst.chgRsnContn`) | 원본은 바인딩 없이 `.value` 로 직접 읽고 씀 → TO-BE 는 `ref` 바인딩 |
 | 종목 찾기 | `img_SetIsuCd` (이미지) | `img_SetIsuCd` (`xf:trigger`) | §6.4 |
-| 종목 그리드 | `grd_isu` (`dts_Isu`) | `grd_isu` (`dlt_isu`) | 번호·종목코드·종목명·변경전 3열·변경후 3열. 변경전·종목은 편집 불가, 변경후 행사가격·전환비율은 편집, 변경후 조기종료발생기준가격은 `ELW_RGHT_TP_KIND_CD='3'` 행만 편집 — §6.3 |
+| 종목 그리드 | `grd_isu` (`dts_Isu`) | `grd_isu` (`dlt_detail`) | 번호·종목코드·종목명·변경전 3열·변경후 3열. 변경전·종목은 편집 불가, 변경후 행사가격·전환비율은 편집, 변경후 조기종료발생기준가격은 `ELW_RGHT_TP_KIND_CD='3'` 행만 편집 — §6.3 |
 | 번호 열 | `{CurRow},{ToString}` | `inputType="expression" expression="rowIndex()+1"` | 퍼블리싱본의 한글 id `번호` 는 영문 id 로 바꿈 |
 | (숨김) `BZ_PROCS_NO` 열 | `show="False"` | **(옮기지 않음)** | 업무처리번호는 화면 상태값(`scwin.bzProcsNo`) |
 | 엑셀업로드 | `btn_exelUpload` | `btn_exelUpload` (`xf:trigger`) | §6.5 |
@@ -268,10 +268,16 @@ stateDiagram-v2
 
 | AS-IS | TO-BE | 종류 | 키(컬럼) | 출처 / 용도 |
 |---|---|---|---|---|
-| (없음 — 입력란을 직접 읽음) | `dma_mst` | dataMap | `bzProcsNo`, `isurCd`, `chgDd`, `chgRsnContn` | 저장 전문 머리(`dma_register`/`dma_update`/`dma_remove`). 수정 조회 때 첫 행 값으로 채움 |
-| `dts_Isu` | `dlt_isu` | dataList | `isuCd`, `isuNm`, `bfchgExerPrc`, `bfchgElwKoOccrBasPrc`, `bfchgConvRto`, `afchgExerPrc`, `afchgElwKoOccrBasPrc`, `afchgConvRto`, `elwRghtTpKindCd`, `listMethdTpCd`, `chgListMktactAdmNo`, `bfchgBybzprocsSeq`, `afchgBybzprocsSeq` | 수정: `select-list-isu` 응답 / 신규: 종목 선택 팝업 결과·엑셀 업로드. 저장 시 `isuList` |
+| (없음 — 입력란을 직접 읽음) | `dma_mst` (**화면 입력용 — 명세 외**) | dataMap | `bzProcsNo`, `isurCd`, `chgDd`, `chgRsnContn` | 변경상장일·변경사유 바인딩. 수정 조회 때 첫 행 값으로 채우고, 저장 때 요청 정의(`dma_register`/`dma_update`)로 옮긴다 |
+| `dts_Isu` | `dlt_detail` | dataList | 명세 `select-list-isu` 응답 `dma_detail` keyInfo 17개 그대로 — `chgListMktactAdmNo`·`bfchgBybzprocsSeq`·`afchgBybzprocsSeq`(number), `bzProcsNo`, `isuCd`, `isuNm`, `chgDd`, `chgRsnContn`, `bfchgExerPrc`·`afchgExerPrc`·`bfchgConvRto`·`afchgConvRto`·`bfchgElwKoOccrBasPrc`·`afchgElwKoOccrBasPrc`(number), `listMethdTpCd`, `isurCd`, `elwRghtTpKindCd` | 그리드 바인딩. 명세는 dataMap 이나 종목 여러 건이라 목록으로 받는다(§10 #1). 종목 선택·엑셀 업로드 결과도 여기 |
+| (`trs` 전송 `dts_Isu`) | `dma_register` · `dlt_register_isuList` | dataMap · dataList | 명세 `register` 요청 그대로 — 머리 `bzProcsNo`·`isurCd`·`chgDd`·`chgRsnContn` + 목록 `isuCd`·변경전후 6값(number)·`listMethdTpCd` | 신규 저장 전문 |
+| (`trs` 전송 `dts_Isu`) | `dma_update` · `dlt_update_isuList` | dataMap · dataList | 명세 `modify` 요청 그대로 (register 와 같은 구성) | 수정 전문 |
+| (`trs` 전송 `dts_Isu`) | `dma_remove` | dataMap | `bzProcsNo`, `isurCd` | 삭제 전문(명세 `remove`) |
 | `dts_BzProcsNo` | (삭제) | — | — | 신규 API 는 서버 채번(§5.2) |
 | `trs` | (삭제) | — | — | 저장·수정·삭제 통신 → `executeDynamic` |
+
+- **TO-BE DataCollection 은 `ULDSTF05911_API.txt` 의 정의 블록(id·name·dataType)을 그대로 옮긴다**(가이드 §5 「API 명세 적용」). 예외 두 가지: 응답 `dma_detail` 은 여러 행이라 같은 keyInfo 의 목록 `dlt_detail` 로, 변경상장일·변경사유 입력은 명세에 대응 정의가 없어 화면 전용 `dma_mst` 로 둔다.
+- AS-IS 는 머리 정보(`ISUR_CD`·`BZ_PROCS_NO`·`CHG_DD`·`CHG_RSN_CONTN`)를 종목 행마다 실었다(§8 #8). 명세는 머리(`dma_register` 등)와 목록(`…_isuList`)을 나누고, 목록에는 `isuNm`·`elwRghtTpKindCd`·행 PK 가 없다(§10 #3).
 
 - AS-IS 컬럼 → TO-BE 키: `ISU_CD→isuCd`, `ISU_NM→isuNm`, `BFCHG_EXER_PRC→bfchgExerPrc`, `BFCHG_ELW_KO_OCCR_BAS_PRC→bfchgElwKoOccrBasPrc`, `BFCHG_CONV_RTO→bfchgConvRto`, `AFCHG_*→afchg*`, `ELW_RGHT_TP_KIND_CD→elwRghtTpKindCd`, `LIST_METHD_TP_CD→listMethdTpCd`, `CHG_DD→chgDd`, `CHG_RSN_CONTN→chgRsnContn`, `ISUR_CD→isurCd`, `BZ_PROCS_NO→bzProcsNo`.
 - 숫자 열 표시: 원본 소수 자릿수 `decao` — 행사가격 8, 조기종료발생기준가격 3, 전환비율 6 → 그리드 `dataType="number"` + `displayFormat` 으로 같은 자릿수.
@@ -289,7 +295,7 @@ stateDiagram-v2
 2. **버튼 매핑** — AS-IS `buttonSet.setSaveInfo/UpdateInfo/DeleteInfo` 3종(안내문작성은 주석). TO-BE 는 `ev:onclick` + `scwin.BTN_MAP = { save : "btn_Save", modify : "btn_Update", "delete" : "btn_Delete" }`.
 3. **신규·수정 분기**
    - 업무처리번호 있음 → `await scwin.selectList()` (§5.1) → 후처리(첫 행 머리 정보, 버튼 상태 — 원본 `dts_Isu OnLoadCompleted`).
-   - 없음 → `scwin.init_newForm()`: `dma_mst.setEmptyValue()`, `dma_mst.set("isurCd", scwin.isurCd)`, `dlt_isu.removeAll()`, 버튼 `insert`. 원본은 `CHGLIST_PRC_INOUT` 헤더만 받는 조회를 보냈다(빈 dataset 구조용) → TO-BE 는 dataList 정의로 대신한다.
+   - 없음 → `scwin.init_newForm()`: `dma_mst.setEmptyValue()`, `dma_mst.set("isurCd", scwin.isurCd)`, `dlt_detail.removeAll()`, 버튼 `insert`. 원본은 `CHGLIST_PRC_INOUT` 헤더만 받는 조회를 보냈다(빈 dataset 구조용) → TO-BE 는 dataList 정의로 대신한다.
 4. `PanelToGroupBox(panel_3)` — 삭제.
 
 ```javascript
@@ -347,6 +353,30 @@ scwin.onpageload = async function () {
 
 (`…` = `/api/listing/lstproc/elw/chg-listing-prc`)
 
+#### API 명세 대응 (`ULDSTF05911_API.txt`)
+
+| # | 명세 블록 | method · 경로 | 요청 (명세 정의) | 응답 (명세 정의) | AS-IS 대응 | TO-BE 함수 |
+|---|---|---|---|---|---|---|
+| 1 | [ULDSTF05911] 종목별 상세 조회 | `GET …/select-list-isu` | `bzProcsNo` | `dma_detail` (dataMap, 17키) | `/Listing.do?method=searchChgList&DIV_IDX=3` → `dts_Isu` | `scwin.selectList` → `dlt_detail` |
+| 2 | [ULDSTF05911] 수정 | `POST …/modify` | `dma_update` + `dlt_update_isuList` | (없음) | `trs` `TRS_IDX=2` `dtsParm1=dts_Isu` | `scwin.saveTrs("U")` |
+| 3 | [ULDSTF05911] 등록 | `POST …/register` | `dma_register` + `dlt_register_isuList` | (없음) | `fn_getNewBzProcNo` + `trs` `TRS_IDX=1` | `scwin.saveTrs("I")` |
+| 4 | [ULDSTF05911] 삭제(논리삭제) | `POST …/remove` | `dma_remove` (`bzProcsNo`·`isurCd`) | (없음) | `trs` `TRS_IDX=3` (그리드 전체 전송) | `scwin.deleteTrs` |
+
+명세에 없는 AS-IS 통신: 채번(`fn_getNewBzProcNo`) — 명세상 서버 채번이라 쓰지 않음, 종목 선택 팝업(ULDSTF92023)의 조회 — 팝업 소관(§6.4).
+
+#### 명세 ↔ AS-IS 차이 (→ §10)
+
+| # | 차이 | 처리 | §10 |
+|---|---|---|---|
+| 1 | `select-list-isu` 응답이 dataMap(`dma_detail`)으로 적혀 있으나 종목 여러 건, 머리 정보(`chgDd`·`chgRsnContn`)도 행마다 옴 | 같은 keyInfo 의 목록 `dlt_detail` 로 받고 첫 행에서 머리 정보 표시 | #1 |
+| 2 | 요청 목록의 JSON 키 이름이 명세에 없음(정의 이름 `…_isuList` 에서 `isuList` 추정) | 가정으로 사용 | #1 |
+| 3 | `register` 는 "등록 시 서버채번", 응답 없음 — AS-IS 는 화면이 채번 | 화면 채번 삭제, 저장 뒤 재조회 키 미확보 | #2 |
+| 4 | 응답 설명은 행 PK(`chgListMktactAdmNo`·`bfchg/afchgBybzprocsSeq`)를 "수정/삭제 시 그대로 전달" 이라 하나 `modify` 요청 목록에 없음 | 요청 정의대로(보내지 않음) | #3 |
+| 5 | 요청 목록의 `listMethdTpCd` 출처(조회 응답·종목 선택 결과)가 명세에 없음, 엑셀 업로드 행에는 없음 | 조회·선택 결과 값을 사용 | #4·#7 |
+| 6 | AS-IS 가 보내던 `LIST_BZ_TP_CD=147`·`DIV_IDX`·`COUNT`·`SCREN_ID`·세션이 명세에 없음 | 보내지 않음 | #9 |
+| 7 | `modify`·`remove` 응답이 비어 있음 | `responseJSON.success` 로 판정 | #11 |
+| 8 | AS-IS 는 머리 정보를 행마다 실음, 명세는 머리·목록 분리 | 머리는 요청 정의 dataMap, 목록은 `…_isuList` | — |
+
 AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=1`, `LIST_BZ_TP_CD=147`(ELW 행사가격/전환비율 변경), `DIV_IDX[0]=3`. TO-BE 는 API 경로로 나뉘므로 필요 없다. `LIST_BZ_TP_CD` 는 요청 명세에 없으므로 서버가 정하는 것으로 본다(§10 #9).
 
 ### 5.1 종목 목록 조회 (`scwin.selectList`)
@@ -355,7 +385,7 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=1`, `LIST_BZ_TP_CD=147`
 |---|---|
 | `id` / `method` / `action` | `sbm_selectList` / `get` / `…/select-list-isu` |
 | `requestData` | `{ bzProcsNo : scwin.bzProcsNo }` |
-| `target` / `gridview` | `dlt_isu=body` / `grd_isu` — 명세의 응답은 `dma_detail`(dataMap)로 적혀 있으나 종목 여러 건이다 → 목록인지 확인(§10 #1) |
+| `target` / `gridview` | `dlt_detail=body` / `grd_isu` — 명세의 응답은 `dma_detail`(dataMap)로 적혀 있으나 종목 여러 건이다 → 목록인지 확인(§10 #1) |
 | 후처리 | ① 1건 이상이면 첫 행의 `chgDd`·`chgRsnContn` 을 `dma_mst` 에, `dma_mst.bzProcsNo`·`isurCd` 도 채움 ② 조기종료기준가격 편집 조건(§6.3) ③ 버튼 상태 `$c.stf.setButtonSetWithDate(edt_MktactEnforceDd, false, "grpBtnBox", scwin.BTN_MAP)` |
 | 실패 처리 | `success:false` 이면 버튼을 모두 잠근다(`disabled`) |
 | 중복 실행 | 기본(건너뜀) |
@@ -366,7 +396,7 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=1`, `LIST_BZ_TP_CD=147`
 |---|---|
 | `id` | `sbm_saveTrs` |
 | `method` / `action` | `post` / `…/register` (I) · `…/modify` (U), `mediatype : "application/json"` |
-| `requestData` | `{ bzProcsNo(수정 시), isurCd, chgDd, chgRsnContn, isuList : [ { isuCd, bfchgExerPrc, afchgExerPrc, bfchgConvRto, afchgConvRto, bfchgElwKoOccrBasPrc, afchgElwKoOccrBasPrc, listMethdTpCd } … ] }` — 목록 키 이름 `isuList` 는 명세 이름(`dlt_register_isuList`)에서 추정한 **가정**(§10 #1). 수정 시 행 PK(`chgListMktactAdmNo`·`bfchgBybzprocsSeq`·`afchgBybzprocsSeq`) 전달 여부는 §10 #3 |
+| `requestData` | 명세 요청 정의에 담아 보낸다 — register 는 `dma_register` + `dlt_register_isuList`, modify 는 `dma_update` + `dlt_update_isuList`. `{ ...머리.getJSON(), isuList : 목록.getAllJSON() }` — 목록 키 이름 `isuList` 는 정의 이름(`…_isuList`)에서 추정한 **가정**(§10 #1). `setJSON` 이 정의된 키만 남기므로 `isuNm`·`elwRghtTpKindCd` 등 명세 밖 열은 보내지 않는다. 수정 시 행 PK(`chgListMktactAdmNo`·`bfchgBybzprocsSeq`·`afchgBybzprocsSeq`)는 요청 정의에 없어 §10 #3 |
 | 채번 | 원본은 화면이 채번(`fn_getNewBzProcNo`, 14자리 아니면 `MSG-0010`). 신규 API 명세는 "**등록 시 서버채번**" → TO-BE 는 채번하지 않는다. 다만 `register` 응답이 비어 있어 저장 뒤 재조회할 번호를 받을 수 없다(§10 #2) |
 | 후처리 | 성공: `MSG-A001` "[저장/수정] 처리 성공하였습니다." → 재조회 `await scwin.selectList()` |
 | 실패 처리 | `success:false`: `MSG-A002` "[…] 처리 실패하였습니다." 신규 실패면 `scwin.bzProcsNo` 를 비운 채 신규 상태를 유지 |
@@ -377,7 +407,7 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=1`, `LIST_BZ_TP_CD=147`
 | 항목 | 내용 |
 |---|---|
 | `id` / `method` / `action` | `sbm_deleteTrs` / `post` / `…/remove` |
-| `requestData` | `{ bzProcsNo : scwin.bzProcsNo, isurCd : scwin.isurCd }` |
+| `requestData` | 명세 `dma_remove` 정의에 담아 보낸다 — `{ bzProcsNo, isurCd }` |
 | 후처리 | 성공: `MSG-A001` "[삭제] 처리 성공하였습니다." → `$c.win.closePopup()` (원본 `buttonSet.status == "D"` 분기) |
 | 실패 처리 | `MSG-A002` "[삭제] 처리 실패하였습니다." |
 
@@ -404,7 +434,7 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=1`, `LIST_BZ_TP_CD=147`
 ### 6.3 조기종료발생기준가격 편집 조건 (`scwin.applyKoEditable`)
 
 - 원본 그리드 속성 `edit="{IF(ELW_RGHT_TP_KIND_CD='3', 'true','false')}"` — 권리형태종류코드가 `3`(조기종료 ELW 로 추정, §10 #8)인 행만 변경후 조기종료발생기준가격을 편집할 수 있다.
-- TO-BE: 목록을 채운 뒤(조회·종목 선택·엑셀 업로드) 행마다 `grd_isu.setCellReadOnly(i, "afchgElwKoOccrBasPrc", dlt_isu.getCellData(i, "elwRghtTpKindCd") !== "3")`. 반복 안에서 화면을 바꾸므로 `setBroadcast` 가드를 쓴다(규칙 28).
+- TO-BE: 목록을 채운 뒤(조회·종목 선택·엑셀 업로드) 행마다 `grd_isu.setCellReadOnly(i, "afchgElwKoOccrBasPrc", dlt_detail.getCellData(i, "elwRghtTpKindCd") !== "3")`. 반복 안에서 화면을 바꾸므로 `setBroadcast` 가드를 쓴다(규칙 28).
 
 ### 6.4 종목 선택 (`scwin.openIsuPopup`) — getPar/setPar → `openPopup` data + `await`
 
@@ -418,7 +448,7 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=1`, `LIST_BZ_TP_CD=147`
       const data = {
           isurCd : scwin.isurCd,              // AS-IS arrPar[0]
           gubun : scwin.gubun,                // AS-IS arrPar[1] — 1 발행사 / 2 기초자산
-          isuList : dlt_isu.getAllJSON()      // AS-IS CopyDataSet(dts_Isu, param_dts)
+          isuList : dlt_detail.getAllJSON()      // AS-IS CopyDataSet(dts_Isu, param_dts)
       };
       const options = { id : "ULDSTF92023", popupName : "종목선택", width : 510, height : 430, type : "pageFramePopup" };
 
@@ -428,7 +458,7 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=1`, `LIST_BZ_TP_CD=147`
       if (!Array.isArray(result.list)) return;
 
       // AS-IS fn_SetParIsu: 선택 결과로 그리드 전체를 바꾼다.
-      dlt_isu.setJSON(result.list);
+      dlt_detail.setJSON(result.list);
       scwin.applyKoEditable();
   };
   ```
@@ -543,7 +573,7 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=1`, `LIST_BZ_TP_CD=147`
 | `buttonSet.set*Info` / `setInsertStatus` | `ev:onclick` + `$c.util.setButtonState("grpBtnBox", "insert", scwin.BTN_MAP)` |
 | `setButtonSetWithDate(edt_MktactEnforceDd, false)` | `$c.stf.setButtonSetWithDate(edt_MktactEnforceDd, false, "grpBtnBox", scwin.BTN_MAP)` |
 | `fn_GetPar = fn_GetParIsu; fn_SetPar = fn_SetParIsu; fn_PopFindElwCode()` | `scwin.openIsuPopup` — `await $c.win.openPopup(…ULDSTF92023…, options, { isurCd, gubun, isuList })` → `result.list` 로 그리드 교체 (가이드 §6.5) |
-| `CopyDataSet(dts_Isu, param_dts)` / `CopyDataSet(param_dts, dts_Isu)` | `data.isuList = dlt_isu.getAllJSON()` / `dlt_isu.setJSON(result.list)` |
+| `CopyDataSet(dts_Isu, param_dts)` / `CopyDataSet(param_dts, dts_Isu)` | `data.isuList = dlt_detail.getAllJSON()` / `dlt_detail.setJSON(result.list)` |
 | 그리드 `edit="{IF(ELW_RGHT_TP_KIND_CD='3', …)}"` | `scwin.applyKoEditable` — `grd_isu.setCellReadOnly(i, "afchgElwKoOccrBasPrc", …)` |
 | `{CurRow}` 번호 열 | `inputType="expression" expression="rowIndex()+1"` |
 | `window.confirm` + `SetDataHeader` + `LoadExcelData` | `await $c.win.confirm` + `$c.data.uploadGridViewExcel(grd_isu, { …, decimal : "8" })` |
