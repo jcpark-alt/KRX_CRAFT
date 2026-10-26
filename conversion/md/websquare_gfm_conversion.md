@@ -51,6 +51,17 @@
 
 결과서를 쓰기 전에 원본 옆의 자료를 먼저 찾아 읽습니다. 있는 자료는 결과서 머리 표에 적고, 없으면 "없음"이라고 적습니다.
 
+**폴더 배치** — 화면 하나의 입력 자료와 결과서는 **화면ID 이름의 폴더 하나**에 모읍니다(2026-10-26 gfm-front 정리).
+
+```text
+conversion/gfm-front/ui/{화면ID}/
+    {화면ID}.gfm          AS-IS 원본
+    {화면ID}_API.txt      신규 API 명세
+    {화면ID}*.png         화면 캡처
+    {화면ID}.md           업무 분석 결과서 (이 가이드의 산출)
+conversion/gfm-front/ui-tobe/{화면ID}.xml   TO-BE 화면
+```
+
 | 자료 | 위치 (예) | 결과서에서 쓰는 곳 |
 |---|---|---|
 | AS-IS 원본 | `{폴더}/{화면ID}.gfm`·`.jsp` | 전 장 |
@@ -289,7 +300,7 @@ AS-IS 의 Ajax(`$.ajax`·`$.post`·axios) 또는 Form Submit 을 `$c.sbm.execute
 
 **API 명세 적용 (`{화면ID}_API.txt`) — 필수**
 
-원본 옆에 `{화면ID}_API.txt`(예: `conversion/gfm-front/ui/ULDSTF05621_API.txt`)가 있으면, 결과서 §5 와 TO-BE 의 모든 통신을 **이 명세의 API 로 바꿉니다**. AS-IS URL(`*.do`, `DIV_IDX`·`TRS_IDX`·`queryId` 파라미터)은 TO-BE 코드에 남기지 않습니다.
+원본 옆에 `{화면ID}_API.txt`(예: `conversion/gfm-front/ui/ULDSTF05621/ULDSTF05621_API.txt`)가 있으면, 결과서 §5 와 TO-BE 의 모든 통신을 **이 명세의 API 로 바꿉니다**. AS-IS URL(`*.do`, `DIV_IDX`·`TRS_IDX`·`queryId` 파라미터)은 TO-BE 코드에 남기지 않습니다.
 
 1. **명세 읽기** — 블록 하나가 API 하나입니다.
 
@@ -609,7 +620,7 @@ done
 
 업무 분석을 마친 화면으로 TO-BE 파일을 만들 때, 그 화면의 **캡처 이미지가 있으면** 스크립트 전환보다 먼저 **퍼블리싱 XML(마크업 전용)을 TO-BE 폴더에 생성**하고, 그 파일 위에 스크립트를 얹습니다. 마크업과 로직을 한 번에 쓰면 레이아웃 검토와 로직 검토가 섞이고, 퍼블리싱 게이트의 보존 검사(P10~P13)를 쓸 수 없기 때문입니다.
 
-**캡처 위치** — `{화면 폴더}/{화면ID}*.png|jpg` (예: `conversion/gfm-front/ui/ULDSTF05621.png`, 상태별이면 `ULDSTF05621_신규.png`). 결과서 머리 표의 "화면 캡처" 칸에 파일명과 상태를 적습니다. 캡처가 없으면 이 절을 건너뛰고 §13.3 으로 갑니다.
+**캡처 위치** — `{화면 폴더}/{화면ID}*.png|jpg` (예: `conversion/gfm-front/ui/ULDSTF05621/ULDSTF05621.png`, 상태별이면 `ULDSTF05621_신규.png`). 결과서 머리 표의 "화면 캡처" 칸에 파일명과 상태를 적습니다. 캡처가 없으면 이 절을 건너뛰고 §13.3 으로 갑니다.
 
 **TO-BE 위치** — 모듈 폴더의 `ui-tobe/{화면ID}.xml` (gfm-front 는 `conversion/gfm-front/ui-tobe/{화면ID}.xml`, sample-front 샘플은 `conversion/sample-front/ui/{화면ID}.xml`).
 

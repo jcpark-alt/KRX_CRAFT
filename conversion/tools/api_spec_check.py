@@ -4,8 +4,8 @@
     python conversion/tools/api_spec_check.py [--spec <API.txt>] [--allow-unused <path,...>] <TO-BE xml> ...
 
 업무 분석 가이드(conversion/md/websquare_gfm_conversion.md §5 「API 명세 적용」) 의 "API 명세가 있으면 그 API 로 바꾼다" 를 검사한다.
---spec 을 생략하면 TO-BE 파일명의 화면ID 로 `../ui/{화면ID}_API.txt`(gfm-front 배치) 와 같은 폴더의
-`{화면ID}_API.txt` 를 차례로 찾는다. 명세가 없으면 검사를 건너뛴다(SKIP, 종료 코드 0).
+--spec 을 생략하면 TO-BE 파일명의 화면ID 로 `../ui/{화면ID}/{화면ID}_API.txt`(gfm-front 화면별 폴더 배치),
+`../ui/{화면ID}_API.txt`, 같은 폴더의 `{화면ID}_API.txt` 를 차례로 찾는다. 명세가 없으면 검사를 건너뛴다(SKIP, 종료 코드 0).
 
 명세 형식 (블록 반복):
     [화면ID][업무][제목]
@@ -93,7 +93,9 @@ def find_spec(xml_path):
     p = Path(xml_path)
     sid = SCREEN_ID.match(p.stem)
     sid = sid.group(1) if sid else p.stem
-    for cand in (p.parent.parent / "ui" / f"{sid}_API.txt", p.parent / f"{sid}_API.txt"):
+    for cand in (p.parent.parent / "ui" / sid / f"{sid}_API.txt",   # gfm-front 화면별 폴더 배치
+                 p.parent.parent / "ui" / f"{sid}_API.txt",
+                 p.parent / f"{sid}_API.txt"):
         if cand.is_file():
             return cand, sid
     return None, sid

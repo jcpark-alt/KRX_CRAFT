@@ -2,15 +2,15 @@
 
 | 항목 | 내용 |
 |---|---|
-| AS-IS | `/lstproc/ULDSTF05621.gfm` (Gauce/X-Internet, 610×680 모달 창 — 부모가 615×710 `window` 로 연다) — 반입 `conversion/gfm-front/ui/ULDSTF05621.gfm` |
-| 신규 API 명세 | `conversion/gfm-front/ui/ULDSTF05621_API.txt` — 블록 7종(이 화면 6종, 다른 화면 1종: ULDSTF05620 목록 조회). §2.2·§5 는 명세 기준(가이드 §0.3·§5) |
+| AS-IS | `/lstproc/ULDSTF05621.gfm` (Gauce/X-Internet, 610×680 모달 창 — 부모가 615×710 `window` 로 연다) — 반입 `conversion/gfm-front/ui/ULDSTF05621/ULDSTF05621.gfm` |
+| 신규 API 명세 | `conversion/gfm-front/ui/ULDSTF05621/ULDSTF05621_API.txt` — 블록 7종(이 화면 6종, 다른 화면 1종: ULDSTF05620 목록 조회). §2.2·§5 는 명세 기준(가이드 §0.3·§5) |
 | TO-BE | `conversion/gfm-front/ui-tobe/ULDSTF05621.xml` (배포 경로 `/ui/lst/lstproc/ULDSTF05621.xml` — 가정, §10). 가이드 §13.2 대로 퍼블리싱본(마크업 전용)을 먼저 만들고 그 위에 스크립트를 전환함 (2026-10-26) |
 | 퍼블리싱 | `conversion/publish/상장/상장처리(대내)/ULDSTF05621.xml` — 컴포넌트 id 는 AS-IS 와 같고, 날짜는 `w2:inputCalendar`, 사유는 `xf:select1`, 달력 이미지 버튼은 없음 |
 | 화면 캡처 | `ULDSTF05621.png` (신규 빈 입력 상태) — TO-BE 퍼블리싱 기준 |
 | 업무공통 | `$c.stf`(`getNewBzProcNo`·`getMessageParam`·`checkMaxLength`·`setButtonSetWithDate`)·`$c.lc`(`isProcess`·`getSecuGrpNm`·`glb.*` 상수) — `cm/pcc/stf`. 게이트는 `--pcc stf` 로 돌린다 |
 | 작성 | Inswave / 2026-10-26 |
 
-참고 양식: [websquare_gfm_conversion.md](../../md/websquare_gfm_conversion.md). Gauce 대응은 [gfm_business_analysis_guide.md](../../md/gfm_business_analysis_guide.md) §5·§6 을 함께 따랐다.
+참고 양식: [websquare_gfm_conversion.md](../../../md/websquare_gfm_conversion.md). Gauce 대응은 [gfm_business_analysis_guide.md](../../../md/gfm_business_analysis_guide.md) §5·§6 을 함께 따랐다.
 
 ---
 
@@ -45,7 +45,7 @@ AS-IS 는 부모가 `fn_GetPar` 를 자기 함수로 바꿔 두면, 팝업이 �
 | `arr[4]` | `bzProcsNo` | 업무처리번호 | **비면 신규**, 있으면 수정 |
 | `arr[5]` | `fiscyyDistrBasddTpCd` | 결산기분배기준일구분코드 (1 결산기 / 2 분배기준일) | 부모는 항상 `"2"`. 화면은 이 값을 읽지 않고 저장 때 `"2"` 를 직접 넣음(원본 변수명 `haltTpCd`) |
 
-- **TO-BE** ([가이드 §6.5](../../md/websquare_gfm_conversion.md) — getPar/setPar → `openPopup` + `await`): 부모는 `fn_GetParNew`/`fn_GetParUpdate` 를 바꿔 끼우지 않고, 위 키 이름의 객체를 `data` 로 넘긴다. 이 화면은 `$c.data.getParameter()` 로 받는다. 부모(05620)가 아직 전환 전이라 키 이름은 제안이다(§10 #6).
+- **TO-BE** ([가이드 §6.5](../../../md/websquare_gfm_conversion.md) — getPar/setPar → `openPopup` + `await`): 부모는 `fn_GetParNew`/`fn_GetParUpdate` 를 바꿔 끼우지 않고, 위 키 이름의 객체를 `data` 로 넘긴다. 이 화면은 `$c.data.getParameter()` 로 받는다. 부모(05620)가 아직 전환 전이라 키 이름은 제안이다(§10 #6).
 
   ```javascript
   // 부모 ULDSTF05620 (신규: bzProcsNo "", 수정: 목록 선택 행의 업무처리번호)
@@ -466,7 +466,7 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=3`, `LIST_BZ_TP_CD=232`
   - `arr[0] = "68212C"` (서식코드 — 분배기준일변경 안내공시), `arr[1] = 업무처리번호`, `arr[2] = 발행기관코드`, `arr[3] = '1'` (시장구분 유가 고정).
   - `CopyDataSet(dts_Mst → param_dts_mst)`, `CopyDataSet(dts_DtlBf → param_dts2)`, `CopyDataSet(dts_DtlAf → param_dts3)` 뒤 `param_dts3` 에서 월·일이 모두 빈 행을 지운다. `dts_isu` 는 주석 처리돼 넘기지 않는다.
   - `return arr.length;` (4 — 92024 의 `isNoGen` 조건 "길이 5 이상"에 걸리지 않음).
-- **TO-BE** ([가이드 §6.5](../../md/websquare_gfm_conversion.md)): 함수를 바꿔 끼우거나 이름으로 부르게 두지 않고, 같은 값을 **`data` 객체**로 넘긴 뒤 `await` 한다. 92024 의 `fn_SetPar` 는 빈 함수라 돌려받을 값은 없다.
+- **TO-BE** ([가이드 §6.5](../../../md/websquare_gfm_conversion.md)): 함수를 바꿔 끼우거나 이름으로 부르게 두지 않고, 같은 값을 **`data` 객체**로 넘긴 뒤 `await` 한다. 92024 의 `fn_SetPar` 는 빈 함수라 돌려받을 값은 없다.
 
   ```javascript
   scwin.writeDscl = async function () {

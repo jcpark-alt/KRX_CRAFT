@@ -107,3 +107,14 @@ def test_no_spec_skips(tmp_path):
     x.write_text(DOC.format(script=GOOD), encoding="utf-8")
     fails, warns, infos, spec = ac.check(str(x))
     assert spec is None and fails == [] and infos[0][0] == "SKIP"
+
+
+def test_spec_found_in_screen_folder_layout(tmp_path):
+    # gfm-front 배치: ui/{화면ID}/{화면ID}_API.txt ↔ ui-tobe/{화면ID}.xml
+    (tmp_path / "ui" / "ULDTST00001").mkdir(parents=True)
+    (tmp_path / "ui-tobe").mkdir()
+    (tmp_path / "ui" / "ULDTST00001" / "ULDTST00001_API.txt").write_text(SPEC, encoding="utf-8")
+    x = tmp_path / "ui-tobe" / "ULDTST00001.xml"
+    x.write_text(DOC.format(script=GOOD), encoding="utf-8")
+    fails, _, _, spec = ac.check(str(x))
+    assert spec is not None and spec.parent.name == "ULDTST00001" and fails == []
