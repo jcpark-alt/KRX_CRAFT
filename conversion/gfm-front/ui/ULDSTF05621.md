@@ -4,9 +4,9 @@
 |---|---|
 | AS-IS | `/lstproc/ULDSTF05621.gfm` (Gauce/X-Internet, 610×680 모달 창 — 부모가 615×710 `window` 로 연다) — 반입 `conversion/gfm-front/ui/ULDSTF05621.gfm` |
 | 신규 API 명세 | `conversion/gfm-front/ui/ULDSTF05621_API.txt` (`/api/listing/lstproc/fund/dist-pay-basdd-change/*` 6종) |
-| TO-BE | `conversion/gfm-front/ui-tobe/ULDSTF05621.xml` (배포 경로 `/ui/lst/lstproc/ULDSTF05621.xml` — 가정, §10) |
+| TO-BE | `conversion/gfm-front/ui-tobe/ULDSTF05621.xml` (배포 경로 `/ui/lst/lstproc/ULDSTF05621.xml` — 가정, §10). 가이드 §13.2 대로 퍼블리싱본(마크업 전용)을 먼저 만들고 그 위에 스크립트를 전환함 (2026-10-26) |
 | 퍼블리싱 | `conversion/publish/상장/상장처리(대내)/ULDSTF05621.xml` — 컴포넌트 id 는 AS-IS 와 같고, 날짜는 `w2:inputCalendar`, 사유는 `xf:select1`, 달력 이미지 버튼은 없음 |
-| 화면 캡처 | 없음 |
+| 화면 캡처 | `ULDSTF05621.png` (신규 빈 입력 상태) — TO-BE 퍼블리싱 기준 |
 | 업무공통 | `$c.stf`(`getNewBzProcNo`·`getMessageParam`·`checkMaxLength`·`setButtonSetWithDate`)·`$c.lc`(`isProcess`·`getSecuGrpNm`·`glb.*` 상수) — `cm/pcc/stf`. 게이트는 `--pcc stf` 로 돌린다 |
 | 작성 | Inswave / 2026-10-26 |
 
@@ -232,7 +232,7 @@ stateDiagram-v2
 
 | 영역 | AS-IS 요소 | TO-BE 컴포넌트 (바인딩) | 설명 |
 |---|---|---|---|
-| 1. 회사코드(명) | `txb_ISUR_CD`·`txb_COM_NM` (readonly) | `txb_ISUR_CD` (`w2:autoComplete`, `dma_mst.isurCd`) · `txb_COM_NM` (`xf:input`, `dma_mst.isurNm`) | 읽기 전용 |
+| 1. 회사코드(명) | `txb_ISUR_CD`·`txb_COM_NM` (readonly) | `txb_ISUR_CD` (`xf:input` readOnly, `dma_mst.isurCd` — 퍼블리셔 XML 의 itemset 없는 `w2:autoComplete` 는 값이 안 보일 수 있어 바꿈) · `txb_COM_NM` (`xf:input`, `dma_mst.isurNm`) | 읽기 전용 |
 | 2. 수입분배기준일 가. 변경전 | `grd_DIST_PAY_BF` (편집 불가, 월·일) | `grd_DIST_PAY_BF` (`dlt_dtlBf`, `readOnly="true"`) | 신규: 현재 기준일, 수정: 등록된 변경전 |
 | 2. 나. 변경후 (*) | `grd_DIST_PAY_AF` (편집, 월·일) | `grd_DIST_PAY_AF` (`dlt_dtlAf`) | 빈 행을 깔아 두고 입력 — §3 |
 | 3. 변경일 (*) | `edt_CHG_DD` + `img_CHG_DD` | `edt_CHG_DD` (`inputCalendar`, `dma_mst.chgDd`) | 달력 이미지 **(옮기지 않음)** — inputCalendar 내장 달력 |
@@ -240,7 +240,7 @@ stateDiagram-v2
 | 5. 변경 후 최초 사업연도 (*) | `edt_ChgStatDd`·`edt_ChgEndDd` + `img_ChgStatDd`·`img_ChgEndDd` | `edt_ChgStatDd` (`dma_mst.fiscyyChgStrtDd`) · `edt_ChgEndDd` (`dma_mst.fiscyyChgEndDd`) | 필수 표시가 있으나 원본은 검증하지 않음 — §8 #9 |
 | 6. 변경사유 (*) | `cmb_FISCYY_CHG_RSN_CD` (고정 목록) | `cmb_FISCYY_CHG_RSN_CD` (`xf:select1`, `dma_mst.fiscyyChgRsnCd`) | 1 임시주주총회에서 결의 / 2 정기주주총회에서 결의 / 9 기타 — §7 |
 | 7. 기타 | `txa_REMK` | `txa_REMK` (`dma_mst.remk`) | 2000 byte 제한 |
-| 버튼 | `btn_Save`·`btn_Update`·`btn_Delete`·`btn_Drft`·`btn_Dscl`·`btn_Close` (이미지) | 같은 id `xf:trigger` (`grpBtnBox`) | 활성 상태는 `buttonSet` → `$c.util.setButtonState` — §4 |
+| 버튼 | `btn_Save`·`btn_Update`·`btn_Delete`·`btn_Drft`·`btn_Dscl`·`btn_Close` (이미지) | `btn_Update`·`btn_Delete`·`btn_Drft`·`btn_Dscl`·`btn_Save`(pt, 맨 오른쪽) `xf:trigger` (`btnbox#grpBtnBox`). `btn_Close` 는 **옮기지 않음** — 팝업 하단 닫기 금지(퍼블리싱 규칙, 팝업 창의 닫기 사용) | 활성 상태는 `buttonSet` → `$c.util.setButtonState` — §4 |
 | (장식) | `panel_3` + `PanelToGroupBox` | **(옮기지 않음)** | 퍼블리싱 마크업이 대신함 |
 
 ### 2.2 데이터 정의
@@ -304,7 +304,7 @@ scwin.onpageload = async function () {
 | `btn_Delete` (삭제) | `onclick` | `scwin.btn_Delete_onclick` | `scwin.remove()` — §6.8 | `fn_delete` |
 | `btn_Dscl` (안내문작성) | `onclick` | `scwin.btn_Dscl_onclick` | `scwin.writeDscl()` — §6.4 | `fn_dscl` |
 | `btn_Drft` (기안) | `onclick` | `scwin.btn_Drft_onclick` | `scwin.writeDraft()` — §6.5 | `fn_drft` |
-| `btn_Close` (닫기) | `onclick` | `scwin.btn_Close_onclick` | `$c.win.closePopup()` | `frame.CloseFrame()` |
+| `btn_Close` (닫기) | — | **(옮기지 않음)** | 팝업 창의 닫기(X)를 쓴다(팝업 하단 닫기 금지) | `frame.CloseFrame()` |
 | `grd_DIST_PAY_AF` (변경후) | `onafteredit` | `scwin.grd_DIST_PAY_AF_onafteredit` | 월 > 12, 일 > 31 이면 "입력월을 확인하세요." / "입력일을 확인하세요." 안내 후 그 칸을 비움 — §6.3 | `OnExit(row, colid, olddata)` |
 | `img_*` 달력 4종 | `onclick` | **(옮기지 않음)** | inputCalendar 내장 달력 | `popUpCalendar2(edt_…)` |
 | `grd_DIST_PAY_AF` | — | **(옮기지 않음)** | 항상 `true` 를 돌려줄 뿐이라 동작 없음 | `CanColumnPosChange` |
@@ -580,7 +580,7 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=3`, `LIST_BZ_TP_CD=232`
 | `fn_drft` + `fn_GetPar` 바꿔 끼우기 + `fn_PopFindDraft` | `scwin.writeDraft` — `await $c.win.openPopup(…ULDSTF92004…, options, { bzProcsNo })` (pcc `popFindDraft` 는 콜백형이라 쓰지 않음, §10 #8) |
 | `CopyDataSet(a, b)` (팝업 dataset 채우기) | `data` 의 키로 JSON 전달(`getJSON()`/`getAllJSON()`) |
 | `grd_DIST_PAY_AF OnExit` | `scwin.grd_DIST_PAY_AF_onafteredit` |
-| `btn_Close onclick` → `frame.CloseFrame()` | `scwin.btn_Close_onclick` → `$c.win.closePopup()` |
+| `btn_Close onclick` → `frame.CloseFrame()` | 삭제 — 팝업 창의 닫기(X) 사용(팝업 하단 닫기 금지). 삭제 성공 시 닫기는 `$c.win.closePopup()` |
 | `popUpCalendar2(...)` 4종, `img_*` 달력 | 삭제 (inputCalendar 내장) |
 | `alert(...)` | `await $c.win.alert(...)` |
 | `ds.NameString(i, "COL")` / `CountRow` / `AddRow` / `DeleteRow` | `getCellData`·`setCellData` / `getRowCount` / `insertRow` / `removeRow` (규칙 29) |
