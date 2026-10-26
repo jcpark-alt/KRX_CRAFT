@@ -94,7 +94,8 @@ describe("sbm 오류 경로의 handleError 합류 (cm/gcc/sbm.xml)", () => {
     h.scwin.__submitErrorHandler(resObj);
 
     expect(h.calls.resultMsg).toHaveLength(1);
-    expect(h.calls.resultMsg[0].message).toBe("서버 오류입니다. 자세한 내용은 관리자에게 문의하시기 바랍니다.");
+    // 기본 문구는 두 줄로 보이도록 문장 사이에 <br/> 을 둔다(a8ba136f).
+    expect(h.calls.resultMsg[0].message).toBe("서버 오류입니다.<br/>자세한 내용은 관리자에게 문의하시기 바랍니다.");
     expect(h.calls.resultMsg[0].errorCode).toBe("");
     expect(h.calls.handleError).toHaveLength(1);
   });
