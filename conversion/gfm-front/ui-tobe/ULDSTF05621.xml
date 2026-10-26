@@ -138,8 +138,21 @@
 			<w2:workflowCollection />
 		</xf:model>
 		<w2:layoutInfo />
-		<w2:publicInfo method="scwin.onpageload,scwin.init_recvParam,scwin.init_newForm,scwin.btn_Save_onclick,scwin.btn_Update_onclick,scwin.btn_Delete_onclick,scwin.btn_Dscl_onclick,scwin.btn_Drft_onclick,scwin.grd_DIST_PAY_AF_onafteredit,scwin.selectCurrentBasdd,scwin.selectOne,scwin.checkMst,scwin.saveTrs,scwin.deleteTrs,scwin.validate,scwin.fillAfRows,scwin.buildDtlList,scwin.getEditState,scwin.getNewBzProcsNo,scwin.save,scwin.update,scwin.remove,scwin.getDsclData,scwin.writeDscl,scwin.getPar,scwin.getIsurCd,scwin.fillDataList,scwin.writeDraft" />
-		<script lazy="false" type="text/javascript"><![CDATA[// 원본 : /lstproc/ULDSTF05621.gfm (분배기준일변경관리 팝업)
+		<w2:publicInfo method="scwin.onpageload,scwin.init,scwin.initNewForm,scwin.btn_Save_onclick,scwin.btn_Update_onclick,scwin.btn_Delete_onclick,scwin.btn_Dscl_onclick,scwin.btn_Drft_onclick,scwin.grd_DIST_PAY_AF_onafteredit,scwin.selectCurrentBasdd,scwin.selectOne,scwin.checkMst,scwin.saveTrs,scwin.deleteTrs,scwin.validate,scwin.fillAfRows,scwin.buildDtlList,scwin.getEditState,scwin.getNewBzProcsNo,scwin.save,scwin.update,scwin.remove,scwin.getDsclData,scwin.writeDscl,scwin.getPar,scwin.getIsurCd,scwin.fillDataList,scwin.writeDraft,scwin.checkAfMmDd" />
+		<script lazy="false" type="text/javascript"><![CDATA[
+///////// 1. 변수 및 선언 영역 /////////
+scwin.screenId = "ULDSTF05621";
+scwin.API = "/api/listing/lstproc/fund/dist-pay-basdd-change/";
+scwin.isurCd = "";          // 발행기관코드
+scwin.isurNm = "";          // 발행기관명
+scwin.bzProcsNo = "";       // 업무처리번호 — 비어 있으면 신규, 있으면 수정
+scwin.trJob = "";           // 처리구분 I: 저장, U: 수정, D: 삭제
+scwin.curDate = "";         // 서버 현재일 (yyyyMMdd)
+scwin.savedState = "";      // 조회 직후 마스터·변경후 목록 — 수정할 내용이 있는지 판정용 (원본 IsUpdated)
+scwin.AF_ROW_COUNT = 13;            // 변경후 그리드 행 수 — 원본 OnLoadCompleted 의 결과(주석은 12, §8 #1)
+scwin.DSCL_FORM_CD = "68212C";      // 공시안내문 서식코드 — 분배기준일변경 안내공시
+scwin.DSCL_MKT_ID = "1";            // 공시안내문 시장구분 — 원본도 유가 고정 (§8 #11)
+// 원본 : /lstproc/ULDSTF05621.gfm (분배기준일변경관리 팝업)
 /*
  * 화면 동작
  *  - 부모(ULDSTF05620)가 넘긴 업무처리번호가 없으면 신규, 있으면 수정이다.
@@ -150,25 +163,11 @@
  * 업무 분석 : conversion/gfm-front/ui/ULDSTF05621/ULDSTF05621.md (§번호는 이 문서의 절)
  */
 
-///////// 1. 변수 및 선언 영역 /////////
-
-scwin.screenId = "ULDSTF05621";
-scwin.API = "/api/listing/lstproc/fund/dist-pay-basdd-change/";
-
 // 부모 화면에서 넘겨받는 값 (§1.2)
-scwin.isurCd = "";          // 발행기관코드
-scwin.isurNm = "";          // 발행기관명
-scwin.bzProcsNo = "";       // 업무처리번호 — 비어 있으면 신규, 있으면 수정
 
 // 화면 상태값
-scwin.trJob = "";           // 처리구분 I: 저장, U: 수정, D: 삭제
-scwin.curDate = "";         // 서버 현재일 (yyyyMMdd)
-scwin.savedState = "";      // 조회 직후 마스터·변경후 목록 — 수정할 내용이 있는지 판정용 (원본 IsUpdated)
 
 // 고정값
-scwin.AF_ROW_COUNT = 13;            // 변경후 그리드 행 수 — 원본 OnLoadCompleted 의 결과(주석은 12, §8 #1)
-scwin.DSCL_FORM_CD = "68212C";      // 공시안내문 서식코드 — 분배기준일변경 안내공시
-scwin.DSCL_MKT_ID = "1";            // 공시안내문 시장구분 — 원본도 유가 고정 (§8 #11)
 
 // 이 화면의 역할→버튼 매핑 — 상태별 활성 정책은 공통(BTN_STATE_MAP)이 보유한다.
 scwin.BTN_MAP = {
@@ -179,31 +178,19 @@ scwin.BTN_MAP = {
     guide : "btn_Dscl"          // [안내문작성]
 };
 
-
 ///////// 2. 초기화 영역 /////////
-
 /**
  * @method
  * @name scwin.onpageload
  * @author Inswave
  * @date 2026. 10. 26
- * @description 페이지로드. 파라미터를 받고 업무처리번호 유무로 신규 준비 또는 수정 조회를 한다. (§3)
- * @param
+ * @description 페이지로드. 로딩 로직은 scwin.init 하나에 둔다(code-convention 초기화 절). (§3)
  * @returns
  * @hidden N
  */
 scwin.onpageload = async function () {
     try {
-        // 로딩이 끝나거나 조회가 예외로 끝나도 버튼이 XML 기본값(전부 활성)으로 남지 않게 먼저 잠근다.
-        $c.util.setButtonState("grpBtnBox", "disabled", scwin.BTN_MAP);
-
-        scwin.init_recvParam();
-
-        if ($c.util.isEmpty(scwin.bzProcsNo)) {
-            await scwin.init_newForm();
-        } else {
-            await scwin.selectOne();
-        }
+        await scwin.init();
     } catch (ex) {
         await $c.exception.handleError(ex, { context : "ULDSTF05621.onpageload" });
     }
@@ -211,16 +198,18 @@ scwin.onpageload = async function () {
 
 /**
  * @method
- * @name scwin.init_recvParam
+ * @name scwin.init
  * @author Inswave
  * @date 2026. 10. 26
- * @description 부모가 openPopup 의 data 로 넘긴 값을 받는다. (원본 frame.Provider("../").fn_GetPar(arrPar) — §1.2)
- * 날짜 입력 형식과 서버 현재일도 여기서 정한다.
- * @param
+ * @description 로딩 — 버튼 잠금 → 파라미터 수신 → 신규 준비(scwin.initNewForm) 또는 수정 조회. (원본 gform onload — §3)
  * @returns
  * @hidden N
  */
-scwin.init_recvParam = function () {
+scwin.init = async function () {
+    // 1) 로딩 동안 버튼 잠금 — 조회가 예외로 끝나도 버튼이 XML 기본값(전부 활성)으로 남지 않게 한다.
+    $c.util.setButtonState("grpBtnBox", "disabled", scwin.BTN_MAP);
+
+    // 2) 파라미터 수신 — 원본 frame.Provider("../").fn_GetPar(arrPar) (§1.2)
     const param = $c.data.getParameter() ?? {};
 
     scwin.isurCd = param.isurCd ?? "";          // AS-IS arr[0]
@@ -233,39 +222,18 @@ scwin.init_recvParam = function () {
     $c.date.checkCalendarFormat(edt_ChgEndDd, "yyyyMMdd");
 
     scwin.curDate = $c.date.getServerDateTime("yyyyMMdd");
+
+    // 3) 업무처리번호 유무로 신규 준비 또는 수정 조회
+    if ($c.util.isEmpty(scwin.bzProcsNo)) {
+        await scwin.initNewForm();
+    } else {
+        await scwin.selectOne();
+    }
 };
-
-/**
- * @method
- * @name scwin.init_newForm
- * @author Inswave
- * @date 2026. 10. 26
- * @description 신규 준비. 마스터를 비우고, 현재 수입분배기준일을 "변경전"에 채운 뒤 "변경후" 빈 행을 깔고 [저장]만 켠다.
- * (원본 fn_new_onload + dts_Mst/dts_DtlAf OnLoadCompleted — §3, §1.4 업무 1)
- * @param
- * @returns
- * @hidden N
- */
-scwin.init_newForm = async function () {
-    dma_resultDetail.setEmptyValue();
-    dlt_resultDetail_dtlBfList.removeAll();
-    dlt_resultDetail_dtlAfList.removeAll();
-
-    // 신규는 부모 값으로 회사를 표시한다 (수정은 조회 응답 값 — §8 #8).
-    dma_resultDetail.set("isurCd", scwin.isurCd);
-    dma_resultDetail.set("isurNm", scwin.isurNm);
-
-    await scwin.selectCurrentBasdd();
-    scwin.fillAfRows();
-
-    $c.util.setButtonState("grpBtnBox", "insert", scwin.BTN_MAP);
-};
-
 
 ///////// 3. 컴포넌트 이벤트 영역 /////////
-
 /**
- * @event
+ * @method
  * @name scwin.btn_Save_onclick
  * @author Inswave
  * @date 2026. 10. 26
@@ -283,7 +251,7 @@ scwin.btn_Save_onclick = async function (e) {
 };
 
 /**
- * @event
+ * @method
  * @name scwin.btn_Update_onclick
  * @author Inswave
  * @date 2026. 10. 26
@@ -301,7 +269,7 @@ scwin.btn_Update_onclick = async function (e) {
 };
 
 /**
- * @event
+ * @method
  * @name scwin.btn_Delete_onclick
  * @author Inswave
  * @date 2026. 10. 26
@@ -319,7 +287,7 @@ scwin.btn_Delete_onclick = async function (e) {
 };
 
 /**
- * @event
+ * @method
  * @name scwin.btn_Dscl_onclick
  * @author Inswave
  * @date 2026. 10. 26
@@ -337,7 +305,7 @@ scwin.btn_Dscl_onclick = async function (e) {
 };
 
 /**
- * @event
+ * @method
  * @name scwin.btn_Drft_onclick
  * @author Inswave
  * @date 2026. 10. 26
@@ -355,12 +323,11 @@ scwin.btn_Drft_onclick = async function (e) {
 };
 
 /**
- * @event
+ * @method
  * @name scwin.grd_DIST_PAY_AF_onafteredit
  * @author Inswave
  * @date 2026. 10. 26
- * @description 변경후 월·일 편집 직후 범위 확인. 월 > 12, 일 > 31 이면 안내하고 그 칸을 비운다. (원본 OnExit — §6.3)
- * 월별 말일(0231 등)은 원본도 보지 않는다(§8 #4).
+ * @description 변경후 월·일 편집 직후 — 범위 확인은 scwin.checkAfMmDd. (원본 OnExit — §6.3)
  * @param {Number} row 행 index
  * @param {Number} col 컬럼 index
  * @param {String} value 입력값
@@ -369,31 +336,19 @@ scwin.btn_Drft_onclick = async function (e) {
  */
 scwin.grd_DIST_PAY_AF_onafteredit = async function (row, col, value) {
     try {
-        const colId = grd_DIST_PAY_AF.getColumnID(col);
-        const val = Number(dlt_resultDetail_dtlAfList.getCellData(row, colId));
-
-        if (colId === "basMm" && val > 12) {
-            await $c.win.alert("입력월을 확인하세요.");
-            dlt_resultDetail_dtlAfList.setCellData(row, "basMm", "");
-        } else if (colId === "basDd" && val > 31) {
-            await $c.win.alert("입력일을 확인하세요.");
-            dlt_resultDetail_dtlAfList.setCellData(row, "basDd", "");
-        }
+        await scwin.checkAfMmDd(row, grd_DIST_PAY_AF.getColumnID(col));
     } catch (ex) {
         await $c.exception.handleError(ex, { context : "ULDSTF05621.grd_DIST_PAY_AF_onafteredit" });
     }
 };
 
-
 ///////// 4. 서브미션 콜백 영역 /////////
-
 /**
  * @method
  * @name scwin.selectCurrentBasdd
  * @author Inswave
  * @date 2026. 10. 26
  * @description 신규: 회사의 현재 수입분배기준일 목록을 "변경전"에 채운다. (원본 DIV_IDX_DTL_DIST_BF + TRS_IDX_NEWSEL2 — §5.1)
- * @param
  * @returns
  * @hidden N
  */
@@ -419,7 +374,6 @@ scwin.selectCurrentBasdd = async function () {
  * @date 2026. 10. 26
  * @description 수정: 업무처리번호로 마스터와 변경전·변경후 목록을 조회하고, 시장조치시행일로 버튼 상태를 정한다.
  * (원본 fn_search 동기 3회 → 1회, dts_Mst OnLoadCompleted — §5.2)
- * @param
  * @returns
  * @hidden N
  */
@@ -453,7 +407,6 @@ scwin.selectOne = async function () {
  * @date 2026. 10. 26
  * @description 현재일 이후로 예약된 분배기준일변경 건이 있는지 확인한다. 있으면 MSG-0011 을 안내하고 false. (원본 fn_mst_check(dts_Mst_Check, "2") — §5.3)
  * pcc $c.lc.mstCheck 는 AS-IS URL·미선언 전역을 써서 쓰지 않는다(§8 #13).
- * @param
  * @returns {Promise<Boolean>} 진행해도 되면 true
  * @hidden N
  */
@@ -552,7 +505,6 @@ scwin.saveTrs = async function (trJob, bzProcsNo) {
  * @author Inswave
  * @date 2026. 10. 26
  * @description 삭제. 성공하면 팝업을 닫는다 — 부모는 await 가 끝나면 목록을 다시 조회한다. (원본 TRS_IDX_DELETE + buttonSet.status "D" — §5.7)
- * @param
  * @returns
  * @hidden N
  */
@@ -577,8 +529,31 @@ scwin.deleteTrs = async function () {
     $c.win.closePopup();
 };
 
-
 ///////// 5. 일반/업무 함수 영역 /////////
+/**
+ * @method
+ * @name scwin.initNewForm
+ * @author Inswave
+ * @date 2026. 10. 26
+ * @description 신규 준비. 마스터를 비우고, 현재 수입분배기준일을 "변경전"에 채운 뒤 "변경후" 빈 행을 깔고 [저장]만 켠다.
+ * (원본 fn_new_onload + dts_Mst/dts_DtlAf OnLoadCompleted — §3, §1.4 업무 1)
+ * @returns
+ * @hidden N
+ */
+scwin.initNewForm = async function () {
+    dma_resultDetail.setEmptyValue();
+    dlt_resultDetail_dtlBfList.removeAll();
+    dlt_resultDetail_dtlAfList.removeAll();
+
+    // 신규는 부모 값으로 회사를 표시한다 (수정은 조회 응답 값 — §8 #8).
+    dma_resultDetail.set("isurCd", scwin.isurCd);
+    dma_resultDetail.set("isurNm", scwin.isurNm);
+
+    await scwin.selectCurrentBasdd();
+    scwin.fillAfRows();
+
+    $c.util.setButtonState("grpBtnBox", "insert", scwin.BTN_MAP);
+};
 
 /**
  * @method
@@ -588,7 +563,6 @@ scwin.deleteTrs = async function () {
  * @description 저장·수정 전 입력 검증. 원본 fn_CheckForm 순서를 따른다. (§6.1)
  *  1) 변경후 월·일은 두 자리씩 4자리  2) 변경일·시장조치시행일·변경사유 필수, 기타 2000 byte (공통 검증)
  *  3) 시장조치시행일은 익일 이후 (원본 checkDdTm — pcc 함수는 Gauce 속성 .text 를 읽어 쓰지 않는다)
- * @param
  * @returns {Promise<Boolean>} 검증 통과 여부
  * @hidden N
  */
@@ -647,7 +621,6 @@ scwin.validate = async function () {
  * @author Inswave
  * @date 2026. 10. 26
  * @description 변경후 그리드에 입력할 빈 행을 채워 AF_ROW_COUNT 행으로 맞춘다. (원본 dts_DtlAf OnLoadCompleted — §6.2)
- * @param
  * @returns
  * @hidden N
  */
@@ -694,7 +667,6 @@ scwin.buildDtlList = function (dataList, chgBfafTpCd, bzProcsNo) {
  * @date 2026. 10. 26
  * @description 수정 여부 판정용으로 마스터와 변경후 목록을 문자열로 묶는다. (원본 dts_Mst.IsUpdated || dts_DtlAf.IsUpdated)
  * 변경후 그리드는 빈 행을 채워 넣어 행 상태(C)로는 판정할 수 없어 값을 비교한다.
- * @param
  * @returns {String} 현재 상태 문자열
  * @hidden N
  */
@@ -709,7 +681,6 @@ scwin.getEditState = function () {
  * @author Inswave
  * @date 2026. 10. 26
  * @description 업무처리번호를 새로 받는다. $c.stf.getNewBzProcNo 는 응답 봉투를 그대로 돌려줄 수 있어 body 를 꺼내 문자열로 만든다. (§5.4)
- * @param
  * @returns {Promise<String>} 업무처리번호 (실패면 빈 문자열)
  * @hidden N
  */
@@ -726,7 +697,6 @@ scwin.getNewBzProcsNo = async function () {
  * @date 2026. 10. 26
  * @description 신규 저장. 검증 → 확인 → 예약 건 확인 → 채번 → 등록 순서 (원본 fn_save — §6.6, §1.4 업무 2)
  * 채번이 확인보다 뒤라서 취소한 건에는 번호가 소비되지 않는다.
- * @param
  * @returns
  * @hidden N
  */
@@ -755,7 +725,6 @@ scwin.save = async function () {
  * @author Inswave
  * @date 2026. 10. 26
  * @description 수정. 검증 → 바뀐 내용 확인 → 확인 → 수정 순서 (원본 fn_update — §6.7, §1.4 업무 3)
- * @param
  * @returns
  * @hidden N
  */
@@ -782,7 +751,6 @@ scwin.update = async function () {
  * @author Inswave
  * @date 2026. 10. 26
  * @description 삭제. 확인을 받은 뒤 삭제한다. 입력 검증은 하지 않는다. (원본 fn_delete — §6.8, §1.4 업무 4)
- * @param
  * @returns
  * @hidden N
  */
@@ -801,7 +769,6 @@ scwin.remove = async function () {
  * @author Inswave
  * @date 2026. 10. 26
  * @description 공시안내문작성(ULDSTF92024)에 넘길 값. 원본 fn_dscl 이 fn_GetPar 로 채우던 arr[0..3] 과 데이터셋 3개다. (§6.4)
- * @param
  * @returns {Object} 넘길 data
  * @hidden N
  */
@@ -824,7 +791,6 @@ scwin.getDsclData = function () {
  * @author Inswave
  * @date 2026. 10. 26
  * @description 공시안내문작성 팝업을 data 로 넘겨 열고 닫힐 때까지 기다린다. 돌려받는 값은 없다. (원본 fn_dscl — §6.4, 가이드 §6.5)
- * @param
  * @returns
  * @hidden N
  */
@@ -877,7 +843,6 @@ scwin.getPar = function (arr, dltIsu, dltMst, dlt2, dlt3) {
  * @author Inswave
  * @date 2026. 10. 26
  * @description 전문에 넣을 회사코드. 수정은 조회 응답 값, 신규는 부모가 넘긴 값이다. (§8 #8)
- * @param
  * @returns {String} 회사코드
  * @hidden N
  */
@@ -913,7 +878,6 @@ scwin.fillDataList = function (dataList, rows) {
  * @date 2026. 10. 26
  * @description 기안문작성 팝업을 업무처리번호와 함께 열고 닫힐 때까지 기다린다. (원본 fn_drft — §6.5)
  * pcc $c.lc.popFindDraft 는 값을 넘기지 않는 콜백형이라 쓰지 않는다.
- * @param
  * @returns
  * @hidden N
  */
@@ -928,6 +892,29 @@ scwin.writeDraft = async function () {
 
     // TODO: 기안 팝업 전환본이 없어 경로·수신 키(bzProcsNo)는 가정 (§10 #8)
     await $c.win.openPopup("/ui/listingcommon/ULDSTF92004.xml", options, { bzProcsNo : scwin.bzProcsNo });
+};
+
+/**
+ * @method
+ * @name scwin.checkAfMmDd
+ * @author Inswave
+ * @date 2026. 10. 26
+ * @description 변경후 월·일 범위 확인. 월 > 12, 일 > 31 이면 안내하고 그 칸을 비운다. 월별 말일(0231 등)은 원본도 보지 않는다(§6.3, §8 #4).
+ * @param {Number} row 행 index
+ * @param {String} colId 편집한 컬럼 id (basMm / basDd)
+ * @returns
+ * @hidden N
+ */
+scwin.checkAfMmDd = async function (row, colId) {
+    const val = Number(dlt_resultDetail_dtlAfList.getCellData(row, colId));
+
+    if (colId === "basMm" && val > 12) {
+        await $c.win.alert("입력월을 확인하세요.");
+        dlt_resultDetail_dtlAfList.setCellData(row, "basMm", "");
+    } else if (colId === "basDd" && val > 31) {
+        await $c.win.alert("입력일을 확인하세요.");
+        dlt_resultDetail_dtlAfList.setCellData(row, "basDd", "");
+    }
 };
 ]]></script>
 	</head>
@@ -950,7 +937,7 @@ scwin.writeDraft = async function () {
 							<w2:attributes>
 								<w2:scope>row</w2:scope>
 							</w2:attributes>
-							<w2:textbox id="label_11" label="1. 회사코드(명)" style="" />
+							<w2:textbox id="" label="1. 회사코드(명)" style="" />
 						</xf:group>
 						<xf:group class="w2tb_td" tagname="td">
 							<w2:attributes>
@@ -968,19 +955,19 @@ scwin.writeDraft = async function () {
 							<w2:attributes>
 								<w2:scope>row</w2:scope>
 							</w2:attributes>
-							<w2:textbox id="label_2" label="2. 수입분배기준일" style="" />
+							<w2:textbox id="" label="2. 수입분배기준일" style="" />
 						</xf:group>
 						<xf:group class="w2tb_th" tagname="th">
 							<w2:attributes>
 								<w2:scope>col</w2:scope>
 							</w2:attributes>
-							<w2:textbox id="label_1" label="가. 변경전(월,일)" style="" />
+							<w2:textbox id="" label="가. 변경전(월,일)" style="" />
 						</xf:group>
 						<xf:group class="w2tb_th" tagname="th">
 							<w2:attributes>
 								<w2:scope>col</w2:scope>
 							</w2:attributes>
-							<w2:textbox class="req" id="label_4" label="나. 변경후(월,일)" style="" />
+							<w2:textbox class="req" id="" label="나. 변경후(월,일)" style="" />
 						</xf:group>
 					</xf:group>
 					<xf:group tagname="tr">
@@ -988,7 +975,7 @@ scwin.writeDraft = async function () {
 							<w2:attributes>
 								<w2:scope>row</w2:scope>
 							</w2:attributes>
-							<w2:textbox id="label_18" label="변경내역" style="" />
+							<w2:textbox id="" label="변경내역" style="" />
 						</xf:group>
 						<xf:group class="w2tb_td" tagname="td">
 							<xf:group class="gvwbox" id="" style="">
@@ -1041,7 +1028,7 @@ scwin.writeDraft = async function () {
 							<w2:attributes>
 								<w2:scope>row</w2:scope>
 							</w2:attributes>
-							<w2:textbox class="req" id="label_6" label="3. 변경일" style="" />
+							<w2:textbox class="req" id="" label="3. 변경일" style="" />
 						</xf:group>
 						<xf:group class="w2tb_td" tagname="td">
 							<w2:attributes>
@@ -1056,7 +1043,7 @@ scwin.writeDraft = async function () {
 							<w2:attributes>
 								<w2:scope>row</w2:scope>
 							</w2:attributes>
-							<w2:textbox class="req" id="label_12" label="4. 시장조치시행일" style="" />
+							<w2:textbox class="req" id="" label="4. 시장조치시행일" style="" />
 						</xf:group>
 						<xf:group class="w2tb_td" tagname="td">
 							<w2:attributes>
@@ -1064,7 +1051,7 @@ scwin.writeDraft = async function () {
 							</w2:attributes>
 							<xf:group class="flex flex_no" id="" style="">
 								<w2:inputCalendar calendarValueType="yearMonthDate" focusOnDateSelect="false" footerDiv="true" id="edt_MKTACT_ENFORCE_DD" ref="data:dma_resultDetail.mktactEnforceDd" renderDiv="true" rightAlign="false" style="" />
-								<w2:textbox class="txt_info" id="label_13" label="(시스템 반영일자를 입력)" style="" />
+								<w2:textbox class="txt_info" id="" label="(시스템 반영일자를 입력)" style="" />
 							</xf:group>
 						</xf:group>
 					</xf:group>
@@ -1074,7 +1061,7 @@ scwin.writeDraft = async function () {
 							<w2:attributes>
 								<w2:scope>row</w2:scope>
 							</w2:attributes>
-							<w2:textbox class="req" id="label_15" label="5. 변경 후 최초 사업연도" style="" />
+							<w2:textbox class="req" id="" label="5. 변경 후 최초 사업연도" style="" />
 						</xf:group>
 						<xf:group class="w2tb_td" tagname="td">
 							<w2:attributes>
@@ -1087,7 +1074,7 @@ scwin.writeDraft = async function () {
 							<w2:attributes>
 								<w2:scope>row</w2:scope>
 							</w2:attributes>
-							<w2:textbox id="label_16" label="가. 시작일" style="" />
+							<w2:textbox id="" label="가. 시작일" style="" />
 						</xf:group>
 						<xf:group class="w2tb_td" tagname="td">
 							<w2:attributes>
@@ -1101,7 +1088,7 @@ scwin.writeDraft = async function () {
 							<w2:attributes>
 								<w2:scope>row</w2:scope>
 							</w2:attributes>
-							<w2:textbox id="label_17" label="나. 종료일" style="" />
+							<w2:textbox id="" label="나. 종료일" style="" />
 						</xf:group>
 						<xf:group class="w2tb_td" tagname="td">
 							<w2:attributes>
@@ -1116,7 +1103,7 @@ scwin.writeDraft = async function () {
 							<w2:attributes>
 								<w2:scope>row</w2:scope>
 							</w2:attributes>
-							<w2:textbox class="req" id="label_10" label="6. 변경사유" style="" />
+							<w2:textbox class="req" id="" label="6. 변경사유" style="" />
 						</xf:group>
 						<xf:group class="w2tb_td" tagname="td">
 							<w2:attributes>
@@ -1146,7 +1133,7 @@ scwin.writeDraft = async function () {
 							<w2:attributes>
 								<w2:scope>row</w2:scope>
 							</w2:attributes>
-							<w2:textbox id="label_7" label="7. 기타" style="" />
+							<w2:textbox id="" label="7. 기타" style="" />
 						</xf:group>
 						<xf:group class="w2tb_td" tagname="td">
 							<w2:attributes>

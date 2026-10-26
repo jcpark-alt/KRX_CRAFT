@@ -71,7 +71,7 @@ AS-IS 는 부모가 `fn_GetPar` 를 `fn_GetParNew3`/`fn_GetParUpdate3` 로 바�
 
 | # | 업무 | 시작 (사용자 동작·진입 조건) | 끝 (결과) | 주요 함수 | 관련 절 |
 |---|---|---|---|---|---|
-| 1 | 진입·로딩 | 부모가 팝업을 엶 (업무처리번호 유무로 신규/수정) | 입력 대기 (모드별 버튼) | `scwin.onpageload` → `init_recvParam` → `init_newForm` / `selectList` | §3, §5.1 |
+| 1 | 진입·로딩 | 부모가 팝업을 엶 (업무처리번호 유무로 신규/수정) | 입력 대기 (모드별 버튼) | `scwin.onpageload` → `scwin.init` → `scwin.initNewForm` / `scwin.selectList` | §3, §5.1 |
 | 2 | 종목 선택 | [종목 찾기] `img_SetIsuCd` | 선택 결과로 그리드 전체 교체 | `scwin.img_SetIsuCd_onclick` → `openIsuPopup` | §6.4 |
 | 3 | 엑셀 업로드 | [엑셀업로드] `btn_exelUpload` | 엑셀 자료로 그리드 전체 교체 | `scwin.btn_exelUpload_onclick` | §6.5 |
 | 4 | 엑셀 다운로드 | [엑셀저장] `img_Excel` | 그리드를 엑셀 파일로 저장 | `scwin.img_Excel_onclick` | §6.6 |
@@ -95,9 +95,9 @@ AS-IS 는 `fn_GetPar`/`fn_SetPar` 를 바꿔 끼우고, 92023 이 `fn_SetPar(par
 
 ```mermaid
 flowchart TD
-    S(["팝업 열림<br/>scwin.onpageload"]) --> P["파라미터 수신<br/>scwin.init_recvParam"]
+    S(["팝업 열림<br/>scwin.onpageload"]) --> P["파라미터 수신<br/>scwin.init"]
     P --> B{"업무처리번호가 있는가?"}
-    B -- "없음(신규)" --> N1["마스터 · 종목 목록 비움<br/>scwin.init_newForm"]
+    B -- "없음(신규)" --> N1["마스터 · 종목 목록 비움<br/>scwin.initNewForm"]
     N1 --> N2["버튼 insert(저장만)"] --> E1(["입력 대기"])
     B -- "있음(수정)" --> U1[/"GET select-list-isu §5.1<br/>종목 목록"/]
     U1 -. "실패 ※TO-BE" .-> U3["버튼 모두 잠금"] --> E2(["끝"])
@@ -288,33 +288,42 @@ stateDiagram-v2
 
 ---
 
-## 3. 로딩 (`gform onload` → `scwin.onpageload` → `scwin.init_*`)
+## 3. 로딩 (`gform onload` → `scwin.onpageload` → `scwin.init`)
 
 원본 `gform onload` 순서:
 
-1. **파라미터 수신** (`scwin.init_recvParam`)
+1. **파라미터 수신** (`scwin.init`)
    - AS-IS: `frame.Provider("../").fn_GetPar(arrPar)` → `Isur_cd`·`Isur_nm`·`Secugrp_id`·`Mkt_id`·`fr_bz_procs_no`·`gubun`.
    - TO-BE: `const param = $c.data.getParameter() ?? {};` → `scwin.isurCd`·`scwin.bzProcsNo`·`scwin.gubun` (§1.2).
 2. **버튼 매핑** — AS-IS `buttonSet.setSaveInfo/UpdateInfo/DeleteInfo` 3종(안내문작성은 주석). TO-BE 는 `ev:onclick` + `scwin.BTN_MAP = { save : "btn_Save", modify : "btn_Update", "delete" : "btn_Delete" }`.
 3. **신규·수정 분기**
    - 업무처리번호 있음 → `await scwin.selectList()` (§5.1) → 후처리(첫 행 머리 정보, 버튼 상태 — 원본 `dts_Isu OnLoadCompleted`).
-   - 없음 → `scwin.init_newForm()`: `dma_mst.setEmptyValue()`, `dma_mst.set("isurCd", scwin.isurCd)`, `dlt_detail.removeAll()`, 버튼 `insert`. 원본은 `CHGLIST_PRC_INOUT` 헤더만 받는 조회를 보냈다(빈 dataset 구조용) → TO-BE 는 dataList 정의로 대신한다.
+   - 없음 → `scwin.initNewForm()`: `dma_mst.setEmptyValue()`, `dma_mst.set("isurCd", scwin.isurCd)`, `dlt_detail.removeAll()`, 버튼 `insert`. 원본은 `CHGLIST_PRC_INOUT` 헤더만 받는 조회를 보냈다(빈 dataset 구조용) → TO-BE 는 dataList 정의로 대신한다.
 4. `PanelToGroupBox(panel_3)` — 삭제.
 
 ```javascript
 scwin.onpageload = async function () {
     try {
-        scwin.init_recvParam();
-        if ($c.util.isEmpty(scwin.bzProcsNo)) {
-            scwin.init_newForm();
-        } else {
-            await scwin.selectList();
-        }
+        await scwin.init();
     } catch (ex) {
         await $c.exception.handleError(ex, { context : "ULDSTF05911.onpageload" });
     }
 };
+
+scwin.init = async function () {
+    // 1) 로딩 동안 버튼 잠금(조회가 예외로 끝나도 XML 기본값으로 남지 않게)
+    $c.util.setButtonState("grpBtnBox", "disabled", scwin.BTN_MAP);
+    // 2) 파라미터 수신 — $c.data.getParameter() (§1.2) · 날짜 형식 · 서버 현재일
+    // 3) 업무처리번호 유무로 신규 준비 또는 수정 조회
+    if ($c.util.isEmpty(scwin.bzProcsNo)) {
+        scwin.initNewForm();
+    } else {
+        await scwin.selectList();
+    }
+};
 ```
+
+`onpageload` 는 `scwin.init()` 만 호출하고, 로딩 로직은 `scwin.init` 하나에 둔다(code-convention 초기화 절, 2026-10-26). 신규 준비는 5구역 `scwin.initNewForm`.
 
 ---
 
@@ -561,10 +570,10 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=1`, `LIST_BZ_TP_CD=147`
 
 | AS-IS | TO-BE |
 |---|---|
-| `gform onload` | `scwin.onpageload` → `scwin.init_recvParam` / `scwin.init_newForm` 또는 `scwin.selectList` |
+| `gform onload` | `scwin.onpageload` → `scwin.init`(버튼 잠금 → 파라미터 수신 → `scwin.initNewForm` 또는 `scwin.selectList`) |
 | `frame.Provider("../").fn_GetPar(arrPar)` | `$c.data.getParameter()` (§1.2) |
 | 전역 `Isur_cd`·`fr_bz_procs_no`·`gubun`·`trsIdx` | `scwin.isurCd`·`scwin.bzProcsNo`·`scwin.gubun`·`scwin.trJob` |
-| `fn_new_onload` (헤더만 조회) | `scwin.init_newForm` (조회 없음) |
+| `fn_new_onload` (헤더만 조회) | `scwin.initNewForm` (조회 없음) |
 | `fn_search` + `dts_Isu OnLoadCompleted` | `scwin.selectList` + `scwin.applyHeader` + `scwin.applyKoEditable` + 버튼 상태 |
 | `fn_CheckForm` | `scwin.validate` (+ `validateDataCollect`) |
 | `fn_save` / `fn_update` / `fn_delete` | `scwin.save` / `scwin.update` / `scwin.remove` |
@@ -587,6 +596,7 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=1`, `LIST_BZ_TP_CD=147`
 | `btn_Close onclick` → `frame.CloseFrame()` | 삭제 — 팝업 창의 닫기(X) 사용. 삭제 성공·등록 후 닫기는 `$c.win.closePopup()` |
 | `popUpCalendar2(...)`, `img_MktactEnforceDd` | 삭제 (inputCalendar 내장) |
 | `alert(...)` | `await $c.win.alert(...)` |
+| `btn_exelUpload onclick` 의 확인·업로드 | 핸들러는 `scwin.uploadExcel()` 호출만, 확인·옵션은 5구역(Thin Event) |
 | `#include(...)` 7종, `PanelToGroupBox`, `vScrenID` | 삭제 (규칙 11·1) |
 | `fn_drft`, `fn_makt` | 삭제 (빈 함수) |
 | (없음 — 화면 보조) | `scwin.isEmptyOrZero`(느슨한 비교 `== "" \|\| == 0` 대체), `scwin.getIsurCd`(조회 값 우선 발행기관코드), `scwin.grd_isu_onfilereadend`(업로드 뒤 편집 조건) |
