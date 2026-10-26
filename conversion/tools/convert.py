@@ -1298,7 +1298,7 @@ def rule4_structure(script, body, report):
         name = f["name"]
         if name in ("onpageload", "onpageunload"):
             return "init"
-        # 컨벤션 '초기화' 절: 로딩 시점 초기화 단위(scwin.init / scwin.init_*)는 onpageload 아래 2구역에 둔다(2026-09-23)
+        # 컨벤션 '초기화' 절: 로딩 로직은 scwin.init 하나(2026-10-26). init_* 는 공급사 산출 호환을 위해 같은 2구역으로 분류(2026-09-23)
         if name == "init" or name.startswith("init_"):
             return "init"
         if name == "gform_onload":

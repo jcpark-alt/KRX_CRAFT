@@ -36,6 +36,7 @@
 
 ### 규칙 4: 코드 구조화 및 영역 분리 (5단계 정형화 구조)
 
+* **초기화 함수 통일**(2026-10-26 변경): `scwin.onpageload` 에 함수 코드가 있으면 그 코드를 **`scwin.init` 하나로** 옮기고 `onpageload` 는 `scwin.init()` 만 호출한다 — 초기화 단위를 `scwin.init_*` 여러 개로 나누지 않는다(code-convention '초기화' 절). 기계 분리는 `init_restructure.py`(onpageload 인라인 → `scwin.init`). 다시 부르는 로직은 5구역 일반 함수(camelCase, `init_` 접두 금지)로 둔다. 예외: jsp-front 공급사(r13) 산출의 `init_*`(생성기 계약·후처리 대상)는 유지.
 * **초기화 함수 분류**(2026-09-23): `scwin.init` / `scwin.init_*` 는 2구역(초기화 영역)으로 분류해 `onpageload`(→ `onpageunload`) 다음에
   배치한다(code-convention '초기화' 절 — onpageload 는 init_* 를 순차 호출하고 로딩 로직을 직접 갖지 않는다). 종전에는 통신 없는 일반 함수로 5구역에 놓였다.
   sample-front/ui/fil·stf 35화면 소급 적용(onpageload 인라인 초기화 → init 분리 23화면).

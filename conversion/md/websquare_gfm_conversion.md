@@ -39,7 +39,7 @@
 | §1 기본 정보·호출 규약 | 1. 변수 및 선언 영역 | 받은 파라미터를 담을 `scwin.*` 전역, 상수 |
 | §1.4 업무 프로세스 흐름 | (구역 전체) | 업무마다 2~5구역 함수가 불리는 순서 — 전환본 흐름 검토의 기준 |
 | §2 화면 구성·데이터 정의 | (head `<w2:dataCollection>` / body) | `dma_`/`dlt_` 정의와 컴포넌트 바인딩 |
-| §3 로딩 | 2. 초기화 영역 | `scwin.onpageload` → `scwin.init` / `scwin.init_*` |
+| §3 로딩 | 2. 초기화 영역 | `scwin.onpageload` → `scwin.init` (하나로 통일) |
 | §4 컴포넌트 이벤트 | 3. 컴포넌트 이벤트 영역 | body `ev:on*` 가 가리키는 핸들러 |
 | §5 서버 통신 | 4. 서브미션 콜백 영역 | `$c.sbm.executeDynamic` 을 호출하는 함수 |
 | §6 일반 함수 | 5. 일반/업무 함수 영역 | 검증·가공·팝업·리셋 |
@@ -227,40 +227,56 @@ stateDiagram-v2
 
 ---
 
-## 3. 로딩 (`scwin.onpageload` → `scwin.init_*`) — 2구역
+## 3. 로딩 (`scwin.onpageload` → `scwin.init`) — 2구역
 
 AS-IS 의 `$(document).ready()`·`window.onload`·JSP 상단 스크립틀릿에 해당하는 로직을 분석합니다.
 
-**작성 원칙** (code-convention 초기화 절, 규칙 4·26):
-* `scwin.onpageload` 는 초기화 단위를 **데이터 의존 순서대로 부르기만** 하고 로직을 직접 갖지 않습니다. 본문은 try/catch + `$c.exception.handleError` 입니다.
-* 초기화 단위는 `scwin.init` 또는 `scwin.init_*` 로 이름 짓습니다 — 이 이름만 2구역으로 분류됩니다. 통신을 기다려야 하면 `await` 순서를 적습니다.
-* 화면 리셋 함수(초기화 버튼 등)는 여기가 아니라 §6(5구역)에 적습니다. 로딩 때도 부른다면 "§6.x 를 호출" 이라고만 씁니다.
+**작성 원칙** (code-convention 초기화 절, 규칙 4·26 — 2026-10-26 변경):
+* `scwin.onpageload` 는 **`scwin.init()` 만 호출**하고 로직을 직접 갖지 않습니다. 본문은 try/catch + `$c.exception.handleError` 입니다.
+* 로딩 로직은 **`scwin.init` 함수 하나**에 데이터 의존 순서대로 씁니다. 초기화 단위를 `scwin.init_*` 여러 개로 나누지 않습니다. 결과서에는 `scwin.init` 안의 **단계**를 번호로 적고, 통신을 기다려야 하는 단계에 `await` 근거를 적습니다.
+* 로딩 외에도 다시 부르는 로직(신규 폼 준비, 화면 리셋 등)은 §6(5구역) 일반 함수로 적고(camelCase, `init_` 접두 금지) `scwin.init` 의 단계에서 "§6.x 호출" 이라고 씁니다.
 
-**작성 예시:**
+**작성 예시 — `scwin.init` 의 단계:**
 
-1. **파라미터 수신** (`scwin.init_recvParam`)
+1. **파라미터 수신**
    * `const param = $c.data.getParameter() ?? {};` → `scwin.menuId`, `scwin.userRole` 에 담음 (AS-IS: JSP `${param.MENU_ID}`)
-2. **공통 코드 바인딩** (`scwin.init_code`)
+2. **공통 코드 바인딩**
    * `await $c.data.setCommonCode([{ code : "DEPT_CD", compID : "sbx_dept", firstRow : ["", "전체"] }, { code : "RANK_CD", compID : "sbx_rank" }]);`
-3. **조건 기본값** (`scwin.init_searchCondition`)
+3. **조건 기본값** — §6.4 `scwin.resetForm` 호출(초기화 버튼과 같은 로직)
    * 등록일 시작일 = 당월 1일, 종료일 = 서버 현재일(`$c.date.getServerDateTime()`), 기간 검사 바인딩(`$c.date.compareFromToDate` — 조회 시점 검사가 아니라 변경 이벤트 바인더이므로 1회만 호출)
    * 검색 영역 Enter 키 바인딩: `$c.win.setEnterKeyEvent(tbl_search, scwin.btn_search_onclick);` (규칙 22)
 4. **버튼 상태** — `$c.util.setButtonState("grpBtnBox", "insert", scwin.BTN_MAP);` (권한·모드별 활성 정책은 표로)
-5. **초기 조회** (`scwin.init_search`)
+5. **초기 조회**
    * 권한이 `ADMIN` 이면 `await scwin.searchList();` (§5.1)
 
 ```javascript
 scwin.onpageload = async function () {
     try {
-        scwin.init_recvParam();
-        await scwin.init_code();
-        scwin.init_searchCondition();
-        await scwin.init_search();
+        await scwin.init();
     } catch (ex) {
         await $c.exception.handleError(ex, { context : "{화면ID}.onpageload" });
     }
 };
+
+scwin.init = async function () {
+    // 1) 파라미터 수신
+    const param = $c.data.getParameter() ?? {};
+    scwin.menuId = param.menuId ?? "";
+
+    // 2) 공통 코드
+    await $c.data.setCommonCode([{ code : "DEPT_CD", compID : "sbx_dept", firstRow : ["", "전체"] }]);
+
+    // 3) 조건 기본값 — 초기화 버튼과 같은 로직이라 5구역 함수로
+    scwin.resetForm();
+    $c.win.setEnterKeyEvent(tbl_search, scwin.btn_search_onclick);
+
+    // 4) 버튼 상태 · 5) 초기 조회
+    $c.util.setButtonState("grpBtnBox", "insert", scwin.BTN_MAP);
+    if (scwin.userRole === "ADMIN") await scwin.searchList();
+};
 ```
+
+* 예외: jsp-front 공급사(r13) 산출의 `init_recvParam`·`init_conds` 등은 생성기 계약이라 그대로 둡니다(이 가이드로 새로 쓰는 화면에는 만들지 않습니다).
 
 ---
 
@@ -462,11 +478,13 @@ scwin.openIsuPopup = async function () {
 **팝업 (열리는 화면)**
 
 ```javascript
-scwin.init_recvParam = function () {
-    const param = $c.data.getParameter() ?? {};   // AS-IS frame.Provider("../").fn_GetPar(arrPar)
+scwin.init = async function () {
+    // 1) 파라미터 수신 — AS-IS frame.Provider("../").fn_GetPar(arrPar)
+    const param = $c.data.getParameter() ?? {};
     scwin.isurCd = param.isurCd ?? "";
     scwin.bzProcsNo = param.bzProcsNo ?? "";
     if (param.mst) dma_mst.setJSON(param.mst);
+    // 2) … (나머지 로딩 단계)
 };
 
 scwin.btn_confirm_onclick = async function () {
@@ -517,7 +535,7 @@ scwin.btn_confirm_onclick = async function () {
 
 | AS-IS | TO-BE |
 |---|---|
-| `$(document).ready(fn)` | `scwin.onpageload` → `scwin.init_*` |
+| `$(document).ready(fn)` | `scwin.onpageload` → `scwin.init` |
 | `fn_SearchList()` | `scwin.searchList()` (규칙 13) |
 | `$.ajax({ url : "/user/list.do", … success : fn })` | `await $c.sbm.executeDynamic(...)` + await 뒤 후처리 |
 | `$("#searchWord").val()` | `ipt_searchWord.getValue()` 또는 `dma_search.get("searchWord")` (규칙 19) |
@@ -541,7 +559,7 @@ scwin.btn_confirm_onclick = async function () {
 
 | AS-IS | WebSquare (sample-front 꼴) | 분석 시 확인할 것 |
 |---|---|---|
-| `$(document).ready` / `window.onload` | `scwin.onpageload` → `scwin.init_*` | 초기화 단위와 순서 |
+| `$(document).ready` / `window.onload` | `scwin.onpageload` → `scwin.init` (하나로 통일) | `init` 안의 단계 순서 |
 | JSP EL `${x}` / `<c:out>` | 진입 파라미터(`$c.data.getParameter`) 또는 조회 응답 | 서버가 넣던 값의 출처 |
 | `<form>` 필드 / `document.F.X.value` | `dma_*` 바인딩 컴포넌트 `getValue`/`setValue` | 필드 → 키 이름(camelCase) |
 | `<table>` + `<tr>` 문자열 빌드 | `w2:gridView` + `dlt_*` | 컬럼·표시 형식 |
@@ -590,7 +608,7 @@ scwin.btn_confirm_onclick = async function () {
 - [ ] §1: 기본 정보 표가 채워졌고, 팝업이면 호출·반환 규약이 키 단위로 있다.
 - [ ] §1.4: 업무 목록의 **모든 업무**에 흐름도와 단계 표가 있다. 취소·검증 탈락·서버 실패 분기가 끝 노드로 이어지고, 화면 간 흐름도(부모·하위 팝업)가 있다. 흐름도가 미리보기에서 그려진다.
 - [ ] §2: AS-IS 의 **모든 입력·출력 요소**가 표에 있거나 "(옮기지 않음)" 사유가 있다. DataCollection 키가 camelCase 로 정리됐다.
-- [ ] §3: onpageload 는 `init_*` 호출만 갖고, 각 단위의 순서와 await 근거가 있다.
+- [ ] §3: onpageload 는 `scwin.init()` 호출만 갖고, 로딩 로직은 `scwin.init` 하나에 단계 순서·await 근거와 함께 있다(`init_*` 분리 없음).
 - [ ] §4: AS-IS 의 **모든 이벤트 바인딩**(스크립트·속성)이 TO-BE 핸들러로 대응됐다.
 - [ ] §5: 모든 Ajax/submit 이 한 절씩 있고, 신규 API 경로(또는 가정 표시)·후처리·실패 처리·중복 실행 정책이 적혔다. `{화면ID}_API.txt` 가 있으면 AS-IS ↔ 명세 대응표가 있고, 명세 요청·응답 키가 §2.2 와 같으며, 명세와 어긋나는 점이 §10 에 올라갔다.
 - [ ] §6: 검증은 공통/업무로 나뉘었고, 팝업은 반환 형태가 적혔다. `fn_GetPar`/`fn_SetPar` 는 전부 `openPopup` data + `await` 반환(§6.5)으로 대응됐고, 취소는 필요한 필드로 판정한다.
@@ -753,9 +771,9 @@ stateDiagram-v2
 | TO-BE | 종류 | 키(컬럼) | 출처 / 용도 |
 |---|---|---|---|
 
-## 3. 로딩 (`scwin.onpageload` → `scwin.init_*`)
+## 3. 로딩 (`scwin.onpageload` → `scwin.init`)
 
-1. **{단위}** (`scwin.init_xxx`) — …
+1. **{단계}** — … (다시 부르는 로직은 §6.x 함수 호출)
 
 ## 4. 컴포넌트 이벤트
 
@@ -799,7 +817,7 @@ stateDiagram-v2
 
 | AS-IS | TO-BE |
 |---|---|
-| `$(document).ready` | `scwin.onpageload` → `scwin.init_*` |
+| `$(document).ready` | `scwin.onpageload` → `scwin.init` |
 
 ## 10. 남은 작업 (TODO)
 

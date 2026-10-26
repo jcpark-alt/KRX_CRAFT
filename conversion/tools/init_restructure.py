@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""onpageload 인라인 초기화 → scwin.init 분리(code-convention '초기화' 절 — onpageload 는 init_* 를 순차 호출만 한다).
+"""onpageload 인라인 초기화 → scwin.init 분리(code-convention '초기화' 절 — onpageload 는 scwin.init() 만 호출하고, 로딩 로직은 scwin.init 하나에 둔다. 2026-10-26).
 
     python conversion/tools/init_restructure.py [--dry] <xml|폴더> ...
 

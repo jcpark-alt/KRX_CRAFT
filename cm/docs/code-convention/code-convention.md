@@ -84,10 +84,14 @@
   블록을 작성한다. `@description desc`·빈 `@description` 같은 **placeholder 금지**, 인자 없는 함수의 빈 `@param` 라인은 쓰지 않는다.
   레거시 박스형(`/**** 함수명 ****/`)·`argument :` 주석은 내용을 `@description`/`@param` 으로 이관하고 삭제한다(단계 2 판단 작업).
 
-## 초기화 — IIFE·onpageload 오버라이딩 금지, `init_*` 순차 호출
+## 초기화 — IIFE·onpageload 오버라이딩 금지, `scwin.init` 하나로 통일
 
 로딩 시점 로직은 **즉시실행함수(IIFE)로 자동 실행하거나 `scwin.onpageload` 를 래핑(오버라이딩)하지 않는다.**
-각 초기화 단위를 명명 함수(`scwin.init_*`)로 분리하고, **`scwin.onpageload` 단일 정의 안에서 데이터 의존성 순서대로 호출**한다. (2026-09-04 확정)
+**`scwin.onpageload` 에 함수 코드(로딩 로직)가 있으면 그 코드를 `scwin.init` 함수 하나로 옮기고, `onpageload` 는 `scwin.init()` 만 호출**한다. 초기화 단위를 `scwin.init_*` 여러 개로 나누지 않는다. (2026-10-26 변경 — 종전 2026-09-04 「`init_*` 단위 분리·순차 호출」을 대체)
+
+- `scwin.init` 안에서 **데이터 의존성 순서**(파라미터 수신 → 파생값·공통코드 → 화면 상태 → 초기 조회)대로 쓰고, 단계가 길면 `// 1) 파라미터 수신` 같은 단계 주석으로 나눈다.
+- 로딩 외에도 다시 부르는 로직(신규 폼 준비, 화면 리셋, 재조회 등)은 **5구역 일반 함수**(`scwin.initNewForm`·`scwin.resetForm` 처럼 camelCase, `init_` 접두 금지)로 두고 `scwin.init` 에서 호출한다.
+- **예외**: jsp-front 공급사(r13) 산출의 `init_recvParam`·`init_conds`·`init_attrReals`·`init_rowCopy` 등은 생성기 계약이자 후처리 도구(`vendor_postprocess`·`vendor_stage2`)의 대상이라 그대로 둔다. convert.py 규칙 4 는 기존 산출물 호환을 위해 `scwin.init`·`scwin.init_*` 를 모두 2구역으로 분류한다.
 
 ```javascript
 // (X) 금지 — IIFE 자동 실행 + onpageload 오버라이딩 래핑
@@ -97,27 +101,39 @@
     scwin.onpageload = function () { scwin.init_conds(); if (__prev) __prev(); };
 })();
 
-// (O) 권장 — onpageload 를 2구역 최상단에 정의, init_* 는 그 아래
-scwin.onpageload = function () {
+// (X) 지양 — 초기화 단위를 init_* 여러 개로 쪼개기 (2026-10-26 변경)
+scwin.onpageload = function () { try { scwin.init_recvParam(); scwin.init_conds(); } catch (ex) { … } };
+
+// (O) 권장 — onpageload 는 scwin.init() 만 호출, 로딩 로직은 scwin.init 하나에
+scwin.onpageload = async function () {
     try {
-        scwin.init_recvParam();   // 1) 파라미터 수신
-        scwin.init_conds();       // 2) 수신값 기반 조건 평가
+        await scwin.init();
     } catch (ex) {
-        $c.exception.handleError(ex, { context : "화면ID.onpageload" });
+        await $c.exception.handleError(ex, { context : "화면ID.onpageload" });
     }
 };
 
-scwin.init_recvParam = function () { $c.data.recvParamData("dma_pageContext"); };
-scwin.init_conds     = function () { $c.util.evalConds(binds); };
+scwin.init = async function () {
+    // 1) 파라미터 수신
+    const param = $c.data.getParameter() ?? {};
+    scwin.bzProcsNo = param.bzProcsNo ?? "";
+
+    // 2) 신규 준비 또는 수정 조회 — 다시 부르는 로직은 5구역 함수로
+    if ($c.util.isEmpty(scwin.bzProcsNo)) {
+        scwin.initNewForm();
+    } else {
+        await scwin.selectOne();
+    }
+};
 ```
 
-- **`scwin.onpageload` 는 `///////// 2. 초기화 영역 /////////` 단락의 최상단에 정의**한다. 진입점을 즉시 식별할 수 있도록 `init_*`·`onpageunload` 등 다른 초기화 함수보다 앞에 둔다(함수 대입은 로딩 시 모두 완료되므로, `onpageload` 가 뒤에 정의된 `init_*` 를 호출해도 실행 시점엔 이미 정의돼 있어 문제없다).
+- **`scwin.onpageload` 는 `///////// 2. 초기화 영역 /////////` 단락의 최상단에 정의**한다. 진입점을 즉시 식별할 수 있도록 `onpageunload`·`init` 등 다른 초기화 함수보다 앞에 둔다(함수 대입은 로딩 시 모두 완료되므로, `onpageload` 가 뒤에 정의된 `init` 을 호출해도 실행 시점엔 이미 정의돼 있어 문제없다).
 - **IIFE 금지(화면 페이지 전면)**: 화면 개발 페이지에서는 즉시실행함수 `(function(){…})()` / `(async function(){…})()` / `(()=>{…})()` 를 **일절 사용하지 않는다** — 로딩 시점 자동 실행뿐 아니라 **값 계산·값 쓰기용 인라인 IIFE** 도 금지. (2026-09-04 확정)
   - 반복되는 값 추출/쓰기 로직은 명명 헬퍼 함수(`scwin.getDmaValue`·`scwin.setComponentText` 등)로 분리해 호출한다.
   - **예외**: 공통 라이브러리(`cm/gcc/*`·`cm/pcc/*`)는 네임스페이스 캡슐화를 위한 모듈 패턴 IIFE 를 허용한다(화면 페이지가 아닌 라이브러리 한정).
 - 초기화 IIFE 는 정의만 하고 `onpageload` 에서 호출한다(위 초기화 절 참조).
 - **오버라이딩 금지**: `var __prev = scwin.onpageload;` 형태의 래핑을 만들지 않는다. `scwin.onpageload` 는 파일당 1회만 정의한다.
-- **순차 호출 순서는 데이터 의존성**을 따른다(파라미터 수신 → 파생값 충전 → 화면 렌더/조건 평가). 렌더가 데이터를 기다리려 `setTimeout` 다중 예약에 의존하지 말고 **선행 함수 완료 후 호출**로 순서를 보장한다. 비동기 초기화면 `onpageload`/`init_*` 를 `async`/`await` 로 전환해 순차 배치한다.
+- **순차 호출 순서는 데이터 의존성**을 따른다(파라미터 수신 → 파생값 충전 → 화면 렌더/조건 평가). 렌더가 데이터를 기다리려 `setTimeout` 다중 예약에 의존하지 말고 **선행 함수 완료 후 호출**로 순서를 보장한다. 비동기 초기화면 `onpageload`/`init` 을 `async`/`await` 로 전환해 순차 배치한다.
 - 진입점이므로 `onpageload` 를 단일 try/catch + `$c.exception.handleError` 로 감싼다(오류 처리 절·규칙 26 정합). 정답지: `conversion/jsp-front/jsp_소스전환/jldfil25900.xml`.
 
 ## 서브미션 — async/await 순차 실행 우선
