@@ -45,15 +45,184 @@ AS-IS 는 부모가 `fn_GetPar` 를 자기 함수로 바꿔 두면, 팝업이 �
 | `arr[4]` | `bzProcsNo` | 업무처리번호 | **비면 신규**, 있으면 수정 |
 | `arr[5]` | `fiscyyDistrBasddTpCd` | 결산기분배기준일구분코드 (1 결산기 / 2 분배기준일) | 부모는 항상 `"2"`. 화면은 이 값을 읽지 않고 저장 때 `"2"` 를 직접 넣음(원본 변수명 `haltTpCd`) |
 
-- **TO-BE 제안**: 부모가 `$c.win.openPopup(url, options, { isurCd, isurNm, secugrpId, mktId, bzProcsNo, fiscyyDistrBasddTpCd })` 로 넘기고, 이 화면은 `$c.data.getParameter()` 로 받는다. 부모(05620)가 아직 전환 전이라 키 이름은 제안이다(§10 #6).
-- **반환**: 없음. 원본은 `frame.CloseFrame()` 만 하고 값을 돌려주지 않는다. 부모는 닫힌 뒤 다시 조회한다.
+- **TO-BE** ([가이드 §6.5](../../md/websquare_gfm_conversion.md) — getPar/setPar → `openPopup` + `await`): 부모는 `fn_GetParNew`/`fn_GetParUpdate` 를 바꿔 끼우지 않고, 위 키 이름의 객체를 `data` 로 넘긴다. 이 화면은 `$c.data.getParameter()` 로 받는다. 부모(05620)가 아직 전환 전이라 키 이름은 제안이다(§10 #6).
+
+  ```javascript
+  // 부모 ULDSTF05620 (신규: bzProcsNo "", 수정: 목록 선택 행의 업무처리번호)
+  const data = { isurCd, isurNm, secugrpId, mktId, bzProcsNo, fiscyyDistrBasddTpCd : "2" };
+  await $c.win.openPopup("/ui/lst/lstproc/ULDSTF05621.xml",
+      { id : "DLG_FSCCHG", popupName : $c.lc.getSecuGrpNm(secugrpId) + " 분배기준일변경관리", width : 615, height : 710, type : "pageFramePopup" }, data);
+  await scwin.search();   // AS-IS: CreateDialogFrame(…) 뒤 fn_search() — 닫힌 뒤 재조회
+  ```
+
+- **반환**: 없음. 원본은 `frame.CloseFrame()` 만 하고 값을 돌려주지 않는다 → TO-BE 는 `$c.win.closePopup()`(인자 없음). 부모는 `await` 가 끝나면(저장·수정·삭제·닫기 어느 경우든) 다시 조회하므로 결과 값을 볼 필요가 없다.
 
 ### 1.3 이 화면이 여는 하위 팝업
 
-| 팝업 | AS-IS 호출 | 넘기는 값 |
+| 팝업 | AS-IS 호출 (getPar/setPar) | 넘기는 `data` (TO-BE) | 받는 결과 (`closePopup`) / 취소 판정 |
+|---|---|---|---|
+| `ULDSTF92024` 공시안내문작성 (735×815) | `fn_GetPar` 바꿔 끼우기 → `arr[0..3]` + `CopyDataSet(dts_Mst/DtlBf/DtlAf → param_dts_mst/dts2/dts3)` → `frame.CreateDialogFrame(…, "window")` | `{ formCd : "68212C", bzProcsNo, isurCd, mktId : "1", mst : [dma_mst], dtl2 : 변경전, dtl3 : 변경후(빈 행 제외) }` — §6.4 | 없음(원본 `fn_SetPar` 는 빈 함수). `await` 뒤 처리 없음 |
+| `ULDSTF92004` 기안문작성 (888×730) | `fn_GetPar` 바꿔 끼우기 → `arr[0]` = 업무처리번호 → `fn_PopFindDraft()` | `{ bzProcsNo }` — §6.5 | 없음. `await` 뒤 처리 없음 |
+
+### 1.4 업무 프로세스 흐름
+
+흐름은 AS-IS 동작을 기준으로 그렸다. 점선과 `※TO-BE` 는 전환본에서 바뀌는 곳이다(근거는 §8).
+
+| # | 업무 | 시작 (사용자 동작·진입 조건) | 끝 (결과) | 주요 함수 | 관련 절 |
+|---|---|---|---|---|---|
+| 1 | 진입·로딩 | 부모가 팝업을 엶 (업무처리번호 유무로 신규/수정) | 입력 대기 (모드별 버튼) | `scwin.onpageload` → `init_recvParam` → `init_newForm` / `selectOne` | §3, §5.1, §5.2 |
+| 2 | 신규 저장 | [저장] (신규 모드) | 저장 성공 안내 후 수정 모드로 재조회 | `scwin.save` → `checkMst` → 채번 → `saveTrs("I")` | §5.3~5.5, §6.1, §6.6 |
+| 3 | 수정 | [수정] (수정 모드, 시행일 > 오늘) | 수정 성공 안내 후 재조회 | `scwin.update` → `saveTrs("U")` | §5.6, §6.7 |
+| 4 | 삭제 | [삭제] (수정 모드, 시행일 > 오늘) | 삭제 성공 안내 후 팝업 닫힘 → 부모 재조회 | `scwin.remove` → `deleteTrs` | §5.7, §6.8 |
+| 5 | 공시안내문작성 | [안내문작성] (수정 모드, 시행일 > 오늘) | 92024 팝업에서 작성·전송 후 닫힘 | `scwin.writeDscl` | §6.4 |
+| 6 | 기안 | [기안] (수정 모드 — 시행일이 지나도 가능) | 92004 팝업에서 기안 후 닫힘 | `scwin.writeDraft` | §6.5 |
+
+#### 화면 간 흐름
+
+```mermaid
+flowchart LR
+    L["ULDSTF05620<br/>분배기준일변경 목록"] -- "등록(신규) / 목록 더블클릭(수정)<br/>data: isurCd · isurNm · bzProcsNo" --> M["ULDSTF05621<br/>분배기준일변경관리(이 화면)"]
+    M -- "닫기 · 삭제 성공 후 closePopup()" --> L2["부모 목록 재조회<br/>await openPopup 뒤 search"]
+    M -- "안내문작성<br/>data: formCd 68212C · mst · dtl2 · dtl3" --> D[["ULDSTF92024<br/>공시안내문작성"]]
+    M -- "기안<br/>data: bzProcsNo" --> R[["ULDSTF92004<br/>기안문작성"]]
+    D -- "닫힘(결과 없음)" --> M
+    R -- "닫힘(결과 없음)" --> M
+```
+
+AS-IS 는 `fn_GetPar` 를 바꿔 끼우고 모달 창이 닫힐 때까지 기다리는 방식이었다. TO-BE 는 모든 화살표가 `await $c.win.openPopup(url, options, data)` 이고, 결과를 돌려받는 팝업은 없다(가이드 §6.5).
+
+#### 업무 1: 진입·로딩
+
+```mermaid
+flowchart TD
+    S(["팝업 열림<br/>scwin.onpageload"]) --> P["파라미터 수신<br/>scwin.init_recvParam"]
+    P --> B{"업무처리번호가 있는가?"}
+    B -- "없음(신규)" --> N1["마스터 · 변경후 비움<br/>scwin.init_newForm"]
+    N1 --> N2[/"GET select-current-dist-pay-basdd §5.1<br/>현재 수입분배기준일 → 변경전"/]
+    N2 --> N3["변경후 빈 행 13행 채우기<br/>scwin.fillAfRows §6.2"]
+    N3 --> N4["회사코드 · 회사명 = 부모 값"]
+    N4 --> N5["버튼 insert(저장만)"] --> E1(["입력 대기"])
+    B -- "있음(수정)" --> U1[/"GET select-one §5.2<br/>마스터 · 변경전 · 변경후"/]
+    U1 -. "실패 ※TO-BE" .-> U3["버튼 모두 잠금"] --> E2(["끝"])
+    U1 --> U4["변경후 빈 행 채우기"]
+    U4 --> U5{"시장조치시행일 > 오늘?"}
+    U5 -- "예" --> U6["버튼 update<br/>수정 · 삭제 · 기안 · 안내문작성"] --> E1
+    U5 -- "아니오" --> U7["버튼 error(기안만)"] --> E1
+```
+
+| # | 단계 | 주체 | 내용 | 분기 · 메시지 | 관련 절 |
+|---|---|---|---|---|---|
+| 1 | 파라미터 수신 | 화면 | `$c.data.getParameter()` → `isurCd`·`isurNm`·`bzProcsNo` | `bzProcsNo` 가 비면 신규 | §1.2, §3 |
+| 2a | 신규 준비 | 화면·서버 | 마스터 빈 값, 현재 기준일 조회(**동기** — 다음 단계 전에 끝나야 함), 변경후 13행 | 조회 실패는 공통 오류 핸들러 | §5.1, §6.2 |
+| 2b | 수정 조회 | 서버 | AS-IS 는 같은 URL 을 `DIV_IDX` 0·3·4 로 **동기** 3회, TO-BE 는 `select-one` 1회 | 실패 시 버튼 잠금(※TO-BE) | §5.2 |
+| 3 | 버튼 상태 | 화면 | 신규 `insert`, 수정은 `setButtonSetWithDate(edt_MKTACT_ENFORCE_DD, false, …)` | 시행일 ≤ 오늘이면 `error`(기안만) | §4 |
+| 4 | 회사 정보 | 화면 | AS-IS 는 모드와 관계없이 부모 값으로 덮어씀 → TO-BE 는 신규만 | — | §8 #8 |
+
+#### 업무 2: 신규 저장
+
+```mermaid
+flowchart TD
+    S(["저장 클릭<br/>scwin.btn_Save_onclick"]) --> V["입력 검증<br/>scwin.validate §6.1"]
+    V -- "실패" --> E1(["끝"])
+    V -- "통과" --> C>"MSG-A006 [저장] 처리를 하시겠습니까?"]
+    C -- "취소" --> E1
+    C -- "확인" --> K[/"GET select-mst-check §5.3"/]
+    K --> K1{"현재일 이후 예약 건이 있는가?"}
+    K1 -- "있음" --> K2>"MSG-0011 현재일 이후에 이미 변경할 업무가 있습니다."] --> E1
+    K1 -- "없음" --> N[/"업무처리번호 채번 §5.4"/]
+    N --> N1{"14자리인가?"}
+    N1 -- "아니오" --> N2>"MSG-0010 업무처리번호생성실패"] --> E1
+    N1 -- "예" --> G["전송 목록 가공<br/>변경전 seq 1~n · 변경후 빈 행 제외 seq 13~"]
+    G --> T[/"POST insert §5.5"/]
+    T -. "중복 실행 건너뜀 ※TO-BE" .-> E1
+    T --> R{"성공?"}
+    R -- "아니오" --> F>"MSG-A002 [저장] 처리 실패하였습니다."] --> F1["업무처리번호 비움 · 신규 유지 ※TO-BE"] --> E1
+    R -- "예" --> O>"MSG-A001 [저장] 처리 성공하였습니다."] --> Q[/"상세 재조회 select-one §5.2"/] --> E2(["수정 모드"])
+```
+
+| # | 단계 | 주체 | 내용 | 분기 · 메시지 | 관련 절 |
+|---|---|---|---|---|---|
+| 1 | 입력 검증 | 화면 | 변경후 월·일 4자리, 변경일 8자리, 시장조치시행일 익일 이후, 변경사유 필수, 기타 2000 byte | 각 안내 + 포커스 후 끝 | §6.1, §7.2 |
+| 2 | 저장 확인 | 사용자 | `await $c.lc.isProcess("I")` | 취소면 끝 | §6.6 |
+| 3 | 예약 건 확인 | 서버 | `select-mst-check` (AS-IS `fn_mst_check(dts_Mst_Check, "2")`) | 있으면 `MSG-0011` 후 끝. boolean 의미 확인 필요 | §5.3, §10 #4 |
+| 4 | 채번 | 서버 | `$c.stf.getNewBzProcNo()` → `body` 를 꺼내 문자열로 | 14자리 아니면 `MSG-0010` 후 끝. 채번 주체 확인 필요 | §5.4, §10 #2 |
+| 5 | 전문 구성 | 화면 | 마스터 + `bzProcsNo`·`isurCd`(AS-IS `FISCYY_DISTR_BASDD_TP_CD="2"` 도), 목록은 복사본으로 가공 | 그리드는 건드리지 않음(※TO-BE) | §5.5, §8 #5 |
+| 6 | 저장 | 서버 | `POST insert` | `skipped` 면 안내 없이 끝, 실패 `MSG-A002` + 신규 유지 | §5.5, §8 #7·#14 |
+| 7 | 결과 반영 | 화면 | `MSG-A001` → 상세 재조회 → 수정 모드 버튼 | — | §5.2 |
+
+#### 업무 3: 수정
+
+```mermaid
+flowchart TD
+    S(["수정 클릭<br/>scwin.btn_Update_onclick"]) --> V["입력 검증 §6.1"]
+    V -- "실패" --> E1(["끝"])
+    V -- "통과" --> M{"마스터나 변경후가 바뀌었는가?"}
+    M -- "아니오" --> M1>"변경된 내용이 없습니다.(fn_alertNoUpdate)"] --> E1
+    M -- "예" --> C>"MSG-A006 [수정] 처리를 하시겠습니까?"]
+    C -- "취소" --> E1
+    C -- "확인" --> G["전송 목록 가공"] --> T[/"POST update §5.6"/]
+    T -. "중복 실행 건너뜀 ※TO-BE" .-> E1
+    T --> R{"성공?"}
+    R -- "아니오" --> F>"MSG-A002 [수정] 처리 실패하였습니다."] --> E1
+    R -- "예" --> O>"MSG-A001 [수정] 처리 성공하였습니다."] --> Q[/"상세 재조회 §5.2"/] --> E2(["끝: 갱신된 상세"])
+```
+
+- 순서는 원본과 같다(검증 → 변경 여부 → 확인 → 전송). 수정은 예약 건 확인과 채번을 하지 않는다.
+- 변경 여부는 변경전 목록을 보지 않는다(읽기 전용). TO-BE 판정 방법은 §6.7.
+
+#### 업무 4: 삭제
+
+```mermaid
+flowchart TD
+    S(["삭제 클릭<br/>scwin.btn_Delete_onclick"]) --> C>"MSG-A006 [삭제] 처리를 하시겠습니까?"]
+    C -- "취소" --> E1(["끝"])
+    C -- "확인" --> T[/"POST delete §5.7<br/>bzProcsNo"/]
+    T -. "중복 실행 건너뜀 ※TO-BE" .-> E1
+    T --> R{"성공?"}
+    R -- "아니오" --> F>"MSG-A002 [삭제] 처리 실패하였습니다."] --> E1
+    R -- "예" --> O>"MSG-A001 [삭제] 처리 성공하였습니다."] --> X["팝업 닫기<br/>$c.win.closePopup()"]
+    X --> P[["부모 ULDSTF05620 목록 재조회"]] --> E2(["끝"])
+```
+
+- 삭제는 입력 검증을 하지 않는다. AS-IS 는 데이터셋 3개를 그대로 보냈고, TO-BE 는 업무처리번호만 보낸다.
+
+#### 업무 5·6: 공시안내문작성 · 기안
+
+```mermaid
+flowchart TD
+    S1(["안내문작성 클릭<br/>scwin.btn_Dscl_onclick"]) --> D1["data 구성<br/>formCd 68212C · bzProcsNo · isurCd · mktId 1<br/>mst · dtl2 · dtl3(월·일 빈 행 제외)"]
+    D1 --> P1[["await openPopup ULDSTF92024 §6.4"]] --> E1(["끝(돌려받는 값 없음)"])
+    S2(["기안 클릭<br/>scwin.btn_Drft_onclick"]) --> D2["data 구성<br/>bzProcsNo"]
+    D2 --> P2[["await openPopup ULDSTF92004 §6.5"]] --> E1
+```
+
+- AS-IS 는 두 업무 모두 `fn_GetPar` 를 바꿔 끼우고, 모달이 닫힐 때까지 기다린 뒤 되돌렸다(§8 #12). TO-BE 는 `data` 로 넘기므로 되돌릴 것이 없다.
+- 안내문작성은 확인 메시지 없이 바로 연다(원본에 `fn_isProcess('DSCL')` 없음).
+- 92024 가 `getParameter` 수신으로 바뀌기 전까지는 호환용 `scwin.getPar` 가 필요하다(§6.4, §10 #7).
+
+#### 화면 모드 상태 전이
+
+```mermaid
+stateDiagram-v2
+    [*] --> 신규: 업무처리번호 없음
+    [*] --> 수정: 업무처리번호 있음 · 시행일 > 오늘
+    [*] --> 기안만: 업무처리번호 있음 · 시행일 ≤ 오늘
+    신규 --> 신규: 저장 실패
+    신규 --> 수정: 저장 성공 후 재조회
+    수정 --> 수정: 수정 성공 후 재조회
+    수정 --> [*]: 삭제 성공(팝업 닫힘)
+    신규 --> [*]: 닫기
+    수정 --> [*]: 닫기
+    기안만 --> [*]: 닫기
+```
+
+| 상태 | 활성 버튼 | 근거 |
 |---|---|---|
-| `ULDSTF92024` 공시안내문작성 (735×815 `window`) | `frame.CreateDialogFrame("ULDSTF92024", "/listingcommon/ULDSTF92024.gfm", …)` | `fn_GetPar(arr, dts_isu, dts_mst, dts2, dts3)` — §6.4 |
-| `ULDSTF92004` 기안문작성 | `fn_PopFindDraft()` (공통) | `fn_GetPar(arr)` 에 `arr[0]` = 업무처리번호 — §6.5 |
+| 신규 | 저장 | `insert` |
+| 수정 | 수정 · 삭제 · 기안 · 안내문작성 | `update` (저장만 제외) |
+| 기안만 | 기안 | `error` |
+
+- 신규 저장 검증이 "시장조치시행일 익일 이후"를 요구하므로, 저장에 성공하면 언제나 `수정` 상태가 된다.
 
 ---
 
@@ -260,20 +429,50 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=3`, `LIST_BZ_TP_CD=232`
 - `basMm` 칸: `Number(값) > 12` 이면 "입력월을 확인하세요." 후 비움. `basDd` 칸: `Number(값) > 31` 이면 "입력일을 확인하세요." 후 비움.
 - 원본은 `eval(문자열) > 12` 로 비교한다. 월별 말일(예: 0231) 검사는 없다 — 원본 동작 유지(§8 #4).
 
-### 6.4 공시안내문작성 (`scwin.writeDscl`) + 부모 계약 (`scwin.getPar`)
+### 6.4 공시안내문작성 (`scwin.writeDscl`) — getPar → `openPopup` data + `await`
 
-- 원본 `fn_dscl`: `fn_GetPar` 를 잠깐 바꿔 끼우고 `CreateDialogFrame("ULDSTF92024", "/listingcommon/ULDSTF92024.gfm", "공시안내문작성", 중앙, 735, 815, "window")` 로 연 다음, 바로 원래 함수로 되돌린다(모달 대기 전제).
-- 92024 전환본(`sample-front/ui/ULDSTF92024.xml`)은 로딩 때 **부모의 `scwin.getPar(arr, dlt_Isu, dlt_Mst, dlt_2, dlt_3, …)` 를 이름으로 찾아** 부른다. 따라서 TO-BE 는 함수를 바꿔 끼우지 않고, 이 화면에 `scwin.getPar` 를 고정으로 정의한다. 이 함수는 하위 팝업이 원래 이름 그대로 부르는 계약이라 개명하지 않는다.
-  - `arr[0] = "68212C"` (서식코드 — 분배기준일변경 안내공시), `arr[1] = scwin.bzProcsNo`, `arr[2] = scwin.isurCd`, `arr[3] = "1"` (시장구분 유가 고정).
-  - `dlt_Mst` ← `dma_mst` 1행, `dlt_2` ← `dlt_dtlBf`, `dlt_3` ← `dlt_dtlAf` 에서 월·일이 모두 빈 행을 뺀 것. 원본 `CopyDataSet` → `$c.stf.copyDataSet` 또는 `setJSON(getAllJSON())`.
-  - `return arr.length;`
-- 열기: `await $c.win.openPopup("/ui/listingcommon/ULDSTF92024.xml", { id : "ULDSTF92024", popupName : "공시안내문작성", width : 735, height : 815, type : "pageFramePopup" })` (규칙 17). 경로는 **가정**이다(§10 #7). 원본 `fn_getModalCenterPos` 중앙 배치는 openPopup 기본 동작에 맡긴다.
-- 92024 가 받는 dataset 컬럼 이름(대문자 AS-IS vs camelCase)은 서식 `68212C` 서버 계약에 달려 있다(§10 #7).
+- 원본 `fn_dscl`: `fn_GetPar` 를 잠깐 바꿔 끼우고 `CreateDialogFrame("ULDSTF92024", "/listingcommon/ULDSTF92024.gfm", "공시안내문작성", 중앙, 735, 815, "window")` 로 연 다음, 바로 원래 함수로 되돌린다(모달 대기 전제). 바꿔 끼운 `fn_GetPar(arr, param_dts_isu, param_dts_mst, param_dts2, param_dts3)` 는:
+  - `arr[0] = "68212C"` (서식코드 — 분배기준일변경 안내공시), `arr[1] = 업무처리번호`, `arr[2] = 발행기관코드`, `arr[3] = '1'` (시장구분 유가 고정).
+  - `CopyDataSet(dts_Mst → param_dts_mst)`, `CopyDataSet(dts_DtlBf → param_dts2)`, `CopyDataSet(dts_DtlAf → param_dts3)` 뒤 `param_dts3` 에서 월·일이 모두 빈 행을 지운다. `dts_isu` 는 주석 처리돼 넘기지 않는다.
+  - `return arr.length;` (4 — 92024 의 `isNoGen` 조건 "길이 5 이상"에 걸리지 않음).
+- **TO-BE** ([가이드 §6.5](../../md/websquare_gfm_conversion.md)): 함수를 바꿔 끼우거나 이름으로 부르게 두지 않고, 같은 값을 **`data` 객체**로 넘긴 뒤 `await` 한다. 92024 의 `fn_SetPar` 는 빈 함수라 돌려받을 값은 없다.
 
-### 6.5 기안 (`scwin.writeDraft`)
+  ```javascript
+  scwin.writeDscl = async function () {
+      const data = {
+          formCd : "68212C",                     // AS-IS arr[0]
+          bzProcsNo : scwin.bzProcsNo,           // AS-IS arr[1]
+          isurCd : scwin.isurCd,                 // AS-IS arr[2]
+          mktId : "1",                           // AS-IS arr[3] — 유가 고정(§8 #11)
+          mst : [dma_mst.getJSON()],             // AS-IS CopyDataSet(dts_Mst, param_dts_mst)
+          dtl2 : dlt_dtlBf.getAllJSON(),         // AS-IS CopyDataSet(dts_DtlBf, param_dts2)
+          dtl3 : dlt_dtlAf.getAllJSON()          // AS-IS CopyDataSet(dts_DtlAf, param_dts3) + 빈 행 삭제
+              .filter(row => !($c.util.isEmpty(row.basMm) && $c.util.isEmpty(row.basDd)))
+      };
+      const options = { id : "ULDSTF92024", popupName : "공시안내문작성", width : 735, height : 815, type : "pageFramePopup" };
+
+      await $c.win.openPopup("/ui/listingcommon/ULDSTF92024.xml", options, data);
+      // 돌려받는 값 없음 — 원본도 닫힌 뒤 하는 일이 없다.
+  };
+  ```
+
+- **92024 쪽 변경 필요** — 현재 전환본(`sample-front/ui/ULDSTF92024.xml` `scwin.init`)은 `$c.win.getParent()?.scwin.getPar(arr, dlt_Isu, dlt_Mst, dlt_2, dlt_3, …)` 로 부모 함수를 이름으로 부른다. 위 `data` 를 받으려면 92024 의 수신부를 `$c.data.getParameter()` 로 바꿔야 한다(`formCd`→`keyFrm`, `bzProcsNo`→`keyBiz`, `isurCd`→`keyIsurCd`, `mktId`→`keyMktId`, `mst/dtl2/dtl3`→`dlt_Mst/dlt_2/dlt_3.setJSON`, 길이 5 이상 `isNoGen` 은 `noGenMsg` 키 유무로). 92024 는 다른 화면도 함께 쓰는 공통 팝업이므로 **이 화면 전환 범위 밖** → §10 #7.
+  - 92024 가 바뀌기 전에 이 화면을 먼저 전환해야 하면, 가이드 §6.5 예외대로 **호환용 `scwin.getPar(arr, dlt_Isu, dlt_Mst, dlt_2, dlt_3)` 를 임시로 두고** 위 `data` 와 같은 값을 채운다(이유·제거 시점을 §9·§10 에 기록).
+- 경로·크기: `/ui/listingcommon/ULDSTF92024.xml` 은 **가정**이다(§10 #7). 원본 `fn_getModalCenterPos` 중앙 배치는 openPopup 기본 동작에 맡긴다. 92024 가 받는 dataset 컬럼 이름(대문자 AS-IS vs camelCase)은 서식 `68212C` 서버 계약에 달려 있다(§10 #7).
+
+### 6.5 기안 (`scwin.writeDraft`) — getPar → `openPopup` data + `await`
 
 - 원본 `fn_drft`: `fn_GetPar` 를 `arr[0] = 업무처리번호` 로 바꿔 끼우고 공통 `fn_PopFindDraft()` 를 부른 다음 되돌린다.
-- pcc `$c.lc.popFindDraft()` 는 `ULDSTF92004.gfm` 을 `browserPopup` + 콜백(`scwin.popupCallback`)으로 열고 **업무처리번호를 넘기지 않는다** → 그대로 쓰면 기안 대상이 빠진다. 기안 팝업의 TO-BE 계약이 정해질 때까지 TODO 로 둔다(§10 #8). 두 팝업이 모두 `getPar` 이름을 쓰면 충돌하므로, 기안 쪽은 `openPopup` data 로 넘기는 방식을 권한다.
+- pcc `$c.lc.popFindDraft()` 는 `ULDSTF92004.gfm` 을 `browserPopup` + 콜백(`scwin.popupCallback`)으로 열고 **업무처리번호를 넘기지 않으며 `await` 할 수 없다**. 그래서 가이드 §6.5 의 예외대로 공통 함수를 쓰지 않고 화면에서 `openPopup` 을 직접 부른다.
+
+  ```javascript
+  scwin.writeDraft = async function () {
+      const options = { id : "ULDSTF92004", popupName : "기안문작성", width : 888, height : 730, type : "pageFramePopup" };
+      await $c.win.openPopup("/ui/listingcommon/ULDSTF92004.xml", options, { bzProcsNo : scwin.bzProcsNo });   // AS-IS arr[0]
+  };
+  ```
+
+- 기안 팝업(ULDSTF92004)의 TO-BE 전환본이 아직 없어 경로와 수신 키(`bzProcsNo`)는 **가정**이다(§10 #8).
 
 ### 6.6 저장 (`scwin.save`) — 원본 `fn_save`
 
@@ -348,7 +547,7 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=3`, `LIST_BZ_TP_CD=232`
 | 9 | "5. 변경 후 최초 사업연도" 시작·종료일, "변경후(월,일)" 에 필수 표시(*)가 있지만 검증하지 않는다(변경후 0건도 저장됨) | 그대로 유지 + §10 #9 확인 |
 | 10 | 쓰지 않는 것: 전역 `Secugrp_id`·`Mkt_id`·`haltTpCd`·`vScrenID`, 빈 함수 `fn_makt`, 빈 이벤트 `dts_DtlBf OnLoadCompleted`, 항상 `true` 인 `CanColumnPosChange`, 주석 처리된 `CHG_DD = MKTACT_ENFORCE_DD` 대입 | 옮기지 않음 (`vScrenID` 규칙 1, 주석 코드 규칙 0) |
 | 11 | 안내문 시장구분이 부모의 `Mkt_id` 와 무관하게 `'1'`(유가) 고정 | 그대로 유지 + §10 #7 |
-| 12 | `fn_dscl`·`fn_drft` 가 `fn_GetPar` 를 바꿔 끼웠다가 `CreateDialogFrame` 바로 뒤에 되돌린다 — 모달 대기를 전제한다 | 고침 — `scwin.getPar` 를 고정 정의(§6.4). 기안은 data 전달(§6.5) |
+| 12 | `fn_dscl`·`fn_drft` 가 `fn_GetPar` 를 바꿔 끼웠다가 `CreateDialogFrame` 바로 뒤에 되돌린다 — 모달 대기를 전제한다 | 고침 — 바꿔 끼우기를 없애고 `openPopup` 의 `data` 로 넘긴 뒤 `await`(가이드 §6.5, §6.4·§6.5). 92024 가 아직 getPar 계약이라 수신부 변경은 §10 #7 |
 | 13 | pcc 대응 함수에 Gauce 잔재: `$c.lc.mstCheck` 는 AS-IS URL·미선언 `Isur_cd`·`getCellData(1, …)`, `$c.lc.checkDdTm` 은 `obj.text` | 쓰지 않음 — 신규 API 직접 호출(§5.3), 날짜 비교는 화면에서 `getValue()` |
 | 14 | 원본은 동기 처리라 연속 클릭이 막혔다. 비동기 전환본은 저장이 두 번 나갈 수 있다 | 고침 — `executeDynamic` 중복 실행 건너뜀 + `skipped` 확인 |
 
@@ -377,9 +576,9 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=3`, `LIST_BZ_TP_CD=232`
 | `checkMaxLength(txa_REMK, 2000, "기타")` | `$c.stf.checkMaxLength(txa_REMK, 2000, "기타")` 또는 `validateDataCollect` 최대 byte |
 | `buttonSet.set*Info` / `setInsertStatus` | `ev:onclick` + `$c.util.setButtonState("grpBtnBox", "insert", scwin.BTN_MAP)` |
 | `setButtonSetWithDate(edt_MKTACT_ENFORCE_DD, false)` | `$c.stf.setButtonSetWithDate(edt_MKTACT_ENFORCE_DD, false, "grpBtnBox", scwin.BTN_MAP)` |
-| `fn_dscl` + `fn_GetPar` 바꿔 끼우기 + `CreateDialogFrame` | `scwin.writeDscl` + 고정 `scwin.getPar`(원래 이름 유지 — 92024 계약) + `$c.win.openPopup` (규칙 17) |
-| `fn_drft` + `fn_PopFindDraft` | `scwin.writeDraft` (TODO — §10 #8) |
-| `CopyDataSet(a, b)` | `$c.stf.copyDataSet` / `setJSON(getAllJSON())` |
+| `fn_dscl` + `fn_GetPar` 바꿔 끼우기 + `CopyDataSet` + `CreateDialogFrame` | `scwin.writeDscl` — `await $c.win.openPopup(url, options, { formCd, bzProcsNo, isurCd, mktId, mst, dtl2, dtl3 })` (규칙 17, 가이드 §6.5). 92024 수신부 변경 전까지만 호환용 `scwin.getPar` 임시 허용(§10 #7) |
+| `fn_drft` + `fn_GetPar` 바꿔 끼우기 + `fn_PopFindDraft` | `scwin.writeDraft` — `await $c.win.openPopup(…ULDSTF92004…, options, { bzProcsNo })` (pcc `popFindDraft` 는 콜백형이라 쓰지 않음, §10 #8) |
+| `CopyDataSet(a, b)` (팝업 dataset 채우기) | `data` 의 키로 JSON 전달(`getJSON()`/`getAllJSON()`) |
 | `grd_DIST_PAY_AF OnExit` | `scwin.grd_DIST_PAY_AF_onafteredit` |
 | `btn_Close onclick` → `frame.CloseFrame()` | `scwin.btn_Close_onclick` → `$c.win.closePopup()` |
 | `popUpCalendar2(...)` 4종, `img_*` 달력 | 삭제 (inputCalendar 내장) |
@@ -397,9 +596,9 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=3`, `LIST_BZ_TP_CD=232`
 3. **서버가 정하는 값** — `fiscyyDistrBasddTpCd`(원본 `"2"`, TO-BE 컬럼은 `'14'`)와 `LIST_BZ_TP_CD 232` 는 요청 명세에 없다. 서버에서 넣는지 확인한다(§6.6 5).
 4. **`select-mst-check` boolean 의 뜻** — true 가 "예약 건 있음"인지 "진행 가능"인지 확인한다. 원본의 `GUBUN_CD=2` 를 서버가 쓰는지도 확인한다(§5.3).
 5. **update·delete 성공 판정** — 응답이 비어 있다. `responseJSON.success` 만으로 판정할지, 업무 결과 코드가 있는지 확인한다(§5.5~5.7).
-6. **부모(ULDSTF05620) 계약** — 부모 전환 때 `fn_GetParNew`/`fn_GetParUpdate` 의 배열을 §1.2 의 data 객체로 바꾼다. 팝업이 닫힌 뒤 다시 조회하는 흐름(`await openPopup` 뒤 `search`)도 함께 맞춘다.
-7. **공시안내문(ULDSTF92024) 연동** — TO-BE 경로(`/ui/listingcommon/ULDSTF92024.xml` 가정)와 팝업 타입. 서식 `68212C` 가 받는 dataset 컬럼 이름(대문자 AS-IS / camelCase)을 확인한다. 시장구분 `'1'` 고정을 유지할지도 정한다(§6.4, §8 #11).
-8. **기안(ULDSTF92004) 연동** — pcc `popFindDraft` 는 업무처리번호를 넘기지 않는다. 기안 팝업 전환본의 수신 계약이 정해지면 `scwin.writeDraft` 를 완성한다(§6.5).
+6. **부모(ULDSTF05620) 계약** — 부모 전환 때 `fn_GetPar`/`fn_GetParNew`/`fn_GetParUpdate` 바꿔 끼우기를 없애고 §1.2 의 `data` 객체로 넘긴다(가이드 §6.5). 팝업이 닫힌 뒤 다시 조회하는 흐름은 `await openPopup` 바로 뒤 `search` 로 맞춘다.
+7. **공시안내문(ULDSTF92024) 연동** — ① 92024 전환본의 수신부를 부모 `scwin.getPar` 호출에서 `$c.data.getParameter()`(`formCd`·`bzProcsNo`·`isurCd`·`mktId`·`mst`·`dtl2`·`dtl3` …)로 바꾼다. 92024 를 여는 다른 화면도 같은 `data` 계약으로 함께 바꿔야 하므로 공통 팝업 단위로 진행한다. 바뀌기 전에 이 화면을 먼저 전환하면 호환용 `scwin.getPar` 를 임시로 두고, 92024 변경 때 지운다. ② TO-BE 경로(`/ui/listingcommon/ULDSTF92024.xml` 가정). ③ 서식 `68212C` 가 받는 dataset 컬럼 이름(대문자 AS-IS / camelCase). ④ 시장구분 `'1'` 고정 유지 여부(§6.4, §8 #11).
+8. **기안(ULDSTF92004) 연동** — pcc `popFindDraft` 는 업무처리번호를 넘기지 않는 콜백형이라 화면에서 `openPopup` 을 직접 부른다(§6.5). 기안 팝업 전환본의 경로·수신 키(`bzProcsNo` 가정)가 정해지면 확정한다.
 9. **필수 표시와 검증 불일치** — 변경 후 최초 사업연도 시작·종료일과 변경후 기준일(0건)을 필수로 검증할지 업무 확인. 결정되면 §6.1 에 추가한다(§8 #9).
 10. **화면 이력·세션 파라미터** — AS-IS 의 `SCREN_ID`·`SCREN_PROCES_TP_CD`·`fn_encodeNSession` 을 서버가 대신 처리하는지 확인한다(§5 공통).
 11. **변경후 빈 행 수** — 원본은 13행이다(주석은 12). 업무상 몇 행이 맞는지 확인한다(§6.2, §8 #1).
