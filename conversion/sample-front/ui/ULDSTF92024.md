@@ -213,6 +213,7 @@ AS-IS 는 모든 호출에 `SCREN_ID=ULDSTF92024.gfm` 과 화면처리구분(`01
 | `fil.open()` + `dts_Fil(fileUrl:URL)` | `$c.util.onUploadClick(mpd_Fil)` + `scwin.mpd_Fil_selectCallback`(전송 대기열 전체로 목록 재구성 — 여러 파일 동시 선택 대응) |
 | `cGetToday2()` | `$c.date.getServerDateTime()` |
 | `fnSplitString` | 삭제 — 정의만 있고 호출 없음 |
+| `fn_engDisclsView` (`btn_engdiscls_view` onclick · `lbl_engdiscls_view` ondblclick → `ULDSTF92024_EN.gfm` 735×815 창) | 삭제 — 진입점이 사실상 없음(§2, §7-4). 필요하면 `ULDSTF92024_EN` 전환 후 버튼 추가(§9-8) |
 | `log.Text = dts_Rst.Text` | 삭제 — 보이지 않는 디버그 영역 |
 
 ## 9. 남은 작업 (TODO)
