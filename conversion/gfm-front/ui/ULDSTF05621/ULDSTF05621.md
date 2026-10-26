@@ -285,6 +285,9 @@ stateDiagram-v2
 ```javascript
 scwin.onpageload = async function () {
     try {
+        // 로딩이 끝나거나 조회가 예외로 끝나도 버튼이 XML 기본값(전부 활성)으로 남지 않게 먼저 잠근다.
+        $c.util.setButtonState("grpBtnBox", "disabled", scwin.BTN_MAP);
+
         scwin.init_recvParam();
         if ($c.util.isEmpty(scwin.bzProcsNo)) {
             await scwin.init_newForm();
@@ -488,7 +491,7 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=3`, `LIST_BZ_TP_CD=232`
   ```
 
 - **92024 쪽 변경 필요** — 현재 전환본(`sample-front/ui/ULDSTF92024.xml` `scwin.init`)은 `$c.win.getParent()?.scwin.getPar(arr, dlt_Isu, dlt_Mst, dlt_2, dlt_3, …)` 로 부모 함수를 이름으로 부른다. 위 `data` 를 받으려면 92024 의 수신부를 `$c.data.getParameter()` 로 바꿔야 한다(`formCd`→`keyFrm`, `bzProcsNo`→`keyBiz`, `isurCd`→`keyIsurCd`, `mktId`→`keyMktId`, `mst/dtl2/dtl3`→`dlt_Mst/dlt_2/dlt_3.setJSON`, 길이 5 이상 `isNoGen` 은 `noGenMsg` 키 유무로). 92024 는 다른 화면도 함께 쓰는 공통 팝업이므로 **이 화면 전환 범위 밖** → §10 #7.
-  - 92024 가 바뀌기 전에 이 화면을 먼저 전환해야 하면, 가이드 §6.5 예외대로 **호환용 `scwin.getPar(arr, dlt_Isu, dlt_Mst, dlt_2, dlt_3)` 를 임시로 두고** 위 `data` 와 같은 값을 채운다(이유·제거 시점을 §9·§10 에 기록).
+  - 92024 가 바뀌기 전에 이 화면을 먼저 전환해야 하면, 가이드 §6.5 예외대로 **호환용 `scwin.getPar(arr, dlt_Isu, dlt_Mst, dlt_2, dlt_3)` 를 임시로 두고** 위 `data` 와 같은 값을 채운다(이유·제거 시점을 §9·§10 에 기록). 92024 의 원천 자료 dataList 는 **컬럼 정의가 비어 있어** `setJSON` 이 0행이 되므로, 첫 행의 키로 `insertColumn` 한 뒤 채운다(`scwin.fillDataList` — TO-BE 리뷰에서 발견).
 - 경로·크기: `/ui/listingcommon/ULDSTF92024.xml` 은 **가정**이다(§10 #7). 원본 `fn_getModalCenterPos` 중앙 배치는 openPopup 기본 동작에 맡긴다. 92024 가 받는 dataset 컬럼 이름(대문자 AS-IS vs camelCase)은 서식 `68212C` 서버 계약에 달려 있다(§10 #7).
 
 ### 6.5 기안 (`scwin.writeDraft`) — getPar → `openPopup` data + `await`
@@ -519,7 +522,7 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=3`, `LIST_BZ_TP_CD=232`
 ### 6.7 수정 (`scwin.update`) — 원본 `fn_update`
 
 1. `await scwin.validate()` 실패면 끝.
-2. 마스터나 변경후 목록이 바뀌었는지 확인한다(원본 `dts_Mst.IsUpdated || dts_DtlAf.IsUpdated`). 바뀌지 않았으면 원본 `fn_alertNoUpdate()` 안내 후 끝. pcc/stf 에는 대응 함수가 없으므로 문구 리터럴을 쓴다(§7.2). dataMap 변경 여부는 조회 직후 `getJSON()` 스냅숏과 비교하는 방식을 권한다. dataList 는 `getModifiedIndex()` 로 본다.
+2. 마스터나 변경후 목록이 바뀌었는지 확인한다(원본 `dts_Mst.IsUpdated || dts_DtlAf.IsUpdated`). 바뀌지 않았으면 원본 `fn_alertNoUpdate()` 안내 후 끝. pcc/stf 에는 대응 함수가 없으므로 문구 리터럴을 쓴다(§7.2). TO-BE 는 조회 직후 **마스터 `getJSON()` 과 변경후 목록의 월·일 값**을 문자열로 묶어 두고(`scwin.getEditState` → `scwin.savedState`) 수정 클릭 때 비교한다. 변경후 그리드는 빈 행을 채워 넣어(§6.2) 그 행들이 '추가(C)' 상태가 되므로 `getModifiedIndex()` 로는 판정할 수 없다. `validate` 가 쓰는 `basMmdd` 는 비교에서 뺀다.
 3. `await $c.lc.isProcess("U")` 확인.
 4. `await scwin.saveTrs("U")`.
 
@@ -617,6 +620,7 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=3`, `LIST_BZ_TP_CD=232`
 | `ds.NameString(i, "COL")` / `CountRow` / `AddRow` / `DeleteRow` | `getCellData`·`setCellData` / `getRowCount` / `insertRow` / `removeRow` (규칙 29) |
 | `#include(...)` 7종, `PanelToGroupBox`, `vScrenID` | 삭제 (규칙 11·1) |
 | `fn_makt`, `CanColumnPosChange`, `dts_DtlBf OnLoadCompleted` | 삭제 (동작 없음) |
+| (없음 — 화면 보조) | `scwin.getEditState`(수정 여부 판정), `scwin.buildDtlList`(전송 목록 복사본·일련번호), `scwin.getNewBzProcsNo`(채번 봉투에서 body 추출), `scwin.getDsclData`(92024 data), `scwin.getIsurCd`(조회 값 우선 회사코드), `scwin.fillDataList`(컬럼 정의가 빈 dataList 채우기) |
 
 ---
 

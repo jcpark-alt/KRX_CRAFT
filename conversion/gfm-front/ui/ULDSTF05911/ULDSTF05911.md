@@ -22,7 +22,7 @@
 2. 변경상장일과 변경사유를 입력한다.
 3. [종목 찾기]로 ELW 종목을 골라 그리드에 담는다(변경전 값은 선택 팝업이 채움). 엑셀 업로드로 그리드를 통째로 바꿀 수도 있다.
 4. 종목마다 변경후 행사가격·전환비율(조기종료 ELW 는 조기종료발생기준가격도)을 입력해 저장한다. 저장하기 전에 확인을 받고 업무처리번호를 새로 받는다.
-5. 수정이면 업무처리번호로 종목 목록을 조회한다. 변경상장일이 이미 지났으면 모든 처리 버튼이 잠긴다. 저장·수정에 성공하면 다시 조회하고, 삭제에 성공하면 팝업을 닫는다.
+5. 수정이면 업무처리번호로 종목 목록을 조회한다. 변경상장일이 이미 지났으면 모든 처리 버튼이 잠긴다. 수정에 성공하면 다시 조회한다. 등록은 서버가 업무처리번호를 매기므로, 응답에 번호가 있으면 수정 모드로 다시 조회하고 없으면 팝업을 닫는다(부모가 다시 조회). 삭제에 성공하면 팝업을 닫는다.
 
 ### 1.1 호출 화면 (1본)
 
@@ -103,7 +103,7 @@ flowchart TD
     U1 -. "실패 ※TO-BE" .-> U3["버튼 모두 잠금"] --> E2(["끝"])
     U1 --> U2{"종목이 1건 이상인가?"}
     U2 -- "예" --> U4["첫 행의 변경상장일 · 변경사유를<br/>입력란에 표시"]
-    U2 -- "아니오" --> U5
+    U2 -- "아니오(0건)" --> U8["입력란 빈 채 → 버튼 update<br/>(빈 날짜는 비교하지 않음, 원본과 같음)"] --> E1
     U4 --> U5{"변경상장일 > 오늘?"}
     U5 -- "예" --> U6["버튼 update(수정 · 삭제)"] --> E1
     U5 -- "아니오" --> U7["버튼 error(처리 버튼 모두 잠김)"] --> E1
@@ -151,7 +151,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    S(["엑셀저장 클릭<br/>scwin.img_Excel_onclick"]) --> X[/"$c.data.downloadGridViewExcel §6.6<br/>ELW 행사가격/전환비율 변경"/]
+    S(["엑셀저장 클릭<br/>scwin.img_Excel_onclick"]) --> X[/"$c.data.downloadGridViewExcel §6.6<br/>ELW 행사가격_전환비율 변경"/]
     X -- "0건" --> M>"해당데이터가 없습니다. 조회후 다운받으십시요."] --> E1(["끝"])
     X -- "1건 이상" --> F["엑셀 파일 저장"] --> E1
 ```
@@ -174,7 +174,9 @@ flowchart TD
     T -. "중복 실행 건너뜀 ※TO-BE" .-> E1
     T --> R{"성공?"}
     R -- "아니오" --> F>"MSG-A002 [저장] 처리 실패하였습니다."] --> E1
-    R -- "예" --> O>"MSG-A001 [저장] 처리 성공하였습니다."] --> Q[/"재조회 select-list-isu §5.1"/] --> E2(["수정 모드"])
+    R -- "예" --> O>"MSG-A001 [저장] 처리 성공하였습니다."] --> K{"응답에 업무처리번호가 있는가?"}
+    K -- "예" --> Q[/"재조회 select-list-isu §5.1"/] --> E2(["수정 모드"])
+    K -- "아니오(명세상 응답 없음)" --> X["팝업 닫기<br/>$c.win.closePopup()"] --> E3(["끝: 부모가 목록 재조회"])
 ```
 
 | # | 단계 | 주체 | 내용 | 분기 · 메시지 | 관련 절 |
@@ -184,7 +186,7 @@ flowchart TD
 | 3 | 채번 | 화면→서버 | AS-IS `fn_getNewBzProcNo` (14자리 아니면 `MSG-0010`). **신규 API 는 "등록 시 서버채번"** → TO-BE 는 화면 채번 생략 | 응답으로 번호를 받아야 재조회 가능 | §5.2, §10 #2 |
 | 4 | 전문 구성 | 화면 | 머리(`isurCd`·`chgDd`·`chgRsnContn`) + 종목 목록(`isuCd`·변경전후 값·`listMethdTpCd`). AS-IS 는 머리 정보를 그리드 모든 행에 써 넣었음 | 그리드는 건드리지 않음(※TO-BE) | §5.2, §8 #8 |
 | 5 | 저장 | 서버 | `POST register` | `skipped` 면 안내 없이 끝, 실패 `MSG-A002` | §5.2 |
-| 6 | 결과 반영 | 화면 | `MSG-A001` → 재조회 → 수정 모드 버튼 | — | §5.1 |
+| 6 | 결과 반영 | 화면 | `MSG-A001` → 응답에 `bzProcsNo` 가 있으면 재조회·수정 모드, 없으면 팝업 닫기(부모 재조회) | 명세상 응답이 비어 지금은 항상 닫힘 | §5.1, §10 #2 |
 
 #### 업무 6: 수정
 
@@ -227,7 +229,8 @@ stateDiagram-v2
     [*] --> 수정: 업무처리번호 있음 · 변경상장일 > 오늘
     [*] --> 조회전용: 업무처리번호 있음 · 변경상장일 ≤ 오늘
     신규 --> 신규: 저장 실패
-    신규 --> 수정: 저장 성공 후 재조회
+    신규 --> 수정: 저장 성공 · 응답 번호 있음 → 재조회
+    신규 --> [*]: 저장 성공 · 응답 번호 없음(팝업 닫힘)
     수정 --> 수정: 수정 성공 후 재조회
     수정 --> [*]: 삭제 성공(팝업 닫힘)
     신규 --> [*]: 닫기
@@ -242,7 +245,7 @@ stateDiagram-v2
 | 조회전용 | 없음 | `error` (활성 목록이 `draft` 하나인데 이 화면에 기안 버튼이 없음) |
 
 - 종목 찾기·엑셀업로드·엑셀저장·닫기는 `BTN_MAP` 에 넣지 않아 상태와 관계없이 켜져 있다(원본도 `buttonSet` 에 등록하지 않음). 조회전용에서 종목을 바꾸거나 업로드해도 저장할 수단은 없다(§8 #15).
-- 신규 저장 검증이 "변경상장일 익일 이후"를 요구하므로, 저장에 성공하면 언제나 `수정` 상태가 된다.
+- 신규 저장 검증이 "변경상장일 익일 이후"를 요구하므로, 저장 뒤 재조회하면 언제나 `수정` 상태가 된다. 다만 명세상 등록 응답에 번호가 없어 지금은 팝업이 닫힌다(§10 #2).
 
 ---
 
@@ -255,13 +258,13 @@ stateDiagram-v2
 | 변경상장일 (*) | `edt_MktactEnforceDd` + `img_MktactEnforceDd` | `edt_MktactEnforceDd` (`inputCalendar`, `dma_mst.chgDd`) | 달력 이미지 **(옮기지 않음)** — inputCalendar 내장 달력. id 는 "시장조치시행일"이지만 값은 변경일(`CHG_DD`) |
 | 변경사유 (*) | `txb_ChgRsnContn` (2000자) | `txb_ChgRsnContn` (`xf:input`, `dma_mst.chgRsnContn`) | 원본은 바인딩 없이 `.value` 로 직접 읽고 씀 → TO-BE 는 `ref` 바인딩 |
 | 종목 찾기 | `img_SetIsuCd` (이미지) | `img_SetIsuCd` (`xf:trigger`) | §6.4 |
-| 종목 그리드 | `grd_isu` (`dts_Isu`) | `grd_isu` (`dlt_detail`) | 번호·종목코드·종목명·변경전 3열·변경후 3열. 변경전·종목은 편집 불가, 변경후 행사가격·전환비율은 편집, 변경후 조기종료발생기준가격은 `ELW_RGHT_TP_KIND_CD='3'` 행만 편집 — §6.3 |
+| 종목 그리드 | `grd_isu` (`dts_Isu`) | `grd_isu` (`dlt_detail`) | 번호·종목코드·종목명·변경전 3열·변경후 3열. 변경전·종목은 편집 불가, 변경후 행사가격·전환비율은 편집, 변경후 조기종료발생기준가격은 `ELW_RGHT_TP_KIND_CD='3'` 행만 편집 — §6.3. 편집 열은 `dataType="float"` + `maxLength`(정수 15 · 소수 8/3/6) + 같은 자릿수 `displayFormat[floor]` 로 자릿수 초과·`1.2.3` 입력을 막는다(SMPFMT10000 가이드) |
 | 번호 열 | `{CurRow},{ToString}` | `inputType="expression" expression="rowIndex()+1"` | 퍼블리싱본의 한글 id `번호` 는 영문 id 로 바꿈 |
 | (숨김) `BZ_PROCS_NO` 열 | `show="False"` | **(옮기지 않음)** | 업무처리번호는 화면 상태값(`scwin.bzProcsNo`) |
 | 엑셀업로드 | `btn_exelUpload` | `btn_exelUpload` (`xf:trigger`) | §6.5 |
 | 엑셀저장 | `img_Excel` | `img_Excel` (`xf:trigger`) | §6.6. 퍼블리싱본 핸들러명 `btn_toexcel_onclick` 은 규칙 3 에 맞춰 `img_Excel_onclick` 으로 |
 | 안내 문구 | `label_1` "엑셀업로드 에러시 체크사항 : 확장자 xls(Excel 97/2003) 확인, 암호화 해제 확인, 쉬트명 "Sheet1" 확인" | 유지 | `uploadGridViewExcel` 은 xlsx 도 받으므로 문구 조정 여부는 §10 #7 |
-| 버튼 | `btn_Save`·`btn_Update`·`btn_Delete`·`btn_Close` (이미지) | 같은 id `xf:trigger` (`grpBtnBox`) | 활성 상태는 `buttonSet` → `$c.util.setButtonState` — §4 |
+| 버튼 | `btn_Save`·`btn_Update`·`btn_Delete`·`btn_Close` (이미지) | `btn_Update`·`btn_Delete`·`btn_Save`(pt) `xf:trigger` (`btnbox#grpBtnBox`). `btn_Close` 는 **옮기지 않음** — 팝업 하단 닫기 금지(팝업 창의 닫기 사용) | 활성 상태는 `buttonSet` → `$c.util.setButtonState` — §4 |
 | (장식) | `panel_3` + `PanelToGroupBox` | **(옮기지 않음)** | 퍼블리싱 마크업이 대신함 |
 
 ### 2.2 데이터 정의
@@ -322,7 +325,8 @@ scwin.onpageload = async function () {
 | `btn_Save` (저장) | `onclick` | `scwin.btn_Save_onclick` | `scwin.save()` — §6.7 | `buttonSet.setSaveInfo(btn_Save, fn_save)` |
 | `btn_Update` (수정) | `onclick` | `scwin.btn_Update_onclick` | `scwin.update()` — §6.8 | `fn_update` |
 | `btn_Delete` (삭제) | `onclick` | `scwin.btn_Delete_onclick` | `scwin.remove()` — §6.9 | `fn_delete` |
-| `btn_Close` (닫기) | `onclick` | `scwin.btn_Close_onclick` | `$c.win.closePopup()` | `frame.CloseFrame()` |
+| `btn_Close` (닫기) | — | **(옮기지 않음)** | 팝업 창의 닫기(X) 사용(팝업 하단 닫기 금지) | `frame.CloseFrame()` |
+| `grd_isu` (그리드) | `onfilereadend` | `scwin.grd_isu_onfilereadend` | 엑셀 업로드가 끝나면 조기종료기준가격 편집 조건 재적용 — §6.5 | (원본은 업로드 뒤 처리 없음) |
 | `img_SetIsuCd` (종목 찾기) | `onclick` | `scwin.img_SetIsuCd_onclick` | `scwin.openIsuPopup()` — §6.4 | `fn_GetPar`/`fn_SetPar` 바꿔 끼우기 + `fn_PopFindElwCode()` |
 | `btn_exelUpload` (엑셀업로드) | `onclick` | `scwin.btn_exelUpload_onclick` | §6.5 | `window.confirm` + `LoadExcelData` |
 | `img_Excel` (엑셀저장) | `onclick` | `scwin.img_Excel_onclick` | §6.6 | `doLogSave` + `GridToExcel` |
@@ -398,7 +402,7 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=1`, `LIST_BZ_TP_CD=147`
 | `method` / `action` | `post` / `…/register` (I) · `…/modify` (U), `mediatype : "application/json"` |
 | `requestData` | 명세 요청 정의에 담아 보낸다 — register 는 `dma_register` + `dlt_register_isuList`, modify 는 `dma_update` + `dlt_update_isuList`. `{ ...머리.getJSON(), isuList : 목록.getAllJSON() }` — 목록 키 이름 `isuList` 는 정의 이름(`…_isuList`)에서 추정한 **가정**(§10 #1). `setJSON` 이 정의된 키만 남기므로 `isuNm`·`elwRghtTpKindCd` 등 명세 밖 열은 보내지 않는다. 수정 시 행 PK(`chgListMktactAdmNo`·`bfchgBybzprocsSeq`·`afchgBybzprocsSeq`)는 요청 정의에 없어 §10 #3 |
 | 채번 | 원본은 화면이 채번(`fn_getNewBzProcNo`, 14자리 아니면 `MSG-0010`). 신규 API 명세는 "**등록 시 서버채번**" → TO-BE 는 채번하지 않는다. 다만 `register` 응답이 비어 있어 저장 뒤 재조회할 번호를 받을 수 없다(§10 #2) |
-| 후처리 | 성공: `MSG-A001` "[저장/수정] 처리 성공하였습니다." → 재조회 `await scwin.selectList()` |
+| 후처리 | 성공: `MSG-A001` "[저장/수정] 처리 성공하였습니다." → 수정은 재조회 `await scwin.selectList()`. 등록은 응답 `body.bzProcsNo` 가 있으면 그 번호로 재조회, 없으면 `$c.win.closePopup()`(부모가 `await` 뒤 재조회 — §1.2 반환 규약) |
 | 실패 처리 | `success:false`: `MSG-A002` "[…] 처리 실패하였습니다." 신규 실패면 `scwin.bzProcsNo` 를 비운 채 신규 상태를 유지 |
 | 중복 실행 | 기본(건너뜀) |
 
@@ -423,7 +427,7 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=1`, `LIST_BZ_TP_CD=147`
   2. 변경사유 비면 안내(원본 `checkEmptyValue(txb_ChgRsnContn, "변경사유")` — pcc/stf 에 대응 함수 없음).
   3. 변경사유 2000 byte 초과면 `$c.stf.checkMaxLength(txb_ChgRsnContn, 2000, "변경사유")` 안내.
   4. 종목이 0건이면 "[종목]을 선택하세요."
-  5. 종목마다 변경후 행사가격 또는 변경후 전환비율이 비었거나 0 이면 `MSG-0019` "[변경후 행사가격, 전환비율]은 모두 입력하셔야 합니다." (원본은 `== 0` 느슨한 비교 — 문자열 "0"·"0.00" 도 0 으로 봄 → TO-BE `Number(값) === 0`).
+  5. 종목마다 변경후 행사가격 또는 변경후 전환비율이 비었거나 0 이면 `MSG-0019`(TO-BE 는 비어 있는 열로 포커스 — 원본에 없는 동작) "[변경후 행사가격, 전환비율]은 모두 입력하셔야 합니다." (원본은 `== 0` 느슨한 비교 — 문자열 "0"·"0.00" 도 0 으로 봄 → TO-BE `Number(값) === 0`).
 - **공통 검증으로 옮길 항목** (`$c.validate.validateDataCollect`, 규칙 24): 변경상장일(필수·날짜), 변경사유(필수·최대 2000 byte).
 - **업무 검증으로 남길 항목**: 1 의 "익일 이후"(서버 현재일 비교), 4·5(그리드 행 단위). pcc `$c.lc.checkDdTm` 은 Gauce 속성 `obj.text` 를 읽으므로 쓰지 않는다(§8 #12).
 
@@ -470,13 +474,13 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=1`, `LIST_BZ_TP_CD=147`
 - 원본: `window.confirm("엑셀자료를 업로드 하시면 그리드의 내용이 엑셀 데이터로 변경됩니다.")` → 확인이면 `dts_Isu.SetDataHeader("번호:,ISU_CD:,ISU_NM:,BFCHG_EXER_PRC:decimal,BFCHG_ELW_KO_OCCR_BAS_PRC:decimal,BFCHG_CONV_RTO:decimal,AFCHG_EXER_PRC:decimal,AFCHG_ELW_KO_OCCR_BAS_PRC:decimal,AFCHG_CONV_RTO:decimal,BZ_PROCS_NO:,ISUR_CD:,CHG_DD:,CHG_RSN_CONTN:,")` 후 `dts_Isu.Do("LoadExcelData", "'','Sheet1',2,0,2")` — 시트 `Sheet1`, 2행부터(1행 머리글 제외로 추정)를 그리드 열 순서대로 읽어 **그리드 전체를 교체**한다.
 - TO-BE:
   1. `if (!await $c.win.confirm("엑셀자료를 업로드 하시면 그리드의 내용이 엑셀 데이터로 변경됩니다.")) return;`
-  2. `$c.data.uploadGridViewExcel(grd_isu, { sheetNo : 0, headerExist : "1", append : "0", decimal : "8" })` — **`decimal` 기본값이 4** 라서 지정하지 않으면 행사가격(소수 8자리)·전환비율(6자리)이 반올림된다. 시작 행·시트 옵션은 원본 인자 의미를 확인해 맞춘다(§10 #7).
+  2. `$c.data.uploadGridViewExcel(grd_isu, { sheetNo : 0, startRowIndex : 0, headerExist : "1", append : "0", decimal : "8" })` — 엔진의 소수 자릿수 기본값이 4 라서 `decimal` 을 주지 않으면 행사가격(소수 8자리)·전환비율(6자리)이 반올림된다. **gcc `uploadGridViewExcel` 이 `decimal` 을 엔진에 넘기지 않고 `startRowIndex` 0 을 1 로 바꾸던 결함은 2026-10-26 gcc 에서 고쳤다.** 시작 행은 원본 형식(머리글 1행)·TO-BE 다운로드 형식(머리글 2행) 파일로 실측해 확정한다(§10 #7).
   3. 업로드가 끝나면 §6.3 편집 조건을 다시 적용한다. 원본 머리글에 없는 `elwRghtTpKindCd`·`listMethdTpCd` 는 비어 있다(§8 #4, §10 #7).
 
 ### 6.6 엑셀 다운로드 (`scwin.img_Excel_onclick`)
 
 - 원본: `doLogSave(vScrenID, SCREN_PROCS_TP_CD_07)` → 0건이면 `alert(NO_EXCEL_DATA)`, 아니면 `grd_isu.GridToExcel("ELW 행사겨격/전환비율 변경", "", "8")`.
-- TO-BE: `$c.data.downloadGridViewExcel(grd_isu, { fileName : "ELW 행사가격/전환비율 변경" })` (규칙 20). 0건 안내는 공통 함수가 하므로 화면에서 따로 확인하지 않는다. `doLogSave` 는 삭제(2026-10-26 결정). 파일명 오타 "행사겨격"은 고친다(§8 #7).
+- TO-BE: `$c.data.downloadGridViewExcel(grd_isu, { fileName : "ELW 행사가격_전환비율 변경" })` (규칙 20). 파일명에 `/` 를 쓰면 저장이 실패하거나 이름이 잘릴 수 있어 `_` 로 바꾼다. 0건 안내는 공통 함수가 하므로 화면에서 따로 확인하지 않는다. `doLogSave` 는 삭제(2026-10-26 결정). 파일명 오타 "행사겨격"은 고친다(§8 #7).
 
 ### 6.7 저장 (`scwin.save`) — 원본 `fn_save`
 
@@ -576,27 +580,28 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=1`, `LIST_BZ_TP_CD=147`
 | `CopyDataSet(dts_Isu, param_dts)` / `CopyDataSet(param_dts, dts_Isu)` | `data.isuList = dlt_detail.getAllJSON()` / `dlt_detail.setJSON(result.list)` |
 | 그리드 `edit="{IF(ELW_RGHT_TP_KIND_CD='3', …)}"` | `scwin.applyKoEditable` — `grd_isu.setCellReadOnly(i, "afchgElwKoOccrBasPrc", …)` |
 | `{CurRow}` 번호 열 | `inputType="expression" expression="rowIndex()+1"` |
-| `window.confirm` + `SetDataHeader` + `LoadExcelData` | `await $c.win.confirm` + `$c.data.uploadGridViewExcel(grd_isu, { …, decimal : "8" })` |
+| `window.confirm` + `SetDataHeader` + `LoadExcelData` | `await $c.win.confirm` + `$c.data.uploadGridViewExcel(grd_isu, { sheetNo : 0, startRowIndex : 0, headerExist : "1", decimal : "8" })` + `ev:onfilereadend` → `scwin.grd_isu_onfilereadend` |
 | `doLogSave` + `GridToExcel` | `$c.data.downloadGridViewExcel(grd_isu, { fileName })` (규칙 20), `doLogSave` 삭제 |
 | `edt_MktactEnforceDd.Text` / `txb_ChgRsnContn.value` 직접 읽기·쓰기 | `dma_mst.chgDd` / `dma_mst.chgRsnContn` `ref` 바인딩 |
 | `ds.NameString(i, "COL")` / `CountRow` / `grd.redraw` | `getCellData`·`setCellData` / `getRowCount` / `setBroadcast` (규칙 28·29) |
-| `btn_Close onclick` → `frame.CloseFrame()` | `scwin.btn_Close_onclick` → `$c.win.closePopup()` |
+| `btn_Close onclick` → `frame.CloseFrame()` | 삭제 — 팝업 창의 닫기(X) 사용. 삭제 성공·등록 후 닫기는 `$c.win.closePopup()` |
 | `popUpCalendar2(...)`, `img_MktactEnforceDd` | 삭제 (inputCalendar 내장) |
 | `alert(...)` | `await $c.win.alert(...)` |
 | `#include(...)` 7종, `PanelToGroupBox`, `vScrenID` | 삭제 (규칙 11·1) |
 | `fn_drft`, `fn_makt` | 삭제 (빈 함수) |
+| (없음 — 화면 보조) | `scwin.isEmptyOrZero`(느슨한 비교 `== "" \|\| == 0` 대체), `scwin.getIsurCd`(조회 값 우선 발행기관코드), `scwin.grd_isu_onfilereadend`(업로드 뒤 편집 조건) |
 
 ---
 
 ## 10. 남은 작업 (TODO)
 
 1. **응답·요청 구조 확정** — `select-list-isu` 응답이 명세에는 `dma_detail`(dataMap)로 적혀 있지만 종목 여러 건이다. 목록인지, 머리 정보(`chgDd`·`chgRsnContn`)가 행마다 오는지 확인한다. `register`/`modify` 요청의 목록 키(`isuList` 가정)도 확정되면 §5.1·§5.2 를 고친다.
-2. **서버 채번 후 재조회** — 신규 API 는 "등록 시 서버채번"인데 `register` 응답이 비어 있다. 저장 뒤 수정 모드로 다시 조회하려면 응답으로 `bzProcsNo` 를 받아야 한다. 받을 수 없으면 저장 성공 뒤 팝업을 닫는 흐름으로 바꿀지 정한다(§1.4 업무 5).
+2. **서버 채번 후 재조회** — 신규 API 는 "등록 시 서버채번"인데 `register` 응답이 비어 있다. **결정(2026-10-26)**: 응답에 `bzProcsNo` 가 오면 그 번호로 재조회해 수정 모드로, 오지 않으면 팝업을 닫아 부모가 다시 조회한다. 응답으로 번호를 줄 수 있는지 서버에 확인한다(§1.4 업무 5).
 3. **수정 시 행 PK** — 명세의 `chgListMktactAdmNo`·`bfchgBybzprocsSeq`·`afchgBybzprocsSeq` 는 "수정/삭제 시 그대로 전달"이라 적혀 있으나 `modify` 요청 목록에는 이 열이 없다. 전달 여부를 확인한다.
 4. **`listMethdTpCd` 출처** — 요청에 필요한 상장방식유형코드를 종목 선택 결과·조회 응답에서 받는지 확인한다. 엑셀 업로드 행에는 없다(#7).
 5. **ELW 종목선택(ULDSTF92023) 계약** — 전환본이 저장소에 없다. TO-BE 경로(`/ui/listingcommon/ULDSTF92023.xml` 가정)·크기, 받는 `data`(`isurCd`·`gubun`·`isuList`)와 돌려주는 결과(`{ list }` 가정), 결과 행에 변경전 값·`elwRghtTpKindCd`·`listMethdTpCd` 가 들어오는지, 이미 입력한 변경후 값을 유지하는지 확정한다(가이드 §6.5).
 6. **부모(ULDSTF05908) 계약** — 부모 전환 때 `fn_GetParNew3`/`fn_GetParUpdate3` 바꿔 끼우기를 없애고 §1.2 의 `data` 로 넘긴다. 닫힌 뒤 콤보(`validExerPrcListWrntCd`·`validExerPrcListElwUlyCd`) 재조회와 `search3` 를 `await openPopup` 바로 뒤에 둔다.
-7. **엑셀 업로드 옵션·보강** — 원본 `LoadExcelData('', 'Sheet1', 2, 0, 2)` 인자 의미(시작 행·열)를 확인해 `uploadGridViewExcel` 의 `sheetNo`·`startRowIndex`·`headerExist` 를 맞춘다. 업로드한 행의 `elwRghtTpKindCd`·`listMethdTpCd` 를 서버에서 보강할지(종목코드로 재조회 등) 정한다. 안내 문구의 "xls(Excel 97/2003)" 제한을 유지할지도 정한다.
+7. **엑셀 업로드 옵션·보강** — 원본 `LoadExcelData('', 'Sheet1', 2, 0, 2)` 인자 의미(시작 행·열)를 확인하고, 원본 형식(머리글 1행)·TO-BE 다운로드 형식(머리글 2행) 파일로 `startRowIndex : 0`·`headerExist : "1"` 를 실측한다(gcc 의 `decimal` 미전달·`startRowIndex` 0 결함은 2026-10-26 수정). 업로드한 행의 `elwRghtTpKindCd`·`listMethdTpCd` 를 서버에서 보강할지(종목코드로 재조회 등) 정한다. 안내 문구의 "xls(Excel 97/2003)" 제한을 유지할지도 정한다.
 8. **조기종료 ELW 규칙** — `ELW_RGHT_TP_KIND_CD` 코드 `3` 의 의미를 확인하고, 그 행의 변경후 조기종료발생기준가격을 필수로 검증할지 정한다(§8 #3).
 9. **화면 이력·세션·업무유형** — AS-IS 의 `SCREN_ID`·`SCREN_PROCES_TP_CD`·`fn_encodeNSession`·`LIST_BZ_TP_CD 147` 을 서버가 대신 처리하는지 확인한다.
 10. **조회전용 상태의 종목 찾기·엑셀업로드** — 변경상장일이 지난 건에서도 그리드를 바꿀 수 있다(저장은 불가). 잠글지 정한다(§8 #15).

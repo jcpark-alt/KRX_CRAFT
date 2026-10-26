@@ -292,11 +292,12 @@ scwin.btn_exelUpload_onclick = async function (e) {
     try {
         if (!await $c.win.confirm("엑셀자료를 업로드 하시면 그리드의 내용이 엑셀 데이터로 변경됩니다.")) return;
 
-        // 원본 LoadExcelData('', 'Sheet1', 2, 0, 2) — 첫 시트, 1행 머리글 다음부터, 그리드 전체 교체
-        // TODO: $c.data.uploadGridViewExcel 은 decimal 옵션을 엔진에 넘기지 않는다 — 행사가격(소수 8)·전환비율(6)이
-        //       엔진 기본 소수 자릿수로 반올림될 수 있음. gcc 보강 또는 원본 인자 의미 확인 (§10 #7)
+        // 원본 LoadExcelData('', 'Sheet1', 2, 0, 2) — 첫 시트, 1행 머리글 다음 2행부터, 그리드 전체 교체.
+        // decimal 8 : 행사가격 소수 8자리(전환비율 6·조기종료가격 3 포함)가 기본 4자리로 반올림되지 않게 한다.
+        // TODO: 원본 형식(머리글 1행)과 TO-BE 다운로드 형식(머리글 2행) 파일로 시작 행 실측 (§10 #7)
         $c.data.uploadGridViewExcel(grd_isu, {
             sheetNo : 0,
+            startRowIndex : 0,
             headerExist : "1",
             append : "0",
             decimal : "8"
@@ -338,7 +339,8 @@ scwin.grd_isu_onfilereadend = async function (e) {
  */
 scwin.img_Excel_onclick = async function (e) {
     try {
-        $c.data.downloadGridViewExcel(grd_isu, { fileName : "ELW 행사가격/전환비율 변경" });
+        // 파일명에 "/" 를 쓰면 저장이 실패하거나 이름이 잘릴 수 있어 "_" 로 바꾼다(원본 "ELW 행사겨격/전환비율 변경").
+        $c.data.downloadGridViewExcel(grd_isu, { fileName : "ELW 행사가격_전환비율 변경" });
     } catch (ex) {
         await $c.exception.handleError(ex, { context : "ULDSTF05911.img_Excel_onclick" });
     }
@@ -531,10 +533,11 @@ scwin.validate = async function () {
     }
 
     for (let i = 0; i < rowCount; i++) {
-        if (scwin.isEmptyOrZero(dlt_detail.getCellData(i, "afchgExerPrc"))
-            || scwin.isEmptyOrZero(dlt_detail.getCellData(i, "afchgConvRto"))) {
+        const badCol = scwin.isEmptyOrZero(dlt_detail.getCellData(i, "afchgExerPrc")) ? "afchgExerPrc"
+            : scwin.isEmptyOrZero(dlt_detail.getCellData(i, "afchgConvRto")) ? "afchgConvRto" : "";
+        if (badCol !== "") {
             await $c.win.alert($c.stf.getMessageParam("MSG-0019", ""));
-            grd_isu.setFocusedCell(i, "afchgExerPrc");
+            grd_isu.setFocusedCell(i, badCol);     // 원본에는 없는 포커스 이동 — 비어 있는 열로 (§6.1)
             return false;
         }
     }
@@ -568,7 +571,6 @@ scwin.isEmptyOrZero = function (value) {
  * @hidden N
  */
 scwin.applyHeader = function () {
-    dma_mst.set("bzProcsNo", scwin.bzProcsNo);
     if (dlt_detail.getRowCount() === 0) {
         dma_mst.set("isurCd", scwin.isurCd);
         return;
@@ -788,9 +790,9 @@ scwin.remove = async function () {
 							<w2:column displayMode="label" id="bfchgExerPrc" inputType="text" dataType="number" displayFormat="#,###.########" readOnly="true" textAlign="right" width="85" />
 							<w2:column displayMode="label" id="bfchgElwKoOccrBasPrc" inputType="text" dataType="number" displayFormat="#,###.###" readOnly="true" textAlign="right" width="125" />
 							<w2:column displayMode="label" id="bfchgConvRto" inputType="text" dataType="number" displayFormat="#,###.######" readOnly="true" textAlign="right" width="80" />
-							<w2:column displayMode="label" id="afchgExerPrc" inputType="text" dataType="number" displayFormat="#,###.########" allowChar="0-9." textAlign="right" width="85" />
-							<w2:column displayMode="label" id="afchgElwKoOccrBasPrc" inputType="text" dataType="number" displayFormat="#,###.###" allowChar="0-9." textAlign="right" width="125" />
-							<w2:column displayMode="label" id="afchgConvRto" inputType="text" dataType="number" displayFormat="#,###.######" allowChar="0-9." textAlign="right" width="80" />
+							<w2:column displayMode="label" id="afchgExerPrc" inputType="text" dataType="float" maxLength="15.8" displayFormat="#,###.########[floor]" textAlign="right" width="85" />
+							<w2:column displayMode="label" id="afchgElwKoOccrBasPrc" inputType="text" dataType="float" maxLength="15.3" displayFormat="#,###.###[floor]" textAlign="right" width="125" />
+							<w2:column displayMode="label" id="afchgConvRto" inputType="text" dataType="float" maxLength="15.6" displayFormat="#,###.######[floor]" textAlign="right" width="80" />
 						</w2:row>
 					</w2:gBody>
 				</w2:gridView>
