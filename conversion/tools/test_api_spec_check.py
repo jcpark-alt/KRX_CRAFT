@@ -181,3 +181,110 @@ def test_a07_multiline_ternary_is_joined(tmp_path):
                      '            ? "/api/x/update"\n            : "/api/x/insert",\n        onSuccess : null\n    });\n};\n')
     fails, _, _ = run(tmp_path, script)
     assert "A07" not in fails
+
+
+# ── 규칙 39 (gfm-front): getContextPath 접두 금지 (A08) ──
+def _a08(tmp_path, expr, key="saveUrl", folder="gfm-front", no_ctx=False):
+    d = tmp_path / folder / "ui-tobe"
+    d.mkdir(parents=True, exist_ok=True)
+    x = d / "ULDTST00009.xml"
+    x.write_text(DOC.format(script='scwin.a = async function () { await udcSaver.save({ %s : %s }); };' % (key, expr)),
+                 encoding="utf-8")
+    fails, _w, _i, _s = ac.check(str(x), None, (), no_ctx)
+    return [c for c, _ in fails]
+
+
+def test_a08_context_path_prefix_fails_in_gfm_front(tmp_path):
+    assert _a08(tmp_path, '$c.sbm.getContextPath() + "/api/x/insert"') == ["A08"]
+    assert _a08(tmp_path, '$c.sbm.getContextPath() + "/api/x/insert"', key="action") == ["A08"]
+
+
+def test_a08_full_literal_ok_in_gfm_front(tmp_path):
+    assert _a08(tmp_path, '"/api/x/insert"') == []
+
+
+def test_a08_prefix_with_global_also_a07(tmp_path):
+    assert sorted(_a08(tmp_path, '$c.sbm.getContextPath() + scwin.API + "insert"')) == ["A07", "A08"]
+
+
+def test_a08_global_save_url_is_a07_in_gfm_front(tmp_path):
+    assert _a08(tmp_path, 'scwin.API + "insert"') == ["A07"]
+
+
+def test_a08_off_outside_gfm_front_unless_flag(tmp_path):
+    assert _a08(tmp_path, '$c.sbm.getContextPath() + "/api/x/insert"', folder="sample-front") == []
+    assert _a08(tmp_path, '$c.sbm.getContextPath() + "/api/x/insert"', folder="sample-front", no_ctx=True) == ["A08"]
+
+
+# ── md 명세 (2026-10-27) ──
+SPEC_MD = """```markdown
+# 업무 API 명세
+
+## 1. [ULDTST00001][업무][상세 조회]
+
+**1) AS-IS → TO-BE 변환 API 명세 내용**
+*   **AS-IS** : `GET /api/x/select-one.do`
+*   **TO-BE** : `GET /api/x/select-one`
+
+**[REQUEST]**
+```javascript
+const requestData = { bzProcsNo : bzProcsNo };
+[ULDTST09999] 코드 블록 안의 대괄호 줄은 블록 머리가 아니다
+```
+
+## 2. [ULDTST00001][업무][저장]
+* **AS-IS** : `POST /api/x/insert.do`
+* **TO-BE** : `POST /api/x/insert`
+
+## 3. [ULDTST00001][업무][수정]
+POST /api/x/update
+
+## 4. [ULDTST00000][업무][목록 조회 — 부모 화면]
+* **TO-BE** : `GET /api/x/select-list`
+```
+"""
+
+
+def test_parse_md_spec_uses_tobe_line_and_heading_blocks():
+    apis = ac.parse_spec(SPEC_MD, "md")
+    assert [(a["screen"], a["method"], a["path"]) for a in apis] == [
+        ("ULDTST00001", "GET", "/api/x/select-one"),
+        ("ULDTST00001", "POST", "/api/x/insert"),
+        ("ULDTST00001", "POST", "/api/x/update"),       # TO-BE 줄이 없으면 블록 안 첫 method 줄
+        ("ULDTST00000", "GET", "/api/x/select-list"),
+    ]
+
+
+def test_parse_spec_detects_md_by_content():
+    assert len(ac.parse_spec(SPEC_MD)) == 4
+    assert len(ac.parse_spec(SPEC)) == 4                 # txt 형식은 그대로
+
+
+def test_md_spec_found_in_screen_folder_and_checked(tmp_path):
+    (tmp_path / "ui" / "ULDTST00001").mkdir(parents=True)
+    (tmp_path / "ui-tobe").mkdir()
+    (tmp_path / "ui" / "ULDTST00001" / "ULDTST00001_API.md").write_text(SPEC_MD, encoding="utf-8")
+    x = tmp_path / "ui-tobe" / "ULDTST00001.xml"
+    x.write_text(DOC.format(script=GOOD), encoding="utf-8")
+    fails, warns, infos, spec = ac.check(str(x))
+    assert spec.suffix == ".md" and fails == [] and warns == []
+    assert [c for c, _ in infos] == ["A06"]
+
+
+def test_md_spec_flags_unused_and_unknown(tmp_path):
+    (tmp_path / "ui" / "ULDTST00001").mkdir(parents=True)
+    (tmp_path / "ui-tobe").mkdir()
+    (tmp_path / "ui" / "ULDTST00001" / "ULDTST00001_API.md").write_text(SPEC_MD, encoding="utf-8")
+    x = tmp_path / "ui-tobe" / "ULDTST00001.xml"
+    script = GOOD.replace('"/api/x/select-one"', '"/api/x/select-one.do"')
+    x.write_text(DOC.format(script=script), encoding="utf-8")
+    codes = [c for c, _ in ac.check(str(x))[0]]
+    assert "A01" in codes and "A03" in codes            # AS-IS .do 경로는 명세에 없는 경로, select-one 미사용
+
+
+def test_txt_spec_wins_over_md_in_same_folder(tmp_path):
+    (tmp_path / "ULDTST00001_API.txt").write_text(SPEC, encoding="utf-8")
+    (tmp_path / "ULDTST00001_API.md").write_text(SPEC_MD, encoding="utf-8")
+    x = tmp_path / "ULDTST00001.xml"
+    x.write_text(DOC.format(script=GOOD), encoding="utf-8")
+    assert ac.check(str(x))[3].suffix == ".txt"

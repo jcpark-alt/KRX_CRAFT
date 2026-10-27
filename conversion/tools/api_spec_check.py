@@ -1,19 +1,27 @@
 # -*- coding: utf-8 -*-
-"""신규 API 명세(`{화면ID}_API.txt`) ↔ TO-BE 화면 통신 대조 게이트.
+"""신규 API 명세(`{화면ID}_API.txt` 또는 `{화면ID}_API.md`) ↔ TO-BE 화면 통신 대조 게이트.
 
-    python conversion/tools/api_spec_check.py [--spec <API.txt>] [--allow-unused <path,...>] <TO-BE xml> ...
+    python conversion/tools/api_spec_check.py [--spec <API.txt|API.md>] [--allow-unused <path,...>] [--no-context-path] <TO-BE xml> ...
 
 업무 분석 가이드(conversion/md/websquare_gfm_conversion.md §5 「API 명세 적용」) 의 "API 명세가 있으면 그 API 로 바꾼다" 를 검사한다.
---spec 을 생략하면 TO-BE 파일명의 화면ID 로 `../ui/{화면ID}/{화면ID}_API.txt`(gfm-front 화면별 폴더 배치),
-`../ui/{화면ID}_API.txt`, 같은 폴더의 `{화면ID}_API.txt` 를 차례로 찾는다. 명세가 없으면 검사를 건너뛴다(SKIP, 종료 코드 0).
+--spec 을 생략하면 TO-BE 파일명의 화면ID 로 `../ui/{화면ID}/{화면ID}_API.{txt,md}`(gfm-front 화면별 폴더 배치),
+`../ui/{화면ID}_API.{txt,md}`, 같은 폴더의 `{화면ID}_API.{txt,md}` 를 차례로 찾는다(같은 자리면 txt 우선).
+명세가 없으면 명세 대조를 건너뛴다(SKIP — A07·A08 형식 검사만, FAIL 없으면 종료 코드 0).
 
-명세 형식 (블록 반복):
+명세 형식 1 — txt (블록 반복):
     [화면ID][업무][제목]
     GET|POST|PUT|DELETE|PATCH /api/...
     REQUEST
         키 …  또는  <w2:dataMap>/<w2:dataList> 정의
     RESPONSE
         …
+
+명세 형식 2 — md (블록 반복, 2026-10-27):
+    ## 1. [화면ID][업무][제목]                       ← `#` 머리글(번호 생략 가능)이 블록 시작
+    *   **AS-IS** : `GET /api/....do`               ← AS-IS 줄은 대조하지 않는다
+    *   **TO-BE** : `GET /api/...`                  ← TO-BE 줄의 method·경로
+    **[REQUEST]** / **[RESPONSE]** …               ← 코드 블록 안 내용은 블록 머리로 보지 않는다
+  TO-BE 줄이 없으면 블록 안 첫 `GET|POST… /경로`(백틱·목록 기호 허용, `.do` 제외)를 쓴다.
 
 검사 (화면마다):
   A01 FAIL  TO-BE 의 executeDynamic action 이 명세에 없는 경로
@@ -25,6 +33,8 @@
   A07 FAIL  action·saveUrl·listUrl 이 전체 경로 리터럴이 아님 — 전역 변수(`scwin.*`) 조립·`+` 이어 붙이기·상대 경로
             (규칙 38. 분기는 가지마다 전체 경로 리터럴이면 통과, saveUrl·listUrl 의 `$c.sbm.getContextPath() +` 접두는 허용.
              명세가 없어도 이 형식 검사는 돈다)
+  A08 FAIL  action·saveUrl·listUrl 에 `$c.sbm.getContextPath()` 가 붙음 (규칙 39 — gfm-front 전용.
+            파일 경로에 `gfm-front` 가 있으면 자동, 그 밖은 --no-context-path 로 켠다. contextRoot "/" 라 UDC 는 "//api/…" 가 된다)
 action 해석: `action : "…"`, `action : scwin.API + "…"`, `scwin.API + (조건 ? "a" : "b")` 처럼 한 줄 안의 문자열 리터럴을
 모두 후보로 보고, `scwin.API` 가 있으면 `scwin.API = "…"` 값을 앞에 붙인다.
 종료 코드: FAIL 0건이면 0, 하나라도 있으면 1.
@@ -41,11 +51,19 @@ import screen_tools as st  # noqa: E402
 
 METHOD_LINE = re.compile(r"^\s*(GET|POST|PUT|DELETE|PATCH)\s+(\S+)", re.I)
 BLOCK_HEAD = re.compile(r"^\s*\[([A-Za-z0-9_]+)\]")
+# md 명세: `## 1. [화면ID][…]` 머리글, `* **TO-BE** : `GET /api/…`` 줄
+MD_BLOCK_HEAD = re.compile(r"^\s*#{1,6}\s*(?:\d+[.)]\s*)?\[([A-Za-z0-9_]+)\]")
+MD_TOBE_LINE = re.compile(r"TO-?BE\W*?:?\s*`?\s*(GET|POST|PUT|DELETE|PATCH)\s+([^`\s]+)", re.I)
+MD_METHOD_LINE = re.compile(r"^\s*(?:[*-]\s+)?`?\s*(GET|POST|PUT|DELETE|PATCH)\s+(/[^`\s]+)", re.I)
 SCREEN_ID = re.compile(r"([A-Za-z]{3}[A-Za-z0-9]*?\d{5}[A-Za-z0-9_]*)")
 
 
-def parse_spec(text):
-    """명세 텍스트 → [{screen, title, method, path}] (블록 순서대로)."""
+def parse_spec(text, fmt=None):
+    """명세 텍스트 → [{screen, title, method, path}] (블록 순서대로). fmt: "txt"|"md"|None(내용으로 판별)."""
+    if fmt is None:
+        fmt = "md" if any(MD_BLOCK_HEAD.match(l) for l in text.split("\n")) else "txt"
+    if fmt == "md":
+        return _parse_spec_md(text)
     apis = []
     cur = None
     for line in text.replace("\r\n", "\n").split("\n"):
@@ -180,33 +198,73 @@ def extract_actions(script):
     return out
 
 
+def _parse_spec_md(text):
+    """md 명세 → [{screen, title, method, path}]. 블록 머리는 `#` 머리글만(코드 블록 안 `[` 줄과 섞이지 않게)."""
+    apis = []
+    cur = None
+    fallback = None
+    for line in text.replace("\r\n", "\n").split("\n"):
+        h = MD_BLOCK_HEAD.match(line)
+        if h:
+            if cur is not None and cur["path"] is None and fallback:
+                cur["method"], cur["path"] = fallback
+            cur = {"screen": h.group(1), "title": line.strip().lstrip("#").strip(), "method": None, "path": None}
+            fallback = None
+            apis.append(cur)
+            continue
+        if cur is None or cur["path"] is not None:
+            continue
+        m = MD_TOBE_LINE.search(line)
+        if m:
+            cur["method"], cur["path"] = m.group(1).upper(), m.group(2)
+            continue
+        if fallback is None and "AS-IS" not in line.upper():
+            m = MD_METHOD_LINE.match(line)
+            if m and not m.group(2).split("?")[0].endswith(".do"):
+                fallback = (m.group(1).upper(), m.group(2))
+    if cur is not None and cur["path"] is None and fallback:
+        cur["method"], cur["path"] = fallback
+    return [a for a in apis if a["path"]]
+
+
 def find_spec(xml_path):
     p = Path(xml_path)
     sid = SCREEN_ID.match(p.stem)
     sid = sid.group(1) if sid else p.stem
-    for cand in (p.parent.parent / "ui" / sid / f"{sid}_API.txt",   # gfm-front 화면별 폴더 배치
-                 p.parent.parent / "ui" / f"{sid}_API.txt",
-                 p.parent / f"{sid}_API.txt"):
-        if cand.is_file():
-            return cand, sid
+    for base in (p.parent.parent / "ui" / sid,    # gfm-front 화면별 폴더 배치
+                 p.parent.parent / "ui",
+                 p.parent):
+        for ext in ("txt", "md"):
+            cand = base / f"{sid}_API.{ext}"
+            if cand.is_file():
+                return cand, sid
     return None, sid
 
 
-def check(xml_path, spec_path=None, allow_unused=()):
+def check(xml_path, spec_path=None, allow_unused=(), no_context_path=False):
     """→ (fails, warns, infos, spec_path) — 각 항목은 (코드, 메시지)."""
     sid = Path(xml_path).stem
     _raw, _eol, reg = st.read_xml(xml_path)
     script = reg["script"] if reg else ""
     actions = extract_actions(script)
-    form_fails = [("A07", f"L{a['line']} {a['key']} 이 전체 경로 리터럴이 아님({a['form']}): {a['raw']} — 규칙 38")
-                  for a in actions if a["form"]]
+    # 규칙 39(gfm-front): getContextPath 접두 금지 — 접두는 A08 로만 알리고 A07 은 접두를 뗀 식으로 본다
+    no_ctx = no_context_path or "gfm-front" in Path(xml_path).resolve().as_posix()
+    form_fails = []
+    for a in actions:
+        prob = a["form"]
+        if no_ctx and "getContextPath" in a["raw"]:
+            form_fails.append(("A08", f"L{a['line']} {a['key']} 에 getContextPath() 가 붙음: {a['raw']} — 규칙 39(접두 없이 전체 경로)"))
+            prob = full_path_problem("saveUrl", a["raw"])
+        if prob:
+            form_fails.append(("A07", f"L{a['line']} {a['key']} 이 전체 경로 리터럴이 아님({prob}): {a['raw']} — 규칙 38"))
 
     if spec_path is None:
         spec_path, sid = find_spec(xml_path)
     if spec_path is None:
-        return form_fails, [], [("SKIP", f"API 명세 없음({sid}_API.txt) — 명세 대조 생략(A07 형식 검사만)")], None
+        return form_fails, [], [("SKIP", f"API 명세 없음({sid}_API.txt|md) — 명세 대조 생략(A07·A08 형식 검사만)")], None
 
-    apis = parse_spec(io.open(spec_path, encoding="utf-8-sig").read())
+    apis = parse_spec(io.open(spec_path, encoding="utf-8-sig").read(),
+                      "md" if Path(spec_path).suffix.lower() == ".md" else "txt")
     mine = [a for a in apis if a["screen"] == sid]
     others = [a for a in apis if a["screen"] != sid]
 
@@ -249,11 +307,14 @@ def check(xml_path, spec_path=None, allow_unused=()):
 def main(argv):
     spec = None
     allow = ()
+    no_ctx = False
     files = []
     i = 0
     while i < len(argv):
         if argv[i] == "--spec":
             spec = Path(argv[i + 1]); i += 2
+        elif argv[i] == "--no-context-path":
+            no_ctx = True; i += 1
         elif argv[i] == "--allow-unused":
             allow = tuple(x.strip() for x in argv[i + 1].split(",") if x.strip()); i += 2
         else:
@@ -264,7 +325,7 @@ def main(argv):
 
     total = 0
     for f in files:
-        fails, warns, infos, sp = check(f, spec, allow)
+        fails, warns, infos, sp = check(f, spec, allow, no_ctx)
         print(f"== {f}" + (f"  (spec: {sp})" if sp else ""))
         for code, msg in fails:
             print(f"  FAIL {code} {msg}")

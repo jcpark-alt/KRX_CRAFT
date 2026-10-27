@@ -858,11 +858,33 @@ action : (trJob === "I") ? "/api/listing/lstproc/fund/dist-pay-basdd-change/inse
     2. 합친 뒤 쓰이지 않는 경로 상수 선언(`scwin.API = "…";`)은 1구역에서 지웁니다.
     3. contextRoot 는 붙이지 않습니다 — `executeDynamic` 이 `CONTEXT_PATH` 를 자동으로 붙입니다(`$c.sbm` 전처리).
 * **예외**
-    * UDC `bulkFileSaver` 의 `saveUrl`·`listUrl` 은 `fetch` 를 직접 불러 contextRoot 를 붙이지 않으므로 `$c.sbm.getContextPath() + "/api/…/전체경로"` 로 씁니다(경로 부분은 같은 규칙 — 전체 리터럴).
+    * (gfm-front 는 이 예외를 쓰지 않습니다 — 규칙 39: 접두 없이 전체 경로) UDC `bulkFileSaver` 의 `saveUrl`·`listUrl` 은 `fetch` 를 직접 불러 contextRoot 를 붙이지 않으므로 `$c.sbm.getContextPath() + "/api/…/전체경로"` 로 씁니다(경로 부분은 같은 규칙 — 전체 리터럴).
     * 데이터에 따라 경로가 정해지는 경우(신고서 종류별 서비스 배열 등)는 분기·`switch` 로 **전체 경로 리터럴 중 하나를 고르게** 바꿉니다. 그럴 수 없으면 단계 2 판단으로 남기고 `// TODO:` 로 표시합니다.
     * 함수 인자로 받은 경로(`job.action`·`url`)를 그대로 넘기는 공통 래퍼는 대상이 아닙니다 — 그 래퍼를 **부르는 쪽**이 전체 경로 리터럴을 넘깁니다.
 * **검사**: `api_spec_check.py` **A07**(FAIL) — `action`·`saveUrl`·`listUrl` 식에 `scwin.` 참조·`+` 조립(`$c.sbm.getContextPath() +` 접두 제외)·`/` 로 시작하지 않는 리터럴이 있으면 실패. 명세(`{화면ID}_API.txt`)가 없어도 이 형식 검사는 돈다.
 * **적용 현황**(2026-10-27, A07 실측): gfm-front 3본 12곳, sample-front/ui 18본 47곳 전환 완료 — A07 0건. 전환 방식: 전역 URL 변수(stf/bnsnew 5본 `scwin.fn*Url`·`fnProcComplt`)는 각 파일이 실행하는 자기 화면 분기의 경로로 리터럴화하고 변수 삭제, 작업 표(`JOB_INFO[jobKey].action`)·`svcId` 표는 처리구분별 삼항(가지마다 전체 경로), 경로 표(`LIST`·`detailMap`·`arr`·`nowAction`)는 표 값을 전체 경로로 바꾸고 상수(`scwin.API`·`CHART_DATA_URL`) 삭제.
+
+### 규칙 39: [gfm-front] UDC `saveUrl` 전체 경로 · API 경로에 `$c.sbm.getContextPath()` 금지 (2026-10-27 신설, 사용자 지시)
+
+* **적용 범위**: `conversion/gfm-front` 화면만 — `ui/{화면ID}/` 업무 분석 결과서와 그 결과서로 만든 `ui-tobe/{화면ID}.xml`. 다른 모듈(sample-front·jsp-front·next-krx-lds-*)에는 적용하지 않습니다(규칙 38 의 UDC 예외를 그대로 둡니다).
+* **규칙**
+    1. `udcSaver`(UDC `/cm/udc/bulkFileSaver.xml`)의 `save({ saveUrl })`·`loadList({ listUrl })` 도 `executeDynamic` 의 `action` 과 같이 **`/` 로 시작하는 전체 경로 문자열 리터럴**로 씁니다. 전역 변수·상수(`scwin.API` 등) 조립, 상대 경로는 금지(규칙 38 과 같은 기준).
+    2. `$c.sbm.executeDynamic` 의 `action` 과 `udcSaver` 의 `saveUrl`·`listUrl` 에 **`$c.sbm.getContextPath()` 를 붙이지 않습니다.**
+
+```javascript
+// (X) gfm-front 금지
+saveUrl : $c.sbm.getContextPath() + "/api/bonds/accountMgt/bndClaimMgrUpdate/mgrUpdate-proc",
+saveUrl : scwin.API + "mgrUpdate-proc",
+action : $c.sbm.getContextPath() + "/api/x/select-list",
+
+// (O)
+saveUrl : "/api/bonds/accountMgt/bndClaimMgrUpdate/mgrUpdate-proc",
+action : "/api/x/select-list",
+```
+
+* **이유**: 배포 설정 contextRoot 가 `"/"`(`websquare/config.xml`)라 `getContextPath()` 는 `"/"` 를 돌려줍니다. `executeDynamic` 은 경로가 contextRoot 로 시작하면 접두를 붙이지 않으므로 붙일 이유가 없고, UDC 는 `fetch` 에 그대로 넘겨 `"/" + "/api/…"` = **`"//api/…"`(프로토콜 상대 URL — 호스트가 `api` 로 해석)** 가 되어 요청이 다른 호스트로 갑니다. 경로 문자열은 명세의 경로와 글자 그대로 같아야 grep·명세 대조가 됩니다.
+* **검사**: `api_spec_check.py` **A08**(FAIL) — `action`·`saveUrl`·`listUrl` 식에 `getContextPath` 가 있으면 실패. 파일 경로에 `gfm-front` 가 있으면 자동으로 켜지고, 다른 경로는 `--no-context-path` 로만 켭니다. 전역 변수 조립은 A07 이 잡습니다(gfm-front 에서는 `getContextPath() +` 접두도 A07 허용 대상이 아닙니다).
+* **적용 현황**(2026-10-27): gfm-front 3본 중 해당 1본(ULDBNF45000 `saveUrl` 1곳)과 결과서 §5.4 를 전환. A07·A08 0건.
 
 ## 규칙 6 보충: Submission 변환 상세
 

@@ -56,7 +56,7 @@
 ```text
 conversion/gfm-front/ui/{화면ID}/
     {화면ID}.gfm          AS-IS 원본
-    {화면ID}_API.txt      신규 API 명세
+    {화면ID}_API.txt|md   신규 API 명세 (txt 블록 형식 또는 md 머리글 형식)
     {화면ID}*.png         화면 캡처
     {화면ID}.md           업무 분석 결과서 (이 가이드의 산출)
 conversion/gfm-front/ui-tobe/{화면ID}.xml   TO-BE 화면
@@ -65,7 +65,7 @@ conversion/gfm-front/ui-tobe/{화면ID}.xml   TO-BE 화면
 | 자료 | 위치 (예) | 결과서에서 쓰는 곳 |
 |---|---|---|
 | AS-IS 원본 | `{폴더}/{화면ID}.gfm`·`.jsp` | 전 장 |
-| **신규 API 명세** | `{폴더}/{화면ID}_API.txt` | **§2.2 데이터 정의(키 이름·dataType), §5 서버 통신(경로·method·요청/응답 — AS-IS ↔ 명세 대응표), §1.4 흐름도의 서버 노드, §10 명세와 AS-IS 의 차이.** 이 화면ID 블록만 이 화면의 API 이고, 다른 화면ID 블록(부모·형제 화면)은 §1.1 호출 화면 설명에만 참고합니다 |
+| **신규 API 명세** | `{폴더}/{화면ID}_API.txt` 또는 `{화면ID}_API.md` | **§2.2 데이터 정의(키 이름·dataType), §5 서버 통신(경로·method·요청/응답 — AS-IS ↔ 명세 대응표), §1.4 흐름도의 서버 노드, §10 명세와 AS-IS 의 차이.** 이 화면ID 블록만 이 화면의 API 이고, 다른 화면ID 블록(부모·형제 화면)은 §1.1 호출 화면 설명에만 참고합니다 |
 | 화면 캡처 | `{폴더}/{화면ID}*.png` | §2.1 화면 구성, TO-BE 1단계 퍼블리싱(§13.2) |
 | KRX 퍼블리셔 XML | `conversion/publish/…/{화면ID}.xml` | §2.1 TO-BE 컴포넌트 종류·id, 부모 화면의 호출 규약(§1.1·§1.2) |
 | 부모·하위 화면 전환본 | `ui-tobe/`·`sample-front/ui/` 등 | §1.2·§1.3 호출·반환 규약 |
@@ -324,11 +324,11 @@ AS-IS 의 Ajax(`$.ajax`·`$.post`·axios) 또는 Form Submit 을 `$c.sbm.execute
 * 통신 오류는 공통 오류 핸들러가 안내하고 예외를 던집니다. 화면이 따로 처리할 것은 **응답 `success:false`·업무 결과 코드** 입니다.
 * **URL 은 신규 API 경로**로 씁니다. 신규 API 명세(`{화면ID}_API.txt`)가 있으면 아래 「API 명세 적용」을 따릅니다. 명세도 매핑도 받지 못했으면 AS-IS 경로를 적고 "가정"임을 표시해 §10 에 올립니다.
 
-**API 명세 적용 (`{화면ID}_API.txt`) — 필수**
+**API 명세 적용 (`{화면ID}_API.txt` / `{화면ID}_API.md`) — 필수**
 
-원본 옆에 `{화면ID}_API.txt`(예: `conversion/gfm-front/ui/ULDSTF05621/ULDSTF05621_API.txt`)가 있으면, 결과서 §5 와 TO-BE 의 모든 통신을 **이 명세의 API 로 바꿉니다**. AS-IS URL(`*.do`, `DIV_IDX`·`TRS_IDX`·`queryId` 파라미터)은 TO-BE 코드에 남기지 않습니다.
+원본 옆에 `{화면ID}_API.txt` 또는 `{화면ID}_API.md`(예: `conversion/gfm-front/ui/ULDSTF05621/ULDSTF05621_API.md`)가 있으면, 결과서 §5 와 TO-BE 의 모든 통신을 **이 명세의 API 로 바꿉니다**. AS-IS URL(`*.do`, `DIV_IDX`·`TRS_IDX`·`queryId` 파라미터)은 TO-BE 코드에 남기지 않습니다.
 
-1. **명세 읽기** — 블록 하나가 API 하나입니다.
+1. **명세 읽기** — 블록 하나가 API 하나입니다. md 명세는 `## n. [화면ID][업무][제목]` 머리글이 블록이고, 경로·method 는 `* **TO-BE** : \`GET /api/…\`` 줄을 씁니다(`AS-IS` 줄의 `.do` 경로는 대조하지 않음). 게이트는 두 형식을 모두 읽습니다(같은 폴더에 둘 다 있으면 txt 우선).
 
    ```text
    [화면ID][업무][제목]            ← 이 화면ID 블록만 이 화면의 대상. 다른 화면ID(부모·형제)는 그 화면 전환 때 쓴다
@@ -342,7 +342,7 @@ AS-IS 의 Ajax(`$.ajax`·`$.post`·axios) 또는 Form Submit 을 `$c.sbm.execute
 4. **응답** — 명세 RESPONSE 의 dataMap/dataList keyInfo 를 결과서 §2.2 데이터 정의와 TO-BE `<w2:dataCollection>` 에 그대로 옮기고(id·name·dataType), `target` 은 그 구조에 맞춥니다.
 5. **명세에 없는 AS-IS 통신** — 업무공통 함수가 대신하는지(예: 채번 `$c.stf.getNewBzProcNo`) 확인하고, 없으면 §10 TODO.
 6. **명세가 모호하거나 AS-IS 와 어긋나면** 명세를 따르되 고치지 않고 기록합니다. 예: 응답이 dataMap 인데 화면은 여러 행, 응답이 비어 재조회할 키가 없음, "등록 시 서버채번", 명세 설명과 요청 열이 다름. → §10 TODO + 코드 `// TODO:` 주석.
-7. **전체 경로** — `action` 은 명세의 경로를 **그대로 쓴 전체 경로 리터럴**입니다(`action : "/api/…/select-one"`). 같은 접두라도 `scwin.API` 같은 전역 상수에 끝 경로를 붙이지 않고, 분기는 가지마다 전체 경로를 씁니다(전환 규칙 38 — 2026-10-27, 게이트 A07). UDC `saveUrl` 만 `$c.sbm.getContextPath() + "/api/…"`.
+7. **전체 경로** — `action` 은 명세의 경로를 **그대로 쓴 전체 경로 리터럴**입니다(`action : "/api/…/select-one"`). 같은 접두라도 `scwin.API` 같은 전역 상수에 끝 경로를 붙이지 않고, 분기는 가지마다 전체 경로를 씁니다(전환 규칙 38 — 2026-10-27, 게이트 A07). UDC `udcSaver` 의 `saveUrl`·`listUrl` 도 같은 전체 경로 리터럴이고, `executeDynamic`·UDC 모두 **`$c.sbm.getContextPath()` 를 붙이지 않습니다**(전환 규칙 39 — gfm-front 전용, 게이트 A08. contextRoot 가 `"/"` 라 UDC 에 붙이면 `"//api/…"` 가 되어 다른 호스트로 요청됩니다).
 8. **게이트** — `api_spec_check.py` 로 TO-BE 의 `executeDynamic` action 을 명세와 대조합니다(§13.3).
 
    | 코드 | 판정 | 내용 |
@@ -351,6 +351,7 @@ AS-IS 의 Ajax(`$.ajax`·`$.post`·axios) 또는 Form Submit 을 `$c.sbm.execute
    | A02 | FAIL | 같은 경로인데 method 가 다름 |
    | A03 | FAIL | 이 화면ID 의 명세 API 를 부르지 않음 — 쓰지 않는 근거가 있으면 `--allow-unused <경로>` 로 낮추고 §10 에 적음 |
    | A07 | FAIL | `action`·`saveUrl`·`listUrl` 이 전체 경로 리터럴이 아님(전역 변수 조립·상대 경로) — 규칙 38 |
+   | A08 | FAIL | `action`·`saveUrl`·`listUrl` 에 `$c.sbm.getContextPath()` 가 붙음 — 규칙 39(gfm-front 경로면 자동 적용) |
    | A04 | FAIL | 코드에 AS-IS URL(`*.do`) 이 남음(주석은 제외) |
    | A05 | WARN | action 을 정적으로 풀 수 없음(변수 조립) — 리뷰 |
    | A06 | INFO | 다른 화면ID 블록 |
@@ -640,8 +641,8 @@ for k in $(grep -oE 'function [A-Za-z_0-9]+' $F | cut -d' ' -f2) \
 done
 
 # API 명세가 있으면 — 이 화면ID 블록의 API 끝 경로가 결과서에 모두 언급됐는지(다른 화면ID 블록은 제외)
-A={폴더}/{화면ID}_API.txt; ID={화면ID}
-[ -f "$A" ] && for k in $(awk -v id="[$ID]" 'index($0,"[")==1{s=(index($0,id)==1)} s && /^(GET|POST|PUT|DELETE|PATCH) /{n=split($2,a,"/"); print a[n]}' $A | sort -u); do
+A=$(ls {폴더}/{화면ID}_API.txt {폴더}/{화면ID}_API.md 2>/dev/null | head -1); ID={화면ID}   # txt·md 모두
+[ -n "$A" ] && for k in $(python -c "import sys; sys.path.insert(0,'conversion/tools'); import api_spec_check as ac; print('\n'.join(sorted({a['path'].rsplit('/',1)[-1] for a in ac.parse_spec(open(sys.argv[1],encoding='utf-8-sig').read(), 'md' if sys.argv[1].endswith('.md') else 'txt') if a['screen']==sys.argv[2]})))" "$A" "$ID"); do
   grep -q "$k" $M || echo "결과서 미언급 API: $k"
 done
 ```
@@ -694,7 +695,7 @@ flowchart TD
 PYTHONUTF8=1 python conversion/tools/gate_screen.py --pcc {fil|stf|mgt|tms} conversion/sample-front/ui/{화면ID}.xml
 PYTHONUTF8=1 python conversion/tools/scan_mixed_compare.py conversion/sample-front/ui/{화면ID}.xml
 PYTHONUTF8=1 python conversion/tools/publish_gate.py --rev HEAD conversion/sample-front/ui/{화면ID}.xml   # 퍼블리싱본 위에 전환했으면
-PYTHONUTF8=1 python conversion/tools/api_spec_check.py conversion/gfm-front/ui-tobe/{화면ID}.xml        # {화면ID}_API.txt 가 있으면 필수(없으면 SKIP)
+PYTHONUTF8=1 python conversion/tools/api_spec_check.py conversion/gfm-front/ui-tobe/{화면ID}.xml        # {화면ID}_API.txt|md 가 있으면 필수(없으면 명세 대조 SKIP)
 PYTHONUTF8=1 python conversion/tools/init_binding_check.py conversion/gfm-front/ui-tobe/{화면ID}.xml    # 달력·조회 Enter 키 init 바인딩(규칙 22·37) — FAIL 0건
 python -m wsxml_lint conversion/sample-front/ui/{화면ID}.xml
 ```
