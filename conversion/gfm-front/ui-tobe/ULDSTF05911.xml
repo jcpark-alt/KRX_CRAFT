@@ -9,7 +9,7 @@
 		<w2:buildDate />
 		<xf:model>
 			<w2:dataCollection baseNode="map">
-				<!-- 아래 정의는 ULDSTF05911_API.txt 명세 원문 그대로(id·name·dataType) — 가이드 §5 「API 명세 적용」.
+				<!-- 아래 정의는 ULDSTF05911_API.md 명세 원문 그대로(id·name·dataType) — 가이드 §5 「API 명세 적용」.
 				     예외: 응답 dma_detail 은 종목 여러 건이라 같은 keyInfo 의 목록 dlt_detail 로(결과서 §10 #1),
 				     변경상장일·변경사유 입력은 명세에 대응 정의가 없어 화면 전용 dma_mst 로 둔다. -->
 				<!-- 화면 입력 (명세 외) -->
@@ -114,7 +114,7 @@ scwin.KO_KIND_CD = "3";     // ELW 권리형태종류코드 — 이 값인 행�
  *  - 부모(ULDSTF05908 변경상장)가 넘긴 업무처리번호가 없으면 신규, 있으면 수정이다.
  *  - 종목은 종목선택 팝업(ULDSTF92023) 결과나 엑셀 업로드로 그리드를 통째로 바꾼다.
  *  - 종목마다 변경후 행사가격·전환비율(조기종료 ELW 는 조기종료발생기준가격도)을 입력해 등록·수정·삭제한다.
- *  - 통신·데이터 정의는 ULDSTF05911_API.txt 명세 기준(register·modify·remove·select-list-isu).
+ *  - 통신·데이터 정의는 ULDSTF05911_API.md 명세 기준(register·modify·remove·select-list-isu).
  * 업무 분석 : conversion/gfm-front/ui/ULDSTF05911/ULDSTF05911.md (§번호는 이 문서의 절)
  */
 
@@ -336,8 +336,12 @@ scwin.selectList = async function () {
     const result = await $c.sbm.executeDynamic(sbmOptions, { bzProcsNo : scwin.bzProcsNo });
     if (result?.skipped) return;    // 진행 중 조회가 있어 이번 호출은 건너뜀
 
-    // 실패하면 onpageload 가 걸어 둔 잠금(disabled) 그대로 둔다.
-    if (!result.responseJSON?.success) return;
+    // 실패하면 버튼을 모두 잠근다 — 첫 로딩은 init 이 걸어 둔 잠금이 남지만, 등록 뒤 재조회 실패면
+    // 신규 상태(insert, [저장] 활성)가 남아 같은 건을 다시 등록할 수 있으므로 명시적으로 잠근다.
+    if (!result.responseJSON?.success) {
+        $c.util.setButtonState("grpBtnBox", "disabled", scwin.BTN_MAP);
+        return;
+    }
 
     scwin.applyHeader();
     scwin.applyKoEditable();
@@ -354,7 +358,7 @@ scwin.selectList = async function () {
  * @description 등록(I)·수정(U). 명세 요청 정의(register: dma_register·dlt_register_isuList / modify: dma_update·dlt_update_isuList)에
  * 담아 보낸다 — setJSON 이 정의된 키만 남겨 명세 밖 값은 보내지 않는다. (원본 fn_save_trs + trs — §5.2, §5.3)
  * 전달 방식은 명세가 정한 대로다: 머리 dataMap 은 executeDynamic 의 ref 를 쓰지 않고 requestData 최상위 필드로,
- * 종목 목록 dataList 는 requestData.isuList 로 보낸다(ULDSTF05911_API.txt, 2026-10-26 갱신).
+ * 종목 목록 dataList 는 requestData.isuList 로 보낸다(ULDSTF05911_API.md, 2026-10-26 갱신).
  * @param {String} trJob 처리구분 I: 저장, U: 수정
  * @returns
  * @hidden N
@@ -570,7 +574,8 @@ scwin.applyHeader = function () {
 scwin.applyKoEditable = function () {
     const rowCount = dlt_detail.getRowCount();
     for (let i = 0; i < rowCount; i++) {
-        const isKo = (dlt_detail.getCellData(i, "elwRghtTpKindCd") === scwin.KO_KIND_CD);
+        // 서버·종목선택 팝업이 숫자 3 으로 줄 수도 있어 문자열로 맞춰 비교한다
+        const isKo = (String(dlt_detail.getCellData(i, "elwRghtTpKindCd") ?? "") === scwin.KO_KIND_CD);
         grd_isu.setCellReadOnly(i, "afchgElwKoOccrBasPrc", !isKo);
     }
 };

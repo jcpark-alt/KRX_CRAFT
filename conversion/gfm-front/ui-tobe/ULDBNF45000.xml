@@ -38,7 +38,7 @@
 						<w2:key id="faxNo3" name="팩스번호3" dataType="text"></w2:key>
 					</w2:keyInfo>
 				</w2:dataMap>
-				<!-- 아래는 ULDBNF45000_API.txt 명세 원문 그대로(id·name·dataType) — 가이드 §5 「API 명세 적용」 -->
+				<!-- 아래는 ULDBNF45000_API.md 명세 원문 그대로(id·name·dataType) — 가이드 §5 「API 명세 적용」 -->
 				<!-- 담당자 조회 요청 -->
 				<w2:dataMap id="dma_searchList" baseNode="map">
 					<w2:keyInfo>
@@ -387,6 +387,8 @@ scwin.searchList = async function () {
     dma_searchList.setEmptyValue();
     // TODO: 목록은 isurCd 만 채운다 — chrgId·bdchrgTpCd 를 비워도 되는지 확인 (§10 #6)
     dma_searchList.set("isurCd", dma_page.get("isurCd"));
+    // GET 은 빈 문자열 값도 쿼리(chrgId=&bdchrgTpCd=)에 붙는다 — 서버 동적 조건이 빈 값으로 걸리지 않게 값 있는 키만 보낸다
+    const requestData = Object.fromEntries(Object.entries(dma_searchList.getJSON()).filter(([, v]) => !$c.util.isEmpty(v)));
 
     const sbmOptions = {
         id : "sbm_searchList",
@@ -397,7 +399,7 @@ scwin.searchList = async function () {
         isProcessMsg : false
     };
 
-    const result = await $c.sbm.executeDynamic(sbmOptions, dma_searchList.getJSON());
+    const result = await $c.sbm.executeDynamic(sbmOptions, requestData);
     if (result?.skipped) return;    // 진행 중 조회가 있어 이번 호출은 건너뜀
     if (!result.responseJSON?.success) {
         await $c.win.alert("현재 서버에서 채권신고담당자 목록을 가져올 수 없습니다. 관리자에게 문의하세요.");
@@ -504,6 +506,8 @@ scwin.changeBdchrg = async function () {
     scwin.buildRequest();
 
     // TODO: 서버가 받는 파트 이름(dataMapId·dataListId)과 첨부의 서류 구분 전달 방법 확정 (§10 #4)
+    // UDC 는 onError 를 await 하지 않는다 — 오류 처리가 끝날 때까지 기다려 [수정] 연타 방지(isSaving)가 일찍 풀리지 않게 한다
+    let errorHandling = null;
     await udcSaver.save({
         dataMap : dma_mgrInfoUpdate,
         dataMapId : "dto",
@@ -513,16 +517,19 @@ scwin.changeBdchrg = async function () {
         // onSuccess 는 HTTP 200 이면 처리 결과와 무관하게 await 없이 불린다 — 결과 판단은 await 되는 onAfterSave 에서
         onAfterSave : async function (res) {
             if (!res?.success) {
+                // UDC 는 HTTP 200 이면 결과와 무관하게 파일 맵을 먼저 비운다 — 파일명만 남으면 재시도 때 서류 없이 전송되므로 첨부를 다시 받는다
+                scwin.initFiles();
                 // TODO: 실패 문구 확정 — 원본은 실패 안내 없음 (§10 #7)
-                await $c.win.alert($c.data.getMessage("com_complete_0151", "담당자 변경"));
+                await $c.win.alert($c.data.getMessage("com_complete_0151", "담당자 변경") + "\n첨부 서류를 다시 선택하세요.");
                 return;
             }
             await scwin.afterSave();
         },
-        onError : async function (ex) {
-            await $c.exception.handleError(ex, { context : "ULDBNF45000.changeBdchrg" });
+        onError : function (ex) {
+            errorHandling = $c.exception.handleError(ex, { context : "ULDBNF45000.changeBdchrg" });
         }
     });
+    if (errorHandling) await errorHandling;
 };
 
 /**

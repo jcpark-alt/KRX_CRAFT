@@ -7,7 +7,7 @@
 | TO-BE | `conversion/gfm-front/ui-tobe/ULDSTF05911.xml` (배포 경로 `/ui/lst/lstproc/ULDSTF05911.xml` — 가정, §10) |
 | 퍼블리싱 | `conversion/publish/상장/상장처리(대내)/ULDSTF05911.xml` — 컴포넌트 id 는 AS-IS 와 같음(`edt_MktactEnforceDd` `inputCalendar`, `txb_ChgRsnContn` `xf:input`, 버튼·`img_SetIsuCd`·`img_Excel`·`btn_exelUpload` 는 `xf:trigger`). 그리드 컬럼 id 는 대문자·한글(`번호`) 그대로 |
 | 화면 캡처 | 없음 |
-| 업무공통 | `$c.stf`(`getMessageParam`·`checkMaxLength`·`setButtonSetWithDate`)·`$c.lc`(`isProcess`·`getSecuGrpNm`·`glb.*` 상수) — `cm/pcc/stf`. 게이트는 `--pcc stf` 로 돌린다 |
+| 업무공통 | `$c.stf`(`getMessageParam`·`setButtonSetWithDate`)·`$c.lc`(`isProcess`·`getSecuGrpNm`·`glb.*` 상수) — `cm/pcc/stf`. 게이트는 `--pcc stf` 로 돌린다 |
 | 작성 | Inswave / 2026-10-26 |
 
 참고 양식: [websquare_gfm_conversion.md](../../../md/websquare_gfm_conversion.md) — 특히 §1.4 업무 프로세스 흐름, §6.5 getPar/setPar 전환. Gauce 대응은 [gfm_business_analysis_guide.md](../../../md/gfm_business_analysis_guide.md) §5·§6 을 함께 따랐다.
@@ -399,8 +399,8 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=1`, `LIST_BZ_TP_CD=147`
 | `id` / `method` / `action` | `sbm_selectList` / `get` / `…/select-list-isu` |
 | `requestData` | `{ bzProcsNo : scwin.bzProcsNo }` |
 | `target` / `gridview` | `dlt_detail=body` / `grd_isu` — 명세의 응답은 `dma_detail`(dataMap)로 적혀 있고 md 명세 `[REQUEST]` 옵션의 `target` 도 응답 id 기준 `dma_detail=body` 이나, 종목 여러 건이라 목록 `dlt_detail` 로 받는다 → 목록인지 확인(§10 #1) |
-| 후처리 | ① 1건 이상이면 첫 행의 `chgDd`·`chgRsnContn` 을 `dma_mst` 에, `dma_mst.bzProcsNo`·`isurCd` 도 채움 ② 조기종료기준가격 편집 조건(§6.3) ③ 버튼 상태 `$c.stf.setButtonSetWithDate(edt_MktactEnforceDd, false, "grpBtnBox", scwin.BTN_MAP)` |
-| 실패 처리 | `success:false` 이면 버튼을 모두 잠근다(`disabled`) |
+| 후처리 | ① 1건 이상이면 첫 행의 `chgDd`·`chgRsnContn`·`isurCd` 를 `dma_mst` 에 채움(`scwin.applyHeader` — `bzProcsNo` 는 `scwin.bzProcsNo` 로 들고 있어 `dma_mst` 에 넣지 않는다) ② 조기종료기준가격 편집 조건(§6.3) ③ 버튼 상태 `$c.stf.setButtonSetWithDate(edt_MktactEnforceDd, false, "grpBtnBox", scwin.BTN_MAP)` |
+| 실패 처리 | `success:false` 이면 버튼을 모두 잠근다(`disabled`, 명시 호출) — 첫 로딩뿐 아니라 등록 뒤 재조회 실패에도 신규 상태([저장] 활성)가 남아 같은 건을 다시 등록하지 않게 |
 | 중복 실행 | 기본(건너뜀) |
 
 ### 5.2 / 5.3 신규 저장·수정 (`scwin.saveTrs(trJob)`)
@@ -434,7 +434,7 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=1`, `LIST_BZ_TP_CD=147`
 - **순서 (원본 그대로):**
   1. 변경상장일: 8자리 아니면 "[변경상장일]을 정확히 입력하세요.", **서버 현재일 이하이면 "[변경상장일]을 익일 이후로 입력하세요."** (원본 `checkDdTm("DD", edt_MktactEnforceDd, "변경상장", false)`).
   2. 변경사유 비면 안내(원본 `checkEmptyValue(txb_ChgRsnContn, "변경사유")` — pcc/stf 에 대응 함수 없음).
-  3. 변경사유 2000 byte 초과면 `$c.stf.checkMaxLength(txb_ChgRsnContn, 2000, "변경사유")` 안내.
+  3. 변경사유 2000 byte 초과면 안내 — 원본 `checkMaxLength(txb_ChgRsnContn, 2000, "변경사유")`, TO-BE 는 `validateDataCollect` 의 `txb_ChgRsnContn : { maxLengthB : 2000 }`.
   4. 종목이 0건이면 "[종목]을 선택하세요."
   5. 종목마다 변경후 행사가격 또는 변경후 전환비율이 비었거나 0 이면 `MSG-0019`(TO-BE 는 비어 있는 열로 포커스 — 원본에 없는 동작) "[변경후 행사가격, 전환비율]은 모두 입력하셔야 합니다." (원본은 `== 0` 느슨한 비교 — 문자열 "0"·"0.00" 도 0 으로 봄 → TO-BE `Number(값) === 0`).
 - **공통 검증으로 옮길 항목** (`$c.validate.validateDataCollect`, 규칙 24): 변경상장일(필수·날짜), 변경사유(필수·최대 2000 byte).
@@ -447,7 +447,7 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=1`, `LIST_BZ_TP_CD=147`
 ### 6.3 조기종료발생기준가격 편집 조건 (`scwin.applyKoEditable`)
 
 - 원본 그리드 속성 `edit="{IF(ELW_RGHT_TP_KIND_CD='3', 'true','false')}"` — 권리형태종류코드가 `3`(조기종료 ELW 로 추정, §10 #8)인 행만 변경후 조기종료발생기준가격을 편집할 수 있다.
-- TO-BE: 목록을 채운 뒤(조회·종목 선택·엑셀 업로드) 행마다 `grd_isu.setCellReadOnly(i, "afchgElwKoOccrBasPrc", dlt_detail.getCellData(i, "elwRghtTpKindCd") !== "3")`. 반복 안에서 화면을 바꾸므로 `setBroadcast` 가드를 쓴다(규칙 28).
+- TO-BE: 목록을 채운 뒤(조회·종목 선택·엑셀 업로드) 행마다 `grd_isu.setCellReadOnly(i, "afchgElwKoOccrBasPrc", String(dlt_detail.getCellData(i, "elwRghtTpKindCd") ?? "") !== scwin.KO_KIND_CD)` — 서버·종목선택 팝업이 숫자 3 으로 줄 수도 있어 문자열로 맞춰 비교한다. 반복 안에서 화면을 바꾸므로 `setBroadcast` 가드를 쓴다(규칙 28).
 
 ### 6.4 종목 선택 (`scwin.openIsuPopup`) — getPar/setPar → `openPopup` data + `await`
 
@@ -536,7 +536,7 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=1`, `LIST_BZ_TP_CD=147`
 | `fn_alertMsg('S'/'F')` | `trs OnSuccess`/`OnFail` | pcc/stf 에 없음 → `$c.stf.getMessageParam("MSG-A001"/"MSG-A002", 처리명)` |
 | "[변경상장일]을 정확히 입력하세요." / "[변경상장일]을 익일 이후로 입력하세요." | 검증 1 (`checkDdTm` 문구) | 그대로 |
 | `checkEmptyValue` 안내 (변경사유) | 검증 2 | pcc/stf 에 없음 → 공통 검증 문구 |
-| "[ 변경사유 ] 항목의 최대입력은 [ 2000 ] byte 입니다. …" | 검증 3 | `$c.stf.checkMaxLength` 문구 |
+| "[ 변경사유 ] 항목의 최대입력은 [ 2000 ] byte 입니다. …" | 검증 3 | `validateDataCollect` 의 최대 byte 문구(`maxLengthB`, 원본 `checkMaxLength` 문구와 다를 수 있음) |
 | "[종목]을 선택하세요." | 검증 4 | 그대로 |
 | "엑셀자료를 업로드 하시면 그리드의 내용이 엑셀 데이터로 변경됩니다." | 엑셀 업로드 확인 | `await $c.win.confirm(...)` |
 | `NO_EXCEL_DATA` "해당데이터가 없습니다. 조회후 다운받으십시요." | 엑셀 다운로드 0건 | `downloadGridViewExcel` 공통 안내 |
@@ -582,7 +582,7 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=1`, `LIST_BZ_TP_CD=147`
 | `fn_isProcess('I'/'U'/'D')` | `await $c.lc.isProcess(...)` |
 | `fn_alertMsg('S'/'F')` | `$c.win.alert($c.stf.getMessageParam("MSG-A001"/"MSG-A002", 처리명))` |
 | `checkDdTm("DD", edt, "변경상장", false)` · `checkEmptyValue` | 화면 업무 검증 · `validateDataCollect` 필수 |
-| `checkMaxLength(txb_ChgRsnContn, 2000, "변경사유")` | `$c.stf.checkMaxLength(...)` 또는 `validateDataCollect` 최대 byte |
+| `checkMaxLength(txb_ChgRsnContn, 2000, "변경사유")` | `validateDataCollect` 의 `maxLengthB : 2000` (`txb_ChgRsnContn`) |
 | `buttonSet.set*Info` / `setInsertStatus` | `ev:onclick` + `$c.util.setButtonState("grpBtnBox", "insert", scwin.BTN_MAP)` |
 | `setButtonSetWithDate(edt_MktactEnforceDd, false)` | `$c.stf.setButtonSetWithDate(edt_MktactEnforceDd, false, "grpBtnBox", scwin.BTN_MAP)` |
 | `fn_GetPar = fn_GetParIsu; fn_SetPar = fn_SetParIsu; fn_PopFindElwCode()` | `scwin.openIsuPopup` — `await $c.win.openPopup(…ULDSTF92023…, options, { isurCd, gubun, isuList })` → `result.list` 로 그리드 교체 (가이드 §6.5) |

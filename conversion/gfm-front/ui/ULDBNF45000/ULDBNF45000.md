@@ -316,7 +316,7 @@ scwin.init = async function () {
 | 항목 | 내용 |
 |---|---|
 | `id` / `method` / `action` | `sbm_searchList` / `get` / `…/bndClaimMgr-select` |
-| `requestData` | 명세 `dma_searchList` 에 `isurCd` 만 채워 보냄 |
+| `requestData` | 명세 `dma_searchList` 에 `isurCd` 만 채우고, **값 있는 키만** 보낸다 — GET 은 빈 문자열도 쿼리(`chrgId=&bdchrgTpCd=`)에 붙어 서버 동적 조건이 빈 값으로 걸릴 수 있다(§10 #6) |
 | `target` / `gridview` | `dlt_searchList=body` / `grd_bdchrgList` |
 | 후처리 | 0건이면 "조회된 데이터가 없습니다."(`gridview : "grd_bdchrgList\|message"`). 조회 전에 선택 행(`scwin.selectedRow`)을 풀고, 실패하면 "현재 서버에서 채권신고담당자 목록을 가져올 수 없습니다. …" 안내(※TO-BE) |
 | 중복 실행 | 기본(건너뜀) |
@@ -349,10 +349,11 @@ scwin.init = async function () {
 |---|---|
 | 방식 | UDC `udcSaver.save({ dataMap : dma_mgrInfoUpdate, dataMapId : "dto", dataList : dlt_files, dataListId : "fileList", saveUrl : "/api/bonds/accountMgt/bndClaimMgrUpdate/mgrUpdate-proc", onAfterSave, onError })` — 전문과 첨부 3종을 한 번에(선례 ULDINF05000). `dataMapId`·`dataListId`(서버가 받는 파트 이름)는 명세에 없어 가정값 → §10 #4 |
 | UDC 주의 | `saveUrl` 은 명세 경로 그대로의 전체 경로 리터럴이고 `$c.sbm.getContextPath()` 를 붙이지 않는다(전환 규칙 39 — contextRoot 가 `"/"` 라 UDC `fetch` 에 붙이면 `"//api/…"` 프로토콜 상대 URL 이 되어 다른 호스트로 요청된다). `onSuccess` 는 HTTP 200 이면 처리 결과와 무관하게 await 없이 불리므로 쓰지 않고, await 되는 `onAfterSave` 에서 `res.success` 를 본다. 통신 오류는 `onError` → `$c.exception.handleError` |
-| 중복 실행 | `scwin.save` 의 `scwin.isSaving` 플래그(try/finally) |
-| 전문 | §5.3 과 같은 키 + 담당자 변경 표시(AS-IS `doc_bdchrg_tp_cd` 에 담당자구분 복사) |
+| 중복 실행 | `scwin.save` 의 `scwin.isSaving` 플래그(try/finally). UDC 는 `onError` 를 await 하지 않으므로 화면이 오류 처리(`handleError`) Promise 를 받아 두었다가 `save` 뒤에 기다린다 — 오류 안내 중에 플래그가 풀리지 않게 |
+| 전문 | §5.3 과 같은 키(`scwin.buildRequest`). AS-IS 의 담당자 변경 표시(`doc_bdchrg_tp_cd` 에 담당자구분 복사)는 **보내지 않는다 — 미결(§10 #4)** |
 | 첨부 | `dlt_files` 3행 — 서류 면제(`fileExemptYn = "Y"`)면 빈 행 허용 |
-| 후처리 | 성공: "요청하신 작업을 완료하였습니다." → `scwin.resetForm()` → `scwin.searchList()`. 실패(`success` 아님): `com_complete_0151` 안내(§10 #7) |
+| 배치 | 5구역 — 통신 함수지만 `executeDynamic` 이 아닌 UDC `save` 를 부르므로, convert 규칙 4(4구역 = `executeDynamic` 호출 함수)와 code-convention 서브미션 절 기준으로 5구역에 둔다(4구역으로 옮기면 convert 가 되돌린다 — 고정점 유지) |
+| 후처리 | 성공: "요청하신 작업을 완료하였습니다." → `scwin.resetForm()` → `scwin.searchList()`. 실패(`success` 아님): `scwin.initFiles()` 로 첨부를 비우고 `com_complete_0151` + "첨부 서류를 다시 선택하세요." 안내(§10 #7) — UDC 는 HTTP 200 이면 결과와 무관하게 파일 맵을 먼저 비우므로, 파일명만 남으면 재시도 때 필수 첨부 검사는 통과하고 서류 없이 전송된다 |
 
 ---
 
@@ -387,7 +388,8 @@ scwin.init = async function () {
 ### 6.4 서식다운로드 (`scwin.downloadDoc(no)` — 1 위임장, 2 개인정보동의서) — 원본 `fn_downloadDoc`
 
 - "[서식명] 다운로드 하시겠습니까?" 확인 → 다운로드.
-- 원본: 숨은 폼 `fileDownForm`(`contnId` = 122 위임장 / 123 개인정보동의서, `cmNotiClssCd` = 4)을 `/main/notice.do?method=downloadFile` 로 submit. 신규 API 명세에 대응이 없다 → gcc 파일 다운로드 공통함수로 같은 URL·파라미터를 쓰는 방식을 가정, §10 #5.
+- 원본: 숨은 폼 `fileDownForm`(`contnId` = 122 위임장 / 123 개인정보동의서, `cmNotiClssCd` = 4)을 `/main/notice.do?method=downloadFile` 로 submit. 신규 API 명세에 대응이 없다(§10 #5).
+- **현재 TO-BE 는 임시 상태**: 확인 뒤 "[서식명] 서식 다운로드 경로 확정 전(TODO)" 안내만 띄우고 내려받지 않는다. 다운로드 경로가 정해지면 gcc 파일 다운로드 공통함수로 바꾼다 — **배포 전 반드시 해소할 항목**(§10 #5).
 
 ### 6.5 입력란·첨부 초기화 (`scwin.resetForm`) — 원본 `initBdchrgInfo` + `initFileList`
 

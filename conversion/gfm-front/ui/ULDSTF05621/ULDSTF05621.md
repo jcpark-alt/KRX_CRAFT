@@ -7,7 +7,7 @@
 | TO-BE | `conversion/gfm-front/ui-tobe/ULDSTF05621.xml` (배포 경로 `/ui/lst/lstproc/ULDSTF05621.xml` — 가정, §10). 가이드 §13.2 대로 퍼블리싱본(마크업 전용)을 먼저 만들고 그 위에 스크립트를 전환함 (2026-10-26). 2026-10-27 갱신 명세(md) 기준으로 재전환 완료(§10 #15) |
 | 퍼블리싱 | `conversion/publish/상장/상장처리(대내)/ULDSTF05621.xml` — 컴포넌트 id 는 AS-IS 와 같고, 날짜는 `w2:inputCalendar`, 사유는 `xf:select1`, 달력 이미지 버튼은 없음 |
 | 화면 캡처 | `ULDSTF05621.png` (신규 빈 입력 상태) — TO-BE 퍼블리싱 기준 |
-| 업무공통 | `$c.stf`(`getNewBzProcNo`·`getMessageParam`·`checkMaxLength`·`setButtonSetWithDate`)·`$c.lc`(`isProcess`·`getSecuGrpNm`·`glb.*` 상수) — `cm/pcc/stf`. 게이트는 `--pcc stf` 로 돌린다 |
+| 업무공통 | `$c.stf`(`getNewBzProcNo`·`getMessageParam`·`setButtonSetWithDate`)·`$c.lc`(`isProcess`·`getSecuGrpNm`·`glb.*` 상수) — `cm/pcc/stf`. 게이트는 `--pcc stf` 로 돌린다 |
 | 작성 | Inswave / 2026-10-26 |
 
 참고 양식: [websquare_gfm_conversion.md](../../../md/websquare_gfm_conversion.md). Gauce 대응은 [gfm_business_analysis_guide.md](../../../md/gfm_business_analysis_guide.md) §5·§6 을 함께 따랐다.
@@ -407,7 +407,7 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=3`, `LIST_BZ_TP_CD=232`
 | `target` / `gridview` | `dlt_detail_dtlBfList=body` / `grd_DIST_PAY_BF` — 명세는 응답을 `dma_std`(dataMap), target 을 `dma_std=body` 로 적었으나 그리드는 여러 행이다 → 목록인지 확인(§10 #1) |
 | 선행 / 순서 | 신규 로딩 중. 빈 행 채우기(§6.2)보다 먼저 |
 | 후처리 | 없음 (원본 `dts_DtlBf OnLoadCompleted` 는 빈 함수) |
-| 실패 처리 | 공통 오류 핸들러. 화면 처리 없음 |
+| 실패 처리 | `skipped` 면 끝, `success:false` 면 "현재 수입분배기준일을 조회하지 못했습니다." 안내(※TO-BE) 후 `false` 반환 — `scwin.initNewForm` 은 신규 준비를 멈추고 버튼을 잠근다(변경전이 빈 채로 저장되지 않게). 통신 오류는 공통 오류 핸들러 |
 | 중복 실행 | 기본(건너뜀) |
 
 ### 5.2 상세 조회 (`scwin.selectOne`)
@@ -419,7 +419,7 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=3`, `LIST_BZ_TP_CD=232`
 | `requestData` | `{ bzProcsNo : scwin.bzProcsNo }` |
 | `target` | `dma_resultDetail=body`, `dlt_detail_dtlBfList=body.dtlBfList`, `dlt_detail_dtlAfList=body.dtlAfList` — 갱신 명세(2026-10-27) `[REQUEST]` 옵션의 `target` 그대로(종전 가정 해제) |
 | 후처리 | ① 변경후 빈 행 채우기(§6.2) ② 버튼 상태 `$c.stf.setButtonSetWithDate(edt_MKTACT_ENFORCE_DD, false, "grpBtnBox", scwin.BTN_MAP)` (원본 `dts_Mst OnLoadCompleted`) |
-| 실패 처리 | `success:false` 이면 버튼을 모두 잠근다(`disabled`) — XML 기본값(전부 활성)이 남지 않게 |
+| 실패 처리 | `success:false` 이면 버튼을 모두 잠근다(`disabled`, 명시 호출) — 첫 로딩은 XML 기본값(전부 활성)이 남지 않게, 저장 뒤 재조회 실패는 신규 상태([저장] 활성)가 남아 같은 건을 다시 저장하지 않게 |
 | 중복 실행 | 기본(건너뜀) |
 
 ### 5.3 예약(미래일자) 중복 확인 (`scwin.checkMst`)
@@ -429,13 +429,13 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=3`, `LIST_BZ_TP_CD=232`
 | `id` / `method` / `action` | `sbm_checkMst` / `get` / `…/select-mst-check` |
 | `requestData` | `{ isurCd : scwin.isurCd }` — 원본의 `GUBUN_CD=2`(분배기준일)는 명세에 없음 |
 | Return | `Promise<Boolean>` — 진행해도 되면 true |
-| 후처리 | 이미 예약 건이 있으면 `MSG-0011` "현재일 이후에 이미 변경할 업무가 있습니다." 안내 후 false. **boolean 의 뜻(true = 중복 있음?)은 명세에 없다** → §10 #4 |
+| 후처리 | 이미 예약 건이 있으면 `MSG-0011` "현재일 이후에 이미 변경할 업무가 있습니다." 안내 후 false. 판정은 `body === true || body === "true"`(서버가 문자열로 줄 때도 막도록). **boolean 의 뜻(true = 중복 있음?)은 명세에 없다** → §10 #4 |
 | 비고 | pcc `$c.lc.mstCheck` 는 AS-IS URL·미선언 전역 `Isur_cd`·1-base `getCellData(1, …)` 를 쓰므로 쓰지 않는다(§8 #13) |
 
 ### 5.4 업무처리번호 채번
 
 - `const res = await $c.stf.getNewBzProcNo();` — 이 함수는 응답 봉투(`responseJSON`)를 그대로 돌려줄 수 있다. 화면에서 `res?.body ?? res` 를 꺼내 `String()` 으로 바꾼 뒤 14자리인지 본다. 아니면 `MSG-0010` "업무처리번호생성실패" 안내 후 중단.
-- 신규 저장 API 명세는 `bzProcsNo` 를 "수정 시에만 전달"이라고 적고 있다. 채번을 화면이 하는지 서버가 하는지 확인이 필요하다(§10 #2).
+- 2026-10-27 명세는 신규 저장 요청을 마스터 합본(`bzProcsNo` 포함)으로 보내고 응답 `dma_resultSave.bzProcsNo` 를 둔다(종전 명세의 "수정 시에만 전달" 문구는 없어짐). 서버가 채번하는지, 화면 채번값을 그대로 쓰는지 확인이 필요하다(§10 #2).
 
 ### 5.5 / 5.6 신규 저장·수정 (`scwin.saveTrs(trJob)`)
 
@@ -447,7 +447,7 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=3`, `LIST_BZ_TP_CD=232`
 | `target` | `dma_resultSave=body` — 응답 `bzProcsNo`·`result`·`resultMessage` |
 | 목록 가공 (원본 `fn_save_trs`) | 변경전: 각 행에 `bzProcsNo`·`bybzprocsSeq = 행번호(1부터)`·`isurCd`·`chgBfafTpCd = "1"`. 변경후: `basMmdd` 가 빈 행을 빼고, 각 행에 `bzProcsNo`·`bybzprocsSeq = 행번호 + 12`·`isurCd`·`chgBfafTpCd = "2"`. **그리드의 dataList 는 고치지 않고 복사본으로 만든다**(§8 #5) |
 | 후처리 | 성공: `MSG-A001` "[저장/수정] 처리 성공하였습니다." → `await scwin.selectOne()` 다시 조회(신규는 이때 수정 모드가 됨) |
-| 실패 처리 | `success:false` 또는 `dma_resultSave.result` 가 성공 코드가 아님: `resultMessage` 가 있으면 그 문구, 없으면 `MSG-A002` "[…] 처리 실패하였습니다."(성공 코드 값은 §10 #5). 신규 실패면 `scwin.bzProcsNo` 를 비워 신규 상태를 유지한다 |
+| 실패 처리 | 판정은 `scwin.checkResult`: `success` 이고 `dma_resultSave.result` 가 비었거나 성공 코드(`scwin.RESULT_OK`, "S" 가정)면 성공. 그 밖의 값이라도 실패 코드(`scwin.RESULT_FAIL`, "F"·"E" 가정)가 아니고 응답 `bzProcsNo` 가 있으면 처리된 것으로 본다(성공 코드 값이 달라 처리된 신규 건을 실패로 안내하면 재저장 때 중복 등록되므로). 실패면 `resultMessage` 가 있으면 그 문구, 없으면 `MSG-A002` "[…] 처리 실패하였습니다."(§10 #5). 신규 실패면 `scwin.bzProcsNo` 를 확정하지 않아 신규 상태를 유지한다 |
 | 중복 실행 | 기본(건너뜀) — 결과가 `skipped` 이면 안내 없이 끝 |
 
 ### 5.7 삭제 (`scwin.deleteTrs`)
@@ -473,7 +473,7 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=3`, `LIST_BZ_TP_CD=232`
   2. 변경일 8자리 아니면 "[변경일]을 정확히 입력하세요." + 포커스.
   3. 시장조치시행일: 8자리 아니면 "[시장조치시행일]을 정확히 입력하세요.", **서버 현재일 이하이면 "[시장조치시행일]을 익일 이후로 입력하세요."** (원본 `checkDdTm("DD", …, "시장조치시행", false)`).
   4. 변경사유 미선택이면 "[변경사유]를  선택해주세요" + 포커스.
-  5. 기타 2000 byte 초과면 `$c.stf.checkMaxLength(txa_REMK, 2000, "기타")` 안내.
+  5. 기타 2000 byte 초과면 안내 — 원본 `checkMaxLength(txa_REMK, 2000, "기타")`, TO-BE 는 `validateDataCollect` 의 `txa_REMK : { maxLengthB : 2000 }`.
 - **공통 검증으로 옮길 항목** (`$c.validate.validateDataCollect`, 규칙 24): 변경일(필수·날짜), 시장조치시행일(필수·날짜), 변경사유(필수), 기타(최대 2000 byte). 이름은 화면 라벨과 같게 적는다.
 - **업무 검증으로 남길 항목**: 1(그리드 행 단위 4자리), 3 의 "익일 이후"(서버 현재일 비교).
 - pcc `$c.lc.checkDdTm` 은 Gauce 속성 `obj.text` 를 읽으므로 그대로 부르면 inputCalendar 에서 길이 검사가 깨진다 → 화면에서 `getValue()` 로 비교한다(§8 #13).
@@ -586,7 +586,7 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=3`, `LIST_BZ_TP_CD=232`
 | "[변경일]을 정확히 입력하세요." | 검증 2 | 그대로 |
 | "[시장조치시행일]을 정확히 입력하세요." / "[시장조치시행일]을 익일 이후로 입력하세요." | 검증 3 (`checkDdTm` 문구) | 그대로 |
 | "[변경사유]를  선택해주세요" | 검증 4 | 그대로(공통 검증으로 옮기면 공통 문구) |
-| "[ 기타 ] 항목의 최대입력은 [ 2000 ] byte 입니다. …" | 검증 5 | `$c.stf.checkMaxLength` 문구 |
+| "[ 기타 ] 항목의 최대입력은 [ 2000 ] byte 입니다. …" | 검증 5 | `validateDataCollect` 의 최대 byte 문구(`maxLengthB`, 원본 `checkMaxLength` 문구와 다를 수 있음) |
 | "입력월을 확인하세요." / "입력일을 확인하세요." | 그리드 편집 | 그대로 |
 
 ---
@@ -632,7 +632,7 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=3`, `LIST_BZ_TP_CD=232`
 | `fn_alertMsg('S'/'F')` | `$c.win.alert($c.stf.getMessageParam("MSG-A001"/"MSG-A002", 처리명))` |
 | `fn_alertNoUpdate()` | `$c.win.alert("변경된 내용이 없습니다.")` (가정) |
 | `checkDdTm("DD", edt, "시장조치시행", false)` | 화면 업무 검증 (`getValue()` 와 서버 현재일 비교) |
-| `checkMaxLength(txa_REMK, 2000, "기타")` | `$c.stf.checkMaxLength(txa_REMK, 2000, "기타")` 또는 `validateDataCollect` 최대 byte |
+| `checkMaxLength(txa_REMK, 2000, "기타")` | `validateDataCollect` 의 `maxLengthB : 2000` (`txa_REMK`) |
 | `buttonSet.set*Info` / `setInsertStatus` | `ev:onclick` + `$c.util.setButtonState("grpBtnBox", "insert", scwin.BTN_MAP)` |
 | `setButtonSetWithDate(edt_MKTACT_ENFORCE_DD, false)` | `$c.stf.setButtonSetWithDate(edt_MKTACT_ENFORCE_DD, false, "grpBtnBox", scwin.BTN_MAP)` |
 | `fn_dscl` + `fn_GetPar` 바꿔 끼우기 + `CopyDataSet` + `CreateDialogFrame` | `scwin.writeDscl` — `await $c.win.openPopup(url, options, { formCd, bzProcsNo, isurCd, mktId, mst, dtl2, dtl3 })` (규칙 17, 가이드 §6.5). 92024 수신부 변경 전까지만 호환용 `scwin.getPar` 임시 허용(§10 #7) |
@@ -656,7 +656,7 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=3`, `LIST_BZ_TP_CD=232`
 2. **업무처리번호 채번 주체** — 원본은 화면이 채번해 보낸다(§5.4). 종전 명세는 `bzProcsNo` 를 "수정 시에만 전달"이라 적었고, 2026-10-27 명세는 `insert` 응답에 `bzProcsNo` 를 둔다. 서버가 채번하면 화면 채번(§5.4)을 빼고 응답 번호로 다시 조회한다(§5.5 후처리).
 3. **서버가 정하는 값** — `fiscyyDistrBasddTpCd`(원본 `"2"`, TO-BE 컬럼은 `'14'`)와 `LIST_BZ_TP_CD 232` 는 요청 명세에 없다. 서버에서 넣는지 확인한다(§6.6 5).
 4. **`select-mst-check` boolean 의 뜻** — true 가 "예약 건 있음"인지 "진행 가능"인지 확인한다. 원본의 `GUBUN_CD=2` 를 서버가 쓰는지도 확인한다(§5.3).
-5. **저장·삭제 성공 판정** — 2026-10-27 명세에 응답 `result`·`resultMessage`(`dma_resultSave`·`dma_resultDelete`)가 생겼다. 성공 코드 값(예: `"S"`)과 `resultMessage` 를 그대로 안내할지 확인한다(§5.5~5.7).
+5. **저장·삭제 성공 판정** — 2026-10-27 명세에 응답 `result`·`resultMessage`(`dma_resultSave`·`dma_resultDelete`)가 생겼다. 성공·실패 코드 값(지금은 성공 `"S"`, 실패 `"F"`·`"E"` 가정)과 `resultMessage` 를 그대로 안내할지 확인한다(§5.5~5.7). **위험**: 서버의 성공 코드가 가정과 다르고 응답 `bzProcsNo` 도 비면 처리된 신규 건을 실패로 안내하고 번호를 확정하지 않아, 다시 저장하면 같은 건이 한 번 더 등록된다 — 응답 `bzProcsNo` 를 처리 완료 근거로 함께 보도록 했지만 코드 값 확정이 우선이다.
 6. **부모(ULDSTF05620) 계약** — 부모 전환 때 `fn_GetPar`/`fn_GetParNew`/`fn_GetParUpdate` 바꿔 끼우기를 없애고 §1.2 의 `data` 객체로 넘긴다(가이드 §6.5). 팝업이 닫힌 뒤 다시 조회하는 흐름은 `await openPopup` 바로 뒤 `search` 로 맞춘다.
 7. **공시안내문(ULDSTF92024) 연동** — ① 92024 전환본의 수신부를 부모 `scwin.getPar` 호출에서 `$c.data.getParameter()`(`formCd`·`bzProcsNo`·`isurCd`·`mktId`·`mst`·`dtl2`·`dtl3` …)로 바꾼다. 92024 를 여는 다른 화면도 같은 `data` 계약으로 함께 바꿔야 하므로 공통 팝업 단위로 진행한다. 바뀌기 전에 이 화면을 먼저 전환하면 호환용 `scwin.getPar` 를 임시로 두고, 92024 변경 때 지운다. ② TO-BE 경로(`/ui/listingcommon/ULDSTF92024.xml` 가정). ③ 서식 `68212C` 가 받는 dataset 컬럼 이름(대문자 AS-IS / camelCase). ④ 시장구분 `'1'` 고정 유지 여부(§6.4, §8 #11).
 8. **기안(ULDSTF92004) 연동** — pcc `popFindDraft` 는 업무처리번호를 넘기지 않는 콜백형이라 화면에서 `openPopup` 을 직접 부른다(§6.5). 기안 팝업 전환본의 경로·수신 키(`bzProcsNo` 가정)가 정해지면 확정한다.
