@@ -288,3 +288,43 @@ def test_txt_spec_wins_over_md_in_same_folder(tmp_path):
     x = tmp_path / "ULDTST00001.xml"
     x.write_text(DOC.format(script=GOOD), encoding="utf-8")
     assert ac.check(str(x))[3].suffix == ".txt"
+
+
+# ── 화면ID 묶음 블록 [A/B] (2026-10-27) ──
+SPEC_MULTI = """## 1. [ULDTST00001/ULDTST00002][업무][공용 인쇄]
+* **AS-IS** : ``
+* **TO-BE** : `GET /api/x/print`
+
+## 2. [ULDTST00000/ULDTST00001][업무][목록·상세 조회]
+* **TO-BE** : `GET /api/x/select-one`
+
+## 3. [ULDTST00002][업무][다른 화면 전용]
+* **TO-BE** : `POST /api/x/other`
+"""
+
+
+def test_multi_screen_block_head_parsed():
+    apis = ac.parse_spec(SPEC_MULTI, "md")
+    assert [a["screen"] for a in apis] == ["ULDTST00001/ULDTST00002", "ULDTST00000/ULDTST00001", "ULDTST00002"]
+    assert ac.screens_of(apis[0]) == ["ULDTST00001", "ULDTST00002"]
+    txt = "[ULDTST00001/ULDTST00002][업무][x]\nGET /api/x/print\n"
+    assert ac.parse_spec(txt, "txt")[0]["path"] == "/api/x/print"
+
+
+def test_multi_screen_block_counts_as_mine(tmp_path):
+    (tmp_path / "ULDTST00001_API.md").write_text(SPEC_MULTI, encoding="utf-8")
+    x = tmp_path / "ULDTST00001.xml"
+    script = ('scwin.a = async function () { const o = { method : "get", action : "/api/x/print" }; };\n'
+              'scwin.b = async function () { const o = { method : "get", action : "/api/x/select-one" }; };\n')
+    x.write_text(DOC.format(script=script), encoding="utf-8")
+    fails, warns, infos, _ = ac.check(str(x))
+    assert fails == [] and warns == []
+    assert [c for c, _ in infos] == ["A06"]          # [ULDTST00002] 전용 블록만 다른 화면
+
+
+def test_multi_screen_block_unused_is_a03(tmp_path):
+    (tmp_path / "ULDTST00001_API.md").write_text(SPEC_MULTI, encoding="utf-8")
+    x = tmp_path / "ULDTST00001.xml"
+    x.write_text(DOC.format(script='scwin.a = function () { const o = { method : "get", action : "/api/x/print" }; };'), encoding="utf-8")
+    codes = [c for c, _ in ac.check(str(x))[0]]
+    assert codes == ["A03"]                             # 묶음 블록의 select-one 을 부르지 않음

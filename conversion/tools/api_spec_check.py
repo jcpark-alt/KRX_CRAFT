@@ -31,6 +31,7 @@
   A04 FAIL  스크립트 코드에 AS-IS 서버 URL(`*.do`) 이 남음
   A05 WARN  action·saveUrl·listUrl 을 정적으로 풀 수 없음(변수만으로 조립) — 리뷰
   A06 INFO  다른 화면ID 블록(부모·형제 화면용) — 이 화면 대상 아님
+            (블록 머리가 `[ULDSTF05710/ULDSTF05801]` 처럼 `/` 로 묶은 여러 화면ID 면, 그중에 이 화면이 있으면 이 화면 대상)
   A07 FAIL  action·saveUrl·listUrl 이 전체 경로 리터럴이 아님 — 전역 변수(`scwin.*`) 조립·`+` 이어 붙이기·상대 경로
             (규칙 38. 분기는 가지마다 전체 경로 리터럴이면 통과, saveUrl·listUrl 의 `$c.sbm.getContextPath() +` 접두는 허용.
              명세가 없어도 이 형식 검사는 돈다)
@@ -51,12 +52,18 @@ sys.path.insert(0, str(_HERE))
 import screen_tools as st  # noqa: E402
 
 METHOD_LINE = re.compile(r"^\s*(GET|POST|PUT|DELETE|PATCH)\s+(\S+)", re.I)
-BLOCK_HEAD = re.compile(r"^\s*\[([A-Za-z0-9_]+)\]")
+# 화면ID 는 하나(`[ULDSTF05621]`) 또는 `/` 로 묶은 여러 개(`[ULDSTF05710/ULDSTF05801]` — 여러 화면이 같이 쓰는 API)
+BLOCK_HEAD = re.compile(r"^\s*\[([A-Za-z0-9_]+(?:\s*/\s*[A-Za-z0-9_]+)*)\]")
 # md 명세: `## 1. [화면ID][…]` 머리글, `* **TO-BE** : `GET /api/…`` 줄
-MD_BLOCK_HEAD = re.compile(r"^\s*#{1,6}\s*(?:\d+[.)]\s*)?\[([A-Za-z0-9_]+)\]")
+MD_BLOCK_HEAD = re.compile(r"^\s*#{1,6}\s*(?:\d+[.)]\s*)?\[([A-Za-z0-9_]+(?:\s*/\s*[A-Za-z0-9_]+)*)\]")
 MD_TOBE_LINE = re.compile(r"TO-?BE\W*?:?\s*`?\s*(GET|POST|PUT|DELETE|PATCH)\s+([^`\s]+)", re.I)
 MD_METHOD_LINE = re.compile(r"^\s*(?:[*-]\s+)?`?\s*(GET|POST|PUT|DELETE|PATCH)\s+(/[^`\s]+)", re.I)
 SCREEN_ID = re.compile(r"([A-Za-z]{3}[A-Za-z0-9]*?\d{5}[A-Za-z0-9_]*)")
+
+
+def screens_of(api):
+    """블록 머리의 화면ID 목록 — `[A/B]` 묶음이면 둘 다."""
+    return [s.strip() for s in api["screen"].split("/") if s.strip()]
 
 
 def parse_spec(text, fmt=None):
@@ -266,8 +273,8 @@ def check(xml_path, spec_path=None, allow_unused=(), no_context_path=False):
 
     apis = parse_spec(io.open(spec_path, encoding="utf-8-sig").read(),
                       "md" if Path(spec_path).suffix.lower() == ".md" else "txt")
-    mine = [a for a in apis if a["screen"] == sid]
-    others = [a for a in apis if a["screen"] != sid]
+    mine = [a for a in apis if sid in screens_of(a)]
+    others = [a for a in apis if sid not in screens_of(a)]
 
     fails, warns, infos = list(form_fails), [], []
     by_path = {}
