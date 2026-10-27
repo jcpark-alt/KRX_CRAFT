@@ -862,7 +862,7 @@ action : (trJob === "I") ? "/api/listing/lstproc/fund/dist-pay-basdd-change/inse
     * 데이터에 따라 경로가 정해지는 경우(신고서 종류별 서비스 배열 등)는 분기·`switch` 로 **전체 경로 리터럴 중 하나를 고르게** 바꿉니다. 그럴 수 없으면 단계 2 판단으로 남기고 `// TODO:` 로 표시합니다.
     * 함수 인자로 받은 경로(`job.action`·`url`)를 그대로 넘기는 공통 래퍼는 대상이 아닙니다 — 그 래퍼를 **부르는 쪽**이 전체 경로 리터럴을 넘깁니다.
 * **검사**: `api_spec_check.py` **A07**(FAIL) — `action`·`saveUrl`·`listUrl` 식에 `scwin.` 참조·`+` 조립(`$c.sbm.getContextPath() +` 접두 제외)·`/` 로 시작하지 않는 리터럴이 있으면 실패. 명세(`{화면ID}_API.txt`)가 없어도 이 형식 검사는 돈다.
-* **적용 현황**(2026-10-27, A07 실측): gfm-front 3본 12곳 전환. sample-front/ui 18본 47곳 미적용 — 전역 URL 변수(stf/bnsnew `ULDBNS00000`~`04000` 의 `scwin.fn*Url`, `ULDSTF05950` `scwin.JOB_INFO[…].action`, `SPCHART_NOTICE`), `scwin.API +` 조립, 상대 경로(`"select-list-…"`), 지역 변수 `+` 조립(`"/api/…/" + svcId`) — 샘플 갱신 때 반영합니다.
+* **적용 현황**(2026-10-27, A07 실측): gfm-front 3본 12곳, sample-front/ui 18본 47곳 전환 완료 — A07 0건. 전환 방식: 전역 URL 변수(stf/bnsnew 5본 `scwin.fn*Url`·`fnProcComplt`)는 각 파일이 실행하는 자기 화면 분기의 경로로 리터럴화하고 변수 삭제, 작업 표(`JOB_INFO[jobKey].action`)·`svcId` 표는 처리구분별 삼항(가지마다 전체 경로), 경로 표(`LIST`·`detailMap`·`arr`·`nowAction`)는 표 값을 전체 경로로 바꾸고 상수(`scwin.API`·`CHART_DATA_URL`) 삭제.
 
 ## 규칙 6 보충: Submission 변환 상세
 

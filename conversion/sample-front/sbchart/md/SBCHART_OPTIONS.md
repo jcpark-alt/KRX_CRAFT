@@ -19,11 +19,10 @@ SBChart 2.0.217 (`sbchart/sbchart.js`, c3/d3 계열) 기준.
 ```javascript
 // 화면 표준 골격 — 데이터/옵션 분리 (JSON 은 순수 데이터, 옵션은 스크립트 보유)
 scwin.CHART_TYPE = "line";
-scwin.CHART_DATA_URL = "/ui/sample/SBChart/COLUMNS/data/COLUMNS.json";   // 배포 경로 기준
 scwin.CHART_CONFIG = { ... };
 
 scwin.onpageload = async function () {
-    const res = await $c.sbm.executeDynamic({ id: "sbm_sbchart", action: scwin.CHART_DATA_URL,
+    const res = await $c.sbm.executeDynamic({ id: "sbm_sbchart", action: "/ui/sample/SBChart/COLUMNS/data/COLUMNS.json",   // 배포 경로 기준 전체 경로(전환 규칙 38 — 전역 변수 금지)
         method: "get", mediatype: "application/json", mode: "asynchronous", isProcessMsg: false });
     scwin.clearChart(chartWrap);                    // 재조회 대비 이전 차트 정리 (§10)
     $c.ext.drawChartData(scwin.CHART_TYPE, res.responseJSON, chartWrap, scwin.CHART_CONFIG);
