@@ -4,10 +4,10 @@
 |---|---|
 | AS-IS | `/lstproc/ULDSTF05710.gfm` (Gauce/X-Internet, 850×455 모달 창 — 부모 ULDSTF05700 이 860×490 `window` 로 연다) — 반입 `conversion/gfm-front/ui/ULDSTF05710/ULDSTF05710.gfm` |
 | 신규 API 명세 | `conversion/gfm-front/ui/ULDSTF05710/ULDSTF05710_API.md` — 블록 5종(`/api/listing/lstproc/warrant/listing/` 아래 `GET print`·`GET select-list-hist`·`POST modify`·`POST register`·`POST remove`). 블록 머리가 **화면ID 결합형**(`[ULDSTF05710/ULDSTF05801]` 4종, `[ULDSTF05700/ULDSTF05710]` 1종)이고 5종 모두 이 화면ID 를 포함하므로 **전부 이 화면의 API** 다(형제 화면 ULDSTF05801 신주인수권증서·부모 ULDSTF05700 과 공유). 블록마다 `* **AS-IS** :` 줄이 빈칸(``)이라 AS-IS 대응은 이 결과서 §5 에서 `.gfm` 기준으로 채웠다. §2.2·§5 는 명세 기준(가이드 §0.3·§5) |
-| TO-BE | `conversion/gfm-front/ui-tobe/ULDSTF05710.xml` (배포 경로 `/ui/lst/lstproc/ULDSTF05710.xml` — 가정, §10 #15). **현재 파일은 publish-tobe 파이프라인 산출 사본**(W-Craft 1차 스크립트 — `/gauceSystemierAdaptor.do`·`/Listing.do` 를 그대로 부르고 `$c.frame.path`·`buttonSet`·`$c.lc.fn_*` 등 정의되지 않은 함수를 씀). 가이드 §13.2 대로 캡처 기준 퍼블리싱본(1단계)부터 다시 만들고 그 위에 이 결과서대로 스크립트를 전환한다 |
+| TO-BE | `conversion/gfm-front/ui-tobe/ULDSTF05710.xml` (배포 경로 `/ui/lst/lstproc/ULDSTF05710.xml` — 가정, §10 #15). **2026-10-27 전환 완료** — 1단계: 캡처 기준 퍼블리싱(contentHeader, 14행 입력 표, 하단 [닫기] 없음), 2단계: 이 결과서대로 스크립트 전환. 게이트 통과: `gate_screen --pcc stf`, `publish_gate --pcc stf`(1단계본 대비 `--allow P20` — 1단계는 [닫기] 버튼·핸들러와 빈 `onpageunload` 제거로 `--allow P11,P12`), `api_spec_check`(명세 5종 모두 사용), `init_binding_check`, `wsxml_lint` 0/0, `convert.py` 고정점 |
 | 퍼블리셔 XML | `conversion/publish/상장/상장처리(대내)/ULDSTF05710.xml` — 컴포넌트 id 는 AS-IS 와 같음(날짜 4종 `w2:inputCalendar`, 상장방식 `xf:select1`, 무액면 `xf:select` checkboxgroup, 이미지 버튼 → `xf:trigger`, 달력 이미지 `img_*_DD` 는 없음) |
 | 화면 캡처 | `ULDSTF05710.png` (빈 입력 상태 — 신규, [저장]만 활성, 인쇄·승인일 숨김) → **TO-BE 는 가이드 §13.2 퍼블리싱본부터 만든다**. 캡처 하단 [닫기] 버튼은 **(옮기지 않음)** — 팝업 하단 닫기 금지(퍼블리싱 규칙) |
-| 업무공통 | `$c.stf`(`getNewBzProcNo`·`getMessageParam`·`setButtonSetWithDate`·`setButtonSetWithDate2`·`formatDateEx`·`glb.SCREN_PROCS_TP_CD_*`)·`$c.lc`(`isProcess`·`popFindNewIsuOfIsur`·`checkDoubleInput`·`checkBzDoubleInput`·`glb.LIST_BZ_TP_CD_121`·`LIST_METHD_TP_CD_1`·`DIV_IDX_NEW_ISS_SWR_*`)·`$c.print`(`openReportPdf`) — `cm/pcc/stf`. 게이트는 `--pcc stf` 로 돌린다 |
+| 업무공통 | pcc(`cm/pcc/stf`): `$c.stf`(`getNewBzProcNo`·`getMessageParam`·`setButtonSetWithDate`·`setButtonSetWithDate2`)·`$c.lc`(`isProcess`·`popFindNewIsuOfIsur`·`checkDoubleInput`·`checkBzDoubleInput`·`glb.LIST_BZ_TP_CD_121`·`glb.LIST_METHD_TP_CD_1`)·`$c.print`(`openReportPdf`). gcc: `$c.data.getParameter`·`$c.date`(`getServerDateTime`·`checkCalendarFormat`·`compareFromToDate`·`formatDate`)·`$c.num.formatNumber`·`$c.validate.validateDataCollect`·`$c.util.setButtonState`·`$c.util.isEmpty`·`$c.win`(`alert`·`openPopup`·`closePopup`)·`$c.sbm.executeDynamic`·`$c.exception.handleError`. 게이트는 `--pcc stf` 로 돌린다 |
 | 작성 | Inswave / 2026-10-27 |
 
 참고 양식: [websquare_gfm_conversion.md](../../../md/websquare_gfm_conversion.md) — 특히 §1.4 업무 프로세스 흐름, §5 「API 명세 적용」, §6.5 getPar/setPar 전환. Gauce 대응은 [gfm_business_analysis_guide.md](../../../md/gfm_business_analysis_guide.md) §5·§6 을 함께 따랐다. 같은 모듈 정답지 [ULDSTF05621.md](../ULDSTF05621/ULDSTF05621.md) 의 구성을 따랐다.
@@ -105,32 +105,36 @@ AS-IS 는 하위 팝업에 `fn_GetPar`/`fn_SetPar` 를 바꿔 끼우고 모달 �
 
 ```mermaid
 flowchart TD
-    S(["팝업 열림<br/>scwin.onpageload"]) --> P["파라미터 수신 · 버튼 잠금<br/>scwin.init"]
-    P --> B{"openTyp?"}
+    S(["팝업 열림<br/>scwin.onpageload"]) --> P["버튼 잠금 · 파라미터 수신<br/>승인일 기본값 · 달력 바인딩<br/>scwin.init"]
+    P --> V["인쇄·승인일 표시 결정<br/>scwin.setPrintVisible §6.10"]
+    V --> B{"openTyp?"}
     B -- "N 신규" --> N1["빈 상세 · 상장방식 1 신주상장<br/>scwin.initNewForm §6.4"]
-    N1 --> N2["버튼 insert(저장만)<br/>신청종목삭제 잠금"] --> V["인쇄·승인일 표시 결정<br/>scwin.setPrintVisible §6.10"]
+    N1 --> N2["버튼 insert(저장만)<br/>신청종목삭제 잠금"] --> E1(["입력 대기"])
     B -- "R 접수" --> R1["빈 상세 §6.4"] --> R2["접수 행 값 채우기<br/>scwin.applyRecv §6.3"]
-    R2 --> R3["버튼 insert<br/>업무처리번호 있으면 신청종목삭제 활성"] --> V
+    R2 --> R3["버튼 insert<br/>업무처리번호 있으면 신청종목삭제 활성"] --> E1
     B -- "H 이력" --> H1[/"GET select-list-hist §5.1<br/>bzProcsNo 행 선택"/]
     H1 -. "실패 · 해당 행 없음 ※TO-BE" .-> H9["버튼 모두 잠금"] --> E2(["끝"])
     H1 --> H2{"상장일 > 오늘?"}
     H2 -- "예" --> H3["버튼 update"] --> H5
     H2 -- "아니오" --> H4["버튼 error(모두 잠금)"] --> H5{"공시여부 Y?"}
     H3 --> H5
-    H5 -- "아니오" --> H6["버튼 update로 덮어씀"] --> V
-    H5 -- "예" --> V
-    V --> E1(["입력 대기"])
+    H5 -- "아니오" --> H6["버튼 update로 덮어씀"] --> E1
+    H5 -- "예" --> E1
 ```
 
 | # | 단계 | 주체 | 내용 | 분기 · 메시지 | 관련 절 |
 |---|---|---|---|---|---|
+| 0 | 버튼 잠금 | 화면 | `$c.util.setButtonState("grpBtnBox", "disabled", scwin.BTN_MAP)` + `btn_RecvIsuDel.setDisabled(true)` (※TO-BE — 조회 예외 때 XML 기본값이 남지 않게) | — | §3 |
 | 1 | 파라미터 수신 | 화면 | `$c.data.getParameter()` → `openTyp`·`bzProcsNo`·`acptNo`·`isurCd`·`secugrpId`·`spotIsuTrdMktTpCd`·`recv` | — | §1.2, §3 |
-| 2 | 승인일 기본값 | 화면 | `edt_APPROV_DD` = 서버 현재일 (AS-IS 클라이언트 `cGetToday("yyyymmdd")`) | — | §3 |
+| 2 | 승인일 기본값 | 화면 | `edt_APPROV_DD.setValue(서버 현재일)` — 바인딩 없음 (AS-IS 클라이언트 `cGetToday("yyyymmdd")`) | — | §3 |
+| 2a | 달력 바인딩 | 화면 | `checkCalendarFormat` 3건 + `compareFromToDate`(행사기간) — 규칙 37 | — | §3 |
+| 2b | 인쇄 표시 | 화면 | `scwin.setPrintVisible()` — 파라미터만 보므로 **모드 분기 앞**(상세 조회가 예외로 끝나도 유가에서 [인쇄]·승인일이 보이지 않게). 유가(1)면 숨김, 코스닥이면 업무처리번호 없는 접수만 숨김 | — | §6.10 |
 | 3a | 신규(N) | 화면 | AS-IS `fn_SetHeader`(헤더 전용 서버 조회 + `AddRow`) → TO-BE 통신 없이 `dma_detail.setEmptyValue()`. `fn_initItem` 으로 상장방식 `1` | 버튼 `insert`, 신청종목삭제 잠금 | §6.4, §5.9 |
 | 3b | 접수(R) | 화면 | 빈 상세 뒤 접수 행 값 복사(`fn_recv_read_sync`) — 업무처리번호·접수번호·발행일·상장증권수량·무액면·행사가격·발행주식수·발행가액총액·행사시작/종료일·비고, **코스닥이면 상장일도** | 버튼 `insert`, 업무처리번호가 있으면 신청종목삭제 활성 | §6.3 |
 | 3c | 이력(H) | 서버 | AS-IS `fn_read_sync`(**동기** 2회 — `dts_Isu`·`dts_Eng_Isu` 같은 URL) → TO-BE `select-list-hist` 1회 후 `bzProcsNo` 행을 상세로 | 실패·0행이면 버튼 잠금(※TO-BE) | §5.1, §8 #4 |
 | 4 | 버튼 상태 | 화면 | AS-IS `dts_Isu OnLoadCompleted`: 신규 또는 업무처리번호 없는 접수 → `insert`, 그 밖 → `setButtonSetWithDate(edt_LIST_DD, false)` 후 `setButtonSetWithDate2(DISCLS_YN)` | 상장일 ≤ 오늘이면 `error`, 단 미공시면 다시 `update` | §4, §6.11 |
-| 5 | 인쇄 표시 | 화면 | 유가(1)면 인쇄·승인일 숨김, 코스닥이면 업무처리번호 없는 접수만 숨김 | — | §6.10 |
+
+- AS-IS 는 인쇄 표시를 onload 끝에서 정했다. TO-BE 는 2b 로 앞당겼다(표시 규칙은 파라미터만 보므로 결과는 같음). 저장 성공 뒤에는 다시 부른다(§5.5).
 
 #### 업무 2: 종목 찾기
 
@@ -146,7 +150,7 @@ flowchart TD
 
 | # | 단계 | 주체 | 내용 | 분기 · 메시지 | 관련 절 |
 |---|---|---|---|---|---|
-| 1 | 회사 확인 | 화면 | `scwin.isurCd` 가 비었는지 | 비면 "[회사]를 선택하세요." 후 끝 | §7.2 |
+| 1 | 회사 확인 | 화면 | `scwin.openIsuPopup` 안에서 `scwin.isurCd` 가 비었는지 | 비면 "[회사]를 선택하세요." 후 끝 | §6.2, §7.2 |
 | 2 | 팝업 | 사용자 | `await $c.lc.popFindNewIsuOfIsur(scwin.secugrpId, scwin.isurCd)` | 취소·닫기(X)는 `{ isCloseButtonClick }` → `isuCd` 없음으로 판정 | §6.2 |
 | 3 | 반영 | 화면 | `dma_detail` 의 `isuCd`·`isuSrtCd`·`isuKorNm`·`isuKorAbbrv`·`isuEngNm`·`isuEngAbbrv`·`isuRnd`·`isuDd`·`tarstkIsuCd`, `dma_view.tarstkIsuNm` | 원본은 업무 확인 없이 덮어씀 | §6.2 |
 
@@ -174,7 +178,7 @@ flowchart TD
 | 1 | 종목 | 화면 | `isuCd` 필수 | "[종목]을 선택하세요." + 종목 찾기 버튼 포커스 | §6.1 |
 | 2 | 종목 중복(신규만) | 서버 | AS-IS `fn_checkDoubleInput(dts_DoubleChk, 종목코드)` (**동기**) | 중복이면 안내 후 false. 명세에 없음 — §5.3, §10 #4 | §5.3 |
 | 3 | 단축코드 | 화면 | 비면 "[종목단축코드]항목값이  없습니다." 안내만 하고 **계속**(원본 `return` 이 주석) | — | §8 #6 |
-| 4 | 필수·형식 | 화면 | 한글/영문 종목(약)명, 발행일, 상장일, 행사종료일, 상장방식, 상장증권수량, 발행주식수, 발행가액총액, 발행사유, 신주인수권의 내용, 신주의 납입방법 | 각 안내 + 포커스 | §6.1 |
+| 4 | 필수·형식 | 화면 | 한글/영문 종목(약)명, 발행일, 상장일, 행사종료일, 상장방식, 상장증권수량, 발행주식수, 발행가액총액, 발행사유, 신주인수권의 내용, 신주의 납입방법 — `validateDataCollect` 를 원본 순서대로 5번 나눠 부름 | 각 안내(공통 문구) + 포커스 | §6.1 |
 | 5 | 업무 날짜 | 화면 | 상장일 > 오늘, 행사종료일 > 오늘, 행사시작일 < 행사종료일(같으면 실패) | §7.2 문구 | §6.1 |
 | 6 | 행사가격 조건부 필수 | 화면 | 무액면이 아니면 행사가격 필수 | AS-IS 는 체크박스가 아닌 조회 값으로 판정(§8 #5) | §6.1 |
 | 7 | 업무 중복 | 서버 | `fn_check_bz_doubleinput(dts_BZ_CHECK, 종목코드, 상장일, 업무처리번호, 121)` (**동기**) | 이미 입력된 건이면 안내 후 false | §5.4 |
@@ -203,7 +207,7 @@ flowchart TD
 |---|---|---|---|---|---|
 | 1 | 입력 검증 | 화면·서버 | 업무 3 (`trJob = "I"`) | false 면 끝 | §6.1 |
 | 2 | 저장 확인 | 사용자 | `await $c.lc.isProcess("I")` | 취소면 끝 | §6.7 |
-| 3 | 채번 | 서버 | 접수번호가 없을 때만 `$c.stf.getNewBzProcNo()` → 봉투에서 `body` 추출 | 14자리 아니면 `MSG-0010`. 접수 건은 받은 업무처리번호를 그대로 검사(비면 `MSG-0010` — §8 #3) | §5.2 |
+| 3 | 채번 | 서버 | 접수번호가 없을 때만 `$c.stf.getNewBzProcNo()` → 봉투에서 `body` 추출(문자열 또는 `{ bzProcsNo }` 모두 받음 — §5.2) | 14자리 아니면 `MSG-0010`. 접수 건은 받은 업무처리번호를 그대로 검사(비면 `MSG-0010` — §8 #3) | §5.2 |
 | 4 | 전문 구성 | 화면 | `dma_detail` 에 `bzProcsNo`·`acptNo`·`isurCd`·`secugrpId`·`nparvalstkYn`(체크 Y / "") | AS-IS 의 `LIST_BZ_TP_CD=121` 은 `secugrpId=SW` 로 대신(명세) | §5.5 |
 | 5 | 저장 | 서버 | `POST register` (`ref : "dma_detail"`) | `skipped` 면 안내 없이 끝, 실패 `MSG-A002` | §5.5 |
 | 6 | 결과 반영 | 화면 | `MSG-A001` → 상세 재조회 → `update` 버튼 → 인쇄 표시. 부모 재조회는 닫힌 뒤(※TO-BE) | — | §5.1, §8 #12 |
@@ -306,7 +310,7 @@ stateDiagram-v2
 
 ### 2.1 화면 구성
 
-캡처(`ULDSTF05710.png`) 기준 위→아래, 왼→오른. TO-BE id 는 AS-IS·퍼블리셔 XML 과 같은 id 를 쓰고(현재 ui-tobe 사본과도 같음), 바인딩은 §2.2 의 `dma_detail` camelCase 키다. 필수 표시(*)는 AS-IS 의 별도 라벨(`label_29`~`label_42` 등)을 TO-BE 라벨의 `class="req"` 로 옮긴다.
+캡처(`ULDSTF05710.png`) 기준 위→아래, 왼→오른. TO-BE id 는 AS-IS·퍼블리셔 XML 과 같은 id 를 쓰고(전환본 ui-tobe 와도 같음), 바인딩은 §2.2 의 `dma_detail` camelCase 키다. 필수 표시(*)는 AS-IS 의 별도 라벨(`label_29`~`label_42` 등)을 TO-BE 라벨의 `class="req"` 로 옮긴다.
 
 | 영역 | AS-IS 요소 | TO-BE 컴포넌트 (바인딩) | 설명 |
 |---|---|---|---|
@@ -321,23 +325,23 @@ stateDiagram-v2
 | 발행사유 (*) / 상장방식 (*) | `label_5` + `label_22`(*) · `txb_ISU_RSN_CONTN` (100) / `label_9` + `label_38`(*) · `cmb_LIST_METHD_TP_CD` (`enable2=False`, `1^신주상장,3^변경상장`) | `txb_ISU_RSN_CONTN` (`dma_detail.isuRsnContn`) / `cmb_LIST_METHD_TP_CD` (`xf:select1` disabled, `dma_detail.listMethdTpCd`) | 상장방식은 잠긴 콤보 — 신규·접수는 `1` 고정(§6.4), 이력은 조회 값 |
 | 발행일 (*) / 행사시작일 | `label_6` + `label_28`(*) · `edt_ISU_DD` + `img_ISU_DD` / `label_19` · `edt_EXER_STRT_DD` + `img_EXER_STRT_DD` | `edt_ISU_DD` (`w2:inputCalendar`, `dma_detail.isuDd`) / `edt_EXER_STRT_DD` (`dma_detail.exerStrtDd`) | 달력 이미지 **(옮기지 않음)** — inputCalendar 내장 달력. 행사시작일은 필수 표시 없음(원본 검사도 주석) |
 | 상장일 (*) / 행사종료일 (*) | `label_13` + `label_27`(*) · `edt_LIST_DD` + `img_LIST_DD` / `label_20` + `label_36`(*) · `edt_EXER_END_DD` + `img_EXER_END_DD` | `edt_LIST_DD` (`dma_detail.listDd`) / `edt_EXER_END_DD` (`dma_detail.exerEndDd`) | 상장일은 수정 모드 버튼 상태의 기준일(§6.11) |
-| 상장증권수량 (*) / 행사가격(원) (*) / 무액면주식 여부 | `label_10` + `label_39`(*) · `edt_LIST_SHRS` (숫자) / `label_25` + `label_41`(*) · `edt_EXER_PRC` (숫자, maxlength 8) / `label_50` · `chk_NPARVALSTK_YN` (value Y) | `edt_LIST_SHRS` (`dataType="number"`, `displayFormat="#,##0"`, `dma_detail.listShrs`) / `edt_EXER_PRC` (`dma_detail.exerPrc`) / `chk_NPARVALSTK_YN` (`xf:select` checkboxgroup `Y`, `dma_detail.nparvalstkYn`) | 체크박스를 바인딩해 검증·전송 값과 화면을 일치시킨다(※TO-BE, §8 #5). AS-IS binder 의 `edt_NPARVALSTK_YN` 은 화면에 없는 컨트롤 — **(옮기지 않음)** |
-| 발행주식수(주) (*) / 발행가액총액(원) (*) | `label_21` + `label_40`(*) · `edt_ISU_SHRS` / `label_7` + `label_42`(*) · `edt_TOT_ISU_PRC` | `edt_ISU_SHRS` (`dma_detail.isuShrs`) / `edt_TOT_ISU_PRC` (`dma_detail.totIsuPrc`) | 숫자 `#,##0` |
+| 상장증권수량 (*) / 행사가격(원) (*) / 무액면주식 여부 | `label_10` + `label_39`(*) · `edt_LIST_SHRS` (숫자) / `label_25` + `label_41`(*) · `edt_EXER_PRC` (숫자, maxlength 8) / `label_50` · `chk_NPARVALSTK_YN` (value Y) | `edt_LIST_SHRS` (`dataType="number"`, `displayFormat="#,###"`, `dma_detail.listShrs`) / `edt_EXER_PRC` (`dma_detail.exerPrc`) / `chk_NPARVALSTK_YN` (`xf:select` checkboxgroup `Y`, `dma_detail.nparvalstkYn`) | 체크박스를 바인딩해 검증·전송 값과 화면을 일치시킨다(※TO-BE, §8 #5). AS-IS binder 의 `edt_NPARVALSTK_YN` 은 화면에 없는 컨트롤 — **(옮기지 않음)** |
+| 발행주식수(주) (*) / 발행가액총액(원) (*) | `label_21` + `label_40`(*) · `edt_ISU_SHRS` / `label_7` + `label_42`(*) · `edt_TOT_ISU_PRC` | `edt_ISU_SHRS` (`dma_detail.isuShrs`) / `edt_TOT_ISU_PRC` (`dma_detail.totIsuPrc`) | 숫자 `#,###` |
 | 신주인수권의 내용 (*) | `label_23` + `label_12`(*) · `txb_SUBSRGHT_CONTN` (200) | `txb_SUBSRGHT_CONTN` (`dma_detail.subsrghtContn`) | |
 | 신주의 납입방법 (*) | `label_24` + `label_37`(*) · `txb_SUBSRGHT_EXERTM_PAYMETHD_CONTN` (200) | `txb_SUBSRGHT_EXERTM_PAYMETHD_CONTN` (`dma_detail.subsrghtExertmPaymethdContn`) | |
 | 비고 | `label_15` · `txa_REMK` (`mxtextarea`) | `txa_REMK` (`xf:textarea`, `dma_detail.remk`) | 검증 없음 |
-| 하단 왼쪽 (인쇄) | `btn_Print` · `label_26` "승인일(인쇄용):" · `edt_APPROV_DD` + `img_APPROV_DD` | `btn_Print` (`xf:trigger`) · `label_26` · `edt_APPROV_DD` (`inputCalendar`, 바인딩 없음 — 인쇄 파라미터 전용) | 캡처에는 숨김 상태(유가 또는 미처리 접수). 표시 규칙 §6.10. `img_APPROV_DD` **(옮기지 않음)** — 내장 달력 |
-| 하단 오른쪽 (버튼) | `btn_RecvIsuDel`(신청종목삭제) · `btn_Save` · `btn_Update` · `btn_Delete` · `btn_Dscl`(안내문작성) · `btn_Close` (이미지) | `btn_RecvIsuDel` · `btn_Save`(pt) · `btn_Update` · `btn_Delete` · `btn_Dscl` (`xf:trigger`, `btnbox#grpBtnBox`) — 캡처 순서: 신청종목삭제 \| 저장 · 수정 · 삭제 · 안내문작성 | `btn_Close` 는 **(옮기지 않음)** — 팝업 하단 닫기 금지(퍼블리싱 규칙), 팝업 창의 닫기(X) 사용. 활성 상태는 `buttonSet` → `$c.util.setButtonState` (§4) |
+| 하단 왼쪽 (인쇄) | `btn_Print` · `label_26` "승인일(인쇄용):" · `edt_APPROV_DD` + `img_APPROV_DD` | `btnbox` 의 `lt` 안 `flex flex_no` 그룹: `btn_Print` (`xf:trigger`) · `label_26` · `edt_APPROV_DD` (`inputCalendar`, 바인딩 없음 — 인쇄 파라미터 전용) | 캡처에는 숨김 상태(유가 또는 미처리 접수). 표시 규칙 §6.10. `img_APPROV_DD` **(옮기지 않음)** — 내장 달력 |
+| 하단 오른쪽 (버튼) | `btn_RecvIsuDel`(신청종목삭제) · `btn_Save` · `btn_Update` · `btn_Delete` · `btn_Dscl`(안내문작성) · `btn_Close` (이미지) | `btnbox#grpBtnBox` 의 `rt`: `btn_RecvIsuDel`(신청종목삭제) · `btn_Update`(수정) · `btn_Delete`(삭제) · `btn_Dscl`(안내문작성) · `btn_Save`(저장, `pt` — 주요 버튼은 맨 오른쪽, 퍼블리싱 스킬 규칙) (`xf:trigger`). 캡처 순서(신청종목삭제 \| 저장 · 수정 · 삭제 · 안내문작성)와 달리 저장을 맨 오른쪽으로 옮김 | `btn_Close`(하단 닫기)는 **(옮기지 않음)** — 팝업 하단 닫기 금지(퍼블리싱 규칙), 팝업 창의 닫기(X) 사용. 활성 상태는 `buttonSet` → `$c.util.setButtonState` (§4) |
 | (데이터 장식) | `bnd_Isu` (`mxbinder`) | 컴포넌트 `ref="data:dma_detail.*"` | |
 
-- 퍼블리싱 1단계(§13.2)는 캡처 기준으로 다시 만든다: 팝업이므로 contentHeader 필수, 하단 닫기 버튼 금지, colgroup 칸 수 일치, `readOnly` 대소문자. 현재 ui-tobe 사본의 `pop_contents` 구조·`userData2` 잔재는 1단계에서 정리한다.
+- 퍼블리싱 1단계(§13.2)는 캡처 기준으로 다시 만들었다(2026-10-27): 팝업이므로 contentHeader(`pfmContentHeader`) 필수, 입력 표 14행(colgroup 4칸), 하단 닫기 버튼 없음, `readOnly` 대소문자.
 
 ### 2.2 데이터 정의
 
 | AS-IS | TO-BE | 종류 | 키(컬럼) | 출처 / 용도 |
 |---|---|---|---|---|
 | `dts_Isu` (1행, `bnd_Isu` 로 바인딩) | `dma_detail` | dataMap | 명세 `modify`·`register` REQUEST 정의 원문 28키(아래) | 화면 바인딩 대상 + **저장·수정·삭제 요청**(`ref : "dma_detail"`). 상세 조회는 `dlt_list` 의 해당 행에서 같은 이름 키를 옮겨 담는다(§5.1) |
-| `dts_Eng_Isu` | (없음 — `dma_detail` 로 대체) | — | AS-IS 는 `dts_Isu` 와 **같은 URL** 을 한 번 더 읽어 둔 사본 | 코스닥 안내문의 `param_dts_mst_eng` 로만 쓰임 → `mstEng : [dma_detail 상세]`(§6.5, §8 #4) |
+| `dts_Eng_Isu` | (없음 — `dma_detail` 로 대체) | — | AS-IS 는 `dts_Isu` 와 **같은 URL** 을 한 번 더 읽어 둔 사본 | 코스닥 안내문의 `param_dts_mst_eng` 로만 쓰임 → `mstEng` 은 `mst` 와 같은 값(원본 행 `scwin.detailRow` + 화면 값, §6.5, §8 #4) |
 | (응답 전용) | `dlt_list` | dataList | 명세 `select-list-hist` RESPONSE 원문 34열(아래) | 상세 조회 응답(`target "dlt_list=body"`). 부모 목록과 같은 API — 이 화면은 `bzProcsNo` 행 하나만 쓴다 |
 | `dts_Report` | `dma_print` | dataMap | 명세 `print` RESPONSE 원문 24키(아래) | 인쇄 자료(§5.8) |
 | (응답 전용) | `dma_result` | dataMap | 명세 `modify`·`register`·`remove` RESPONSE 원문 — `bzProcsNo`·`completeYn` | 저장·수정·삭제 결과 판정(§5.5~5.7) |
@@ -490,12 +494,12 @@ stateDiagram-v2
 2. **승인일 기본값** — `edt_APPROV_DD` = 서버 현재일 `$c.date.getServerDateTime().substring(0, 8)` (AS-IS 클라이언트 `cGetToday("yyyymmdd")`).
 3. `PanelToGroupBox(panel_Item)` — 삭제(퍼블리싱 마크업).
 4. **버튼 매핑** — AS-IS `buttonSet.setSaveInfo(btn_Save, fn_save)`·`setUpdateInfo(btn_Update, fn_update)`·`setDeleteInfo(btn_Delete, fn_delete)`·`setDsclInfo(btn_Dscl, fn_dscl)`(기안 `setDrftInfo` 는 주석). TO-BE 는 `ev:onclick` 바인딩(§4) + 역할 매핑 `scwin.BTN_MAP = { save : "btn_Save", modify : "btn_Update", "delete" : "btn_Delete", guide : "btn_Dscl" }`. 로딩 시작에 `$c.util.setButtonState("grpBtnBox", "disabled", scwin.BTN_MAP)` 와 `btn_RecvIsuDel.setDisabled(true)` 로 잠가 둔다(조회 예외 때 XML 기본값이 남지 않게).
-5. **모드 분기**
+5. **모드 분기** — TO-BE 는 6(인쇄 표시)·7(달력 바인딩)을 이 분기보다 **앞**에 둔다(아래 코드 순서 참고). `R`·`N` 만 신규 준비(`else if (R || N)`), 그 밖의 값은 아무것도 하지 않는다.
    - `R` 접수: §6.4 `scwin.initNewForm()` (AS-IS `fn_SetHeader`) → §6.3 `scwin.applyRecv(scwin.recv)` (AS-IS `fn_recv_read_sync(dts_Recv.RowPosition)`) → 버튼 `insert` → §6.12 `scwin.setBtnRecvIsuDel()`.
    - `H` 이력: `await scwin.selectDetail()` (§5.1, AS-IS `fn_read_sync`) — 후처리에서 §6.11 버튼 상태·신청종목삭제 잠금.
    - `N` 신규: `scwin.initNewForm()` (AS-IS `fn_SetHeader` + `fn_initItem`) → 버튼 `insert` → `scwin.setBtnRecvIsuDel()`.
    - AS-IS 의 R/N 버튼 상태는 `fn_SetHeader` 의 `dts_Isu.reset()` 이 일으킨 `OnLoadCompleted` 에서 한 번, onload 끝에서 `setInsertStatus()` 로 또 한 번 정해진다(결과는 같음 — §8 #11). TO-BE 는 한 번만 건다.
-6. **인쇄 표시** — §6.10 `scwin.setPrintVisible()` (AS-IS onload 끝의 `showObj(btn_Print·label_26·edt_APPROV_DD·img_APPROV_DD, …)`).
+6. **인쇄 표시** — §6.10 `scwin.setPrintVisible()` (AS-IS onload 끝의 `showObj(btn_Print·label_26·edt_APPROV_DD·img_APPROV_DD, …)`). TO-BE 는 파라미터만 보므로 **모드 분기 앞**에서 부른다 — 상세 조회(H)가 예외로 끝나도 유가에서 [인쇄]·승인일이 보이지 않게(※TO-BE). 저장 성공 뒤에도 다시 부른다(§5.5).
 7. **달력 검사 바인딩** (TO-BE 신설, 전환 규칙 37 — `scwin.init` 에서 1회)
 
    | 대상 | 적용 |
@@ -519,21 +523,25 @@ scwin.init = async function () {
     // 1) 로딩 동안 버튼 잠금
     $c.util.setButtonState("grpBtnBox", "disabled", scwin.BTN_MAP);
     btn_RecvIsuDel.setDisabled(true);
-    // 2) 파라미터 수신 — $c.data.getParameter() (§1.2) · 승인일 = 서버 현재일
+    // 2) 파라미터 수신 — $c.data.getParameter() (§1.2)
+    //    승인일(인쇄용) 기본값 — 바인딩 없음
+    edt_APPROV_DD.setValue($c.date.getServerDateTime().substring(0, 8));
     // 3) 달력 검사 바인딩(규칙 37)
-    // 4) 모드 분기
+    // 4) 인쇄 표시 — 파라미터만 보므로 모드 분기 앞
+    scwin.setPrintVisible();
+    // 5) 모드 분기 — R/H/N 외에는 아무것도 하지 않음(버튼은 잠긴 채)
     if (scwin.openTyp === "H") {
         await scwin.selectDetail();
-    } else {
+    } else if (scwin.openTyp === "R" || scwin.openTyp === "N") {
         scwin.initNewForm();
         if (scwin.openTyp === "R") scwin.applyRecv(scwin.recv);
         $c.util.setButtonState("grpBtnBox", "insert", scwin.BTN_MAP);
         scwin.setBtnRecvIsuDel();
     }
-    // 5) 인쇄 표시
-    scwin.setPrintVisible();
 };
 ```
+
+실제 순서: 버튼 잠금 → 파라미터 수신 → 승인일 `edt_APPROV_DD.setValue(서버 현재일)` → 달력 바인딩 → `scwin.setPrintVisible()` → 모드 분기.
 
 `onpageload` 는 `scwin.init()` 만 호출하고 로딩 로직은 `scwin.init` 하나에 둔다(`init_*` 분리 없음, 2026-10-26). 다시 부르는 로직(빈 상세 준비·접수 반영·버튼 상태)은 5구역 함수다. AS-IS `openTyp` 가 R/H/N 이 아니면 아무 분기도 타지 않는다 — TO-BE 도 같다(버튼은 잠긴 채).
 
@@ -543,7 +551,7 @@ scwin.init = async function () {
 
 | TO-BE 컴포넌트 | 이벤트 | TO-BE 핸들러 | 동작 (호출 함수) | AS-IS |
 |---|---|---|---|---|
-| `img_ISU_CD` (종목 찾기) | `onclick` | `scwin.img_ISU_CD_onclick` | 회사 확인 → `scwin.openIsuPopup()` — §6.2 | `img_ISU_CD onclick` (`fn_GetPar = fn_GetParIsuCd`, `fn_SetPar = fn_SetParIsuCd`, `fn_PopFindNewIsuOfIsur()`) |
+| `img_ISU_CD` (종목 찾기) | `onclick` | `scwin.img_ISU_CD_onclick` | `scwin.openIsuPopup()` (회사 확인 "[회사]를 선택하세요." 는 이 함수 안) — §6.2 | `img_ISU_CD onclick` (`fn_GetPar = fn_GetParIsuCd`, `fn_SetPar = fn_SetParIsuCd`, `fn_PopFindNewIsuOfIsur()`) |
 | `btn_Save` (저장) | `onclick` | `scwin.btn_Save_onclick` | `scwin.save()` — §6.7 | `buttonSet.setSaveInfo(btn_Save, fn_save)` |
 | `btn_Update` (수정) | `onclick` | `scwin.btn_Update_onclick` | `scwin.update()` — §6.8 | `fn_update` |
 | `btn_Delete` (삭제) | `onclick` | `scwin.btn_Delete_onclick` | `scwin.remove()` — §6.9 | `fn_delete` |
@@ -628,13 +636,21 @@ scwin.init = async function () {
 | `ref` / `requestData` | `ref : ""` / `{ isurCd : scwin.isurCd, secugrpId : scwin.secugrpId }` (명세 그대로 — `bzProcsNo` 조건 없음, §10 #5) |
 | `target` | `dlt_list=body` |
 | 선행 / 순서 | 로딩(H)·저장/수정 성공 뒤. AS-IS 는 동기 — 뒤의 버튼 상태·체크박스가 결과에 의존하므로 `await` |
-| 후처리 | ① `dlt_list` 에서 `bzProcsNo === scwin.bzProcsNo` 행을 찾아 `dma_detail` 28키 중 같은 이름 키를 옮기고(`isuRnd` 는 `String()`), `dma_view.tarstkIsuNm`·`disclsYn` 을 채운다(`scwin.setDetailFromList`) ② 버튼 상태 §6.11 ③ 신청종목삭제 §6.12. 체크박스는 바인딩이라 따로 맞추지 않는다(AS-IS 는 `'Y'` 일 때만 `checked=true`) |
-| 실패 처리 | `success:false` 이거나 해당 행이 없으면 "상세 내역을 찾을 수 없습니다."(가정 문구) 안내 후 버튼을 모두 잠근다(※TO-BE — 저장 뒤 재조회 실패에서 `insert` 가 남아 같은 건을 다시 저장하지 않게) |
+| 후처리 | ① `dlt_list` 에서 `bzProcsNo === scwin.bzProcsNo` 행을 찾아 행 전체를 `scwin.detailRow` 에 두고(공시안내문 `mst` 용, §6.5), `dma_detail` 28키 중 같은 이름 키를 옮기고(`isuRnd` 는 `String()`), `dma_view.tarstkIsuNm`·`disclsYn` 을 채운다(`scwin.setDetailFromList`) ② 버튼 상태 §6.11 ③ 신청종목삭제 §6.12 ④ `true` 반환. 체크박스는 바인딩이라 따로 맞추지 않는다(AS-IS 는 `'Y'` 일 때만 `checked=true`) |
+| 반환 | `Promise<Boolean>` — 상세를 채웠으면 `true`, `skipped`·실패·행 없음이면 `false`. `scwin.saveTrs` 는 `false` 면 뒤의 `update` 버튼·인쇄 표시를 건너뛴다 |
+| 실패 처리 | `success:false` 이거나 해당 행이 없으면 버튼을 모두 잠그고(`setButtonState(…, "disabled", …)` + **[신청종목삭제]도** `setDisabled(true)`) "상세 내역을 찾을 수 없습니다."(가정 문구) 안내 후 `false`(※TO-BE — 저장 뒤 재조회 실패에서 `insert` 가 남아 같은 건을 다시 저장하지 않게). 행이 없으면 `scwin.detailRow = {}` |
 | 중복 실행 | 기본(건너뜀) |
 
 ### 5.2 업무처리번호 채번
 
-- `const res = await $c.stf.getNewBzProcNo();` — pcc 함수는 응답 봉투(`responseJSON`)를 그대로 돌려준다. 화면에서 `String(res?.body ?? "")` 로 꺼내(`scwin.getNewBzProcsNo`) 14자리인지 본다. 아니면 `MSG-0010` "업무처리번호생성실패" 안내 후 중단.
+- `const res = await $c.stf.getNewBzProcNo();` — pcc 함수는 응답 봉투(`responseJSON`)를 그대로 돌려줄 수 있다. 응답 모양이 확정되지 않아(§10 #3) `scwin.getNewBzProcsNo` 는 둘 다 받는다:
+
+  ```javascript
+  const body = res?.body ?? res;
+  const no = String((typeof body === "object" && body !== null) ? (body.bzProcsNo ?? "") : (body ?? ""));
+  ```
+
+  body 가 문자열이면 그대로, `{ bzProcsNo }` 객체면 그 값. 호출부 `scwin.save` 가 14자리인지 보고, 아니면 `MSG-0010` "업무처리번호생성실패" 안내 후 중단.
 - **접수번호가 있으면(접수 건) 채번하지 않는다** — 받은 업무처리번호(`scwin.bzProcsNo`)를 그대로 14자리 검사한다(원본 `if (vAcptNo == "")`).
 - 채번 API 는 주식 변경상장 경로(`stock/chglisting/new-bzprocsno`)다. 명세 `register` 응답에 `bzProcsNo` 가 있어 서버 채번일 수도 있다 → §10 #3.
 
@@ -646,7 +662,8 @@ scwin.init = async function () {
 ### 5.4 업무 중복 입력 확인 (저장·수정 검증 끝)
 
 - AS-IS `fn_check_bz_doubleinput(dts_BZ_CHECK, 종목코드, 상장일, 업무처리번호, LIST_BZ_TP_CD_121)` — 응답 `DISCLS_PROCS_DDTM` 이 비면 통과, 있으면 "[`DISCLS_PROCS_STAT_CD`]건으로 `DISCLS_PROCS_DDTM`에  이미 입력되어있습니다." 후 false. 원본 함수의 `CNT` 검사("상장(변경/조치)일자가 동일한 시장안내정보가 이미 입력되었습니다")는 `return` 뒤라 **도달하지 않는다**.
-- TO-BE: `if (!(await $c.lc.checkBzDoubleInput(isuCd, listDd, scwin.bzProcsNo, $c.lc.glb.LIST_BZ_TP_CD_121))) return false;` — pcc 는 `{ isuCd, mktactEnforceDd, bzProcsNo, listBzTpCd }` 로 `stock/chglisting/check-double-input` 을 부른다(명세 외, §10 #4).
+- TO-BE: `return await $c.lc.checkBzDoubleInput(isuCd, listDd, scwin.bzProcsNo, $c.lc.glb.LIST_BZ_TP_CD_121);` (검증 마지막) — pcc 는 `{ isuCd, mktactEnforceDd, bzProcsNo, listBzTpCd }` 로 `stock/chglisting/check-double-input` 을 부른다(명세 외, §10 #4).
+- **pcc 결함(§10 #4, 코드에 `// TODO:`)** — pcc 는 `disclsProcsDdtm === null || === ""` 일 때만 통과라 응답에 이 키가 **없으면(undefined) 중복으로 보고 `false`** → 저장·수정이 늘 막힌다. `checkDoubleInput` 은 `dbinputYn` 이 `Y`/`N` 밖이면 `undefined` 를 돌려줘 통과한다. 둘 다 `skipped` 가드가 없다. 화면은 pcc 를 고치지 않고 수정 요청한다.
 
 ### 5.5 / 5.6 신규 저장·수정 (`scwin.saveTrs(trJob)`)
 
@@ -708,7 +725,13 @@ scwin.init = async function () {
   11. **무액면이 아니고**(`nparvalstkYn !== "Y"`) 행사가격이 비면 "[행사가격]을 입력하세요." — TO-BE 는 체크박스 바인딩 값으로 판정(§8 #5).
   12. 발행가액총액 "[발행가액총액]을 입력하세요.", 발행사유 "[발행사유]를 입력하세요.", 신주인수권의 내용 "[신주인수권의 내용]를 입력하세요.", 신주의 납입방법 "[신주의 납입방법]를 입력하세요."
   13. 업무 중복 입력 확인(§5.4) — 중복이면 false.
-- **공통 검증으로 옮길 항목** (`$c.validate.validateDataCollect`, 규칙 24 — 이름은 화면 라벨): 한글종목명·한글종목약명·영문종목명·영문종목약명(필수), 발행일·상장일·행사종료일(필수·날짜), 상장방식(필수), 상장증권수량·발행주식수·발행가액총액(필수), 발행사유·신주인수권의 내용·신주의 납입방법(필수). 공통 검증은 한 번에 앞에서 돌므로 **안내 순서와 문구가 원본과 달라진다**(원본은 날짜 업무 검사가 필수 검사 사이에 끼어 있음) — 순서를 원본과 똑같이 지켜야 하면 화면 검증으로 남긴다(§10 #13).
+- **공통 검증** (`$c.validate.validateDataCollect(panel_Item, …)`, 규칙 24 — 이름은 화면 라벨, `validateType "alert"`·`checkType "single"`): 공통 검증은 `fields` 순서가 아니라 **컨테이너의 DOM 순서**로 검사하므로, 원본 순서를 지키려고 **5번 나눠** 부르고 그 사이에 업무 검사를 둔다.
+  1. 4) 한글종목명·한글종목약명·영문종목명·영문종목약명·발행일·상장일(필수, 날짜 2종 `format "date"`) → 이어서 업무 검사 상장일 > 오늘
+  2. 6) 행사종료일(필수·날짜) → 업무 검사 행사종료일 > 오늘, 행사시작일 < 행사종료일
+  3. 8) 상장방식·상장증권수량·발행주식수(필수) → 업무 검사 무액면이 아니면 행사가격 필수
+  4. 10) **발행가액총액만**(필수) — 화면에서 발행사유(7행)가 발행가액총액(11행)보다 위라 한 번에 부르면 사유가 먼저 검사된다. 원본 순서(총액 → 사유)를 지키려고 따로 부른다
+  5. 11) 발행사유·신주인수권의 내용·신주의 납입방법(필수)
+  - 원본과 남은 차이는 **안내 문구**뿐이다(공통 검증의 공통 문구 — §7.2). 종목명 `maxlength`(글자 수)와 안내 라벨(byte 의미) 불일치는 코드에 `// TODO:` (§10 #10).
 - **업무 검증으로 남길 항목**: 1(종목 — 버튼 포커스), 2·13(서버 중복 확인), 3(경고만), 5·7(서버 현재일 비교 — `$c.date.getServerDateTime().substring(0, 8)`, AS-IS 클라이언트 `cGetToday`), 8(선후, 같으면 실패), 11(조건부 필수).
 - 숫자 하한 검사 `fn_checkNumber`(100 이하 경고)는 원본에서 호출이 모두 주석 → **(옮기지 않음)**(§8 #10).
 
@@ -720,6 +743,10 @@ scwin.init = async function () {
 
   ```javascript
   scwin.openIsuPopup = async function () {
+      if ($c.util.isEmpty(scwin.isurCd)) {                                             // 회사 확인 — 이 함수 안
+          await $c.win.alert("[회사]를 선택하세요.");
+          return;
+      }
       const result = await $c.lc.popFindNewIsuOfIsur(scwin.secugrpId, scwin.isurCd);   // AS-IS arr[0]·arr[1]
       if (result?.isCloseButtonClick === true || $c.util.isEmpty(result?.isuCd)) return; // 취소·닫기
       scwin.setIsu(result);
@@ -735,11 +762,13 @@ scwin.init = async function () {
 
 - **파라미터:** `recv` — 부모가 넘긴 접수 목록 선택 행(§1.2). 없으면 아무것도 하지 않는다.
 - 원본: `dts_Recv` 의 `row` 에서 `BZ_PROCS_NO`·`ACPT_NO`·`ISU_DD`·`LIST_SHRS`·`NPARVALSTK_YN`·`EXER_PRC`·`ISU_SHRS`·`TOT_ISU_PRC`·`EXER_STRT_DD`·`EXER_END_DD`·`REMK` 를 `dts_Isu` 1행에 복사, **코스닥(`vSPOT_ISU_TRD_MKT_TP_CD == "2"`)이면 `LIST_DD` 도** 복사, 무액면이 `Y` 면 체크, 끝에 `fn_initItem()`(상장방식 1). 상장방식 복사는 주석.
-- TO-BE: 같은 키를 camelCase 로 `dma_detail.set(…)` (체크박스는 `nparvalstkYn` 바인딩으로 자동), `listMethdTpCd = $c.lc.glb.LIST_METHD_TP_CD_1`. `recv` 의 키 이름은 부모 접수 목록 API 정의(이 명세 밖)에 달렸다 → §10 #6.
+- TO-BE: 같은 키를 camelCase 로 `dma_detail.set(…)`, `listMethdTpCd = $c.lc.glb.LIST_METHD_TP_CD_1`. `recv` 의 키 이름은 부모 접수 목록 API 정의(이 명세 밖)에 달렸다 → §10 #6.
+  - **`bzProcsNo`·`acptNo` 는 파라미터 하나를 기준으로** — `recv` 키를 복사한 뒤 `dma_detail.set("bzProcsNo", scwin.bzProcsNo)`·`set("acptNo", scwin.acptNo)` 로 덮는다. `recv` 키 이름이 달라도 삭제·인쇄·등록에 빈 `bzProcsNo` 가 가지 않게(§10 #6).
+  - `nparvalstkYn` 은 `"Y"`/`""` 로 맞춘다 — `recv.nparvalstkYn === "Y"` 면 `"Y"`, 그 밖(`"N"` 포함)은 `""`(원본 저장 값과 같음, 체크박스는 바인딩으로 자동).
 
 ### 6.4 빈 상세 준비 (`scwin.initNewForm`) — 원본 `fn_SetHeader` + `fn_initItem`
 
-- `dma_detail.setEmptyValue()`, `dma_view.setEmptyValue()`, `dma_detail.set("listMethdTpCd", $c.lc.glb.LIST_METHD_TP_CD_1)`("1" 신주상장 — 원본 `setObjectValue(cmb_LIST_METHD_TP_CD, LIST_METHD_TP_CD_1)`), `dma_detail.set("isurCd", scwin.isurCd)`, `dma_detail.set("secugrpId", scwin.secugrpId)`.
+- `dma_detail.setEmptyValue()`, `dma_view.setEmptyValue()`, `scwin.detailRow = {}`, `dma_detail.set("listMethdTpCd", $c.lc.glb.LIST_METHD_TP_CD_1)`("1" 신주상장 — 원본 `setObjectValue(cmb_LIST_METHD_TP_CD, LIST_METHD_TP_CD_1)`), `dma_detail.set("isurCd", scwin.isurCd)`, `dma_detail.set("secugrpId", scwin.secugrpId)`.
 - 신규(N)·접수(R) 공통. 통신 없음(§5.9).
 
 ### 6.5 공시안내문작성 (`scwin.writeDscl`) — getPar → `openPopup` data + `await`
@@ -752,16 +781,24 @@ scwin.init = async function () {
 - **TO-BE** ([가이드 §6.5](../../../md/websquare_gfm_conversion.md)):
 
   ```javascript
+  // 넘길 값 — 보조 함수 (시장구분이 1·2 가 아니면 null)
+  scwin.getDsclData = function () {
+      // AS-IS CopyDataSet(dts_Isu, param_dts_mst) — 조회 원본 행 전체 위에 화면 입력값을 덮는다
+      const mst = [{ ...scwin.detailRow, ...dma_detail.getJSON(), ...dma_view.getJSON() }];
+      if (scwin.mktTpCd === "1") {                                                  // 유가
+          return { formCd : scwin.DSCL_FORM_CD_KSE, bzProcsNo : scwin.bzProcsNo, isurCd : scwin.isurCd, mst : mst };
+      }
+      if (scwin.mktTpCd === "2") {                                                  // 코스닥
+          return { formCd : scwin.DSCL_FORM_CD_KOSDAQ, bzProcsNo : scwin.bzProcsNo, isurCd : scwin.isurCd,
+                   mktId : scwin.mktTpCd, mst : mst, mstEng : mst };              // AS-IS dts_Eng_Isu = 같은 조회 결과
+      }
+      return null;
+  };
+
   scwin.writeDscl = async function () {
       if ($c.util.isEmpty(dma_detail.get("isuCd"))) { await $c.win.alert("[종목]을 선택하세요."); img_ISU_CD.focus(); return; }
-      const mst = [{ ...dma_detail.getJSON(), ...dma_view.getJSON() }];          // AS-IS CopyDataSet(dts_Isu, param_dts_mst)
-      let data;
-      if (scwin.mktTpCd === "1") {                                                  // 유가
-          data = { formCd : "68912", bzProcsNo : scwin.bzProcsNo, isurCd : scwin.isurCd, mst };
-      } else if (scwin.mktTpCd === "2") {                                           // 코스닥
-          data = { formCd : "70920", bzProcsNo : scwin.bzProcsNo, isurCd : scwin.isurCd, mktId : scwin.mktTpCd,
-                   mst, mstEng : mst };                                             // AS-IS dts_Eng_Isu = 같은 조회 결과
-      } else {
+      const data = scwin.getDsclData();
+      if (!data) {
           await $c.win.alert("안내문을 작성할 수 없는 시장구분입니다.");             // 가정 문구 — §8 #13, §10 #8
           return;
       }
@@ -771,7 +808,8 @@ scwin.init = async function () {
   };
   ```
 
-- **92024 쪽 변경 필요** — 현재 전환본(`sample-front/ui/ULDSTF92024.xml`)은 `$c.win.getParent()?.scwin.getPar(arr, dlt_Isu, dlt_Mst, …, dlt_MstEng, …)` 로 부모 함수를 이름으로 부른다. 위 `data` 를 받으려면 92024 수신부를 `$c.data.getParameter()` 로 바꿔야 한다(`formCd`→`keyFrm`, `bzProcsNo`→`keyBiz`, `isurCd`→`keyIsurCd`, `mktId`→`keyMktId`, `mst`→`dlt_Mst`, `mstEng`→`dlt_MstEng`). 92024 는 공통 팝업이라 **이 화면 전환 범위 밖** → §10 #8. 그 전에 이 화면을 먼저 전환하면 가이드 §6.5 예외대로 **호환용 `scwin.getPar(arr, dlt_Isu, dlt_Mst, dlt_2, dlt_3, dlt_4, dlt_IsuEng, dlt_MstEng)` 를 임시로 두고** 같은 값을 채운다(§9·§10 #8, 컬럼 정의가 빈 dataList 는 첫 행 키로 `insertColumn` 후 채움 — 05621 선례).
+- **`mst` = 원본 행 + 화면 값** — AS-IS `CopyDataSet(dts_Isu → param_dts_mst)` 는 `searchIsuIssChgList` 조회 행을 통째로 넘겼다. TO-BE 는 상세 조회에서 찾은 `dlt_list` 행 전체(`scwin.detailRow` — `comNm`·`listMethdTpNm`·`bfListShrs`·`fnlEmpNm` 등 `dma_detail` 에 없는 열 포함) 위에 `dma_detail`·`dma_view` 값을 덮어 넘긴다. 신규(N·R)는 `scwin.detailRow = {}` 라 화면 값만 간다. 서식이 읽는 열 이름은 §10 #8.
+- **92024 쪽 변경 필요** — 현재 전환본(`sample-front/ui/ULDSTF92024.xml`)은 `$c.win.getParent()?.scwin.getPar(arr, dlt_Isu, dlt_Mst, …, dlt_MstEng, …)` 로 부모 함수를 이름으로 부른다. 위 `data` 를 받으려면 92024 수신부를 `$c.data.getParameter()` 로 바꿔야 한다(`formCd`→`keyFrm`, `bzProcsNo`→`keyBiz`, `isurCd`→`keyIsurCd`, `mktId`→`keyMktId`, `mst`→`dlt_Mst`, `mstEng`→`dlt_MstEng`). 92024 는 공통 팝업이라 **이 화면 전환 범위 밖** → §10 #8. 그래서 가이드 §6.5 예외대로 **호환용 `scwin.getPar(arr, dltIsu, dltMst, dlt2, dlt3, dlt4, dltIsuEng, dltMstEng)` 를 임시로 두었다** — `scwin.getDsclData()` 값으로 `arr[0]` 서식·`arr[1]` 업무처리번호·`arr[2]` 회사를 채우고, **`arr[3]`(시장구분)과 `dltMstEng` 는 코스닥만** 채운다. `dltMst`·`dltMstEng` 는 `scwin.fillDataList(dataList, rows)` 로 채운다 — 컬럼 정의가 빈 dataList 라 첫 행 키로 `insertColumn` 을 먼저 한 뒤 `setJSON`(05621 선례). 시장구분이 1·2 가 아니면 아무것도 채우지 않고 `arr.length` 를 돌려준다.
 - 서식 `68912`/`70920` 서버 생성이 읽는 dataset 컬럼 이름(AS-IS 대문자 `ISU_CD` 등 vs camelCase)은 92024 서버 계약에 달렸다(§10 #8). 경로 `/ui/listingcommon/ULDSTF92024.xml` 은 가정.
 
 ### 6.6 인쇄 (`scwin.print`) — 원본 `fn_print`
@@ -788,13 +826,13 @@ scwin.init = async function () {
      | `ISU_INFO` | `isuCd + " / " + isuSrtCd` | — |
      | `ISU_KOR_NM`·`ISU_KOR_ABBRV`·`ISU_ENG_NM`·`ISU_ENG_ABBRV` | 같은 이름 키 | — |
      | `ISU_RSN_CONTN`·`TARSTK_ISU_NM`·`SUBSRGHT_EP_CONTN` | `isuRsnContn`·`tarstkIsuNm`·`subsrghtEpContn` | — |
-     | `LIST_SHRS`·`EXER_PRC`·`ISU_SHRS`·`TOT_ISU_PRC` | 같은 이름 키 | 천 단위 콤마 — AS-IS `FormatNumberEx` → `$c.print.dataFormatValue("FormatNumberEx", v)` |
-     | `EXER_STRT_DD`·`EXER_END_DD`·`ISU_DD`·`LIST_DD` | 같은 이름 키 | `YYYY-MM-DD` — AS-IS `FormatDateEx` → `$c.stf.formatDateEx(v)` |
-     | `COMMIT_DD` | **`edt_APPROV_DD.getValue()`**(승인일(인쇄용) 입력값 — 응답 `commitDd` 가 아님, 원본 그대로) | `formatDateEx` |
+     | `LIST_SHRS`·`EXER_PRC`·`ISU_SHRS`·`TOT_ISU_PRC` | 같은 이름 키 | 천 단위 콤마 — AS-IS `FormatNumberEx` → gcc `$c.num.formatNumber(v)` |
+     | `EXER_STRT_DD`·`EXER_END_DD`·`ISU_DD`·`LIST_DD` | 같은 이름 키 | `YYYY-MM-DD` — AS-IS `FormatDateEx` → gcc `$c.date.formatDate(v, "-")` (pcc `formatDateEx` 도 이것에 위임 — 신규 코드는 gcc 직접) |
+     | `COMMIT_DD` | **`edt_APPROV_DD.getValue()`**(승인일(인쇄용) 입력값 — 응답 `commitDd` 가 아님, 원본 그대로) | `$c.date.formatDate(v, "-")` |
      | `ISU_DD_INFO` | `isuDd + " / 제" + isuRnd + "회"` (발행일은 형식 없이 원문) | — |
 
   4. `doLogSave` 는 삭제(2026-10-26 결정, §8 #14).
-  5. `$c.print.openReportPdf("RLDSTF00029", userParam)` — 숨은 form 을 만들어 `/filePdfload.do?method=getPdfInfo` 로 새 창에 POST 한다. `await` 조회 뒤 `window.open` 이라 팝업 차단 여부를 실화면에서 확인(§10 #12).
+  5. `$c.print.openReportPdf(scwin.REPORT_ID, userParam)` (`"RLDSTF00029"`) — 숨은 form 을 만들어 `/filePdfload.do?method=getPdfInfo` 로 새 창에 POST 한다. `await` 조회 뒤 `window.open` 이라 팝업 차단 여부를 실화면에서 확인(§10 #12).
 - 원본 `fn_print_old`(Rexpert, 2018-04-03 백업)는 호출이 없다 → **(옮기지 않음)**.
 
 ### 6.7 저장 (`scwin.save`) — 원본 `fn_save`
@@ -821,7 +859,7 @@ scwin.init = async function () {
 
 - 유가(`"1"`) → `btn_Print`·`label_26`·`edt_APPROV_DD` 숨김(`hide()`).
 - 코스닥 등 그 밖 → 접수(R)이고 업무처리번호가 비면 숨김, 아니면 표시(`show("")`).
-- 원본 저장 성공 처리(`OnSuccess`)는 `btn_Print` 만 토글하고 승인일 라벨·입력은 그대로 둔다 → TO-BE 는 같은 함수로 넷을 함께 맞춘다(§8 #8). 달력 이미지 `img_APPROV_DD` 는 TO-BE 에 없다.
+- 원본 저장 성공 처리(`OnSuccess`)는 `btn_Print` 만 토글하고 승인일 라벨·입력은 그대로 둔다 → TO-BE 는 같은 함수로 셋(btn_Print·label_26·edt_APPROV_DD)을 함께 맞춘다(§8 #8). 달력 이미지 `img_APPROV_DD` 는 TO-BE 에 없다.
 
 ### 6.11 수정 모드 버튼 상태 (`scwin.applyButtonState`) — 원본 `dts_Isu OnLoadCompleted`
 
@@ -863,6 +901,20 @@ scwin.applyButtonState = function () {
 | 화면처리구분 | `01` 조회, `02` 입력, `03` 수정, `04` 삭제, `05` 인쇄 | `SCREN_PROCS_TP_CD_0x` (TO-BE 미전송) |
 | 처리구분 `TRS_IDX` | `TRS_IDX_INSERT`·`TRS_IDX_UPDATE`·`TRS_IDX_DELETE`·`TRS_IDX_NEWSEL` | `$c.lc.glb` (TO-BE 는 API 경로로 대체) |
 | 업무처리번호 | 14자리 | 채번 검사 |
+| 저장·삭제 성공 값 `completeYn` | `"Y"` (가정, §10 #7) | 명세에 값 없음 |
+
+**TO-BE 1구역 상수·상태값** (`scwin.init` 위 — 05621 과 같은 소제목 「부모 화면에서 넘겨받는 값 / 화면 상태값 / 고정값」):
+
+| 구분 | 이름 | 값 · 용도 |
+|---|---|---|
+| 고정값 | `scwin.DSCL_FORM_CD_KSE` | `"68912"` — 공시안내문 서식코드(유가) |
+| 고정값 | `scwin.DSCL_FORM_CD_KOSDAQ` | `"70920"` — 공시안내문 서식코드(코스닥) |
+| 고정값 | `scwin.REPORT_ID` | `"RLDSTF00029"` — 증권발행내역 리포트 |
+| 고정값 | `scwin.COMPLETE_YN_OK` | `"Y"`(가정, §10 #7) — 저장·삭제 응답 `completeYn` 성공 값 |
+| 고정값 | `scwin.BTN_MAP` | `{ save : "btn_Save", modify : "btn_Update", "delete" : "btn_Delete", guide : "btn_Dscl" }` |
+| 화면 상태값 | `scwin.trJob` | 처리구분 `I`/`U`/`D` |
+| 화면 상태값 | `scwin.detailRow` | 상세 조회에서 찾은 원본 행 전체 — 공시안내문 `mst` 용(§6.5). 신규 준비·행 없음이면 `{}` |
+| 부모 값 | `scwin.openTyp`·`bzProcsNo`·`acptNo`·`isurCd`·`secugrpId`·`mktTpCd`·`recv` | §1.2 |
 
 ### 7.2 메시지
 
@@ -899,7 +951,7 @@ scwin.applyButtonState = function () {
 | 5 | 행사가격 조건부 필수 판정이 체크박스가 아니라 `dts_Isu.NPARVALSTK_YN`(조회·접수 값)을 본다 — binder 가 화면에 없는 `edt_NPARVALSTK_YN` 에 묶여 체크 변경이 저장 직전(`fn_trs`)까지 반영되지 않음 | 고침 — 체크박스를 `dma_detail.nparvalstkYn` 에 바인딩해 현재 값으로 판정 |
 | 6 | "[종목단축코드]항목값이  없습니다." 뒤 `return false` 가 주석 — 안내만 하고 저장이 계속된다 | 그대로 유지(경고만) |
 | 7 | 신규 저장이 실패해도 채번한 `vBzProcsNo` 가 남는다 | 고침 — 성공한 뒤에만 `scwin.bzProcsNo` 확정 |
-| 8 | 인쇄 표시: 신규(N) 코스닥은 업무처리번호가 없는데도 [인쇄] 가 보여 빈 리포트가 나간다. 저장 성공 뒤에는 `btn_Print` 만 토글되고 승인일 라벨·입력은 그대로 | 고침 — 업무처리번호가 없으면 안내 후 중단(§6.6), 표시는 네 요소를 함께(§6.10) |
+| 8 | 인쇄 표시: 신규(N) 코스닥은 업무처리번호가 없는데도 [인쇄] 가 보여 빈 리포트가 나간다. 저장 성공 뒤에는 `btn_Print` 만 토글되고 승인일 라벨·입력은 그대로 | 고침 — 업무처리번호가 없으면 안내 후 중단(§6.6), 표시는 세 요소를 함께(§6.10) |
 | 9 | 글자 수 안내 "(한글:30자)"·"(한글:15자)"·"(영문:60자)"·"(영문:30자)" 와 `maxlength` 40·20·80·40 이 맞지 않음(Gauce byte 기준 추정) | 그대로 유지(maxlength 값) + §10 #10 확인 |
 | 10 | 쓰지 않는 것: `dts_Bf_Isu`, `dts_Print`(새 `fn_print`), `fn_checkNumber`(호출 모두 주석), `fn_drft`(기안 버튼·`setDrftInfo` 주석 — 진입점 없음), `fn_print_old`(호출 없음), `vScrenID`·`vScrenTpCD`·`TR_JOB` 전역의 화면 이력 용도 | 옮기지 않음 (`vScrenID` 규칙 1, 주석 코드 규칙 0) |
 | 11 | R/N 로딩에서 버튼 상태가 두 번 정해진다 — `fn_SetHeader` 의 `reset()` 이 `OnLoadCompleted` 를 일으키고, onload 끝에서 `setInsertStatus()` 를 또 부른다 | 고침 — `scwin.init` 에서 한 번 |
@@ -917,7 +969,7 @@ scwin.applyButtonState = function () {
 
 | AS-IS | TO-BE |
 |---|---|
-| `gform onload` | `scwin.onpageload` → `scwin.init`(버튼 잠금 → 파라미터 → 달력 바인딩 → 모드 분기 → 인쇄 표시) |
+| `gform onload` | `scwin.onpageload` → `scwin.init`(버튼 잠금 → 파라미터 → 승인일 기본값 → 달력 바인딩 → 인쇄 표시 → 모드 분기) |
 | `frame.Provider("../")` 의 `dts_Recv`·`clickBzProcsNo`·`vAcptNo`·`txb_ISUR_CD`·`pSecuGrpId`·`vSPOT_ISU_TRD_MKT_TP_CD`·`vOpenTyp` | `$c.data.getParameter()` → `scwin.recv`·`bzProcsNo`·`acptNo`·`isurCd`·`secugrpId`·`mktTpCd`·`openTyp` (§1.2) |
 | 전역 `vBzProcsNo`·`vAcptNo`·`vIsurCd`·`vOpenTyp`·`fr_SecuGrpId`·`vSPOT_ISU_TRD_MKT_TP_CD`·`TR_JOB`·`dts_Recv` | `scwin.bzProcsNo`·`acptNo`·`isurCd`·`openTyp`·`secugrpId`·`mktTpCd`·`trJob`·`recv` |
 | `VListBzTpCd = LIST_BZ_TP_CD_121` | 삭제 — 요청은 `secugrpId`(명세). 업무 중복 확인 인자로만 `$c.lc.glb.LIST_BZ_TP_CD_121` |
@@ -929,7 +981,7 @@ scwin.applyButtonState = function () {
 | `fn_read_sync` (동기 2회 — `dts_Isu`·`dts_Eng_Isu`) | `scwin.selectDetail` (`select-list-hist` 1회 + `scwin.setDetailFromList`) |
 | `dts_Isu OnLoadCompleted` | `scwin.applyButtonState` + `scwin.setBtnRecvIsuDel` (`selectDetail` 후처리) |
 | `dts_Isu`·`dts_BZ_CHECK OnLoadError` (`alert_error`) | 삭제 — 공통 오류 핸들러 |
-| `fn_CheckForm` | `scwin.validate(trJob)` (+ `validateDataCollect`) |
+| `fn_CheckForm` | `scwin.validate(trJob)` (+ `validateDataCollect` 5회 분할 — 원본 순서 유지, §6.1) |
 | `fn_checkDoubleInput(dts_DoubleChk, 종목코드)` | `await $c.lc.checkDoubleInput(isuCd)` + `// TODO:` (§5.3) |
 | `fn_check_bz_doubleinput(dts_BZ_CHECK, …, LIST_BZ_TP_CD_121)` | `await $c.lc.checkBzDoubleInput(isuCd, listDd, bzProcsNo, "121")` (§5.4) |
 | `fn_checkNumber` | 삭제 (호출 모두 주석) |
@@ -937,7 +989,7 @@ scwin.applyButtonState = function () {
 | `fn_RecvtIsuDel` | `scwin.removeRecvIsu` |
 | `fn_trs(trsIdx)` + `trs_Save.Post()` + `OnSuccess`/`OnFail` | `scwin.saveTrs(trJob)` (register·modify) / `scwin.removeTrs` (remove) — `await $c.sbm.executeDynamic` + `ref : "dma_detail"` + await 뒤 후처리 (규칙 16) |
 | `fn_getCheckboxData(chk_NPARVALSTK_YN)` | 삭제 — 체크박스 바인딩 `dma_detail.nparvalstkYn` (`"Y"`/`""`) |
-| `fn_getNewBzProcNo(dts_BzProcsNo)` | `$c.stf.getNewBzProcNo()` + 봉투 `body` 추출 `scwin.getNewBzProcsNo` |
+| `fn_getNewBzProcNo(dts_BzProcsNo)` | `$c.stf.getNewBzProcNo()` + 봉투 `body` 추출 `scwin.getNewBzProcsNo`(문자열 또는 `{ bzProcsNo }`) |
 | `fn_isProcess('I'/'U'/'D')` | `await $c.lc.isProcess(...)` |
 | `fn_alertMsg('S'/'F')` | `await $c.win.alert($c.stf.getMessageParam("MSG-A001"/"MSG-A002", 처리명))` |
 | `fn_dscl` + `fn_GetPar` 바꿔 끼우기 + `CopyDataSet` + `fn_getModalCenterPos` + `CreateDialogFrame` | `scwin.writeDscl` — `await $c.win.openPopup(…ULDSTF92024…, options, { formCd, bzProcsNo, isurCd, mktId, mst, mstEng })` (규칙 17, 가이드 §6.5). 92024 수신부 변경 전까지만 호환용 `scwin.getPar` 임시 허용(§10 #8) |
@@ -945,7 +997,7 @@ scwin.applyButtonState = function () {
 | `fn_parentRefresh` (`frame.Provider("../").fn_all_list_sync`) | 삭제 — 부모가 `await openPopup` 뒤 재조회(§8 #12) |
 | `fn_setBtnRecvIsuDel` | `scwin.setBtnRecvIsuDel` (`setDisabled`) |
 | `fn_report_read_sync` | `scwin.selectPrint` (`GET print`) |
-| `fn_print` (+ `FormatNumberEx`·`FormatDateEx`·`doLogSave`·`fn_open_report_pdf`) | `scwin.print` — `$c.print.dataFormatValue`·`$c.stf.formatDateEx`·`$c.print.openReportPdf` (`doLogSave` 삭제) |
+| `fn_print` (+ `FormatNumberEx`·`FormatDateEx`·`doLogSave`·`fn_open_report_pdf`) | `scwin.print` — `$c.num.formatNumber`·`$c.date.formatDate(v, "-")`·`$c.print.openReportPdf` (`doLogSave` 삭제) |
 | `fn_print_old` (Rexpert) | 삭제 (호출 없음) |
 | `showObj(btn_Print·label_26·edt_APPROV_DD·img_APPROV_DD, …)` | `scwin.setPrintVisible` (`show("")`/`hide()`) |
 | `buttonSet.set*Info` / `setInsertStatus` / `setUpdateStatus` / `setDeleteStatus` | `ev:onclick` + `$c.util.setButtonState("grpBtnBox", "insert"/"update", scwin.BTN_MAP)` (`setDeleteStatus` 삭제) |
@@ -956,8 +1008,8 @@ scwin.applyButtonState = function () {
 | `alert(...)` | `await $c.win.alert(...)` |
 | `dts_Isu.NameString(1, "COL")` / `NameValue` / `setObjectValue` / `getObjectValue` | `dma_detail.get/set("col")` / 컴포넌트 `getValue`·`setValue` (규칙 29) |
 | `#include(...)` 10종, `PanelToGroupBox` | 삭제 (규칙 11) |
-| (없음 — 화면 보조) | `scwin.setDetailFromList`(목록 행 → `dma_detail`·`dma_view`), `scwin.getNewBzProcsNo`(채번 봉투 추출), `scwin.checkResult`(`success` + `completeYn` 판정), `scwin.setIsu`(92016 결과 반영) |
-| W-Craft 1차본(ui-tobe 현재 사본)의 `$c.frame.path`·`buttonSet`·`$c.lc.fn_PopFindNewIsuOfIsur`·`$c.lc.fn_isProcess`·`$c.stf.copyDataSet`·`$c.stf.fn_getModalCenterPos`·`$c.rpt.fn_open_report_pdf`·`$c.libRoundPanel`·`$c.ut.cGetToday`·`scwin.popupCallback` | 모두 쓰지 않음(pcc/gcc 에 없거나 Gauce 잔재) — 위 행들로 대체 |
+| (없음 — 화면 보조) | `scwin.setDetailFromList`(목록 행 → `dma_detail`·`dma_view`·`scwin.detailRow`), `scwin.getNewBzProcsNo`(채번 봉투 추출), `scwin.checkResult`(`success` + `completeYn` 판정), `scwin.setIsu`(92016 결과 반영), `scwin.getDsclData`(안내문 `data` — `mst` = 원본 행 + 화면 값, 1·2 외 시장은 `null`), `scwin.fillDataList`(빈 dataList 에 `insertColumn` 후 `setJSON`), `scwin.getPar`(92024 호환용 임시 — `arr[3]`·`dltMstEng` 는 코스닥만, §6.5), `scwin.applyButtonState`(§6.11), `scwin.setBtnRecvIsuDel`(§6.12), `scwin.setPrintVisible`(§6.10), `scwin.initNewForm`(§6.4), `scwin.applyRecv`(§6.3), `scwin.openIsuPopup`(§6.2), `scwin.validate`(§6.1), `scwin.selectPrint`(§5.8) |
+| W-Craft 1차본(전환 전 ui-tobe 사본)의 `$c.frame.path`·`buttonSet`·`$c.lc.fn_PopFindNewIsuOfIsur`·`$c.lc.fn_isProcess`·`$c.stf.copyDataSet`·`$c.stf.fn_getModalCenterPos`·`$c.rpt.fn_open_report_pdf`·`$c.libRoundPanel`·`$c.ut.cGetToday`·`scwin.popupCallback` | 모두 쓰지 않음(pcc/gcc 에 없거나 Gauce 잔재) — 위 행들로 대체 |
 
 ---
 
@@ -965,17 +1017,17 @@ scwin.applyButtonState = function () {
 
 1. **`ref : "dma_detail"` 사용 확인** — 명세 `modify`·`register`·`remove` 는 `ref : "dma_detail"` 로 보내도록 적었다(종전 gfm-front 화면들은 `requestData` 만 씀). TO-BE 는 명세대로 `ref` 를 쓴다. `register` 블록은 `requestData { isurCd : 조회 영역의 isurCd 값 }` 도 함께 적었는데 `$c.sbm.executeDynamic` 은 requestData 를 주면 ref 를 무시하므로, `isurCd` 를 `dma_detail` 에 넣고 ref 만 보낸다고 가정했다 — 서버가 `isurCd` 를 본문 외(쿼리 등)로 따로 받아야 하는지 확인한다(§5.5). 블록 머리가 결합형(`[ULDSTF05710/ULDSTF05801]`)이라 형제 화면 ULDSTF05801 과 요청 형태를 함께 맞춘다.
 2. **명세 AS-IS 줄 빈칸** — 5개 블록 모두 `* **AS-IS** :` 가 `` 이다. 이 결과서 §5 대응표(AS-IS 함수·URL·파라미터)로 명세를 채워 달라고 회신한다.
-3. **업무처리번호 채번 주체** — 원본은 화면이 채번(`fn_getNewBzProcNo`)해 보낸다. 명세에는 채번 API 가 없고 `register` 요청·응답에 `bzProcsNo` 가 모두 있다. 업무공통 `$c.stf.getNewBzProcNo()` 는 주식 변경상장 경로(`stock/chglisting/new-bzprocsno`)를 부른다. 서버 채번이면 §5.2 를 빼고 응답 `bzProcsNo` 로 재조회한다.
-4. **중복 확인 2종(명세 외)** — ① 종목 중복: AS-IS 는 `P_KEY` 에 **종목코드**를 넣지만 pcc `$c.lc.checkDoubleInput` 은 요청 키 `isurCd` 로 주식 신규상장 경로를 부른다 → 신주인수권증권 종목에 맞는 API·키 확인. ② 업무 중복: pcc `checkBzDoubleInput` 은 `stock/chglisting/check-double-input`(`isuCd`·`mktactEnforceDd`=상장일·`bzProcsNo`·`listBzTpCd`=121) — 121 업무에서도 맞는지 확인. 결정 전까지 코드에 `// TODO:` (§5.3·§5.4).
+3. **업무처리번호 채번 주체** — 원본은 화면이 채번(`fn_getNewBzProcNo`)해 보낸다. 명세에는 채번 API 가 없고 `register` 요청·응답에 `bzProcsNo` 가 모두 있다. 업무공통 `$c.stf.getNewBzProcNo()` 는 주식 변경상장 경로(`stock/chglisting/new-bzprocsno`)를 부른다. 서버 채번이면 §5.2 를 빼고 응답 `bzProcsNo` 로 재조회한다. **채번 응답 모양도 미확정** — `body` 가 문자열인지 `{ bzProcsNo }` 객체인지 확인한다(지금은 `scwin.getNewBzProcsNo` 가 둘 다 받음, 코드 `// TODO:`).
+4. **중복 확인 2종(명세 외)** — ① 종목 중복: AS-IS 는 `P_KEY` 에 **종목코드**를 넣지만 pcc `$c.lc.checkDoubleInput` 은 요청 키 `isurCd` 로 주식 신규상장 경로를 부른다 → 신주인수권증권 종목에 맞는 API·키 확인. ② 업무 중복: pcc `checkBzDoubleInput` 은 `stock/chglisting/check-double-input`(`isuCd`·`mktactEnforceDd`=상장일·`bzProcsNo`·`listBzTpCd`=121) — 121 업무에서도 맞는지 확인. 결정 전까지 코드에 `// TODO:` (§5.3·§5.4). ③ **pcc 결함 — 수정 요청 필요, 배포 전 차단**: `checkBzDoubleInput` 은 응답에 `disclsProcsDdtm` 이 없으면(`undefined`) 중복으로 보고 `false` 를 돌려줘 **저장·수정이 늘 막힌다**(사용할 API 응답에 `disclsProcsDdtm` 이 없으면 배포 전에 반드시 고쳐야 함). `checkDoubleInput` 은 `dbinputYn` 이 `Y`/`N` 밖이면 `undefined` 를 돌려줘 통과한다. 둘 다 `executeDynamic` 의 `skipped` 가드가 없다. 화면은 pcc 를 고치지 않고 호출부에 `// TODO:`(§10 #4)를 남겼다.
 5. **상세 조회·요청 키 구성** — ① 상세 전용 API 가 없어 `select-list-hist`(`isurCd`·`secugrpId`) 결과에서 `bzProcsNo` 행을 고른다 — `bzProcsNo` 조건(또는 상세 API) 추가 여부 확인. ② `dma_detail` 에 목적주권명(`tarstkIsuNm`)·공시여부(`disclsYn`)가 없어 화면 전용 `dma_view` 를 뒀다. ③ `delistDd`·`incdecListShrs` 는 화면 입력이 없다(신규는 빈 값). ④ `isuRnd` dataType(`dlt_list` number ↔ `dma_detail` text) 정리.
 6. **부모(ULDSTF05700) 계약** — 부모 전환 때 전역 직접 참조를 없애고 §1.2 `data` 객체(`openTyp`·`bzProcsNo`·`acptNo`·`isurCd`·`secugrpId`·`spotIsuTrdMktTpCd`·`recv`)로 넘기며, `await openPopup` 뒤 `fn_all_list_sync` 대응 재조회를 둔다. 접수 행(`recv`) 키 이름은 부모 접수 목록 API(이 명세 밖, AS-IS `DIV_IDX_NEW_ISS_SW_RECV_S/K`) 정의를 따른다. 접수 행에 업무처리번호가 비는 경우가 있는지(§8 #3)도 확인.
 7. **저장·삭제 성공 판정** — 응답 `dma_result.completeYn` 의 값(성공 `"Y"` 가정)과 실패 시 안내 문구 출처를 확인한다(§5.5~5.7).
-8. **공시안내문(ULDSTF92024) 연동** — ① 92024 전환본의 수신부를 `scwin.getPar` 호출에서 `$c.data.getParameter()`(`formCd`·`bzProcsNo`·`isurCd`·`mktId`·`mst`·`mstEng`)로 바꾼다(공통 팝업 단위로 다른 호출 화면과 함께). 바뀌기 전에 이 화면을 먼저 전환하면 호환용 `scwin.getPar` 를 임시로 두고 92024 변경 때 지운다. ② 서식 `68912`/`70920` 서버 생성이 읽는 컬럼 이름(대문자/camelCase). ③ 유가는 `mktId` 를 넘기지 않음(원본 `arr` 길이 3) — 유지 여부. ④ 시장구분 1·2 외(코넥스 등)의 처리(TO-BE 는 안내 후 중단 가정). ⑤ 경로 `/ui/listingcommon/ULDSTF92024.xml`(가정).
+8. **공시안내문(ULDSTF92024) 연동** — ① 92024 전환본의 수신부를 `scwin.getPar` 호출에서 `$c.data.getParameter()`(`formCd`·`bzProcsNo`·`isurCd`·`mktId`·`mst`·`mstEng`)로 바꾼다(공통 팝업 단위로 다른 호출 화면과 함께). 바뀌기 전에 이 화면을 먼저 전환하면 호환용 `scwin.getPar` 를 임시로 두고 92024 변경 때 지운다. ② 서식 `68912`/`70920` 서버 생성이 읽는 컬럼 이름(대문자/camelCase). `mst` 는 이제 상세 조회 원본 행 전체(`scwin.detailRow`) + 화면 값이라 원본처럼 조회 열이 모두 간다 — 서식이 읽는 열 이름이 `select-list-hist` 응답 열(camelCase)과 맞는지 확인. ③ 유가는 `mktId` 를 넘기지 않음(원본 `arr` 길이 3) — 유지 여부. ④ 시장구분 1·2 외(코넥스 등)의 처리(TO-BE 는 안내 후 중단 가정). ⑤ 경로 `/ui/listingcommon/ULDSTF92024.xml`(가정).
 9. **종목선택(ULDSTF92016) 연동** — pcc `popFindNewIsuOfIsur` 가 여는 경로(`/ui/lst/common/ULDSTF92016.xml`)와 전환본 위치(`sample-front/ui/stf/lst/common/ULDSTF92016.xml`)가 다르다. 반환 키(`isuNm`→한글종목명, `isuSnm`→한글약명, `isuEngSnm`→영문약명 등)와 원본 `arr[2] = "S"` 구분값의 필요 여부 확인(§6.2).
-10. **입력 길이** — 안내 라벨(한글 30자 등)과 `maxlength`(40 등)가 다르다. TO-BE `maxlength` 는 글자 수라 Gauce(byte 추정)와 의미가 다르다 — byte 제한(`maxByteLength`, KOR_BYTE 2)으로 할지 확인(§8 #9).
+10. **입력 길이** — 안내 라벨(한글 30자 등)과 `maxlength`(40 등)가 다르다. TO-BE `maxlength` 는 글자 수라 Gauce(byte 추정)와 의미가 다르다 — byte 제한(`maxByteLength`, KOR_BYTE 2)으로 할지 확인(§8 #9). 종목명 4종 `maxlength` 40/20/80/40 은 글자 수이고 "(한글:30자)" 등은 byte 의미라 어긋난다 — 동작은 바꾸지 않고 검증 4) 그룹 옆에 `// TODO:` 를 남겼다.
 11. **화면 이력·세션·업무유형 파라미터** — AS-IS `SCREN_ID`·`SCREN_PROCES_TP_CD`·`fn_encodeNSession`·`LIST_BZ_TP_CD=121`·`TRS_IDX`·`DIV_IDX[0]`·`COUNT` 를 보내지 않는다. 서버가 `secugrpId` 로 121/122 를 정하고 이력·세션을 처리하는지 확인(§5).
 12. **인쇄 창 팝업 차단** — `GET print` 를 `await` 한 뒤 `openReportPdf` 가 `window.open` 하므로 브라우저 팝업 차단 여부를 실화면에서 확인한다(§6.6). 승인일을 응답 `commitDd` 가 아닌 화면 입력값으로 쓰는 원본 동작 유지 여부도 확인.
-13. **검증 순서·문구** — 필수 검사를 `validateDataCollect` 로 옮기면 안내 순서·문구가 원본과 달라진다(§6.1). 원본 순서를 지킬지 결정.
+13. **검증 문구** — 필수 검사는 `validateDataCollect` 를 4~5번(발행가액총액 분리 포함 5번) 나눠 불러 **원본 순서를 지킨다**(§6.1). 남은 차이는 공통 검증의 안내 문구뿐이다 — 공통 문구로 둘지 확인.
 14. **TO-BE 신설 문구** — "상세 내역을 찾을 수 없습니다."·"안내문을 작성할 수 없는 시장구분입니다."·"저장 후 인쇄하세요." 는 가정 문구다(§7.2) — 업무 확정.
 15. **TO-BE 배포 경로·창 크기·프레임 id** — `/ui/lst/lstproc/ULDSTF05710.xml`(가정), 부모가 여는 크기 860×490, 원본 프레임 id `ULDSTF05711.gfm` 은 TO-BE 에서 `ULDSTF05710` 으로(§1.1).
-16. **TO-BE 1단계(퍼블리싱) 재작성** — 현재 ui-tobe 는 publish-tobe 파이프라인 사본(W-Craft 1차)이다. 캡처 기준으로 마크업을 다시 만들고(팝업 contentHeader 필수, 하단 [닫기] 제외, 인라인 배경색 제거 — 규칙 40) `publish_gate.py --pcc stf` 통과 후 2단계 스크립트 전환(§13.2·§13.3, `api_spec_check.py` 로 명세 5종 대조).
+16. ~~**TO-BE 1단계(퍼블리싱) 재작성**~~ — **완료(2026-10-27)**. 캡처 기준으로 마크업을 다시 만들고(contentHeader, 14행 입력 표, 하단 [닫기] 제외, 인라인 배경색 없음 — 규칙 40) 2단계 스크립트까지 전환했다. 게이트: `gate_screen --pcc stf`, `publish_gate --pcc stf`(1단계본 대비 `--allow P20`; 1단계는 `--allow P11,P12`), `api_spec_check`(5종 모두 사용), `init_binding_check`, lint 0/0, `convert.py` 고정점.
