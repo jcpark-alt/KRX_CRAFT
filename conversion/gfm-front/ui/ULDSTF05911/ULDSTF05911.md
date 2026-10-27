@@ -264,7 +264,7 @@ stateDiagram-v2
 | 엑셀업로드 | `btn_exelUpload` | `btn_exelUpload` (`xf:trigger`) | §6.5 |
 | 엑셀저장 | `img_Excel` | `img_Excel` (`xf:trigger`) | §6.6. 퍼블리싱본 핸들러명 `btn_toexcel_onclick` 은 규칙 3 에 맞춰 `img_Excel_onclick` 으로 |
 | 안내 문구 | `label_1` "엑셀업로드 에러시 체크사항 : 확장자 xls(Excel 97/2003) 확인, 암호화 해제 확인, 쉬트명 "Sheet1" 확인" | 유지 | `uploadGridViewExcel` 은 xlsx 도 받으므로 문구 조정 여부는 §10 #7 |
-| 버튼 | `btn_Save`·`btn_Update`·`btn_Delete`·`btn_Close` (이미지) | `btn_Update`·`btn_Delete`·`btn_Save`(pt) `xf:trigger` (`btnbox#grpBtnBox`). `btn_Close` 는 **옮기지 않음** — 팝업 하단 닫기 금지(팝업 창의 닫기 사용) | 활성 상태는 `buttonSet` → `$c.util.setButtonState` — §4 |
+| 버튼 | `btn_Save`·`btn_Update`·`btn_Delete`·`btn_Close` (이미지) | `btn_Delete`(삭제, pt)·`btn_Update`(수정, pt)·`btn_Save`(저장, pt) `xf:trigger` (`btnbox#grpBtnBox` 의 `rt` — 규칙 41: 일반 버튼 → 주요 버튼 5종(취소·삭제·수정·저장·신규, `pt`) 순, 2026-10-27. `lt` 의 엑셀업로드 안내문은 그대로). `btn_Close` 는 **옮기지 않음** — 팝업 하단 닫기 금지(팝업 창의 닫기 사용) | 활성 상태는 `buttonSet` → `$c.util.setButtonState` — §4 |
 | (장식) | `panel_3` + `PanelToGroupBox` | **(옮기지 않음)** | 퍼블리싱 마크업이 대신함 |
 
 ### 2.2 데이터 정의

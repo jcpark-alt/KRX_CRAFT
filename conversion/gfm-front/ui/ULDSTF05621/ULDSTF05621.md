@@ -240,7 +240,7 @@ stateDiagram-v2
 | 5. 변경 후 최초 사업연도 (*) | `edt_ChgStatDd`·`edt_ChgEndDd` + `img_ChgStatDd`·`img_ChgEndDd` | `edt_ChgStatDd` (`dma_resultDetail.fiscyyChgStrtDd`) · `edt_ChgEndDd` (`dma_resultDetail.fiscyyChgEndDd`) | 필수 표시가 있으나 원본은 검증하지 않음 — §8 #9 |
 | 6. 변경사유 (*) | `cmb_FISCYY_CHG_RSN_CD` (고정 목록) | `cmb_FISCYY_CHG_RSN_CD` (`xf:select1`, `dma_resultDetail.fiscyyChgRsnCd`) | 1 임시주주총회에서 결의 / 2 정기주주총회에서 결의 / 9 기타 — §7 |
 | 7. 기타 | `txa_REMK` | `txa_REMK` (`dma_resultDetail.remk`) | 2000 byte 제한 |
-| 버튼 | `btn_Save`·`btn_Update`·`btn_Delete`·`btn_Drft`·`btn_Dscl`·`btn_Close` (이미지) | `btn_Update`·`btn_Delete`·`btn_Drft`·`btn_Dscl`·`btn_Save`(pt, 맨 오른쪽) `xf:trigger` (`btnbox#grpBtnBox`). `btn_Close` 는 **옮기지 않음** — 팝업 하단 닫기 금지(퍼블리싱 규칙, 팝업 창의 닫기 사용) | 활성 상태는 `buttonSet` → `$c.util.setButtonState` — §4 |
+| 버튼 | `btn_Save`·`btn_Update`·`btn_Delete`·`btn_Drft`·`btn_Dscl`·`btn_Close` (이미지) | `btn_Drft`(기안)·`btn_Dscl`(안내문작성) · `btn_Delete`(삭제, pt)·`btn_Update`(수정, pt)·`btn_Save`(저장, pt) `xf:trigger` (`btnbox#grpBtnBox` 의 `rt` — 규칙 41: 일반 버튼 → 주요 버튼 5종(취소·삭제·수정·저장·신규, `pt`) 순, 2026-10-27). `btn_Close` 는 **옮기지 않음** — 팝업 하단 닫기 금지(퍼블리싱 규칙, 팝업 창의 닫기 사용) | 활성 상태는 `buttonSet` → `$c.util.setButtonState` — §4 |
 | (장식) | `panel_3` + `PanelToGroupBox` | **(옮기지 않음)** | 퍼블리싱 마크업이 대신함 |
 
 ### 2.2 데이터 정의
