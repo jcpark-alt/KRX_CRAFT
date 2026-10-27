@@ -3,7 +3,7 @@
 | 항목 | 내용 |
 |---|---|
 | AS-IS | `ULDBNF45000.jsp` (JSP/jQuery, 대외 메인 화면 — 계정관리 > 담당자정보 변경, `dmenus` bmenu 7) — 반입 `conversion/gfm-front/ui/ULDBNF45000/ULDBNF45000.jsp` |
-| 신규 API 명세 | `conversion/gfm-front/ui/ULDBNF45000/ULDBNF45000_API.txt` — 블록 4종(이 화면 4종, 다른 화면 0종). §2.2·§5 는 명세 기준(가이드 §0.3·§5) |
+| 신규 API 명세 | `conversion/gfm-front/ui/ULDBNF45000/ULDBNF45000_API.md` — 블록 4종(이 화면 4종, 다른 화면 0종). §2.2·§5 는 명세 기준(가이드 §0.3·§5) |
 | TO-BE | `conversion/gfm-front/ui-tobe/ULDBNF45000.xml` — 전환 완료(2026-10-26). 1단계 퍼블리싱(캡처 기준 마크업 + §2.1 id) → 2단계 스크립트(이 문서 + API 명세). 게이트: gate_screen(`--pcc fil`)·publish_gate(1단계 대비 `--allow P20`)·api_spec_check·convert 고정점·lint 0/0 통과. 남은 확인은 §10 의 `TODO` |
 | 퍼블리셔 XML | `conversion/publish/채권/채권상장신청(대외)/ULDBNF45000.xml` (첨부 영역은 커밋 f21f61af 로 보강) |
 | 화면 캡처 | `ULDBNF45000.png` (신고담당자(부) 선택 · 첨부 영역 표시 상태) — TO-BE 퍼블리싱 기준(가이드 §13.2) |
@@ -287,7 +287,7 @@ scwin.init = async function () {
 
 (`…` = `/api/bonds/accountMgt/bndClaimMgrUpdate`)
 
-#### API 명세 대응 (`ULDBNF45000_API.txt`)
+#### API 명세 대응 (`ULDBNF45000_API.md`)
 
 | # | 명세 블록 | method · 경로 | 요청 (명세 정의) | 응답 (명세 정의) | AS-IS 대응 | TO-BE 함수 |
 |---|---|---|---|---|---|---|
@@ -347,8 +347,8 @@ scwin.init = async function () {
 
 | 항목 | 내용 |
 |---|---|
-| 방식 | UDC `udcSaver.save({ dataMap : dma_mgrInfoUpdate, dataMapId : "dto", dataList : dlt_files, dataListId : "fileList", saveUrl : $c.sbm.getContextPath() + "/api/bonds/accountMgt/bndClaimMgrUpdate/mgrUpdate-proc", onAfterSave, onError })` — 전문과 첨부 3종을 한 번에(선례 ULDINF05000). `dataMapId`·`dataListId`(서버가 받는 파트 이름)는 명세에 없어 가정값 → §10 #4 |
-| UDC 주의 | `save` 는 `fetch` 를 직접 불러 contextRoot 를 붙이지 않는다 → `getContextPath()` 를 앞에 붙인다. `onSuccess` 는 HTTP 200 이면 처리 결과와 무관하게 await 없이 불리므로 쓰지 않고, await 되는 `onAfterSave` 에서 `res.success` 를 본다. 통신 오류는 `onError` → `$c.exception.handleError` |
+| 방식 | UDC `udcSaver.save({ dataMap : dma_mgrInfoUpdate, dataMapId : "dto", dataList : dlt_files, dataListId : "fileList", saveUrl : "/api/bonds/accountMgt/bndClaimMgrUpdate/mgrUpdate-proc", onAfterSave, onError })` — 전문과 첨부 3종을 한 번에(선례 ULDINF05000). `dataMapId`·`dataListId`(서버가 받는 파트 이름)는 명세에 없어 가정값 → §10 #4 |
+| UDC 주의 | `saveUrl` 은 명세 경로 그대로의 전체 경로 리터럴이고 `$c.sbm.getContextPath()` 를 붙이지 않는다(전환 규칙 39 — contextRoot 가 `"/"` 라 UDC `fetch` 에 붙이면 `"//api/…"` 프로토콜 상대 URL 이 되어 다른 호스트로 요청된다). `onSuccess` 는 HTTP 200 이면 처리 결과와 무관하게 await 없이 불리므로 쓰지 않고, await 되는 `onAfterSave` 에서 `res.success` 를 본다. 통신 오류는 `onError` → `$c.exception.handleError` |
 | 중복 실행 | `scwin.save` 의 `scwin.isSaving` 플래그(try/finally) |
 | 전문 | §5.3 과 같은 키 + 담당자 변경 표시(AS-IS `doc_bdchrg_tp_cd` 에 담당자구분 복사) |
 | 첨부 | `dlt_files` 3행 — 서류 면제(`fileExemptYn = "Y"`)면 빈 행 허용 |

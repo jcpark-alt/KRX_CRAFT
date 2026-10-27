@@ -3,7 +3,7 @@
 | 항목 | 내용 |
 |---|---|
 | AS-IS | `/lstproc/ULDSTF05911.gfm` (Gauce/X-Internet, 980×480 모달 창 — 부모가 1000×490 `window` 로 연다) — 반입 `conversion/gfm-front/ui/ULDSTF05911/ULDSTF05911.gfm` |
-| 신규 API 명세 | `conversion/gfm-front/ui/ULDSTF05911/ULDSTF05911_API.txt` — 블록 4종(이 화면 4종, 다른 화면 0종). §2.2·§5 는 명세 기준(가이드 §0.3·§5). **2026-10-26 갱신**: `register`·`modify` 요청 전달 방식 명시(머리 dataMap 은 `ref` 없이 `requestData` 로, 목록은 `requestData.isuList`) |
+| 신규 API 명세 | `conversion/gfm-front/ui/ULDSTF05911/ULDSTF05911_API.md` — 블록 4종(이 화면 4종, 다른 화면 0종). §2.2·§5 는 명세 기준(가이드 §0.3·§5). **2026-10-26 갱신**: `register`·`modify` 요청 전달 방식 명시(머리 dataMap 은 `ref` 없이 `requestData` 로, 목록은 `requestData.isuList`) |
 | TO-BE | `conversion/gfm-front/ui-tobe/ULDSTF05911.xml` (배포 경로 `/ui/lst/lstproc/ULDSTF05911.xml` — 가정, §10) |
 | 퍼블리싱 | `conversion/publish/상장/상장처리(대내)/ULDSTF05911.xml` — 컴포넌트 id 는 AS-IS 와 같음(`edt_MktactEnforceDd` `inputCalendar`, `txb_ChgRsnContn` `xf:input`, 버튼·`img_SetIsuCd`·`img_Excel`·`btn_exelUpload` 는 `xf:trigger`). 그리드 컬럼 id 는 대문자·한글(`번호`) 그대로 |
 | 화면 캡처 | 없음 |
@@ -279,7 +279,7 @@ stateDiagram-v2
 | `dts_BzProcsNo` | (삭제) | — | — | 신규 API 는 서버 채번(§5.2) |
 | `trs` | (삭제) | — | — | 저장·수정·삭제 통신 → `executeDynamic` |
 
-- **TO-BE DataCollection 은 `ULDSTF05911_API.txt` 의 정의 블록(id·name·dataType)을 그대로 옮긴다**(가이드 §5 「API 명세 적용」). 예외 두 가지: 응답 `dma_detail` 은 여러 행이라 같은 keyInfo 의 목록 `dlt_detail` 로, 변경상장일·변경사유 입력은 명세에 대응 정의가 없어 화면 전용 `dma_mst` 로 둔다.
+- **TO-BE DataCollection 은 `ULDSTF05911_API.md` 의 정의 블록(id·name·dataType)을 그대로 옮긴다**(가이드 §5 「API 명세 적용」). 예외 두 가지: 응답 `dma_detail` 은 여러 행이라 같은 keyInfo 의 목록 `dlt_detail` 로, 변경상장일·변경사유 입력은 명세에 대응 정의가 없어 화면 전용 `dma_mst` 로 둔다.
 - AS-IS 는 머리 정보(`ISUR_CD`·`BZ_PROCS_NO`·`CHG_DD`·`CHG_RSN_CONTN`)를 종목 행마다 실었다(§8 #8). 명세는 머리(`dma_register` 등)와 목록(`…_isuList`)을 나누고, 목록에는 `isuNm`·`elwRghtTpKindCd`·행 PK 가 없다(§10 #3).
 
 - AS-IS 컬럼 → TO-BE 키: `ISU_CD→isuCd`, `ISU_NM→isuNm`, `BFCHG_EXER_PRC→bfchgExerPrc`, `BFCHG_ELW_KO_OCCR_BAS_PRC→bfchgElwKoOccrBasPrc`, `BFCHG_CONV_RTO→bfchgConvRto`, `AFCHG_*→afchg*`, `ELW_RGHT_TP_KIND_CD→elwRghtTpKindCd`, `LIST_METHD_TP_CD→listMethdTpCd`, `CHG_DD→chgDd`, `CHG_RSN_CONTN→chgRsnContn`, `ISUR_CD→isurCd`, `BZ_PROCS_NO→bzProcsNo`.
@@ -366,7 +366,7 @@ scwin.init = async function () {
 
 (`…` = `/api/listing/lstproc/elw/chg-listing-prc`)
 
-#### API 명세 대응 (`ULDSTF05911_API.txt`)
+#### API 명세 대응 (`ULDSTF05911_API.md`)
 
 | # | 명세 블록 | method · 경로 | 요청 (명세 정의) | 응답 (명세 정의) | AS-IS 대응 | TO-BE 함수 |
 |---|---|---|---|---|---|---|
