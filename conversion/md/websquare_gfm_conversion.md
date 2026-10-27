@@ -235,6 +235,15 @@ AS-IS 의 `$(document).ready()`·`window.onload`·JSP 상단 스크립틀릿에 
 * `scwin.onpageload` 는 **`scwin.init()` 만 호출**하고 로직을 직접 갖지 않습니다. 본문은 try/catch + `$c.exception.handleError` 입니다.
 * 로딩 로직은 **`scwin.init` 함수 하나**에 데이터 의존 순서대로 씁니다. 초기화 단위를 `scwin.init_*` 여러 개로 나누지 않습니다. 결과서에는 `scwin.init` 안의 **단계**를 번호로 적고, 통신을 기다려야 하는 단계에 `await` 근거를 적습니다.
 * 로딩 외에도 다시 부르는 로직(신규 폼 준비, 화면 리셋 등)은 §6(5구역) 일반 함수로 적고(camelCase, `init_` 접두 금지) `scwin.init` 의 단계에서 "§6.x 호출" 이라고 씁니다.
+* **init 바인딩(필수, 2026-10-27 — 전환 규칙 22·37)** — 화면 상태 단계에 아래를 한 번씩 둡니다. 세 함수 모두 값 검사가 아니라 이벤트 바인더라 재호출되는 §6 함수(`resetForm` 등)에 두지 않습니다. 결과서에는 대상 컴포넌트를 표로 적습니다(단일 달력 목록, 기간 쌍과 명칭, 조회 영역과 조회 버튼 핸들러).
+
+  | 대상 (body) | 적용 |
+  |---|---|
+  | 단일 달력 — 기간 쌍이 아닌 날짜 `w2:inputCalendar` | `$c.date.checkCalendarFormat(calDate, "yyyyMMdd");` |
+  | 기간 달력 — 시작 ~ 종료 (같은 `flex` 안 2개, 또는 id 가 Strt/Start·End 등만 다름) | `$c.date.compareFromToDate(cal_start1, cal_end1, ["조회 시작일자", "조회 종료일자"]);` — 명칭은 화면 라벨. 쌍에는 `checkCalendarFormat` 을 겹쳐 걸지 않음(onviewchange 바인딩이 지워짐) |
+  | 조회 영역 — `schbox` 클래스 또는 `tbl_search` id 그룹에 조회 버튼이 있음 | `$c.win.setEnterKeyEvent(tbl_search, scwin.btn_search_onclick);` — 첫 인자는 영역 그룹 id(없으면 안쪽 표 그룹에 `tbl_search` 부여), 둘째는 그 조회 버튼의 실제 핸들러 |
+
+  달력에 마크업 `ev:onviewchange` 업무 로직이 있으면 init 바인딩이 그것을 지우므로 §8 에 적고 처리 방법을 정합니다.
 
 **작성 예시 — `scwin.init` 의 단계:**
 
@@ -243,8 +252,8 @@ AS-IS 의 `$(document).ready()`·`window.onload`·JSP 상단 스크립틀릿에 
 2. **공통 코드 바인딩**
    * `await $c.data.setCommonCode([{ code : "DEPT_CD", compID : "sbx_dept", firstRow : ["", "전체"] }, { code : "RANK_CD", compID : "sbx_rank" }]);`
 3. **조건 기본값** — §6.4 `scwin.resetForm` 호출(초기화 버튼과 같은 로직)
-   * 등록일 시작일 = 당월 1일, 종료일 = 서버 현재일(`$c.date.getServerDateTime()`), 기간 검사 바인딩(`$c.date.compareFromToDate` — 조회 시점 검사가 아니라 변경 이벤트 바인더이므로 1회만 호출)
-   * 검색 영역 Enter 키 바인딩: `$c.win.setEnterKeyEvent(tbl_search, scwin.btn_search_onclick);` (규칙 22)
+   * 등록일 시작일 = 당월 1일, 종료일 = 서버 현재일(`$c.date.getServerDateTime()`)
+   * init 바인딩(위 표): 기간 `$c.date.compareFromToDate(cal_regStrtDd, cal_regEndDd, ["등록 시작일", "등록 종료일"])`, 검색 영역 Enter 키 `$c.win.setEnterKeyEvent(tbl_search, scwin.btn_search_onclick)` (규칙 22·37)
 4. **버튼 상태** — `$c.util.setButtonState("grpBtnBox", "insert", scwin.BTN_MAP);` (권한·모드별 활성 정책은 표로)
 5. **초기 조회**
    * 권한이 `ADMIN` 이면 `await scwin.searchList();` (§5.1)
@@ -266,8 +275,9 @@ scwin.init = async function () {
     // 2) 공통 코드
     await $c.data.setCommonCode([{ code : "DEPT_CD", compID : "sbx_dept", firstRow : ["", "전체"] }]);
 
-    // 3) 조건 기본값 — 초기화 버튼과 같은 로직이라 5구역 함수로
+    // 3) 조건 기본값 — 초기화 버튼과 같은 로직이라 5구역 함수로, 바인딩은 init 에서 1회
     scwin.resetForm();
+    $c.date.compareFromToDate(cal_regStrtDd, cal_regEndDd, ["등록 시작일", "등록 종료일"]);
     $c.win.setEnterKeyEvent(tbl_search, scwin.btn_search_onclick);
 
     // 4) 버튼 상태 · 5) 초기 조회
@@ -609,6 +619,7 @@ scwin.btn_confirm_onclick = async function () {
 - [ ] §1.4: 업무 목록의 **모든 업무**에 흐름도와 단계 표가 있다. 취소·검증 탈락·서버 실패 분기가 끝 노드로 이어지고, 화면 간 흐름도(부모·하위 팝업)가 있다. 흐름도가 미리보기에서 그려진다.
 - [ ] §2: AS-IS 의 **모든 입력·출력 요소**가 표에 있거나 "(옮기지 않음)" 사유가 있다. DataCollection 키가 camelCase 로 정리됐다.
 - [ ] §3: onpageload 는 `scwin.init()` 호출만 갖고, 로딩 로직은 `scwin.init` 하나에 단계 순서·await 근거와 함께 있다(`init_*` 분리 없음).
+- [ ] §3: 날짜 달력마다 init 바인딩(단일 `checkCalendarFormat` / 기간 쌍 `compareFromToDate` + 명칭)이, 조회 버튼이 있는 `schbox`·`tbl_search` 영역마다 `setEnterKeyEvent` 가 적혔다.
 - [ ] §4: AS-IS 의 **모든 이벤트 바인딩**(스크립트·속성)이 TO-BE 핸들러로 대응됐다.
 - [ ] §5: 모든 Ajax/submit 이 한 절씩 있고, 신규 API 경로(또는 가정 표시)·후처리·실패 처리·중복 실행 정책이 적혔다. `{화면ID}_API.txt` 가 있으면 AS-IS ↔ 명세 대응표가 있고, 명세 요청·응답 키가 §2.2 와 같으며, 명세와 어긋나는 점이 §10 에 올라갔다.
 - [ ] §6: 검증은 공통/업무로 나뉘었고, 팝업은 반환 형태가 적혔다. `fn_GetPar`/`fn_SetPar` 는 전부 `openPopup` data + `await` 반환(§6.5)으로 대응됐고, 취소는 필요한 필드로 판정한다.
@@ -670,7 +681,7 @@ flowchart TD
     P2 --> P3["캡처 대조 리뷰 · 기준본 보관(커밋 또는 사본)"]
     P3 --> S1["2단계: 스크립트 전환 §13.3"]
     B -- "아니오" --> S1
-    S1 --> S2[/"gate_screen · scan_mixed_compare · wsxml_lint<br/>+ 캡처가 있었으면 publish_gate --rev/--before --allow P20"/]
+    S1 --> S2[/"gate_screen · scan_mixed_compare · wsxml_lint · init_binding_check<br/>+ 캡처가 있었으면 publish_gate --rev/--before --allow P20"/]
     S2 --> E(["전환 완료"])
 ```
 
@@ -683,6 +694,7 @@ PYTHONUTF8=1 python conversion/tools/gate_screen.py --pcc {fil|stf|mgt|tms} conv
 PYTHONUTF8=1 python conversion/tools/scan_mixed_compare.py conversion/sample-front/ui/{화면ID}.xml
 PYTHONUTF8=1 python conversion/tools/publish_gate.py --rev HEAD conversion/sample-front/ui/{화면ID}.xml   # 퍼블리싱본 위에 전환했으면
 PYTHONUTF8=1 python conversion/tools/api_spec_check.py conversion/gfm-front/ui-tobe/{화면ID}.xml        # {화면ID}_API.txt 가 있으면 필수(없으면 SKIP)
+PYTHONUTF8=1 python conversion/tools/init_binding_check.py conversion/gfm-front/ui-tobe/{화면ID}.xml    # 달력·조회 Enter 키 init 바인딩(규칙 22·37) — FAIL 0건
 python -m wsxml_lint conversion/sample-front/ui/{화면ID}.xml
 ```
 

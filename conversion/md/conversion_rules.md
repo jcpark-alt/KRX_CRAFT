@@ -340,24 +340,24 @@
 * **browserPopup 예외**: 변환 대상 화면이 **browserPopup 으로 열리는 팝업 화면**(규칙 17 `type:"window"` 계열)이면 `$c.win.getParent()` 는 부모 화면이 아니라 자기 자신을 가리켜 동작하지 않습니다. 이 경우 `$c.win.getOpenerScope()`/`$c.win.callOpener()` 로 치환합니다(팝업 타입 무관 동작 — pageFramePopup 은 내부에서 `$p.parent()` 폴백). **단계 2 검토** 대상이며, 상세는 `cm/docs/popup-opener-guide.md` 참조.
 * 코드 세그먼트(문자열/주석/정규식 제외)만 치환하며, 결과에 `.Provider(` 가 없으므로 **재변환 시 no-op(멱등)** 입니다. 매핑표는 [substitution_map.md](substitution_map.md) §6 참조.
 
-### 규칙 22: 검색 테이블 Enter 키 이벤트 자동 바인딩 (`tbl_search`/`tbl_Search` → `$c.win.setEnterKeyEvent`)
+### 규칙 22: 조회 영역 Enter 키 바인딩 (`schbox`/`tbl_search` → `$c.win.setEnterKeyEvent`) — 2026-10-27 개정
 
-* `<body>` XML 영역에 **id 가 `tbl_search` 또는 `tbl_Search` 인 WebSquare 컴포넌트가 존재하면**, `scwin.onpageload` 함수 본문에 아래 한 줄을 추가하여 해당 검색 영역에서 Enter 키 입력 시 조회 버튼 핸들러가 실행되도록 바인딩합니다.
+* **대상**: `<body>` 에서 **class 에 `schbox` 가 있거나 id 가 `tbl_search`/`tbl_Search` 인 그룹** 중 **조회 버튼을 품은 것**.
+  조회 버튼은 `xf:trigger` 의 class 에 `sch`(`btn_cm sch`)가 있거나 id 가 `btn_search*`/`btnSearch*` 인 것입니다. 바깥 `schbox` 와 안쪽 `tbl_search` 는 한 영역으로 봅니다. 조회 버튼이 없는 영역은 대상이 아닙니다.
+* **변환 규약**: `scwin.init`(2구역, 규칙 4) 안에 영역마다 한 줄을 둡니다.
 
 ```javascript
-$c.win.setEnterKeyEvent(tbl_search, scwin.btn_Search_onclick);
+$c.win.setEnterKeyEvent(tbl_search, scwin.btn_search_onclick);
 ```
 
-* **변환 규약**:
-    1. **대상 판별**: `<body>` 를 스캔해 `id="tbl_search"` 또는 `id="tbl_Search"` 를 가진 컴포넌트(주로 `<w2:group>`/테이블 컨테이너)가 있는지 확인합니다. 없으면 이 규칙은 적용하지 않습니다.
-    2. **첫 인자 = 매칭된 id 원형**: `$c.win.setEnterKeyEvent(...)` 의 첫 인자로 **실제로 발견된 id**(대소문자 원형 그대로 — `tbl_search` 또는 `tbl_Search`)를 사용합니다.
-    3. **두 번째 인자 = 조회 버튼 핸들러**: `scwin.btn_Search_onclick` 을 지정합니다(검색 영역의 표준 조회 버튼 핸들러 — 규칙 3의 소문자 이벤트명 규약 `scwin.{컴포넌트명}_{이벤트명}` 준수).
-    4. **삽입 위치**: 규칙 4의 초기화 함수 영역인 `scwin.onpageload` 함수 **본문 내부**에 추가합니다(규칙 4에서 `scwin.gform_onload` 코드를 `scwin.onpageload` 로 이동·통합한 뒤이므로, 그 본문 말미에 배치). `scwin.onpageload` 가 없으면 규칙 4 규약에 따라 생성한 뒤 삽입합니다.
+    1. **첫 인자 = 영역 그룹 id** — `schbox` 그룹 또는 그 안의 표 그룹 id(원형 대소문자 그대로). 영역에 id 가 하나도 없으면 안쪽 표 그룹에 `id="tbl_search"` 를 붙입니다(마크업 보강 — 퍼블리싱 1단계에서 붙이는 것이 원칙).
+    2. **두 번째 인자 = 그 영역 조회 버튼의 실제 `ev:onclick` 핸들러**(`scwin.btn_search_onclick`, `scwin.btn_Search_onclick` 등). 종전 기본값 `scwin.btn_Search_onclick` 고정은 폐기합니다.
+    3. **삽입 위치**: `scwin.init` 의 화면 상태 단계(공통 코드·기본값 다음, 초기 조회 앞). 초기화 버튼과 공유하는 5구역 함수(`scwin.resetForm` 등)에 두지 않습니다 — 재호출될 때마다 onkeyup 이 겹쳐 걸립니다.
 * **유의사항**:
-    * 동일 파일에 `id="tbl_search"` 와 `id="tbl_Search"` 가 **동시에** 존재하면 각각에 대해 한 줄씩 추가합니다(중복 id 는 원래 비정상이므로 이 경우는 리포트).
-    * 이미 같은 `$c.win.setEnterKeyEvent(...)` 바인딩이 `scwin.onpageload` 에 존재하면 **중복 추가하지 않습니다**(재변환 시 no-op — 멱등).
-    * 두 번째 인자 핸들러명은 기본값 `scwin.btn_Search_onclick`(규칙 3 소문자 이벤트명 규약)을 사용하되, 해당 화면의 실제 조회 버튼 컴포넌트 id 가 다르면(예: `btn_search`·`btnSearch` → `scwin.btn_search_onclick` 등) **단계 2(Claude) 검토**로 실제 핸들러에 맞춥니다.
+    * 영역이 둘 이상이면(탭별 조회 등) 영역마다 한 줄. 같은 바인딩이 이미 있으면 추가하지 않습니다(멱등).
+    * 원본의 `onkeyup`/`onkeypress` `keyCode == 13` 조회 처리는 이 한 줄로 대체하고 지웁니다.
     * 문자열/주석/정규식 리터럴 내부는 보호합니다(규칙 5 동일 원칙).
+* **검사**: `init_binding_check.py` B03(바인딩 없음·id 없음)·B05(핸들러 불일치)·B06(init 밖). convert.py 자동 삽입은 하지 않습니다(조회 버튼·영역 id 판단이 필요한 단계 2 규칙).
 
 ### 규칙 23: 그리드 전체 행 표시 `{grid}.setVisibleRowNum("all")` → `$c.util.setGridVisibleRowNum({grid}, "all")`
 
@@ -815,6 +815,24 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
 | U11 | `setCorpInfo*` 함수 안 `getComponent("id").setValue(` 대상 입력 → `readOnly="true"` | — |
 
 검증 절차: `ui_restyle.py --dry` 재실행 무변경 → 내용 보존 검사(git HEAD 대비 ref·라벨 문구·입력/선택/그리드/달력/업로드 수·id — hidden/iframe/img_N 소실만 허용) → `wsxml_lint` → `gate_screen.py`. 실제로 잡힌 결함: 요소 삭제 시 `parent.text` 생 텍스트 덮어씀, 한 칸 행 colspan 제거, 고아 핸들러 때문에 body 가 정의 없는 핸들러를 가리킴, id 있는 행·래퍼 평탄화, th 생 텍스트가 scope 삽입에 덮임 — 모두 위 "지키는 것" 으로 닫혔다. 기계로 못 닫는 잔여: 스크립트가 DOM 으로 참조하는 hidden input, c_choose 조건 표, 이미지 장식 팝업(JLDFIL00019/00024 류), onclick 없는 span 버튼.
+
+### 규칙 37: 달력 init 바인딩 — 단일 `checkCalendarFormat` · 기간 `compareFromToDate` (2026-10-27 신설, 사용자 지시)
+
+`scwin.init`(2구역) 에서 화면의 날짜 달력(`w2:inputCalendar`, `calendarValueType` 없음 또는 `yearMonthDate`)마다 gcc 검사 바인딩을 **한 번** 겁니다. 두 함수 모두 값 검사 함수가 아니라 `onviewchange` 이벤트 바인더입니다(잘못된 날짜 입력 시 안내 → 빈값 초기화 → 포커스, 엔진 단독 달력은 실존하지 않는 날짜도 확정하므로 유일한 방어선 — 2026-09 실측).
+
+| 구분 | 판정 | 적용 |
+|---|---|---|
+| 단일 달력 | 기간 쌍이 아닌 날짜 달력 | `$c.date.checkCalendarFormat(cal_x, "yyyyMMdd");` |
+| 기간 달력 (시작 ~ 종료) | ① 같은 부모(기간 관용구 `xf:group.flex` > 달력 + `~` + 달력)에 날짜 달력이 정확히 2개, 또는 ② id 가 시작/종료 토큰만 다름(`Strt`·`Start`·`Stat`·`Str`·`Fr`·`From`·`Bgn`·`Beg` ↔ `End`·`To`·`Ed`, 예: `cal_start1`/`cal_end1`, `edt_ChgStatDd`/`edt_ChgEndDd`, `ica_FST_BZYY_STRT_DD`/`…_END_DD`) | `$c.date.compareFromToDate(cal_start1, cal_end1, ["조회 시작일자", "조회 종료일자"]);` |
+
+* **명칭 배열**: 화면 라벨을 씁니다(예: 「변경 후 최초 사업연도」 가. 시작일·나. 종료일 → `["최초 사업연도 시작일", "최초 사업연도 종료일"]`). 생략하면 공통 기본값 "검색시작일/검색종료일" 이 나가므로 조회조건이 아닌 입력 폼에서는 반드시 줍니다.
+* **포맷**: 둘째 인자 `"yyyyMMdd"` 는 컴포넌트 `getValue()` 의 ioFormat 입니다(displayFormat 아님). ioFormat 을 바꾼 달력만 그 포맷을 넘깁니다. `compareFromToDate` 는 포맷을 생략해도 실존 날짜 검사를 합니다.
+* **한 달력에 하나만**: 두 함수 모두 `unbind("onviewchange")` 뒤 `bind` 하므로, 기간 쌍 달력에 `checkCalendarFormat` 을 같이 걸면 나중 호출이 앞 바인딩을 지웁니다 → 기간 쌍은 `compareFromToDate` 만 둡니다.
+* **마크업 `ev:onviewchange` 와 충돌**: 같은 이유로 init 바인딩이 마크업 핸들러를 지웁니다. 달력에 `ev:onviewchange` 업무 로직이 있으면 그 로직을 다른 이벤트(`onchange` 등)로 옮기거나 바인딩 뒤 재연결을 단계 2 에서 정합니다.
+* **삽입 위치**: `scwin.init` 의 화면 상태 단계. 반복 호출되는 5구역 함수에 두지 않습니다(호출할 때마다 재바인딩 — 동작은 같지만 init 1회 원칙). 필수 여부·조회 시점 기간 검사는 이 규칙이 아니라 `validateDataCollect`(규칙 24)의 몫입니다.
+* **제외**: 날짜형이 아닌 달력(`yearMonthDateTimeSec` 등)·그리드 컬럼 달력(`inputType="calendar"`) — 검사 도구가 INFO 로만 알립니다.
+* **검사**: `init_binding_check.py` — B01(단일 미적용)·B02(기간 미적용·순서 뒤바뀜)·B04(기간 쌍에 단일 검사 중복)·B06(init 밖)·B07(마크업 onviewchange 충돌). 테스트 `test_init_binding_check.py`.
+* **적용 현황**(2026-10-27 실측, 도구 기준): gfm-front 3본 중 1본(ULDSTF05621 기간 쌍) 보정. sample-front/ui 46본 중 15본, jsp-front ui-tobe 1,677본 중 343본(B01 370·B02 265·B03 81·B04 132 — B04 는 공급사 r13 `init_datefmt_*` 가 기간 쌍에도 단일 검사를 거는 것)이 미적용 — 각 모듈 재전환 때 반영합니다.
 
 ## 규칙 6 보충: Submission 변환 상세
 

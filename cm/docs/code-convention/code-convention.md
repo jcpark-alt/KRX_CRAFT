@@ -91,6 +91,11 @@
 
 - `scwin.init` 안에서 **데이터 의존성 순서**(파라미터 수신 → 파생값·공통코드 → 화면 상태 → 초기 조회)대로 쓰고, 단계가 길면 `// 1) 파라미터 수신` 같은 단계 주석으로 나눈다.
 - 로딩 외에도 다시 부르는 로직(신규 폼 준비, 화면 리셋, 재조회 등)은 **5구역 일반 함수**(`scwin.initNewForm`·`scwin.resetForm` 처럼 camelCase, `init_` 접두 금지)로 두고 `scwin.init` 에서 호출한다.
+- **init 바인딩(공통 함수, 2026-10-27)** — 화면 상태 단계에서 한 번 건다(전환 규칙 22·37, 검사 `conversion/tools/init_binding_check.py`).
+  - 단일 달력(`w2:inputCalendar`): `$c.date.checkCalendarFormat(calDate, "yyyyMMdd");`
+  - 기간 달력(시작 ~ 종료): `$c.date.compareFromToDate(cal_start1, cal_end1, ["조회 시작일자", "조회 종료일자"]);` — 쌍에는 이것만 둔다(두 함수 모두 onviewchange 를 unbind 후 bind 하므로 겹쳐 걸면 앞 바인딩이 지워진다).
+  - 조회 영역(`schbox` 클래스 또는 `tbl_search` id 그룹)에 조회 버튼이 있으면: `$c.win.setEnterKeyEvent(tbl_search, scwin.btn_search_onclick);` — 둘째 인자는 그 조회 버튼의 실제 핸들러.
+  - 세 함수 모두 이벤트 바인더라 재호출되는 5구역 함수(`resetForm` 등)가 아니라 `scwin.init` 에 둔다.
 - **예외**: jsp-front 공급사(r13) 산출의 `init_recvParam`·`init_conds`·`init_attrReals`·`init_rowCopy` 등은 생성기 계약이자 후처리 도구(`vendor_postprocess`·`vendor_stage2`)의 대상이라 그대로 둔다. convert.py 규칙 4 는 기존 산출물 호환을 위해 `scwin.init`·`scwin.init_*` 를 모두 2구역으로 분류한다.
 
 ```javascript
@@ -118,7 +123,12 @@ scwin.init = async function () {
     const param = $c.data.getParameter() ?? {};
     scwin.bzProcsNo = param.bzProcsNo ?? "";
 
-    // 2) 신규 준비 또는 수정 조회 — 다시 부르는 로직은 5구역 함수로
+    // 2) 화면 상태 — 달력 검사·조회 Enter 키 바인딩(1회)
+    $c.date.checkCalendarFormat(cal_applDd, "yyyyMMdd");
+    $c.date.compareFromToDate(cal_start1, cal_end1, ["조회 시작일자", "조회 종료일자"]);
+    $c.win.setEnterKeyEvent(tbl_search, scwin.btn_search_onclick);
+
+    // 3) 신규 준비 또는 수정 조회 — 다시 부르는 로직은 5구역 함수로
     if ($c.util.isEmpty(scwin.bzProcsNo)) {
         scwin.initNewForm();
     } else {
