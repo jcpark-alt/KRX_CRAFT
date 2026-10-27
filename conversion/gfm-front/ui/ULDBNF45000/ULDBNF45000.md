@@ -4,7 +4,7 @@
 |---|---|
 | AS-IS | `ULDBNF45000.jsp` (JSP/jQuery, 대외 메인 화면 — 계정관리 > 담당자정보 변경, `dmenus` bmenu 7) — 반입 `conversion/gfm-front/ui/ULDBNF45000/ULDBNF45000.jsp` |
 | 신규 API 명세 | `conversion/gfm-front/ui/ULDBNF45000/ULDBNF45000_API.txt` — 블록 4종(이 화면 4종, 다른 화면 0종). §2.2·§5 는 명세 기준(가이드 §0.3·§5) |
-| TO-BE | `conversion/gfm-front/ui-tobe/ULDBNF45000.xml` — **현재는 퍼블리싱본(`conversion/publish-tobe/채권/채권상장신청(대외)/ULDBNF45000.xml`)과 같은 마크업 전용 사본**(컴포넌트 id 미지정, 그리드 컬럼 `col1`… 임시 id). 스크립트 전환 때 §2.1 의 id 를 붙인다 |
+| TO-BE | `conversion/gfm-front/ui-tobe/ULDBNF45000.xml` — 전환 완료(2026-10-26). 1단계 퍼블리싱(캡처 기준 마크업 + §2.1 id) → 2단계 스크립트(이 문서 + API 명세). 게이트: gate_screen(`--pcc fil`)·publish_gate(1단계 대비 `--allow P20`)·api_spec_check·convert 고정점·lint 0/0 통과. 남은 확인은 §10 의 `TODO` |
 | 퍼블리셔 XML | `conversion/publish/채권/채권상장신청(대외)/ULDBNF45000.xml` (첨부 영역은 커밋 f21f61af 로 보강) |
 | 화면 캡처 | `ULDBNF45000.png` (신고담당자(부) 선택 · 첨부 영역 표시 상태) — TO-BE 퍼블리싱 기준(가이드 §13.2) |
 | 업무공통 | 쓰지 않음(gcc 만). 게이트는 `--pcc fil`(ULD* 기본) |
@@ -37,7 +37,7 @@
 | JSP `${companyInfoVO.isurCd}` / `${companyInfoVO.comNm}` | 로그인 사용자 회사의 발행기관코드·명 | 명세에 조회 API 가 없다 → 세션(`$c.session.getUserInfo`) 또는 진입 파라미터로 받는다(§10 #1) |
 | JSP `${result}` | 담당자 목록 | `GET …/bndClaimMgr-select` (§5.1) |
 | JSP `${bdchrgRegNoFileInstYn}` | 신고담당자 등록 서류 면제 여부(국고채 대행 한국은행·정부·지자체 = `Y`) | 명세에 출처 없음(§10 #2) |
-| 세션 Struts TOKEN | 중복 등록 방지 | `executeDynamic`·UDC 의 중복 실행 방지로 대체 |
+| 세션 Struts TOKEN | 중복 등록 방지 | 정보 수정은 `executeDynamic` 중복 실행 방지, 담당자 변경은 화면 플래그 `scwin.isSaving`(UDC `save` 는 fetch 직접 호출이라 sbm 중복 방지를 타지 않는다) |
 
 ### 1.3 이 화면이 여는 하위 팝업
 
@@ -176,7 +176,7 @@ stateDiagram-v2
 
 ### 2.1 화면 구성
 
-퍼블리싱본은 컴포넌트 id 가 비어 있다. 아래 TO-BE id 는 명명 규칙(가이드 §0.1)으로 제안한 것이고, 스크립트 전환 때 퍼블리싱본에 붙인다(마크업 구조는 그대로).
+퍼블리싱본은 컴포넌트 id 가 비어 있다. 아래 TO-BE id 는 명명 규칙(가이드 §0.1)으로 정한 것이고, 1단계 퍼블리싱 때 붙였다(마크업 구조는 그대로).
 
 | 영역 | AS-IS 요소 | TO-BE 컴포넌트 (바인딩) | 설명 |
 |---|---|---|---|
@@ -318,7 +318,7 @@ scwin.init = async function () {
 | `id` / `method` / `action` | `sbm_searchList` / `get` / `…/bndClaimMgr-select` |
 | `requestData` | 명세 `dma_searchList` 에 `isurCd` 만 채워 보냄 |
 | `target` / `gridview` | `dlt_searchList=body` / `grd_bdchrgList` |
-| 후처리 | 0건이면 "데이터가 없습니다."(그리드 빈 목록 안내). 입력란은 §6.5 로 비운 상태 |
+| 후처리 | 0건이면 "조회된 데이터가 없습니다."(`gridview : "grd_bdchrgList\|message"`). 조회 전에 선택 행(`scwin.selectedRow`)을 풀고, 실패하면 "현재 서버에서 채권신고담당자 목록을 가져올 수 없습니다. …" 안내(※TO-BE) |
 | 중복 실행 | 기본(건너뜀) |
 
 ### 5.2 담당자 상세 조회 (`scwin.selectDtl(row)`)
@@ -329,7 +329,7 @@ scwin.init = async function () {
 | `id` / `method` / `action` | `sbm_selectDtl` / `get` / `…/bndClaimMgrDtl-select` |
 | `requestData` | 명세 `dma_searchDtlReq` — 선택 행의 `isurCd`·`chrgId`·`bdchrgTpCd` |
 | `target` | `dma_searchDtlRes=body` |
-| 후처리 | `dma_searchDtlRes` → `dma_form`: 담당자구분·이름·직책·소속기관·소속부서, 전화·휴대폰·팩스는 `-` 로 3칸(국번 `00` 이면 빈칸, 3조각이 아니면 비움), 이메일은 `@` 로 2칸. `scwin.bfBdchrgTpCd` 에 담당자구분 보관 |
+| 후처리 | `dma_searchDtlRes` → `dma_form`: 담당자구분·이름·직책·소속기관·소속부서, 전화·휴대폰·팩스는 `-` 로 3칸(국번 `00` 이면 빈칸, 3조각이 아니면 비움), 이메일은 `@` 로 2칸. `scwin.bfBdchrgTpCd` 에 담당자구분 보관. 조회 전에 `bfBdchrgTpCd` 를 비우고 담당자구분은 목록 행 값으로 먼저 채운다(이전 행 값이 남지 않게). 실패하면 선택 행을 풀고(-1) 안내 |
 | 실패 처리 | 통신 오류는 공통 오류 핸들러. AS-IS 문구 "현재 서버에서 채권신고담당자 정보를 가져올 수 없습니다. 관리자에게 문의하세요." 는 `success:false` 일 때 안내 |
 | 중복 실행 | `{ onDuplicate : "abort" }` — 빠르게 다른 행을 누르면 마지막 행 기준(AS-IS 는 동기라 순서 보장) |
 
@@ -347,10 +347,12 @@ scwin.init = async function () {
 
 | 항목 | 내용 |
 |---|---|
-| 방식 | UDC `udcSaver.save({ dataMap : dma_mgrInfoUpdate, dataMapId : "…", dataList : dlt_files, dataListId : "…", saveUrl : "/api/bonds/accountMgt/bndClaimMgrUpdate/mgrUpdate-proc", onSuccess })` — 전문과 첨부 3종을 한 번에(선례 ULDINF05000). `dataMapId`·`dataListId`(서버가 받는 파트 이름)는 명세에 없음 → §10 #4 |
+| 방식 | UDC `udcSaver.save({ dataMap : dma_mgrInfoUpdate, dataMapId : "dto", dataList : dlt_files, dataListId : "fileList", saveUrl : $c.sbm.getContextPath() + "/api/bonds/accountMgt/bndClaimMgrUpdate/mgrUpdate-proc", onAfterSave, onError })` — 전문과 첨부 3종을 한 번에(선례 ULDINF05000). `dataMapId`·`dataListId`(서버가 받는 파트 이름)는 명세에 없어 가정값 → §10 #4 |
+| UDC 주의 | `save` 는 `fetch` 를 직접 불러 contextRoot 를 붙이지 않는다 → `getContextPath()` 를 앞에 붙인다. `onSuccess` 는 HTTP 200 이면 처리 결과와 무관하게 await 없이 불리므로 쓰지 않고, await 되는 `onAfterSave` 에서 `res.success` 를 본다. 통신 오류는 `onError` → `$c.exception.handleError` |
+| 중복 실행 | `scwin.save` 의 `scwin.isSaving` 플래그(try/finally) |
 | 전문 | §5.3 과 같은 키 + 담당자 변경 표시(AS-IS `doc_bdchrg_tp_cd` 에 담당자구분 복사) |
 | 첨부 | `dlt_files` 3행 — 서류 면제(`fileExemptYn = "Y"`)면 빈 행 허용 |
-| 후처리 | 성공: "요청하신 작업을 완료하였습니다." → `scwin.resetForm()` → `scwin.searchList()` |
+| 후처리 | 성공: "요청하신 작업을 완료하였습니다." → `scwin.resetForm()` → `scwin.searchList()`. 실패(`success` 아님): `com_complete_0151` 안내(§10 #7) |
 
 ---
 
@@ -379,9 +381,10 @@ scwin.init = async function () {
 - 화면에 `udcSaver`(`/cm/udc/bulkFileSaver.xml`)를 둔다. `dlt_files` 는 3행(위임장·개인정보동의서·재직증명서)으로 미리 만든다.
 - [찾아보기] → `udcSaver.attachFile(행, dlt_files)` → 선택한 파일명을 `ipt_fileNm1~3` 에 표시. 원본 `fn_getFileNm(i)`(외부 `fileUpload.js`)를 대신한다.
 - 입력란 초기화 때 `udcSaver.clearFileMap()` 으로 첨부도 비운다(원본 `initFileList` — `input type="file"` 값 비움).
+- 행의 `uid` 는 UDC 파일 맵의 키다. 처음 고를 때만 만들고, 같은 서류를 다시 고르면 그 `uid` 를 그대로 써서 이전 파일을 덮는다(새로 만들면 이전 파일이 맵에 남아 함께 전송된다).
 - 파일 확장자·크기 제한은 원본에 없다(UDC 기본 크기 한도 102,400Kb).
 
-### 6.4 서식다운로드 (`scwin.downloadDoc(docCd, fileNm)`) — 원본 `fn_downloadDoc`
+### 6.4 서식다운로드 (`scwin.downloadDoc(no)` — 1 위임장, 2 개인정보동의서) — 원본 `fn_downloadDoc`
 
 - "[서식명] 다운로드 하시겠습니까?" 확인 → 다운로드.
 - 원본: 숨은 폼 `fileDownForm`(`contnId` = 122 위임장 / 123 개인정보동의서, `cmNotiClssCd` = 4)을 `/main/notice.do?method=downloadFile` 로 submit. 신규 API 명세에 대응이 없다 → gcc 파일 다운로드 공통함수로 같은 URL·파라미터를 쓰는 방식을 가정, §10 #5.
@@ -440,6 +443,7 @@ scwin.init = async function () {
 | 10 | 첨부 안내 목록 닫는 태그 오타 `</ui>` | 마크업에서 해소(퍼블리싱본) |
 | 11 | 쓰지 않는 것: `fnReset`(버튼 주석 처리), hidden `method`·`check_svc`, `$(document).ready` 의 주석 처리된 `#dtlInfo` 숨김, `complete` 콜백 주석 | 옮기지 않음(규칙 0) |
 | 12 | 세 첨부 행 모두 찾아보기 이미지 `name="file_1"`(중복) | 옮기지 않음(UDC 버튼으로 대체) |
+| 13 | 국번이 비면 전화는 `"00"` 을 채워 보내지만 팩스는 채우지 않는다(`setCellphoneNoEtc`). 표시할 때는 둘 다 `"00"` 을 빈칸으로 바꾼다(`setTelNo`·`setFaxNo`) | 그대로 유지(`scwin.joinContacts`·`scwin.splitTo`) |
 
 ---
 
@@ -450,11 +454,11 @@ scwin.init = async function () {
 | `$(document).ready` (첨부 영역 숨김) + JSP 서버 렌더링(발행기관·목록) | `scwin.onpageload` → `scwin.init`(발행기관 → `scwin.resetForm` → `scwin.searchList`) |
 | JSP `${result}` 목록 + `tr onclick="focus_tr(this)"` | `grd_bdchrgList`(`dlt_searchList`) + `scwin.grd_bdchrgList_oncellclick` |
 | `focus_tr` + `fn_SelectBdchrgDtlInfo` (`$.ajax` 동기) | `scwin.selectDtl` — `await $c.sbm.executeDynamic` GET `bndClaimMgrDtl-select` |
-| `setTelNo`·`setCellphoneNo`·`setEmail`·`setFaxNo` | `scwin.splitPhone`·`scwin.splitEmail` (5구역 — 상세 → `dma_form`) |
+| `setTelNo`·`setCellphoneNo`·`setEmail`·`setFaxNo` | `scwin.splitTo(prefix, value, sep, blankZeroArea)` (5구역 — 상세 → `dma_form`) |
 | `fn_chkData` | `scwin.validate` (+ `validateDataCollect`) + 변경 모드 검증 |
 | `setCellphoneNoEtc` | `scwin.joinContacts` (5구역 — `dma_form` → 전문) |
 | `fn_Update` (+ `confirm` + `SendForm.submit`) | `scwin.btn_update_onclick` → `scwin.updateInfo`(정보 수정) / `scwin.changeBdchrg`(담당자 변경) |
-| `fn_AddNewBdchrg` + `fn_GetSelectedIndex` + `fn_GetChrgNm` | `scwin.startChange` (선택 행은 `grd_bdchrgList.getFocusedRowIndex()`) |
+| `fn_AddNewBdchrg` + `fn_GetSelectedIndex` + `fn_GetChrgNm` | `scwin.startChange` (선택 행은 `scwin.selectedRow` — 상세 조회 성공 때만 유지, 목록 재조회·조회 실패 때 -1) |
 | `initBdchrgInfo` + `initFileList` | `scwin.resetForm` |
 | `fn_downloadDoc` + `fileDownForm` | `scwin.downloadDoc` (§10 #5) |
 | `input type="file"` + `fn_getFileNm` + multipart submit | UDC `udcSaver.attachFile` / `udcSaver.save` + `dlt_files` |
@@ -465,7 +469,8 @@ scwin.init = async function () {
 | `$("input[name='x']").val()` · `document.SendForm.x.value` | `dma_form.get("x")` / 컴포넌트 `getValue()` (규칙 19) |
 | `.attr("readonly", true/false)` | `setReadOnly(true/false)` |
 | `$("#fileList").show()/hide()` | `grp_fileList.show("")/hide()` |
-| `dmenus`, Struts TOKEN, `fnReset`, hidden `method`·`check_svc` | 삭제 |
+| Struts TOKEN | `scwin.isSaving` 플래그 + `executeDynamic` 중복 실행 방지 (§1.2) |
+| `dmenus`, `fnReset`, hidden `method`·`check_svc` | 삭제 |
 
 ---
 
@@ -480,6 +485,6 @@ scwin.init = async function () {
 7. **저장 성공·실패 판정과 문구** — 저장 2종 응답이 비어 있다. `responseJSON.success` 로 판정하고 실패 문구를 정한다(AS-IS 는 실패 안내 없음).
 8. **전화번호 칸 자동 이동** — AS-IS `fnNextFeild`(4자리 입력 시 다음 칸). 대외 화면 사용성 요구인지 확인 후 유지 여부를 정한다(§4).
 9. **암호화 필드** — 요청 키 `cellphoneNo`·`email` 이 "암호화" 로 명시돼 있다. 화면은 평문을 보내고 서버가 암호화하는지 확인한다.
-10. **공백 검증** — AS-IS 는 이름·직책·소속기관·소속부서를 `trim()` 뒤 검사했다. 공통 검증이 공백만 있는 값을 빈 값으로 보는지 확인하고, 아니면 업무 검증으로 남긴다(§6.1).
+10. ~~**공백 검증**~~ — 확인 완료: 공통 검증(`validateDataCollect`)은 trim 하지 않는다. `scwin.validate` 가 검사 전에 네 값의 앞뒤 공백을 지운다(AS-IS `trim()` 과 같음, §6.1).
 11. **미선택 [수정]** — 담당자를 고르지 않고 [수정] 을 누르면 "이름을 입력하세요." 가 뜬다(§8 #6). "담당자를 선택하세요." 로 바꿀지 정한다.
-12. **TO-BE 마크업 id** — `ui-tobe/ULDBNF45000.xml` 은 퍼블리싱본 사본(id 없음)이다. 스크립트 전환 때 §2.1 의 id 를 붙이고, 첨부 3행을 `dlt_files` 로 다룰지(행별 입력칸 + 버튼 유지) 정한다. 퍼블리싱본이 캡처(첨부 안내가 표 오른쪽 칸)와 다르게 안내를 표 위로 옮긴 점(f21f61af)도 확인한다.
+12. ~~**TO-BE 마크업 id**~~ — 반영 완료: §2.1 의 id 를 붙였고, 첨부 3행은 `dlt_files` 3행 + 행별 파일명 칸·[찾아보기] 버튼으로 다룬다(§6.3). 남은 확인: 퍼블리싱본이 캡처(첨부 안내가 표 오른쪽 칸)와 다르게 안내를 표 위로 옮긴 점(f21f61af) — TO-BE 는 퍼블리싱본 배치를 따랐다.
