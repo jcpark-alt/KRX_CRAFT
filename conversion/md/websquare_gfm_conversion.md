@@ -593,6 +593,8 @@ scwin.btn_confirm_onclick = async function () {
 | `alert` / `confirm` | `await $c.win.alert` / `await $c.win.confirm` | `if (confirm(...))` 은 반드시 await |
 | 수기 날짜 계산(`new Date`, `substr`) | `$c.date.*` (`getServerDateTime`, `addDate`, `formatDate`) | 서버 시각인가 클라이언트 시각인가 |
 | `keyCode == 13` 검사 | `$c.win.setEnterKeyEvent(tbl_search, …)` (규칙 22) | |
+| 셀 글자색 (`ColumnProp(col, 'color')`·`style.color`) | `grd.setCellClass(row, col, "red"/"orange"/"blue"/"green")` — `base.css` 공통 색상 class (규칙 40) | `setCellColor` 로 색상값 직접 지정 금지 |
+| 배경색 (`style="background-color:…"`, 셀·행 배경 지정) | 마크업 `class="bg_red"` 등 / 스크립트 `setCellClass(row, col, "bg_blue")`·`setRowClass(row, "row_bg_lgray")` — `base.css` 공통 배경색 class `bg_lgray`·`bg_dgray`·`bg_blue`·`bg_red`·`bg_orange`·`bg_green`·`bg_violet` (규칙 40) | 인라인 배경색·`setCellBackgroundColor`·`setRowBackgroundColor` 금지. `bg_*` 는 그리드·표 칸·입력류에만 정의돼 일반 그룹엔 색이 안 나옴 |
 | `$.parseJSON(x)` | `JSON.parse(x)` / `$c.util.getJSON(x)` | |
 
 ---

@@ -886,6 +886,66 @@ action : "/api/x/select-list",
 * **검사**: `api_spec_check.py` **A08**(FAIL) — `action`·`saveUrl`·`listUrl` 식에 `getContextPath` 가 있으면 실패. 파일 경로에 `gfm-front` 가 있으면 자동으로 켜지고, 다른 경로는 `--no-context-path` 로만 켭니다. 전역 변수 조립은 A07 이 잡습니다(gfm-front 에서는 `getContextPath() +` 접두도 A07 허용 대상이 아닙니다).
 * **적용 현황**(2026-10-27): gfm-front 3본 중 해당 1본(ULDBNF45000 `saveUrl` 1곳)과 결과서 §5.4 를 전환. A07·A08 0건.
 
+### 규칙 40: 색상 — 글자색·배경색은 `base.css` 공통 class 로 (`setCellColor`·인라인 색 금지, `setCellClass`) (2026-10-27 신설, 사용자 지시)
+
+* **대상**: gridView·테이블 셀의 글자색을 바꾸는 로직(AS-IS Gauce `ColumnProp(col, 'color') = "{decode(…)}"`, W-Craft `$c.cm.setColumnProp(…, 'color', …)`, TO-BE 초안의 `setCellColor(row, col, "#FF0000")` 등).
+* **금지**: `setCellColor` 로 색상값(`#FF0000`·`red` 문자열 등)을 셀에 직접 지정하는 것.
+* **필수**: `setCellClass(row, col, "<class>")` 로 `cm/css/base.css` 에 정의된 공통 색상 class 를 붙인다. 허용 class 는 아래 4종뿐이다.
+
+| class | `base.css` 정의 |
+|---|---|
+| `red` | `color: var(--ws-red-500) !important` |
+| `orange` | `color: var(--ws-orange-500) !important` |
+| `blue` | `color: var(--ws-blue-500) !important` |
+| `green` | `color: var(--ws-green-500) !important` |
+
+```javascript
+// (X) 금지
+grd_list.setCellColor(i, "procState", "#FF0000");
+
+// (O) 권장 — 값 → class 표, 기본색이면 class 없음
+scwin.PROC_STATE_CLASS = { "미처리" : "red", "반송" : "blue" };
+const cls = scwin.PROC_STATE_CLASS[dlt_list.getCellData(i, "procState")];
+grd_list.removeCellClass(i, "procState");     // 재조회 때 이전 행 class 가 남지 않게
+if (cls) grd_list.setCellClass(i, "procState", cls);
+```
+
+* **색 대응**: AS-IS 색상값은 가까운 공통 class 로 옮긴다(빨강 계열 → `red`, 파랑 → `blue`, 주황·노랑 → `orange`, 초록 → `green`). 검정·회색(`#000000`·`#343434` 등 기본 글자색)은 class 를 붙이지 않는다. 4종으로 옮길 수 없는 색은 임의 class·인라인 스타일을 만들지 말고 단계 2 판단으로 남겨 `// TODO:` 로 표시한다.
+* **해제**: 같은 셀을 다시 칠할 수 있으면(재조회·값 변경) `removeCellClass(row, col)` 로 먼저 뗀다 — 엔진 `setCellClass` 는 같은 셀의 이전 class 를 지우고 새 class 를 붙이지만, 기본색으로 돌아가는 경우는 class 를 떼야 한다.
+* **배경색** (2026-10-27 추가, 사용자 지시) — 인라인 배경색(`style="background-color:…"`)과 인라인 색을 입히는 함수(`setCellBackgroundColor`·`setRowBackgroundColor`) 대신 `base.css` 의 공통 배경색 class 를 쓴다. 허용 class 는 아래 7종이다.
+
+| class | 용도 | `base.css` 색 |
+|---|---|---|
+| `bg_lgray` | 연한 회색 | `#F4F6F8` |
+| `bg_dgray` | 짙은 회색 | `#DCE0E4` |
+| `bg_blue` | 파란색 | `#E9F5FE` |
+| `bg_red` | 빨간색 | `#FDECEB` |
+| `bg_orange` | 주황색 | `#FFF5E6` |
+| `bg_green` | 초록색 | `#EDF7EE` |
+| `bg_violet` | 보라색 | `#ECEBF9` |
+
+```xml
+<!-- (X) 금지 -->
+<xf:group class="w2tb_td" tagname="td" style="background-color:#ff0000;">
+<!-- (O) 권장 -->
+<xf:group class="w2tb_td bg_red" tagname="td">
+```
+
+```javascript
+// (X) 금지
+grd_list.setCellBackgroundColor(i, "amt", "#E9F5FE");
+grd_list.setRowBackgroundColor(i, "#F4F6F8");
+// (O) 권장 — 셀은 setCellClass, 행 전체는 setRowClass + row_bg_*
+grd_list.setCellClass(i, "amt", "bg_blue");
+grd_list.setRowClass(i, "row_bg_lgray");
+```
+
+    * **class 가 정의된 요소만 색이 나온다** — `base.css` 의 `bg_*` 는 요소별 선택자로만 정의돼 있다: 그리드 셀(`td.gridBodyDefault`), 그리드 행(`row_bg_*` — `setRowClass`), 표 칸(`w2tb_td`), `w2input`·`inputCalendar`·`w2checkbox`·`w2radio`·`w2selectbox`. **단독 `.bg_red` 정의가 없어 일반 그룹(`xf:group`·div)에 붙이면 색이 나오지 않는다** — 그런 자리는 표 칸·입력 등 위 요소로 옮기거나, 공통 class 추가를 퍼블리싱 담당에게 요청하고 `// TODO:` 로 남긴다(임의 class·인라인 스타일 금지).
+    * 표 칸(`w2tb_td`)에는 `bg_dgray` 정의가 없다(6종만) — 짙은 회색이 필요하면 위와 같이 요청·TODO.
+    * 색 대응은 글자색과 같다 — 가까운 계열의 class 로 옮기고, 흰색·투명(기본 배경)은 class 없음, 7종으로 못 옮기는 색은 TODO. 다시 칠할 수 있으면 `removeCellClass`·`removeRowClass` 로 먼저 뗀다.
+    * **적용 현황**(2026-10-27): gfm-front 4화면은 해당 없음(인라인 배경색·배경색 함수 0건). sample-front/ui 인라인 배경색 68곳, jsp-front ui-tobe 1,231곳은 각 재전환 때 반영.
+* **적용 현황**(2026-10-27): gfm-front `ULDBNS30400`(처리결과 1곳) 전환. sample-front/ui 의 `setCellColor` 3곳은 샘플 갱신 때 반영.
+
 ## 규칙 6 보충: Submission 변환 상세
 
 * **규칙 12 — `{DC}.DataID = encodeURI(url)` 의 `url` 선언 역추적 스코프**(2026-10-08): 선언(`var|let|const url = …;`)은 DataID 문이 든 **같은 최상위 함수 안**에서만 찾는다. 스크립트 전체에서 "앞에 있는 마지막 대입"을 고르면 규칙 4 재배치 뒤 다른 핸들러의 팝업 URL 상수(`let url = "/ui/lst/lstproc/ULDSTF05106_read.xml";`)가 걸려 삭제되고 해석 실패한 DataID 는 그대로 남는다(ULDSTF92002 button_1_onclick). 같은 함수에 선언이 없으면 「action URL 해석 실패」로 보류한다. 회귀 테스트 `test_convert_rule12_scope.py`.
