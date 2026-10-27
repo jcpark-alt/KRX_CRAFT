@@ -3,7 +3,7 @@
 | 항목 | 내용 |
 |---|---|
 | AS-IS | `/lstproc/ULDSTF05621.gfm` (Gauce/X-Internet, 610×680 모달 창 — 부모가 615×710 `window` 로 연다) — 반입 `conversion/gfm-front/ui/ULDSTF05621/ULDSTF05621.gfm` |
-| 신규 API 명세 | `conversion/gfm-front/ui/ULDSTF05621/ULDSTF05621_API.md` — 블록 7종(이 화면 6종, 다른 화면 1종: ULDSTF05620 목록 조회). §2.2·§5 는 명세 기준(가이드 §0.3·§5). **2026-10-27 명세 갱신**(txt → md): 저장 요청을 상세 데이터 합본으로, 저장·삭제 응답 신설, 상세 목록 id `dlt_detail_dtl*List`, `select-one` 응답은 개요만 — 변경 대조는 §5 「명세 갱신(2026-10-27)」 |
+| 신규 API 명세 | `conversion/gfm-front/ui/ULDSTF05621/ULDSTF05621_API.md` — 블록 7종(이 화면 6종, 다른 화면 1종: ULDSTF05620 목록 조회). §2.2·§5 는 명세 기준(가이드 §0.3·§5). **2026-10-27 명세 갱신**(txt → md): 저장 요청을 상세 데이터 합본으로, 저장·삭제 응답 신설, 상세 목록 id `dlt_detail_dtl*List`, `select-one` 응답은 개요만. 같은 날 2차 수정으로 블록마다 AS-IS 가 **AS-IS 함수·인덱스 표기**(`fn_save_trs(TRS_IDX_INSERT)` 등)로 바뀌고 파일 감싸기(```` ```markdown ````)가 없어짐 — 변경 대조는 §5 「명세 갱신(2026-10-27)」 |
 | TO-BE | `conversion/gfm-front/ui-tobe/ULDSTF05621.xml` (배포 경로 `/ui/lst/lstproc/ULDSTF05621.xml` — 가정, §10). 가이드 §13.2 대로 퍼블리싱본(마크업 전용)을 먼저 만들고 그 위에 스크립트를 전환함 (2026-10-26). **TO-BE 는 아직 이전 명세(txt) 기준** — 2026-10-27 명세 갱신분 반영은 §10 #15 |
 | 퍼블리싱 | `conversion/publish/상장/상장처리(대내)/ULDSTF05621.xml` — 컴포넌트 id 는 AS-IS 와 같고, 날짜는 `w2:inputCalendar`, 사유는 `xf:select1`, 달력 이미지 버튼은 없음 |
 | 화면 캡처 | `ULDSTF05621.png` (신규 빈 입력 상태) — TO-BE 퍼블리싱 기준 |
@@ -114,7 +114,7 @@ flowchart TD
 |---|---|---|---|---|---|
 | 1 | 파라미터 수신 | 화면 | `$c.data.getParameter()` → `isurCd`·`isurNm`·`bzProcsNo` | `bzProcsNo` 가 비면 신규 | §1.2, §3 |
 | 2a | 신규 준비 | 화면·서버 | 마스터 빈 값, 현재 기준일 조회(**동기** — 다음 단계 전에 끝나야 함), 변경후 13행 | 조회 실패는 공통 오류 핸들러 | §5.1, §6.2 |
-| 2b | 수정 조회 | 서버 | AS-IS 는 같은 URL 을 `DIV_IDX` 0·3·4 로 **동기** 3회, TO-BE 는 `select-one` 1회 | 실패 시 버튼 잠금(※TO-BE) | §5.2 |
+| 2b | 수정 조회 | 서버 | AS-IS 는 같은 URL 을 `DIV_IDX` 0·3·4 로 **동기** 3회, TO-BE 는 `select-one` 1회(세 조회가 항상 함께 호출되고 단독 호출 지점이 없어 명세가 하나로 통합) | 실패 시 버튼 잠금(※TO-BE) | §5.2 |
 | 3 | 버튼 상태 | 화면 | 신규 `insert`, 수정은 `setButtonSetWithDate(edt_MKTACT_ENFORCE_DD, false, …)` | 시행일 ≤ 오늘이면 `error`(기안만) | §4 |
 | 4 | 회사 정보 | 화면 | AS-IS 는 모드와 관계없이 부모 값으로 덮어씀 → TO-BE 는 신규만 | — | §8 #8 |
 
@@ -345,7 +345,7 @@ scwin.init = async function () {
 | # | 용도 | AS-IS | TO-BE |
 |---|---|---|---|
 | 5.1 | 신규: 현재 수입분배기준일 | `/fiscalYearChange.do?method=searchFiscalYearChange&DIV_IDX=3(DTL_DIST_BF)&TRS_IDX=5(NEWSEL2)&ISUR_CD=` → `dts_DtlBf` | `GET …/select-current-dist-pay-basdd` (`isurCd`) |
-| 5.2 | 수정: 상세 조회 | 같은 URL `DIV_IDX` 0(FSC_MST)·3·4 로 3번 → `dts_Mst`·`dts_DtlBf`·`dts_DtlAf` | `GET …/select-one` (`bzProcsNo`) 1번 |
+| 5.2 | 수정: 상세 조회 | `fn_search` — 같은 URL `DIV_IDX` 0(FSC_MST)·3(DTL_DIST_BF)·4(DTL_DIST_AF) 로 3번 → `dts_Mst`·`dts_DtlBf`·`dts_DtlAf` | `GET …/select-one` (`bzProcsNo`) 1번 — 세 조회가 항상 함께 호출되고 단독 호출 지점이 없어 하나의 API 로 통합(명세) |
 | 5.3 | 예약(미래일자) 중복 확인 | `fn_mst_check(dts_Mst_Check, "2")` (공통, `DIV_IDX=0&TRS_IDX=NEWSEL&GUBUN_CD=2`) | `GET …/select-mst-check` (`isurCd`) → boolean |
 | 5.4 | 채번 | `fn_getNewBzProcNo(dts_BzProcsNo)` | `$c.stf.getNewBzProcNo()` (`GET /api/listing/lstproc/stock/chglisting/new-bzprocsno`) — §10 #2 |
 | 5.5 | 신규 저장 | `trs` `/fiscalYearChange.do?method=saveFiscalYearChange` `TRS_IDX=1` `KeyValue: dtsParm1=dts_Mst, dtsParm2=dts_DtlAf, dtsParm3=dts_DtlBf` | `POST …/insert` |
@@ -358,12 +358,12 @@ scwin.init = async function () {
 
 | # | 명세 블록 | method · 경로 | 요청 (명세 정의) | 응답 (명세 정의) | AS-IS 대응 | TO-BE 함수 |
 |---|---|---|---|---|---|---|
-| 1 | [ULDSTF05621] 신규 등록 시 현재 수입분배기준일 조회 | `GET …/select-current-dist-pay-basdd` | `isurCd` | `dma_std` (dataMap — `bzProcsNo`·`bybzprocsSeq`·`isurCd`·`chgBfafTpCd`·`basMmdd`·`basMm`·`basDd`) | `DIV_IDX=3`·`TRS_IDX=5` → `dts_DtlBf` | `scwin.selectCurrentBasdd` → `dlt_detail_dtlBfList` (명세 target 은 `dma_std=body` — §10 #1) |
+| 1 | [ULDSTF05621] 신규 등록 시 현재 수입분배기준일 조회 | `GET …/select-current-dist-pay-basdd` | `isurCd` | `dma_std` (dataMap — `bzProcsNo`·`bybzprocsSeq`·`isurCd`·`chgBfafTpCd`·`basMmdd`·`basMm`·`basDd`) | `fn_new_onload` → `searchFiscalYearChange(DIV_IDX_DTL_DIST_BF, TRS_IDX_NEWSEL2)` (`DIV_IDX=3`·`TRS_IDX=5`) → `dts_DtlBf` | `scwin.selectCurrentBasdd` → `dlt_detail_dtlBfList` (명세 target 은 `dma_std=body` — §10 #1) |
 | 2 | [ULDSTF05621] 예약(미래일자) 등록 중복 체크 | `GET …/select-mst-check` | `isurCd` | `boolean` | `fn_mst_check(dts_Mst_Check, "2")` (`GUBUN_CD=2`) | `scwin.checkMst` |
-| 3 | [ULDSTF05621] 상세 조회(마스터 + 변경전/후) | `GET …/select-one` | `bzProcsNo` | JSON 개요 `body { 마스터…, dtlBfList : [ … ], dtlAfList : [ … ] }` — target `dma_resultDetail=body, dlt_detail_dtlBfList=body.dtlBfList, dlt_detail_dtlAfList=body.dtlAfList` | 같은 URL `DIV_IDX` 0·3·4 로 3회 → `dts_Mst`·`dts_DtlBf`·`dts_DtlAf` | `scwin.selectOne` |
-| 4 | [ULDSTF05621] 삭제 | `POST …/delete` | `{ bzProcsNo }` | `dma_resultDelete` (`bzProcsNo`·`result`·`resultMessage`) | `trs` `TRS_IDX=3` (dataset 3개 전송) | `scwin.deleteTrs` |
-| 5 | [ULDSTF05621] 신규 저장 | `POST …/insert` | `{ ...dma_resultDetail.getJSON(), dtlBfList : dlt_detail_dtlBfList.getAllJSON(), dtlAfList : dlt_detail_dtlAfList.getAllJSON() }` | `dma_resultSave` (`bzProcsNo`·`result`·`resultMessage`) | `trs` `TRS_IDX=1` `dtsParm1=dts_Mst, dtsParm2=dts_DtlAf, dtsParm3=dts_DtlBf` | `scwin.saveTrs("I")` |
-| 6 | [ULDSTF05621] 수정 | `POST …/update` | (insert 와 같은 합본) | `dma_resultSave` (insert 와 같음) | `trs` `TRS_IDX=2` | `scwin.saveTrs("U")` |
+| 3 | [ULDSTF05621] 상세 조회(마스터 + 변경전/후) | `GET …/select-one` | `bzProcsNo` | JSON 개요 `body { 마스터…, dtlBfList : [ … ], dtlAfList : [ … ] }` — target `dma_resultDetail=body, dlt_detail_dtlBfList=body.dtlBfList, dlt_detail_dtlAfList=body.dtlAfList` | `fn_search(DIV_IDX_FSC_MST + DIV_IDX_DTL_DIST_BF + DIV_IDX_DTL_DIST_AF)` — 같은 URL `DIV_IDX` 0·3·4 로 3회 → `dts_Mst`·`dts_DtlBf`·`dts_DtlAf` (항상 함께 호출 → 1 API 통합) | `scwin.selectOne` |
+| 4 | [ULDSTF05621] 삭제 | `POST …/delete` | `{ bzProcsNo }` | `dma_resultDelete` (`bzProcsNo`·`result`·`resultMessage`) | `fn_save_trs(TRS_IDX_DELETE)` — `trs` `TRS_IDX=3` (dataset 3개 전송) | `scwin.deleteTrs` |
+| 5 | [ULDSTF05621] 신규 저장 | `POST …/insert` | `{ ...dma_resultDetail.getJSON(), dtlBfList : dlt_detail_dtlBfList.getAllJSON(), dtlAfList : dlt_detail_dtlAfList.getAllJSON() }` | `dma_resultSave` (`bzProcsNo`·`result`·`resultMessage`) | `fn_save_trs(TRS_IDX_INSERT)` — `trs` `TRS_IDX=1` `dtsParm1=dts_Mst, dtsParm2=dts_DtlAf, dtsParm3=dts_DtlBf` | `scwin.saveTrs("I")` |
+| 6 | [ULDSTF05621] 수정 | `POST …/update` | (insert 와 같은 합본) | `dma_resultSave` (insert 와 같음) | `fn_save_trs(TRS_IDX_UPDATE)` — `trs` `TRS_IDX=2` | `scwin.saveTrs("U")` |
 | 7 | [ULDSTF05620] 목록 조회 | `GET …/select-list` | `isurCd` | `dlt_std` | 부모 ULDSTF05620 `fn_search` | **이 화면 대상 아님** — 부모 전환 때 사용(§1.1) |
 
 명세에 없는 AS-IS 통신: 채번(`fn_getNewBzProcNo`) → 업무공통 `$c.stf.getNewBzProcNo()`(§5.4).
@@ -372,7 +372,7 @@ scwin.init = async function () {
 
 | # | API | 종전(txt) | 갱신(md) | 결과서·TO-BE 영향 |
 |---|---|---|---|---|
-| 1 | 공통 | 경로·요청·응답 | 블록마다 AS-IS 경로와 `submission target` 추가 | 명세의 AS-IS 는 TO-BE 경로에 `.do` 를 붙인 표기라 실제 AS-IS(Gauce `/fiscalYearChange.do?…DIV_IDX…`)와 다르다 — AS-IS 대응은 §5 표를 따른다 |
+| 1 | 공통 | 경로·요청·응답 | 블록마다 AS-IS 와 `submission target` 추가. AS-IS 는 1차에 `TO-BE 경로 + .do` 표기였다가 2차 수정에서 **AS-IS 함수·인덱스 표기**로 바뀜(`searchFiscalYearChange(DIV_IDX_DTL_DIST_BF, TRS_IDX_NEWSEL2)`, `fn_search(…)`, `fn_mst_check`, `fn_save_trs(TRS_IDX_INSERT·UPDATE·DELETE)`) | 원본 `.gfm` 의 함수·상수 이름과 일치함을 확인 — §5 API 명세 대응표의 AS-IS 대응 열에 함께 적었다. 실제 호출 URL(`/fiscalYearChange.do?method=…`)은 §5 표 |
 | 2 | `select-current-dist-pay-basdd` | 응답 `dma_std` | 같음 + target `dma_std=body` | 화면은 여러 행 → 변경전 목록으로 받는 가정 유지(§5.1, §10 #1) |
 | 3 | `select-one` | 응답 정의 3개(`dma_resultDetail` 20키, `dlt_resultDetail_dtlBfList`·`…AfList` 7열) | JSON 개요만, target `dma_resultDetail=body, dlt_detail_dtlBfList=body.dtlBfList, dlt_detail_dtlAfList=body.dtlAfList` | 목록 JSON 키(`dtlBfList`·`dtlAfList`)가 **확정**(종전 가정 해제). 목록 id 를 `dlt_detail_dtl*List` 로 바꾼다. 키 정의는 이전 명세 유지(§2.2) |
 | 4 | `delete` | 요청 `bzProcsNo`, 응답 빈칸 | 요청 `{ bzProcsNo }`, 응답 `dma_resultDelete`(`bzProcsNo`·`result`·`resultMessage`) | 결과 판정에 `result` 를 쓴다(§5.7, §10 #5) |

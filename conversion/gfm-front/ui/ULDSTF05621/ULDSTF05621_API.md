@@ -1,10 +1,11 @@
-```markdown
+
 # [선박투자] 수입분배기준일변경 API 명세 및 변환 정보
+
 
 ## 1. [ULDSTF05621][선박투자][수입분배기준일변경 - 상세] 신규 등록 시 현재 수입분배기준일 조회
 
-**1) AS-IS → TO-BE 변환 API 명세 내용**
-*   **AS-IS** : `GET /api/listing/lstproc/fund/dist-pay-basdd-change/select-current-dist-pay-basdd.do`
+**1) AS-IS 함수 → TO-BE 변환 API 명세 내용**
+*   **AS-IS** : `searchFiscalYearChange(DIV_IDX_DTL_DIST_BF, TRS_IDX_NEWSEL2)`
 *   **TO-BE** : `GET /api/listing/lstproc/fund/dist-pay-basdd-change/select-current-dist-pay-basdd`
 
 **[REQUEST]**
@@ -40,7 +41,7 @@ const requestData = {
 
 **1) AS-IS → TO-BE 변환 API 명세 내용**
 
-* **AS-IS** : `GET /api/listing/lstproc/fund/dist-pay-basdd-change/select-list.do`
+* **AS-IS** : `fn_search`
 * **TO-BE** : `GET /api/listing/lstproc/fund/dist-pay-basdd-change/select-list`
 
 **[REQUEST]**
@@ -82,7 +83,7 @@ const requestData = {
 
 **1) AS-IS → TO-BE 변환 API 명세 내용**
 
-* **AS-IS** : `GET /api/listing/lstproc/fund/dist-pay-basdd-change/select-mst-check.do`
+* **AS-IS** : `fn_mst_check`
 * **TO-BE** : `GET /api/listing/lstproc/fund/dist-pay-basdd-change/select-mst-check`
 
 **[REQUEST]**
@@ -109,7 +110,7 @@ const result = await $c.sbm.executeDynamic(sbmOptions, requestData);
 
 **1) AS-IS → TO-BE 변환 API 명세 내용**
 
-* **AS-IS** : `GET /api/listing/lstproc/fund/dist-pay-basdd-change/select-one.do`
+* **AS-IS** : `fn_search(DIV_IDX_FSC_MST + DIV_IDX_DTL_DIST_BF + DIV_IDX_DTL_DIST_AF)`, 세 조회가 항상 함께 호출되고 단독 호출 지점이 없어 하나의 API 로 통합
 * **TO-BE** : `GET /api/listing/lstproc/fund/dist-pay-basdd-change/select-one`
 
 **[REQUEST]**
@@ -140,7 +141,7 @@ body {
 
 **1) AS-IS → TO-BE 변환 API 명세 내용**
 
-* **AS-IS** : `POST /api/listing/lstproc/fund/dist-pay-basdd-change/delete.do`
+* **AS-IS** : `fn_save_trs(TRS_IDX_DELETE)`
 * **TO-BE** : `POST /api/listing/lstproc/fund/dist-pay-basdd-change/delete`
 
 **[REQUEST]**
@@ -171,7 +172,7 @@ const requestData = { bzProcsNo: bzProcsNo };
 
 **1) AS-IS → TO-BE 변환 API 명세 내용**
 
-* **AS-IS** : `POST /api/listing/lstproc/fund/dist-pay-basdd-change/insert.do`
+* **AS-IS** : `fn_save_trs(TRS_IDX_INSERT)`
 * **TO-BE** : `POST /api/listing/lstproc/fund/dist-pay-basdd-change/insert`
 
 **[REQUEST 병합 처리]**
@@ -206,7 +207,7 @@ const requestData = {
 
 **1) AS-IS → TO-BE 변환 API 명세 내용**
 
-* **AS-IS** : `POST /api/listing/lstproc/fund/dist-pay-basdd-change/update.do`
+* **AS-IS** : `fn_save_trs(TRS_IDX_UPDATE)`
 * **TO-BE** : `POST /api/listing/lstproc/fund/dist-pay-basdd-change/update`
 
 **[REQUEST 병합 처리]**
@@ -224,7 +225,3 @@ const requestData = {
 *(6번 신규 저장의 DataMap `dma_resultSave` 구조와 동일)*
 
 * **submission target**: `"dma_resultSave=body"`
-
-```
-
-```
