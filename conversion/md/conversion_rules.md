@@ -912,7 +912,8 @@ if (cls) grd_list.setCellClass(i, "procState", cls);
 
 * **색 대응**: AS-IS 색상값은 가까운 공통 class 로 옮긴다(빨강 계열 → `red`, 파랑 → `blue`, 주황·노랑 → `orange`, 초록 → `green`). 검정·회색(`#000000`·`#343434` 등 기본 글자색)은 class 를 붙이지 않는다. 4종으로 옮길 수 없는 색은 임의 class·인라인 스타일을 만들지 말고 단계 2 판단으로 남겨 `// TODO:` 로 표시한다.
 * **해제**: 같은 셀을 다시 칠할 수 있으면(재조회·값 변경) `removeCellClass(row, col)` 로 먼저 뗀다 — 엔진 `setCellClass` 는 같은 셀의 이전 class 를 지우고 새 class 를 붙이지만, 기본색으로 돌아가는 경우는 class 를 떼야 한다.
-* **배경색** (2026-10-27 추가, 사용자 지시) — 인라인 배경색(`style="background-color:…"`)과 인라인 색을 입히는 함수(`setCellBackgroundColor`·`setRowBackgroundColor`) 대신 `base.css` 의 공통 배경색 class 를 쓴다. 허용 class 는 아래 7종이다.
+* **그리드 셀 글자색은 규칙 43 의 customFormatter(span class) 가 우선**이다 — 위 `setCellClass` 글자색 방식은 그리드 밖·formatter 를 쓸 수 없는 경우에 쓴다.
+* 배경색 (2026-10-27 추가, 사용자 지시) — 인라인 배경색(`style="background-color:…"`)과 인라인 색을 입히는 함수(`setCellBackgroundColor`·`setRowBackgroundColor`) 대신 `base.css` 의 공통 배경색 class 를 쓴다. 허용 class 는 아래 7종이다.
 
 | class | 용도 | `base.css` 색 |
 |---|---|---|
@@ -1007,6 +1008,42 @@ grd_list.setRowClass(i, "row_bg_lgray");
     3. **이름**은 AS-IS 파일명(`GridToExcel`·`GridToOffice` 의 파일명 인자)이나 화면·탭·그리드 구분명을 쓴다. 메뉴명과 같으면 `fileName` 을 생략해 공통 함수 기본 규칙에 맡겨도 된다 — 단 **팝업·탭 본문처럼 메뉴 정보가 없을 수 있는 화면은 생략하지 않는다**(`excel.xlsx` 가 되어 menuId 가 빠진다).
     4. 일시는 서버 시각 `$c.date.getServerDateTime("yyyyMMddHHmmss")`, 확장자는 `.xlsx` 를 명시한다. 파일명에 쓸 수 없는 문자(`\ / : * ? " < > |`)는 넣지 않는다(예: "행사가격/전환비율" → "행사가격_전환비율").
 * **적용 현황**(2026-10-27, gfm-front TO-BE): `fileName` 을 직접 지정하는 3곳 모두 적용 완료 — ULDBNS30400 `scwin.excelDown`·`scwin.excelDownDtl`, ULDSTF05911 엑셀 다운로드(팝업이라 생략 불가). sample-front·jsp-front 는 각 재전환 때.
+
+### 규칙 43: gridView 표시용 반복문 → 컬럼 `customFormatter` (2026-10-27 신설, 사용자 지시)
+
+* **AS-IS**: 조회 뒤 gridView 에 바인딩된 dataList 를 반복문으로 돌며 셀 표시를 직접 바꾸는 코드 — 글자색 class(`setCellClass(i, col, "red")`), 표시용 문자열을 만들려고 `setCellData` 로 값을 덮어쓰기, 링크·강조 표시 등.
+* **TO-BE**: 반복문을 두지 않고 해당 **컬럼의 `customFormatter`** 로 표시 내용과 스타일을 그릴 때마다 계산한다.
+
+```xml
+<w2:column id="procState" inputType="text" readOnly="true" customFormatter="scwin.fmtProcState" escape="false" ... />
+```
+
+```javascript
+// 반환값 = 셀 안에 들어갈 HTML. 글자색 class 는 span 에 붙인다(base.css red·orange·blue·green — 규칙 40)
+scwin.fmtProcState = function (data, formattedData, rowIndex, colIndex) {
+    const text = $c.str.escapeToHtml(String(formattedData ?? ""));
+    const cls = scwin.PROC_STATE_CLASS[data];
+    return cls ? "<span class=\"" + cls + "\">" + text + "</span>" : text;
+};
+```
+
+* **엔진 동작**(websquare-engine 실측 — 85669·85699행 부근)
+    * 호출: `customFormatter.call(gridView, data, formattedData, rowIndex, colIndex)` — `this` 는 gridView, `data` 는 원본 값, `formattedData` 는 displayFormat 을 적용한 값.
+    * 반환값은 셀 안에 **`innerHTML`** 로 들어간다 → `<span class="red">…</span>` 이 그대로 그려진다. 값은 `$c.str.escapeToHtml` 로 이스케이프하고, 컬럼에 `escape="false"` 를 함께 둔다.
+    * 셀을 그릴 때마다(조회·정렬·필터·스크롤·값 변경) 다시 불린다 → 스타일이 행을 따라가고, 재조회 때 class 를 지우고 다시 칠할 필요가 없다.
+    * 표시 전용이다 — dataList 값은 바뀌지 않는다(엑셀 다운로드·`getCellDisplayData` 도 formatter 결과를 쓴다).
+* **지킬 것**
+    1. formatter 는 **동기 함수**다(`async` 금지 — 엔진이 반환값을 기다리지 않아 `[object Promise]` 가 표시된다). 통신·`await` 를 넣지 않는다.
+    2. `rowIndex` 는 **화면 행 번호**(정렬·필터 반영)다. 같은 행의 다른 컬럼은 `this.getCellData(rowIndex, "col")`(gridView 기준)로 읽고, `dlt_x.getCellData(rowIndex, …)` 로 읽지 않는다.
+    3. 부작용 금지 — formatter 안에서 `setCellClass`·`setCellData`·`setCellReadOnly` 등을 부르지 않는다(그릴 때마다 불린다).
+    4. 함수 이름은 `scwin.fmt{컬럼}` 형태로 짓고 `publicInfo` 에 올린다(엔진이 문자열 이름을 화면 scope 에서 찾는다).
+* **예외 — 반복문 유지**: customFormatter 는 셀 **안의 내용**만 그린다. 다음은 대신할 수 없으므로 기존 방식(반복문 또는 이벤트)을 쓴다.
+    * 셀 전체(TD)의 class·배경색(`bg_*` — 셀을 다 칠해야 함) → `setCellClass`(규칙 40)
+    * 편집 가능 여부 `setCellReadOnly`·`disabled` → 반복문 유지 또는 편집 시작 이벤트에서 막기
+    * 실제 데이터 변경(`setCellData` 로 값을 계산해 저장, 행 추가 등)
+* **규칙 40 과의 관계**: 그리드 셀 **글자색**은 이 규칙의 formatter + span class 가 우선이다. 셀 **배경색**과 그리드 밖 요소는 규칙 40 의 `setCellClass`·마크업 class 를 그대로 쓴다.
+* **적용 현황**(2026-10-27): gfm-front ULDBNS30400 처리결과 색(`scwin.applyProcStateColor` 반복문 → `scwin.fmtProcState`, 그리드 3개) 전환. ULDSTF05911 `applyKoEditable`(readOnly)·ULDSTF05621 월·일 계산(데이터 변경)은 예외라 유지.
+    * **점검 필요**: jsp-front ui-tobe 101개 파일의 `_fmt_* = async function` customFormatter — 위 1번 위반(Promise 표시 의심). 해당 모듈 재전환 때 동기 함수로 고친다.
 
 ## 규칙 6 보충: Submission 변환 상세
 
