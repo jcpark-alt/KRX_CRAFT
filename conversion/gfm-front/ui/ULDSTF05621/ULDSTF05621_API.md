@@ -9,6 +9,14 @@
 *   **TO-BE** : `GET /api/listing/lstproc/fund/dist-pay-basdd-change/select-current-dist-pay-basdd`
 
 **[REQUEST]**
+
+```javascript
+{
+    ref: "",
+    target: "dma_std=body"
+}
+```
+
 ```javascript
 const requestData = {
     isurCd: 조회 영역의 isurCd 값
@@ -33,8 +41,6 @@ const requestData = {
 
 ```
 
-* **submission target**: `"dma_std=body"`
-
 ---
 
 ## 2. [ULDSTF05620][선박투자][수입분배기준일변경] 목록 조회
@@ -45,6 +51,13 @@ const requestData = {
 * **TO-BE** : `GET /api/listing/lstproc/fund/dist-pay-basdd-change/select-list`
 
 **[REQUEST]**
+
+```javascript
+{
+    ref: "",
+    target: "dlt_std=body"
+}
+```
 
 ```javascript
 const requestData = {
@@ -75,8 +88,6 @@ const requestData = {
 
 ```
 
-* **submission target**: `"dlt_std=body"`
-
 ---
 
 ## 3. [ULDSTF05621][선박투자][수입분배기준일변경 - 상세] 예약(미래일자) 등록 중복 체크
@@ -87,6 +98,13 @@ const requestData = {
 * **TO-BE** : `GET /api/listing/lstproc/fund/dist-pay-basdd-change/select-mst-check`
 
 **[REQUEST]**
+
+```javascript
+{
+    ref: "",
+    target: ""
+}
+```
 
 ```javascript
 const requestData = {
@@ -116,6 +134,13 @@ const result = await $c.sbm.executeDynamic(sbmOptions, requestData);
 **[REQUEST]**
 
 ```javascript
+{
+    ref: "",
+    target: "dma_resultDetail=body, dlt_detail_dtlBfList=body.dtlBfList, dlt_detail_dtlAfList=body.dtlAfList"
+}
+```
+
+```javascript
 const requestData = {
     bzProcsNo: bzProcsNo
 };
@@ -133,8 +158,6 @@ body {
 
 ```
 
-* **submission target**: `"dma_resultDetail=body, dlt_detail_dtlBfList=body.dtlBfList, dlt_detail_dtlAfList=body.dtlAfList"`
-
 ---
 
 ## 5. [ULDSTF05621][선박투자][수입분배기준일변경 - 상세] 삭제
@@ -145,6 +168,13 @@ body {
 * **TO-BE** : `POST /api/listing/lstproc/fund/dist-pay-basdd-change/delete`
 
 **[REQUEST]**
+
+```javascript
+{
+    ref: "",
+    target: "dma_resultDelete=body"
+}
+```
 
 ```javascript
 const requestData = { bzProcsNo: bzProcsNo };
@@ -164,8 +194,6 @@ const requestData = { bzProcsNo: bzProcsNo };
 
 ```
 
-* **submission target**: `"dma_resultDelete=body"`
-
 ---
 
 ## 6. [ULDSTF05621][선박투자][수입분배기준일변경 - 상세] 신규 저장
@@ -176,6 +204,13 @@ const requestData = { bzProcsNo: bzProcsNo };
 * **TO-BE** : `POST /api/listing/lstproc/fund/dist-pay-basdd-change/insert`
 
 **[REQUEST 병합 처리]**
+
+```javascript
+{
+    ref: "",
+    target: "dma_resultSave=body"
+}
+```
 
 ```javascript
 const requestData = {
@@ -199,8 +234,6 @@ const requestData = {
 
 ```
 
-* **submission target**: `"dma_resultSave=body"`
-
 ---
 
 ## 7. [ULDSTF05621][선박투자][수입분배기준일변경 - 상세] 수정
@@ -213,6 +246,13 @@ const requestData = {
 **[REQUEST 병합 처리]**
 
 ```javascript
+{
+    ref: "",
+    target: "dma_resultSave=body"
+}
+```
+
+```javascript
 const requestData = {
     ...dma_resultDetail.getJSON(),
     dtlBfList : dlt_detail_dtlBfList.getAllJSON(),
@@ -223,5 +263,3 @@ const requestData = {
 
 **[RESPONSE]**
 *(6번 신규 저장의 DataMap `dma_resultSave` 구조와 동일)*
-
-* **submission target**: `"dma_resultSave=body"`

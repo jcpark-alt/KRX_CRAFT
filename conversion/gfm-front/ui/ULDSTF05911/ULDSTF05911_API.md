@@ -12,6 +12,13 @@
 **[REQUEST]**
 
 ```javascript
+{
+    ref: "",
+    target: "dma_detail=body"
+}
+```
+
+```javascript
 const requestData = {
     bzProcsNo : bzProcsNo
 };
@@ -43,8 +50,6 @@ const requestData = {
 </w2:dataMap>
 ```
 
-* **submission target**: `"dma_detail=body"`
-
 ---
 
 ## 2. [ULDSTF05911][ELW][행사가격/전환비율 변경] 수정
@@ -55,6 +60,13 @@ const requestData = {
 * **TO-BE** : `POST /api/listing/lstproc/elw/chg-listing-prc/modify`
 
 **[REQUEST]**
+
+```javascript
+{
+    ref: "",
+    target: ""
+}
+```
 
 ```xml
 <w2:dataMap id="dma_update" baseNode="map">
@@ -98,6 +110,13 @@ const requestData = {
 
 **[REQUEST]**
 
+```javascript
+{
+    ref: "",
+    target: ""
+}
+```
+
 ```xml
 <w2:dataMap id="dma_register" baseNode="map">
 	<w2:keyInfo>
@@ -139,6 +158,13 @@ const requestData = {
 * **TO-BE** : `POST /api/listing/lstproc/elw/chg-listing-prc/remove`
 
 **[REQUEST]**
+
+```javascript
+{
+    ref: "",
+    target: ""
+}
+```
 
 ```xml
 <w2:dataMap id="dma_remove" baseNode="map">

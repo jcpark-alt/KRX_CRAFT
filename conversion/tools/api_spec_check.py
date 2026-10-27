@@ -22,6 +22,7 @@
     *   **TO-BE** : `GET /api/...`                  ← TO-BE 줄의 method·경로
     **[REQUEST]** / **[RESPONSE]** …               ← 코드 블록 안 내용은 블록 머리로 보지 않는다
   TO-BE 줄이 없으면 블록 안 첫 `GET|POST… /경로`(백틱·목록 기호 허용, `.do` 제외)를 쓴다.
+  executeDynamic 옵션 ref·target 은 [REQUEST] 아래 `{ ref: "", target: "…" }` 코드 블록으로 적는다(이 게이트는 읽지 않는다).
 
 검사 (화면마다):
   A01 FAIL  TO-BE 의 executeDynamic action 이 명세에 없는 경로

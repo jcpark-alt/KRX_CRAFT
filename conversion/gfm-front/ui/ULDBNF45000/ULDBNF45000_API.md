@@ -11,6 +11,13 @@
 
 **[REQUEST]**
 
+```javascript
+{
+    ref: "",
+    target: "dlt_searchList=body"
+}
+```
+
 ```xml
 <w2:dataMap id="dma_searchList" baseNode="map">
 	<w2:keyInfo>
@@ -43,8 +50,6 @@
 </w2:dataList>
 ```
 
-* **submission target**: `"dlt_searchList=body"`
-
 ---
 
 ## 2. [ULDBNF45000] 담당자 상세 조회
@@ -55,6 +60,13 @@
 * **TO-BE** : `GET /api/bonds/accountMgt/bndClaimMgrUpdate/bndClaimMgrDtl-select`
 
 **[REQUEST]**
+
+```javascript
+{
+    ref: "",
+    target: "dma_searchDtlRes=body"
+}
+```
 
 ```xml
 <w2:dataMap id="dma_searchDtlReq" baseNode="map">
@@ -88,8 +100,6 @@
 </w2:dataMap>
 ```
 
-* **submission target**: `"dma_searchDtlRes=body"`
-
 ---
 
 ## 3. [ULDBNF45000] 담당자 정보 수정
@@ -100,6 +110,13 @@
 * **TO-BE** : `POST /api/bonds/accountMgt/bndClaimMgrUpdate/mgrInfo-update`
 
 **[REQUEST]**
+
+```javascript
+{
+    ref: "",
+    target: ""
+}
+```
 
 ```xml
 <w2:dataMap id="dma_mgrInfoUpdate" baseNode="map">
@@ -144,6 +161,13 @@
 * **TO-BE** : `POST /api/bonds/accountMgt/bndClaimMgrUpdate/mgrUpdate-proc`
 
 **[REQUEST]**
+
+```javascript
+{
+    ref: "",
+    target: ""
+}
+```
 
 ```xml
 <w2:dataMap id="dma_mgrInfoUpdate" baseNode="map">

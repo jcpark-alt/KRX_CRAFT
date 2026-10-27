@@ -328,7 +328,15 @@ AS-IS 의 Ajax(`$.ajax`·`$.post`·axios) 또는 Form Submit 을 `$c.sbm.execute
 
 원본 옆에 `{화면ID}_API.txt` 또는 `{화면ID}_API.md`(예: `conversion/gfm-front/ui/ULDSTF05621/ULDSTF05621_API.md`)가 있으면, 결과서 §5 와 TO-BE 의 모든 통신을 **이 명세의 API 로 바꿉니다**. AS-IS URL(`*.do`, `DIV_IDX`·`TRS_IDX`·`queryId` 파라미터)은 TO-BE 코드에 남기지 않습니다.
 
-1. **명세 읽기** — 블록 하나가 API 하나입니다. md 명세는 `## n. [화면ID][업무][제목]` 머리글이 블록이고, 경로·method 는 `* **TO-BE** : \`GET /api/…\`` 줄을 씁니다(`AS-IS` 줄의 `.do` 경로는 대조하지 않음). 게이트는 두 형식을 모두 읽습니다(같은 폴더에 둘 다 있으면 txt 우선).
+1. **명세 읽기** — 블록 하나가 API 하나입니다. md 명세는 `## n. [화면ID][업무][제목]` 머리글이 블록이고, 경로·method 는 `* **TO-BE** : \`GET /api/…\`` 줄을 씁니다(`AS-IS` 줄의 `.do` 경로는 대조하지 않음). 게이트는 두 형식을 모두 읽습니다(같은 폴더에 둘 다 있으면 txt 우선). md 명세에서 `$c.sbm.executeDynamic` 옵션 `ref`·`target` 을 적을 때는 블록의 `**[REQUEST]**` 바로 아래에 아래 샘플 형식으로 둡니다(값이 없으면 빈 문자열, 2026-10-27).
+
+   ```javascript
+   {
+       ref: "",
+       target: "dma_resultSave=body"
+   }
+   ```
+
 
    ```text
    [화면ID][업무][제목]            ← 이 화면ID 블록만 이 화면의 대상. 다른 화면ID(부모·형제)는 그 화면 전환 때 쓴다
@@ -642,7 +650,8 @@ done
 
 # API 명세가 있으면 — 이 화면ID 블록의 API 끝 경로가 결과서에 모두 언급됐는지(다른 화면ID 블록은 제외)
 A=$(ls {폴더}/{화면ID}_API.txt {폴더}/{화면ID}_API.md 2>/dev/null | head -1); ID={화면ID}   # txt·md 모두
-[ -n "$A" ] && for k in $(python -c "import sys; sys.path.insert(0,'conversion/tools'); import api_spec_check as ac; print('\n'.join(sorted({a['path'].rsplit('/',1)[-1] for a in ac.parse_spec(open(sys.argv[1],encoding='utf-8-sig').read(), 'md' if sys.argv[1].endswith('.md') else 'txt') if a['screen']==sys.argv[2]})))" "$A" "$ID" | tr -d ''); do   # Windows 의 CRLF 출력 제거
+[ -n "$A" ] && for k in $(python -c "import sys; sys.path.insert(0,'conversion/tools'); import api_spec_check as ac; print('\n'.join(sorted({a['path'].rsplit('/',1)[-1] for a in ac.parse_spec(open(sys.argv[1],encoding='utf-8-sig').read(), 'md' if sys.argv[1].endswith('.md') else 'txt') if a['screen']==sys.argv[2]})))" "$A" "$ID" | tr -d '
+'); do   # Windows 의 CRLF 출력 제거
   grep -q "$k" $M || echo "결과서 미언급 API: $k"
 done
 ```
