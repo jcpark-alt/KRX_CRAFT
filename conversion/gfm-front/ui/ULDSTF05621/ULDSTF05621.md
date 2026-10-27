@@ -281,6 +281,7 @@ stateDiagram-v2
      4. 버튼 상태 `insert` (원본 `buttonSet.setInsertStatus()`).
 4. **회사코드·명 설정** — AS-IS 는 조회 뒤 `dts_Mst` 에 `ISUR_CD`·`ISUR_NM` 을 부모 값으로 덮어쓴다(수정 모드도). TO-BE 는 신규일 때만 부모 값을 넣고, 수정은 조회 응답(`isurCd`·`isurNm`)을 그대로 쓴다(§8 #8).
 5. `PanelToGroupBox(panel_3)` — 삭제(퍼블리싱 마크업).
+6. **달력 검사 바인딩** (TO-BE 신설, 전환 규칙 37 — `scwin.init` 에서 1회) — 단일 달력 `edt_CHG_DD`·`edt_MKTACT_ENFORCE_DD` 는 `$c.date.checkCalendarFormat(…, "yyyyMMdd")`, 기간 쌍 「5. 변경 후 최초 사업연도」 `edt_ChgStatDd`~`edt_ChgEndDd` 는 `$c.date.compareFromToDate(edt_ChgStatDd, edt_ChgEndDd, ["최초 사업연도 시작일", "최초 사업연도 종료일"])`. AS-IS 는 시작·종료일 선후를 검사하지 않았다(종료일이 시작일보다 앞서면 안내 후 원복하는 동작이 TO-BE 에서 생긴다).
 
 ```javascript
 scwin.onpageload = async function () {
