@@ -946,6 +946,43 @@ grd_list.setRowClass(i, "row_bg_lgray");
     * **적용 현황**(2026-10-27): gfm-front 4화면은 해당 없음(인라인 배경색·배경색 함수 0건). sample-front/ui 인라인 배경색 68곳, jsp-front ui-tobe 1,231곳은 각 재전환 때 반영.
 * **적용 현황**(2026-10-27): gfm-front `ULDBNS30400`(처리결과 1곳) 전환. sample-front/ui 의 `setCellColor` 3곳은 샘플 갱신 때 반영.
 
+### 규칙 41: 하단 버튼 영역(`btnbox`) — 주요 버튼 5종은 `pt` + 오른쪽 고정 순서, 나머지는 그 바로 왼쪽 (2026-10-27 신설, 사용자 지시)
+
+화면·팝업 하단 버튼 영역(`xf:group.btnbox`)의 버튼 class 와 순서를 정한다. 섹션 버튼(`titbox` 의 `rt`)·조회 버튼(`btn_schbox`)·입력칸에 붙는 찾기 버튼은 대상이 아니다.
+
+* **주요 버튼 5종** — **취소·삭제·수정·저장·신규**
+    * class 에 `pt` 를 붙인다: `class="btn_cm pt"`.
+    * 영역 **오른쪽 끝**에 아래 순서로 둔다(좌 → 우). 화면에 없는 버튼은 건너뛰고 순서만 지킨다.
+
+      `[취소] - [삭제] - [수정] - [저장] - [신규]`
+* **나머지 일반 버튼** — 위 5종을 뺀 모든 버튼(안내문작성·기안·신청종목삭제·인쇄·초기화·엑셀 등)
+    * class 는 `btn_cm`(용도 class `download` 등은 유지, `pt` 는 붙이지 않는다).
+    * 주요 버튼 묶음의 **바로 왼쪽**(=[취소] 가 있으면 그 왼쪽, 없으면 첫 주요 버튼의 왼쪽)에 이어서 둔다. 일반 버튼끼리의 순서는 캡처·원본 순서를 따른다.
+    * 일반 버튼을 영역 왼쪽 끝(`lt`)으로 떼어 놓지 않는다 — 버튼은 모두 `rt` 한 그룹 안에 [일반 버튼…] [주요 버튼…] 순서로 둔다. `lt` 는 버튼이 아닌 요소(예: 인쇄용 승인일 입력처럼 버튼과 붙어 다니는 입력)가 있을 때만 쓰고, 비어 있으면 만들지 않는다.
+
+```xml
+<xf:group class="btnbox" id="grpBtnBox" style="">
+	<xf:group class="rt" id="" style="">
+		<!-- 일반 버튼 : 주요 버튼 바로 왼쪽 -->
+		<xf:trigger class="btn_cm" id="btn_Dscl" type="button"><xf:label><![CDATA[안내문작성]]></xf:label></xf:trigger>
+		<!-- 주요 버튼 : 취소 - 삭제 - 수정 - 저장 - 신규 -->
+		<xf:trigger class="btn_cm pt" id="btn_Cancel" type="button"><xf:label><![CDATA[취소]]></xf:label></xf:trigger>
+		<xf:trigger class="btn_cm pt" id="btn_Delete" type="button"><xf:label><![CDATA[삭제]]></xf:label></xf:trigger>
+		<xf:trigger class="btn_cm pt" id="btn_Update" type="button"><xf:label><![CDATA[수정]]></xf:label></xf:trigger>
+		<xf:trigger class="btn_cm pt" id="btn_Save" type="button"><xf:label><![CDATA[저장]]></xf:label></xf:trigger>
+		<xf:trigger class="btn_cm pt" id="btn_New" type="button"><xf:label><![CDATA[신규]]></xf:label></xf:trigger>
+	</xf:group>
+</xf:group>
+```
+
+* **판정은 버튼 라벨 기준** — 라벨이 정확히 「취소」「삭제」「수정」「저장」「신규」인 버튼만 주요 버튼이다. 「신청종목삭제」「임시저장」「행삭제」처럼 다른 말이 붙은 버튼은 일반 버튼이다. 「닫기」는 팝업 하단에 두지 않는다(퍼블리싱 규칙 — 팝업 닫기 금지).
+* 종전 관용구 「주요 동작 하나만 `btn_cm pt`, 맨 오른쪽」은 이 규칙으로 대체한다(퍼블리싱 스킬·markup-idioms 3.1·3.2 동기화).
+* 버튼 id·`ev:onclick`·라벨은 그대로 두고 **순서와 class 만** 바꾼다 — 퍼블리싱 게이트 보존 검사(P10~P13)에 걸리지 않는다.
+* **적용 현황**(2026-10-27, gfm-front TO-BE): ULDBNF45000(수정 1개 — 이미 맞음). 아래 3화면은 다음 갱신 때 맞춘다.
+    * ULDSTF05621: 지금 수정·삭제·기안·안내문작성·저장(pt) → 기안·안내문작성 | 삭제(pt)·수정(pt)·저장(pt)
+    * ULDSTF05710: 지금 `lt` 인쇄·승인일 / `rt` 신청종목삭제·수정·삭제·안내문작성·저장(pt) → `rt` 신청종목삭제·안내문작성·(인쇄) | 삭제(pt)·수정(pt)·저장(pt) — 인쇄는 승인일 입력과 한 묶음이라 `lt` 유지 여부는 판단 필요
+    * ULDSTF05911: 지금 빈 `lt` / 수정·삭제·저장(pt) → 삭제(pt)·수정(pt)·저장(pt), 빈 `lt` 제거
+
 ## 규칙 6 보충: Submission 변환 상세
 
 * **규칙 12 — `{DC}.DataID = encodeURI(url)` 의 `url` 선언 역추적 스코프**(2026-10-08): 선언(`var|let|const url = …;`)은 DataID 문이 든 **같은 최상위 함수 안**에서만 찾는다. 스크립트 전체에서 "앞에 있는 마지막 대입"을 고르면 규칙 4 재배치 뒤 다른 핸들러의 팝업 URL 상수(`let url = "/ui/lst/lstproc/ULDSTF05106_read.xml";`)가 걸려 삭제되고 해석 실패한 DataID 는 그대로 남는다(ULDSTF92002 button_1_onclick). 같은 함수에 선언이 없으면 「action URL 해석 실패」로 보류한다. 회귀 테스트 `test_convert_rule12_scope.py`.

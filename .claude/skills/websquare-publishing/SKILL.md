@@ -57,7 +57,7 @@ PYTHONUTF8=1 python conversion/tools/publish_gate.py --rev HEAD <수정한 xml> 
 | 안내문 | `w2:textbox class="txt_info"` |
 | 버튼 영역 | 섹션 버튼은 titbox 의 `rt`, 화면 하단 버튼은 `xf:group.btnbox` > `xf:group.rt` — 표 안 빈 tr/td 에 버튼을 두지 않는다(팝업 찾기 버튼처럼 입력칸에 붙는 것은 예외) |
 | 팝업 닫기 | 팝업 하단 `btnbox` 에 **「닫기」 버튼을 넣지 않는다**(팝업 창 자체의 닫기를 쓴다, 2026-10-23 확정). 캡처에 닫기가 있어도 옮기지 않는다. 하단에 남는 버튼이 없으면 `btnbox` 자체를 두지 않는다. 기존 화면의 `btn_close`(+`ev:onclick` 핸들러)를 지우는 것은 보존 규칙(P11·P13) 대상이라 요청자 승인 후 `--allow` 로 진행한다 |
-| 버튼 class | 기본 `btn_cm`, 주요 동작 `btn_cm pt`(하단 버튼줄 맨 오른쪽), 조회 `sch`, 엑셀·파일 `download`/`upload`, 행 `row_add`/`row_del`, 팝업 찾기 `btn_cm icon search`(읽기전용 입력칸과 같은 td) |
+| 버튼 class | 기본 `btn_cm`, 하단 `btnbox` 의 주요 버튼 5종(취소·삭제·수정·저장·신규)은 `btn_cm pt` 를 붙여 오른쪽 끝에 [취소]-[삭제]-[수정]-[저장]-[신규] 순서, 나머지 버튼은 그 바로 왼쪽(같은 `rt` 안, 전환 규칙 41), 조회 `sch`, 엑셀·파일 `download`/`upload`, 행 `row_add`/`row_del`, 팝업 찾기 `btn_cm icon search`(읽기전용 입력칸과 같은 td) |
 | 입력 | 필수 라벨 `w2:textbox class="req"`, 금액 `xf:input class="tar" dataType="number" displayFormat="#,###"`, 한 칸 여러 컨트롤 `xf:group.flex`(줄바꿈 금지 `flex flex_no`), 기간 `flex flex_no` > 달력 + `w2:span "~"` + 달력 |
 | 다단 배치 | `xf:group.lybox` > `xf:group.col_N` > `xf:group.tblbox` > table |
 | 표 | `xf:group tagname="table" class="w2tb tbl"` + `w2:attributes/w2:summary`, **colgroup 직속 col 수 = 각 행 실제 칸 수**(colspan/rowspan 은 `w2:attributes/w2:colspan`·`w2:rowspan`), th 는 `class="w2tb_th"` + `w2:scope row`, td 는 `class="w2tb_td"` |

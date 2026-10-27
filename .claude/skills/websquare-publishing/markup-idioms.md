@@ -70,7 +70,7 @@
 | class | 용도 | 예 |
 |---|---|---|
 | `btn_cm` | 모든 텍스트 버튼의 기본 (108) | 취소, 초기화 (팝업 「닫기」는 만들지 않음 — 3.2) |
-| `btn_cm pt` | 주요 동작 — 저장·확인·등록·접수 (62) | 저장 |
+| `btn_cm pt` | 하단 `btnbox` 주요 버튼 5종 — 취소·삭제·수정·저장·신규 (전환 규칙 41, 2026-10-27. 종전 "주요 동작 하나" 관용구 대체) | 저장 |
 | `btn_cm sch` | 조회조건의 조회 버튼 (36) | 조회 |
 | `btn_cm download` / `upload` | 엑셀·파일 내려받기 / 올리기 (25 / 9) | 엑셀다운로드 |
 | `btn_cm row_add` / `row_del` | 그리드 행 추가 / 삭제 (14) | 행추가 |
@@ -80,12 +80,15 @@
 ### 3.2 버튼 영역
 
 ```xml
-<!-- 화면·팝업 하단 「8_04 전체제어버튼」「8_05 팝업전체제어버튼」 : 주요 버튼(pt)을 맨 오른쪽(마지막)에.
+<!-- 화면·팝업 하단 「8_04 전체제어버튼」「8_05 팝업전체제어버튼」 (전환 규칙 41):
+     주요 버튼 5종(취소·삭제·수정·저장·신규)은 btn_cm pt + 오른쪽 끝에 [취소]-[삭제]-[수정]-[저장]-[신규] 순서,
+     나머지 일반 버튼은 같은 rt 안에서 그 바로 왼쪽. lt 는 버튼이 아닌 요소가 있을 때만.
      팝업은 「닫기」 버튼을 넣지 않는다(팝업 창의 닫기 사용). 남는 버튼이 없으면 btnbox 자체를 생략 -->
 <xf:group class="btnbox" id="" style="">
-	<xf:group class="lt" id="" style="">…</xf:group>          <!-- 왼쪽 버튼이 있을 때만 -->
 	<xf:group class="rt" id="" style="">
 		<xf:trigger class="btn_cm" id="btn_reset" type="button"><xf:label><![CDATA[초기화]]></xf:label></xf:trigger>
+		<xf:trigger class="btn_cm pt" id="btn_delete" type="button"><xf:label><![CDATA[삭제]]></xf:label></xf:trigger>
+		<xf:trigger class="btn_cm pt" id="btn_update" type="button"><xf:label><![CDATA[수정]]></xf:label></xf:trigger>
 		<xf:trigger class="btn_cm pt" id="btn_save" type="button"><xf:label><![CDATA[저장]]></xf:label></xf:trigger>
 	</xf:group>
 </xf:group>
