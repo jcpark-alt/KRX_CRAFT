@@ -342,7 +342,7 @@ AS-IS 의 Ajax(`$.ajax`·`$.post`·axios) 또는 Form Submit 을 `$c.sbm.execute
 4. **응답** — 명세 RESPONSE 의 dataMap/dataList keyInfo 를 결과서 §2.2 데이터 정의와 TO-BE `<w2:dataCollection>` 에 그대로 옮기고(id·name·dataType), `target` 은 그 구조에 맞춥니다.
 5. **명세에 없는 AS-IS 통신** — 업무공통 함수가 대신하는지(예: 채번 `$c.stf.getNewBzProcNo`) 확인하고, 없으면 §10 TODO.
 6. **명세가 모호하거나 AS-IS 와 어긋나면** 명세를 따르되 고치지 않고 기록합니다. 예: 응답이 dataMap 인데 화면은 여러 행, 응답이 비어 재조회할 키가 없음, "등록 시 서버채번", 명세 설명과 요청 열이 다름. → §10 TODO + 코드 `// TODO:` 주석.
-7. **base 경로** — 같은 접두를 쓰면 `scwin.API = "/api/…/"` 상수 + `action : scwin.API + "select-one"` 으로 씁니다(게이트가 이 형태를 풀어 대조합니다).
+7. **전체 경로** — `action` 은 명세의 경로를 **그대로 쓴 전체 경로 리터럴**입니다(`action : "/api/…/select-one"`). 같은 접두라도 `scwin.API` 같은 전역 상수에 끝 경로를 붙이지 않고, 분기는 가지마다 전체 경로를 씁니다(전환 규칙 38 — 2026-10-27, 게이트 A07). UDC `saveUrl` 만 `$c.sbm.getContextPath() + "/api/…"`.
 8. **게이트** — `api_spec_check.py` 로 TO-BE 의 `executeDynamic` action 을 명세와 대조합니다(§13.3).
 
    | 코드 | 판정 | 내용 |
@@ -350,6 +350,7 @@ AS-IS 의 Ajax(`$.ajax`·`$.post`·axios) 또는 Form Submit 을 `$c.sbm.execute
    | A01 | FAIL | 명세에 없는 경로를 부름 |
    | A02 | FAIL | 같은 경로인데 method 가 다름 |
    | A03 | FAIL | 이 화면ID 의 명세 API 를 부르지 않음 — 쓰지 않는 근거가 있으면 `--allow-unused <경로>` 로 낮추고 §10 에 적음 |
+   | A07 | FAIL | `action`·`saveUrl`·`listUrl` 이 전체 경로 리터럴이 아님(전역 변수 조립·상대 경로) — 규칙 38 |
    | A04 | FAIL | 코드에 AS-IS URL(`*.do`) 이 남음(주석은 제외) |
    | A05 | WARN | action 을 정적으로 풀 수 없음(변수 조립) — 리뷰 |
    | A06 | INFO | 다른 화면ID 블록 |

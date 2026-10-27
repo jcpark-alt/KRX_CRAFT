@@ -22,6 +22,9 @@
   A04 FAIL  스크립트 코드에 AS-IS 서버 URL(`*.do`) 이 남음
   A05 WARN  action·saveUrl·listUrl 을 정적으로 풀 수 없음(변수만으로 조립) — 리뷰
   A06 INFO  다른 화면ID 블록(부모·형제 화면용) — 이 화면 대상 아님
+  A07 FAIL  action·saveUrl·listUrl 이 전체 경로 리터럴이 아님 — 전역 변수(`scwin.*`) 조립·`+` 이어 붙이기·상대 경로
+            (규칙 38. 분기는 가지마다 전체 경로 리터럴이면 통과, saveUrl·listUrl 의 `$c.sbm.getContextPath() +` 접두는 허용.
+             명세가 없어도 이 형식 검사는 돈다)
 action 해석: `action : "…"`, `action : scwin.API + "…"`, `scwin.API + (조건 ? "a" : "b")` 처럼 한 줄 안의 문자열 리터럴을
 모두 후보로 보고, `scwin.API` 가 있으면 `scwin.API = "…"` 값을 앞에 붙인다.
 종료 코드: FAIL 0건이면 0, 하나라도 있으면 1.
@@ -65,6 +68,74 @@ def _option_object(script, pos):
     return script[s if s >= 0 else 0:e if e >= 0 else len(script)]
 
 
+def _value_expr(expr):
+    """`action : …` 뒤 한 줄에서 값 식만 — 문자열·괄호 밖의 첫 `,`·`}`·`;` 앞까지."""
+    depth, quote, i = 0, None, 0
+    while i < len(expr):
+        ch = expr[i]
+        if quote:
+            if ch == "\\":
+                i += 1
+            elif ch == quote:
+                quote = None
+        elif ch in "\"'`":
+            quote = ch
+        elif ch in "([":
+            depth += 1
+        elif ch in ")]":
+            if depth == 0:
+                break
+            depth -= 1
+        elif ch in ",};" and depth == 0:
+            break
+        i += 1
+    return expr[:i].strip()
+
+
+def _top_level_plus(expr):
+    depth, quote, i = 0, None, 0
+    while i < len(expr):
+        ch = expr[i]
+        if quote:
+            if ch == "\\":
+                i += 1
+            elif ch == quote:
+                quote = None
+        elif ch in "\"'`":
+            quote = ch
+        elif ch in "([":
+            depth += 1
+        elif ch in ")]":
+            depth -= 1
+        elif ch == "+" and depth == 0:
+            return True
+        i += 1
+    return False
+
+
+def full_path_problem(key, expr):
+    """규칙 38 — 전체 경로 리터럴이 아니면 사유 문자열, 맞으면 None."""
+    e = expr.strip()
+    if key != "action":
+        e = re.sub(r"^\$c\.sbm\.getContextPath\(\)\s*\+\s*", "", e)
+    # 괄호·문자열 밖의 `+` = 이어 붙이기(`scwin.API + (c ? "a" : "b")` 도 여기서 걸린다)
+    if _top_level_plus(e):
+        return "전역 변수 조립" if "scwin." in e else "`+` 이어 붙이기"
+    # 삼항이면 조건은 보지 않고 가지(값)만 본다
+    branches = re.split(r"\s[?:]\s", e.split("?", 1)[1]) if "?" in e else [e]
+    for b in branches:
+        b = b.strip().strip("()").strip()
+        if "scwin." in b:
+            return "전역 변수 사용"
+        m = re.fullmatch(r"\"([^\"]*)\"|'([^']*)'", b)
+        if not m:
+            return None     # 지역 변수·함수 인자 — 정적으로 못 풀면 A05(WARN) 몫
+        lit = m.group(1) if m.group(1) is not None else m.group(2)
+        if not lit.startswith("/"):
+            return "상대 경로"
+    return None
+
+
 def extract_actions(script):
     """스크립트 → [{line, paths, method, raw}] — executeDynamic 옵션의 action."""
     code = st.without_comments(script)
@@ -75,7 +146,20 @@ def extract_actions(script):
     out = []
     # executeDynamic 의 action 외에 UDC 일괄 저장(bulkFileSaver)의 saveUrl(POST)·listUrl(GET)도 서버 호출이다.
     for am in re.finditer(r"\b(action|saveUrl|listUrl)\s*:\s*([^\n,][^\n]*)", code):
-        key, expr = am.group(1), am.group(2)
+        key, line = am.group(1), am.group(2)
+        # 여러 줄 식 — 다음 줄이 `?`·`:`·`+` 로 시작하거나 이번 줄이 그것으로 끝나면 이어 붙인다
+        pos = am.end()
+        while True:
+            nl = code.find("\n", pos)
+            if nl < 0:
+                break
+            nxt_end = code.find("\n", nl + 1)
+            nxt = code[nl + 1:nxt_end if nxt_end >= 0 else len(code)]
+            if not (nxt.strip().startswith(("?", ":", "+")) or line.rstrip().endswith(("?", ":", "+"))) or not nxt.strip():
+                break
+            line = line.rstrip() + " " + nxt.strip()
+            pos = nxt_end if nxt_end >= 0 else len(code)
+        expr = _value_expr(line)
         # 조건식의 비교값(`trJob === "I" ? … : …` 의 "I")은 경로 조각이 아니다.
         lits = re.findall(r'"([^"]*)"', re.sub(r'(?:[!=]==?|[<>]=?)\s*"[^"]*"', "", expr))
         uses_base = "scwin.API" in expr
@@ -90,6 +174,8 @@ def extract_actions(script):
             "paths": paths,
             "method": method,
             "raw": expr.strip().rstrip(","),
+            "key": key,
+            "form": full_path_problem(key, expr),
         })
     return out
 
@@ -109,20 +195,22 @@ def find_spec(xml_path):
 def check(xml_path, spec_path=None, allow_unused=()):
     """→ (fails, warns, infos, spec_path) — 각 항목은 (코드, 메시지)."""
     sid = Path(xml_path).stem
+    _raw, _eol, reg = st.read_xml(xml_path)
+    script = reg["script"] if reg else ""
+    actions = extract_actions(script)
+    form_fails = [("A07", f"L{a['line']} {a['key']} 이 전체 경로 리터럴이 아님({a['form']}): {a['raw']} — 규칙 38")
+                  for a in actions if a["form"]]
+
     if spec_path is None:
         spec_path, sid = find_spec(xml_path)
     if spec_path is None:
-        return [], [], [("SKIP", f"API 명세 없음({sid}_API.txt) — 검사 생략")], None
+        return form_fails, [], [("SKIP", f"API 명세 없음({sid}_API.txt) — 명세 대조 생략(A07 형식 검사만)")], None
 
     apis = parse_spec(io.open(spec_path, encoding="utf-8-sig").read())
     mine = [a for a in apis if a["screen"] == sid]
     others = [a for a in apis if a["screen"] != sid]
 
-    _raw, _eol, reg = st.read_xml(xml_path)
-    script = reg["script"] if reg else ""
-    actions = extract_actions(script)
-
-    fails, warns, infos = [], [], []
+    fails, warns, infos = list(form_fails), [], []
     by_path = {}
     for a in apis:
         by_path.setdefault(a["path"], []).append(a)

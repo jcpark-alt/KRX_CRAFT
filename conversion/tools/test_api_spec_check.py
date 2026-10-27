@@ -35,15 +35,14 @@ DOC = ('<?xml version="1.0" encoding="UTF-8"?>\n<html xmlns="http://www.w3.org/1
        ' xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">\n'
        '<head><script type="text/javascript"><![CDATA[\n{script}\n]]></script></head>\n<body></body></html>\n')
 
-GOOD = '''scwin.API = "/api/x/";
-scwin.selectOne = async function () {
-    const sbmOptions = { id : "sbm_a", method : "get", action : scwin.API + "select-one" };
+GOOD = '''scwin.selectOne = async function () {
+    const sbmOptions = { id : "sbm_a", method : "get", action : "/api/x/select-one" };
 };
 scwin.saveTrs = async function (trJob) {
     const sbmOptions = {
         id : "sbm_b",
         method : "post",
-        action : scwin.API + ((trJob === "I") ? "insert" : "update")
+        action : (trJob === "I") ? "/api/x/insert" : "/api/x/update"
     };
 };
 '''
@@ -85,7 +84,7 @@ def test_method_mismatch_fails(tmp_path):
 
 
 def test_unused_spec_api_fails_unless_allowed(tmp_path):
-    script = GOOD.replace('((trJob === "I") ? "insert" : "update")', '"insert"')
+    script = GOOD.replace('(trJob === "I") ? "/api/x/insert" : "/api/x/update"', '"/api/x/insert"')
     fails, _, _ = run(tmp_path, script)
     assert "A03" in fails
     fails, warns, _ = run(tmp_path, script, allow=("/api/x/update",))
@@ -122,7 +121,63 @@ def test_spec_found_in_screen_folder_layout(tmp_path):
 
 def test_udc_save_url_counts_as_post_call(tmp_path):
     # UDC bulkFileSaver 의 saveUrl 은 POST 호출로 본다 — insert 를 udcSaver.save 로 부르는 화면
-    script = GOOD.replace('((trJob === "I") ? "insert" : "update")', '"update"') + \
-        'scwin.c = async function () { await udcSaver.save({ dataMap : dma_a, saveUrl : scwin.API + "insert" }); };\n'
+    script = GOOD.replace('(trJob === "I") ? "/api/x/insert" : "/api/x/update"', '"/api/x/update"') + \
+        'scwin.c = async function () { await udcSaver.save({ dataMap : dma_a, saveUrl : $c.sbm.getContextPath() + "/api/x/insert" }); };\n'
     fails, warns, _ = run(tmp_path, script)
     assert fails == [] and warns == []
+
+
+# ── 규칙 38: action 은 전체 경로 리터럴 (A07) ──
+def _a07(tmp_path, action_expr, key="action"):
+    script = GOOD + 'scwin.k = async function () { const o = { method : "post", %s : %s }; };\n' % (key, action_expr)
+    fails, _, _ = run(tmp_path, script)
+    return fails.count("A07")
+
+
+def test_a07_global_base_concat_fails(tmp_path):
+    assert _a07(tmp_path, 'scwin.API + "insert"') == 1
+
+
+def test_a07_global_base_with_ternary_fails(tmp_path):
+    assert _a07(tmp_path, 'scwin.API + ((trJob === "I") ? "insert" : "update")') == 1
+
+
+def test_a07_relative_literal_fails(tmp_path):
+    assert _a07(tmp_path, '"insert"') == 1
+
+
+def test_a07_plain_concat_fails(tmp_path):
+    assert _a07(tmp_path, '"/api/x/" + "insert"') == 1
+
+
+def test_a07_ternary_condition_may_use_scwin(tmp_path):
+    assert _a07(tmp_path, '(scwin.mode === "I") ? "/api/x/insert" : "/api/x/update"') == 0
+
+
+def test_a07_ternary_branch_global_fails(tmp_path):
+    assert _a07(tmp_path, '(scwin.mode === "I") ? scwin.URL_INS : "/api/x/update"') == 1
+
+
+def test_a07_save_url_context_path_prefix_ok(tmp_path):
+    assert _a07(tmp_path, '$c.sbm.getContextPath() + "/api/x/insert"', key="saveUrl") == 0
+    assert _a07(tmp_path, '$c.sbm.getContextPath() + scwin.API + "insert"', key="saveUrl") == 1
+
+
+def test_a07_local_variable_is_a05_not_a07(tmp_path):
+    script = GOOD + 'scwin.w = function (u) { const o = { action : u }; };\n'
+    fails, warns, _ = run(tmp_path, script)
+    assert "A07" not in fails and "A05" in warns
+
+
+def test_a07_runs_without_spec(tmp_path):
+    x = tmp_path / "ULDTST00009.xml"
+    x.write_text(DOC.format(script='scwin.a = function () { const o = { action : scwin.API + "x" }; };'), encoding="utf-8")
+    fails, _w, infos, spec = ac.check(str(x))
+    assert spec is None and [c for c, _ in fails] == ["A07"] and infos[0][0] == "SKIP"
+
+
+def test_a07_multiline_ternary_is_joined(tmp_path):
+    script = GOOD + ('scwin.m = async function () {\n    await mud.saveMapForm({\n        saveUrl : scwin.aplcNo\n'
+                     '            ? "/api/x/update"\n            : "/api/x/insert",\n        onSuccess : null\n    });\n};\n')
+    fails, _, _ = run(tmp_path, script)
+    assert "A07" not in fails

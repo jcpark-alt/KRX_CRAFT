@@ -834,6 +834,36 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
 * **검사**: `init_binding_check.py` — B01(단일 미적용)·B02(기간 미적용·순서 뒤바뀜)·B04(기간 쌍에 단일 검사 중복)·B06(init 밖)·B07(마크업 onviewchange 충돌). 테스트 `test_init_binding_check.py`.
 * **적용 현황**(2026-10-27 실측, 도구 기준): gfm-front 3본 중 1본(ULDSTF05621 기간 쌍) 보정. sample-front/ui 46본 중 15본, jsp-front ui-tobe 1,677본 중 343본(B01 370·B02 265·B03 81·B04 132 — B04 는 공급사 r13 `init_datefmt_*` 가 기간 쌍에도 단일 검사를 거는 것)이 미적용 — 각 모듈 재전환 때 반영합니다.
 
+### 규칙 38: `$c.sbm.executeDynamic` 의 `action` 은 전체 경로 리터럴 — 전역 변수 조립 금지 (2026-10-27 신설, 사용자 지시)
+
+* `action` 값은 **`/` 로 시작하는 전체 API 경로 문자열 리터럴**로 씁니다. 화면 전역 변수·상수(`scwin.API`·`scwin.svcUrl`·`const BASE` 등)에 끝 경로를 이어 붙이지 않습니다.
+* **이유**: 경로 문자열 하나로 화면·명세·서버 로그를 바로 찾을 수 있어야 합니다(grep·`api_spec_check` 대조·영향도 분석). 조립식은 읽는 쪽이 선언부까지 따라가야 하고, 상수 하나를 바꾸면 화면의 모든 통신이 함께 바뀝니다.
+
+```javascript
+// (X) 금지 — 전역 상수 + 끝 경로
+scwin.API = "/api/listing/lstproc/fund/dist-pay-basdd-change/";
+action : scwin.API + "select-one",
+action : scwin.API + ((trJob === "I") ? "insert" : "update"),
+action : "select-one",                                  // 상대 경로도 금지
+
+// (O) 권장 — 전체 경로 리터럴
+action : "/api/listing/lstproc/fund/dist-pay-basdd-change/select-one",
+// 분기는 가지마다 전체 경로
+action : (trJob === "I") ? "/api/listing/lstproc/fund/dist-pay-basdd-change/insert"
+                         : "/api/listing/lstproc/fund/dist-pay-basdd-change/update",
+```
+
+* **변환 규약**
+    1. `scwin.X + "끝"` → `X` 의 선언값을 앞에 붙인 리터럴 하나로 합칩니다. 삼항 분기면 가지마다 합칩니다.
+    2. 합친 뒤 쓰이지 않는 경로 상수 선언(`scwin.API = "…";`)은 1구역에서 지웁니다.
+    3. contextRoot 는 붙이지 않습니다 — `executeDynamic` 이 `CONTEXT_PATH` 를 자동으로 붙입니다(`$c.sbm` 전처리).
+* **예외**
+    * UDC `bulkFileSaver` 의 `saveUrl`·`listUrl` 은 `fetch` 를 직접 불러 contextRoot 를 붙이지 않으므로 `$c.sbm.getContextPath() + "/api/…/전체경로"` 로 씁니다(경로 부분은 같은 규칙 — 전체 리터럴).
+    * 데이터에 따라 경로가 정해지는 경우(신고서 종류별 서비스 배열 등)는 분기·`switch` 로 **전체 경로 리터럴 중 하나를 고르게** 바꿉니다. 그럴 수 없으면 단계 2 판단으로 남기고 `// TODO:` 로 표시합니다.
+    * 함수 인자로 받은 경로(`job.action`·`url`)를 그대로 넘기는 공통 래퍼는 대상이 아닙니다 — 그 래퍼를 **부르는 쪽**이 전체 경로 리터럴을 넘깁니다.
+* **검사**: `api_spec_check.py` **A07**(FAIL) — `action`·`saveUrl`·`listUrl` 식에 `scwin.` 참조·`+` 조립(`$c.sbm.getContextPath() +` 접두 제외)·`/` 로 시작하지 않는 리터럴이 있으면 실패. 명세(`{화면ID}_API.txt`)가 없어도 이 형식 검사는 돈다.
+* **적용 현황**(2026-10-27, A07 실측): gfm-front 3본 12곳 전환. sample-front/ui 18본 47곳 미적용 — 전역 URL 변수(stf/bnsnew `ULDBNS00000`~`04000` 의 `scwin.fn*Url`, `ULDSTF05950` `scwin.JOB_INFO[…].action`, `SPCHART_NOTICE`), `scwin.API +` 조립, 상대 경로(`"select-list-…"`), 지역 변수 `+` 조립(`"/api/…/" + svcId`) — 샘플 갱신 때 반영합니다.
+
 ## 규칙 6 보충: Submission 변환 상세
 
 * **규칙 12 — `{DC}.DataID = encodeURI(url)` 의 `url` 선언 역추적 스코프**(2026-10-08): 선언(`var|let|const url = …;`)은 DataID 문이 든 **같은 최상위 함수 안**에서만 찾는다. 스크립트 전체에서 "앞에 있는 마지막 대입"을 고르면 규칙 4 재배치 뒤 다른 핸들러의 팝업 URL 상수(`let url = "/ui/lst/lstproc/ULDSTF05106_read.xml";`)가 걸려 삭제되고 해석 실패한 DataID 는 그대로 남는다(ULDSTF92002 button_1_onclick). 같은 함수에 선언이 없으면 「action URL 해석 실패」로 보류한다. 회귀 테스트 `test_convert_rule12_scope.py`.
