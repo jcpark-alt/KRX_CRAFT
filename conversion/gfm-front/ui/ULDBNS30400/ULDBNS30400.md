@@ -826,7 +826,7 @@ scwin.searchTotList = async function () {
 ### 6.9 처리결과 색 (컬럼 customFormatter `scwin.fmtProcState`) — AS-IS `OnLoadCompleted` 의 `ColumnProp('PROC_STATE', 'color')`
 
 - AS-IS: `grd.ColumnProp('PROC_STATE', 'color') = "{decode(PROC_STATE,'처리중','#343434','처리완료','#343434','미처리','#FF0000','반송','#0000FF')}"` — 조회가 끝날 때마다 다시 건다(3탭 같음, 월별 그리드 제외).
-- TO-BE: 1구역 `scwin.PROC_STATE_CLASS = { "미처리" : "red", "반송" : "blue" }`(처리중·처리완료 `#343434` 는 기본 글자색이라 class 없음). 그리드 3개(`grd_List1~3`)의 `procState` 컬럼에 `customFormatter="scwin.fmtProcState" escape="false"` 를 두고, 동기 함수 `scwin.fmtProcState(data, formattedData, rowIndex, colIndex)` 가 `$c.str.escapeToHtml` 로 이스케이프한 값을 class 가 있으면 `<span class="red|blue">` 로 감싸 돌려준다(전환 규칙 43·40, 2026-10-27). 엔진이 셀을 그릴 때마다(조회·정렬·필터·스크롤) 부르므로 조회 후처리 반복문(종전 `scwin.applyProcStateColor` + `setCellClass`)이 없고, 색이 정렬 뒤에도 행을 따라간다. `setCellColor` 직접 지정은 쓰지 않는다.
+- TO-BE: 1구역 `scwin.PROC_STATE_CLASS = { "미처리" : "red", "반송" : "blue" }`(처리중·처리완료 `#343434` 는 기본 글자색이라 class 없음). 그리드 3개(`grd_List1~3`)의 `procState` 컬럼에 `customFormatter="scwin.fmtProcState"` 를 두고, 동기 함수 `scwin.fmtProcState(data, formattedData, rowIndex, colIndex)` 가 값은 그대로(순수 데이터, HTML 없음) 돌려주고 class 가 있으면 `this.setCellClass(rowIndex, colIndex, cls)`, 없으면 `this.removeCellClass(rowIndex, colIndex)` 를 부른다(전환 규칙 43 개정·40, 2026-10-27). 엔진이 셀을 그릴 때마다(조회·정렬·필터·스크롤) 부르므로 조회 후처리 반복문(종전 `scwin.applyProcStateColor`)이 없고, 셀 class 는 실제 행 기준이라 정렬 뒤에도 행을 따라간다. formatter 안에서 붙인 class 가 셀 다시 그리기 뒤에도 남는지는 실화면 확인(규칙 43 지킬 것 5).
 - W-Craft 1차본의 `$c.cm.setColumnProp(…)` 는 Gauce 표현식 문자열을 넘겨 동작하지 않는다(§9).
 
 ### 6.10 요청 데이터 (`scwin.getSearchData()`)

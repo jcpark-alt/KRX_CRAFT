@@ -1048,7 +1048,7 @@ scwin.fmtProcState = function (data, formattedData, rowIndex, colIndex) {
     5. 실화면 확인 항목: formatter 안에서 붙인 class 가 셀 다시 그리기 뒤에도 유지되는지(엔진 렌더 순서) — 첫 적용 화면에서 정렬·스크롤로 확인한다.
 * **예외 — 반복문 유지**: 편집 가능 여부(`setCellReadOnly`·`disabled`)와 실제 데이터 변경(`setCellData` 로 값을 계산해 저장, 행 추가 등)은 formatter 로 하지 않는다 — 기존 반복문 또는 이벤트를 쓴다.
 * **규칙 40 과의 관계**: 그리드 셀의 글자색·배경색은 조회 후 반복문 대신 이 규칙의 formatter 안 `setCellClass` 로 붙인다. 그리드 밖 요소는 규칙 40 의 마크업 class 를 쓴다.
-* **적용 현황**(2026-10-27): gfm-front ULDBNS30400 `scwin.fmtProcState` 는 개정 전 방식(`<span class="red">` HTML 반환 + `escape="false"`)이라 **개정 규칙 위반** — 다음 갱신 때 순수 데이터 반환 + `this.setCellClass` 로 바꾸고 `escape="false"` 를 뗀다. ULDSTF05911 `applyKoEditable`(readOnly)·ULDSTF05621 월·일 계산(데이터 변경)은 예외라 유지.
+* **적용 현황**(2026-10-27): gfm-front ULDBNS30400 `scwin.fmtProcState`(그리드 3개 `procState`) — 개정 규칙대로 순수 데이터 반환 + `this.setCellClass`·`removeCellClass`, `escape="false"` 제거 완료. ULDSTF05911 `applyKoEditable`(readOnly)·ULDSTF05621 월·일 계산(데이터 변경)은 예외라 유지.
     * **점검 필요**: jsp-front ui-tobe 101개 파일의 `_fmt_* = async function` customFormatter — 지킬 것 1번 위반(Promise 표시 의심), HTML(`<a class="lnk">` 등) 반환도 상세 규칙 1번 위반. 해당 모듈 재전환 때 고친다.
 
 ## 규칙 6 보충: Submission 변환 상세
