@@ -20,7 +20,7 @@
   A02 FAIL  같은 경로인데 method 가 명세와 다름
   A03 FAIL  이 화면ID 의 명세 API 를 TO-BE 가 부르지 않음 (--allow-unused 로 낮춤)
   A04 FAIL  스크립트 코드에 AS-IS 서버 URL(`*.do`) 이 남음
-  A05 WARN  action 을 정적으로 풀 수 없음(변수만으로 조립) — 리뷰
+  A05 WARN  action·saveUrl·listUrl 을 정적으로 풀 수 없음(변수만으로 조립) — 리뷰
   A06 INFO  다른 화면ID 블록(부모·형제 화면용) — 이 화면 대상 아님
 action 해석: `action : "…"`, `action : scwin.API + "…"`, `scwin.API + (조건 ? "a" : "b")` 처럼 한 줄 안의 문자열 리터럴을
 모두 후보로 보고, `scwin.API` 가 있으면 `scwin.API = "…"` 값을 앞에 붙인다.
@@ -73,17 +73,22 @@ def extract_actions(script):
     if m:
         api_base = m.group(1)
     out = []
-    for am in re.finditer(r"\baction\s*:\s*([^\n,][^\n]*)", code):
-        expr = am.group(1)
+    # executeDynamic 의 action 외에 UDC 일괄 저장(bulkFileSaver)의 saveUrl(POST)·listUrl(GET)도 서버 호출이다.
+    for am in re.finditer(r"\b(action|saveUrl|listUrl)\s*:\s*([^\n,][^\n]*)", code):
+        key, expr = am.group(1), am.group(2)
         # 조건식의 비교값(`trJob === "I" ? … : …` 의 "I")은 경로 조각이 아니다.
         lits = re.findall(r'"([^"]*)"', re.sub(r'(?:[!=]==?|[<>]=?)\s*"[^"]*"', "", expr))
         uses_base = "scwin.API" in expr
         paths = [(api_base + lit) if uses_base else lit for lit in lits]
-        mm = re.search(r'\bmethod\s*:\s*"(\w+)"', _option_object(code, am.start()))
+        if key == "action":
+            mm = re.search(r'\bmethod\s*:\s*"(\w+)"', _option_object(code, am.start()))
+            method = mm.group(1).upper() if mm else "POST"       # executeDynamic 기본 method 는 post
+        else:
+            method = "POST" if key == "saveUrl" else "GET"       # bulkFileSaver: save 는 XHR POST, loadList 는 GET
         out.append({
             "line": code.count("\n", 0, am.start()) + 1,
             "paths": paths,
-            "method": (mm.group(1).upper() if mm else "POST"),   # executeDynamic 기본 method 는 post
+            "method": method,
             "raw": expr.strip().rstrip(","),
         })
     return out

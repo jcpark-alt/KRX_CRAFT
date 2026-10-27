@@ -118,3 +118,11 @@ def test_spec_found_in_screen_folder_layout(tmp_path):
     x.write_text(DOC.format(script=GOOD), encoding="utf-8")
     fails, _, _, spec = ac.check(str(x))
     assert spec is not None and spec.parent.name == "ULDTST00001" and fails == []
+
+
+def test_udc_save_url_counts_as_post_call(tmp_path):
+    # UDC bulkFileSaver 의 saveUrl 은 POST 호출로 본다 — insert 를 udcSaver.save 로 부르는 화면
+    script = GOOD.replace('((trJob === "I") ? "insert" : "update")', '"update"') + \
+        'scwin.c = async function () { await udcSaver.save({ dataMap : dma_a, saveUrl : scwin.API + "insert" }); };\n'
+    fails, warns, _ = run(tmp_path, script)
+    assert fails == [] and warns == []
