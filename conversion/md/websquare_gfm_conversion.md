@@ -594,7 +594,7 @@ scwin.btn_confirm_onclick = async function () {
 | 수기 날짜 계산(`new Date`, `substr`) | `$c.date.*` (`getServerDateTime`, `addDate`, `formatDate`) | 서버 시각인가 클라이언트 시각인가 |
 | `keyCode == 13` 검사 | `$c.win.setEnterKeyEvent(tbl_search, …)` (규칙 22) | |
 | 셀 글자색 (`ColumnProp(col, 'color')`·`style.color`) | `grd.setCellClass(row, col, "red"/"orange"/"blue"/"green")` — `base.css` 공통 색상 class (규칙 40) | `setCellColor` 로 색상값 직접 지정 금지 |
-| 조회 뒤 그리드 행 반복문으로 표시만 바꾸기 (`ColumnProp` 색·표시용 값 덮어쓰기) | 컬럼 `customFormatter="scwin.fmt{컬럼}" escape="false"` — 동기 함수가 `<span class="red">값</span>` 등 반환 (규칙 43) | 셀 배경(TD)·`readOnly`·실제 데이터 변경은 예외(반복문 유지). formatter 는 `async` 금지, 같은 행 값은 `this.getCellData` |
+| 조회 뒤 그리드 행 반복문으로 표시만 바꾸기 (`ColumnProp` 색·표시용 값 덮어쓰기) | 컬럼 `customFormatter="scwin.fmt{컬럼}"` — 동기 함수가 **순수 데이터만 반환**하고, class 는 `this.setCellClass(rowIndex, colIndex, "red")`·없으면 `this.removeCellClass(rowIndex, colIndex)` (규칙 43) | HTML 태그 반환·`escape="false"` 금지, `async` 금지, 같은 행 값은 `this.getCellData`. `readOnly`·실제 데이터 변경은 예외(반복문 유지) |
 | 엑셀 다운로드 파일명 (`GridToExcel`·`GridToOffice` 파일명 인자) | `fileName : $c.win.getProgramId() + "_{이름}_" + $c.date.getServerDateTime("yyyyMMddHHmmss") + ".xlsx"` — menuId(화면 파일명) 맨 앞 (규칙 42) | menuId 없는 이름 금지. 메뉴명과 같으면 생략 가능하나 팝업·탭 본문은 지정 |
 | 배경색 (`style="background-color:…"`, 셀·행 배경 지정) | 마크업 `class="bg_red"` 등 / 스크립트 `setCellClass(row, col, "bg_blue")`·`setRowClass(row, "row_bg_lgray")` — `base.css` 공통 배경색 class `bg_lgray`·`bg_dgray`·`bg_blue`·`bg_red`·`bg_orange`·`bg_green`·`bg_violet` (규칙 40) | 인라인 배경색·`setCellBackgroundColor`·`setRowBackgroundColor` 금지. `bg_*` 는 그리드·표 칸·입력류에만 정의돼 일반 그룹엔 색이 안 나옴 |
 | `$.parseJSON(x)` | `JSON.parse(x)` / `$c.util.getJSON(x)` | |

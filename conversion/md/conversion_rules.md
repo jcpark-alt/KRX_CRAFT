@@ -912,7 +912,7 @@ if (cls) grd_list.setCellClass(i, "procState", cls);
 
 * **색 대응**: AS-IS 색상값은 가까운 공통 class 로 옮긴다(빨강 계열 → `red`, 파랑 → `blue`, 주황·노랑 → `orange`, 초록 → `green`). 검정·회색(`#000000`·`#343434` 등 기본 글자색)은 class 를 붙이지 않는다. 4종으로 옮길 수 없는 색은 임의 class·인라인 스타일을 만들지 말고 단계 2 판단으로 남겨 `// TODO:` 로 표시한다.
 * **해제**: 같은 셀을 다시 칠할 수 있으면(재조회·값 변경) `removeCellClass(row, col)` 로 먼저 뗀다 — 엔진 `setCellClass` 는 같은 셀의 이전 class 를 지우고 새 class 를 붙이지만, 기본색으로 돌아가는 경우는 class 를 떼야 한다.
-* **그리드 셀 글자색은 규칙 43 의 customFormatter(span class) 가 우선**이다 — 위 `setCellClass` 글자색 방식은 그리드 밖·formatter 를 쓸 수 없는 경우에 쓴다.
+* **그리드 셀은 조회 후 반복문 대신 규칙 43 의 customFormatter 안에서 `this.setCellClass(rowIndex, colIndex, class)` 로 붙인다**(formatter 반환값은 순수 데이터 — HTML 금지).
 * 배경색 (2026-10-27 추가, 사용자 지시) — 인라인 배경색(`style="background-color:…"`)과 인라인 색을 입히는 함수(`setCellBackgroundColor`·`setRowBackgroundColor`) 대신 `base.css` 의 공통 배경색 class 를 쓴다. 허용 class 는 아래 7종이다.
 
 | class | 용도 | `base.css` 색 |
@@ -1009,41 +1009,47 @@ grd_list.setRowClass(i, "row_bg_lgray");
     4. 일시는 서버 시각 `$c.date.getServerDateTime("yyyyMMddHHmmss")`, 확장자는 `.xlsx` 를 명시한다. 파일명에 쓸 수 없는 문자(`\ / : * ? " < > |`)는 넣지 않는다(예: "행사가격/전환비율" → "행사가격_전환비율").
 * **적용 현황**(2026-10-27, gfm-front TO-BE): `fileName` 을 직접 지정하는 3곳 모두 적용 완료 — ULDBNS30400 `scwin.excelDown`·`scwin.excelDownDtl`, ULDSTF05911 엑셀 다운로드(팝업이라 생략 불가). sample-front·jsp-front 는 각 재전환 때.
 
-### 규칙 43: gridView 표시용 반복문 → 컬럼 `customFormatter` (2026-10-27 신설, 사용자 지시)
+### 규칙 43: gridView 표시용 반복문 → 컬럼 `customFormatter` (2026-10-27 신설, 같은 날 상세 규칙 개정 — 사용자 지시)
 
-* **AS-IS**: 조회 뒤 gridView 에 바인딩된 dataList 를 반복문으로 돌며 셀 표시를 직접 바꾸는 코드 — 글자색 class(`setCellClass(i, col, "red")`), 표시용 문자열을 만들려고 `setCellData` 로 값을 덮어쓰기, 링크·강조 표시 등.
-* **TO-BE**: 반복문을 두지 않고 해당 **컬럼의 `customFormatter`** 로 표시 내용과 스타일을 그릴 때마다 계산한다.
+* **AS-IS**: 조회 뒤 gridView 에 바인딩된 dataList 를 반복문으로 돌며 셀 표시를 직접 바꾸는 코드 — 글자색 class(`setCellClass(i, col, "red")`), 표시용 문자열을 만들려고 `setCellData` 로 값을 덮어쓰기 등.
+* **TO-BE**: 반복문을 두지 않고 해당 **컬럼의 `customFormatter`** 로 처리한다. 엔진이 셀을 그릴 때마다(조회·정렬·필터·스크롤·값 변경) 부르므로 표시와 스타일이 행을 따라간다.
+* **상세 규칙 (2026-10-27 개정)**
+    1. **순수 데이터 반환** — 반환값에는 **HTML 태그를 넣지 않는다**(`<span class="red">`·`<a>`·`<b>` 등 금지). 가공한 표시 값(문자열·숫자 형식)만 돌려준다. 컬럼 `escape` 는 기본값을 그대로 두고 `escape="false"` 를 쓰지 않는다.
+    2. **스타일·class 는 그리드 내장 API 로** — 셀의 글자색·class 를 바꿔야 하면 HTML 을 조작하지 않고, 인자로 받은 `rowIndex`·`colIndex` 로 `this.setCellClass(rowIndex, colIndex, "<class>")` 를 부른다(`this` = gridView). class 가 필요 없는 값이면 `this.removeCellClass(rowIndex, colIndex)` 로 뗀다 — 같은 셀에 이전 값의 class 가 남지 않게(엔진은 셀 class 를 실제 행 기준으로 기억한다).
+    3. class 는 `base.css` 공통 class 만 쓴다(글자색 `red`·`orange`·`blue`·`green`, 배경 `bg_*` — 규칙 40).
 
 ```xml
-<w2:column id="procState" inputType="text" readOnly="true" customFormatter="scwin.fmtProcState" escape="false" ... />
+<w2:column id="procState" inputType="text" readOnly="true" customFormatter="scwin.fmtProcState" ... />
 ```
 
 ```javascript
-// 반환값 = 셀 안에 들어갈 HTML. 글자색 class 는 span 에 붙인다(base.css red·orange·blue·green — 규칙 40)
+// 반환 = 순수 데이터, class = 그리드 내장 API
 scwin.fmtProcState = function (data, formattedData, rowIndex, colIndex) {
-    const text = $c.str.escapeToHtml(String(formattedData ?? ""));
     const cls = scwin.PROC_STATE_CLASS[data];
-    return cls ? "<span class=\"" + cls + "\">" + text + "</span>" : text;
+    if (cls) {
+        this.setCellClass(rowIndex, colIndex, cls);
+    } else {
+        this.removeCellClass(rowIndex, colIndex);
+    }
+    return formattedData;
 };
 ```
 
-* **엔진 동작**(websquare-engine 실측 — 85669·85699행 부근)
-    * 호출: `customFormatter.call(gridView, data, formattedData, rowIndex, colIndex)` — `this` 는 gridView, `data` 는 원본 값, `formattedData` 는 displayFormat 을 적용한 값.
-    * 반환값은 셀 안에 **`innerHTML`** 로 들어간다 → `<span class="red">…</span>` 이 그대로 그려진다. 값은 `$c.str.escapeToHtml` 로 이스케이프하고, 컬럼에 `escape="false"` 를 함께 둔다.
-    * 셀을 그릴 때마다(조회·정렬·필터·스크롤·값 변경) 다시 불린다 → 스타일이 행을 따라가고, 재조회 때 class 를 지우고 다시 칠할 필요가 없다.
-    * 표시 전용이다 — dataList 값은 바뀌지 않는다(엑셀 다운로드·`getCellDisplayData` 도 formatter 결과를 쓴다).
+* **엔진 동작**(websquare-engine 실측)
+    * 호출: `customFormatter.call(gridView, data, formattedData, rowIndex, colIndex)`(85669행 부근) — `this` 는 gridView, `rowIndex` 는 **화면 행 번호**(정렬·필터 반영).
+    * `gridView.setCellClass(row, col, class)` 는 첫 인자를 화면 행 번호로 받아 내부에서 실제 행으로 바꾼다(`_getStyleRowIndex` → `dataList.getRealRowIndex`, 76710·76870행) → formatter 의 `rowIndex`·`colIndex` 를 **그대로 넘긴다**. 엔진 자신도 formatter 경로에서 `mainGrid.setCellClass(…)` 를 부른다(83168행).
+    * 셀 class 는 실제 행 기준으로 기억돼 정렬해도 행을 따라가고, `setJSON` 등 데이터 전체 재설정 때 초기화된다 — 다시 그릴 때 formatter 가 다시 붙인다.
+    * formatter 결과는 표시 전용이다 — dataList 값은 바뀌지 않는다(엑셀 다운로드·`getCellDisplayData` 도 formatter 를 부른다).
 * **지킬 것**
     1. formatter 는 **동기 함수**다(`async` 금지 — 엔진이 반환값을 기다리지 않아 `[object Promise]` 가 표시된다). 통신·`await` 를 넣지 않는다.
-    2. `rowIndex` 는 **화면 행 번호**(정렬·필터 반영)다. 같은 행의 다른 컬럼은 `this.getCellData(rowIndex, "col")`(gridView 기준)로 읽고, `dlt_x.getCellData(rowIndex, …)` 로 읽지 않는다.
-    3. 부작용 금지 — formatter 안에서 `setCellClass`·`setCellData`·`setCellReadOnly` 등을 부르지 않는다(그릴 때마다 불린다).
+    2. 같은 행의 다른 컬럼 값은 `this.getCellData(rowIndex, "col")`(gridView 기준)로 읽는다 — `dlt_x.getCellData(rowIndex, …)` 는 정렬·필터 뒤 다른 행을 읽는다.
+    3. formatter 안에서 부르는 그리드 API 는 **그 셀의 `setCellClass`·`removeCellClass` 만** 허용한다. `setCellData`·`setCellReadOnly`·다른 셀 조작은 금지(그릴 때마다 불리고, 값 변경은 다시 그리기를 부른다).
     4. 함수 이름은 `scwin.fmt{컬럼}` 형태로 짓고 `publicInfo` 에 올린다(엔진이 문자열 이름을 화면 scope 에서 찾는다).
-* **예외 — 반복문 유지**: customFormatter 는 셀 **안의 내용**만 그린다. 다음은 대신할 수 없으므로 기존 방식(반복문 또는 이벤트)을 쓴다.
-    * 셀 전체(TD)의 class·배경색(`bg_*` — 셀을 다 칠해야 함) → `setCellClass`(규칙 40)
-    * 편집 가능 여부 `setCellReadOnly`·`disabled` → 반복문 유지 또는 편집 시작 이벤트에서 막기
-    * 실제 데이터 변경(`setCellData` 로 값을 계산해 저장, 행 추가 등)
-* **규칙 40 과의 관계**: 그리드 셀 **글자색**은 이 규칙의 formatter + span class 가 우선이다. 셀 **배경색**과 그리드 밖 요소는 규칙 40 의 `setCellClass`·마크업 class 를 그대로 쓴다.
-* **적용 현황**(2026-10-27): gfm-front ULDBNS30400 처리결과 색(`scwin.applyProcStateColor` 반복문 → `scwin.fmtProcState`, 그리드 3개) 전환. ULDSTF05911 `applyKoEditable`(readOnly)·ULDSTF05621 월·일 계산(데이터 변경)은 예외라 유지.
-    * **점검 필요**: jsp-front ui-tobe 101개 파일의 `_fmt_* = async function` customFormatter — 위 1번 위반(Promise 표시 의심). 해당 모듈 재전환 때 동기 함수로 고친다.
+    5. 실화면 확인 항목: formatter 안에서 붙인 class 가 셀 다시 그리기 뒤에도 유지되는지(엔진 렌더 순서) — 첫 적용 화면에서 정렬·스크롤로 확인한다.
+* **예외 — 반복문 유지**: 편집 가능 여부(`setCellReadOnly`·`disabled`)와 실제 데이터 변경(`setCellData` 로 값을 계산해 저장, 행 추가 등)은 formatter 로 하지 않는다 — 기존 반복문 또는 이벤트를 쓴다.
+* **규칙 40 과의 관계**: 그리드 셀의 글자색·배경색은 조회 후 반복문 대신 이 규칙의 formatter 안 `setCellClass` 로 붙인다. 그리드 밖 요소는 규칙 40 의 마크업 class 를 쓴다.
+* **적용 현황**(2026-10-27): gfm-front ULDBNS30400 `scwin.fmtProcState` 는 개정 전 방식(`<span class="red">` HTML 반환 + `escape="false"`)이라 **개정 규칙 위반** — 다음 갱신 때 순수 데이터 반환 + `this.setCellClass` 로 바꾸고 `escape="false"` 를 뗀다. ULDSTF05911 `applyKoEditable`(readOnly)·ULDSTF05621 월·일 계산(데이터 변경)은 예외라 유지.
+    * **점검 필요**: jsp-front ui-tobe 101개 파일의 `_fmt_* = async function` customFormatter — 지킬 것 1번 위반(Promise 표시 의심), HTML(`<a class="lnk">` 등) 반환도 상세 규칙 1번 위반. 해당 모듈 재전환 때 고친다.
 
 ## 규칙 6 보충: Submission 변환 상세
 
