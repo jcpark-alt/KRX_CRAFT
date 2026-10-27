@@ -372,7 +372,7 @@ scwin.init = async function () {
 
 | # | API | 종전(txt) | 갱신(md) | 결과서·TO-BE 영향 |
 |---|---|---|---|---|
-| 1 | 공통 | 경로·요청·응답 | 블록마다 AS-IS 와 `submission target` 추가. AS-IS 는 1차에 `TO-BE 경로 + .do` 표기였다가 2차 수정에서 **AS-IS 함수·인덱스 표기**로 바뀜(`searchFiscalYearChange(DIV_IDX_DTL_DIST_BF, TRS_IDX_NEWSEL2)`, `fn_search(…)`, `fn_mst_check`, `fn_save_trs(TRS_IDX_INSERT·UPDATE·DELETE)`) | 원본 `.gfm` 의 함수·상수 이름과 일치함을 확인 — §5 API 명세 대응표의 AS-IS 대응 열에 함께 적었다. 실제 호출 URL(`/fiscalYearChange.do?method=…`)은 §5 표 |
+| 1 | 공통 | 경로·요청·응답 | 블록마다 AS-IS 와 `target`(`[REQUEST]` 아래 `{ ref, target }` 옵션 — 처음엔 `submission target` 줄, 2026-10-27 형식 정리) 추가. AS-IS 는 1차에 `TO-BE 경로 + .do` 표기였다가 2차 수정에서 **AS-IS 함수·인덱스 표기**로 바뀜(`searchFiscalYearChange(DIV_IDX_DTL_DIST_BF, TRS_IDX_NEWSEL2)`, `fn_search(…)`, `fn_mst_check`, `fn_save_trs(TRS_IDX_INSERT·UPDATE·DELETE)`) | 원본 `.gfm` 의 함수·상수 이름과 일치함을 확인 — §5 API 명세 대응표의 AS-IS 대응 열에 함께 적었다. 실제 호출 URL(`/fiscalYearChange.do?method=…`)은 §5 표 |
 | 2 | `select-current-dist-pay-basdd` | 응답 `dma_std` | 같음 + target `dma_std=body` | 화면은 여러 행 → 변경전 목록으로 받는 가정 유지(§5.1, §10 #1) |
 | 3 | `select-one` | 응답 정의 3개(`dma_resultDetail` 20키, `dlt_resultDetail_dtlBfList`·`…AfList` 7열) | JSON 개요만, target `dma_resultDetail=body, dlt_detail_dtlBfList=body.dtlBfList, dlt_detail_dtlAfList=body.dtlAfList` | 목록 JSON 키(`dtlBfList`·`dtlAfList`)가 **확정**(종전 가정 해제). 목록 id 를 `dlt_detail_dtl*List` 로 바꾼다. 키 정의는 이전 명세 유지(§2.2) |
 | 4 | `delete` | 요청 `bzProcsNo`, 응답 빈칸 | 요청 `{ bzProcsNo }`, 응답 `dma_resultDelete`(`bzProcsNo`·`result`·`resultMessage`) | 결과 판정에 `result` 를 쓴다(§5.7, §10 #5) |
@@ -417,7 +417,7 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=3`, `LIST_BZ_TP_CD=232`
 | `id` | `sbm_selectOne` |
 | `method` / `action` | `get` / `…/select-one` |
 | `requestData` | `{ bzProcsNo : scwin.bzProcsNo }` |
-| `target` | `dma_resultDetail=body`, `dlt_detail_dtlBfList=body.dtlBfList`, `dlt_detail_dtlAfList=body.dtlAfList` — 갱신 명세(2026-10-27)의 `submission target` 그대로(종전 가정 해제) |
+| `target` | `dma_resultDetail=body`, `dlt_detail_dtlBfList=body.dtlBfList`, `dlt_detail_dtlAfList=body.dtlAfList` — 갱신 명세(2026-10-27) `[REQUEST]` 옵션의 `target` 그대로(종전 가정 해제) |
 | 후처리 | ① 변경후 빈 행 채우기(§6.2) ② 버튼 상태 `$c.stf.setButtonSetWithDate(edt_MKTACT_ENFORCE_DD, false, "grpBtnBox", scwin.BTN_MAP)` (원본 `dts_Mst OnLoadCompleted`) |
 | 실패 처리 | `success:false` 이면 버튼을 모두 잠근다(`disabled`) — XML 기본값(전부 활성)이 남지 않게 |
 | 중복 실행 | 기본(건너뜀) |

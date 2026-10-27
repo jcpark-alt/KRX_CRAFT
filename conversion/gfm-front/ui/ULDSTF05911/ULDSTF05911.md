@@ -3,7 +3,7 @@
 | 항목 | 내용 |
 |---|---|
 | AS-IS | `/lstproc/ULDSTF05911.gfm` (Gauce/X-Internet, 980×480 모달 창 — 부모가 1000×490 `window` 로 연다) — 반입 `conversion/gfm-front/ui/ULDSTF05911/ULDSTF05911.gfm` |
-| 신규 API 명세 | `conversion/gfm-front/ui/ULDSTF05911/ULDSTF05911_API.md` — 블록 4종(이 화면 4종, 다른 화면 0종). §2.2·§5 는 명세 기준(가이드 §0.3·§5). **2026-10-26 갱신**: `register`·`modify` 요청 전달 방식 명시(머리 dataMap 은 `ref` 없이 `requestData` 로, 목록은 `requestData.isuList`). **2026-10-27 형식 전환**: `_API.txt` → `_API.md`(블록 제목·경로·요청/응답 정의는 원문 그대로, 블록마다 AS-IS 호출(이 결과서 §5 표 기준)과 `submission target` 표기 추가 — 내용 변경 없음) |
+| 신규 API 명세 | `conversion/gfm-front/ui/ULDSTF05911/ULDSTF05911_API.md` — 블록 4종(이 화면 4종, 다른 화면 0종). §2.2·§5 는 명세 기준(가이드 §0.3·§5). **2026-10-26 갱신**: `register`·`modify` 요청 전달 방식 명시(머리 dataMap 은 `ref` 없이 `requestData` 로, 목록은 `requestData.isuList`). **2026-10-27 형식 전환**: `_API.txt` → `_API.md`(블록 제목·경로·요청/응답 정의는 원문 그대로, 블록마다 AS-IS 호출(이 결과서 §5 표 기준)과 `[REQUEST]` 아래 `{ ref, target }` 옵션 표기 추가 — 내용 변경 없음) |
 | TO-BE | `conversion/gfm-front/ui-tobe/ULDSTF05911.xml` (배포 경로 `/ui/lst/lstproc/ULDSTF05911.xml` — 가정, §10) |
 | 퍼블리싱 | `conversion/publish/상장/상장처리(대내)/ULDSTF05911.xml` — 컴포넌트 id 는 AS-IS 와 같음(`edt_MktactEnforceDd` `inputCalendar`, `txb_ChgRsnContn` `xf:input`, 버튼·`img_SetIsuCd`·`img_Excel`·`btn_exelUpload` 는 `xf:trigger`). 그리드 컬럼 id 는 대문자·한글(`번호`) 그대로 |
 | 화면 캡처 | 없음 |
@@ -398,7 +398,7 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=1`, `LIST_BZ_TP_CD=147`
 |---|---|
 | `id` / `method` / `action` | `sbm_selectList` / `get` / `…/select-list-isu` |
 | `requestData` | `{ bzProcsNo : scwin.bzProcsNo }` |
-| `target` / `gridview` | `dlt_detail=body` / `grd_isu` — 명세의 응답은 `dma_detail`(dataMap)로 적혀 있고 md 명세의 `submission target` 도 응답 id 기준 `dma_detail=body` 이나, 종목 여러 건이라 목록 `dlt_detail` 로 받는다 → 목록인지 확인(§10 #1) |
+| `target` / `gridview` | `dlt_detail=body` / `grd_isu` — 명세의 응답은 `dma_detail`(dataMap)로 적혀 있고 md 명세 `[REQUEST]` 옵션의 `target` 도 응답 id 기준 `dma_detail=body` 이나, 종목 여러 건이라 목록 `dlt_detail` 로 받는다 → 목록인지 확인(§10 #1) |
 | 후처리 | ① 1건 이상이면 첫 행의 `chgDd`·`chgRsnContn` 을 `dma_mst` 에, `dma_mst.bzProcsNo`·`isurCd` 도 채움 ② 조기종료기준가격 편집 조건(§6.3) ③ 버튼 상태 `$c.stf.setButtonSetWithDate(edt_MktactEnforceDd, false, "grpBtnBox", scwin.BTN_MAP)` |
 | 실패 처리 | `success:false` 이면 버튼을 모두 잠근다(`disabled`) |
 | 중복 실행 | 기본(건너뜀) |
