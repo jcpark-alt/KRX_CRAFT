@@ -305,9 +305,9 @@ flowchart TD
 ```mermaid
 flowchart TD
     S(["엑셀다운로드 클릭<br/>scwin.btn_Excel_onclick"]) --> T{"선택한 탭?"}
-    T -- "전체" --> A["grd_List1 · 채권처리현황(전체)_일시"]
-    T -- "개별종목" --> B["grd_List2 · 채권처리현황(개별)_일시"]
-    T -- "일괄상장종목" --> C["grd_List3 · 채권처리현황(일괄)_일시"]
+    T -- "전체" --> A["grd_List1 · menuId_채권처리현황(전체)_일시"]
+    T -- "개별종목" --> B["grd_List2 · menuId_채권처리현황(개별)_일시"]
+    T -- "일괄상장종목" --> C["grd_List3 · menuId_채권처리현황(일괄)_일시"]
     A --> G{"$p.getComponentById(id) 로 찾았나?<br/>탭 본문 지연 렌더 ※TO-BE"}
     B --> G
     C --> G
@@ -817,12 +817,12 @@ scwin.searchTotList = async function () {
 
 - 탭별 대상: 0 → `grd_List1`·"채권처리현황(전체)", 1 → `grd_List2`·"채권처리현황(개별)", 2 → `grd_List3`·"채권처리현황(일괄)" — `{ id, name }` 표에서 `Number(tab_Main.getSelectedTabIndex())` 번째를 고른다(없으면 끝).
 - 탭 본문은 처음 선택될 때 그려질 수 있어(`w2:tabControl` `alwaysDraw` 기본 false) 그리드 전역 변수를 바로 쓰지 않고, **선택한 탭의 그리드만 `$p.getComponentById(target.id)` 로 찾는다** — 찾지 못하면(`$c.util.isEmpty(grd)`) 아무것도 하지 않고 끝.
-- `$c.data.downloadGridViewExcel(grd, { fileName : 이름 + "_" + $c.date.getServerDateTime("yyyyMMddHHmmss") + ".xlsx", sheetName : "sheet1" });` (규칙 20). 0건 확인·안내는 공통 함수가 한다("다운로드 할 데이터가 없습니다." — AS-IS 문구와 다름, §8 #19).
+- `$c.data.downloadGridViewExcel(grd, { fileName : $c.win.getProgramId() + "_" + 이름 + "_" + $c.date.getServerDateTime("yyyyMMddHHmmss") + ".xlsx", sheetName : "sheet1" });` — 파일명 `{menuId}_{이름}_{yyyyMMddHHmmss}.xlsx`(전환 규칙 42, 2026-10-27)` (규칙 20). 0건 확인·안내는 공통 함수가 한다("다운로드 할 데이터가 없습니다." — AS-IS 문구와 다름, §8 #19).
 - AS-IS: `cGetToday("yyyymmddhhmmss")`(클라이언트 시각), `getExcelDownPath()` + 파일명(로컬 저장 경로), `voDtsList.countrow > 0` 이면 `doLogSave(vScrenID, SCREN_PROCS_TP_CD_07)` 후 `voGrid.GridToOffice("sheet1", xls_path, 8, 0)`, 0건이면 `alert("해당데이터가 없습니다. 조회후 다운받으십시요.")`. 미사용 지역 변수 `excelSheet`. `getExcelDownPath`·`doLogSave` 는 TO-BE 에서 쓰지 않는다(브라우저 다운로드, 이력 삭제 결정 2026-10-26). `GridToOffice` 옵션 `8, 0` 의미(숨김 열 포함 여부 등)는 §10 #17.
 
 ### 6.8 월별등록현황 엑셀 다운로드 (`scwin.excelDownDtl`) — AS-IS `fn_ExcelDown3`
 
-- `$c.data.downloadGridViewExcel(grd_ListDetail, { fileName : "채권처리현황(일괄월별)_" + 일시 + ".xlsx", sheetName : "sheet1" });` — 그 밖은 §6.7 과 같다(AS-IS `dts_ListDet.countrow > 0` 확인 → `doLogSave` → `grd_ListDetail.GridToOffice("sheet1", xls_path, 8, 0)`).
+- `$c.data.downloadGridViewExcel(grd_ListDetail, { fileName : $c.win.getProgramId() + "_채권처리현황(일괄월별)_" + 일시 + ".xlsx", sheetName : "sheet1" });` (규칙 42) — 그 밖은 §6.7 과 같다(AS-IS `dts_ListDet.countrow > 0` 확인 → `doLogSave` → `grd_ListDetail.GridToOffice("sheet1", xls_path, 8, 0)`).
 
 ### 6.9 처리결과 색 (`scwin.applyProcStateColor(grd, dlt)`) — AS-IS `OnLoadCompleted` 의 `ColumnProp('PROC_STATE', 'color')`
 
@@ -854,7 +854,7 @@ scwin.searchTotList = async function () {
 | 처리결과 색 | 처리중·처리완료 `#343434`, 미처리 `#FF0000`, 반송 `#0000FF` | `ColumnProp` decode — TO-BE `scwin.PROC_STATE_CLASS`(`red`·`blue`, 규칙 40) |
 | 상장채권종목 검색 유형 `listTypeCd` | `'2'` | `fn_GetParListBndIsu` |
 | 화면처리구분 | `SCREN_PROCS_TP_CD_01` 조회, `SCREN_PROCS_TP_CD_07` 엑셀 | TO-BE 미전송·미사용 |
-| 엑셀 파일명 | "채권처리현황(전체)_"·"채권처리현황(개별)_"·"채권처리현황(일괄)_"·"채권처리현황(일괄월별)_" + `yyyyMMddHHmmss` + `.xlsx`, 시트 `sheet1` | `fn_ExcelDown`·`fn_ExcelDown3` |
+| 엑셀 파일명 | "채권처리현황(전체)_"·"채권처리현황(개별)_"·"채권처리현황(일괄)_"·"채권처리현황(일괄월별)_" + `yyyyMMddHHmmss` + `.xlsx`, 시트 `sheet1` | `fn_ExcelDown`·`fn_ExcelDown3` — TO-BE 는 앞에 menuId(`$c.win.getProgramId()`)를 붙인다(규칙 42) |
 
 ### 7.2 메시지
 

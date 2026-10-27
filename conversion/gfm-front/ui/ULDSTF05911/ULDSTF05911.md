@@ -489,7 +489,7 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=1`, `LIST_BZ_TP_CD=147`
 ### 6.6 엑셀 다운로드 (`scwin.img_Excel_onclick`)
 
 - 원본: `doLogSave(vScrenID, SCREN_PROCS_TP_CD_07)` → 0건이면 `alert(NO_EXCEL_DATA)`, 아니면 `grd_isu.GridToExcel("ELW 행사겨격/전환비율 변경", "", "8")`.
-- TO-BE: `$c.data.downloadGridViewExcel(grd_isu, { fileName : "ELW 행사가격_전환비율 변경" })` (규칙 20). 파일명에 `/` 를 쓰면 저장이 실패하거나 이름이 잘릴 수 있어 `_` 로 바꾼다. 0건 안내는 공통 함수가 하므로 화면에서 따로 확인하지 않는다. `doLogSave` 는 삭제(2026-10-26 결정). 파일명 오타 "행사겨격"은 고친다(§8 #7).
+- TO-BE: `$c.data.downloadGridViewExcel(grd_isu, { fileName : $c.win.getProgramId() + "_ELW 행사가격_전환비율 변경_" + $c.date.getServerDateTime("yyyyMMddHHmmss") + ".xlsx" })` (규칙 20·42 — 파일명 `{menuId}_{이름}_{yyyyMMddHHmmss}.xlsx`. 팝업이라 메뉴 정보가 없어 생략하면 `excel.xlsx` 가 된다). 파일명에 `/` 를 쓰면 저장이 실패하거나 이름이 잘릴 수 있어 `_` 로 바꾼다. 0건 안내는 공통 함수가 하므로 화면에서 따로 확인하지 않는다. `doLogSave` 는 삭제(2026-10-26 결정). 파일명 오타 "행사겨격"은 고친다(§8 #7).
 
 ### 6.7 저장 (`scwin.save`) — 원본 `fn_save`
 

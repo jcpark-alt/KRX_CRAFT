@@ -1006,7 +1006,7 @@ grd_list.setRowClass(i, "row_bg_lgray");
     2. **menuId** 는 `$c.win.getProgramId()` 로 얻는다 — 화면의 `meta_screenId`(전환 화면은 모두 지정), 없으면 화면 파일명을 돌려준다. 공통 함수 기본 규칙의 menuId(메뉴 `src` 파일명)와 같은 값이다. 화면 ID 문자열을 직접 적지 않는다(복사본 화면에서 어긋난다).
     3. **이름**은 AS-IS 파일명(`GridToExcel`·`GridToOffice` 의 파일명 인자)이나 화면·탭·그리드 구분명을 쓴다. 메뉴명과 같으면 `fileName` 을 생략해 공통 함수 기본 규칙에 맡겨도 된다 — 단 **팝업·탭 본문처럼 메뉴 정보가 없을 수 있는 화면은 생략하지 않는다**(`excel.xlsx` 가 되어 menuId 가 빠진다).
     4. 일시는 서버 시각 `$c.date.getServerDateTime("yyyyMMddHHmmss")`, 확장자는 `.xlsx` 를 명시한다. 파일명에 쓸 수 없는 문자(`\ / : * ? " < > |`)는 넣지 않는다(예: "행사가격/전환비율" → "행사가격_전환비율").
-* **적용 현황**(2026-10-27, gfm-front TO-BE): `fileName` 을 직접 지정하는 3곳 모두 menuId 없음 — ULDBNS30400 `scwin.excelDown`·`scwin.excelDownDtl`(이름_일시.xlsx), ULDSTF05911 엑셀 다운로드(이름만). 다음 갱신 때 맞춘다. sample-front·jsp-front 는 각 재전환 때.
+* **적용 현황**(2026-10-27, gfm-front TO-BE): `fileName` 을 직접 지정하는 3곳 모두 적용 완료 — ULDBNS30400 `scwin.excelDown`·`scwin.excelDownDtl`, ULDSTF05911 엑셀 다운로드(팝업이라 생략 불가). sample-front·jsp-front 는 각 재전환 때.
 
 ## 규칙 6 보충: Submission 변환 상세
 
