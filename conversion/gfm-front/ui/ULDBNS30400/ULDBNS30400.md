@@ -628,7 +628,7 @@ const requestData = {
 | `ref` / `requestData` | `ref : ""` / `scwin.getSearchData()` — `dma_search` 9키(§6.10). AS-IS `{P}V_CO_NM=txb_ISUR_CD.value`, `V_ISU_NM=txb_ISU_CD.value`, `V_EMP_NM`, `V_MKT_RSN_CD`, `V_STATE`, `V_STRT_DD`, `V_END_DD`, `V_SRI_BND_TP_CD`, `V_DD_TP` |
 | `target` / `gridview` | `"dlt_searchTotList=body"` / `grd_List1` |
 | 선행 / 순서 | 로딩 마지막 단계(§3) 또는 `validateSearch` 통과 뒤 |
-| 후처리 | `$c.stf.fillGridHeaderTotalCnt(dlt_searchTotList.getRowCount(), panel_page1)` → `scwin.applyProcStateColor(grd_List1, dlt_searchTotList)`(§6.9). 0건 안내 없음(원본과 같음) |
+| 후처리 | `$c.stf.fillGridHeaderTotalCnt(dlt_searchTotList.getRowCount(), panel_page1)`. 처리결과 색은 컬럼 customFormatter(§6.9)가 그릴 때 처리 — 후처리 반복문 없음. 0건 안내 없음(원본과 같음) |
 | 실패 처리 | `success:false` → `await $c.win.alert($c.stf.getMessageParam("MSG-0002"))` (AS-IS `dts_List1 OnLoadError`). 통신 오류는 공통 오류 핸들러 |
 | 중복 실행 | 기본(건너뜀) |
 
@@ -652,7 +652,6 @@ scwin.searchTotList = async function () {
         return;
     }
     $c.stf.fillGridHeaderTotalCnt(dlt_searchTotList.getRowCount(), panel_page1);
-    scwin.applyProcStateColor(grd_List1, dlt_searchTotList);
 };
 ```
 
@@ -664,7 +663,7 @@ scwin.searchTotList = async function () {
 | `method` / `action` | `get` / `"/api/bonds/clsAdm/procsStat/indvdlIsuList-select"` *(AS-IS `queryId=…select.list2`)* |
 | `ref` / `requestData` | `ref : ""` / `scwin.getSearchData()` (9키). AS-IS 는 `V_SRI_BND_TP_CD` 를 보내지 않았다 — 이 탭은 ESG 체크가 막혀 늘 미체크 값이 간다(§10 #7) |
 | `target` / `gridview` | `"dlt_searchIndvdlIsuList=body"` / `grd_List2` (명세 submission target 의 `dlt_searchIndvdlisuList` 오타는 정의 id 로 맞춤 — §10 #2) |
-| 후처리 | 건수 `panel_page2` → `applyProcStateColor(grd_List2, dlt_searchIndvdlIsuList)` |
+| 후처리 | 건수 `panel_page2` (처리결과 색은 customFormatter — §6.9) |
 | 실패 처리 | `MSG-0002` (AS-IS `dts_List2 OnLoadError`) |
 | 중복 실행 | 기본(건너뜀) |
 
@@ -676,7 +675,7 @@ scwin.searchTotList = async function () {
 | `method` / `action` | `get` / `"/api/bonds/clsAdm/procsStat/packListIsuList-select"` *(AS-IS `queryId=…select.list3`)* |
 | `ref` / `requestData` | `ref : ""` / `scwin.getSearchData()` (9키). AS-IS 는 `V_ISU_NM`(주석 처리)·`V_SRI_BND_TP_CD`·`V_DD_TP` 를 보내지 않았다 — 이 탭에서 종목은 빈 값, ESG 미체크, 기준구분 "1" 로 잠겨 있어 값은 사실상 고정(§10 #7) |
 | `target` / `gridview` | `"dlt_searchPackListIsuList=body"` / `grd_List3` |
-| 후처리 | 건수 `panel_page3` → `applyProcStateColor(grd_List3, dlt_searchPackListIsuList)` → 1건 이상이면 `grd_List3.setFocusedCell(0, "procState")` 후 `scwin.searchPackListIsuDtl(0)`(동기 호출 — 지금은 서버 호출 없이 빈 목록·건수 0, §5.5 — AS-IS `OnRowPosChanged` 자동 발화 대체. `setFocusedCell` 이 `onrowindexchange` 를 발화해 두 번 부르는지 실측 §10 #19), 0건이면 `dlt_searchPackListIsuDtlList.removeAll()` + `fillGridHeaderTotalCnt(0, panel_page4)`(§8 #15) |
+| 후처리 | 건수 `panel_page3`(처리결과 색은 customFormatter — §6.9) → 1건 이상이면 `grd_List3.setFocusedCell(0, "procState")` 후 `scwin.searchPackListIsuDtl(0)`(동기 호출 — 지금은 서버 호출 없이 빈 목록·건수 0, §5.5 — AS-IS `OnRowPosChanged` 자동 발화 대체. `setFocusedCell` 이 `onrowindexchange` 를 발화해 두 번 부르는지 실측 §10 #19), 0건이면 `dlt_searchPackListIsuDtlList.removeAll()` + `fillGridHeaderTotalCnt(0, panel_page4)`(§8 #15) |
 | 실패 처리 | 이전 행 기준 월별등록현황이 남지 않게 **먼저** `dlt_searchPackListIsuDtlList.removeAll()` + `$c.stf.fillGridHeaderTotalCnt(0, panel_page4)` → `MSG-0002` 안내 (AS-IS `dts_List3 OnLoadError`) |
 | 중복 실행 | 기본(건너뜀) |
 
@@ -824,10 +823,10 @@ scwin.searchTotList = async function () {
 
 - `$c.data.downloadGridViewExcel(grd_ListDetail, { fileName : $c.win.getProgramId() + "_채권처리현황(일괄월별)_" + 일시 + ".xlsx", sheetName : "sheet1" });` (규칙 42) — 그 밖은 §6.7 과 같다(AS-IS `dts_ListDet.countrow > 0` 확인 → `doLogSave` → `grd_ListDetail.GridToOffice("sheet1", xls_path, 8, 0)`).
 
-### 6.9 처리결과 색 (`scwin.applyProcStateColor(grd, dlt)`) — AS-IS `OnLoadCompleted` 의 `ColumnProp('PROC_STATE', 'color')`
+### 6.9 처리결과 색 (컬럼 customFormatter `scwin.fmtProcState`) — AS-IS `OnLoadCompleted` 의 `ColumnProp('PROC_STATE', 'color')`
 
 - AS-IS: `grd.ColumnProp('PROC_STATE', 'color') = "{decode(PROC_STATE,'처리중','#343434','처리완료','#343434','미처리','#FF0000','반송','#0000FF')}"` — 조회가 끝날 때마다 다시 건다(3탭 같음, 월별 그리드 제외).
-- TO-BE: 1구역 `scwin.PROC_STATE_CLASS = { "미처리" : "red", "반송" : "blue" }`(처리중·처리완료 `#343434` 는 기본 글자색이라 class 없음)를 두고, 행마다 `grd.removeCellClass(i, "procState")` 뒤 class 가 있으면 `grd.setCellClass(i, "procState", cls)` — `setCellColor` 직접 지정 금지, `base.css` 공통 색상 class(`red`·`orange`·`blue`·`green`)만 쓴다(전환 규칙 40, 2026-10-27). 목록 조회 3종의 후처리에서 부른다.
+- TO-BE: 1구역 `scwin.PROC_STATE_CLASS = { "미처리" : "red", "반송" : "blue" }`(처리중·처리완료 `#343434` 는 기본 글자색이라 class 없음). 그리드 3개(`grd_List1~3`)의 `procState` 컬럼에 `customFormatter="scwin.fmtProcState" escape="false"` 를 두고, 동기 함수 `scwin.fmtProcState(data, formattedData, rowIndex, colIndex)` 가 `$c.str.escapeToHtml` 로 이스케이프한 값을 class 가 있으면 `<span class="red|blue">` 로 감싸 돌려준다(전환 규칙 43·40, 2026-10-27). 엔진이 셀을 그릴 때마다(조회·정렬·필터·스크롤) 부르므로 조회 후처리 반복문(종전 `scwin.applyProcStateColor` + `setCellClass`)이 없고, 색이 정렬 뒤에도 행을 따라간다. `setCellColor` 직접 지정은 쓰지 않는다.
 - W-Craft 1차본의 `$c.cm.setColumnProp(…)` 는 Gauce 표현식 문자열을 넘겨 동작하지 않는다(§9).
 
 ### 6.10 요청 데이터 (`scwin.getSearchData()`)
@@ -914,7 +913,7 @@ scwin.searchTotList = async function () {
 | `fn_Search` (`ActiveIndex` 1·2·3) | `scwin.search` (`getSelectedTabIndex()` 0·1·2) |
 | `fn_Search1` / `fn_Search2` / `fn_Search3` + `DataID`·`Reset()` | `scwin.searchTotList` / `scwin.searchIndvdlIsuList` / `scwin.searchPackListIsuList` — `await $c.sbm.executeDynamic` (GET 명세 경로, 규칙 16·38·39) |
 | `fn_SearchDetail(row)` + `dts_List3 OnRowPosChanged` | `scwin.searchPackListIsuDtl(rowIndex)`(동기 — 지금은 서버 호출 없이 빈 목록·건수 0) + `grd_List3` `onrowindexchange` → `scwin.grd_List3_onrowindexchange` (명세 없음 — §5.5, §10 #3) |
-| `dts_* OnLoadCompleted(rowcount)` (`FillGridHeaderTotalCnt`·`CloseWin`·`ColumnProp` 색) | 통신 함수 `await` 뒤: `$c.stf.fillGridHeaderTotalCnt(getRowCount(), panel_pageN)` + `scwin.applyProcStateColor` |
+| `dts_* OnLoadCompleted(rowcount)` (`FillGridHeaderTotalCnt`·`CloseWin`·`ColumnProp` 색) | 통신 함수 `await` 뒤: `$c.stf.fillGridHeaderTotalCnt(getRowCount(), panel_pageN)` — `ColumnProp` 색은 컬럼 customFormatter `scwin.fmtProcState`(규칙 43) |
 | `dts_* OnLoadError()` → `alert(getMessageParam("MSG-0002"))` | `success:false` → `await $c.win.alert($c.stf.getMessageParam("MSG-0002"))` |
 | `ShowWin(grd)` / `CloseWin(rowcount, grd)` | 삭제 — `gridview` 옵션 스피너 |
 | `tab_Main OnSelChanged(nIndex)` | `scwin.tab_Main_onchange` → `scwin.applyTabCondition(idx)` (§6.2) |
@@ -934,7 +933,7 @@ scwin.searchTotList = async function () {
 | 그리드 대문자 컬럼 id(`PROC_STATE` …) | 명세 camelCase 키(`procState` …), 머리글 `h_` 접두 (§2.1) |
 | `alert(...)` | `await $c.win.alert(...)` |
 | `fn_SetParForIsuCd`, `clickBzProcsNo`, `vScrenID`, `vCurDate`, `excelSheet`, `#include(...)` 9종 | 삭제 (§8 #2·#8, 규칙 1·11) |
-| (없음 — 화면 보조) | `scwin.validateSearch`, `scwin.getSearchData`, `scwin.applyTabCondition`, `scwin.applyDdTpLock`, `scwin.applyProcStateColor`, 상수 `scwin.BND_STS_ITEMS`·`scwin.PROC_STATE_CLASS`·`scwin.PACK_MKTACT_CDS` |
+| (없음 — 화면 보조) | `scwin.validateSearch`, `scwin.getSearchData`, `scwin.applyTabCondition`, `scwin.applyDdTpLock`, `scwin.fmtProcState`(customFormatter), 상수 `scwin.BND_STS_ITEMS`·`scwin.PROC_STATE_CLASS`·`scwin.PACK_MKTACT_CDS` |
 
 **W-Craft 1차본(전환 전 ui-tobe 스크립트 = publish-tobe 사본) 대비** — 2단계 전환(2026-10-27)에서 아래를 모두 바꿨다(1차본은 그대로 동작하지 않았음).
 
@@ -975,5 +974,5 @@ scwin.searchTotList = async function () {
 16. ~~**퍼블리싱 기준본 보강** (캡처 없음 — 기존 ui-tobe 마크업이 기준) — ① `schbox` 안쪽 표 그룹 `id="tbl_search"`(규칙 22) ② `txb_ISUR_CD` `w2:autoComplete` → `xf:input` ③ 그리드 컬럼 id camelCase·머리글 `h_`·번호 열 expression·전 열 `readOnly` ④ `txb_ISU_NM` maxlength 삭제 ⑤ 본화면 `contentHeader`(pageFrame) ⑥ `w2:caption` "this is a grid caption." 기본 문구 정리~~ — 완료(2026-10-27): ①~⑥ 모두 반영(⑤ `sub_contents` 첫 자식 `w2:pageFrame#pfmContentHeader` — 메인 화면이라 필수, 탭 본문에는 넣지 않음). 그 밖에 W-Craft 잔재 `hierarchy`·`orgid`·`userData2` 삭제, `dataList` `dlt_*`, 숨김 2열 `gBody` 도 hidden, 금액 열 `#,##0`, 파란 글자 `class="blue"`, 그리드 4종 `sortable="true"`(AS-IS `sort="True"`), ESG 퍼블리셔 `onclick` 제거(1단계 `publish_gate --allow P11`). 2단계는 `publish_gate.py --pcc stf --before {1단계 사본} --allow P20` 통과. 남은 잔재는 #20.
 17. **엑셀 옵션** — AS-IS `GridToOffice("sheet1", 경로, 8, 0)` 의 `8, 0` 이 숨김 열(`신청자구분`·`은행채구분`) 포함 여부·서식 중 무엇인지 확인해 `downloadGridViewExcel` 옵션(`type`·숨김 열)을 맞춘다.
 18. **탭 되돌림 이벤트 순서** — TO-BE 는 `tab_Main.setSelectedTabIndex(0)` 뒤 **언제나 `applyTabCondition(0)` 을 직접 부른다**. `onchange` 가 다시 발화하면 전체 탭 조건이 두 번 적용되지만 결과가 같아 무해하다. ESG 안내 중 탭이 이미 바뀌어 보이는지 실화면으로 확인하고, 탭 전환을 미리 막는 `onbeforeselect` 를 쓸지도 함께 정한다(§6.2).
-19. **엔진 API 실측** — ① 처리구분 항목 교체: TO-BE 는 `cmb_BndStsGb.removeAll()` → `addItem(value, label)` → `setSelectedIndex(0)` — 바인딩 `dma_search.state` 가 "0" 으로 따라오는지 ② 처리결과 셀 색 class(`setCellClass` 가 정렬·필터 뒤에도 행을 따라가는지 — 규칙 40) — 4종 모두 `sortable="true"` 라 정렬 후 확인 필수 ③ gridView 기본 `focus` 가 false 라 행 이벤트는 화면 코드의 `setFocusedCell` 로만 시작된다 — 조회 직후 `setFocusedCell(0, …)` 이 `onrowindexchange` 를 발화해 `searchPackListIsuDtl` 이 두 번 불리는지(명세 후 통신이 생기면 중복 조회) ④ 탭 본문 지연 렌더(`alwaysDraw` 기본 false) 시점 — 처음 고르기 전의 탭 그리드에 조회·`setCellClass`·`setFocusedCell` 이 안전한지(엑셀은 `$p.getComponentById` 로 막음, §6.7)(§5.3·§6.2·§6.9).
+19. **엔진 API 실측** — ① 처리구분 항목 교체: TO-BE 는 `cmb_BndStsGb.removeAll()` → `addItem(value, label)` → `setSelectedIndex(0)` — 바인딩 `dma_search.state` 가 "0" 으로 따라오는지 ② ~~처리결과 셀 색 class 가 정렬·필터 뒤에도 행을 따라가는지~~ — 해소: customFormatter 로 바꿔 그릴 때마다 계산(규칙 43) — 4종 모두 `sortable="true"` 라 정렬 후 확인 필수 ③ gridView 기본 `focus` 가 false 라 행 이벤트는 화면 코드의 `setFocusedCell` 로만 시작된다 — 조회 직후 `setFocusedCell(0, …)` 이 `onrowindexchange` 를 발화해 `searchPackListIsuDtl` 이 두 번 불리는지(명세 후 통신이 생기면 중복 조회) ④ 탭 본문 지연 렌더(`alwaysDraw` 기본 false) 시점 — 처음 고르기 전의 탭 그리드에 조회·`setFocusedCell` 이 안전한지(엑셀은 `$p.getComponentById` 로 막음, §6.7)(§5.3·§6.2·§6.9).
 20. **퍼블리셔 마크업 잔재 (Minor)** — 1단계에서 고치지 않은 것: ① 기간 칸 `td` 에 `flex flex_no` 래퍼가 없고 "~" 를 `w2:textbox`(`label_3`)로 둠 ② 그리드 높이를 `rowN`/`visibleRowNum` 대신 인라인 `style="height:153px;"` ③ `xf:trigger` 의 `src`·`cursor` 속성, `xf:select1` 의 `item=` 속성. 동작 영향은 없다 — 퍼블리싱 정비 때 표준 마크업으로 정리(§2.1, §8 #26).

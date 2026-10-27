@@ -132,7 +132,7 @@
 			<w2:workflowCollection />
 		</xf:model>
 		<w2:layoutInfo />
-		<w2:publicInfo method="scwin.onpageload,scwin.init,scwin.onpageunload,scwin.btn_Search_onclick,scwin.img_CoSearch_onclick,scwin.btn_ISU_CD_SEARCH_onclick,scwin.txb_ISUR_CD_onblur,scwin.txb_ISU_CD_onblur,scwin.btn_Excel_onclick,scwin.btn_Excel3_onclick,scwin.tab_Main_onchange,scwin.chk_SRI_BND_TP_CD_onviewchange,scwin.grd_List1_oncelldblclick,scwin.grd_List2_oncelldblclick,scwin.grd_List3_oncelldblclick,scwin.grd_List3_onrowindexchange,scwin.searchTotList,scwin.searchIndvdlIsuList,scwin.searchPackListIsuList,scwin.searchPrevBzDd,scwin.searchPackListIsuDtl,scwin.search,scwin.validateSearch,scwin.getSearchData,scwin.applyTabCondition,scwin.applyDdTpLock,scwin.applyProcStateColor,scwin.openIsurPopup,scwin.openListBndIsuPopup,scwin.openIsuInfoPopup,scwin.excelDown,scwin.excelDownDtl" />
+		<w2:publicInfo method="scwin.onpageload,scwin.init,scwin.onpageunload,scwin.btn_Search_onclick,scwin.img_CoSearch_onclick,scwin.btn_ISU_CD_SEARCH_onclick,scwin.txb_ISUR_CD_onblur,scwin.txb_ISU_CD_onblur,scwin.btn_Excel_onclick,scwin.btn_Excel3_onclick,scwin.tab_Main_onchange,scwin.chk_SRI_BND_TP_CD_onviewchange,scwin.grd_List1_oncelldblclick,scwin.grd_List2_oncelldblclick,scwin.grd_List3_oncelldblclick,scwin.grd_List3_onrowindexchange,scwin.searchTotList,scwin.searchIndvdlIsuList,scwin.searchPackListIsuList,scwin.searchPrevBzDd,scwin.searchPackListIsuDtl,scwin.search,scwin.validateSearch,scwin.getSearchData,scwin.applyTabCondition,scwin.applyDdTpLock,scwin.fmtProcState,scwin.openIsurPopup,scwin.openListBndIsuPopup,scwin.openIsuInfoPopup,scwin.excelDown,scwin.excelDownDtl" />
 		<script lazy="false" type="text/javascript"><![CDATA[
 ///////// 1. 변수 및 선언 영역 /////////
 scwin.param1 = "";          // 발행기관 검색 팝업(ULDBNS25001) 검색어 — 팝업이 $p.parent().scwin.param1 로 읽는다(§6.4)
@@ -153,7 +153,7 @@ scwin.BND_STS_ITEMS = {
     pack : [["0", "전체"], ["1", "미처리"], ["3", "접수완료"], ["4", "반송"]]
 };
 
-// 처리결과 글자색 class (원본 ColumnProp('PROC_STATE', 'color') decode — §6.9). base.css 공통 색상 class 만 쓴다(규칙 40).
+// 처리결과 글자색 class (원본 ColumnProp('PROC_STATE', 'color') decode — §6.9). base.css 공통 색상 class 만 쓴다(규칙 40) — 컬럼 customFormatter scwin.fmtProcState 가 span 으로 그린다(규칙 43).
 // 미처리 #FF0000 → red, 반송 #0000FF → blue. 처리중·처리완료(#343434)는 기본 글자색이라 class 없음.
 scwin.PROC_STATE_CLASS = {
     "미처리" : "red",
@@ -514,7 +514,6 @@ scwin.searchTotList = async function () {
         return;
     }
     $c.stf.fillGridHeaderTotalCnt(dlt_searchTotList.getRowCount(), panel_page1);
-    scwin.applyProcStateColor(grd_List1, dlt_searchTotList);
 };
 
 /**
@@ -547,7 +546,6 @@ scwin.searchIndvdlIsuList = async function () {
         return;
     }
     $c.stf.fillGridHeaderTotalCnt(dlt_searchIndvdlIsuList.getRowCount(), panel_page2);
-    scwin.applyProcStateColor(grd_List2, dlt_searchIndvdlIsuList);
 };
 
 /**
@@ -582,7 +580,6 @@ scwin.searchPackListIsuList = async function () {
         return;
     }
     $c.stf.fillGridHeaderTotalCnt(dlt_searchPackListIsuList.getRowCount(), panel_page3);
-    scwin.applyProcStateColor(grd_List3, dlt_searchPackListIsuList);
 
     // 원본은 데이터셋 로드 때 OnRowPosChanged 가 발화해 첫 행 월별등록현황을 조회했다 — gridView 는 로드 때 행 이벤트가 없어 직접 부른다.
     // 0건이면 조회 없이 월별등록현황을 비운다(§8 #15).
@@ -777,24 +774,23 @@ scwin.applyDdTpLock = function () {
 
 /**
  * @method
- * @name scwin.applyProcStateColor
+ * @name scwin.fmtProcState
  * @author Inswave
  * @date 2026. 10. 27
- * @description 처리결과 글자색 — 미처리 red, 반송 blue class(base.css), 처리중·처리완료는 기본색. setCellColor 대신 setCellClass(규칙 40). (원본 ColumnProp('PROC_STATE', 'color') decode — §6.9)
- * @param {Object} grd 목록 gridView
- * @param {Object} dlt 목록 dataList
- * @returns
+ * @description 처리결과 컬럼 customFormatter — 미처리 red, 반송 blue(base.css)를 span 으로 감싸 그린다. 처리중·처리완료는 기본색.
+ * 셀을 그릴 때마다(조회·정렬·스크롤) 엔진이 부르므로 반복문 없이 색이 행을 따라간다(전환 규칙 43). 동기 함수 — async 금지.
+ * (원본 ColumnProp('PROC_STATE', 'color') decode — §6.9)
+ * @param {String} data 원본 값(처리결과 명)
+ * @param {String} formattedData 표시 형식이 적용된 값
+ * @param {Number} rowIndex 화면 행 번호
+ * @param {Number} colIndex 컬럼 번호
+ * @returns {String} 셀에 그릴 HTML
  * @hidden N
  */
-scwin.applyProcStateColor = function (grd, dlt) {
-    const rowCount = dlt.getRowCount();
-
-    // TODO: 정렬·필터 뒤에도 class 가 행을 따라가는지 실측 (§10 #19)
-    for (let i = 0; i < rowCount; i++) {
-        const cls = scwin.PROC_STATE_CLASS[dlt.getCellData(i, "procState")];
-        grd.removeCellClass(i, "procState");     // 재조회 때 이전 행 class 가 남지 않게
-        if (cls) grd.setCellClass(i, "procState", cls);
-    }
+scwin.fmtProcState = function (data, formattedData, rowIndex, colIndex) {
+    const text = $c.str.escapeToHtml(String(formattedData ?? ""));
+    const cls = scwin.PROC_STATE_CLASS[data];
+    return cls ? "<span class=\"" + cls + "\">" + text + "</span>" : text;
 };
 
 /**
@@ -1217,7 +1213,7 @@ scwin.excelDownDtl = function () {
 							<w2:gBody style="" id="gBody1">
 								<w2:row style="" id="">
 									<w2:column readOnly="true" textAlign="center" width="44" inputType="expression" expression="rowIndex()+1" id="no" displayMode="label"></w2:column>
-									<w2:column readOnly="true" textAlign="center" width="80" inputType="text" id="procState" displayMode="label"></w2:column>
+									<w2:column readOnly="true" textAlign="center" width="80" inputType="text" id="procState" displayMode="label" customFormatter="scwin.fmtProcState" escape="false"></w2:column>
 									<w2:column readOnly="true" textAlign="left" width="120" inputType="text" id="mktNm" displayMode="label"></w2:column>
 									<w2:column readOnly="true" textAlign="left" width="180" inputType="text" id="isuNm" displayMode="label"></w2:column>
 									<w2:column readOnly="true" textAlign="left" width="210" inputType="text" id="ctnt" displayMode="label"></w2:column>
@@ -1319,7 +1315,7 @@ scwin.excelDownDtl = function () {
 							<w2:gBody style="" id="gBody2">
 								<w2:row style="" id="">
 									<w2:column readOnly="true" textAlign="center" width="44" inputType="expression" expression="rowIndex()+1" id="no" displayMode="label"></w2:column>
-									<w2:column readOnly="true" textAlign="center" width="80" inputType="text" id="procState" displayMode="label"></w2:column>
+									<w2:column readOnly="true" textAlign="center" width="80" inputType="text" id="procState" displayMode="label" customFormatter="scwin.fmtProcState" escape="false"></w2:column>
 									<w2:column readOnly="true" textAlign="left" width="150" inputType="text" id="mktNm" displayMode="label"></w2:column>
 									<w2:column readOnly="true" textAlign="center" width="100" inputType="text" id="bndApplId" displayMode="label"></w2:column>
 									<w2:column readOnly="true" textAlign="left" width="150" inputType="text" id="coNm" displayMode="label"></w2:column>
@@ -1394,7 +1390,7 @@ scwin.excelDownDtl = function () {
 							<w2:gBody style="" id="gBody3">
 								<w2:row style="" id="">
 									<w2:column readOnly="true" textAlign="center" width="44" inputType="expression" expression="rowIndex()+1" id="no" displayMode="label"></w2:column>
-									<w2:column readOnly="true" textAlign="center" width="100" inputType="text" id="procState" displayMode="label"></w2:column>
+									<w2:column readOnly="true" textAlign="center" width="100" inputType="text" id="procState" displayMode="label" customFormatter="scwin.fmtProcState" escape="false"></w2:column>
 									<w2:column readOnly="true" class="blue" textAlign="left" width="150" inputType="text" id="mktNm" displayMode="label"></w2:column>
 									<w2:column readOnly="true" textAlign="center" width="100" inputType="text" id="bndApplId" displayMode="label"></w2:column>
 									<w2:column readOnly="true" textAlign="left" width="150" inputType="text" id="coNm" displayMode="label"></w2:column>
