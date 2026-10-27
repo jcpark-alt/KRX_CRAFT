@@ -827,7 +827,7 @@ scwin.searchTotList = async function () {
 ### 6.9 처리결과 색 (`scwin.applyProcStateColor(grd, dlt)`) — AS-IS `OnLoadCompleted` 의 `ColumnProp('PROC_STATE', 'color')`
 
 - AS-IS: `grd.ColumnProp('PROC_STATE', 'color') = "{decode(PROC_STATE,'처리중','#343434','처리완료','#343434','미처리','#FF0000','반송','#0000FF')}"` — 조회가 끝날 때마다 다시 건다(3탭 같음, 월별 그리드 제외).
-- TO-BE: `scwin.PROC_STATE_COLOR = { "처리중" : "#343434", "처리완료" : "#343434", "미처리" : "#FF0000", "반송" : "#0000FF" }` 를 1구역에 두고, 행마다 `grd.setCellColor(i, "procState", scwin.PROC_STATE_COLOR[값] ?? "")` (0 ≤ i < `getRowCount()`, 규칙 29). 표에 없는 값(일괄 탭 "접수완료" 등)은 기본 글자색(decode 기본값 없음과 같음). 정렬·필터 뒤에도 유지되는지 실측하고, 안 되면 컬럼 `displayFormatter`/`class` 방식으로 바꾼다(§10 #19).
+- TO-BE: 1구역 `scwin.PROC_STATE_CLASS = { "미처리" : "red", "반송" : "blue" }`(처리중·처리완료 `#343434` 는 기본 글자색이라 class 없음)를 두고, 행마다 `grd.removeCellClass(i, "procState")` 뒤 class 가 있으면 `grd.setCellClass(i, "procState", cls)` — `setCellColor` 직접 지정 금지, `base.css` 공통 색상 class(`red`·`orange`·`blue`·`green`)만 쓴다(전환 규칙 40, 2026-10-27). 목록 조회 3종의 후처리에서 부른다.
 - W-Craft 1차본의 `$c.cm.setColumnProp(…)` 는 Gauce 표현식 문자열을 넘겨 동작하지 않는다(§9).
 
 ### 6.10 요청 데이터 (`scwin.getSearchData()`)
@@ -851,7 +851,7 @@ scwin.searchTotList = async function () {
 | 시장조치 `mktRsnCd` | 공통 코드 `03057` = `BND_MKTACT_TP_CD`, 제외 `104`·`105`·`999`·`313`·`321`, 첫 항목 "전체"(빈 값) | `fn_SetBnsComboToCode2` |
 | 일괄상장 시장조치 | `112`·`122`·`132`(국채·지방채·특수채 일괄상장) → 상세 팝업 코드에 `Y` 붙임 | 그리드 `OnDblClick` — TO-BE `scwin.PACK_MKTACT_CDS` |
 | 검색구분명 `searchGbNm` | `"일괄상장종목"` 이면 전체 탭에서도 `Y` 보정 | `grd_List1 OnDblClick` |
-| 처리결과 색 | 처리중·처리완료 `#343434`, 미처리 `#FF0000`, 반송 `#0000FF` | `ColumnProp` decode — TO-BE `scwin.PROC_STATE_COLOR` |
+| 처리결과 색 | 처리중·처리완료 `#343434`, 미처리 `#FF0000`, 반송 `#0000FF` | `ColumnProp` decode — TO-BE `scwin.PROC_STATE_CLASS`(`red`·`blue`, 규칙 40) |
 | 상장채권종목 검색 유형 `listTypeCd` | `'2'` | `fn_GetParListBndIsu` |
 | 화면처리구분 | `SCREN_PROCS_TP_CD_01` 조회, `SCREN_PROCS_TP_CD_07` 엑셀 | TO-BE 미전송·미사용 |
 | 엑셀 파일명 | "채권처리현황(전체)_"·"채권처리현황(개별)_"·"채권처리현황(일괄)_"·"채권처리현황(일괄월별)_" + `yyyyMMddHHmmss` + `.xlsx`, 시트 `sheet1` | `fn_ExcelDown`·`fn_ExcelDown3` |
@@ -934,7 +934,7 @@ scwin.searchTotList = async function () {
 | 그리드 대문자 컬럼 id(`PROC_STATE` …) | 명세 camelCase 키(`procState` …), 머리글 `h_` 접두 (§2.1) |
 | `alert(...)` | `await $c.win.alert(...)` |
 | `fn_SetParForIsuCd`, `clickBzProcsNo`, `vScrenID`, `vCurDate`, `excelSheet`, `#include(...)` 9종 | 삭제 (§8 #2·#8, 규칙 1·11) |
-| (없음 — 화면 보조) | `scwin.validateSearch`, `scwin.getSearchData`, `scwin.applyTabCondition`, `scwin.applyDdTpLock`, `scwin.applyProcStateColor`, 상수 `scwin.BND_STS_ITEMS`·`scwin.PROC_STATE_COLOR`·`scwin.PACK_MKTACT_CDS` |
+| (없음 — 화면 보조) | `scwin.validateSearch`, `scwin.getSearchData`, `scwin.applyTabCondition`, `scwin.applyDdTpLock`, `scwin.applyProcStateColor`, 상수 `scwin.BND_STS_ITEMS`·`scwin.PROC_STATE_CLASS`·`scwin.PACK_MKTACT_CDS` |
 
 **W-Craft 1차본(전환 전 ui-tobe 스크립트 = publish-tobe 사본) 대비** — 2단계 전환(2026-10-27)에서 아래를 모두 바꿨다(1차본은 그대로 동작하지 않았음).
 
@@ -975,5 +975,5 @@ scwin.searchTotList = async function () {
 16. ~~**퍼블리싱 기준본 보강** (캡처 없음 — 기존 ui-tobe 마크업이 기준) — ① `schbox` 안쪽 표 그룹 `id="tbl_search"`(규칙 22) ② `txb_ISUR_CD` `w2:autoComplete` → `xf:input` ③ 그리드 컬럼 id camelCase·머리글 `h_`·번호 열 expression·전 열 `readOnly` ④ `txb_ISU_NM` maxlength 삭제 ⑤ 본화면 `contentHeader`(pageFrame) ⑥ `w2:caption` "this is a grid caption." 기본 문구 정리~~ — 완료(2026-10-27): ①~⑥ 모두 반영(⑤ `sub_contents` 첫 자식 `w2:pageFrame#pfmContentHeader` — 메인 화면이라 필수, 탭 본문에는 넣지 않음). 그 밖에 W-Craft 잔재 `hierarchy`·`orgid`·`userData2` 삭제, `dataList` `dlt_*`, 숨김 2열 `gBody` 도 hidden, 금액 열 `#,##0`, 파란 글자 `class="blue"`, 그리드 4종 `sortable="true"`(AS-IS `sort="True"`), ESG 퍼블리셔 `onclick` 제거(1단계 `publish_gate --allow P11`). 2단계는 `publish_gate.py --pcc stf --before {1단계 사본} --allow P20` 통과. 남은 잔재는 #20.
 17. **엑셀 옵션** — AS-IS `GridToOffice("sheet1", 경로, 8, 0)` 의 `8, 0` 이 숨김 열(`신청자구분`·`은행채구분`) 포함 여부·서식 중 무엇인지 확인해 `downloadGridViewExcel` 옵션(`type`·숨김 열)을 맞춘다.
 18. **탭 되돌림 이벤트 순서** — TO-BE 는 `tab_Main.setSelectedTabIndex(0)` 뒤 **언제나 `applyTabCondition(0)` 을 직접 부른다**. `onchange` 가 다시 발화하면 전체 탭 조건이 두 번 적용되지만 결과가 같아 무해하다. ESG 안내 중 탭이 이미 바뀌어 보이는지 실화면으로 확인하고, 탭 전환을 미리 막는 `onbeforeselect` 를 쓸지도 함께 정한다(§6.2).
-19. **엔진 API 실측** — ① 처리구분 항목 교체: TO-BE 는 `cmb_BndStsGb.removeAll()` → `addItem(value, label)` → `setSelectedIndex(0)` — 바인딩 `dma_search.state` 가 "0" 으로 따라오는지 ② 처리결과 셀 색(`setCellColor` 가 정렬·필터 뒤에도 남는지, 아니면 `displayFormatter`/`class`) — 4종 모두 `sortable="true"` 라 정렬 후 확인 필수 ③ gridView 기본 `focus` 가 false 라 행 이벤트는 화면 코드의 `setFocusedCell` 로만 시작된다 — 조회 직후 `setFocusedCell(0, …)` 이 `onrowindexchange` 를 발화해 `searchPackListIsuDtl` 이 두 번 불리는지(명세 후 통신이 생기면 중복 조회) ④ 탭 본문 지연 렌더(`alwaysDraw` 기본 false) 시점 — 처음 고르기 전의 탭 그리드에 조회·`setCellColor`·`setFocusedCell` 이 안전한지(엑셀은 `$p.getComponentById` 로 막음, §6.7)(§5.3·§6.2·§6.9).
+19. **엔진 API 실측** — ① 처리구분 항목 교체: TO-BE 는 `cmb_BndStsGb.removeAll()` → `addItem(value, label)` → `setSelectedIndex(0)` — 바인딩 `dma_search.state` 가 "0" 으로 따라오는지 ② 처리결과 셀 색 class(`setCellClass` 가 정렬·필터 뒤에도 행을 따라가는지 — 규칙 40) — 4종 모두 `sortable="true"` 라 정렬 후 확인 필수 ③ gridView 기본 `focus` 가 false 라 행 이벤트는 화면 코드의 `setFocusedCell` 로만 시작된다 — 조회 직후 `setFocusedCell(0, …)` 이 `onrowindexchange` 를 발화해 `searchPackListIsuDtl` 이 두 번 불리는지(명세 후 통신이 생기면 중복 조회) ④ 탭 본문 지연 렌더(`alwaysDraw` 기본 false) 시점 — 처음 고르기 전의 탭 그리드에 조회·`setCellClass`·`setFocusedCell` 이 안전한지(엑셀은 `$p.getComponentById` 로 막음, §6.7)(§5.3·§6.2·§6.9).
 20. **퍼블리셔 마크업 잔재 (Minor)** — 1단계에서 고치지 않은 것: ① 기간 칸 `td` 에 `flex flex_no` 래퍼가 없고 "~" 를 `w2:textbox`(`label_3`)로 둠 ② 그리드 높이를 `rowN`/`visibleRowNum` 대신 인라인 `style="height:153px;"` ③ `xf:trigger` 의 `src`·`cursor` 속성, `xf:select1` 의 `item=` 속성. 동작 영향은 없다 — 퍼블리싱 정비 때 표준 마크업으로 정리(§2.1, §8 #26).
