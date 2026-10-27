@@ -3,8 +3,8 @@
 | 항목 | 내용 |
 |---|---|
 | AS-IS | `/lstproc/ULDSTF05621.gfm` (Gauce/X-Internet, 610×680 모달 창 — 부모가 615×710 `window` 로 연다) — 반입 `conversion/gfm-front/ui/ULDSTF05621/ULDSTF05621.gfm` |
-| 신규 API 명세 | `conversion/gfm-front/ui/ULDSTF05621/ULDSTF05621_API.txt` — 블록 7종(이 화면 6종, 다른 화면 1종: ULDSTF05620 목록 조회). §2.2·§5 는 명세 기준(가이드 §0.3·§5) |
-| TO-BE | `conversion/gfm-front/ui-tobe/ULDSTF05621.xml` (배포 경로 `/ui/lst/lstproc/ULDSTF05621.xml` — 가정, §10). 가이드 §13.2 대로 퍼블리싱본(마크업 전용)을 먼저 만들고 그 위에 스크립트를 전환함 (2026-10-26) |
+| 신규 API 명세 | `conversion/gfm-front/ui/ULDSTF05621/ULDSTF05621_API.md` — 블록 7종(이 화면 6종, 다른 화면 1종: ULDSTF05620 목록 조회). §2.2·§5 는 명세 기준(가이드 §0.3·§5). **2026-10-27 명세 갱신**(txt → md): 저장 요청을 상세 데이터 합본으로, 저장·삭제 응답 신설, 상세 목록 id `dlt_detail_dtl*List`, `select-one` 응답은 개요만 — 변경 대조는 §5 「명세 갱신(2026-10-27)」 |
+| TO-BE | `conversion/gfm-front/ui-tobe/ULDSTF05621.xml` (배포 경로 `/ui/lst/lstproc/ULDSTF05621.xml` — 가정, §10). 가이드 §13.2 대로 퍼블리싱본(마크업 전용)을 먼저 만들고 그 위에 스크립트를 전환함 (2026-10-26). **TO-BE 는 아직 이전 명세(txt) 기준** — 2026-10-27 명세 갱신분 반영은 §10 #15 |
 | 퍼블리싱 | `conversion/publish/상장/상장처리(대내)/ULDSTF05621.xml` — 컴포넌트 id 는 AS-IS 와 같고, 날짜는 `w2:inputCalendar`, 사유는 `xf:select1`, 달력 이미지 버튼은 없음 |
 | 화면 캡처 | `ULDSTF05621.png` (신규 빈 입력 상태) — TO-BE 퍼블리싱 기준 |
 | 업무공통 | `$c.stf`(`getNewBzProcNo`·`getMessageParam`·`checkMaxLength`·`setButtonSetWithDate`)·`$c.lc`(`isProcess`·`getSecuGrpNm`·`glb.*` 상수) — `cm/pcc/stf`. 게이트는 `--pcc stf` 로 돌린다 |
@@ -146,7 +146,7 @@ flowchart TD
 | 2 | 저장 확인 | 사용자 | `await $c.lc.isProcess("I")` | 취소면 끝 | §6.6 |
 | 3 | 예약 건 확인 | 서버 | `select-mst-check` (AS-IS `fn_mst_check(dts_Mst_Check, "2")`) | 있으면 `MSG-0011` 후 끝. boolean 의미 확인 필요 | §5.3, §10 #4 |
 | 4 | 채번 | 서버 | `$c.stf.getNewBzProcNo()` → `body` 를 꺼내 문자열로 | 14자리 아니면 `MSG-0010` 후 끝. 채번 주체 확인 필요 | §5.4, §10 #2 |
-| 5 | 전문 구성 | 화면 | 마스터 + `bzProcsNo`·`isurCd`(AS-IS `FISCYY_DISTR_BASDD_TP_CD="2"` 도), 목록은 복사본으로 가공 | 그리드는 건드리지 않음(※TO-BE) | §5.5, §8 #5 |
+| 5 | 전문 구성 | 화면 | 마스터(`dma_resultDetail`)에 `bzProcsNo`·`isurCd` 를 넣고 `{ ...마스터, dtlBfList, dtlAfList }` 합본(2026-10-27 명세), 목록은 복사본으로 가공 | 그리드는 건드리지 않음(※TO-BE) | §5.5, §8 #5 |
 | 6 | 저장 | 서버 | `POST insert` | `skipped` 면 안내 없이 끝, 실패 `MSG-A002` + 신규 유지 | §5.5, §8 #7·#14 |
 | 7 | 결과 반영 | 화면 | `MSG-A001` → 상세 재조회 → 수정 모드 버튼 | — | §5.2 |
 
@@ -233,8 +233,8 @@ stateDiagram-v2
 | 영역 | AS-IS 요소 | TO-BE 컴포넌트 (바인딩) | 설명 |
 |---|---|---|---|
 | 1. 회사코드(명) | `txb_ISUR_CD`·`txb_COM_NM` (readonly) | `txb_ISUR_CD` (`xf:input` readOnly, `dma_resultDetail.isurCd` — 퍼블리셔 XML 의 itemset 없는 `w2:autoComplete` 는 값이 안 보일 수 있어 바꿈) · `txb_COM_NM` (`xf:input`, `dma_resultDetail.isurNm`) | 읽기 전용 |
-| 2. 수입분배기준일 가. 변경전 | `grd_DIST_PAY_BF` (편집 불가, 월·일) | `grd_DIST_PAY_BF` (`dlt_resultDetail_dtlBfList`, `readOnly="true"`) | 신규: 현재 기준일, 수정: 등록된 변경전 |
-| 2. 나. 변경후 (*) | `grd_DIST_PAY_AF` (편집, 월·일) | `grd_DIST_PAY_AF` (`dlt_resultDetail_dtlAfList`) | 빈 행을 깔아 두고 입력 — §3 |
+| 2. 수입분배기준일 가. 변경전 | `grd_DIST_PAY_BF` (편집 불가, 월·일) | `grd_DIST_PAY_BF` (`dlt_detail_dtlBfList`, `readOnly="true"`) | 신규: 현재 기준일, 수정: 등록된 변경전 |
+| 2. 나. 변경후 (*) | `grd_DIST_PAY_AF` (편집, 월·일) | `grd_DIST_PAY_AF` (`dlt_detail_dtlAfList`) | 빈 행을 깔아 두고 입력 — §3 |
 | 3. 변경일 (*) | `edt_CHG_DD` + `img_CHG_DD` | `edt_CHG_DD` (`inputCalendar`, `dma_resultDetail.chgDd`) | 달력 이미지 **(옮기지 않음)** — inputCalendar 내장 달력 |
 | 4. 시장조치시행일 (*) | `edt_MKTACT_ENFORCE_DD` + `img_MKTACT_ENFORCE_DD` | `edt_MKTACT_ENFORCE_DD` (`dma_resultDetail.mktactEnforceDd`) | "(시스템 반영일자를 입력)" 안내 라벨 유지. 수정 모드 버튼 상태의 기준일 |
 | 5. 변경 후 최초 사업연도 (*) | `edt_ChgStatDd`·`edt_ChgEndDd` + `img_ChgStatDd`·`img_ChgEndDd` | `edt_ChgStatDd` (`dma_resultDetail.fiscyyChgStrtDd`) · `edt_ChgEndDd` (`dma_resultDetail.fiscyyChgEndDd`) | 필수 표시가 있으나 원본은 검증하지 않음 — §8 #9 |
@@ -247,16 +247,18 @@ stateDiagram-v2
 
 | AS-IS | TO-BE | 종류 | 키(컬럼) | 출처 / 용도 |
 |---|---|---|---|---|
-| `dts_Mst` (1행) | `dma_resultDetail` | dataMap | 명세 `select-one` 응답 keyInfo 20개 그대로 — `bzProcsNo`, `isurCd`, `fiscyyDistrBasddTpCd`, `isurNm`, `comNm`, `chgDd`, `mktactEnforceDd`, `fiscyyChgRsnCd`, `fiscyyChgRsnNm`, `remk`, `fiscyyChgStrtDd`, `fiscyyChgEndDd`, `fiscyyStrt/End(Yy·Mm·Dd)`, `disclsYn`, `draftYn` | 화면 바인딩 대상. 상세 조회 응답, 신규는 빈 값 + 부모 회사 |
-| `dts_DtlBf` | `dlt_resultDetail_dtlBfList` | dataList | 명세 `select-one` 응답 변경전 목록 그대로 — `bzProcsNo`, `bybzprocsSeq`(number), `isurCd`, `chgBfafTpCd`, `basMmdd`, `basMm`, `basDd` | 신규: `select-current-dist-pay-basdd` 응답(명세상 `dma_std` dataMap — §10 #1) / 수정: `select-one` 변경전 |
-| `dts_DtlAf` | `dlt_resultDetail_dtlAfList` | dataList | (위와 같음) | 수정: `select-one` 변경후 + 빈 행 보충 |
-| (`trs` 전송 dataset) | `dma_reqSave` · `dlt_reqSave_dtlBfList` · `dlt_reqSave_dtlAfList` | dataMap · dataList | 명세 `insert` 요청 그대로 — 머리 8키(`bzProcsNo`·`isurCd`·`chgDd`·`mktactEnforceDd`·`fiscyyChgRsnCd`·`remk`·`fiscyyChgStrtDd`·`fiscyyChgEndDd`) + 목록 7열 | 신규 저장 전문. 화면 값을 담아 보내므로 명세에 없는 키는 걸러진다 |
-| (`trs` 전송 dataset) | `dma_reqUpdate` · `dlt_reqUpdate_dtlBfList` · `dlt_reqUpdate_dtlAfList` | dataMap · dataList | 명세 `update` 요청 그대로 (insert 와 같은 구성) | 수정 전문 |
+| `dts_Mst` (1행) | `dma_resultDetail` | dataMap | `select-one` 응답 마스터(`target` `dma_resultDetail=body`). 갱신 명세는 `bzProcsNo, isurCd, fiscyyDistrBasddTpCd, ...` 개요만 적어 **키 정의는 이전 명세(2026-10-26 txt)의 keyInfo 20개를 유지** — `bzProcsNo`, `isurCd`, `fiscyyDistrBasddTpCd`, `isurNm`, `comNm`, `chgDd`, `mktactEnforceDd`, `fiscyyChgRsnCd`, `fiscyyChgRsnNm`, `remk`, `fiscyyChgStrtDd`, `fiscyyChgEndDd`, `fiscyyStrt/End(Yy·Mm·Dd)`, `disclsYn`, `draftYn` | 화면 바인딩 대상. 상세 조회 응답, 신규는 빈 값 + 부모 회사. **저장·수정 요청의 머리**이기도 하다(`...dma_resultDetail.getJSON()`, §5.5) |
+| `dts_DtlBf` | `dlt_detail_dtlBfList` | dataList | `select-one` 응답 `body.dtlBfList`(갱신 명세의 target id — 종전 `dlt_resultDetail_dtlBfList`). 열은 갱신 명세 개요 `{ bzProcsNo, bybzprocsSeq, isurCd, ... }` + 이전 명세 정의 — `bzProcsNo`, `bybzprocsSeq`(number), `isurCd`, `chgBfafTpCd`, `basMmdd`, `basMm`, `basDd` | 신규: `select-current-dist-pay-basdd` 응답(명세상 `dma_std` dataMap — §10 #1) / 수정: `select-one` 변경전 |
+| `dts_DtlAf` | `dlt_detail_dtlAfList` | dataList | (위와 같음, `body.dtlAfList`) | 수정: `select-one` 변경후 + 빈 행 보충 |
+| (응답 전용) | `dma_std` | dataMap | 명세 `select-current-dist-pay-basdd` 응답 — `bzProcsNo`·`bybzprocsSeq`·`isurCd`·`chgBfafTpCd`·`basMmdd`·`basMm`·`basDd` (target `dma_std=body`) | 화면은 여러 행이라 변경전 목록으로 받는다 — §5.1, §10 #1 |
+| (응답 전용) | `dma_resultSave` | dataMap | 명세 `insert`·`update` 응답 — `bzProcsNo`·`result`·`resultMessage` (target `dma_resultSave=body`) | 저장 결과 판정·신규 번호(§5.5) |
+| (응답 전용) | `dma_resultDelete` | dataMap | 명세 `delete` 응답 — `bzProcsNo`·`result`·`resultMessage` (target `dma_resultDelete=body`) | 삭제 결과 판정(§5.7) |
+| (`trs` 전송 dataset) | (없음 — 2026-10-27 명세 갱신으로 삭제) | — | 종전 명세의 요청 전용 정의 `dma_reqSave`·`dlt_reqSave_*`·`dma_reqUpdate`·`dlt_reqUpdate_*` 는 쓰지 않는다. 요청은 `{ ...dma_resultDetail.getJSON(), dtlBfList, dtlAfList }` 합본(§5.5) | — |
 | `dts_BzProcsNo` | (삭제) | — | — | 채번 결과는 `$c.stf.getNewBzProcNo()` 반환값을 바로 쓴다 |
 | `dts_Mst_Check` | (삭제) | — | — | 예약 건 확인 응답은 boolean 하나 — 응답 값을 바로 쓴다(§5.3) |
-
-- **TO-BE DataCollection 은 `ULDSTF05621_API.txt` 의 정의 블록 원문(id·name·dataType)을 그대로 옮겼다**(가이드 §5 「API 명세 적용」, 2026-10-26 재변환). 부모용 `dlt_std`(ULDSTF05620 목록)는 넣지 않았다.
 | `trs` | (삭제) | — | — | 저장·수정·삭제 통신 → `executeDynamic` |
+
+- **TO-BE DataCollection 은 API 명세의 정의 블록 원문(id·name·dataType)을 그대로 옮긴다**(가이드 §5 「API 명세 적용」). 갱신 명세(2026-10-27 md)에 정의가 있으면 그것을, 개요만 있는 `select-one` 응답은 이전 명세(2026-10-26 txt) 정의를 쓴다. 부모용 `dlt_std`(ULDSTF05620 목록)는 넣지 않는다.
 
 - AS-IS 컬럼은 대문자(`ISUR_CD`·`BAS_MM`…)이다. TO-BE 키는 API 명세의 camelCase 를 쓴다. 매핑: `ISUR_CD→isurCd`, `ISUR_NM→isurNm`, `MKTACT_ENFORCE_DD→mktactEnforceDd`, `CHG_DD→chgDd`, `REMK→remk`, `FISCYY_CHG_RSN_CD→fiscyyChgRsnCd`, `FISCYY_CHG_STRT_DD→fiscyyChgStrtDd`, `FISCYY_CHG_END_DD→fiscyyChgEndDd`, `BAS_MM/BAS_DD/BAS_MMDD→basMm/basDd/basMmdd`, `BYBZPROCS_SEQ→bybzprocsSeq`, `CHG_BFAF_TP_CD→chgBfafTpCd`, `FISCYY_DISTR_BASDD_TP_CD→fiscyyDistrBasddTpCd`.
 - 그리드 컬럼 id 는 `basMm`(월)·`basDd`(일) 두 개다. 퍼블리싱본의 대문자 컬럼 id(`BAS_MM`/`BAS_DD`, 헤더 `h_BAS_MM`/`h_BAS_DD`)는 dataList 키에 맞춰 바꾼다.
@@ -275,8 +277,8 @@ stateDiagram-v2
 3. **신규·수정 분기**
    - 업무처리번호 있음 → **수정 조회** `await scwin.selectOne()` (§5.2).
    - 없음 → **신규 준비** `await scwin.initNewForm()`:
-     1. `dma_resultDetail.setEmptyValue()` (원본: 헤더만 받은 뒤 `OnLoadCompleted` 에서 `AddRow`), `dlt_resultDetail_dtlAfList.removeAll()`.
-     2. 현재 수입분배기준일 조회 → `dlt_resultDetail_dtlBfList` (§5.1, 원본 `TRS_IDX_NEWSEL2`).
+     1. `dma_resultDetail.setEmptyValue()` (원본: 헤더만 받은 뒤 `OnLoadCompleted` 에서 `AddRow`), `dlt_detail_dtlAfList.removeAll()`.
+     2. 현재 수입분배기준일 조회 → `dlt_detail_dtlBfList` (§5.1, 원본 `TRS_IDX_NEWSEL2`).
      3. 변경후 빈 행 채우기(§6.2 `scwin.fillAfRows`).
      4. 버튼 상태 `insert` (원본 `buttonSet.setInsertStatus()`).
 4. **회사코드·명 설정** — AS-IS 는 조회 뒤 `dts_Mst` 에 `ISUR_CD`·`ISUR_NM` 을 부모 값으로 덮어쓴다(수정 모드도). TO-BE 는 신규일 때만 부모 값을 넣고, 수정은 조회 응답(`isurCd`·`isurNm`)을 그대로 쓴다(§8 #8).
@@ -352,32 +354,46 @@ scwin.init = async function () {
 
 (`…` = `/api/listing/lstproc/fund/dist-pay-basdd-change`)
 
-#### API 명세 대응 (`ULDSTF05621_API.txt`)
+#### API 명세 대응 (`ULDSTF05621_API.md`, 2026-10-27 갱신)
 
 | # | 명세 블록 | method · 경로 | 요청 (명세 정의) | 응답 (명세 정의) | AS-IS 대응 | TO-BE 함수 |
 |---|---|---|---|---|---|---|
-| 1 | [ULDSTF05621] 신규 등록 시 현재 수입분배기준일 조회 | `GET …/select-current-dist-pay-basdd` | `isurCd` | `dma_std` (dataMap — `bzProcsNo`·`bybzprocsSeq`·`isurCd`·`chgBfafTpCd`·`basMmdd`·`basMm`·`basDd`) | `DIV_IDX=3`·`TRS_IDX=5` → `dts_DtlBf` | `scwin.selectCurrentBasdd` → `dlt_resultDetail_dtlBfList` |
+| 1 | [ULDSTF05621] 신규 등록 시 현재 수입분배기준일 조회 | `GET …/select-current-dist-pay-basdd` | `isurCd` | `dma_std` (dataMap — `bzProcsNo`·`bybzprocsSeq`·`isurCd`·`chgBfafTpCd`·`basMmdd`·`basMm`·`basDd`) | `DIV_IDX=3`·`TRS_IDX=5` → `dts_DtlBf` | `scwin.selectCurrentBasdd` → `dlt_detail_dtlBfList` (명세 target 은 `dma_std=body` — §10 #1) |
 | 2 | [ULDSTF05621] 예약(미래일자) 등록 중복 체크 | `GET …/select-mst-check` | `isurCd` | `boolean` | `fn_mst_check(dts_Mst_Check, "2")` (`GUBUN_CD=2`) | `scwin.checkMst` |
-| 3 | [ULDSTF05621] 상세 조회(마스터 + 변경전/후) | `GET …/select-one` | `bzProcsNo` | `dma_resultDetail` + `dlt_resultDetail_dtlBfList` + `dlt_resultDetail_dtlAfList` | 같은 URL `DIV_IDX` 0·3·4 로 3회 → `dts_Mst`·`dts_DtlBf`·`dts_DtlAf` | `scwin.selectOne` |
-| 4 | [ULDSTF05621] 삭제 | `POST …/delete` | `bzProcsNo` | (없음) | `trs` `TRS_IDX=3` (dataset 3개 전송) | `scwin.deleteTrs` |
-| 5 | [ULDSTF05621] 신규 저장 | `POST …/insert` | `dma_reqSave` + `dlt_reqSave_dtlBfList` + `dlt_reqSave_dtlAfList` | (없음) | `trs` `TRS_IDX=1` `dtsParm1=dts_Mst, dtsParm2=dts_DtlAf, dtsParm3=dts_DtlBf` | `scwin.saveTrs("I")` |
-| 6 | [ULDSTF05621] 수정 | `POST …/update` | `dma_reqUpdate` + `dlt_reqUpdate_dtlBfList` + `dlt_reqUpdate_dtlAfList` | (없음) | `trs` `TRS_IDX=2` | `scwin.saveTrs("U")` |
+| 3 | [ULDSTF05621] 상세 조회(마스터 + 변경전/후) | `GET …/select-one` | `bzProcsNo` | JSON 개요 `body { 마스터…, dtlBfList : [ … ], dtlAfList : [ … ] }` — target `dma_resultDetail=body, dlt_detail_dtlBfList=body.dtlBfList, dlt_detail_dtlAfList=body.dtlAfList` | 같은 URL `DIV_IDX` 0·3·4 로 3회 → `dts_Mst`·`dts_DtlBf`·`dts_DtlAf` | `scwin.selectOne` |
+| 4 | [ULDSTF05621] 삭제 | `POST …/delete` | `{ bzProcsNo }` | `dma_resultDelete` (`bzProcsNo`·`result`·`resultMessage`) | `trs` `TRS_IDX=3` (dataset 3개 전송) | `scwin.deleteTrs` |
+| 5 | [ULDSTF05621] 신규 저장 | `POST …/insert` | `{ ...dma_resultDetail.getJSON(), dtlBfList : dlt_detail_dtlBfList.getAllJSON(), dtlAfList : dlt_detail_dtlAfList.getAllJSON() }` | `dma_resultSave` (`bzProcsNo`·`result`·`resultMessage`) | `trs` `TRS_IDX=1` `dtsParm1=dts_Mst, dtsParm2=dts_DtlAf, dtsParm3=dts_DtlBf` | `scwin.saveTrs("I")` |
+| 6 | [ULDSTF05621] 수정 | `POST …/update` | (insert 와 같은 합본) | `dma_resultSave` (insert 와 같음) | `trs` `TRS_IDX=2` | `scwin.saveTrs("U")` |
 | 7 | [ULDSTF05620] 목록 조회 | `GET …/select-list` | `isurCd` | `dlt_std` | 부모 ULDSTF05620 `fn_search` | **이 화면 대상 아님** — 부모 전환 때 사용(§1.1) |
 
 명세에 없는 AS-IS 통신: 채번(`fn_getNewBzProcNo`) → 업무공통 `$c.stf.getNewBzProcNo()`(§5.4).
+
+#### 명세 갱신 (2026-10-27, `ULDSTF05621_API.txt` → `ULDSTF05621_API.md`)
+
+| # | API | 종전(txt) | 갱신(md) | 결과서·TO-BE 영향 |
+|---|---|---|---|---|
+| 1 | 공통 | 경로·요청·응답 | 블록마다 AS-IS 경로와 `submission target` 추가 | 명세의 AS-IS 는 TO-BE 경로에 `.do` 를 붙인 표기라 실제 AS-IS(Gauce `/fiscalYearChange.do?…DIV_IDX…`)와 다르다 — AS-IS 대응은 §5 표를 따른다 |
+| 2 | `select-current-dist-pay-basdd` | 응답 `dma_std` | 같음 + target `dma_std=body` | 화면은 여러 행 → 변경전 목록으로 받는 가정 유지(§5.1, §10 #1) |
+| 3 | `select-one` | 응답 정의 3개(`dma_resultDetail` 20키, `dlt_resultDetail_dtlBfList`·`…AfList` 7열) | JSON 개요만, target `dma_resultDetail=body, dlt_detail_dtlBfList=body.dtlBfList, dlt_detail_dtlAfList=body.dtlAfList` | 목록 JSON 키(`dtlBfList`·`dtlAfList`)가 **확정**(종전 가정 해제). 목록 id 를 `dlt_detail_dtl*List` 로 바꾼다. 키 정의는 이전 명세 유지(§2.2) |
+| 4 | `delete` | 요청 `bzProcsNo`, 응답 빈칸 | 요청 `{ bzProcsNo }`, 응답 `dma_resultDelete`(`bzProcsNo`·`result`·`resultMessage`) | 결과 판정에 `result` 를 쓴다(§5.7, §10 #5) |
+| 5 | `insert` | 요청 `dma_reqSave`(8키) + `dlt_reqSave_dtlBfList`·`…AfList`, 응답 빈칸 | 요청 `{ ...dma_resultDetail.getJSON(), dtlBfList, dtlAfList }`, 응답 `dma_resultSave`(`bzProcsNo`·`result`·`resultMessage`) | 요청 전용 정의 6개를 쓰지 않는다. 마스터 20키를 모두 보낸다(명세에 없던 `fiscyyDistrBasddTpCd` 등도 전송 — §10 #3). 응답 `bzProcsNo` 로 서버 채번도 가능(§10 #2) |
+| 6 | `update` | 요청 `dma_reqUpdate` + `dlt_reqUpdate_*`, 응답 빈칸 | insert 와 같은 합본, 응답 `dma_resultSave` | 5 와 같음 |
+| 7 | `select-list`(ULDSTF05620) | `mktactEnforceDd` "변경일" | "변경일(시장조치시행일)" | 부모 화면 소관 — 이 화면 영향 없음 |
+| 8 | `select-mst-check` | `boolean` | 같음 | 없음 |
 
 #### 명세 ↔ AS-IS 차이 (→ §10)
 
 | # | 차이 | 처리 | §10 |
 |---|---|---|---|
-| 1 | `select-current-dist-pay-basdd` 응답이 dataMap(`dma_std`)으로 적혀 있으나 변경전 기준일은 여러 행 | 변경전 목록(`dlt_resultDetail_dtlBfList`)으로 받음 | #1 |
-| 2 | `select-one`·`insert`/`update` 의 목록 JSON 키 이름이 명세에 없음(정의 이름 `…_dtlBfList` 에서 `dtlBfList` 추정) | 가정으로 사용 | #1 |
-| 3 | `insert` 요청의 `bzProcsNo` 는 "수정 시에만 전달", 응답 없음 — AS-IS 는 화면이 채번해 보냄 | 화면 채번 유지 + TODO | #2 |
-| 4 | AS-IS 가 보내던 `FISCYY_DISTR_BASDD_TP_CD="2"`·`LIST_BZ_TP_CD=232`·`DIV_IDX`·`COUNT` 가 요청 명세에 없음. 명세 응답의 구분코드는 TO-BE 컬럼 기준 `'14'` | 보내지 않음(요청 정의가 거름) | #3 |
+| 1 | `select-current-dist-pay-basdd` 응답이 dataMap(`dma_std`)으로 적혀 있으나 변경전 기준일은 여러 행 | 변경전 목록(`dlt_detail_dtlBfList`)으로 받음 | #1 |
+| 2 | ~~`select-one`·`insert`/`update` 의 목록 JSON 키 이름이 명세에 없음~~ — 2026-10-27 명세가 `dtlBfList`·`dtlAfList` 로 확정 | 명세대로 | — |
+| 3 | AS-IS 는 화면이 채번해 보냄. 갱신 명세는 요청이 마스터 합본(`bzProcsNo` 포함)이고 응답 `dma_resultSave.bzProcsNo` 가 있어 서버 채번도 가능 | 화면 채번 유지 + TODO | #2 |
+| 4 | AS-IS 가 보내던 `LIST_BZ_TP_CD=232`·`DIV_IDX`·`COUNT` 는 요청에 없음. `fiscyyDistrBasddTpCd` 는 갱신 명세의 합본 요청(`dma_resultDetail`)에 들어간다 — AS-IS 값 `"2"`, 명세 응답의 TO-BE 컬럼 기준 값 `'14'` | 신규는 값을 채울지 서버에 맡길지 확인 | #3 |
 | 5 | `select-mst-check` 응답 boolean 의 뜻이 없음, AS-IS 의 `GUBUN_CD=2` 없음 | `true` = 예약 건 있음으로 가정 | #4 |
-| 6 | `update`·`delete` 응답이 비어 있음 | `responseJSON.success` 로 판정 | #5 |
+| 6 | 갱신 명세에 `insert`·`update`(`dma_resultSave`)·`delete`(`dma_resultDelete`) 응답 `result`·`resultMessage` 가 생김 — 값의 뜻(성공 코드)은 적혀 있지 않음 | `success` + `body.result` 로 판정, 실패면 `resultMessage` 안내(성공 코드 가정) | #5 |
 | 7 | AS-IS 공통 파라미터 `SCREN_ID`·`SCREN_PROCES_TP_CD`·세션(`fn_encodeNSession`) 이 명세에 없음 | 보내지 않음 | #10 |
-| 8 | 명세 응답에만 있는 키(`comNm`·`fiscyyChgRsnNm`·`fiscyyStrt/End(Yy·Mm·Dd)`·`disclsYn`·`draftYn`) | 정의에 두되 화면에 표시하지 않음(AS-IS 도 미표시) | — |
+| 8 | 명세 응답에만 있는 키(`comNm`·`fiscyyChgRsnNm`·`fiscyyStrt/End(Yy·Mm·Dd)`·`disclsYn`·`draftYn`) | 정의에 두되 화면에 표시하지 않음(AS-IS 도 미표시). 갱신 명세의 합본 요청으로 저장 때 함께 전송된다 | — |
+| 9 | 갱신 명세의 저장 요청 예시는 그리드 dataList 를 그대로(`getAllJSON()`) 보낸다 — AS-IS `fn_save_trs` 는 일련번호·변경전후 구분을 채우고 변경후 빈 행을 뺀다 | AS-IS 가공 유지 — 그리드 복사본(`scwin.buildDtlList`)을 `dtlBfList`·`dtlAfList` 로 보낸다 | #1 |
 
 AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=3`, `LIST_BZ_TP_CD=232`(분배기준일변경), `DIV_IDX[0]=0`·`DIV_IDX[1]=4`·`DIV_IDX[2]=3`. TO-BE 는 API 마다 경로가 나뉘므로 `TRS_IDX`·`DIV_IDX`·`COUNT` 는 필요 없다. `LIST_BZ_TP_CD` 는 요청 명세에 없으므로 서버가 정하는 것으로 본다(§10 #3).
 
@@ -388,7 +404,7 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=3`, `LIST_BZ_TP_CD=232`
 | `id` | `sbm_selectCurrentBasdd` |
 | `method` / `action` | `get` / `…/select-current-dist-pay-basdd` |
 | `requestData` | `{ isurCd : scwin.isurCd }` |
-| `target` / `gridview` | `dlt_resultDetail_dtlBfList=body` / `grd_DIST_PAY_BF` — 명세의 응답이 `dma_std`(dataMap)로 적혀 있으나 그리드는 여러 행이다 → 목록인지 확인(§10 #1) |
+| `target` / `gridview` | `dlt_detail_dtlBfList=body` / `grd_DIST_PAY_BF` — 명세는 응답을 `dma_std`(dataMap), target 을 `dma_std=body` 로 적었으나 그리드는 여러 행이다 → 목록인지 확인(§10 #1) |
 | 선행 / 순서 | 신규 로딩 중. 빈 행 채우기(§6.2)보다 먼저 |
 | 후처리 | 없음 (원본 `dts_DtlBf OnLoadCompleted` 는 빈 함수) |
 | 실패 처리 | 공통 오류 핸들러. 화면 처리 없음 |
@@ -401,7 +417,7 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=3`, `LIST_BZ_TP_CD=232`
 | `id` | `sbm_selectOne` |
 | `method` / `action` | `get` / `…/select-one` |
 | `requestData` | `{ bzProcsNo : scwin.bzProcsNo }` |
-| `target` | `dma_resultDetail=body`, `dlt_resultDetail_dtlBfList=body.dtlBfList`, `dlt_resultDetail_dtlAfList=body.dtlAfList` — 명세 이름(`dma_resultDetail`·`dlt_resultDetail_dtlBfList`·`…_dtlAfList`)에서 추정한 **가정**(§10 #1) |
+| `target` | `dma_resultDetail=body`, `dlt_detail_dtlBfList=body.dtlBfList`, `dlt_detail_dtlAfList=body.dtlAfList` — 갱신 명세(2026-10-27)의 `submission target` 그대로(종전 가정 해제) |
 | 후처리 | ① 변경후 빈 행 채우기(§6.2) ② 버튼 상태 `$c.stf.setButtonSetWithDate(edt_MKTACT_ENFORCE_DD, false, "grpBtnBox", scwin.BTN_MAP)` (원본 `dts_Mst OnLoadCompleted`) |
 | 실패 처리 | `success:false` 이면 버튼을 모두 잠근다(`disabled`) — XML 기본값(전부 활성)이 남지 않게 |
 | 중복 실행 | 기본(건너뜀) |
@@ -427,10 +443,11 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=3`, `LIST_BZ_TP_CD=232`
 |---|---|
 | `id` | `sbm_saveTrs` |
 | `method` / `action` | `post` / `…/insert` (I) · `…/update` (U), `mediatype : "application/json"` |
-| `requestData` | 명세 요청 정의에 담아 보낸다 — insert 는 `dma_reqSave`·`dlt_reqSave_dtlBfList`·`dlt_reqSave_dtlAfList`, update 는 `dma_reqUpdate`·`dlt_reqUpdate_*`. `{ ...머리.getJSON(), dtlBfList : 변경전.getAllJSON(), dtlAfList : 변경후.getAllJSON() }` — 목록 키 이름은 **가정**(§10 #1). `setJSON` 이 정의된 키만 남기므로 명세에 없는 값은 보내지 않는다 |
+| `requestData` | 갱신 명세(2026-10-27) 합본 — `{ ...dma_resultDetail.getJSON(), dtlBfList : 변경전 복사본, dtlAfList : 변경후 복사본 }`. 머리는 화면 마스터 그대로(20키 — 신규는 채번한 `bzProcsNo`·`isurCd` 를 먼저 넣는다), 목록은 명세 예시의 `getAllJSON()` 대신 아래 가공을 거친 `scwin.buildDtlList` 결과(§5 차이 #9). 요청 전용 정의(`dma_reqSave` 등)는 쓰지 않는다 |
+| `target` | `dma_resultSave=body` — 응답 `bzProcsNo`·`result`·`resultMessage` |
 | 목록 가공 (원본 `fn_save_trs`) | 변경전: 각 행에 `bzProcsNo`·`bybzprocsSeq = 행번호(1부터)`·`isurCd`·`chgBfafTpCd = "1"`. 변경후: `basMmdd` 가 빈 행을 빼고, 각 행에 `bzProcsNo`·`bybzprocsSeq = 행번호 + 12`·`isurCd`·`chgBfafTpCd = "2"`. **그리드의 dataList 는 고치지 않고 복사본으로 만든다**(§8 #5) |
 | 후처리 | 성공: `MSG-A001` "[저장/수정] 처리 성공하였습니다." → `await scwin.selectOne()` 다시 조회(신규는 이때 수정 모드가 됨) |
-| 실패 처리 | `success:false`: `MSG-A002` "[…] 처리 실패하였습니다." 신규 실패면 `scwin.bzProcsNo` 를 비워 신규 상태를 유지한다 |
+| 실패 처리 | `success:false` 또는 `dma_resultSave.result` 가 성공 코드가 아님: `resultMessage` 가 있으면 그 문구, 없으면 `MSG-A002` "[…] 처리 실패하였습니다."(성공 코드 값은 §10 #5). 신규 실패면 `scwin.bzProcsNo` 를 비워 신규 상태를 유지한다 |
 | 중복 실행 | 기본(건너뜀) — 결과가 `skipped` 이면 안내 없이 끝 |
 
 ### 5.7 삭제 (`scwin.deleteTrs`)
@@ -439,8 +456,9 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=3`, `LIST_BZ_TP_CD=232`
 |---|---|
 | `id` / `method` / `action` | `sbm_deleteTrs` / `post` / `…/delete` |
 | `requestData` | `{ bzProcsNo : scwin.bzProcsNo }` |
+| `target` | `dma_resultDelete=body` — 응답 `bzProcsNo`·`result`·`resultMessage`(2026-10-27 명세 신설) |
 | 후처리 | 성공: `MSG-A001` "[삭제] 처리 성공하였습니다." → `$c.win.closePopup()` (원본 `buttonSet.status == "D"` 분기) |
-| 실패 처리 | `MSG-A002` "[삭제] 처리 실패하였습니다." |
+| 실패 처리 | `success:false` 또는 `result` 가 성공 코드가 아님: `resultMessage` 또는 `MSG-A002` "[삭제] 처리 실패하였습니다." (§10 #5) |
 | 중복 실행 | 기본(건너뜀) |
 
 ---
@@ -463,7 +481,7 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=3`, `LIST_BZ_TP_CD=232`
 ### 6.2 변경후 빈 행 채우기 (`scwin.fillAfRows`)
 
 - 원본 `dts_DtlAf OnLoadCompleted`: `for (i = CountRow; i < 13; i++) AddRow()` — 주석은 "항상 12개"지만 **실제로는 13행**이 된다(§8 #1).
-- TO-BE: `while (dlt_resultDetail_dtlAfList.getRowCount() < 13) dlt_resultDetail_dtlAfList.insertRow();` — 행 수는 원본 동작(13)을 유지하고 §10 #11 에서 확인한다. 반복 안에서 행을 넣으므로 `setBroadcast(false)` … `setBroadcast(true, true)` 로 감싼다(규칙 28).
+- TO-BE: `while (dlt_detail_dtlAfList.getRowCount() < 13) dlt_detail_dtlAfList.insertRow();` — 행 수는 원본 동작(13)을 유지하고 §10 #11 에서 확인한다. 반복 안에서 행을 넣으므로 `setBroadcast(false)` … `setBroadcast(true, true)` 로 감싼다(규칙 28).
 
 ### 6.3 변경후 월·일 즉시 검사 (`grd_DIST_PAY_AF_onafteredit` 안)
 
@@ -486,8 +504,8 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=3`, `LIST_BZ_TP_CD=232`
           isurCd : scwin.isurCd,                 // AS-IS arr[2]
           mktId : "1",                           // AS-IS arr[3] — 유가 고정(§8 #11)
           mst : [dma_resultDetail.getJSON()],             // AS-IS CopyDataSet(dts_Mst, param_dts_mst)
-          dtl2 : dlt_resultDetail_dtlBfList.getAllJSON(),         // AS-IS CopyDataSet(dts_DtlBf, param_dts2)
-          dtl3 : dlt_resultDetail_dtlAfList.getAllJSON()          // AS-IS CopyDataSet(dts_DtlAf, param_dts3) + 빈 행 삭제
+          dtl2 : dlt_detail_dtlBfList.getAllJSON(),         // AS-IS CopyDataSet(dts_DtlBf, param_dts2)
+          dtl3 : dlt_detail_dtlAfList.getAllJSON()          // AS-IS CopyDataSet(dts_DtlAf, param_dts3) + 빈 행 삭제
               .filter(row => !($c.util.isEmpty(row.basMm) && $c.util.isEmpty(row.basDd)))
       };
       const options = { id : "ULDSTF92024", popupName : "공시안내문작성", width : 735, height : 815, type : "pageFramePopup" };
@@ -521,7 +539,7 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=3`, `LIST_BZ_TP_CD=232`
 2. `await $c.lc.isProcess("I")` — `MSG-A006` "[저장] 처리를 하시겠습니까?" 확인. 취소면 끝.
 3. `await scwin.checkMst()` (§5.3) — 예약 건이 있으면 끝.
 4. 채번(§5.4). 실패면 `MSG-0010` 후 끝.
-5. `dma_resultDetail` 에 `bzProcsNo`·`isurCd` 를 넣는다. 원본은 `FISCYY_DISTR_BASDD_TP_CD = "2"`(1 결산기 / 2 수입분배기준일)도 넣지만, 신규 API 요청 명세에는 이 키가 없다(§10 #3).
+5. `dma_resultDetail` 에 `bzProcsNo`·`isurCd` 를 넣는다. 원본은 `FISCYY_DISTR_BASDD_TP_CD = "2"`(1 결산기 / 2 수입분배기준일)도 넣는다. 갱신 명세(2026-10-27)는 마스터 전체를 보내므로 `fiscyyDistrBasddTpCd` 도 전송된다 — 신규에 값을 채울지(`"2"` 또는 TO-BE 기준 `'14'`) 서버에 맡길지 확인(§10 #3).
 6. `await scwin.saveTrs("I")`.
 
 - 순서(확인 → 중복 확인 → 채번)는 원본을 유지한다. 채번이 확인보다 뒤라서 취소한 건에는 번호가 소비되지 않는다.
@@ -634,11 +652,11 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=3`, `LIST_BZ_TP_CD=232`
 
 ## 10. 남은 작업 (TODO)
 
-1. **응답·요청 구조 확정** — `select-current-dist-pay-basdd` 응답이 명세에는 `dma_std`(dataMap)로 적혀 있지만 그리드는 여러 행이다. 목록인지 확인하고 §5.1 target 을 정한다. `select-one` 응답과 `insert`/`update` 요청의 목록 키(`dtlBfList`/`dtlAfList` 가정)도 확정되면 §5.2·§5.5 를 고친다.
-2. **업무처리번호 채번 주체** — 원본은 화면이 채번해 보낸다(§5.4). 신규 API 명세는 `bzProcsNo` 를 "수정 시에만 전달"이라 적고 `insert` 응답도 비어 있다. 서버가 채번한다면 응답으로 번호를 받아야 저장 뒤 다시 조회할 수 있다(§5.5 후처리).
+1. **응답·요청 구조 확정** — `select-current-dist-pay-basdd` 응답이 명세에는 `dma_std`(dataMap, target `dma_std=body`)로 적혀 있지만 그리드는 여러 행이다. 목록인지 확인하고 §5.1 target 을 정한다. 목록 키 `dtlBfList`/`dtlAfList` 는 2026-10-27 명세로 확정됐다. 저장 목록을 명세 예시처럼 그리드 그대로 보낼지, AS-IS 가공(일련번호·변경전후 구분·빈 행 제외)을 거쳐 보낼지 확인한다(§5 차이 #9 — 결과서는 가공 유지).
+2. **업무처리번호 채번 주체** — 원본은 화면이 채번해 보낸다(§5.4). 종전 명세는 `bzProcsNo` 를 "수정 시에만 전달"이라 적었고, 2026-10-27 명세는 `insert` 응답에 `bzProcsNo` 를 둔다. 서버가 채번하면 화면 채번(§5.4)을 빼고 응답 번호로 다시 조회한다(§5.5 후처리).
 3. **서버가 정하는 값** — `fiscyyDistrBasddTpCd`(원본 `"2"`, TO-BE 컬럼은 `'14'`)와 `LIST_BZ_TP_CD 232` 는 요청 명세에 없다. 서버에서 넣는지 확인한다(§6.6 5).
 4. **`select-mst-check` boolean 의 뜻** — true 가 "예약 건 있음"인지 "진행 가능"인지 확인한다. 원본의 `GUBUN_CD=2` 를 서버가 쓰는지도 확인한다(§5.3).
-5. **update·delete 성공 판정** — 응답이 비어 있다. `responseJSON.success` 만으로 판정할지, 업무 결과 코드가 있는지 확인한다(§5.5~5.7).
+5. **저장·삭제 성공 판정** — 2026-10-27 명세에 응답 `result`·`resultMessage`(`dma_resultSave`·`dma_resultDelete`)가 생겼다. 성공 코드 값(예: `"S"`)과 `resultMessage` 를 그대로 안내할지 확인한다(§5.5~5.7).
 6. **부모(ULDSTF05620) 계약** — 부모 전환 때 `fn_GetPar`/`fn_GetParNew`/`fn_GetParUpdate` 바꿔 끼우기를 없애고 §1.2 의 `data` 객체로 넘긴다(가이드 §6.5). 팝업이 닫힌 뒤 다시 조회하는 흐름은 `await openPopup` 바로 뒤 `search` 로 맞춘다.
 7. **공시안내문(ULDSTF92024) 연동** — ① 92024 전환본의 수신부를 부모 `scwin.getPar` 호출에서 `$c.data.getParameter()`(`formCd`·`bzProcsNo`·`isurCd`·`mktId`·`mst`·`dtl2`·`dtl3` …)로 바꾼다. 92024 를 여는 다른 화면도 같은 `data` 계약으로 함께 바꿔야 하므로 공통 팝업 단위로 진행한다. 바뀌기 전에 이 화면을 먼저 전환하면 호환용 `scwin.getPar` 를 임시로 두고, 92024 변경 때 지운다. ② TO-BE 경로(`/ui/listingcommon/ULDSTF92024.xml` 가정). ③ 서식 `68212C` 가 받는 dataset 컬럼 이름(대문자 AS-IS / camelCase). ④ 시장구분 `'1'` 고정 유지 여부(§6.4, §8 #11).
 8. **기안(ULDSTF92004) 연동** — pcc `popFindDraft` 는 업무처리번호를 넘기지 않는 콜백형이라 화면에서 `openPopup` 을 직접 부른다(§6.5). 기안 팝업 전환본의 경로·수신 키(`bzProcsNo` 가정)가 정해지면 확정한다.
@@ -648,3 +666,4 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=3`, `LIST_BZ_TP_CD=232`
 12. **"수정할 내용 없음" 문구** — 원본 공통 `fn_alertNoUpdate` 의 정확한 문구를 확인해 §7.2 를 고친다.
 13. **변경사유 목록 출처** — 고정 3종(1·2·9)을 유지할지, 상장업무사유코드(`LIST_BZ_RSN_TP_CD='03'`) 공통코드로 받을지 정한다.
 14. **TO-BE 배포 경로·창 크기** — `/ui/lst/lstproc/ULDSTF05621.xml`(가정), 부모가 여는 크기 615×710.
+15. **TO-BE 재전환(2026-10-27 명세)** — `ui-tobe/ULDSTF05621.xml` 은 이전 명세(txt) 기준이다. ① 요청 전용 정의 6개(`dma_reqSave`·`dlt_reqSave_*`·`dma_reqUpdate`·`dlt_reqUpdate_*`) 삭제, `scwin.saveTrs` 요청을 `{ ...dma_resultDetail.getJSON(), dtlBfList, dtlAfList }` 합본으로 ② 목록 id `dlt_resultDetail_dtl*List` → `dlt_detail_dtl*List`(그리드 `dataList`·스크립트) ③ 응답 `dma_resultSave`·`dma_resultDelete` 정의와 target 추가, `result`·`resultMessage` 판정 ④ 머리 주석의 명세 파일명 `_API.md`.

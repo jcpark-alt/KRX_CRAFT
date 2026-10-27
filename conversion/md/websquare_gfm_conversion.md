@@ -642,7 +642,7 @@ done
 
 # API 명세가 있으면 — 이 화면ID 블록의 API 끝 경로가 결과서에 모두 언급됐는지(다른 화면ID 블록은 제외)
 A=$(ls {폴더}/{화면ID}_API.txt {폴더}/{화면ID}_API.md 2>/dev/null | head -1); ID={화면ID}   # txt·md 모두
-[ -n "$A" ] && for k in $(python -c "import sys; sys.path.insert(0,'conversion/tools'); import api_spec_check as ac; print('\n'.join(sorted({a['path'].rsplit('/',1)[-1] for a in ac.parse_spec(open(sys.argv[1],encoding='utf-8-sig').read(), 'md' if sys.argv[1].endswith('.md') else 'txt') if a['screen']==sys.argv[2]})))" "$A" "$ID"); do
+[ -n "$A" ] && for k in $(python -c "import sys; sys.path.insert(0,'conversion/tools'); import api_spec_check as ac; print('\n'.join(sorted({a['path'].rsplit('/',1)[-1] for a in ac.parse_spec(open(sys.argv[1],encoding='utf-8-sig').read(), 'md' if sys.argv[1].endswith('.md') else 'txt') if a['screen']==sys.argv[2]})))" "$A" "$ID" | tr -d ''); do   # Windows 의 CRLF 출력 제거
   grep -q "$k" $M || echo "결과서 미언급 API: $k"
 done
 ```
