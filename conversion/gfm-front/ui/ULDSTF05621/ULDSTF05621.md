@@ -4,7 +4,7 @@
 |---|---|
 | AS-IS | `/lstproc/ULDSTF05621.gfm` (Gauce/X-Internet, 610×680 모달 창 — 부모가 615×710 `window` 로 연다) — 반입 `conversion/gfm-front/ui/ULDSTF05621/ULDSTF05621.gfm` |
 | 신규 API 명세 | `conversion/gfm-front/ui/ULDSTF05621/ULDSTF05621_API.md` — 블록 7종(이 화면 6종, 다른 화면 1종: ULDSTF05620 목록 조회). §2.2·§5 는 명세 기준(가이드 §0.3·§5). **2026-10-27 명세 갱신**(txt → md): 저장 요청을 상세 데이터 합본으로, 저장·삭제 응답 신설, 상세 목록 id `dlt_detail_dtl*List`, `select-one` 응답은 개요만. 같은 날 2차 수정으로 블록마다 AS-IS 가 **AS-IS 함수·인덱스 표기**(`fn_save_trs(TRS_IDX_INSERT)` 등)로 바뀌고 파일 감싸기(```` ```markdown ````)가 없어짐 — 변경 대조는 §5 「명세 갱신(2026-10-27)」 |
-| TO-BE | `conversion/gfm-front/ui-tobe/ULDSTF05621.xml` (배포 경로 `/ui/lst/lstproc/ULDSTF05621.xml` — 가정, §10). 가이드 §13.2 대로 퍼블리싱본(마크업 전용)을 먼저 만들고 그 위에 스크립트를 전환함 (2026-10-26). **TO-BE 는 아직 이전 명세(txt) 기준** — 2026-10-27 명세 갱신분 반영은 §10 #15 |
+| TO-BE | `conversion/gfm-front/ui-tobe/ULDSTF05621.xml` (배포 경로 `/ui/lst/lstproc/ULDSTF05621.xml` — 가정, §10). 가이드 §13.2 대로 퍼블리싱본(마크업 전용)을 먼저 만들고 그 위에 스크립트를 전환함 (2026-10-26). 2026-10-27 갱신 명세(md) 기준으로 재전환 완료(§10 #15) |
 | 퍼블리싱 | `conversion/publish/상장/상장처리(대내)/ULDSTF05621.xml` — 컴포넌트 id 는 AS-IS 와 같고, 날짜는 `w2:inputCalendar`, 사유는 `xf:select1`, 달력 이미지 버튼은 없음 |
 | 화면 캡처 | `ULDSTF05621.png` (신규 빈 입력 상태) — TO-BE 퍼블리싱 기준 |
 | 업무공통 | `$c.stf`(`getNewBzProcNo`·`getMessageParam`·`checkMaxLength`·`setButtonSetWithDate`)·`$c.lc`(`isProcess`·`getSecuGrpNm`·`glb.*` 상수) — `cm/pcc/stf`. 게이트는 `--pcc stf` 로 돌린다 |
@@ -646,7 +646,7 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=3`, `LIST_BZ_TP_CD=232`
 | `grd_DIST_PAY_AF OnExit` 의 범위 검사 | 핸들러는 `scwin.checkAfMmDd(row, colId)` 호출만, 검사는 5구역(Thin Event) |
 | `#include(...)` 7종, `PanelToGroupBox`, `vScrenID` | 삭제 (규칙 11·1) |
 | `fn_makt`, `CanColumnPosChange`, `dts_DtlBf OnLoadCompleted` | 삭제 (동작 없음) |
-| (없음 — 화면 보조) | `scwin.getEditState`(수정 여부 판정), `scwin.buildDtlList`(전송 목록 복사본·일련번호), `scwin.getNewBzProcsNo`(채번 봉투에서 body 추출), `scwin.getDsclData`(92024 data), `scwin.getIsurCd`(조회 값 우선 회사코드), `scwin.fillDataList`(컬럼 정의가 빈 dataList 채우기) |
+| (없음 — 화면 보조) | `scwin.getEditState`(수정 여부 판정), `scwin.buildDtlList`(전송 목록 복사본·일련번호), `scwin.checkResult`(저장·삭제 응답 `result`·`resultMessage` 판정, 2026-10-27 명세), `scwin.getNewBzProcsNo`(채번 봉투에서 body 추출), `scwin.getDsclData`(92024 data), `scwin.getIsurCd`(조회 값 우선 회사코드), `scwin.fillDataList`(컬럼 정의가 빈 dataList 채우기) |
 
 ---
 
@@ -666,4 +666,4 @@ AS-IS `trs.Parameters`: `TRS_IDX`, `BZ_PROCS_NO`, `COUNT=3`, `LIST_BZ_TP_CD=232`
 12. **"수정할 내용 없음" 문구** — 원본 공통 `fn_alertNoUpdate` 의 정확한 문구를 확인해 §7.2 를 고친다.
 13. **변경사유 목록 출처** — 고정 3종(1·2·9)을 유지할지, 상장업무사유코드(`LIST_BZ_RSN_TP_CD='03'`) 공통코드로 받을지 정한다.
 14. **TO-BE 배포 경로·창 크기** — `/ui/lst/lstproc/ULDSTF05621.xml`(가정), 부모가 여는 크기 615×710.
-15. **TO-BE 재전환(2026-10-27 명세)** — `ui-tobe/ULDSTF05621.xml` 은 이전 명세(txt) 기준이다. ① 요청 전용 정의 6개(`dma_reqSave`·`dlt_reqSave_*`·`dma_reqUpdate`·`dlt_reqUpdate_*`) 삭제, `scwin.saveTrs` 요청을 `{ ...dma_resultDetail.getJSON(), dtlBfList, dtlAfList }` 합본으로 ② 목록 id `dlt_resultDetail_dtl*List` → `dlt_detail_dtl*List`(그리드 `dataList`·스크립트) ③ 응답 `dma_resultSave`·`dma_resultDelete` 정의와 target 추가, `result`·`resultMessage` 판정 ④ 머리 주석의 명세 파일명 `_API.md`.
+15. ~~**TO-BE 재전환(2026-10-27 명세)**~~ — 완료(2026-10-27): ① 요청 전용 정의 6개 삭제, `scwin.saveTrs` 요청을 `{ ...dma_resultDetail.getJSON(), bzProcsNo, isurCd, dtlBfList, dtlAfList }` 합본으로(목록은 `scwin.buildDtlList` 복사본) ② 목록 id `dlt_detail_dtl*List`(정의·그리드·스크립트 29곳) ③ 응답 `dma_resultSave`·`dma_resultDelete` 정의·target 추가, 판정은 5구역 `scwin.checkResult`(통신 성공 + `result` 가 비었거나 `scwin.RESULT_OK`("S" 가정, #5) — 아니면 `resultMessage` 또는 MSG-A002) ④ 머리 주석 `_API.md`.
