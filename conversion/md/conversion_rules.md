@@ -984,6 +984,30 @@ grd_list.setRowClass(i, "row_bg_lgray");
     * ULDSTF05710: `rt` 신청종목삭제·안내문작성 | 삭제(pt)·수정(pt)·저장(pt). 인쇄는 승인일 입력과 한 묶음이라 `lt` 유지(버튼 아닌 요소가 있는 `lt`)
     * ULDSTF05911: 삭제(pt)·수정(pt)·저장(pt). `lt` 의 엑셀업로드 안내문(`txt_info`)은 버튼이 아니라 그대로
 
+### 규칙 42: 엑셀 다운로드 파일명 — `{menuId}_{이름}_{yyyyMMddHHmmss}.xlsx` (2026-10-27 신설, 사용자 지시)
+
+엑셀 다운로드(`$c.data.downloadGridViewExcel` 등 `fileName` 옵션을 받는 공통 함수)의 파일명에 **menuId(화면 파일명)** 가 들어가게 한다. 형식은 공통 함수의 기본 파일명 규칙과 같다.
+
+* **공통 함수 기본 규칙**(`cm/gcc/data.xml` `downloadGridViewExcel`): `fileName` 을 넘기지 않으면 메뉴 정보(`paramData.menuInfo`)로 `` `${menuId}_${menuInfo.menuNm}_${$c.date.getServerDateTime("yyyyMMddHHmmss")}.xlsx` `` 를 만든다(menuId = 메뉴 `src` 의 화면 파일명). `fileName` 을 넘기면 **그 이름을 그대로** 쓰고 확장자가 없을 때만 `.xlsx` 를 붙인다 — menuId 를 붙여 주지 않는다. 메뉴 정보가 없으면(메뉴로 열지 않은 팝업 등) `excel.xlsx` 가 된다.
+* **규칙**
+    1. 화면에서 `fileName` 을 지정할 때는 기본 규칙과 같은 형식으로 **menuId 를 맨 앞에** 붙인다.
+
+       ```javascript
+       // (X) 금지 — menuId 없음
+       $c.data.downloadGridViewExcel(grd_isu, { fileName : "ELW 행사가격_전환비율 변경" });
+       $c.data.downloadGridViewExcel(grd, { fileName : "채권처리현황(전체)_" + $c.date.getServerDateTime("yyyyMMddHHmmss") + ".xlsx" });
+
+       // (O) 권장 — {menuId}_{이름}_{yyyyMMddHHmmss}.xlsx
+       $c.data.downloadGridViewExcel(grd, {
+           fileName : $c.win.getProgramId() + "_채권처리현황(전체)_" + $c.date.getServerDateTime("yyyyMMddHHmmss") + ".xlsx"
+       });
+       ```
+
+    2. **menuId** 는 `$c.win.getProgramId()` 로 얻는다 — 화면의 `meta_screenId`(전환 화면은 모두 지정), 없으면 화면 파일명을 돌려준다. 공통 함수 기본 규칙의 menuId(메뉴 `src` 파일명)와 같은 값이다. 화면 ID 문자열을 직접 적지 않는다(복사본 화면에서 어긋난다).
+    3. **이름**은 AS-IS 파일명(`GridToExcel`·`GridToOffice` 의 파일명 인자)이나 화면·탭·그리드 구분명을 쓴다. 메뉴명과 같으면 `fileName` 을 생략해 공통 함수 기본 규칙에 맡겨도 된다 — 단 **팝업·탭 본문처럼 메뉴 정보가 없을 수 있는 화면은 생략하지 않는다**(`excel.xlsx` 가 되어 menuId 가 빠진다).
+    4. 일시는 서버 시각 `$c.date.getServerDateTime("yyyyMMddHHmmss")`, 확장자는 `.xlsx` 를 명시한다. 파일명에 쓸 수 없는 문자(`\ / : * ? " < > |`)는 넣지 않는다(예: "행사가격/전환비율" → "행사가격_전환비율").
+* **적용 현황**(2026-10-27, gfm-front TO-BE): `fileName` 을 직접 지정하는 3곳 모두 menuId 없음 — ULDBNS30400 `scwin.excelDown`·`scwin.excelDownDtl`(이름_일시.xlsx), ULDSTF05911 엑셀 다운로드(이름만). 다음 갱신 때 맞춘다. sample-front·jsp-front 는 각 재전환 때.
+
 ## 규칙 6 보충: Submission 변환 상세
 
 * **규칙 12 — `{DC}.DataID = encodeURI(url)` 의 `url` 선언 역추적 스코프**(2026-10-08): 선언(`var|let|const url = …;`)은 DataID 문이 든 **같은 최상위 함수 안**에서만 찾는다. 스크립트 전체에서 "앞에 있는 마지막 대입"을 고르면 규칙 4 재배치 뒤 다른 핸들러의 팝업 URL 상수(`let url = "/ui/lst/lstproc/ULDSTF05106_read.xml";`)가 걸려 삭제되고 해석 실패한 DataID 는 그대로 남는다(ULDSTF92002 button_1_onclick). 같은 함수에 선언이 없으면 「action URL 해석 실패」로 보류한다. 회귀 테스트 `test_convert_rule12_scope.py`.
