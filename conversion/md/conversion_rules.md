@@ -1134,7 +1134,22 @@ scwin.tab_List_ontabload = async function (tabId, index, userTabId) {
 ```
 
 * **금지**: 문자열 자릿수 마스크 `displayFormat="####-##-##"`(dataType 없음) — AS-IS `XXXX-XX-XX` 를 1:1 로 옮긴 꼴이지만 이 규칙의 형태와 다르다.
-* **범위**: 그리드 표시 열만. 입력 달력은 `w2:inputCalendar`(규칙 37), 날짜·시각처럼 다른 마스크(`XXXX-XX-XX XX:XX` 등)는 이 규칙 밖 — 결과서 §2.2 에 근거를 적고 정한다. dataList 컬럼 `dataType` 은 명세 그대로 둔다(표시만 바꾼다).
+* **범위**: 그리드 표시 열만. 입력 달력은 `w2:inputCalendar`(규칙 37), 값이 8자리 날짜가 아닌 일시·시각 열은 아래 「`ioFormat`」 조항을 따른다. dataList 컬럼 `dataType` 은 명세 그대로 둔다(표시만 바꾼다).
+* **`ioFormat` — 값이 8자리 `yyyyMMdd` 가 아닌 날짜·일시 열** (2026-10-28 추가, 사용자 지시)
+    1. **언제**: 서버 값이 `yyyyMMdd` 8자리가 아니면 `ioFormat` 을 값 형식과 **글자 수까지 똑같이** 지정한다. 지정하지 않으면 엔진이 `yyyyMMdd` 로 보고 길이가 달라 원시 값을 그대로 표시한다(형식이 붙지 않음).
+
+        | 서버 값 | 열 속성 | 표시 |
+        |---|---|---|
+        | `20261028134500` | `dataType="date" ioFormat="yyyyMMddHHmmSS" displayFormat="yyyy-MM-dd HH:mm:SS"` | `2026-10-28 13:45:00` |
+        | `202610281345` | `dataType="date" ioFormat="yyyyMMddHHmm" displayFormat="yyyy-MM-dd HH:mm"` | `2026-10-28 13:45` |
+        | `20261028134500` (날짜만 보임) | `dataType="date" ioFormat="yyyyMMddHHmmSS" displayFormat="yyyy-MM-dd"` | `2026-10-28` |
+
+    2. **글자 — 날짜 열의 시·분·초는 `HH`·`mm`·`SS`(대문자 S)**: `formatDate` 는 ioFormat 의 `y`·`M`·`d`·`H`·`m`·`S` 만 displayFormat 의 같은 글자 자리에 옮긴다(16519행). 소문자 `hh`·`ss` 는 옮기지 않아 글자가 그대로 남는다 — `ioFormat="yyyyMMddHHmmss" displayFormat="yyyy-MM-dd HH:mm:ss"` → `2026-10-28 13:45:ss`, `hh` 를 쓰면 `hh:45:ss`. ioFormat·displayFormat **둘 다** 대문자로 쓴다(`websquare/config.xml` 달력 기본값도 `yyyy-MM-dd HH:mm:SS`). `hh`·`ss` 금지. 단 날짜만 보이는 displayFormat(`yyyy-MM-dd`)이면 ioFormat 의 소문자 `ss` 는 결과에 영향이 없다(sample-front `ULDSTF30702` 선례) — 새로 쓸 때는 대문자로 통일한다.
+    3. **`displayFormat` 은 반드시 명시**: 설정 `gridView > dataType > date displayFormat="yyyy-MM-dd"` 가 날짜 열 기본값을 채우므로(84532행) 생략하면 시각이 잘린다.
+    4. **시각만 있는 열**(`HHmmss`·`HHmm`, 예: `…Tm`)은 날짜가 아니라 `dataType="time"` + `displayFormat="HH:mm:ss"`(또는 `HH:mm`) — 이쪽 `formatTime` 은 **소문자 `s`** 를 쓴다(날짜와 반대). ioFormat 기본 `HHmmss`, displayFormat 기본 `HH:mm` 이고 길이 검사가 없어 자리로만 옮긴다 — 값이 `HHmm` 이면 `ioFormat="HHmm"` 을 준다.
+    5. **길이가 섞인 열**: ioFormat 은 길이 하나만 맞춘다 — 같은 열에 8자리와 14자리가 섞여 오면 맞지 않는 행은 원시 값으로 보인다. 섞이면 서버 형식 통일을 §10 에 올린다(`customFormatter` 로 길이 분기는 규칙 43 범위에서 요청 시에만).
+    6. **대상 판단**: 값 형식(길이·구성)이 **명세·결과서·서버 회신으로 확인된 열만**. AS-IS 마스크·id(`…Dt`)·명칭으로는 날짜/일시를 가를 수 없고 명세 `dataType` 은 대부분 `text` 다 — 확인 전에는 붙이지 않고 결과서 §10 에 올린다(추측으로 길이를 고정하면 원시 값이 그대로 보인다).
+    7. **후보 현황**(2026-10-28, conversion-front): AS-IS 일시 마스크 0건. 값 형식 확인 대기 — ULDBNS30400 `…Dt` 6열(결과서 §10 #21), ULDBNS30300 `grd_ClsSendInfo` `mktactTrnsmTm`·`mktactEndTm`(시각, `dataType="time"` 후보).
 * **관련**: 퍼블리싱 스킬 `markup-idioms.md` §5.2 「날짜 컬럼은 `dataType="date" displayFormat="yyyy-MM-dd"`」 — 이 규칙이 「날짜 컬럼」의 기준이다.
 * **적용 현황**(2026-10-28, conversion-front TO-BE): ① AS-IS 마스크 열 48곳 모두 이 형태 — ULDSTF05700·05702·05232·05923·08200 31곳(처음부터), ULDBNS30300 15곳·ULDSTF05950 2곳(`####-##-##` → 이 형태로 정정). ② 확장 대상 23열(그리드 중복 43곳) 적용 — ULDBNS30300 21열(`grd_SendList`·`grd_SendList1` 전송 항목 20열 + `grd_ClsSendInfo.taskDd`), ULDBNS30400 2열(`grd_ListDetail.isuDd`·`redmptDd`). 제외: ULDSTF05950 6곳(명세에 `YYYY-MM-DD`), ULDSTF05621 `basDd` 2곳(날짜 아님), ULDBNS30400 `…Dt` 6열(일시 가능 — 결과서 §10).
 

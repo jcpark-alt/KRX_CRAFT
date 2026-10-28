@@ -167,7 +167,7 @@
 ```
 - 높이 class `rowN` 은 **`row5`·`row10`·`row15`·`row20`·`row25` 만** CSS 가 있고(`cm/css/base.css` `.gvwbox .w2grid.rowN`), `gvwbox` 안에서만 먹는다. 그 밖의 행 수는 class 없이 `visibleRowNum` 으로 맞춘다.
 - 감싸는 group 은 `gvwbox` 다. `grdbox` 는 CSS 가 없다(SMPDLT10000·SMPFMT10000·SMPVAL10000 에 있던 것을 2026-10-22 정정).
-- 컬럼 id 는 dataList 컬럼 id 와 같게, 날짜 컬럼(AS-IS `mask="XXXX-XX-XX"` 가 있던 열, 또는 id `…Dd` + 명칭 `…일`·`…일자` 동시 일치 — 전환 규칙 46)은 `dataType="date" displayFormat="yyyy-MM-dd"`(`####-##-##` 금지), 숫자 컬럼은 `textAlign="right"` + `displayFormat`.
+- 컬럼 id 는 dataList 컬럼 id 와 같게, 날짜 컬럼(AS-IS `mask="XXXX-XX-XX"` 가 있던 열, 또는 id `…Dd` + 명칭 `…일`·`…일자` 동시 일치 — 전환 규칙 46)은 `dataType="date" displayFormat="yyyy-MM-dd"`(`####-##-##` 금지; 값이 8자리가 아니면 `ioFormat` 을 값과 같게 — 일시는 `ioFormat="yyyyMMddHHmmSS" displayFormat="yyyy-MM-dd HH:mm:SS"` 처럼 시·초 대문자, 시각만이면 `dataType="time" displayFormat="HH:mm:ss"`), 숫자 컬럼은 `textAlign="right"` + `displayFormat`.
 
 ### 5.3 페이징 「6_03 페이지리스트」 (11)
 ```xml
