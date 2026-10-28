@@ -1042,7 +1042,7 @@ scwin.fmtProcState = function (data, formattedData, rowIndex, colIndex) {
     * formatter 결과는 표시 전용이다 — dataList 값은 바뀌지 않는다(엑셀 다운로드·`getCellDisplayData` 도 formatter 를 부른다).
 * **지킬 것**
     1. formatter 는 **동기 함수**다(`async` 금지 — 엔진이 반환값을 기다리지 않아 `[object Promise]` 가 표시된다). 통신·`await` 를 넣지 않는다.
-    2. 같은 행의 다른 컬럼 값은 `this.getCellData(rowIndex, "col")`(gridView 기준)로 읽는다 — `dlt_x.getCellData(rowIndex, …)` 는 정렬·필터 뒤 다른 행을 읽는다.
+    2. 같은 행의 다른 컬럼 값은 `this.getCellData(rowIndex, "col")`(gridView 기준)로 읽는다 — `rowIndex` 는 화면 행 번호다. `dlt_x.getCellData` 도 화면 번호를 받아 일반 그리드에선 같은 행을 읽지만(2026-10-28 정정: 종전 "정렬·필터 뒤 다른 행을 읽는다"는 엔진 실측과 다름), 그룹화(groupby) 그리드까지 맞추려면 그리드 기준으로 읽는다. 실제 행 번호(`getRealRowIndex` 결과)를 넘기면 다른 행을 읽는다 — `sample-front/ui/SMPROW10000.xml`.
     3. formatter 안에서 부르는 그리드 API 는 **그 셀의 `setCellClass`·`removeCellClass` 만** 허용한다. `setCellData`·`setCellReadOnly`·다른 셀 조작은 금지(그릴 때마다 불리고, 값 변경은 다시 그리기를 부른다).
     4. 함수 이름은 `scwin.fmt{컬럼}` 형태로 짓고 `publicInfo` 에 올린다(엔진이 문자열 이름을 화면 scope 에서 찾는다).
     5. 실화면 확인 항목: formatter 안에서 붙인 class 가 셀 다시 그리기 뒤에도 유지되는지(엔진 렌더 순서) — 첫 적용 화면에서 정렬·스크롤로 확인한다.

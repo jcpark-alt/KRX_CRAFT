@@ -1,0 +1,398 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:ev="http://www.w3.org/2001/xml-events"
+    xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+    <head meta_screenName="[가이드] gridView 화면 행 번호와 실제 행 번호 (getRealRowIndex · getDisplayRowIndex)" meta_screenId="SMPROW10000" meta_screenDesc="정렬·필터를 건 gridView 에서 화면 행 번호(보이는 순서)와 실제 행 번호(데이터가 들어온 순서)가 갈라지는 것을 보여주고, getRealRowIndex·getDisplayRowIndex·getFocusedRealRowIndex 변환, 화면 번호를 받는 API 와 실제 번호를 받는 API 의 구분, 수정 행 조회·행 추가·전체 JSON 순서의 함정을 시연하는 가이드." meta_author="Inswave" meta_type="가이드" meta_date="2026.10.28">
+        <w2:type>COMPONENT</w2:type>
+        <w2:buildDate/>
+        <w2:MSA/>
+        <xf:model>
+            <w2:dataCollection baseNode="map">
+                <w2:dataList baseNode="list" repeatNode="map" id="dlt_list" ev:oncelldatachange="scwin.dlt_list_oncelldatachange">
+                    <w2:columnInfo>
+                        <w2:column id="seq" name="적재 순번(= 실제 행 번호)" dataType="number"></w2:column>
+                        <w2:column id="isuNm" name="종목명" dataType="text"></w2:column>
+                        <w2:column id="region" name="지역" dataType="text"></w2:column>
+                        <w2:column id="trdAmt" name="거래금액" dataType="number"></w2:column>
+                        <w2:column id="memo" name="메모" dataType="text"></w2:column>
+                    </w2:columnInfo>
+                </w2:dataList>
+            </w2:dataCollection>
+            <w2:workflowCollection/>
+        </xf:model>
+        <w2:layoutInfo/>
+        <w2:publicInfo method="scwin.onpageload,scwin.grd_list_oncellclick,scwin.dlt_list_oncelldatachange,scwin.btn_sort_onclick,scwin.btn_filter_onclick,scwin.btn_clear_onclick,scwin.btn_modified_onclick,scwin.btn_insert_onclick,scwin.btn_json_onclick,scwin.btn_reset_onclick,scwin.initGrid,scwin.showFocusInfo,scwin.showModified,scwin.insertAtFocus,scwin.showJsonOrder"/>
+        <script lazy="false" type="text/javascript"><![CDATA[// 가이드 : gridView 화면 행 번호 · 실제 행 번호 샘플 (합성 화면 — 원본 없음)
+
+/*
+ * 화면 동작
+ * 1. 「금액 내림차순 정렬」·「서울만 보기」(또는 헤더 클릭 정렬)로 보이는 순서를 바꾼 뒤 행을 클릭하면
+ *    포커스 행의 화면 번호·실제 번호와 각 변환 함수 결과, 번호를 잘못 넘겼을 때 읽히는 값을 표시한다
+ *    — 「적재 순번」 컬럼은 조회 때 넣은 실제 행 번호라 눈으로 대조할 수 있다
+ * 2. 메모를 고치면 oncelldatachange 의 rowIndex(화면)·realRowIndex(실제)를 표시한다
+ * 3. 「수정 행 조회」 : getModifiedIndex(화면 번호)로 첫 수정 행에 포커스를 옮기고 getModifiedJSON 건수를 표시한다
+ *    — 부산 행 메모를 고친 뒤 「서울만 보기」 를 누르고 조회하면 숨긴 수정 행이 빠진다(함정 ①)
+ * 4. 「포커스 위치에 행 추가」 : 정렬·필터 중이면 화면에는 그 자리에 보이지만 실제 데이터는 맨 끝에 붙는다(함정 ②)
+ * 5. 「JSON 순서 비교」 : getAllJSON·getAllFilteredJSON 이 돌려주는 순서를 비교한다(함정 ③)
+ *
+ * 두 가지 행 번호 — 엔진 실측(websquare-engine.js)
+ * - 실제 행 번호 : 데이터가 들어온 순서(dataList 내부 dataArr). 정렬·필터와 무관하게 행마다 고정
+ * - 화면 행 번호 : 정렬·필터를 반영해 보이는 순서. dataList 가 화면 → 실제 매핑 배열(filteredRowIndexArr)로 관리
+ * - 정렬도 내부적으로 필터의 한 종류(setFilter type "sort")라 데이터를 옮기지 않고 매핑만 바꾼다 → 정렬만 해도 두 번호가 갈라진다
+ *
+ * 변환 함수
+ * - grd.getRealRowIndex(화면) / dlt.getRealRowIndex(화면)        → 실제 번호 (gridView 쪽은 dataList 에 위임)
+ * - grd.getDisplayRowIndex(실제) / dlt.getFilteredRowIndex(실제) → 화면 번호 (필터로 숨은 행이면 undefined)
+ * - grd.getFocusedRowIndex() → 화면 번호, grd.getFocusedRealRowIndex() → 실제 번호
+ *
+ * 어느 번호를 받나 (트리 그리드 — dataList depthColumn 지정 — 는 예외로 전부 실제 번호)
+ * - 화면 번호를 받는다 : getCellData·setCellData·getRowData·getRowJSON·getRowStatus·deleteRow·insertRow·modifyRowStatus·
+ *   setRowJSON·grd.setFocusedCell·grd.setCellClass, 그리고 gridView 이벤트(oncellclick 등)·customFormatter 의 rowIndex
+ * - 화면 번호를 돌려준다 : getModifiedIndex·getInsertedIndex·getUpdatedIndex·getDeletedIndex·getMatchedIndex·grd.getCheckedIndex
+ * - 실제 번호를 받는다 : getCellAllData·setCellAllData, getRowData(n, { realRowIndex : true }), setCellData({ realRowIndex : n }, col, value)
+ * → 이벤트·조회 API 가 준 번호는 대부분 화면 번호라 그대로 다른 API 에 넘기면 된다. 변환은 실제 번호를 보관·비교할 때만 한다
+ *   (예 : 조회 직후 기억한 행을 정렬 뒤 다시 찾기 → 실제 번호를 보관했다가 getDisplayRowIndex 로 화면 번호를 구한다)
+ * → dlt.getCellData(rowIndex) 와 grd.getCellData(rowIndex) 는 둘 다 화면 번호라 일반 그리드에서는 같은 행을 읽는다(그룹화 그리드는 다를 수 있다)
+ *
+ * 함정
+ * ① getModifiedIndex·getModifiedData·getModifiedJSON 은 화면 번호를 기준으로 모으므로 필터로 숨긴 수정 행이 빠진다
+ *    → 수정 행을 모아 저장하기 전에 필터를 풀거나(clearFilter), 필터 상태에서는 저장 버튼을 막는다
+ * ② insertRow(n) 은 정렬·필터 중이면 실제 데이터 맨 끝에 붙이고 화면에만 n 위치로 보인다(반환값은 화면 번호 n)
+ * ③ getAllJSON 은 정렬만 했으면 정렬된 순서, 필터로 숨은 행이 있으면 실제 순서로 전체 행을 돌려준다 — 순서를 믿지 않는다.
+ *    보이는 행만, 보이는 순서로 필요하면 getAllFilteredJSON
+ * ④ 실제 번호를 getCellData·setCellData 에 넘기면 정렬·필터 뒤 엉뚱한 행을 읽고 쓴다
+ * - clearFilter() 는 정렬까지 푼다(두 번째 인자 { keepSort : true } 로 정렬을 남길 수 있다 — 이 화면에선 쓰지 않음)
+ */
+
+///////// 1. 변수 및 선언 영역 /////////
+
+// 그리드 초기 데이터 — 적재 순번(seq)은 실제 행 번호와 같게 넣는다
+scwin.SAMPLE = [
+    { isuNm : "가나전자", region : "서울", trdAmt : 15000000 },
+    { isuNm : "다라화학", region : "부산", trdAmt : 32000000 },
+    { isuNm : "마바증권", region : "서울", trdAmt : 9800000 },
+    { isuNm : "사아바이오", region : "대전", trdAmt : 50000000 },
+    { isuNm : "자차건설", region : "부산", trdAmt : 7200000 },
+    { isuNm : "카타물산", region : "서울", trdAmt : 41000000 },
+    { isuNm : "파하식품", region : "대전", trdAmt : 23000000 },
+    { isuNm : "거너통신", region : "서울", trdAmt : 3600000 }
+];
+
+///////// 2. 초기화 영역 /////////
+
+/**
+ * @method
+ * @name scwin.onpageload
+ * @author Inswave
+ * @date 2026. 10. 28
+ * @description 페이지 로드. 그리드 샘플 데이터를 설정한다.
+ * @hidden N
+*/
+scwin.onpageload = function () {
+    try {
+        scwin.initGrid();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "SMPROW10000.onpageload" });
+    }
+};
+
+///////// 3. 컴포넌트 이벤트 영역 /////////
+
+/**
+ * @event
+ * @name scwin.grd_list_oncellclick
+ * @description 클릭한 행의 화면 번호·실제 번호와 변환 결과를 표시한다. 이벤트의 row 인자는 화면 번호다.
+ * @param {Number} row 화면 행 번호
+ * @param {Number} col 컬럼 인덱스
+ * @hidden N
+*/
+scwin.grd_list_oncellclick = function (row, col) {
+    try {
+        scwin.showFocusInfo();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "SMPROW10000.grd_list_oncellclick" });
+    }
+};
+
+/**
+ * @event
+ * @name scwin.dlt_list_oncelldatachange
+ * @description 셀 값이 바뀌면 info.rowIndex(화면 번호)와 info.realRowIndex(실제 번호)를 표시한다.
+ * @param {Object} info { rowIndex, realRowIndex, colID, oldValue, newValue }
+ * @hidden N
+*/
+scwin.dlt_list_oncelldatachange = function (info) {
+    try {
+        spn_event.setValue("oncelldatachange : " + info.colID + " 「" + info.oldValue + "」 → 「" + info.newValue + "」"
+            + " | rowIndex(화면) = " + info.rowIndex + " / realRowIndex(실제) = " + info.realRowIndex);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "SMPROW10000.dlt_list_oncelldatachange" });
+    }
+};
+
+/**
+ * @event
+ * @name scwin.btn_sort_onclick
+ * @description 거래금액 내림차순으로 정렬한다. 데이터는 그대로이고 화면 → 실제 매핑만 바뀐다.
+ * @hidden N
+*/
+scwin.btn_sort_onclick = function () {
+    try {
+        dlt_list.sort("trdAmt", 1);
+        scwin.showFocusInfo();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "SMPROW10000.btn_sort_onclick" });
+    }
+};
+
+/**
+ * @event
+ * @name scwin.btn_filter_onclick
+ * @description 지역이 서울인 행만 보이게 필터를 건다.
+ * @hidden N
+*/
+scwin.btn_filter_onclick = function () {
+    try {
+        dlt_list.setColumnFilter({ type : "row", colIndex : "region", key : "서울", condition : "and", exactMatch : true });
+        scwin.showFocusInfo();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "SMPROW10000.btn_filter_onclick" });
+    }
+};
+
+/**
+ * @event
+ * @name scwin.btn_clear_onclick
+ * @description 필터와 정렬을 모두 푼다. 화면 번호와 실제 번호가 다시 같아진다(추가한 행 제외).
+ * @hidden N
+*/
+scwin.btn_clear_onclick = function () {
+    try {
+        dlt_list.clearFilter();
+        scwin.showFocusInfo();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "SMPROW10000.btn_clear_onclick" });
+    }
+};
+
+/**
+ * @event
+ * @name scwin.btn_modified_onclick
+ * @description 수정 행 번호(화면 번호)와 getModifiedJSON 건수를 표시하고 첫 수정 행으로 포커스를 옮긴다.
+ * @hidden N
+*/
+scwin.btn_modified_onclick = function () {
+    try {
+        scwin.showModified();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "SMPROW10000.btn_modified_onclick" });
+    }
+};
+
+/**
+ * @event
+ * @name scwin.btn_insert_onclick
+ * @description 포커스 행 위치에 행을 추가하고 화면 번호·실제 번호를 표시한다.
+ * @hidden N
+*/
+scwin.btn_insert_onclick = function () {
+    try {
+        scwin.insertAtFocus();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "SMPROW10000.btn_insert_onclick" });
+    }
+};
+
+/**
+ * @event
+ * @name scwin.btn_json_onclick
+ * @description getAllJSON·getAllFilteredJSON 의 행 순서를 비교해 표시한다.
+ * @hidden N
+*/
+scwin.btn_json_onclick = function () {
+    try {
+        scwin.showJsonOrder();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "SMPROW10000.btn_json_onclick" });
+    }
+};
+
+/**
+ * @event
+ * @name scwin.btn_reset_onclick
+ * @description 필터·정렬을 풀고 그리드 데이터를 초기 상태로 되돌린다.
+ * @hidden N
+*/
+scwin.btn_reset_onclick = function () {
+    try {
+        dlt_list.clearFilter();
+        scwin.initGrid();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "SMPROW10000.btn_reset_onclick" });
+    }
+};
+
+///////// 5. 일반/업무 함수 영역 /////////
+
+/**
+ * @method
+ * @name scwin.initGrid
+ * @author Inswave
+ * @date 2026. 10. 28
+ * @description 샘플 데이터에 적재 순번(= 실제 행 번호)을 붙여 설정하고 표시 영역을 비운다.
+ * @hidden N
+*/
+scwin.initGrid = function () {
+    const rows = scwin.SAMPLE.map(function (row, index) {
+        return { seq : index, isuNm : row.isuNm, region : row.region, trdAmt : row.trdAmt, memo : "" };
+    });
+    dlt_list.setJSON(rows);
+    spn_focus.setValue("행을 클릭하면 화면 번호·실제 번호를 표시합니다.");
+    spn_event.setValue("");
+    spn_result.setValue("");
+};
+
+/**
+ * @method
+ * @name scwin.showFocusInfo
+ * @author Inswave
+ * @date 2026. 10. 28
+ * @description 포커스 행의 화면 번호·실제 번호, 변환 함수 결과, 번호 종류별로 읽은 종목명을 표시한다.
+ *              [함정 ④] 실제 번호를 getCellData 에 넘기면 정렬·필터 뒤 다른 행을 읽는다.
+ * @hidden N
+*/
+scwin.showFocusInfo = function () {
+    const displayRow = grd_list.getFocusedRowIndex();
+    if (displayRow < 0 || displayRow >= dlt_list.getRowCount()) {
+        spn_focus.setValue("포커스 행 없음 — 행을 클릭하세요.");
+        return;
+    }
+    const realRow = grd_list.getFocusedRealRowIndex();
+    spn_focus.setValue([
+        "화면 번호 getFocusedRowIndex() = " + displayRow,
+        "실제 번호 getFocusedRealRowIndex() = " + realRow,
+        "getRealRowIndex(" + displayRow + ") = " + grd_list.getRealRowIndex(displayRow),
+        "getDisplayRowIndex(" + realRow + ") = " + grd_list.getDisplayRowIndex(realRow),
+        "getCellData(화면 " + displayRow + ") = " + dlt_list.getCellData(displayRow, "isuNm"),
+        "getCellAllData(실제 " + realRow + ") = " + dlt_list.getCellAllData(realRow, "isuNm"),
+        "[함정] getCellData(실제 " + realRow + ") = " + dlt_list.getCellData(realRow, "isuNm"),
+        "보이는 행 " + dlt_list.getRowCount() + " / 전체 행 " + dlt_list.getTotalRow()
+    ].join(" | "));
+};
+
+/**
+ * @method
+ * @name scwin.showModified
+ * @author Inswave
+ * @date 2026. 10. 28
+ * @description getModifiedIndex(화면 번호 배열)와 getModifiedJSON 건수를 표시하고, 첫 수정 행으로 포커스를 옮긴다.
+ *              반환 번호가 화면 번호라 변환 없이 setFocusedCell 에 넘긴다. [함정 ①] 필터로 숨긴 수정 행은 빠진다.
+ * @hidden N
+*/
+scwin.showModified = function () {
+    const modifiedIndex = dlt_list.getModifiedIndex();
+    const modifiedCount = dlt_list.getModifiedJSON().length;
+    const hidden = dlt_list.getTotalRow() - dlt_list.getRowCount();
+    if (modifiedIndex.length > 0) {
+        grd_list.setFocusedCell(modifiedIndex[0], "memo");
+        scwin.showFocusInfo();
+    }
+    spn_result.setValue("getModifiedIndex() = [" + modifiedIndex.join(", ") + "] (화면 번호) | getModifiedJSON() " + modifiedCount + "건"
+        + (hidden > 0 ? " | 숨긴 행 " + hidden + "개 — 그 안의 수정 행은 위 결과에서 빠집니다. 저장 전 필터를 푸세요." : ""));
+};
+
+/**
+ * @method
+ * @name scwin.insertAtFocus
+ * @author Inswave
+ * @date 2026. 10. 28
+ * @description 포커스 행 위치(화면 번호)에 행을 추가한다. [함정 ②] 정렬·필터 중이면 실제 데이터는 맨 끝에 붙는다.
+ * @hidden N
+*/
+scwin.insertAtFocus = function () {
+    const focusRow = grd_list.getFocusedRowIndex();
+    const displayRow = dlt_list.insertRow(focusRow < 0 ? 0 : focusRow);
+    const realRow = dlt_list.getRealRowIndex(displayRow);
+    dlt_list.setCellData(displayRow, "isuNm", "신규 행");
+    dlt_list.setCellData(displayRow, "memo", "실제 " + realRow);
+    grd_list.setFocusedCell(displayRow, "memo");
+    scwin.showFocusInfo();
+    spn_result.setValue("insertRow 반환값(화면 번호) = " + displayRow + " | 실제 번호 = " + realRow
+        + " | 전체 행 " + dlt_list.getTotalRow() + " — 정렬·필터 중이면 실제 번호가 맨 끝(" + (dlt_list.getTotalRow() - 1) + ")입니다.");
+};
+
+/**
+ * @method
+ * @name scwin.showJsonOrder
+ * @author Inswave
+ * @date 2026. 10. 28
+ * @description getAllJSON·getAllFilteredJSON 이 돌려주는 행 순서를 적재 순번(seq)으로 표시한다. [함정 ③]
+ * @hidden N
+*/
+scwin.showJsonOrder = function () {
+    const toSeq = function (rows) {
+        return rows.map(function (row) {
+            return row.seq === "" ? "신규" : row.seq;
+        }).join(",");
+    };
+    spn_result.setValue("getAllJSON() seq 순서 = [" + toSeq(dlt_list.getAllJSON()) + "]"
+        + " | getAllFilteredJSON() seq 순서 = [" + toSeq(dlt_list.getAllFilteredJSON()) + "]");
+};
+]]></script>
+    </head>
+
+    <body ev:onpageload="scwin.onpageload">
+        <xf:group class="sub_contents" id="" meta_componentContainer="true" style="">
+            <w2:pageFrame id="pfmContentHeader" src="/cm/xml/contentHeader.xml" style=""></w2:pageFrame>
+            <w2:textbox class="txt_info blue bold" id="" label="gridView 의 행 번호는 두 가지입니다. 화면 번호는 정렬·필터를 반영한 보이는 순서, 실제 번호는 데이터가 들어온 순서입니다. 정렬만 해도 두 번호가 달라집니다." style="" tagname=""></w2:textbox>
+            <w2:textbox class="txt_info" id="" label="getCellData·setCellData·getRowData·deleteRow·insertRow·setFocusedCell 과 이벤트·customFormatter 의 rowIndex, getModifiedIndex·getCheckedIndex 의 결과는 모두 화면 번호입니다. 실제 번호는 getCellAllData·getRowData(n, { realRowIndex : true }) 에만 넘깁니다." style="" tagname=""></w2:textbox>
+            <w2:textbox class="txt_info" id="" label="변환은 getRealRowIndex(화면 → 실제)·getDisplayRowIndex(실제 → 화면), 포커스 행은 getFocusedRowIndex(화면)·getFocusedRealRowIndex(실제) 입니다. 실제 번호는 정렬·필터 뒤에도 같은 행을 다시 찾으려고 보관할 때만 씁니다." style="" tagname=""></w2:textbox>
+            <w2:textbox class="txt_info red" id="" label="함정 — ① 필터 중 getModifiedIndex·getModifiedJSON 은 숨긴 수정 행을 빠뜨립니다(저장 전 필터 해제) ② 정렬·필터 중 insertRow 는 실제 데이터 맨 끝에 붙습니다 ③ getAllJSON 순서는 상태에 따라 다릅니다 ④ 실제 번호를 getCellData 에 넘기면 다른 행을 읽습니다." style="" tagname=""></w2:textbox>
+
+            <xf:group class="titbox" id="" style="">
+                <w2:textbox class="tit" id="" label="gridView — 「적재 순번」 = 실제 행 번호 (헤더 클릭 정렬 가능 · 메모 편집 가능)" style="" tagname="h3"></w2:textbox>
+            </xf:group>
+            <xf:group class="btnbox" id="" style="">
+                <xf:group class="lt" id="" style="">
+                    <xf:trigger class="btn_cm" id="btn_sort" type="button" ev:onclick="scwin.btn_sort_onclick"><xf:label><![CDATA[금액 내림차순 정렬]]></xf:label></xf:trigger>
+                    <xf:trigger class="btn_cm" id="btn_filter" type="button" ev:onclick="scwin.btn_filter_onclick"><xf:label><![CDATA[서울만 보기]]></xf:label></xf:trigger>
+                    <xf:trigger class="btn_cm" id="btn_clear" type="button" ev:onclick="scwin.btn_clear_onclick"><xf:label><![CDATA[정렬·필터 해제]]></xf:label></xf:trigger>
+                </xf:group>
+                <xf:group class="rt" id="" style="">
+                    <xf:trigger class="btn_cm" id="btn_modified" type="button" ev:onclick="scwin.btn_modified_onclick"><xf:label><![CDATA[수정 행 조회]]></xf:label></xf:trigger>
+                    <xf:trigger class="btn_cm" id="btn_insert" type="button" ev:onclick="scwin.btn_insert_onclick"><xf:label><![CDATA[포커스 위치에 행 추가]]></xf:label></xf:trigger>
+                    <xf:trigger class="btn_cm" id="btn_json" type="button" ev:onclick="scwin.btn_json_onclick"><xf:label><![CDATA[JSON 순서 비교]]></xf:label></xf:trigger>
+                    <xf:trigger class="btn_cm" id="btn_reset" type="button" ev:onclick="scwin.btn_reset_onclick"><xf:label><![CDATA[초기화]]></xf:label></xf:trigger>
+                </xf:group>
+            </xf:group>
+            <xf:group class="gvwbox" id="" style="">
+                <w2:gridView autoFit="allColumn" class="gvw row10" dataList="data:dlt_list" focusMode="row" id="grd_list"
+                    keepDefaultColumnWidth="false" rowNumHeaderValue="화면" rowNumVisible="true" rowNumWidth="60"
+                    scrollByColumn="false" style="" visibleRowNum="10" ev:oncellclick="scwin.grd_list_oncellclick">
+                    <w2:header id="header_list" style="">
+                        <w2:row id="row_listHead" style="">
+                            <w2:column displayMode="label" id="hSeq" inputType="text" value="적재 순번(실제)" width="120" sortable="true"></w2:column>
+                            <w2:column displayMode="label" id="hIsuNm" inputType="text" value="종목명" width="150" sortable="true"></w2:column>
+                            <w2:column displayMode="label" id="hRegion" inputType="text" value="지역" width="100" sortable="true"></w2:column>
+                            <w2:column displayMode="label" id="hTrdAmt" inputType="text" value="거래금액" width="150" sortable="true"></w2:column>
+                            <w2:column displayMode="label" id="hMemo" inputType="text" value="메모 (편집)" width="200"></w2:column>
+                        </w2:row>
+                    </w2:header>
+                    <w2:gBody id="gBody_list" style="">
+                        <w2:row id="row_listBody" style="">
+                            <w2:column id="seq" inputType="text" width="120" textAlign="center" readOnly="true"></w2:column>
+                            <w2:column id="isuNm" inputType="text" width="150" readOnly="true"></w2:column>
+                            <w2:column id="region" inputType="text" width="100" textAlign="center" readOnly="true"></w2:column>
+                            <w2:column id="trdAmt" inputType="text" width="150" textAlign="right" readOnly="true" dataType="number" displayFormat="#,###"></w2:column>
+                            <w2:column id="memo" inputType="text" width="200"></w2:column>
+                        </w2:row>
+                    </w2:gBody>
+                </w2:gridView>
+            </xf:group>
+            <w2:span id="spn_focus" label="" style="display:block;margin-top:8px;font-size:12px;color:#1c5dd9;"/>
+            <w2:span id="spn_event" label="" style="display:block;margin-top:4px;font-size:12px;color:#0a7a52;"/>
+            <w2:span id="spn_result" label="" style="display:block;margin-top:4px;font-size:12px;color:#c0392b;"/>
+            <w2:textbox class="txt_info" id="" label="왼쪽 「화면」 열은 그리드가 그리는 화면 행 번호(1부터), 「적재 순번」 은 실제 행 번호(0부터)입니다. 정렬·필터 뒤 행을 클릭해 [함정] 줄이 다른 종목명을 읽는지 확인하세요." style="" tagname=""></w2:textbox>
+        </xf:group>
+    </body>
+</html>
