@@ -58,6 +58,7 @@ conversion/conversion-front/ui/{화면ID}/
     {화면ID}.gfm          AS-IS 원본
     {화면ID}_API.txt|md   신규 API 명세 (txt 블록 형식 또는 md 머리글 형식)
     {화면ID}*.png         화면 캡처
+    {화면ID}.xml          퍼블리싱 파일 (있으면 §13.2 1단계 마크업 기준)
     {화면ID}.md           업무 분석 결과서 (이 가이드의 산출)
 conversion/conversion-front/ui-tobe/{화면ID}.xml   TO-BE 화면
 ```
@@ -69,7 +70,7 @@ conversion/conversion-front/ui-tobe/{화면ID}.xml   TO-BE 화면
 | AS-IS 원본 | `{폴더}/{화면ID}.gfm`·`.jsp` | 전 장 |
 | **신규 API 명세** | `{폴더}/{화면ID}_API.txt` 또는 `{화면ID}_API.md` | **§2.2 데이터 정의(키 이름·dataType), §5 서버 통신(경로·method·요청/응답 — AS-IS ↔ 명세 대응표), §1.4 흐름도의 서버 노드, §10 명세와 AS-IS 의 차이.** 이 화면ID 블록만 이 화면의 API 이고, 다른 화면ID 블록(부모·형제 화면)은 §1.1 호출 화면 설명에만 참고합니다 |
 | 화면 캡처 | `{폴더}/{화면ID}*.png` | §2.1 화면 구성, TO-BE 1단계 퍼블리싱(§13.2) |
-| KRX 퍼블리셔 XML | `conversion/publish/…/{화면ID}.xml` | §2.1 TO-BE 컴포넌트 종류·id, 부모 화면의 호출 규약(§1.1·§1.2) |
+| KRX 퍼블리셔 XML | **화면 폴더의 `{폴더}/{화면ID}.xml` 이 있으면 그것이 퍼블리싱 파일**(2026-10-28), 없으면 `conversion/publish/…/{화면ID}.xml` | §2.1 TO-BE 컴포넌트 종류·id, 부모 화면의 호출 규약(§1.1·§1.2) |
 | 부모·하위 화면 전환본 | `ui-tobe/`·`sample-front/ui/` 등 | §1.2·§1.3 호출·반환 규약 |
 
 * **API 명세가 있으면 분석 단계에서 이미 TO-BE 통신을 명세 기준으로 적습니다** — 전환 단계에서 처음 맞추면 §2.2·§5·§1.4 를 다시 써야 합니다. 명세 읽는 법과 적용 규칙은 §5 「API 명세 적용」입니다.
