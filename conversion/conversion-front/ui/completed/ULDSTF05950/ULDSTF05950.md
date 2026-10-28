@@ -84,7 +84,7 @@ flowchart TD
 | # | 단계 | 주체 | 내용 | 분기 · 메시지 | 관련 절 |
 |---|---|---|---|---|---|
 | 1 | 조회조건 기본값 | 화면 | `chkYn` Y, `basYymm` 서버 당월(원본 `fn_setYYYYMM`·`cGetToday`), `rghtTpCd` C | — | §3 |
-| 2 | init 바인딩 | 화면 | 단일 달력 3개 `checkCalendarFormat`, 기간 쌍 2개 `compareFromToDate`, `tbl_search` Enter → `btn_Search_onclick` | — | §3 |
+| 2 | init·탭 로드 바인딩 | 화면 | init: `tbl_search` Enter → `btn_Search_onclick`. 탭 로드(`MaxTab_01_ontabload`, 규칙 45): 단일 달력 3개 `checkCalendarFormat`, 기간 쌍 2개 `compareFromToDate` | — | §3 |
 | 3 | 탭1 표시 | 화면 | 안내문 탭1 문구, 체크박스 보임, 기준년월·분기·권리형태 숨김 | — | §6.2 |
 | 4 | 분기 콤보 | 서버 | `GET select-list-bas-yymm` → `dlt_listbasyymmdd` | 실패해도 계속(콤보만 빔) | §5.1 |
 | 5 | 목록 조회 | 서버 | 입력란 비우고 잠금 → `GET select-list-isu-lmt { chkYn }` | `skipped`·실패면 빈 목록 | §5.2 |
@@ -346,7 +346,7 @@ stateDiagram-v2
 `scwin.onpageload` 는 `scwin.init()` 만 부르고(try/catch + `handleError`), `scwin.init` 의 단계는 다음과 같다.
 
 1. **조회조건 기본값** — `dma_search.chkYn = "Y"`(원본 `chk_DelYn checked`), `basYymm = $c.date.getServerDateTime("yyyyMM")`(원본 `fn_setYYYYMM`: `cGetToday("yyyymmdd").substr(0,6)`), `rghtTpCd = "C"`(원본 `codevalue="C"`).
-2. **init 바인딩**(규칙 22·37) — 아래 표. 달력에 마크업 `ev:onviewchange` 는 없다(충돌 없음).
+2. **init·탭 로드 바인딩**(규칙 22·37·45) — 아래 표. 탭 밖 조회 영역은 `scwin.init`, 탭 본문 안 달력은 `scwin.MaxTab_01_ontabload`(탭마다 처음 그려질 때 한 번, 로드된 탭 index 로 분기 — 0 [상장제한종목]·1 [지수구성종목변동]·3 [심사서류첨부]·4 [기타안내]; 첫 탭은 init 보다 먼저 온다)에서 건다. 달력에 마크업 `ev:onviewchange` 는 없다(충돌 없음).
 
    | 대상 | 적용 |
    |---|---|

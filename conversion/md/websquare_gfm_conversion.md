@@ -583,6 +583,7 @@ scwin.btn_confirm_onclick = async function () {
 | AS-IS | WebSquare (sample-front 꼴) | 분석 시 확인할 것 |
 |---|---|---|
 | `$(document).ready` / `window.onload` | `scwin.onpageload` → `scwin.init` (하나로 통일) | `init` 안의 단계 순서 |
+| 로딩 때 탭 본문 안 컴포넌트 일괄 제어 (버튼 표시·달력/Enter 바인딩·열 설정) | tabControl `ev:ontabload="scwin.{탭}_ontabload"` 에서 `index`(또는 셋째 인자 tabs id)로 나눠 **그 탭 컴포넌트만** 제어 (규칙 45) | 탭 본문 `alwaysDraw`(기본 false 면 적용, true 면 init 유지), 첫 탭은 init 보다 먼저 로드 — init 상태 의존 금지, 탭 전환마다 할 일은 `onchange` |
 | JSP EL `${x}` / `<c:out>` | 진입 파라미터(`$c.data.getParameter`) 또는 조회 응답 | 서버가 넣던 값의 출처 |
 | `<form>` 필드 / `document.F.X.value` | `dma_*` 바인딩 컴포넌트 `getValue`/`setValue` | 필드 → 키 이름(camelCase) |
 | `<table>` + `<tr>` 문자열 빌드 | `w2:gridView` + `dlt_*` | 컬럼·표시 형식 |

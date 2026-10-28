@@ -83,14 +83,17 @@ AS-IS 는 `fn_GetPar` 를 바꿔 끼우고(되돌리지 않음) 팝업이 부모
 
 ```mermaid
 flowchart TD
-    S(["화면 열림<br/>scwin.onpageload"]) --> I["scwin.init"]
-    I --> U{"사용자구분 usrTpCd = 1 (운영자)?"}
+    S(["화면 열림"]) --> T["첫 탭 로드 — init 보다 먼저 (규칙 45)"]
+    T --> U{"tab_List_ontabload(0)<br/>사용자구분 usrTpCd = 1 (운영자)?"}
     U -- "예" --> U1["재마감처리 버튼 보임"]
     U -- "아니오" --> U2["재마감처리 버튼 숨김"]
-    U1 --> C["종목정보 기본 열<br/>scwin.applyIsuColumns('')"]
-    U2 --> C
-    C --> B["init 바인딩 1회<br/>checkCalendarFormat ×3 · setEnterKeyEvent"]
-    B --> L[["업무 2 [상장마감] 탭 조회"]]
+    U1 --> B["달력 바인딩 ×2<br/>edt_PrsntDd · edt_StrtDd"]
+    U2 --> B
+    T --> C["tab_ListCls_ontabload(0)<br/>종목정보 기본 열 scwin.applyIsuColumns('')"]
+    B --> I["scwin.onpageload → scwin.init"]
+    C --> I
+    I --> L[["업무 2 [상장마감] 탭 조회"]]
+    X(["[상장마감내역] 탭 첫 선택"]) --> X1["tab_List_ontabload(1)<br/>edt_BizClsDd 달력 · tbl_search Enter 키"]
     L --> E(["끝: 조회 대기"])
 ```
 
@@ -429,19 +432,14 @@ AS-IS 대문자 키 → 명세 키: `CLS_DD → clsDd`, `PRSNT_DD → prsntDd`, 
 
 ## 3. 로딩 (`gform onload` → `scwin.onpageload` → `scwin.init`)
 
-`scwin.onpageload` 는 `await scwin.init()` 만 하고 try/catch + `$c.exception.handleError` 로 감싼다. `scwin.init` 의 단계:
+`scwin.onpageload` 는 `await scwin.init()` 만 하고 try/catch + `$c.exception.handleError` 로 감싼다. 탭 본문(`alwaysDraw` 기본 false — 처음 선택될 때 그려짐) 안 컴포넌트 제어는 init 이 아니라 tabControl `ev:ontabload` 에서 로드된 탭 index 로 나눠 한다(규칙 45). 첫 탭(`selectedIndex="0"`)의 `ontabload` 는 tabControl 초기화 때 오므로 `scwin.init` 보다 먼저 실행된다.
 
-1. **재마감처리 버튼** — `$c.session.getUserInfo("usrTpCd") === "1"`(운영자)이면 `btn_ReClsProcs.show("")`, 아니면 `hide()` (AS-IS `js_usr_tp_cd == '1'` → `showObj`).
-2. **종목정보 기본 열** — §6.3 `scwin.applyIsuColumns("")`(AS-IS `fn_IntiIsuCol`, `vMktCd = ''`).
-3. **init 바인딩**(규칙 22·37, 한 번만):
-
-   | 대상 | 적용 |
-   |---|---|
-   | 단일 달력 `edt_PrsntDd`·`edt_StrtDd`(읽기전용 표시), `edt_BizClsDd`(입력) — 기간 쌍 없음 | `$c.date.checkCalendarFormat(cal, "yyyyMMdd")` ×3 |
-   | [상장마감내역] 조회 영역 `schbox` > `tbl_search`(조회 버튼 `btn_Search`) | `$c.win.setEnterKeyEvent(tbl_search, scwin.btn_Search_onclick)` |
-
-   마크업 `ev:onviewchange` 가 있는 달력은 없다.
-4. **[상장마감] 탭 조회** — `await scwin.loadClsTab()`(§6.1). AS-IS 는 비동기 데이터셋 이벤트 사슬(`dts_CheckCls OnLoadCompleted` → …)이었고 TO-BE 는 `await` 순서로 같은 순서를 만든다.
+1. **`scwin.tab_List_ontabload`** (탭마다 처음 한 번)
+   * index 0 [상장마감]: **재마감처리 버튼** — `$c.session.getUserInfo("usrTpCd") === "1"`(운영자)이면 `btn_ReClsProcs.show("")`, 아니면 `hide()` (AS-IS `js_usr_tp_cd == '1'` → `showObj`). 단일 달력 `edt_PrsntDd`·`edt_StrtDd`(읽기전용 표시) `$c.date.checkCalendarFormat(cal, "yyyyMMdd")`(규칙 37).
+   * index 1 [상장마감내역]: 단일 달력 `edt_BizClsDd`(입력) `checkCalendarFormat`, 조회 영역 `schbox` > `tbl_search`(조회 버튼 `btn_Search`) `$c.win.setEnterKeyEvent(tbl_search, scwin.btn_Search_onclick)`(규칙 22).
+   * 기간 쌍 없음. 마크업 `ev:onviewchange` 가 있는 달력은 없다.
+2. **`scwin.tab_ListCls_ontabload`** — index 0 [조치내역]: **종목정보 기본 열** §6.3 `scwin.applyIsuColumns("")`(AS-IS `fn_IntiIsuCol`, `vMktCd = ''`). `grd_IsuList` 가 안쪽 탭 본문에 있어 가장 안쪽 tabControl 에서 한다.
+3. **`scwin.init`** — **[상장마감] 탭 조회**: `await scwin.loadClsTab()`(§6.1). AS-IS 는 비동기 데이터셋 이벤트 사슬(`dts_CheckCls OnLoadCompleted` → …)이었고 TO-BE 는 `await` 순서로 같은 순서를 만든다.
 
 - AS-IS 의 `tab_*.ActiveIndex = 1`(1-base)은 마크업 `selectedIndex="0"` 으로, `BnsPanelToGroupBox` 7회는 퍼블리싱 그룹으로, `dts_Temp` 준비는 `dma_save` 로 대신한다.
 
@@ -858,7 +856,7 @@ getPar/setPar 계약은 §6.11·§6.12 에서 `openPopup` data 로 바꿨다(가
 | `tab_*.ActiveIndex = 1` | 마크업 `selectedIndex="0"` |
 | `BnsPanelToGroupBox(…)` 7회 | 삭제 — 퍼블리싱 그룹 |
 | `dts_Temp.SetDataHeader`·`AddRow` | 삭제 — `dma_save` |
-| (없음) | `$c.date.checkCalendarFormat` ×3, `$c.win.setEnterKeyEvent(tbl_search, scwin.btn_Search_onclick)` (규칙 22·37) |
+| (없음) | `$c.date.checkCalendarFormat` ×3, `$c.win.setEnterKeyEvent(tbl_search, scwin.btn_Search_onclick)` (규칙 22·37) — 탭 로드 `scwin.tab_List_ontabload` 에서 (규칙 45) |
 | `processGp` 전역 + `dts_CheckCls OnLoadCompleted` 분기 | `scwin.loadClsTab`(1) / `scwin.searchClsEndTab`(2) |
 | `fn_SearchClsDd` | `scwin.searchClsDd` (§5.1) |
 | `fn_SearchCls` + `dts_MktList OnLoadCompleted`(1) / `OnLoadError` | `scwin.searchCls` (§5.2) |

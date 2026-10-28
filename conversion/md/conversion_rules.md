@@ -352,7 +352,7 @@ $c.win.setEnterKeyEvent(tbl_search, scwin.btn_search_onclick);
 
     1. **첫 인자 = 영역 그룹 id** — `schbox` 그룹 또는 그 안의 표 그룹 id(원형 대소문자 그대로). 영역에 id 가 하나도 없으면 안쪽 표 그룹에 `id="tbl_search"` 를 붙입니다(마크업 보강 — 퍼블리싱 1단계에서 붙이는 것이 원칙).
     2. **두 번째 인자 = 그 영역 조회 버튼의 실제 `ev:onclick` 핸들러**(`scwin.btn_search_onclick`, `scwin.btn_Search_onclick` 등). 종전 기본값 `scwin.btn_Search_onclick` 고정은 폐기합니다.
-    3. **삽입 위치**: `scwin.init` 의 화면 상태 단계(공통 코드·기본값 다음, 초기 조회 앞). 초기화 버튼과 공유하는 5구역 함수(`scwin.resetForm` 등)에 두지 않습니다 — 재호출될 때마다 onkeyup 이 겹쳐 걸립니다.
+    3. **삽입 위치**: `scwin.init` 의 화면 상태 단계(공통 코드·기본값 다음, 초기 조회 앞). 초기화 버튼과 공유하는 5구역 함수(`scwin.resetForm` 등)에 두지 않습니다 — 재호출될 때마다 onkeyup 이 겹쳐 걸립니다. 탭 본문 안의 조회 영역은 그 tabControl 의 `ontabload` 분기에 둡니다(규칙 45).
 * **유의사항**:
     * 영역이 둘 이상이면(탭별 조회 등) 영역마다 한 줄. 같은 바인딩이 이미 있으면 추가하지 않습니다(멱등).
     * 원본의 `onkeyup`/`onkeypress` `keyCode == 13` 조회 처리는 이 한 줄로 대체하고 지웁니다.
@@ -829,7 +829,7 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
 * **포맷**: 둘째 인자 `"yyyyMMdd"` 는 컴포넌트 `getValue()` 의 ioFormat 입니다(displayFormat 아님). ioFormat 을 바꾼 달력만 그 포맷을 넘깁니다. `compareFromToDate` 는 포맷을 생략해도 실존 날짜 검사를 합니다.
 * **한 달력에 하나만**: 두 함수 모두 `unbind("onviewchange")` 뒤 `bind` 하므로, 기간 쌍 달력에 `checkCalendarFormat` 을 같이 걸면 나중 호출이 앞 바인딩을 지웁니다 → 기간 쌍은 `compareFromToDate` 만 둡니다.
 * **마크업 `ev:onviewchange` 와 충돌**: 같은 이유로 init 바인딩이 마크업 핸들러를 지웁니다. 달력에 `ev:onviewchange` 업무 로직이 있으면 그 로직을 다른 이벤트(`onchange` 등)로 옮기거나 바인딩 뒤 재연결을 단계 2 에서 정합니다.
-* **삽입 위치**: `scwin.init` 의 화면 상태 단계. 반복 호출되는 5구역 함수에 두지 않습니다(호출할 때마다 재바인딩 — 동작은 같지만 init 1회 원칙). 필수 여부·조회 시점 기간 검사는 이 규칙이 아니라 `validateDataCollect`(규칙 24)의 몫입니다.
+* **삽입 위치**: `scwin.init` 의 화면 상태 단계. 반복 호출되는 5구역 함수에 두지 않습니다(호출할 때마다 재바인딩 — 동작은 같지만 init 1회 원칙). 단, 탭 본문(`alwaysDraw` 기본) 안의 달력은 그 tabControl 의 `ontabload` 분기에 둡니다(규칙 45). 필수 여부·조회 시점 기간 검사는 이 규칙이 아니라 `validateDataCollect`(규칙 24)의 몫입니다.
 * **제외**: 날짜형이 아닌 달력(`yearMonthDateTimeSec` 등)·그리드 컬럼 달력(`inputType="calendar"`) — 검사 도구가 INFO 로만 알립니다.
 * **검사**: `init_binding_check.py` — B01(단일 미적용)·B02(기간 미적용·순서 뒤바뀜)·B04(기간 쌍에 단일 검사 중복)·B06(init 밖)·B07(마크업 onviewchange 충돌). 테스트 `test_init_binding_check.py`.
 * **적용 현황**(2026-10-27 실측, 도구 기준): conversion-front 3본 중 1본(ULDSTF05621 기간 쌍) 보정. sample-front/ui 46본 중 15본, jsp-front ui-tobe 1,677본 중 343본(B01 370·B02 265·B03 81·B04 132 — B04 는 공급사 r13 `init_datefmt_*` 가 기간 쌍에도 단일 검사를 거는 것)이 미적용 — 각 모듈 재전환 때 반영합니다.
@@ -1068,6 +1068,55 @@ gridview : "grd_list|focus",
 * 여러 그리드면 쉼표로 이은 id 목록만 쓴다(`"grd_a,grd_b"`). 객체 형태(`gridview : { … }`)도 요청이 있을 때만.
 * 규칙 6 보충의 `gridview` 자동 매핑(역추적)도 추출한 **id 만** 넣는다.
 * **적용 현황**(2026-10-28, conversion-front TO-BE): 6곳 중 5곳은 id 만(ULDBNS30400 3·ULDSTF05621 1·ULDSTF05911 1). **ULDBNF45000 `scwin.searchList` 의 `"grd_bdchrgList|message"` 1곳**이 규칙과 다르다 — 리뷰 권고로 붙인 것이라 요청 근거가 없으면 다음 갱신 때 id 만으로 바꾸고 결과서 §5.1 후처리 문구도 고친다. sample-front/ui 접미사 9곳(97곳 중)은 샘플 갱신 때.
+
+### 규칙 45: tabControl 안 컴포넌트 제어는 `ontabload` 에서 — 탭 index(또는 tabs id)로 나눠 그 탭 컴포넌트만 (2026-10-28 신설, 사용자 지시)
+
+* **AS-IS**: `scwin.onpageload`(→ `scwin.init`) 에서 탭 본문 안의 컴포넌트 제어를 한꺼번에 부른다 — 버튼 `show`/`hide`·달력 검사 바인딩(규칙 37)·Enter 키 바인딩(규칙 22)·그리드 열 설정 등.
+* **TO-BE**: 해당 tabControl 의 **`ev:ontabload`** 핸들러에서 부른다. 탭이 로드될 때 엔진이 넘기는 **`index`(또는 tabs id)** 를 조건으로 나눠, **로드된 그 탭에 속한 컴포넌트만** 제어한다.
+
+```xml
+<w2:tabControl id="tab_List" ev:onchange="scwin.tab_List_onchange" ev:ontabload="scwin.tab_List_ontabload" ...>
+```
+
+```javascript
+/**
+ * @method
+ * @name scwin.tab_List_ontabload
+ * @description 탭 로드 — 처음 그려진 탭의 컴포넌트만 제어한다(규칙 45).
+ * @param {String} tabId 엔진 탭 id("{tabControl id}_tab_{tabs id}")
+ * @param {Number} index 로드된 탭 index
+ * @param {String} userTabId w2:tabs id
+ * @returns
+ * @hidden N
+ */
+scwin.tab_List_ontabload = async function (tabId, index, userTabId) {
+    try {
+        if (index === 0) {            // [상장마감]
+            $c.date.checkCalendarFormat(edt_PrsntDd, "yyyyMMdd");
+        } else if (index === 1) {     // [상장마감내역]
+            $c.date.checkCalendarFormat(edt_BizClsDd, "yyyyMMdd");
+            $c.win.setEnterKeyEvent(tbl_search, scwin.btn_Search_onclick);
+        }
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "{화면ID}.tab_List_ontabload" });
+    }
+};
+```
+
+* **엔진 동작**(websquare-engine 소스 판독)
+    * 호출: `fireEvent(tabControl, "ontabload", tabID, index, userTabID)`(123459행 부근). **첫 인자 `tabID` 는 엔진 합성 id `"{tabControl id}_tab_{tabs id}"`**(예: `tab_List_tab_pnl_Item`, `makeTabArray` 122528행) — `<w2:tabs id>` 와 비교하려면 **셋째 인자 `userTabID`** 를 쓴다. 조건은 `index`(숫자) 를 기본으로 한다.
+    * 탭 본문은 `alwaysDraw` 기본값 `false` 라 **처음 선택될 때 한 번** 그려지고, 그때 `ontabload` 가 한 번 발화한다(이후 전환은 다시 그리지 않음 — `setActiveTab` 123383행 `m.render` 분기). 그래서 그려지지 않은 탭의 컴포넌트는 `onpageload` 시점에 아직 없다 — 이 규칙의 이유다.
+    * 처음 선택된 탭(`selectedIndex`)은 tabControl 초기화(`setActiveTab(this.options.selectedIndex)`, 123090행)에서 그려지므로 **그 탭의 `ontabload` 는 `onpageload`(`scwin.init`) 보다 먼저** 온다. 핸들러 정의는 `scriptPrecedence=true`(websquare/config.xml) 라 이미 있다.
+    * `alwaysDraw="true"` 본문(인라인)은 처음부터 모두 그려지고 `ontabload` 가 발화하지 않는다 → **예외: 기존처럼 `scwin.init` 에 둔다**(ULDSTF08200).
+* **지킬 것**
+    1. 핸들러 이름은 `scwin.{tabControl id}_ontabload`(규칙 3), 3구역(컴포넌트 이벤트)에 두고 `publicInfo` 에 올린다. 진입점이라 규칙 26 try/catch 를 씌운다.
+    2. 각 분기에는 **그 탭 본문 안의 컴포넌트만** 넣는다. 탭 밖(조회 영역·상단 버튼)은 `scwin.init` 에 남긴다. 중첩 탭 안의 컴포넌트는 **가장 안쪽 tabControl** 의 `ontabload` 에 둔다(바깥 탭 로드 시점에 안쪽 탭 본문이 다 그려졌다고 가정하지 않는다).
+    3. 첫 탭 분기는 `scwin.init` 보다 먼저 실행되므로 **init 이 만든 상태(전역 변수·조회 결과)에 기대지 않는다** — 세션 정보·마크업 값·dataList 정의만 쓴다. init 상태가 필요한 제어는 init 에 두거나 init 뒤 함수로 뺀다.
+    4. `ontabload` 는 탭마다 한 번이다 → 바인딩(규칙 22·37)의 "1회" 원칙과 맞는다. **탭을 바꿀 때마다** 할 일(재조회·값 초기화)은 `ev:onchange` 에 둔다 — `ontabload` 로 옮기지 않는다.
+    5. 통신(조회)은 이 규칙의 대상이 아니다 — 첫 화면 조회는 `scwin.init`, 탭 전환 조회는 `onchange` 그대로.
+    6. 실화면 확인 항목: 첫 탭 `ontabload` 가 `onpageload` 보다 먼저 오는지, 탭 전환 시 다시 오지 않는지 — 첫 적용 화면에서 확인한다(이 리포는 엔진 실렌더 불가, 소스 판독 기준).
+* **규칙 22·37 과의 관계**: 탭 본문 안 달력·`schbox`/`tbl_search` 의 init 바인딩은 `scwin.init` 대신 이 규칙의 `ontabload` 분기에서 건다(바인딩 형태는 22·37 그대로).
+* **적용 현황**(2026-10-28, conversion-front TO-BE): `alwaysDraw` 기본(lazy) 탭이 있는 4본 중 init 이 탭 안 컴포넌트를 건드리던 **ULDBNS30300**(`tab_List` 0: 재마감 버튼·달력 2 / 1: 달력 1·Enter 키, `tab_ListCls` 0: 종목정보 열 초기화)·**ULDSTF05950**(`MaxTab_01` 0·1·3·4: 달력 바인딩) 적용 완료. ULDBNS30400 은 해당 없음, ULDSTF08200 은 `alwaysDraw="true"` 예외. sample-front·jsp-front 는 각 모듈 재전환 때.
 
 ## 규칙 6 보충: Submission 변환 상세
 

@@ -435,7 +435,7 @@
 			<w2:workflowCollection />
 		</xf:model>
 		<w2:layoutInfo />
-		<w2:publicInfo method="scwin.onpageload,scwin.onpageunload,scwin.init,scwin.tab_List_onchange,scwin.grd_MktList_oncellclick,scwin.grd_MktList_onrowindexchange,scwin.grd_SendList_oncellclick,scwin.btn_Excel_onclick,scwin.btn_ReClsProcs_onclick,scwin.btn_SendCfm_onclick,scwin.btn_ClsProcs_onclick,scwin.btn_MktFileConfrm_onclick,scwin.btn_Search_onclick,scwin.grd_MktList1_oncellclick,scwin.grd_MktList1_onrowindexchange,scwin.grd_IsuList1_oncelldblclick,scwin.grd_SendList1_oncellclick,scwin.btn_Excel1_onclick,scwin.searchClsDd,scwin.searchCls,scwin.searchClsDtl,scwin.searchSendData,scwin.searchMktackDtl,scwin.searchKorChk,scwin.searchChkProc,scwin.searchDupIsu,scwin.procSend,scwin.procCls,scwin.procReCls,scwin.searchClsEnd,scwin.searchClsEndDtl,scwin.searchSendData1,scwin.searchClsSendInfo,scwin.searchMktackDtl1,scwin.getSearchData,scwin.setSaveData,scwin.afterProc,scwin.loadClsTab,scwin.selectClsMkt,scwin.searchClsEndTab,scwin.selectClsEndMkt,scwin.applyIsuColumns,scwin.sendCfm,scwin.clsProcs,scwin.reClsProcs,scwin.excelDown,scwin.openMktFilePopup,scwin.openIsuDtlPopup" />
+		<w2:publicInfo method="scwin.onpageload,scwin.onpageunload,scwin.init,scwin.tab_List_onchange,scwin.tab_List_ontabload,scwin.tab_ListCls_ontabload,scwin.grd_MktList_oncellclick,scwin.grd_MktList_onrowindexchange,scwin.grd_SendList_oncellclick,scwin.btn_Excel_onclick,scwin.btn_ReClsProcs_onclick,scwin.btn_SendCfm_onclick,scwin.btn_ClsProcs_onclick,scwin.btn_MktFileConfrm_onclick,scwin.btn_Search_onclick,scwin.grd_MktList1_oncellclick,scwin.grd_MktList1_onrowindexchange,scwin.grd_IsuList1_oncelldblclick,scwin.grd_SendList1_oncellclick,scwin.btn_Excel1_onclick,scwin.searchClsDd,scwin.searchCls,scwin.searchClsDtl,scwin.searchSendData,scwin.searchMktackDtl,scwin.searchKorChk,scwin.searchChkProc,scwin.searchDupIsu,scwin.procSend,scwin.procCls,scwin.procReCls,scwin.searchClsEnd,scwin.searchClsEndDtl,scwin.searchSendData1,scwin.searchClsSendInfo,scwin.searchMktackDtl1,scwin.getSearchData,scwin.setSaveData,scwin.afterProc,scwin.loadClsTab,scwin.selectClsMkt,scwin.searchClsEndTab,scwin.selectClsEndMkt,scwin.applyIsuColumns,scwin.sendCfm,scwin.clsProcs,scwin.reClsProcs,scwin.excelDown,scwin.openMktFilePopup,scwin.openIsuDtlPopup" />
 		<script lazy="false" type="text/javascript"><![CDATA[
 ///////// 1. 변수 및 선언 영역 /////////
 // 원본 : ULDBNS30300.gfm (채권 마감관리 > 채권상장마감)
@@ -553,28 +553,12 @@ scwin.onpageunload = function () {
  * @name scwin.init
  * @author Inswave
  * @date 2026. 10. 28
- * @description 로딩 — 재마감처리 버튼 권한 → 종목정보 열 초기화 → init 바인딩(규칙 22·37) → [상장마감] 탭 조회. (원본 gform onload — §3)
+ * @description 로딩 — [상장마감] 탭 조회. 탭 본문 안 컴포넌트 제어(재마감처리 버튼 권한·종목정보 열 초기화·달력/Enter 키 바인딩)는 탭 로드 때 scwin.tab_List_ontabload·scwin.tab_ListCls_ontabload 가 한다(규칙 45). (원본 gform onload — §3)
  * @returns
  * @hidden N
  */
 scwin.init = async function () {
-    // 1) 재마감처리 버튼 — 운영자(사용자구분 1)만 (원본 js_usr_tp_cd == '1' → showObj)
-    if (String($c.session.getUserInfo("usrTpCd") ?? "") === "1") {
-        btn_ReClsProcs.show("");
-    } else {
-        btn_ReClsProcs.hide();
-    }
-
-    // 2) 조치내역 종목정보 열 — 기본(신규상장) 열 (원본 fn_IntiIsuCol, vMktCd = '')
-    scwin.applyIsuColumns("");
-
-    // 3) init 바인딩(1회) — 단일 달력 3개(기간 쌍 없음), [상장마감내역] 조회 영역 Enter 키
-    $c.date.checkCalendarFormat(edt_PrsntDd, "yyyyMMdd");
-    $c.date.checkCalendarFormat(edt_StrtDd, "yyyyMMdd");
-    $c.date.checkCalendarFormat(edt_BizClsDd, "yyyyMMdd");
-    $c.win.setEnterKeyEvent(tbl_search, scwin.btn_Search_onclick);
-
-    // 4) [상장마감] 탭 조회 (원본 processGp = '1'; fn_SearchClsDd(''))
+    // [상장마감] 탭 조회 (원본 processGp = '1'; fn_SearchClsDd(''))
     await scwin.loadClsTab();
 };
 
@@ -602,6 +586,62 @@ scwin.tab_List_onchange = async function (tabId, index) {
         }
     } catch (ex) {
         await $c.exception.handleError(ex, { context : "ULDBNS30300.tab_List_onchange" });
+    }
+};
+
+/**
+ * @method
+ * @name scwin.tab_List_ontabload
+ * @author Inswave
+ * @date 2026. 10. 28
+ * @description 상위 탭 로드(탭마다 처음 그려질 때 한 번) — 로드된 탭 본문의 컴포넌트만 제어한다. [상장마감] 재마감처리 버튼 권한·달력 2개, [상장마감내역] 달력·조회 영역 Enter 키(규칙 22·37·45). 첫 탭은 scwin.init 보다 먼저 온다. (원본 gform onload — §3)
+ * @param {String} tabId 엔진 탭 id ("tab_List_tab_{tabs id}")
+ * @param {Number} index 로드된 탭 index
+ * @param {String} userTabId w2:tabs id
+ * @returns
+ * @hidden N
+ */
+scwin.tab_List_ontabload = async function (tabId, index, userTabId) {
+    try {
+        if (index === 0) {
+            // [상장마감] 재마감처리 버튼 — 운영자(사용자구분 1)만 (원본 js_usr_tp_cd == '1' → showObj)
+            if (String($c.session.getUserInfo("usrTpCd") ?? "") === "1") {
+                btn_ReClsProcs.show("");
+            } else {
+                btn_ReClsProcs.hide();
+            }
+            // 단일 달력 2개(기간 쌍 없음)
+            $c.date.checkCalendarFormat(edt_PrsntDd, "yyyyMMdd");
+            $c.date.checkCalendarFormat(edt_StrtDd, "yyyyMMdd");
+        } else if (index === 1) {
+            // [상장마감내역] 단일 달력, 조회 영역 Enter 키
+            $c.date.checkCalendarFormat(edt_BizClsDd, "yyyyMMdd");
+            $c.win.setEnterKeyEvent(tbl_search, scwin.btn_Search_onclick);
+        }
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDBNS30300.tab_List_ontabload" });
+    }
+};
+
+/**
+ * @method
+ * @name scwin.tab_ListCls_ontabload
+ * @author Inswave
+ * @date 2026. 10. 28
+ * @description [상장마감] 하위 탭 로드 — [조치내역] 종목정보 열을 기본(신규상장) 열로 둔다(규칙 45). (원본 fn_IntiIsuCol, vMktCd = '' — §3)
+ * @param {String} tabId 엔진 탭 id ("tab_ListCls_tab_{tabs id}")
+ * @param {Number} index 로드된 탭 index
+ * @param {String} userTabId w2:tabs id
+ * @returns
+ * @hidden N
+ */
+scwin.tab_ListCls_ontabload = async function (tabId, index, userTabId) {
+    try {
+        if (index === 0) {
+            scwin.applyIsuColumns("");
+        }
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDBNS30300.tab_ListCls_ontabload" });
     }
 };
 
@@ -1768,7 +1808,7 @@ scwin.openIsuDtlPopup = async function (row) {
 			style="">
 			<w2:pageFrame src="/cm/xml/contentHeader.xml" style="" id="pfmContentHeader"></w2:pageFrame>
 			<xf:group id="" class="tbcbox">
-				<w2:tabControl id="tab_List" ev:onchange="scwin.tab_List_onchange"
+				<w2:tabControl id="tab_List" ev:onchange="scwin.tab_List_onchange" ev:ontabload="scwin.tab_List_ontabload"
 				 style="" selectedIndex="0"
 					class="tbc" useMoveNextTabFocus="false" confirmTrueAction="exist" useConfirmMessage="false" confirmFalseAction="new">
 					<w2:tabs label="상장마감" id="pnl_Item" style="" />
@@ -1840,7 +1880,7 @@ scwin.openIsuDtlPopup = async function (row) {
 								</xf:group>
 								<xf:group class="tbcbox" id="">
 								<w2:tabControl class="tbc" confirmFalseAction="new" confirmTrueAction="exist"
-								 id="tab_ListCls" selectedIndex="0" style="" useConfirmMessage="false"
+								 id="tab_ListCls" selectedIndex="0" style="" useConfirmMessage="false" ev:ontabload="scwin.tab_ListCls_ontabload"
 									useMoveNextTabFocus="false">
 									<w2:tabs id="pnl_ClsDtl" label="조치내역" style=""></w2:tabs>
 									<w2:tabs id="pnl_SendDtl" label="전송내역" style=""></w2:tabs>

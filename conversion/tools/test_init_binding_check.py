@@ -124,6 +124,19 @@ def test_binding_outside_init_warns(tmp_path):
     assert f == [] and w == ["B06"]
 
 
+def test_binding_in_tab_ontabload_counts(tmp_path):
+    # 규칙 45 — 탭 본문 안 달력은 tabControl ev:ontabload 핸들러에서 바인딩
+    tab = ('<w2:tabControl id="tab_main" ev:ontabload="scwin.tab_main_ontabload">'
+           '<w2:tabs id="tab1" label="1" /><w2:content id="tab1_01">' + SINGLE + '</w2:content></w2:tabControl>')
+    extra = ('scwin.tab_main_ontabload = async function (tabId, index, userTabId) {\n'
+             '    if (index === 0) {\n        $c.date.checkCalendarFormat(cal_applDd, "yyyyMMdd");\n    }\n};\n')
+    f, w, _i, _ = _run(tmp_path, tab, "", extra)
+    assert f == [] and w == []
+    # ontabload 를 마크업에 걸지 않으면 init 밖 함수
+    f, w, _i, _ = _run(tmp_path, tab.replace(' ev:ontabload="scwin.tab_main_ontabload"', ""), "", extra)
+    assert f == [] and w == ["B06"]
+
+
 def test_commented_binding_does_not_count(tmp_path):
     f, _w, _i, _ = _run(tmp_path, SINGLE, '    // $c.date.checkCalendarFormat(cal_applDd, "yyyyMMdd");')
     assert f == ["B01"]

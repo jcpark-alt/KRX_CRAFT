@@ -5,6 +5,7 @@
 
 전환 규칙 22(조회 영역 Enter 키)·37(달력 init 바인딩) 의 검사 도구다. 마크업(body)에서 대상을 찾고,
 스크립트의 `scwin.init`(없으면 `scwin.onpageload`) 와 그 함수가 부르는 scwin 함수(재귀) 안에 아래 호출이 있는지 본다.
+tabControl `ev:ontabload` 핸들러도 init 과 같은 출발점으로 본다(규칙 45 — 탭 본문 안 컴포넌트는 탭 로드 때 바인딩).
 
   단일 달력   : $c.date.checkCalendarFormat(cal, "yyyyMMdd");
   기간 달력   : $c.date.compareFromToDate(calStart, calEnd, ["시작 명칭", "종료 명칭"]);
@@ -23,7 +24,7 @@
   B03 FAIL  조회 영역에 setEnterKeyEvent 없음(영역·하위 그룹에 id 가 없으면 id 부여 필요)
   B04 FAIL  기간 쌍 달력에 checkCalendarFormat 도 걸림 — 두 함수 모두 onviewchange 를 unbind 후 bind 하므로 나중 호출이 앞 바인딩을 지운다
   B05 WARN  setEnterKeyEvent 의 핸들러가 영역 조회 버튼의 ev:onclick 과 다름 / 조회 버튼에 ev:onclick 없음
-  B06 WARN  바인딩이 init 밖(init 에서 닿지 않는 함수)에만 있음
+  B06 WARN  바인딩이 init 밖(init·ontabload 에서 닿지 않는 함수)에만 있음
   B07 WARN  마크업에 ev:onviewchange 가 있는 달력 — init 바인딩의 unbind 가 그 핸들러를 지운다(바인딩 콜백 안으로 옮길 것)
   B08 INFO  날짜형이 아닌 달력(검사 생략)
 종료 코드: FAIL 0건이면 0(--warn-only 면 항상 0).
@@ -133,11 +134,11 @@ def find_search_areas(root):
     return areas
 
 
-def _reachable(script, code):
-    """init(없으면 onpageload)에서 닿는 scwin 함수 이름 집합과 함수 spans."""
+def _reachable(script, code, extra_roots=()):
+    """init(없으면 onpageload)·extra_roots(ontabload 핸들러)에서 닿는 scwin 함수 이름 집합과 함수 spans."""
     spans = st.func_spans(script)
     bodies = {name: code[b:e] for name, _s, b, e, _a in spans}
-    roots = [n for n in ("init", "onpageload") if n in bodies]
+    roots = [n for n in ("init", "onpageload") if n in bodies] + [n for n in extra_roots if n in bodies]
     seen, todo = set(), list(roots)
     while todo:
         n = todo.pop()
@@ -155,10 +156,20 @@ def _owner(spans, pos):
     return None
 
 
-def extract_calls(script):
+def find_tabload_handlers(root):
+    """→ tabControl `ev:ontabload` 가 가리키는 scwin 함수 이름 목록(규칙 45)."""
+    out = []
+    for tc in root.iter("{%s}tabControl" % W2):
+        m = re.match(r"\s*scwin\.(\w+)\s*$", tc.get("{%s}ontabload" % EV) or "")
+        if m:
+            out.append(m.group(1))
+    return out
+
+
+def extract_calls(script, extra_roots=()):
     """→ {"ccf": [(id, owner)], "cft": [(start, end, owner)], "enter": [(grp, handler, owner)]}."""
     code = st.without_comments(script)
-    _seen, spans = _reachable(script, code)
+    _seen, spans = _reachable(script, code, extra_roots)
     out = {"ccf": [], "cft": [], "enter": []}
     for m in re.finditer(r"\$c\.date\.checkCalendarFormat\(\s*[\"']?(\w+)", code):
         out["ccf"].append((m.group(1), _owner(spans, m.start())))
@@ -174,7 +185,7 @@ def check(xml_path):
     raw, _eol, reg = st.read_xml(xml_path)
     root = etree.fromstring(raw.encode("utf-8"), etree.XMLParser(strip_cdata=False, recover=True))
     script = reg["script"] if reg else ""
-    calls, reach = extract_calls(script)
+    calls, reach = extract_calls(script, find_tabload_handlers(root))
 
     fails, warns, infos = [], [], []
     dates, others = find_calendars(root)
