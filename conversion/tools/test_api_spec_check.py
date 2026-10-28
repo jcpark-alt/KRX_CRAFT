@@ -339,3 +339,41 @@ def test_multi_screen_block_unused_is_a03(tmp_path):
     x.write_text(DOC.format(script='scwin.a = function () { const o = { method : "get", action : "/api/x/print" }; };'), encoding="utf-8")
     codes = [c for c, _ in ac.check(str(x))[0]]
     assert codes == ["A03"]                             # 묶음 블록의 select-one 을 부르지 않음
+
+
+def test_screens_of_range_and_comma_heads():
+    # 공유 명세 머리글: `[A~B]` 범위(뒤쪽 숫자 꼬리 약식 포함)·`[A, B]` 쉼표 묶음(2026-10-28 ULDSTF08301~08305)
+    assert ac.screens_of({"screen": "ULDSTF08301~08305"}) == [f"ULDSTF0830{n}" for n in range(1, 6)]
+    assert ac.screens_of({"screen": "ULDSTF08301~305"}) == [f"ULDSTF0830{n}" for n in range(1, 6)]
+    assert ac.screens_of({"screen": "ULDSTF08304, ULDSTF08305"}) == ["ULDSTF08304", "ULDSTF08305"]
+    apis = ac.parse_spec("## 1. [ULDSTF08301~08305][업무][제목]\n* **TO-BE** : `GET /api/x/select-one`\n"
+                         "## 2. [ULDSTF08304, ULDSTF08305][업무][제목]\n* **TO-BE** : `GET /api/x/select-fst`\n", "md")
+    assert [a["path"] for a in apis] == ["/api/x/select-one", "/api/x/select-fst"]
+    assert "ULDSTF08303" in ac.screens_of(apis[0]) and "ULDSTF08303" not in ac.screens_of(apis[1])
+
+
+def test_head_without_system_prefix_is_same_screen():
+    # 명세 머리에 시스템 접두 없이 `[STF08200]` 으로 적혀도 ULDSTF08200 의 블록(2026-10-28) — 아니면 조용히 A06 처리돼 대조가 빠진다
+    api = {"screen": "STF08200"}
+    assert ac.is_screen_of(api, "ULDSTF08200")
+    assert not ac.is_screen_of(api, "ULDSTF08201")
+    assert not ac.is_screen_of({"screen": "ULDSTF08200"}, "XXXSTF08200")
+    assert ac.is_screen_of({"screen": "ULDSTF08301~08305"}, "ULDSTF08303")
+
+
+def test_md_first_block_without_hash_heading():
+    # md 명세 첫 블록이 `## 1.` 없이 `[화면ID][…]` 로 시작해도 첫 블록으로 읽는다(2026-10-28 ULDSTF05950) — 중간의 `[` 줄은 여전히 무시
+    text = ("[ULDTST00001][업무][콤보 조회]\n* **TO-BE** : get /api/x/select-combo\n"
+            "## 2. [ULDTST00001][업무][목록 조회]\n* **TO-BE** : `GET /api/x/select-list`\n"
+            "```\n[ULDTST00009][코드 블록 안]\nGET /api/x/not-a-block\n```\n")
+    apis = ac.parse_spec(text, "md")
+    assert [a["path"] for a in apis] == ["/api/x/select-combo", "/api/x/select-list"]
+
+
+def test_md_first_block_without_hash_heading():
+    # md 명세 첫 블록이 `## 1.` 없이 `[화면ID][…]` 로 시작해도 첫 블록으로 읽는다(2026-10-28 ULDSTF05950) — 중간의 `[` 줄은 여전히 무시
+    text = ("[ULDTST00001][업무][콤보 조회]\n* **TO-BE** : get /api/x/select-combo\n"
+            "## 2. [ULDTST00001][업무][목록 조회]\n* **TO-BE** : `GET /api/x/select-list`\n"
+            "```\n[ULDTST00009][코드 블록 안]\nGET /api/x/not-a-block\n```\n")
+    apis = ac.parse_spec(text, "md")
+    assert [a["path"] for a in apis] == ["/api/x/select-combo", "/api/x/select-list"]

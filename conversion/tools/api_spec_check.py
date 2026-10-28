@@ -52,18 +52,45 @@ sys.path.insert(0, str(_HERE))
 import screen_tools as st  # noqa: E402
 
 METHOD_LINE = re.compile(r"^\s*(GET|POST|PUT|DELETE|PATCH)\s+(\S+)", re.I)
-# 화면ID 는 하나(`[ULDSTF05621]`) 또는 `/` 로 묶은 여러 개(`[ULDSTF05710/ULDSTF05801]` — 여러 화면이 같이 쓰는 API)
-BLOCK_HEAD = re.compile(r"^\s*\[([A-Za-z0-9_]+(?:\s*/\s*[A-Za-z0-9_]+)*)\]")
+# 화면ID 는 하나(`[ULDSTF05621]`) 또는 `/`·`,` 로 묶은 여러 개(`[ULDSTF05710/ULDSTF05801]`·`[ULDSTF08304, ULDSTF08305]` — 여러 화면이 같이 쓰는 API),
+# 또는 `~` 범위(`[ULDSTF08301~08305]` — 뒤쪽은 숫자 꼬리만 적어도 됨, 2026-10-28)
+BLOCK_HEAD = re.compile(r"^\s*\[([A-Za-z0-9_]+(?:\s*[/,~]\s*[A-Za-z0-9_]+)*)\]")
 # md 명세: `## 1. [화면ID][…]` 머리글, `* **TO-BE** : `GET /api/…`` 줄
-MD_BLOCK_HEAD = re.compile(r"^\s*#{1,6}\s*(?:\d+[.)]\s*)?\[([A-Za-z0-9_]+(?:\s*/\s*[A-Za-z0-9_]+)*)\]")
+MD_BLOCK_HEAD = re.compile(r"^\s*#{1,6}\s*(?:\d+[.)]\s*)?\[([A-Za-z0-9_]+(?:\s*[/,~]\s*[A-Za-z0-9_]+)*)\]")
 MD_TOBE_LINE = re.compile(r"TO-?BE\W*?:?\s*`?\s*(GET|POST|PUT|DELETE|PATCH)\s+([^`\s]+)", re.I)
 MD_METHOD_LINE = re.compile(r"^\s*(?:[*-]\s+)?`?\s*(GET|POST|PUT|DELETE|PATCH)\s+(/[^`\s]+)", re.I)
 SCREEN_ID = re.compile(r"([A-Za-z]{3}[A-Za-z0-9]*?\d{5}[A-Za-z0-9_]*)")
 
 
 def screens_of(api):
-    """블록 머리의 화면ID 목록 — `[A/B]` 묶음이면 둘 다."""
-    return [s.strip() for s in api["screen"].split("/") if s.strip()]
+    """블록 머리의 화면ID 목록 — `[A/B]`·`[A, B]` 묶음이면 둘 다, `[A~B]` 범위면 사이 번호 전부."""
+    out = []
+    for part in re.split(r"[/,]", api["screen"]):
+        part = part.strip()
+        if "~" not in part:
+            if part:
+                out.append(part)
+            continue
+        lo, hi = (x.strip() for x in part.split("~", 1))
+        ml = re.match(r"^(.*?)(\d+)$", lo)
+        mh = re.match(r"^(.*?)(\d+)$", hi)
+        if not (ml and mh) or (mh.group(1) and mh.group(1) != ml.group(1)):
+            out.extend(x for x in (lo, hi) if x)     # 범위로 못 읽으면 양 끝만
+            continue
+        width = len(ml.group(2))
+        a, b = int(ml.group(2)), int(mh.group(2))
+        if len(mh.group(2)) < width:                 # 뒤쪽 숫자 꼬리 약식(`08301~305`)
+            b = int(ml.group(2)[:width - len(mh.group(2))] + mh.group(2))
+        out.extend(f"{ml.group(1)}{n:0{width}d}" for n in range(a, b + 1))
+    return out
+
+
+def is_screen_of(api, sid):
+    """블록이 화면 sid 의 것인가 — 머리 화면ID 가 sid 와 같거나, 시스템 접두 없이 적힌 꼬리(`[STF08200]` ↔ ULDSTF08200)가 같으면 참."""
+    for s in screens_of(api):
+        if s == sid or (re.fullmatch(r"[A-Za-z]{3}\d{5}[A-Za-z0-9_]*", s) and len(sid) > len(s) and sid.endswith(s)):
+            return True
+    return False
 
 
 def parse_spec(text, fmt=None):
@@ -207,12 +234,16 @@ def extract_actions(script):
 
 
 def _parse_spec_md(text):
-    """md 명세 → [{screen, title, method, path}]. 블록 머리는 `#` 머리글만(코드 블록 안 `[` 줄과 섞이지 않게)."""
+    """md 명세 → [{screen, title, method, path}]. 블록 머리는 `#` 머리글만(코드 블록 안 `[` 줄과 섞이지 않게).
+    예외: 파일 맨 첫 줄이 `#` 없이 `[화면ID][…]` 이면 첫 블록 머리로 본다(머리글을 빠뜨린 첫 블록, 2026-10-28 ULDSTF05950)."""
     apis = []
     cur = None
     fallback = None
+    first = True
     for line in text.replace("\r\n", "\n").split("\n"):
-        h = MD_BLOCK_HEAD.match(line)
+        h = MD_BLOCK_HEAD.match(line) or (BLOCK_HEAD.match(line) if first else None)
+        if line.strip():
+            first = False
         if h:
             if cur is not None and cur["path"] is None and fallback:
                 cur["method"], cur["path"] = fallback
@@ -274,8 +305,8 @@ def check(xml_path, spec_path=None, allow_unused=(), no_context_path=False):
 
     apis = parse_spec(io.open(spec_path, encoding="utf-8-sig").read(),
                       "md" if Path(spec_path).suffix.lower() == ".md" else "txt")
-    mine = [a for a in apis if sid in screens_of(a)]
-    others = [a for a in apis if sid not in screens_of(a)]
+    mine = [a for a in apis if is_screen_of(a, sid)]
+    others = [a for a in apis if not is_screen_of(a, sid)]
 
     fails, warns, infos = list(form_fails), [], []
     by_path = {}
