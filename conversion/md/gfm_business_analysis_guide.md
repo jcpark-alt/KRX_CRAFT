@@ -259,7 +259,7 @@ grep -no '"[0-9A-Z]\{5,7\}"' $F | sort -u                            # 서식·�
 | `getMessageParam("MSG-…")` | `$c.{pcc}.getMessageParam` | |
 | `js_market`, `js_dep_cd` 등 세션 전역 | `$c.session.getUserInfo("market" \| "depCd" …)` | |
 | `cGetToday2()` 등 날짜 | `$c.date.getServerDateTime()` 등 | 서버/클라이언트 시각 |
-| `fn_open_report_pdf` | `$c.print.openReportPdf` | |
+| `fn_open_report_pdf(파일명, [{uid, unm}])` | `dma.getJSON()` → 조합·형식 덮어쓰기 → `$c.str.toUpperSnakeCase` → `pdf_rptname` → `await $c.data.openReportPdf({ url, reqParam })` (규칙 47) | AS-IS `uid` 목록과 변환 키 1:1 대조(화면 값·조합 키·형식 누락), 서버 키 형식 계약, 응답 뒤 창 — 팝업 차단 |
 | `#include("../js/*.js")` | 삭제(규칙 11) — 필요한 함수만 `$c.*` 로 대응 | 호출되는 함수만 추림 |
 | `vScrenID` | 삭제(규칙 1) | |
 

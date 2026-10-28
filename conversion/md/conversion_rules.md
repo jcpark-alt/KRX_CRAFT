@@ -1153,6 +1153,47 @@ scwin.tab_List_ontabload = async function (tabId, index, userTabId) {
 * **관련**: 퍼블리싱 스킬 `markup-idioms.md` §5.2 「날짜 컬럼은 `dataType="date" displayFormat="yyyy-MM-dd"`」 — 이 규칙이 「날짜 컬럼」의 기준이다.
 * **적용 현황**(2026-10-28, conversion-front TO-BE): ① AS-IS 마스크 열 48곳 모두 이 형태 — ULDSTF05700·05702·05232·05923·08200 31곳(처음부터), ULDBNS30300 15곳·ULDSTF05950 2곳(`####-##-##` → 이 형태로 정정). ② 확장 대상 23열(그리드 중복 43곳) 적용 — ULDBNS30300 21열(`grd_SendList`·`grd_SendList1` 전송 항목 20열 + `grd_ClsSendInfo.taskDd`), ULDBNS30400 2열(`grd_ListDetail.isuDd`·`redmptDd`). 제외: ULDSTF05950 6곳(명세에 `YYYY-MM-DD`), ULDSTF05621 `basDd` 2곳(날짜 아님), ULDBNS30400 `…Dt` 6열(일시 가능 — 결과서 §10).
 
+### 규칙 47: 리포트 PDF 출력 — 파라미터 배열 수동 매핑 → 데이터 객체 일괄 변환 + `$c.data.openReportPdf` (2026-10-28 신설, 사용자 지시)
+
+* **AS-IS**: `fn_open_report_pdf(pdf_rptname, userParam)`(1차 전환본 `$c.print.openReportPdf(파일명, 배열)`) — `[{ uid : "COM_NM", unm : 값 }, …]` 배열을 키마다 손으로 만들고, 숨은 form 을 `/filePdfload.do?method=getPdfInfo` 로 POST 해 새 창에 띄운다.
+* **TO-BE**: 조회 결과(DataMap)를 `getJSON()` 으로 한 번에 꺼내 **조합·형식이 필요한 키만 덮어쓰고**, `$c.str.toUpperSnakeCase` 로 키를 리포트 필드명(대문자 스네이크 — AS-IS `uid`)으로 일괄 변환한 뒤, 리포트명 `pdf_rptname` 을 넣어 `$c.data.openReportPdf({ url, reqParam })` 로 보낸다(서버가 PDF 를 만들고 그 경로를 새 창으로 연다).
+
+```javascript
+// AS-IS (1차 전환본)
+$c.print.openReportPdf("RLDSTF00029", [
+    { uid : "COM_NM", unm : rpt.comNm },
+    { uid : "ISU_INFO", unm : rpt.isuCd + " / " + rpt.isuSrtCd },
+    { uid : "LIST_SHRS", unm : $c.num.formatNumber(rpt.listShrs) },
+    { uid : "COMMIT_DD", unm : $c.date.formatDate(edt_APPROV_DD.getValue(), "-") },
+    …
+]);
+
+// TO-BE
+const rpt = dma_print.getJSON();                                   // 1) 조회 결과를 한 번에
+rpt.isuInfo = rpt.isuCd + " / " + rpt.isuSrtCd;                    // 2) 조합 키 — 원시 값으로 먼저 만든다
+rpt.isuDdInfo = rpt.isuDd + " / 제" + rpt.isuRnd + "회";
+rpt.listShrs = $c.num.formatNumber(rpt.listShrs);                  // 3) 형식 덮어쓰기 (AS-IS FormatNumberEx·FormatDateEx 그대로)
+rpt.isuDd = $c.date.formatDate(rpt.isuDd, "-");
+rpt.commitDd = $c.date.formatDate(edt_APPROV_DD.getValue(), "-"); //    화면 값은 getJSON 에 없다 — 따로 넣는다
+const reqParam = $c.str.toUpperSnakeCase(rpt);                     // 4) 키 → 대문자 스네이크 (isuInfo → ISU_INFO)
+reqParam.pdf_rptname = "RLDSTF00029";                              // 5) 리포트명은 변환 뒤에 (소문자 그대로)
+await $c.data.openReportPdf({ url : "/api/listing/common/report/pdf-download", reqParam : reqParam });
+```
+
+* **순서**: `getJSON` → 조합 키(원시 값으로) → 형식 덮어쓰기 → 키 변환 → `pdf_rptname`. 조합 키를 형식 뒤에 만들면 `isuDdInfo` 처럼 원시 값이 필요한 조합에 형식 값이 섞인다.
+* **`pdf_rptname` 은 바꾸지 않는다**: 키 변환을 객체 전체에 돌리면 `PDF_RPTNAME` 이 되어 서버가 리포트명을 못 찾는다 — 변환 **뒤에** 넣거나 `toUpperSnakeCase(rpt, { exclude : ["pdf_rptname"] })` 로 뺀다. AS-IS 가 소문자·특수 이름으로 넘기던 키(`jsonData` 등)도 같다.
+* **AS-IS `uid` 와 1:1 대조**(결과서 §6 인쇄 절에 표로): 변환 결과 키가 AS-IS `uid` 목록과 같은지 확인한다.
+    1. **누락** — 조합 키(`ISU_INFO`)·화면 값(`COMMIT_DD` ← 달력)·형식 덮어쓰기(숫자·날짜)를 빠뜨리면 빈칸이거나 원시 값(`20261028`, `1000000`)이 찍힌다.
+    2. **이름 불일치** — `toUpperSnakeCase` 는 소문자·숫자 뒤 대문자 앞에만 `_` 를 넣는다. 숫자가 낀 이름(`chg1prefstkShrs` → `CHG1PREFSTK_SHRS`)이나, 명세 키가 AS-IS 필드명을 다르게 줄인 경우(변환해도 AS-IS `uid` 가 되지 않음)는 그 키만 AS-IS `uid` 로 직접 넣는다.
+    3. **잉여** — `getJSON` 의 다른 키도 함께 간다(리포트가 모르는 키는 무시되는 것이 보통 — 서버가 엄격하면 결과서 §10).
+* **목록 데이터**(AS-IS `uid : "jsonData"` + `JSON.stringify(데이터셋)`): `reqParam.jsonData = dlt_x.getAllJSON()` 처럼 배열 그대로 넣는다(문자열화하지 않음). 행 안의 키도 리포트 필드명이어야 하면 `toUpperSnakeCase(dlt_x.getAllJSON())`(배열은 행마다 변환). 키 이름 `jsonData` 자체는 AS-IS 그대로 두고 변환 뒤에 넣는다.
+* **`url`**: 명세 경로 전체 리터럴(규칙 38) — 상장 리포트 `/api/listing/common/report/pdf-download`(`reqParam` 꼴), 공시 리포트 `/api/discls/common/report/pdf-download`(본문 키를 평평하게). `getContextPath()` 를 붙이지 않는다(규칙 39).
+* **결과·창**: `openReportPdf` 는 `Promise<Boolean>` — 창을 열면 `true`, 중복 실행·통신 실패·서버 `errorMsg`(안내 후)면 `false`. `await` 한다. 창은 **서버 응답 뒤에** 열리므로(종전 form POST 는 클릭 직후) 앞에 조회까지 겹치면 팝업 차단에 걸릴 수 있다 — 결과서 §10 에 실화면 확인 항목으로 올린다.
+* **함께 없애는 것**: `doLogSave`(화면 로그) 호출, AS-IS 빈 껍데기 데이터셋(`dts_Print.SetDataHeader`·`AddRow`) — 옮기지 않는다.
+* **미결 — 서버 키 형식 계약**: `reqParam` 의 키를 서버가 대문자 스네이크(AS-IS 필드명)로 받는지 camelCase 로 받아 스스로 바꾸는지 확정되지 않았다. 이 규칙은 리포트 서식이 AS-IS 필드명을 쓴다는 전제로 4) 키 변환을 둔다 — 서버가 camelCase 를 받기로 정해지면 4) 만 빼고 나머지는 그대로다. 전환 결과서 §10 에 화면마다 확인 항목으로 둔다.
+* **공통함수**: `$c.str.toUpperSnakeCase(value, { exclude })`·`$c.data.openReportPdf(param)` — `cm/gcc`(2026-10-28 `ba1b608c`). 화면에 같은 변환 함수를 따로 만들지 않는다.
+* **적용 현황**(2026-10-28, conversion-front TO-BE): `ULDSTF05710` `scwin.print`(RLDSTF00029, 19키)가 아직 `$c.print.openReportPdf` 배열 방식 — 미적용.
+
 ## 규칙 6 보충: Submission 변환 상세
 
 * **규칙 12 — `{DC}.DataID = encodeURI(url)` 의 `url` 선언 역추적 스코프**(2026-10-08): 선언(`var|let|const url = …;`)은 DataID 문이 든 **같은 최상위 함수 안**에서만 찾는다. 스크립트 전체에서 "앞에 있는 마지막 대입"을 고르면 규칙 4 재배치 뒤 다른 핸들러의 팝업 URL 상수(`let url = "/ui/lst/lstproc/ULDSTF05106_read.xml";`)가 걸려 삭제되고 해석 실패한 DataID 는 그대로 남는다(ULDSTF92002 button_1_onclick). 같은 함수에 선언이 없으면 「action URL 해석 실패」로 보류한다. 회귀 테스트 `test_convert_rule12_scope.py`.
