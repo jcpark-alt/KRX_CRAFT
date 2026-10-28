@@ -1051,6 +1051,24 @@ scwin.fmtProcState = function (data, formattedData, rowIndex, colIndex) {
 * **적용 현황**(2026-10-27): gfm-front ULDBNS30400 `scwin.fmtProcState`(그리드 3개 `procState`) — 개정 규칙대로 순수 데이터 반환 + `this.setCellClass`·`removeCellClass`, `escape="false"` 제거 완료. ULDSTF05911 `applyKoEditable`(readOnly)·ULDSTF05621 월·일 계산(데이터 변경)은 예외라 유지.
     * **점검 필요**: jsp-front ui-tobe 101개 파일의 `_fmt_* = async function` customFormatter — 지킬 것 1번 위반(Promise 표시 의심), HTML(`<a class="lnk">` 등) 반환도 상세 규칙 1번 위반. 해당 모듈 재전환 때 고친다.
 
+### 규칙 44: `$c.sbm.executeDynamic` 의 `gridview` 옵션은 gridView 컴포넌트 id 만 (2026-10-28 신설, 사용자 지시)
+
+* `sbmOptions.gridview` 에는 **특별한 요청이 없는 한 gridView 컴포넌트 id 만** 쓴다. 공통 함수가 지원하는 접미사 옵션(`"id|focus"`·`"id|refresh"`·`"id|message"`)은 붙이지 않는다.
+
+```javascript
+// (O) 기본
+gridview : "grd_bdchrgList",
+// (X) 요청 없이 접미사 추가
+gridview : "grd_bdchrgList|message",
+gridview : "grd_list|focus",
+```
+
+* **접미사의 뜻**(`cm/gcc/sbm.xml` 254·847행 부근): `|focus` 조회 뒤 첫 행 포커스, `|refresh` refresh·initGrid 끔, `|message` 0건이면 "조회된 데이터가 없습니다." 안내. 기본(id 만)은 refresh 실행·안내 없음이다.
+* **접미사를 쓰는 경우**: 요청자(업무 분석·화면 설계·리뷰 회신)가 0건 안내·첫 행 포커스 등을 **명시적으로 요구**했을 때만 붙이고, 업무 분석 결과서 §5 해당 절에 근거를 적는다. 원본에 0건 안내 문구가 있었다는 이유만으로 붙이지 않는다 — 결과서 §10 에 올려 요청자가 정한다.
+* 여러 그리드면 쉼표로 이은 id 목록만 쓴다(`"grd_a,grd_b"`). 객체 형태(`gridview : { … }`)도 요청이 있을 때만.
+* 규칙 6 보충의 `gridview` 자동 매핑(역추적)도 추출한 **id 만** 넣는다.
+* **적용 현황**(2026-10-28, gfm-front TO-BE): 6곳 중 5곳은 id 만(ULDBNS30400 3·ULDSTF05621 1·ULDSTF05911 1). **ULDBNF45000 `scwin.searchList` 의 `"grd_bdchrgList|message"` 1곳**이 규칙과 다르다 — 리뷰 권고로 붙인 것이라 요청 근거가 없으면 다음 갱신 때 id 만으로 바꾸고 결과서 §5.1 후처리 문구도 고친다. sample-front/ui 접미사 9곳(97곳 중)은 샘플 갱신 때.
+
 ## 규칙 6 보충: Submission 변환 상세
 
 * **규칙 12 — `{DC}.DataID = encodeURI(url)` 의 `url` 선언 역추적 스코프**(2026-10-08): 선언(`var|let|const url = …;`)은 DataID 문이 든 **같은 최상위 함수 안**에서만 찾는다. 스크립트 전체에서 "앞에 있는 마지막 대입"을 고르면 규칙 4 재배치 뒤 다른 핸들러의 팝업 URL 상수(`let url = "/ui/lst/lstproc/ULDSTF05106_read.xml";`)가 걸려 삭제되고 해석 실패한 DataID 는 그대로 남는다(ULDSTF92002 button_1_onclick). 같은 함수에 선언이 없으면 「action URL 해석 실패」로 보류한다. 회귀 테스트 `test_convert_rule12_scope.py`.
@@ -1064,7 +1082,7 @@ scwin.fmtProcState = function (data, formattedData, rowIndex, colIndex) {
 
 
 3. 일치하는 `<w2:gridView>` 컴포넌트를 찾으면, 해당 태그의 **`id` 속성 값**을 추출합니다. (예: `id="grd_jongmok"`)
-4. 추출한 ID를 `sbmOptions` 객체의 **`gridview` 속성**으로 추가합니다. 만약 매핑된 `gridView`가 없다면 해당 속성은 생략하거나 가이드라인에 따라 처리합니다.
+4. 추출한 ID를 `sbmOptions` 객체의 **`gridview` 속성**으로 추가합니다(**id 만** — `|focus`·`|refresh`·`|message` 접미사는 요청이 있을 때만, 규칙 44). 만약 매핑된 `gridView`가 없다면 해당 속성은 생략하거나 가이드라인에 따라 처리합니다.
 
 
 

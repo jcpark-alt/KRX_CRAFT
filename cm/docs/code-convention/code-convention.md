@@ -167,6 +167,7 @@ scwin.searchList = async function () {
 ```
 
 - **`action` 은 전체 경로 리터럴**(2026-10-27): `action : "/api/x/select-list"` 처럼 `/` 로 시작하는 전체 경로를 문자열 하나로 쓴다. `scwin.API + "select-list"` 같은 전역 변수·상수 조립과 상대 경로는 쓰지 않는다(분기는 `cond ? "/api/x/insert" : "/api/x/update"` 처럼 가지마다 전체 경로). contextRoot 는 `executeDynamic` 이 붙이므로 넣지 않는다 — UDC `bulkFileSaver` 의 `saveUrl` 만 `$c.sbm.getContextPath() + "/api/…"`. (전환 규칙 38, 검사 `api_spec_check.py` A07) 단 **gfm-front 화면은** UDC `saveUrl`·`listUrl` 도 접두 없는 전체 경로 리터럴이고 `executeDynamic`·UDC 어디에도 `getContextPath()` 를 붙이지 않는다(전환 규칙 39, 검사 A08).
+- **`gridview` 옵션은 gridView 컴포넌트 id 만**(2026-10-28): `gridview : "grd_list"`. 공통 함수의 접미사(`"id|focus"`·`"id|refresh"`·`"id|message"`)는 특별한 요청이 있을 때만 붙인다(전환 규칙 44).
 - **배치**: `$c.sbm.executeDynamic` 을 호출하는 통신 실행 함수는 **4구역(서브미션 콜백 영역)** 에 배치한다(2026-09-01 확정).
   `ev:on*` 에 연결된 이벤트 핸들러가 직접 호출하는 경우는 예외 — 3구역을 우선한다.
 - **원리**: `$c.sbm.executeDynamic` 은 `submitDoneHandler` 가 **비어 있을 때만** Promise 가 응답(resObj)으로 resolve 된다
