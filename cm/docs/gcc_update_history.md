@@ -1,6 +1,6 @@
 # gcc 공통 함수 업데이트 이력
 
-`cm/gcc/` 공통 라이브러리(`$c.*`)의 최초 반입(2026-06-08, `92a35bd`) 이후 변경 내역 정리 (최종 갱신 2026-10-08).
+`cm/gcc/` 공통 라이브러리(`$c.*`)의 최초 반입(2026-06-08, `92a35bd`) 이후 변경 내역 정리 (최종 갱신 2026-10-28).
 API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run docs:gcc`) 참고. 2026-09-21 기준 **13개 모듈 / 300개 공개 메서드**.
 
 > `src/cm/gcc/`는 CM 모듈용 사본으로 일반적 개선만 선별 반영해 왔으나(2026-06-10 병합, 2026-07-22 대규모 동기화로 11파일 체제),
@@ -275,6 +275,14 @@ API 명세는 [api/gcc/index.html](api/gcc/index.html)(자동 생성, `npm run d
 ---
 
 ## 2026년 10월
+
+### 리포트 PDF 출력 공통 정비 (10-28)
+- (미커밋, 10-28) — **`$c.data.openReportPdf` 응답 처리 결함 수정 + `$c.str.toUpperSnakeCase` 신설** (306→307 메서드, 사용자 지시):
+  - 배경: 리포트 PDF 출력을 `$c.print.openReportPdf(파일명, [{uid, unm}])`(숨은 form POST) 에서 `$c.data.openReportPdf({ url, reqParam })`(서버 생성 → 경로 열기) 로 바꾸는 검토에서 결함 확인 — 응답을 `res.responseJSON.body.errorMsg` 로 바로 읽어 중복 실행(`skipped`)·통신 실패(`responseJSON` 없음)에서 TypeError.
+  - `openReportPdf`: `res?.responseJSON?.body` 로 읽고 `skipped`·응답 없음·`pdfFileShortPath` 없음이면 창을 열지 않고 `false`(실패 안내는 공통 오류 핸들러), 서버 `errorMsg` 는 `await $c.win.alert` 후 `false`, 정상이면 `openExternalPage` 후 `true`(반환 `Promise<Boolean>` 신설). `param.url` 없을 때 `param?.url` 가드, 디버그 `console.log` 제거. 요청 본문은 종전대로 `param` 전체. JSDoc 설명·예시를 실제 사용 꼴(`reqParam` + `pdf_rptname`)로 갱신 — 서버 응답 뒤 창을 여는 구조라 팝업 차단 가능성을 명시.
+  - `toUpperSnakeCase(value, options)` 신설: camelCase → UPPER_SNAKE_CASE(소문자·숫자 뒤 대문자 앞 `_`). 문자열 → 문자열, 객체(`getJSON()`) → 키만 바꾼 새 객체, 배열(`getAllJSON()`) → 행마다 키 변환, 한 단계(얕게)·원본 불변, `options.exclude` 로 바꾸지 않을 키 지정(예: `pdf_rptname`). 리포트 파라미터를 AS-IS 필드명(대문자 스네이크)으로 넘길 때 화면마다 만들던 변환을 공통화. 숫자가 낀 이름(`chg1prefstkShrs` → `CHG1PREFSTK_SHRS`)은 AS-IS 필드명과 다를 수 있어 JSDoc 에 명시.
+  - 미결: 상장 리포트 API(`/api/listing/common/report/pdf-download`)가 `reqParam` 키를 camelCase 로 받는지 UPPER_SNAKE 로 받는지 서버 계약 확인 필요(샘플 `ULDSTF92002`·`92050` 은 camelCase 로 보냄).
+  - 검증: Jest 신규 `test/reportPdfSnake.test.js` 14건(변환 7: 문자열·숫자·null·객체 불변·exclude·배열 / openReportPdf 7: 정상·url 기본값·errorMsg·skipped·responseJSON 없음·응답 undefined·경로 없음), 전체 292건 통과, lint:xml 0/0, `npm run docs:gcc`(13 모듈 307 메서드).
 
 ### byte 길이 검증 한글 2byte 기본·전역 설정화 (10-08)
 - (미커밋, 10-08) — **`$c.validate` byte 길이 규칙(minLengthB/maxLengthB) 한글 계산을 3byte 고정 → 전역 설정 `BYTE_LENGTH_INFO.KOR_BYTE`(기본 2byte) 로 전환** (메서드 수 유지, 사용자 지시):

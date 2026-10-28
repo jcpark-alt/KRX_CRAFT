@@ -2185,43 +2185,53 @@ scwin.uploadGridViewCSV = function (grdObj, options) {
 /**
  * @method
  * @name openReportPdf
- * @description desc
- * @param {Object} param pdf 다운로드 parameter 및 url 설정
- * @returns
+ * @description 서버에 PDF 리포트 생성을 요청하고, 응답의 파일 경로(pdfFileShortPath)를 새 창으로 연다.
+ * param 전체가 요청 본문으로 전송되고 param.url 은 요청 경로로 쓰인다(생략 시 공시 리포트 다운로드 API).
+ * 서버가 오류 문구(errorMsg)를 주면 안내만 하고 창을 열지 않는다. 중복 실행(skipped)·통신 실패면 창을 열지 않는다(실패 안내는 공통 오류 핸들러).
+ * 창은 서버 응답 뒤에 열리므로 브라우저 팝업 차단 설정에 걸릴 수 있다.
+ * @param {Object} param 요청 본문 겸 설정
+ * @param {String} [param.url] 요청 경로 (기본값 "/api/discls/common/report/pdf-download")
+ * @param {Object} [param.reqParam] 리포트 파라미터 객체 — 리포트명 pdf_rptname 포함 (상장 리포트 API 꼴)
+ * @returns {Promise<Boolean>} PDF 창을 열었으면 true
  * @hidden N
  * @exception
- * @migrationStatus
  * @example
-    // pdf 다운로드 parameter 설정
-	const param = {
-		url : "/api/discls/common/report/pdf-download",
-		cmitBzProcsNo : "20250124000310",
-		cmitTpCd : "20",
-		cmitAttachFileNm : "코스닥예비심사청구조건검색.txt"
-	}; 
-	
-	//서버 저장된 pdf 다운로드
- 	$c.data.openReportPdf(param);
+// 상장 리포트 — 리포트 파라미터를 reqParam 객체로 (리포트명 pdf_rptname 포함)
+const reqParam = $c.str.toUpperSnakeCase(dma_print.getJSON(), { exclude : ["pdf_rptname"] });
+reqParam.pdf_rptname = "RLDSTF00029";
+await $c.data.openReportPdf({ url : "/api/listing/common/report/pdf-download", reqParam : reqParam });
+
+// 공시 리포트 — 서버 저장 PDF 다운로드 (본문 키를 그대로)
+await $c.data.openReportPdf({
+    url : "/api/discls/common/report/pdf-download",
+    cmitBzProcsNo : "20250124000310",
+    cmitTpCd : "20",
+    cmitAttachFileNm : "코스닥예비심사청구조건검색.txt"
+});
  */
 scwin.openReportPdf = async function (param) {
-	const sbmOptions = {
+    const sbmOptions = {
         id: "sbm_donwloadPdf",
-        action: param.url || "/api/discls/common/report/pdf-download", // PDF 리포트 다운로드
-        method: "post",
+        action: param?.url || "/api/discls/common/report/pdf-download", // PDF 리포트 다운로드
+        method: "post"
     };
 
     const res = await $c.sbm.executeDynamic(sbmOptions, param);
+    if (res?.skipped) return false;    // 진행 중인 같은 요청이 있어 이번 호출은 건너뜀
 
-	// 서버 정보로 pdf 파일 오픈
-    if ($c.util.isEmpty(res.responseJSON.body.errorMsg)) {
-        let pdfFileShortPath = res.responseJSON.body.pdfFileShortPath;
-        console.log("pdfFileShortPath=" + pdfFileShortPath);
-        $c.win.openExternalPage(pdfFileShortPath);
-    } else {
-		if (!$c.util.isEmpty(res.responseJSON?.body?.errorMsg)) {
-        	$c.win.alert(res.responseJSON.body.errorMsg);
-		}
+    // 통신 실패·응답 없음이면 responseJSON 이 없다 — 안내는 공통 오류 핸들러가 한다.
+    const body = res?.responseJSON?.body;
+    if ($c.util.isEmpty(body)) return false;
+
+    if (!$c.util.isEmpty(body.errorMsg)) {
+        await $c.win.alert(body.errorMsg);
+        return false;
     }
+    if ($c.util.isEmpty(body.pdfFileShortPath)) return false;
+
+    // 서버 정보로 pdf 파일 오픈
+    $c.win.openExternalPage(body.pdfFileShortPath);
+    return true;
 };
 
 /**

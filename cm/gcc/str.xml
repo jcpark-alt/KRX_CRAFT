@@ -15,7 +15,7 @@ xmlns:xf="http://www.w3.org/2002/xforms">
 		</xf:model>
 		<w2:layoutInfo>
 		</w2:layoutInfo>
-		<w2:publicInfo method="scwin.serialize,scwin.lpad,scwin.rpad,scwin.formatSSN,scwin.formatPhone,scwin.formatPhonePattern,scwin.formatMobilePhone,scwin.formatTime,scwin.getLocale,scwin.existKorean,scwin.isKorean,scwin.isFinalConsonant,scwin.attachPostposition,scwin.attachObjectPostposition,scwin.isBizID,scwin.isCorpNum,scwin.isSSN,scwin.isEmail,scwin.isPhone,scwin.isMobilePhone,scwin.replaceAll,scwin.trim,scwin.lTrim,scwin.rTrim,scwin.setUppercase,scwin.setLowercase,scwin.getByteLength,scwin.getByteSubstring,scwin.stringFormat,scwin.stringUnFormat,scwin.isEscapeToChar,scwin.escapeToChar,scwin.escapeToXml,scwin.escapeToHtml,scwin.escapeToEnter,scwin.escapeToEnterBlank,scwin.escapeToDataJSON"/>
+		<w2:publicInfo method="scwin.serialize,scwin.lpad,scwin.rpad,scwin.formatSSN,scwin.formatPhone,scwin.formatPhonePattern,scwin.formatMobilePhone,scwin.formatTime,scwin.getLocale,scwin.existKorean,scwin.isKorean,scwin.isFinalConsonant,scwin.attachPostposition,scwin.attachObjectPostposition,scwin.isBizID,scwin.isCorpNum,scwin.isSSN,scwin.isEmail,scwin.isPhone,scwin.isMobilePhone,scwin.replaceAll,scwin.trim,scwin.lTrim,scwin.rTrim,scwin.setUppercase,scwin.setLowercase,scwin.getByteLength,scwin.getByteSubstring,scwin.stringFormat,scwin.stringUnFormat,scwin.isEscapeToChar,scwin.escapeToChar,scwin.escapeToXml,scwin.escapeToHtml,scwin.escapeToEnter,scwin.escapeToEnterBlank,scwin.escapeToDataJSON,scwin.toUpperSnakeCase"/>
 		<script lazy="false" type="text/javascript"><![CDATA[// =============================================================================
 /**
  * 문자열 관련 함수를 작성한다.
@@ -1076,6 +1076,50 @@ scwin.escapeToDataJSON = function (dataJSON) {
         });
     }
     return dataJSON;
+};
+
+/**
+ * @method
+ * @name toUpperSnakeCase
+ * @description camelCase 이름을 대문자 스네이크(UPPER_SNAKE_CASE)로 바꾼다. 소문자·숫자 다음에 오는 대문자 앞에 "_" 를 넣고 전체를 대문자로 바꾼다.
+ * 문자열이면 바꾼 문자열을, 객체(DataMap.getJSON())면 키만 바꾼 새 객체를, 배열(DataList.getAllJSON())이면 행마다 키를 바꾼 새 배열을 돌려준다.
+ * 키 변환은 한 단계(얕게)만 하고 값은 그대로 둔다. 원본 객체는 바꾸지 않는다.
+ * 리포트 파라미터처럼 AS-IS 필드명(대문자 스네이크)으로 넘겨야 할 때 쓴다 — 바뀌면 안 되는 키(예: pdf_rptname)는 options.exclude 로 뺀다.
+ * 숫자가 낀 이름은 숫자 뒤 대문자 앞에만 "_" 가 들어간다(chg1prefstkShrs → CHG1PREFSTK_SHRS) — AS-IS 필드명과 다르면 그 키만 따로 넣는다.
+ * @param {(String|Object|Array)} value 바꿀 이름, 또는 키를 바꿀 객체·객체 배열
+ * @param {Object} [options] 옵션
+ * @param {Array} [options.exclude] 객체·배열의 키 중 바꾸지 않을 키 목록
+ * @returns {(String|Object|Array)} 바꾼 문자열·객체·배열 (null·undefined 는 "")
+ * @hidden N
+ * @exception
+ * @example
+$c.str.toUpperSnakeCase("isuKorAbbrv"); // "ISU_KOR_ABBRV"
+$c.str.toUpperSnakeCase("COM_NM"); // "COM_NM" (이미 대문자 스네이크면 그대로)
+$c.str.toUpperSnakeCase({ comNm : "가나", listShrs : "1,000" }); // { COM_NM : "가나", LIST_SHRS : "1,000" }
+$c.str.toUpperSnakeCase({ isuCd : "A", pdf_rptname : "RLDSTF00029" }, { exclude : ["pdf_rptname"] });
+// { ISU_CD : "A", pdf_rptname : "RLDSTF00029" }
+ */
+scwin.toUpperSnakeCase = function (value, options) {
+    const exclude = (options && Array.isArray(options.exclude)) ? options.exclude : [];
+    const convert = function (name) {
+        return String(name).replace(/([a-z0-9])([A-Z])/g, "$1_$2").toUpperCase();
+    };
+    const convertKeys = function (obj) {
+        const result = {};
+        Object.keys(obj).forEach(function (key) {
+            result[exclude.indexOf(key) > -1 ? key : convert(key)] = obj[key];
+        });
+        return result;
+    };
+
+    if (value === null || value === undefined) return "";
+    if (Array.isArray(value)) {
+        return value.map(function (row) {
+            return (row !== null && typeof row === "object" && !Array.isArray(row)) ? convertKeys(row) : row;
+        });
+    }
+    if (typeof value === "object") return convertKeys(value);
+    return convert(value);
 };
 
 
