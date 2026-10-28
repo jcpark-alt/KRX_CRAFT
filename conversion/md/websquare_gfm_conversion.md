@@ -62,6 +62,8 @@ conversion/conversion-front/ui/{화면ID}/
 conversion/conversion-front/ui-tobe/{화면ID}.xml   TO-BE 화면
 ```
 
+**전환 완료 폴더** — TO-BE 가 §13 검증 게이트를 모두 통과하면 화면 폴더를 통째로 `conversion/conversion-front/ui/completed/{화면ID}/` 로 옮깁니다(`git mv`, 2026-10-28). `ui/` 바로 아래에는 작업 중인 화면만 남습니다. `api_spec_check.py` 는 `ui/{화면ID}/` 와 `ui/completed/{화면ID}/` 를 모두 찾으므로 옮긴 뒤에도 명세 대조가 그대로 됩니다. 완료 화면을 다시 고칠 때는 폴더를 옮기지 않고 `completed/` 안에서 작업합니다.
+
 | 자료 | 위치 (예) | 결과서에서 쓰는 곳 |
 |---|---|---|
 | AS-IS 원본 | `{폴더}/{화면ID}.gfm`·`.jsp` | 전 장 |
@@ -326,7 +328,7 @@ AS-IS 의 Ajax(`$.ajax`·`$.post`·axios) 또는 Form Submit 을 `$c.sbm.execute
 
 **API 명세 적용 (`{화면ID}_API.txt` / `{화면ID}_API.md`) — 필수**
 
-원본 옆에 `{화면ID}_API.txt` 또는 `{화면ID}_API.md`(예: `conversion/conversion-front/ui/ULDSTF05621/ULDSTF05621_API.md`)가 있으면, 결과서 §5 와 TO-BE 의 모든 통신을 **이 명세의 API 로 바꿉니다**. AS-IS URL(`*.do`, `DIV_IDX`·`TRS_IDX`·`queryId` 파라미터)은 TO-BE 코드에 남기지 않습니다.
+원본 옆에 `{화면ID}_API.txt` 또는 `{화면ID}_API.md`(예: `conversion/conversion-front/ui/completed/ULDSTF05621/ULDSTF05621_API.md`)가 있으면, 결과서 §5 와 TO-BE 의 모든 통신을 **이 명세의 API 로 바꿉니다**. AS-IS URL(`*.do`, `DIV_IDX`·`TRS_IDX`·`queryId` 파라미터)은 TO-BE 코드에 남기지 않습니다.
 
 1. **명세 읽기** — 블록 하나가 API 하나입니다. md 명세는 `## n. [화면ID][업무][제목]` 머리글이 블록이고, 경로·method 는 `* **TO-BE** : \`GET /api/…\`` 줄을 씁니다(`AS-IS` 줄의 `.do` 경로는 대조하지 않음). 게이트는 두 형식을 모두 읽습니다(같은 폴더에 둘 다 있으면 txt 우선). md 명세에서 `$c.sbm.executeDynamic` 옵션 `ref`·`target` 을 적을 때는 블록의 `**[REQUEST]**` 바로 아래에 아래 샘플 형식으로 둡니다(값이 없으면 빈 문자열, 2026-10-27).
 
@@ -664,7 +666,7 @@ done
 
 업무 분석을 마친 화면으로 TO-BE 파일을 만들 때, 그 화면의 **캡처 이미지가 있으면** 스크립트 전환보다 먼저 **퍼블리싱 XML(마크업 전용)을 TO-BE 폴더에 생성**하고, 그 파일 위에 스크립트를 얹습니다. 마크업과 로직을 한 번에 쓰면 레이아웃 검토와 로직 검토가 섞이고, 퍼블리싱 게이트의 보존 검사(P10~P13)를 쓸 수 없기 때문입니다.
 
-**캡처 위치** — `{화면 폴더}/{화면ID}*.png|jpg` (예: `conversion/conversion-front/ui/ULDSTF05621/ULDSTF05621.png`, 상태별이면 `ULDSTF05621_신규.png`). 결과서 머리 표의 "화면 캡처" 칸에 파일명과 상태를 적습니다. 캡처가 없으면 이 절을 건너뛰고 §13.3 으로 갑니다.
+**캡처 위치** — `{화면 폴더}/{화면ID}*.png|jpg` (예: `conversion/conversion-front/ui/completed/ULDSTF05621/ULDSTF05621.png`, 상태별이면 `ULDSTF05621_신규.png`). 결과서 머리 표의 "화면 캡처" 칸에 파일명과 상태를 적습니다. 캡처가 없으면 이 절을 건너뛰고 §13.3 으로 갑니다.
 
 **TO-BE 위치** — 모듈 폴더의 `ui-tobe/{화면ID}.xml` (conversion-front 는 `conversion/conversion-front/ui-tobe/{화면ID}.xml`, sample-front 샘플은 `conversion/sample-front/ui/{화면ID}.xml`).
 

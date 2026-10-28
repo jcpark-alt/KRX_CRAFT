@@ -119,6 +119,17 @@ def test_spec_found_in_screen_folder_layout(tmp_path):
     assert spec is not None and spec.parent.name == "ULDTST00001" and fails == []
 
 
+def test_spec_found_in_completed_folder_layout(tmp_path):
+    # 전환 완료 화면: ui/completed/{화면ID}/{화면ID}_API.md ↔ ui-tobe/{화면ID}.xml
+    (tmp_path / "ui" / "completed" / "ULDTST00001").mkdir(parents=True)
+    (tmp_path / "ui-tobe").mkdir()
+    (tmp_path / "ui" / "completed" / "ULDTST00001" / "ULDTST00001_API.md").write_text(SPEC_MD, encoding="utf-8")
+    x = tmp_path / "ui-tobe" / "ULDTST00001.xml"
+    x.write_text(DOC.format(script=GOOD), encoding="utf-8")
+    fails, _, _, spec = ac.check(str(x))
+    assert spec is not None and spec.parent.parent.name == "completed" and fails == []
+
+
 def test_udc_save_url_counts_as_post_call(tmp_path):
     # UDC bulkFileSaver 의 saveUrl 은 POST 호출로 본다 — insert 를 udcSaver.save 로 부르는 화면
     script = GOOD.replace('(trJob === "I") ? "/api/x/insert" : "/api/x/update"', '"/api/x/update"') + \
