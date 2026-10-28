@@ -24,4 +24,4 @@
 - 의미 확인: `insPopupOpen` 첫 인자로 문자열 `"KIS_CD"` 를 넘기는 호출 2건(그리드 객체 계약과 불일치, as-is 그대로), `$c.util.getParameter` 는 현재 창 URL 기준(원본은 `frame.srcUrl`), `alertJobMsg` 는 `scwin.TR_JOB`/전역 `TR_JOB` 이 없는 화면(07403·07407)에서 작업명이 빈 문자열.
 
 ### 검증
-`python -m wsxml_lint conversion/next-krx-lds-stf-front/ui-tobe --ignore WS111,WS112,WS113` 101 files 0 warnings(오류 2 = 기존 WS120) · CDATA `node --check` 101/101 · `ev:`·publicInfo↔정의 문제 파일 HEAD 32 → 32(신규 0) · 미정의 `$c` 호출 28회(보류 목록과 일치).
+`python -m wsxml_lint conversion/w-craft-front/next-krx-lds-stf-front/ui-tobe --ignore WS111,WS112,WS113` 101 files 0 warnings(오류 2 = 기존 WS120) · CDATA `node --check` 101/101 · `ev:`·publicInfo↔정의 문제 파일 HEAD 32 → 32(신규 0) · 미정의 `$c` 호출 28회(보류 목록과 일치).

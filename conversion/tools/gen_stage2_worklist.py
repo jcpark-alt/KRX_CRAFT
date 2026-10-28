@@ -18,10 +18,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.normpath(os.path.join(HERE, ".."))
 OUT = os.path.join(ROOT, "md", "stage2_todo_worklist.md")
 MODS = [
-    ("fil", "next-krx-lds-fil-front"),
-    ("mgt", "next-krx-lds-mgt-front"),
-    ("stf", "next-krx-lds-stf-front"),
-    ("tms", "next-krx-lds-tms-front"),
+    ("fil", "w-craft-front/next-krx-lds-fil-front"),
+    ("mgt", "w-craft-front/next-krx-lds-mgt-front"),
+    ("stf", "w-craft-front/next-krx-lds-stf-front"),
+    ("tms", "w-craft-front/next-krx-lds-tms-front"),
 ]
 
 TODO_RE = re.compile(r"//\s*(TODO Stage2\s*:?[^\n]*|TO\s*-\s*DO[^\n]*)")
@@ -105,7 +105,7 @@ def main():
     L = []
     L.append("# Stage 2 잔여 TODO 워크리스트 (conversion ui-tobe)")
     L.append("")
-    L.append("> W-Craft 변환 Stage 2에서 **기계가 안전하게 확정할 수 없어 보류**한 항목 목록이다. 대부분 화면 실행(런타임)·업무 로직 판단·서버 API 스펙 확정이 필요하다. 코드 내 `// TODO Stage2:` / `// TO-DO` 주석과 1:1 대응한다. 변환본은 `conversion/next-krx-lds-{fil,mgt,stf,tms}-front/ui-tobe/` 에 있다.")
+    L.append("> W-Craft 변환 Stage 2에서 **기계가 안전하게 확정할 수 없어 보류**한 항목 목록이다. 대부분 화면 실행(런타임)·업무 로직 판단·서버 API 스펙 확정이 필요하다. 코드 내 `// TODO Stage2:` / `// TO-DO` 주석과 1:1 대응한다. 변환본은 `conversion/w-craft-front/next-krx-lds-{fil,mgt,stf,tms}-front/ui-tobe/` 에 있다.")
     L.append("")
     L.append("자동 생성 문서(`python conversion/tools/gen_stage2_worklist.py`, 최종 집계 %s) — 항목 해결 시 코드의 주석을 제거하고 본 도구로 재집계할 것." % today)
     L.append("")

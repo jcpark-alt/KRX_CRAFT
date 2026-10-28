@@ -23,7 +23,7 @@
 - 기존 결함(이번 미변경): `ULDMGT_N010` WS120(grd_dept 내 `chk` 컬럼 id 중복) — 그리고 CDATA 첫 줄에 놓인 `///////// 2. 초기화 영역` 헤더를 `convert.py` 의 첫 줄 결합이 삼켜 재변환 시 1줄 차이(HEAD 동일). body `ev:`·publicInfo↔정의·0열 여닫힘 문제 파일 HEAD 21 → 18(신규 0; 줄어든 3건은 삭제한 `const data = {` … `};` 잔재).
 
 ### 검증
-`python -m wsxml_lint conversion/next-krx-lds-mgt-front/ui-tobe --ignore WS111,WS112,WS113` 165 files 0 warnings(오류 1 = 기존 WS120) · CDATA `node --check` 165/165 · 미정의 `$c` 호출 0(gcc 957·pcc/stf 23) · 변경 11파일 `convert.py` 재실행 내용 변화 0(N010 의 첫 줄 헤더 1줄 제외) · 잔존 토큰(`stFocusGrid`/`js_com_`/`Grd_com_isur`/`fn_com_`/`$c.ut`/`$c.mgt`/`$c.frame`) 0.
+`python -m wsxml_lint conversion/w-craft-front/next-krx-lds-mgt-front/ui-tobe --ignore WS111,WS112,WS113` 165 files 0 warnings(오류 1 = 기존 WS120) · CDATA `node --check` 165/165 · 미정의 `$c` 호출 0(gcc 957·pcc/stf 23) · 변경 11파일 `convert.py` 재실행 내용 변화 0(N010 의 첫 줄 헤더 1줄 제외) · 잔존 토큰(`stFocusGrid`/`js_com_`/`Grd_com_isur`/`fn_com_`/`$c.ut`/`$c.mgt`/`$c.frame`) 0.
 
 ## 2026-09-21 (2차) — pcc/mgt 기준 재대조 (5파일)
 

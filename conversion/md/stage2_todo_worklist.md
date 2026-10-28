@@ -1,6 +1,6 @@
 # Stage 2 잔여 TODO 워크리스트 (conversion ui-tobe)
 
-> W-Craft 변환 Stage 2에서 **기계가 안전하게 확정할 수 없어 보류**한 항목 목록이다. 대부분 화면 실행(런타임)·업무 로직 판단·서버 API 스펙 확정이 필요하다. 코드 내 `// TODO Stage2:` / `// TO-DO` 주석과 1:1 대응한다. 변환본은 `conversion/next-krx-lds-{fil,mgt,stf,tms}-front/ui-tobe/` 에 있다.
+> W-Craft 변환 Stage 2에서 **기계가 안전하게 확정할 수 없어 보류**한 항목 목록이다. 대부분 화면 실행(런타임)·업무 로직 판단·서버 API 스펙 확정이 필요하다. 코드 내 `// TODO Stage2:` / `// TO-DO` 주석과 1:1 대응한다. 변환본은 `conversion/w-craft-front/next-krx-lds-{fil,mgt,stf,tms}-front/ui-tobe/` 에 있다.
 
 자동 생성 문서(`python conversion/tools/gen_stage2_worklist.py`, 최종 집계 2026-10-06) — 항목 해결 시 코드의 주석을 제거하고 본 도구로 재집계할 것.
 

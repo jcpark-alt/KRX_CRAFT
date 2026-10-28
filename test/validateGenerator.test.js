@@ -10,7 +10,7 @@ const path = require("path");
 
 const HTML = path.join(__dirname, "..", "cm", "docs", "validate-generator", "validate-generator.html");
 const REAL_XML = path.join(__dirname, "..", "conversion",
-  "next-krx-lds-fil-front", "ui-tobe", "dis", "account", "JLDFIL00356.xml");
+  "w-craft-front", "next-krx-lds-fil-front", "ui-tobe", "dis", "account", "JLDFIL00356.xml");
 
 function loadVG() {
   const html = fs.readFileSync(HTML, "utf8");

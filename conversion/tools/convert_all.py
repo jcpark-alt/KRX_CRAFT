@@ -28,10 +28,10 @@ import convert  # noqa: E402
 BASE = Path(__file__).resolve().parents[1]  # conversion
 
 MAPPINGS = [
-    ("next-krx-lds-fil-front/ui", "next-krx-lds-fil-front/ui-tobe"),
-    ("next-krx-lds-mgt-front/ui", "next-krx-lds-mgt-front/ui-tobe"),
-    ("next-krx-lds-stf-front/ui", "next-krx-lds-stf-front/ui-tobe"),
-    ("next-krx-lds-tms-front/ui", "next-krx-lds-tms-front/ui-tobe"),
+    ("w-craft-front/next-krx-lds-fil-front/ui", "w-craft-front/next-krx-lds-fil-front/ui-tobe"),
+    ("w-craft-front/next-krx-lds-mgt-front/ui", "w-craft-front/next-krx-lds-mgt-front/ui-tobe"),
+    ("w-craft-front/next-krx-lds-stf-front/ui", "w-craft-front/next-krx-lds-stf-front/ui-tobe"),
+    ("w-craft-front/next-krx-lds-tms-front/ui", "w-craft-front/next-krx-lds-tms-front/ui-tobe"),
     # 공급사(editor-web generate) r13 전달본 — jld*/uld* 1,677화면. 원본은 jsp-front/ui, 공급사 문서는 jsp-front/r13.
     ("jsp-front/ui", "jsp-front/ui-tobe"),
 ]
@@ -100,7 +100,8 @@ def main():
     args = sys.argv[1:]
     force = "--force" in args  # 기존 산출물 덮어쓰기(수기 보강 유실 주의)
     only = [a for a in args if a != "--force"]  # 선택: 지정한 모듈 폴더명만 변환(미지정 시 MAPPINGS 전체)
-    mappings = [m for m in MAPPINGS if not only or m[0].split("/")[0] in only]
+    # 모듈 폴더명(next-krx-lds-fil-front)으로 고른다 — 2026-10-28 부터 w-craft-front/ 아래라 경로의 어느 마디든 일치하면 대상
+    mappings = [m for m in MAPPINGS if not only or any(seg in only for seg in m[0].split("/"))]
     print("== 일괄 변환 (ui → ui-tobe)%s ==\n" % (" [--force 재생성]" if force else ""))
     total = 0
     for src_rel, dst_rel in mappings:

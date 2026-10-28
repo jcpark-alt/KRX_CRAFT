@@ -30,7 +30,7 @@ gcc 13모듈 + pcc/stf publicInfo 와 대조한 미정의 `$c` 호출 **114회(1
 - 기존 결함(이번 미변경): body `ev:`·publicInfo↔정의·0열 여닫힘 문제 파일 HEAD 16 → 16(신규 0).
 
 ### 검증
-`python -m wsxml_lint conversion/next-krx-lds-tms-front/ui-tobe --ignore WS111,WS112,WS113` 36 files 0/0 · CDATA `node --check` 36/36 · 변경 22파일 `convert.py` 재실행 내용 변화 0 · 미정의 `$c` 호출 = 보류 목록과 일치(113).
+`python -m wsxml_lint conversion/w-craft-front/next-krx-lds-tms-front/ui-tobe --ignore WS111,WS112,WS113` 36 files 0/0 · CDATA `node --check` 36/36 · 변경 22파일 `convert.py` 재실행 내용 변화 0 · 미정의 `$c` 호출 = 보류 목록과 일치(113).
 
 ## 2026-09-21 (2차) — pcc/tms 기준 재대조 (8파일)
 
@@ -45,4 +45,4 @@ gcc + pcc/tms(tms.xml `$c.tms` 13·main.xml) 만으로 대조: 미정의 **8회(
 - `$c.tms` 나머지 10종 106회는 pcc/tms 정의를 그대로 사용(호출 변경 없음). 이전 보류표의 gcc 후보는 참고용으로만 남긴다.
 
 ### 검증(2차)
-`python -m wsxml_lint conversion/next-krx-lds-tms-front/ui-tobe --ignore WS111,WS112,WS113` 36 files 0/0 · `node --check` 36/36 · 변경 8파일 `convert.py` 재실행 내용 변화 0 · 문제 파일 16 → 16 · 미정의 `$c` 호출 0.
+`python -m wsxml_lint conversion/w-craft-front/next-krx-lds-tms-front/ui-tobe --ignore WS111,WS112,WS113` 36 files 0/0 · `node --check` 36/36 · 변경 8파일 `convert.py` 재실행 내용 변화 0 · 문제 파일 16 → 16 · 미정의 `$c` 호출 0.

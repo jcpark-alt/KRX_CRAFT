@@ -26,4 +26,4 @@
 - byte 기준: `$c.fil.checkMaxLength`/`$c.util.setTextLengthCounter` 는 `$c.str.getByteLength` 기준으로 잰다 — DB 컬럼 byte 기준과 대조.
 
 ### 검증
-`python -m wsxml_lint conversion/next-krx-lds-fil-front/ui-tobe --ignore WS111,WS112,WS113` 34 files 0/0 · CDATA `node --check` 34/34 · body `ev:`·publicInfo ↔ 정의(기존 결함 3파일 제외) · `$c.session.info`/`$c.cm.fn_`/"공통 적용 예정" TODO 잔존 0 · `convert.py` 재실행 내용 변화 0.
+`python -m wsxml_lint conversion/w-craft-front/next-krx-lds-fil-front/ui-tobe --ignore WS111,WS112,WS113` 34 files 0/0 · CDATA `node --check` 34/34 · body `ev:`·publicInfo ↔ 정의(기존 결함 3파일 제외) · `$c.session.info`/`$c.cm.fn_`/"공통 적용 예정" TODO 잔존 0 · `convert.py` 재실행 내용 변화 0.

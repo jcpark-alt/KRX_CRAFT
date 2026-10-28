@@ -4,7 +4,7 @@
 
 규칙 1~7 중 **판단이 필요 없는 단순 치환·코드 재배치**는 Python 으로 일괄(기계어) 처리하고, **판단·재설계가 필요한 부분만** Claude Code 로 보강하는 2단계 워크플로우입니다. 대량 파일을 빠르고 일관되게, 그리고 비용 효율적으로 변환하는 것이 목적입니다.
 
-> 기준 파일 예시: `conversion/next-krx-lds-fil-front/ui/ULDCOM00007.xml` — `head(3~430) → script CDATA(22~429) → body(431~568)` 구조.
+> 기준 파일 예시: `conversion/w-craft-front/next-krx-lds-fil-front/ui/ULDCOM00007.xml` — `head(3~430) → script CDATA(22~429) → body(431~568)` 구조.
 
 ## 전제 — 파일을 3개 영역으로 분리
 

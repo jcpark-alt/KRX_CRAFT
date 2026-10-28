@@ -66,9 +66,10 @@ conversion/
 ├── sample-front/                    ← 최종 샘플 작업 공간
 │   └── ui/          ← gcc 공통함수 활용 최종 샘플 13종 (화면 유형별 표준 템플릿 — 단계 2 정답지)
 │
-└── next-krx-lds-{fil,mgt,stf,tms}-front/   ← 모듈별 변환 작업 공간
-    ├── ui/          ← 입력: W-Craft 1차 변환 원본 (단계 0 산출)
-    └── ui-tobe/     ← 출력: 단계 1 기계 치환본 → 단계 2 보강본
+└── w-craft-front/                   ← W-Craft 변환 모듈 묶음 (2026-10-28 이동)
+    └── next-krx-lds-{fil,mgt,stf,tms}-front/   ← 모듈별 변환 작업 공간
+        ├── ui/          ← 입력: W-Craft 1차 변환 원본 (단계 0 산출)
+        └── ui-tobe/     ← 출력: 단계 1 기계 치환본 → 단계 2 보강본
 
          [ 단일 출처(SOT) — 도구가 참조 ]
          ├── cm/docs/api/{fil,ins,mgt}/index_transfer.html  → gcc_mapping.substitution_dict()

@@ -1,6 +1,6 @@
 # 그리드 엑셀 다운로드 공통함수 변환 결과 (규칙 20 / 20b)
 
-> conversion 트리(`conversion/next-krx-lds-{mgt,stf,tms}-front/ui-tobe/`)의 그리드 엑셀 다운로드 호출을 gcc 공통함수 `$c.data.downloadGridViewExcel` 의 객체 시그니처로 통일한 결과 보고서. 규칙 정의는 [conversion_rules.md](conversion_rules.md) §규칙 20·20b, 매핑표는 [substitution_map.md](substitution_map.md) §10 참조.
+> conversion 트리(`conversion/w-craft-front/next-krx-lds-{mgt,stf,tms}-front/ui-tobe/`)의 그리드 엑셀 다운로드 호출을 gcc 공통함수 `$c.data.downloadGridViewExcel` 의 객체 시그니처로 통일한 결과 보고서. 규칙 정의는 [conversion_rules.md](conversion_rules.md) §규칙 20·20b, 매핑표는 [substitution_map.md](substitution_map.md) §10 참조.
 
 ## 개요
 
