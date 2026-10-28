@@ -20,7 +20,8 @@
 | `meta_screenId` | `$c.<id>` 형식 (예: `$c.util`, `$c.session`, `$c.mgt`) — 파일/도메인과 일치 |
 | 호출 | 같은 파일 내부: `scwin.함수명()` · 다른 모듈: `$c.<id>.함수명()` |
 | 내부(비공개) 헬퍼 | 이름 앞 `_` 또는 `__` — `@hidden Y`, **publicInfo 에 넣지 않음**(외부 비노출). 본문에서 `$p`/`$c` 를 사용하면 `scwin._함수명`, 순수 함수(`$p`/`$c` 미사용)면 `scwin.__함수명` |
-| 엔진 훅(예외) | WebSquare 설정(`websquare/config.js`·`config.xml`)에서 **이름으로 참조하는 `$c` 공통함수는 위 비공개 규칙의 예외** — 접두어(`_`/`__`)를 유지한 채 publicInfo 에 등재(`@hidden N`)한다. 엔진은 `$c.<id>` 에 publicInfo 메서드만 노출하므로 등재하지 않으면 훅이 조용히 사라진다. 현재 4종: `$c.sbm.__preSubmitFunction`·`__callbackSubmitFunction`·`__submitErrorHandler`(submission), `$c.win._errorHandler`(errorPage). 이름 변경 시 config.js/config.xml 도 함께 바꾼다. 본문에서 호출 화면의 `$p` 가 필요한 함수는 `_` 헬퍼로 두지 말고 **공개 함수 하나로 합쳐** 주입을 받게 한다(`$c.data.getParameter` 선례 — 래퍼/`_getParameter` 분리 폐지). 호출부에서 `$p` 를 명시적으로 넘기지 않는다 |
+| scope 인자 헬퍼(`___`) | 호출 화면의 scope(`$p`)를 **인자로 받는** 내부 헬퍼는 밑줄 3개 `scwin.___함수명` — `@hidden Y`, publicInfo 제외. `_` 헬퍼는 빌드가 첫 매개변수로 `$p` 를 주입해(`function ($p, scopeApi)`) 넘긴 scope 가 한 칸 밀리므로, `___` 접두로 주입을 피한다. 공개 래퍼는 scope 미전달 시 `$p` 를 명시 전달한다(예: `$c.win.getProgramId` → `scwin.___getProgramId(scopeApi ?? $p)` 구조) |
+| 엔진 훅(예외) | WebSquare 설정(`websquare/config.js`·`config.xml`)에서 **이름으로 참조하는 `$c` 공통함수는 위 비공개 규칙의 예외** — 접두어(`_`/`__`)를 유지한 채 publicInfo 에 등재(`@hidden N`)한다. 엔진은 `$c.<id>` 에 publicInfo 메서드만 노출하므로 등재하지 않으면 훅이 조용히 사라진다. 현재 4종: `$c.sbm.__preSubmitFunction`·`__callbackSubmitFunction`·`__submitErrorHandler`(submission), `$c.win._errorHandler`(errorPage). 이름 변경 시 config.js/config.xml 도 함께 바꾼다. 본문에서 호출 화면의 `$p` 가 필요한 함수는 `_` 헬퍼로 두지 말고 **공개 함수 하나로 합쳐** 주입을 받게 한다(`$c.data.getParameter` 선례 — 래퍼/`_getParameter` 분리 폐지). 호출부에서 `_` 헬퍼·공개 함수에 `$p` 를 명시적으로 넘기지 않는다(주입과 겹쳐 인자가 밀림). scope 를 인자로 받는 `___` 헬퍼에 넘기는 것만 예외 |
 
 ---
 
@@ -102,7 +103,7 @@ scwin.isEmpty = function (value) {
 };
 ```
 
-- `@hidden N` = 공개(publicInfo 등재), `@hidden Y` = 내부(`_`/`__` 접두어, publicInfo 제외). 내부 헬퍼는 `$p`/`$c` 사용 여부로 접두어를 나눈다: 사용 → `_함수명`, 미사용(순수) → `__함수명`.
+- `@hidden N` = 공개(publicInfo 등재), `@hidden Y` = 내부(`_`/`__` 접두어, publicInfo 제외). 내부 헬퍼는 `$p`/`$c` 사용 여부로 접두어를 나눈다: 사용 → `_함수명`, 미사용(순수) → `__함수명`. scope(`$p`)를 인자로 받는 헬퍼는 빌드 `$p` 주입을 피하려고 `___함수명`(밑줄 3개)을 쓴다.
 - `@param {Type} 이름 설명` / `@returns {Type} 설명` 형식. 타입은 `{Object}`, `{String}`, `{Boolean}`, `{Number}`, `{void}`, `{Promise<Object>}` 등.
 - `@example` 아래 줄에 실제 호출 예시 코드를 둔다(주석 `*` 없이).
 - 설명·예시는 **한국어** 로 작성(프로젝트 일관성).
@@ -179,7 +180,7 @@ scwin.isEmpty = function (value) {
 - [ ] head 골격(`w2:type`/`xf:model`+`dataCollection`/`layoutInfo`/`publicInfo`) 완비.
 - [ ] 모든 공개 함수에 JSDoc(`@method`~`@example`) 작성, 한국어 설명.
 - [ ] 공개 함수 ↔ `publicInfo` 일치(추가/삭제 동기화).
-- [ ] 내부 헬퍼는 `_`(`$p`/`$c` 사용) 또는 `__`(순수) + `@hidden Y` + publicInfo 제외. `_`/`__` 함수는 publicInfo 에 등재하지 않는다 — **단, `config.js`/`config.xml` 이 이름으로 참조하는 `$c` 공통함수(엔진 훅, §2 표)는 예외로 등재**.
+- [ ] 내부 헬퍼는 `_`(`$p`/`$c` 사용) 또는 `__`(순수), scope 를 인자로 받으면 `___`(빌드 `$p` 주입 회피) + `@hidden Y` + publicInfo 제외. `_`/`__` 함수는 publicInfo 에 등재하지 않는다 — **단, `config.js`/`config.xml` 이 이름으로 참조하는 `$c` 공통함수(엔진 훅, §2 표)는 예외로 등재**.
 - [ ] 기존 `$c.*` 함수 재사용(중복 구현·`eval` 없음, `const/let`).
 - [ ] `python -m wsxml_lint <파일>` → **0 errors, 0 warnings**.
 - [ ] (함수 추가 시) `npm run docs:gcc` 로 문서 현행화.
