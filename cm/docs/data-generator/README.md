@@ -237,3 +237,65 @@ date
 </w2:dataList>
 
 ```
+---
+
+## 8. 추가 기능 — DTO 선언문 기반 생성 (2026-10-28)
+
+기존 3줄 명세서 입력은 그대로 두고, **입력 형식** 라디오에 `DTO 선언문` 을 추가했습니다. 백엔드 Java DTO(예: `DisclsReviewListResponseDto.java`)를 붙여 넣거나 **DTO 파일 불러오기**(.txt/.java, UTF-8 → 깨지면 EUC-KR 재시도)로 읽으면 같은 템플릿(§5)으로 `dataMap`/`dataList` 를 생성합니다.
+
+### 8.1 파싱 규칙
+
+| 항목 | 규칙 |
+| --- | --- |
+| 대상 | 클래스 본문의 `[접근제어자] 타입 이름 [= 초기값];` 필드 (`String a, b;` 다중 선언 포함). 클래스 선언 없이 필드만 붙여 넣어도 됨 |
+| 제외 | `static` 필드(상수), 메서드·생성자, 중첩 클래스·초기화 블록, `enum` |
+| `id` | 필드명 그대로 (`@JsonProperty("X")` 가 있으면 그 값) |
+| `name` | `@Schema(description \| title)` → `@ApiModelProperty(value)` → 필드 위 주석(`/** */`, `//`) → 같은 줄 뒤 주석 → 빈값 |
+| hidden | `@Schema` / `@Parameter` / `@ApiModelProperty` 의 `hidden = true` (`"true"` 도 인정) |
+| 기본 ID | ID 입력이 비어 있으면 클래스명에서 `Dto`/`Vo` → `Request`/`Response` 접미를 떼고 첫 글자 소문자 (`DisclsReviewListResponseDto` → `disclsReviewList`). 자동 채운 값은 다음 DTO 생성 때 갱신, 직접 고친 값은 유지 |
+
+### 8.2 hidden 컬럼 처리
+
+* 기본: `hidden = true` 필드는 생성 대상에서 **제외**하고, 결과 하단에 제외된 필드 id 를 표시합니다.
+* **`hidden 컬럼 포함`** 체크 시 hidden 필드도 포함해 생성합니다 (체크 변경 시 결과가 있으면 즉시 재생성).
+
+### 8.3 Java 타입 매핑
+
+| Java 타입 (제네릭·패키지 제거 후) | `dataType` |
+| --- | --- |
+| `String`, `char`/`Character`, `boolean`/`Boolean`, `UUID` | `"text"` |
+| `int`/`Integer`, `long`/`Long`, `short`, `byte`, `float`, `double` (+ 래퍼) | `"number"` |
+| `BigDecimal`, `BigInteger` | `"bigDecimal"` |
+| `Date`, `LocalDate`, `LocalDateTime`, `Timestamp`, `ZonedDateTime`, `OffsetDateTime`, `Instant` | `"date"` |
+| `LocalTime`, `Time` | `"time"` |
+| `List`/`Set`/`Map`/`Collection` 계열, 배열(`[]`), `Object`, `JsonNode` | `"json"` |
+| 그 외 | §4.2 매핑으로 폴백 (기본 `"text"`) |
+
+### 8.4 테스트 케이스 C — hidden 포함 DTO
+
+```java
+@Schema(description = "공시검토 - 공시작성상태 변경 요청 DTO")
+public class DisclsReviewWrtStatRequestDto {
+    @NotBlank
+    @Schema(description = "신청번호")
+    private String applNo;
+
+    @Schema(description = "공시작성상태코드", hidden = true)
+    private String disclsWrtStatCd;
+
+    @Schema(description = "통합사용자ID", hidden = true)
+    private String integUsrId;
+}
+```
+
+* 기본 (`dataMap`, ID 비움 → `dma_disclsReviewWrtStat`):
+
+```xml
+<w2:dataMap id="dma_disclsReviewWrtStat" baseNode="map">
+	<w2:keyInfo>
+		<w2:key id="applNo" name="신청번호" dataType="text"></w2:key>
+	</w2:keyInfo>
+</w2:dataMap>
+```
+
+* `hidden 컬럼 포함` 체크 시: 위에 `disclsWrtStatCd`(공시작성상태코드), `integUsrId`(통합사용자ID) 두 key 가 추가됩니다.
