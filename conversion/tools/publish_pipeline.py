@@ -2,7 +2,7 @@
 """KRX 퍼블리싱 산출 XML(`conversion/publish/**`, W-Craft 1차 변환 스크립트 내장) 전환 파이프라인 — publish/<폴더>/<name>.xml → publish-tobe/<폴더>/<name>.xml
 
     python conversion/tools/publish_pipeline.py [--no-gate] [--jobs N] [<xml|폴더> ...]
-    (인자가 없으면 publish/ 전체. 폴더를 주면 그 안의 *.xml 전부. 원본(publish/)은 읽기만 하고 결과는 publish-tobe/ 에 같은 상대 경로로 쓴다 — 기존 산출물은 덮어쓴다)
+    (인자가 없으면 publish/ 전체. 폴더를 주면 그 안의 *.xml 전부. 원본(publish/)은 읽기만 하고 결과는 publish/publish-tobe/ 에 같은 상대 경로로 쓴다 — 기존 산출물은 덮어쓴다)
 
 단계(순서 고정 — jspfront_pipeline 과 같은 수렴 규약, 공급사(r13) 전용 단계 vendor_postprocess·publish_normalize·publish_merge 는 없음):
   1 convert.convert      Stage 1 기계 치환(규칙 1~32) — W-Craft 원본이라 screen 프로파일 기본(keep_nullish 없음, next-krx-lds-* 모듈과 동일)
@@ -12,7 +12,7 @@
 
 pcc(업무공통 재고 — await 전파·미정의 $c 판정): 화면 접두로 정하고(uldstf/jldstf/uldfis/uldins/uldbns/uldbnf/uldcom → stf, uldfil/jldfil/*ods → fil,
   uldmgt → mgt, uldtms → tms), 접두가 없으면 업무 폴더로(공시 → fil, 상장·채권·표준코드·샘플(전환) → stf, 운영자(대내) → mgt, TMS → tms).
-리포트: `conversion/publish-tobe/README.md`(폴더별 집계 + 게이트 실패 분류 + 치명 오류 목록), `conversion/publish-tobe/pipeline_report.json`(화면별).
+리포트: `conversion/publish/publish-tobe/README.md`(폴더별 집계 + 게이트 실패 분류 + 치명 오류 목록), `conversion/publish/publish-tobe/pipeline_report.json`(화면별).
 """
 import collections
 import glob
@@ -32,7 +32,8 @@ import screen_convention as sc  # noqa: E402
 import gate_screen  # noqa: E402
 
 SRC = st.ROOT / "conversion" / "publish"
-DST = st.ROOT / "conversion" / "publish-tobe"
+# 2026-10-28 결과 폴더를 publish/ 아래로 이동 — 입력(publish/**)을 훑을 때 이 하위는 반드시 뺀다(결과를 다시 변환하지 않게)
+DST = SRC / "publish-tobe"
 PCC_BY_PREFIX = {"uldstf": "stf", "jldstf": "stf", "uldfis": "stf", "uldins": "stf", "uldbns": "stf", "uldbnf": "stf", "uldcom": "stf",
                  "uldfil": "fil", "jldfil": "fil", "uldods": "fil", "jldods": "fil", "uldmgt": "mgt", "uldtms": "tms", "uldinf": "fil", "jldinf": "fil"}
 PCC_BY_FOLDER = {"공시": "fil", "상장": "stf", "채권": "stf", "표준코드": "stf", "샘플(전환)": "stf", "운영자(대내)": "mgt", "TMS(서식관리_대내)": "tms"}
@@ -171,7 +172,7 @@ def summarize(reps, elapsed):
         for k, n in (g.get("tokens") or {}).items():
             tokens[k] += n
     lines = ["# publish → publish-tobe 전환 기록", "",
-             "- `conversion/publish/` — KRX 퍼블리싱 산출 XML 원본(W-Craft 1차 변환 스크립트 내장, **수정 금지**). `conversion/publish-tobe/` — `publish_pipeline.py` 산출물(같은 상대 경로).",
+             "- `conversion/publish/` — KRX 퍼블리싱 산출 XML 원본(W-Craft 1차 변환 스크립트 내장, **수정 금지**). `conversion/publish/publish-tobe/` — `publish_pipeline.py` 산출물(같은 상대 경로).",
              "- 파이프라인: convert(Stage 1) → screen_convention(jsdoc·await·reindent·unused·finalize) → 컨벤션↔convert 수렴 → gate_screen. 스크립트 없는 순수 목업은 convert 만 거친다.",
              "- 재실행: `python conversion/tools/publish_pipeline.py` (전체) 또는 `python conversion/tools/publish_pipeline.py \"conversion/publish/상장/상장처리(대내)\"` (폴더·파일 단위). 화면별 상세는 `pipeline_report.json`.",
              "", "## 실행 결과 (%s, %d본, %.0f초)" % (time.strftime("%Y-%m-%d %H:%M"), len(reps), elapsed), "",
@@ -210,7 +211,8 @@ def main(argv=None):
     files, _fl, _op = st.parse_cli(argv, flags=(), opts=())
     if not argv:
         files = sorted(glob.glob(str(SRC / "**" / "*.xml"), recursive=True))
-    files = [f for f in files if Path(f).resolve().is_relative_to(SRC.resolve())]
+    files = [f for f in files
+             if Path(f).resolve().is_relative_to(SRC.resolve()) and not Path(f).resolve().is_relative_to(DST.resolve())]
     if not files:
         print(__doc__); return 2
     t0 = time.time()

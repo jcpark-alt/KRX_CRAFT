@@ -1,6 +1,6 @@
 # publish → publish-tobe 전환 기록
 
-- `conversion/publish/` — KRX 퍼블리싱 산출 XML 원본(W-Craft 1차 변환 스크립트 내장, **수정 금지**). `conversion/publish-tobe/` — `publish_pipeline.py` 산출물(같은 상대 경로).
+- `conversion/publish/` — KRX 퍼블리싱 산출 XML 원본(W-Craft 1차 변환 스크립트 내장, **수정 금지**). `conversion/publish/publish-tobe/` — `publish_pipeline.py` 산출물(같은 상대 경로).
 - 파이프라인: convert(Stage 1) → screen_convention(jsdoc·await·reindent·unused·finalize) → 컨벤션↔convert 수렴 → gate_screen. 스크립트 없는 순수 목업은 convert 만 거친다.
 - 재실행: `python conversion/tools/publish_pipeline.py` (전체) 또는 `python conversion/tools/publish_pipeline.py "conversion/publish/상장/상장처리(대내)"` (폴더·파일 단위). 화면별 상세는 `pipeline_report.json`.
 
@@ -92,12 +92,12 @@
 
 - 없음
 
-## wsxml_lint (`python -m wsxml_lint conversion/publish-tobe --ignore WS111,WS112,WS113`)
+## wsxml_lint (`python -m wsxml_lint conversion/publish/publish-tobe --ignore WS111,WS112,WS113`)
 
 | 대상 | 파일 | 오류 | 경고 | 비고 |
 |---|---|---|---|---|
 | `conversion/publish/` (원본) | 1,934 | 15,249 (전부 WS120 중복 id, 674화면) | 0 | 퍼블리싱 자동생성 id·그리드 header↔gBody 동일 컬럼 id |
-| `conversion/publish-tobe/` (산출) | 1,934 | 334 (전부 WS120, 62화면) | 0 | finalize 의 header `_H` 접미로 612화면 해소. **새로 생긴 오류 0**. 잔여는 퍼블리싱 목업 자체의 중복 id(`template.xml` tabs1 등) — Stage 2 |
+| `conversion/publish/publish-tobe/` (산출) | 1,934 | 334 (전부 WS120, 62화면) | 0 | finalize 의 header `_H` 접미로 612화면 해소. **새로 생긴 오류 0**. 잔여는 퍼블리싱 목업 자체의 중복 id(`template.xml` tabs1 등) — Stage 2 |
 
 - 게이트 FAIL 889 의 주된 사유는 `undefined_c`(827) — as-is 공통 네임스페이스(`$c.ut`·`$c.bns`·`$c.libRoundPanel`·`$c.elw`·`$c.lce`·`$c.stockSearch` …)가 `cm/pcc` 에 없거나 개명 전 이름(`$c.stf.fn_PopupCorpInfo` → `openPopupCorpInfo`, `compareFromToDate2`)인 자리. next-krx-lds-*-front README 의 치환표(예: `$c.ut.cGetToday` → `$c.date.getServerDateTime()`)를 Stage 2 에서 적용한다.
 - `node` 구문 실패 38 은 원본의 같은 스코프 `var` 중복 선언이 규칙 8 `let` 전환으로 드러난 것(`let str` 2회 등)과 W-Craft `X` 마커 등 원본 구문 오류 — 화면별 손작업.

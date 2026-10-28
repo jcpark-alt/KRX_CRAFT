@@ -81,7 +81,10 @@ COPY_ATTRS = ("id", "ref", "dataList", "displayFormatter", "customFormatter", "c
 
 def publish_index():
     idx = {}
+    out_dir = (PUB_DIR / "publish-tobe").resolve()     # 2026-10-28 부터 publish/ 아래의 전환 결과 — 원본 색인에서 뺀다
     for f in glob.glob(str(PUB_DIR / "**" / "*.xml"), recursive=True):
+        if Path(f).resolve().is_relative_to(out_dir):
+            continue
         idx.setdefault(os.path.basename(f)[:-4].lower(), []).append(f)
     return idx
 

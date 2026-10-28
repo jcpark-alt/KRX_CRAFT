@@ -9,7 +9,7 @@
 | 2 | [markup-idioms.md](../../../.claude/skills/websquare-publishing/markup-idioms.md) | sample-front 119화면 실측 마크업 관용구 | 2026-10-23 |
 | 3 | [request-template.md](../../../.claude/skills/websquare-publishing/request-template.md) | 퍼블리싱 생성·반영 요청 양식 + 스니펫 목록 | 2026-10-22 |
 | 4 | [conversion_rules.md](../conversion_rules.md) 규칙 34·35 | 퍼블리싱 정규화(`publish_normalize.py`)·병합(`publish_merge.py`) 규칙 | — |
-| 5 | [publish-tobe/README.md](../../publish-tobe/README.md) | publish → publish-tobe 일괄 전환 실행 기록 | 2026-10-12 |
+| 5 | [publish-tobe/README.md](../../publish/publish-tobe/README.md) | publish → publish-tobe 일괄 전환 실행 기록 | 2026-10-12 |
 | 6 | [publish_merge_report.md](../../jsp-front/publish_merge_report.md) | jsp-front 퍼블리싱 병합 화면별 판정표 | 2026-10-07 |
 
 관련 HTML 보고서: [publishing_model_detailed_report.html](publishing_model_detailed_report.html)(하네스 근거 §5~§7), [publishing_model_comparison_report.html](publishing_model_comparison_report.html).
@@ -176,7 +176,7 @@ sample-front 가이드 골격으로 바꾸는 1:1 구조 치환만 한다.
 
 ## 5. publish-tobe/README.md — publish → publish-tobe 전환 기록
 
-- **대상**: `conversion/publish/`(KRX 퍼블리싱 원본 1,934본, W-Craft 1차 스크립트 내장, **수정 금지**)를 같은 상대 경로의 `conversion/publish-tobe/`로 산출한다.
+- **대상**: `conversion/publish/`(KRX 퍼블리싱 원본 1,934본, W-Craft 1차 스크립트 내장, **수정 금지**)를 같은 상대 경로의 `conversion/publish/publish-tobe/`로 산출한다.
 - **파이프라인** `publish_pipeline.py`: convert(Stage 1) → screen_convention(jsdoc·await·reindent·unused·finalize) → convert 수렴(최대 3회) → gate_screen. 스크립트가 없는 목업은 convert만 거친다. 폴더·파일 단위로 재실행할 수 있고, 상세는 `pipeline_report.json`에 있다.
 - **실행 결과 (2026-10-12, 1,934본, 197초)**:
 
