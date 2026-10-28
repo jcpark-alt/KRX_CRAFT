@@ -7,7 +7,7 @@
 | TO-BE | `conversion/conversion-front/ui-tobe/ULDSTF05710.xml` (배포 경로 `/ui/lst/lstproc/ULDSTF05710.xml` — 가정, §10 #15). **2026-10-27 전환 완료** — 1단계: 캡처 기준 퍼블리싱(contentHeader, 14행 입력 표, 하단 [닫기] 없음), 2단계: 이 결과서대로 스크립트 전환. 게이트 통과: `gate_screen --pcc stf`, `publish_gate --pcc stf`(1단계본 대비 `--allow P20` — 1단계는 [닫기] 버튼·핸들러와 빈 `onpageunload` 제거로 `--allow P11,P12`), `api_spec_check`(명세 5종 모두 사용), `init_binding_check`, `wsxml_lint` 0/0, `convert.py` 고정점 |
 | 퍼블리셔 XML | `conversion/publish/상장/상장처리(대내)/ULDSTF05710.xml` — 컴포넌트 id 는 AS-IS 와 같음(날짜 4종 `w2:inputCalendar`, 상장방식 `xf:select1`, 무액면 `xf:select` checkboxgroup, 이미지 버튼 → `xf:trigger`, 달력 이미지 `img_*_DD` 는 없음) |
 | 화면 캡처 | `ULDSTF05710.png` (빈 입력 상태 — 신규, [저장]만 활성, 인쇄·승인일 숨김) → **TO-BE 는 가이드 §13.2 퍼블리싱본부터 만든다**. 캡처 하단 [닫기] 버튼은 **(옮기지 않음)** — 팝업 하단 닫기 금지(퍼블리싱 규칙) |
-| 업무공통 | pcc(`cm/pcc/stf`): `$c.stf`(`getNewBzProcNo`·`getMessageParam`·`setButtonSetWithDate`·`setButtonSetWithDate2`)·`$c.lc`(`isProcess`·`popFindNewIsuOfIsur`·`checkDoubleInput`·`checkBzDoubleInput`·`glb.LIST_BZ_TP_CD_121`·`glb.LIST_METHD_TP_CD_1`)·`$c.print`(`openReportPdf`). gcc: `$c.data.getParameter`·`$c.date`(`getServerDateTime`·`checkCalendarFormat`·`compareFromToDate`·`formatDate`)·`$c.num.formatNumber`·`$c.validate.validateDataCollect`·`$c.util.setButtonState`·`$c.util.isEmpty`·`$c.win`(`alert`·`openPopup`·`closePopup`)·`$c.sbm.executeDynamic`·`$c.exception.handleError`. 게이트는 `--pcc stf` 로 돌린다 |
+| 업무공통 | pcc(`cm/pcc/stf`): `$c.stf`(`getNewBzProcNo`·`getMessageParam`·`setButtonSetWithDate`·`setButtonSetWithDate2`)·`$c.lc`(`isProcess`·`popFindNewIsuOfIsur`·`checkDoubleInput`·`checkBzDoubleInput`·`glb.LIST_BZ_TP_CD_121`·`glb.LIST_METHD_TP_CD_1`)·gcc: `$c.data.getParameter`·`$c.data.openReportPdf`·`$c.str.toUpperSnakeCase`·`$c.date`(`getServerDateTime`·`checkCalendarFormat`·`compareFromToDate`·`formatDate`)·`$c.num.formatNumber`·`$c.validate.validateDataCollect`·`$c.util.setButtonState`·`$c.util.isEmpty`·`$c.win`(`alert`·`openPopup`·`closePopup`)·`$c.sbm.executeDynamic`·`$c.exception.handleError`. 게이트는 `--pcc stf` 로 돌린다 |
 | 작성 | Inswave / 2026-10-27 |
 
 참고 양식: [websquare_gfm_conversion.md](../../../md/websquare_gfm_conversion.md) — 특히 §1.4 업무 프로세스 흐름, §5 「API 명세 적용」, §6.5 getPar/setPar 전환. Gauce 대응은 [gfm_business_analysis_guide.md](../../../md/gfm_business_analysis_guide.md) §5·§6 을 함께 따랐다. 같은 모듈 정답지 [ULDSTF05621.md](../ULDSTF05621/ULDSTF05621.md) 의 구성을 따랐다.
@@ -67,7 +67,7 @@ AS-IS 는 `fn_GetPar` 배열이 아니라 **부모 창의 전역 변수를 직�
 | `ULDSTF92016` 종목선택(발행기관의 미상장종목, 385×250) | `img_ISU_CD onclick` → `fn_GetPar = fn_GetParIsuCd`(`arr[0]` 증권그룹ID, `arr[1]` 발행회사코드, `arr[2] = "S"`), `fn_SetPar = fn_SetParIsuCd` → `fn_PopFindNewIsuOfIsur()` (`CreateDialogFrame("DLG_NEW_ISU_ISUR_CD", "../listingcommon/ULDSTF92016.gfm", …, "window")`) | `$c.lc.popFindNewIsuOfIsur(secugrpId, isurCd)` — pcc 가 `{ secugrpId, isurCd }` 로 `pageFramePopup`(기본 타입) 을 열고 결과를 돌려준다. `arr[2] = "S"` 는 넘기지 않음(§10 #9) | 선택 행 객체(`isuCd`·`isuSrtCd`·`isuNm`·`isuSnm`·`isuEngNm`·`isuEngSnm`·`isuRnd`·`isuDd`·`tarstkIsuCd`·`tarstkIsuNm` — 전환본 `sample-front/ui/stf/lst/common/ULDSTF92016.xml`). **`isuCd` 가 비면 취소**로 본다(원본 `if (arrPar[0].ISU_CD != "")`) — §6.2 |
 | `ULDSTF92024` 공시안내문작성 (750×825) | `fn_dscl` — `fn_GetPar` 바꿔 끼우기: 유가 `arr = ["68912", 업무처리번호, 발행회사코드]` + `CopyDataSet(dts_Isu → param_dts_mst)`, 코스닥 `arr = ["70920", 업무처리번호, 발행회사코드, 시장구분]` + `CopyDataSet(dts_Isu → param_dts_mst)`·`CopyDataSet(dts_Eng_Isu → param_dts_mst_eng)` → `frame.CreateDialogFrame("ULDSTF92024", "/listingcommon/ULDSTF92024.gfm", "공시안내문작성", 중앙, 750, 825, "window")` | `{ formCd : "68912"/"70920", bzProcsNo, isurCd, mktId(코스닥만 "2"), mst : [상세], mstEng : [상세](코스닥만) }` — §6.5 | 없음(원본 `fn_SetPar` 는 빈 함수). `await` 뒤 처리 없음 |
 | (기안 `ULDSTF92004`) | `fn_drft` → `fn_PopFindDraft()` — 하지만 기안 버튼 `btn_Drft` 가 없고 `buttonSet.setDrftInfo` 도 주석 처리라 **진입점 없음** | **(옮기지 않음)** — §8 #10 | — |
-| (인쇄 PDF 창) | `fn_print` → `fn_open_report_pdf("RLDSTF00029", userParam)` (숨은 form POST → 새 창) | `$c.print.openReportPdf("RLDSTF00029", userParam)` — 팝업 화면이 아니라 브라우저 창(§6.6) | 없음 |
+| (인쇄 PDF 창) | `fn_print` → `fn_open_report_pdf("RLDSTF00029", userParam)` (숨은 form POST → 새 창) | `await $c.data.openReportPdf({ url : "/api/listing/common/report/pdf-download", reqParam })` — 서버가 만든 PDF 를 브라우저 창으로(팝업 화면 아님, 전환 규칙 47, §6.6) | 없음(창을 열면 `true`) |
 
 ### 1.4 업무 프로세스 흐름
 
@@ -269,7 +269,7 @@ flowchart TD
     B -- "없음 ※TO-BE" --> B1>"저장 후 인쇄하세요.(가정)"] --> E1
     B -- "있음" --> T[/"GET print §5.8"/]
     T -. "실패 · 중복 실행 건너뜀" .-> E1
-    T --> U["userParam 구성 · 승인일 = 승인일(인쇄용)"] --> R[["$c.print.openReportPdf RLDSTF00029"]] --> E1
+    T --> U["reqParam 구성(getJSON → 조합·형식 → 대문자 스네이크) · 승인일 = 승인일(인쇄용)"] --> R[["$c.data.openReportPdf RLDSTF00029"]] --> E1
 ```
 
 - 안내문작성은 확인 메시지 없이 바로 연다(원본에 `fn_isProcess('DSCL')` 없음). 수정 중인 미저장 값 확인(`IsUpdated`)은 원본에서 주석 처리돼 하지 않는다.
@@ -818,7 +818,7 @@ scwin.init = async function () {
 - TO-BE:
   1. `scwin.bzProcsNo` 가 비면 "저장 후 인쇄하세요."(가정 문구) 안내 후 끝(※TO-BE — §8 #8).
   2. `if (!(await scwin.selectPrint())) return;` (§5.8)
-  3. `userParam` (리포트 `uid` 는 AS-IS 그대로, 값은 `dma_print`):
+  3. 리포트 파라미터 `reqParam` — **전환 규칙 47**: `dma_print.getJSON()` → 조합 키(`isuInfo`·`isuDdInfo`, 원시 값으로 먼저) → 형식 덮어쓰기(숫자 4·날짜 4) → `commitDd` 를 화면 승인일로 덮어쓰기 → `$c.str.toUpperSnakeCase` 로 키를 대문자 스네이크로 → `pdf_rptname = scwin.REPORT_ID`(변환 뒤). 결과 키는 아래 AS-IS `uid` 19개와 키·값이 모두 같다(2026-10-28 대조, 불일치 0). `dma_print` 의 나머지 7키(`BZ_PROCS_NO`·`ACPT_NO`·`ISUR_CD`·`ISU_CD`·`ISU_RND`·`DELIST_DD`·`ISU_SRT_CD`)도 함께 간다(규칙 47 「잉여」):
 
      | uid | 값 | 형식 |
      |---|---|---|
@@ -832,7 +832,7 @@ scwin.init = async function () {
      | `ISU_DD_INFO` | `isuDd + " / 제" + isuRnd + "회"` (발행일은 형식 없이 원문) | — |
 
   4. `doLogSave` 는 삭제(2026-10-26 결정, §8 #14).
-  5. `$c.print.openReportPdf(scwin.REPORT_ID, userParam)` (`"RLDSTF00029"`) — 숨은 form 을 만들어 `/filePdfload.do?method=getPdfInfo` 로 새 창에 POST 한다. `await` 조회 뒤 `window.open` 이라 팝업 차단 여부를 실화면에서 확인(§10 #12).
+  5. `await $c.data.openReportPdf({ url : "/api/listing/common/report/pdf-download", reqParam })` — 서버가 PDF 를 만들고 그 경로를 새 창으로 연다(종전 `$c.print.openReportPdf` 숨은 form POST 에서 2026-10-28 전환). 조회(`await`)·PDF 생성 뒤 창을 열어 팝업 차단 여부를 실화면에서 확인(§10 #12). 서버가 `reqParam` 키를 대문자 스네이크로 받는지는 §10 #17.
 - 원본 `fn_print_old`(Rexpert, 2018-04-03 백업)는 호출이 없다 → **(옮기지 않음)**.
 
 ### 6.7 저장 (`scwin.save`) — 원본 `fn_save`
@@ -997,7 +997,7 @@ scwin.applyButtonState = function () {
 | `fn_parentRefresh` (`frame.Provider("../").fn_all_list_sync`) | 삭제 — 부모가 `await openPopup` 뒤 재조회(§8 #12) |
 | `fn_setBtnRecvIsuDel` | `scwin.setBtnRecvIsuDel` (`setDisabled`) |
 | `fn_report_read_sync` | `scwin.selectPrint` (`GET print`) |
-| `fn_print` (+ `FormatNumberEx`·`FormatDateEx`·`doLogSave`·`fn_open_report_pdf`) | `scwin.print` — `$c.num.formatNumber`·`$c.date.formatDate(v, "-")`·`$c.print.openReportPdf` (`doLogSave` 삭제) |
+| `fn_print` (+ `FormatNumberEx`·`FormatDateEx`·`doLogSave`·`fn_open_report_pdf`) | `scwin.print` — `dma_print.getJSON()` + `$c.num.formatNumber`·`$c.date.formatDate(v, "-")` 덮어쓰기 + `$c.str.toUpperSnakeCase` + `$c.data.openReportPdf` (전환 규칙 47, `doLogSave` 삭제) |
 | `fn_print_old` (Rexpert) | 삭제 (호출 없음) |
 | `showObj(btn_Print·label_26·edt_APPROV_DD·img_APPROV_DD, …)` | `scwin.setPrintVisible` (`show("")`/`hide()`) |
 | `buttonSet.set*Info` / `setInsertStatus` / `setUpdateStatus` / `setDeleteStatus` | `ev:onclick` + `$c.util.setButtonState("grpBtnBox", "insert"/"update", scwin.BTN_MAP)` (`setDeleteStatus` 삭제) |
@@ -1031,3 +1031,4 @@ scwin.applyButtonState = function () {
 14. **TO-BE 신설 문구** — "상세 내역을 찾을 수 없습니다."·"안내문을 작성할 수 없는 시장구분입니다."·"저장 후 인쇄하세요." 는 가정 문구다(§7.2) — 업무 확정.
 15. **TO-BE 배포 경로·창 크기·프레임 id** — `/ui/lst/lstproc/ULDSTF05710.xml`(가정), 부모가 여는 크기 860×490, 원본 프레임 id `ULDSTF05711.gfm` 은 TO-BE 에서 `ULDSTF05710` 으로(§1.1).
 16. ~~**TO-BE 1단계(퍼블리싱) 재작성**~~ — **완료(2026-10-27)**. 캡처 기준으로 마크업을 다시 만들고(contentHeader, 14행 입력 표, 하단 [닫기] 제외, 인라인 배경색 없음 — 규칙 40) 2단계 스크립트까지 전환했다. 게이트: `gate_screen --pcc stf`, `publish_gate --pcc stf`(1단계본 대비 `--allow P20`; 1단계는 `--allow P11,P12`), `api_spec_check`(5종 모두 사용), `init_binding_check`, lint 0/0, `convert.py` 고정점.
+17. **리포트 파라미터 키 형식(전환 규칙 47 미결)** — `scwin.print` 는 `reqParam` 키를 AS-IS 필드명(대문자 스네이크, `COM_NM` 등)으로 보낸다. 상장 리포트 API(`/api/listing/common/report/pdf-download`)가 이 형식으로 받는지 서버에 확인 — camelCase 로 받기로 정해지면 `$c.str.toUpperSnakeCase` 단계만 뺀다. AS-IS 에 없던 7키가 함께 가는 것이 문제 없는지도 함께 확인.

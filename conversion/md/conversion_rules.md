@@ -1192,7 +1192,7 @@ await $c.data.openReportPdf({ url : "/api/listing/common/report/pdf-download", r
 * **함께 없애는 것**: `doLogSave`(화면 로그) 호출, AS-IS 빈 껍데기 데이터셋(`dts_Print.SetDataHeader`·`AddRow`) — 옮기지 않는다.
 * **미결 — 서버 키 형식 계약**: `reqParam` 의 키를 서버가 대문자 스네이크(AS-IS 필드명)로 받는지 camelCase 로 받아 스스로 바꾸는지 확정되지 않았다. 이 규칙은 리포트 서식이 AS-IS 필드명을 쓴다는 전제로 4) 키 변환을 둔다 — 서버가 camelCase 를 받기로 정해지면 4) 만 빼고 나머지는 그대로다. 전환 결과서 §10 에 화면마다 확인 항목으로 둔다.
 * **공통함수**: `$c.str.toUpperSnakeCase(value, { exclude })`·`$c.data.openReportPdf(param)` — `cm/gcc`(2026-10-28 `ba1b608c`). 화면에 같은 변환 함수를 따로 만들지 않는다.
-* **적용 현황**(2026-10-28, conversion-front TO-BE): `ULDSTF05710` `scwin.print`(RLDSTF00029, 19키)가 아직 `$c.print.openReportPdf` 배열 방식 — 미적용.
+* **적용 현황**(2026-10-28, conversion-front TO-BE): `ULDSTF05710` `scwin.print`(RLDSTF00029) 적용 완료 — AS-IS `uid` 19개와 키·값 대조 불일치 0(조합 2: `ISU_INFO`·`ISU_DD_INFO`, 화면 값 1: `COMMIT_DD`, 형식 8), 잉여 7키 동반, 서버 키 형식 확인은 결과서 §10 #17.
 
 ## 규칙 6 보충: Submission 변환 상세
 

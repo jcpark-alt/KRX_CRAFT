@@ -1069,7 +1069,8 @@ scwin.fillDataList = function (dataList, rows) {
  * @name scwin.print
  * @author Inswave
  * @date 2026. 10. 27
- * @description 증권발행내역 인쇄. 인쇄 자료를 조회해 리포트 파라미터를 만들고 PDF 미리보기 창을 연다. (원본 fn_print — §6.6)
+ * @description 증권발행내역 인쇄. 인쇄 자료를 조회해 리포트 파라미터를 만들고 서버에서 만든 PDF 를 새 창으로 연다. (원본 fn_print — §6.6, 전환 규칙 47)
+ * 조회 결과를 한 번에 꺼내 조합·형식 키만 덮어쓰고 키를 리포트 필드명(대문자 스네이크)으로 바꾼다.
  * 승인일은 응답 commitDd 가 아니라 승인일(인쇄용) 입력값이다(원본 그대로). 원본 doLogSave 는 삭제(§8 #14).
  * @returns
  * @hidden N
@@ -1083,34 +1084,26 @@ scwin.print = async function () {
 
     if (!await scwin.selectPrint()) return;
 
+    // 1) 조회 결과를 한 번에 — 키를 바꾸면 AS-IS 필드명이 되는 16개(COM_NM·ISU_KOR_NM·…·SUBSRGHT_EP_CONTN)는 그대로 쓴다
     const rpt = dma_print.getJSON();
-    const num = value => $c.num.formatNumber(value);          // AS-IS FormatNumberEx
-    const date = value => $c.date.formatDate(value, "-");     // AS-IS FormatDateEx (yyyy-MM-dd)
 
-    const userParam = [
-        { uid : "COM_NM", unm : rpt.comNm },
-        { uid : "ISU_INFO", unm : rpt.isuCd + " / " + rpt.isuSrtCd },
-        { uid : "ISU_KOR_NM", unm : rpt.isuKorNm },
-        { uid : "ISU_KOR_ABBRV", unm : rpt.isuKorAbbrv },
-        { uid : "ISU_ENG_NM", unm : rpt.isuEngNm },
-        { uid : "ISU_ENG_ABBRV", unm : rpt.isuEngAbbrv },
-        { uid : "ISU_RSN_CONTN", unm : rpt.isuRsnContn },
-        { uid : "TARSTK_ISU_NM", unm : rpt.tarstkIsuNm },
-        { uid : "SUBSRGHT_EP_CONTN", unm : rpt.subsrghtEpContn },
-        { uid : "LIST_SHRS", unm : num(rpt.listShrs) },
-        { uid : "EXER_PRC", unm : num(rpt.exerPrc) },
-        { uid : "ISU_SHRS", unm : num(rpt.isuShrs) },
-        { uid : "TOT_ISU_PRC", unm : num(rpt.totIsuPrc) },
-        { uid : "EXER_STRT_DD", unm : date(rpt.exerStrtDd) },
-        { uid : "EXER_END_DD", unm : date(rpt.exerEndDd) },
-        { uid : "COMMIT_DD", unm : date(edt_APPROV_DD.getValue()) },
-        { uid : "ISU_DD", unm : date(rpt.isuDd) },
-        { uid : "ISU_DD_INFO", unm : rpt.isuDd + " / 제" + rpt.isuRnd + "회" },
-        { uid : "LIST_DD", unm : date(rpt.listDd) }
-    ];
+    // 2) 조합 키 — 원시 값(형식 전)으로 먼저 만든다
+    rpt.isuInfo = rpt.isuCd + " / " + rpt.isuSrtCd;                        // ISU_INFO
+    rpt.isuDdInfo = rpt.isuDd + " / 제" + rpt.isuRnd + "회";                 // ISU_DD_INFO
 
-    // TODO: 조회(await) 뒤 window.open 이라 팝업 차단 여부를 실화면에서 확인 (§10 #12)
-    $c.print.openReportPdf(scwin.REPORT_ID, userParam);
+    // 3) 형식 덮어쓰기 — AS-IS FormatNumberEx·FormatDateEx(yyyy-MM-dd) 그대로
+    ["listShrs", "exerPrc", "isuShrs", "totIsuPrc"].forEach(key => { rpt[key] = $c.num.formatNumber(rpt[key]); });
+    ["exerStrtDd", "exerEndDd", "isuDd", "listDd"].forEach(key => { rpt[key] = $c.date.formatDate(rpt[key], "-"); });
+    // 승인일은 응답 commitDd 가 아니라 승인일(인쇄용) 입력값 — 화면 값이라 getJSON 밖이다(원본 그대로)
+    rpt.commitDd = $c.date.formatDate(edt_APPROV_DD.getValue(), "-");     // COMMIT_DD
+
+    // 4) 키 → 리포트 필드명(대문자 스네이크), 5) 리포트명은 변환 뒤에(소문자 pdf_rptname 그대로)
+    // TODO: 서버가 reqParam 키를 대문자 스네이크로 받는지 확인 — camelCase 로 정해지면 4) 만 뺀다 (§10 #17, 전환 규칙 47 미결)
+    const reqParam = $c.str.toUpperSnakeCase(rpt);
+    reqParam.pdf_rptname = scwin.REPORT_ID;
+
+    // TODO: 조회(await)·PDF 생성 뒤 창을 열어 팝업 차단 여부를 실화면에서 확인 (§10 #12)
+    await $c.data.openReportPdf({ url : "/api/listing/common/report/pdf-download", reqParam : reqParam });
 };
 ]]></script>
 	</head>
