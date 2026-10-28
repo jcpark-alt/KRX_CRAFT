@@ -1,0 +1,462 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:ev="http://www.w3.org/2001/xml-events"
+    xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+    <head meta_screenName="[가이드] gridView 컬럼 displayFormatter · customFormatter" meta_screenId="SMPFMT10001" meta_screenDesc="gridView 컬럼의 displayFormatter(값 하나만 받는 표시 변환 — 전화번호·주민번호 마스킹·비율·계좌번호)와 customFormatter(행·컬럼 위치를 받아 같은 행 값 참조와 셀 class 를 함께 처리 — 상태 코드명·등락률 색·한도 초과 배경)의 차이, 두 formatter 의 적용 순서, 실행 중 formatter 교체, 원본 데이터 보존을 시연하는 가이드." meta_author="Inswave" meta_type="가이드" meta_date="2026.10.28">
+        <w2:type>COMPONENT</w2:type>
+        <w2:buildDate/>
+        <w2:MSA/>
+        <xf:model>
+            <w2:dataCollection baseNode="map">
+                <w2:dataList baseNode="list" repeatNode="map" id="dlt_list">
+                    <w2:columnInfo>
+                        <w2:column id="isuNm" name="종목명" dataType="text"></w2:column>
+                        <w2:column id="telNo" name="연락처" dataType="text"></w2:column>
+                        <w2:column id="ssn" name="주민등록번호" dataType="text"></w2:column>
+                        <w2:column id="acctNo" name="계좌번호" dataType="text"></w2:column>
+                        <w2:column id="feeRt" name="수수료율(소수)" dataType="number"></w2:column>
+                        <w2:column id="procState" name="처리상태코드" dataType="text"></w2:column>
+                        <w2:column id="chgRt" name="등락률" dataType="number"></w2:column>
+                        <w2:column id="trdAmt" name="거래금액" dataType="number"></w2:column>
+                        <w2:column id="limitAmt" name="한도금액" dataType="number"></w2:column>
+                    </w2:columnInfo>
+                </w2:dataList>
+            </w2:dataCollection>
+            <w2:workflowCollection/>
+        </xf:model>
+        <w2:layoutInfo/>
+        <w2:publicInfo method="scwin.onpageload,scwin.btn_reset_onclick,scwin.btn_acctMask_onclick,scwin.btn_check_onclick,scwin.initGrid,scwin.setAcctMask,scwin.showResult,scwin.fmtTelNo,scwin.fmtSsnMask,scwin.fmtAcctNo,scwin.fmtAcctMask,scwin.fmtFeeRt,scwin.fmtProcState,scwin.fmtChgRt,scwin.fmtTrdAmt"/>
+        <script lazy="false" type="text/javascript"><![CDATA[// 가이드 : gridView displayFormatter · customFormatter 샘플 (합성 화면 — 원본 없음)
+
+/*
+ * 화면 동작
+ * 1. 조회 결과(dlt_list)를 그리드에 그리면 컬럼마다 지정한 formatter 가 표시 문자열만 바꾼다 — dataList 값은 원본 그대로
+ * 2. 왼쪽 4개 컬럼(연락처·주민번호·계좌번호·수수료율)은 displayFormatter — 셀 값 하나만 보고 표시 문자열을 만든다
+ * 3. 오른쪽 3개 컬럼(처리상태·등락률·거래금액)은 customFormatter — 행·컬럼 위치를 받아 같은 행 값을 읽고 셀 class 를 붙인다
+ * 4. 「계좌번호 마스킹」 버튼은 실행 중에 계좌번호 컬럼의 displayFormatter 를 바꿔 끼운다(setColumnDisplayFormatter)
+ * 5. 처리상태·등락률·거래금액 셀을 편집하거나 헤더를 눌러 정렬해도 표시 문자열·글자색·배경색이 행을 따라간다(반복문 없음)
+ * 6. 「원본/표시값 확인」 은 포커스 행의 getCellData(원본)와 getCellDisplayData(formatter 결과)를 나란히 보여준다
+ *
+ * 언제 무엇을 쓰나 — 엔진 실측(websquare-engine.js)
+ * ┌───────────────┬──────────────────────────────────┬──────────────────────────────────────────────┐
+ * │               │ displayFormatter                 │ customFormatter                              │
+ * ├───────────────┼──────────────────────────────────┼──────────────────────────────────────────────┤
+ * │ 호출 인자     │ (value) — 문자열로 바꾼 셀 값 1개 │ (data, formattedData, rowIndex, colIndex)     │
+ * │ this          │ 엔진 formatter 객체(그리드 아님)  │ gridView                                     │
+ * │ 빈 값         │ null·undefined 는 호출 없이 ""    │ 그대로 호출됨 → 함수가 직접 처리             │
+ * │ displayFormat │ 함께 주면 무시됨(대체)            │ 먼저 적용된 결과가 formattedData 로 들어옴    │
+ * │ 같은 행 참조  │ 불가                              │ this.getCellData(rowIndex, "컬럼")           │
+ * │ 셀 class      │ 불가                              │ this.setCellClass / removeCellClass          │
+ * │ 쓰임          │ 값만으로 정해지는 형식·마스킹      │ 코드명 치환 + 색, 다른 컬럼과 비교한 강조     │
+ * └───────────────┴──────────────────────────────────┴──────────────────────────────────────────────┘
+ * - 적용 순서 : 원본 → (displayFormat 또는 displayFormatter) → formattedData → customFormatter 반환값이 최종 표시
+ * - 둘 다 표시 전용 : dataList·getCellData·저장 데이터는 원본 그대로. getCellDisplayData 는 formatter 결과를 돌려준다
+ * - 셀 편집기는 formatter 없이 원본을 편집한다(편집 중엔 01012345678, 편집이 끝나면 다시 010-1234-5678)
+ * - 함수는 이름 문자열("scwin.fmtX")로 지정 → 엔진이 화면 scope 에서 찾는다 → publicInfo 에 반드시 올린다
+ *
+ * customFormatter 작성 규칙 (conversion_rules.md 규칙 43)
+ * - 동기 함수만 — async 면 반환값(Promise)을 기다리지 않아 "[object Promise]" 가 표시된다. 통신·await 금지
+ * - 반환값은 순수 데이터 — HTML 태그(<span class="red"> 등)·escape="false" 금지. 색은 this.setCellClass 로
+ * - class 를 붙이지 않는 값이면 this.removeCellClass 로 뗀다 — 셀 class 는 행 기준으로 기억돼 이전 값의 class 가 남는다
+ *   (setCellClass 는 같은 셀의 이전 class 를 떼고 새 class 하나만 붙인다 — 셀당 class 1개)
+ * - 같은 행 값은 this.getCellData(rowIndex, col) — rowIndex 는 화면 행 번호(정렬 반영)라 dlt_list.getCellData 로 읽으면 정렬 뒤 다른 행이 읽힌다
+ * - formatter 안에서 쓰는 그리드 API 는 그 셀의 setCellClass·removeCellClass 만 — setCellData·setCellReadOnly 금지(그릴 때마다 불린다)
+ * - class 는 base.css 공통 class 만 — 글자색 red·orange·blue·green, 배경 bg_lgray·bg_dgray·bg_blue·bg_red·bg_orange·bg_green·bg_violet (규칙 40)
+ * - 반복문 대신 formatter 를 쓴다 — 조회 뒤 dataList 를 돌며 setCellClass 하는 코드는 정렬·필터·스크롤·편집 때 어긋난다
+ *   (예외: 편집 가능 여부 setCellReadOnly, 실제 값 변경 setCellData 는 formatter 가 아니라 반복문·이벤트로)
+ */
+
+///////// 1. 변수 및 선언 영역 /////////
+
+// 처리상태 코드 → 표시명·글자색 class (class 가 "" 이면 기본색)
+scwin.PROC_STATE = {
+    "10" : { name : "접수", cls : "" },
+    "20" : { name : "처리중", cls : "blue" },
+    "30" : { name : "완료", cls : "green" },
+    "90" : { name : "반려", cls : "red" }
+};
+
+// 계좌번호 마스킹 여부 — 「계좌번호 마스킹」 버튼으로 전환
+scwin.acctMasked = false;
+
+// 그리드 초기 데이터 — 서버 조회 결과라고 가정(가공하지 않은 원본 값)
+scwin.SAMPLE = [
+    { isuNm : "가나전자", telNo : "0212345678", ssn : "8001011234567", acctNo : "12345678901", feeRt : 0.0523, procState : "10", chgRt : 1.234, trdAmt : 15000000, limitAmt : 20000000 },
+    { isuNm : "다라화학", telNo : "01012345678", ssn : "9203152345678", acctNo : "98765432109", feeRt : 0.015, procState : "20", chgRt : -0.5, trdAmt : 32000000, limitAmt : 30000000 },
+    { isuNm : "마바증권", telNo : "0311234567", ssn : "7512241234567", acctNo : "11122233344", feeRt : 0.1, procState : "30", chgRt : 0, trdAmt : 9800000, limitAmt : 10000000 },
+    { isuNm : "사아바이오", telNo : "05051234567", ssn : "0109094123456", acctNo : "55566677788", feeRt : 0.00125, procState : "90", chgRt : 12.5, trdAmt : 50000000, limitAmt : 50000000 },
+    { isuNm : "자차건설", telNo : "", ssn : "", acctNo : "", feeRt : null, procState : "99", chgRt : -3.75, trdAmt : 120000000, limitAmt : 100000000 },
+    { isuNm : "카타물산", telNo : "0533456789", ssn : "8808082345678", acctNo : "10120230340", feeRt : 0.2, procState : "", chgRt : null, trdAmt : null, limitAmt : 5000000 }
+];
+
+///////// 2. 초기화 영역 /////////
+
+/**
+ * @method
+ * @name scwin.onpageload
+ * @author Inswave
+ * @date 2026. 10. 28
+ * @description 페이지 로드. 그리드 샘플 데이터를 설정한다.
+ * @hidden N
+*/
+scwin.onpageload = function () {
+    try {
+        scwin.initGrid();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "SMPFMT10001.onpageload" });
+    }
+};
+
+///////// 3. 컴포넌트 이벤트 영역 /////////
+
+/**
+ * @event
+ * @name scwin.btn_reset_onclick
+ * @description 그리드 데이터와 계좌번호 표시 방식을 초기 상태로 되돌린다.
+ * @hidden N
+*/
+scwin.btn_reset_onclick = function () {
+    try {
+        scwin.setAcctMask(false);
+        scwin.initGrid();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "SMPFMT10001.btn_reset_onclick" });
+    }
+};
+
+/**
+ * @event
+ * @name scwin.btn_acctMask_onclick
+ * @description 계좌번호 컬럼의 displayFormatter 를 마스킹 ↔ 전체 표시로 바꿔 끼운다.
+ * @hidden N
+*/
+scwin.btn_acctMask_onclick = function () {
+    try {
+        scwin.setAcctMask(!scwin.acctMasked);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "SMPFMT10001.btn_acctMask_onclick" });
+    }
+};
+
+/**
+ * @event
+ * @name scwin.btn_check_onclick
+ * @description 포커스 행의 원본 값과 formatter 표시 값을 비교해 표시한다.
+ * @hidden N
+*/
+scwin.btn_check_onclick = function () {
+    try {
+        scwin.showResult();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "SMPFMT10001.btn_check_onclick" });
+    }
+};
+
+///////// 5. 일반/업무 함수 영역 /////////
+
+/**
+ * @method
+ * @name scwin.initGrid
+ * @author Inswave
+ * @date 2026. 10. 28
+ * @description 그리드 샘플 데이터를 설정하고 확인 결과를 비운다. 표시 가공·색 지정은 하지 않는다 — 컬럼 formatter 가 그릴 때 처리한다.
+ * @hidden N
+*/
+scwin.initGrid = function () {
+    dlt_list.setJSON(scwin.SAMPLE);
+    spn_result.setValue("");
+};
+
+/**
+ * @method
+ * @name scwin.setAcctMask
+ * @author Inswave
+ * @date 2026. 10. 28
+ * @description 계좌번호 컬럼의 displayFormatter 를 실행 중에 교체한다. 엔진이 컬럼 formatter 를 다시 만들고 컬럼을 다시 그린다.
+ * @param {Boolean} masked true 면 마스킹(scwin.fmtAcctMask), false 면 전체 표시(scwin.fmtAcctNo)
+ * @hidden N
+ * @example
+ * scwin.setAcctMask(true);  // 123-**-****01
+ * scwin.setAcctMask(false); // 123-45-678901
+*/
+scwin.setAcctMask = function (masked) {
+    scwin.acctMasked = masked;
+    grd_list.setColumnDisplayFormatter("acctNo", masked ? "scwin.fmtAcctMask" : "scwin.fmtAcctNo");
+    btn_acctMask.setValue(masked ? "계좌번호 전체 표시" : "계좌번호 마스킹");
+};
+
+/**
+ * @method
+ * @name scwin.showResult
+ * @author Inswave
+ * @date 2026. 10. 28
+ * @description 포커스 행의 formatter 지정 컬럼마다 getCellData(원본)와 getCellDisplayData(표시 값)를 나란히 표시한다.
+ * @hidden N
+*/
+scwin.showResult = function () {
+    const rowIndex = Math.max(grd_list.getFocusedRowIndex(), 0);
+    const colIds = ["telNo", "ssn", "acctNo", "feeRt", "procState", "chgRt", "trdAmt"];
+    const text = colIds.map(function (colId) {
+        return colId + " : " + grd_list.getCellData(rowIndex, colId) + " → " + grd_list.getCellDisplayData(rowIndex, colId);
+    }).join(" / ");
+    spn_result.setValue((rowIndex + 1) + "행 원본 → 표시 | " + text);
+};
+
+///////// 5-1. displayFormatter — (value) 하나만 받는다, this 는 그리드가 아니다 /////////
+
+/**
+ * @method
+ * @name scwin.fmtTelNo
+ * @author Inswave
+ * @date 2026. 10. 28
+ * @description [displayFormatter] 숫자만 저장된 전화번호에 지역번호·국번 구분자를 넣어 표시한다.
+ * @param {String} value 셀 원본 값(엔진이 문자열로 바꿔 넘긴다. null·undefined 면 호출되지 않는다)
+ * @returns {String} 표시 문자열
+ * @hidden N
+ * @example
+ * <w2:column id="telNo" inputType="text" displayFormatter="scwin.fmtTelNo"/>
+ * scwin.fmtTelNo("0212345678");  // "02-1234-5678"
+ * scwin.fmtTelNo("01012345678"); // "010-1234-5678"
+*/
+scwin.fmtTelNo = function (value) {
+    if (value === "") {
+        return "";
+    }
+    return $c.str.formatPhone(value);
+};
+
+/**
+ * @method
+ * @name scwin.fmtSsnMask
+ * @author Inswave
+ * @date 2026. 10. 28
+ * @description [displayFormatter] 주민등록번호 13자리를 생년월일·성별 자리만 보이고 뒤 6자리는 가려 표시한다.
+ * @param {String} value 셀 원본 값(숫자 13자리)
+ * @returns {String} 표시 문자열 (13자리가 아니면 원본 그대로)
+ * @hidden N
+ * @example
+ * <w2:column id="ssn" inputType="text" readOnly="true" displayFormatter="scwin.fmtSsnMask"/>
+ * scwin.fmtSsnMask("8001011234567"); // "800101-1******"
+*/
+scwin.fmtSsnMask = function (value) {
+    if (value.length !== 13) {
+        return value;
+    }
+    return value.substring(0, 6) + "-" + value.charAt(6) + "******";
+};
+
+/**
+ * @method
+ * @name scwin.fmtAcctNo
+ * @author Inswave
+ * @date 2026. 10. 28
+ * @description [displayFormatter] 계좌번호 11자리를 3-2-6 자리로 끊어 표시한다.
+ * @param {String} value 셀 원본 값(숫자 11자리)
+ * @returns {String} 표시 문자열 (11자리가 아니면 원본 그대로)
+ * @hidden N
+ * @example
+ * <w2:column id="acctNo" inputType="text" displayFormatter="scwin.fmtAcctNo"/>
+ * scwin.fmtAcctNo("12345678901"); // "123-45-678901"
+*/
+scwin.fmtAcctNo = function (value) {
+    if (value.length !== 11) {
+        return value;
+    }
+    return value.substring(0, 3) + "-" + value.substring(3, 5) + "-" + value.substring(5);
+};
+
+/**
+ * @method
+ * @name scwin.fmtAcctMask
+ * @author Inswave
+ * @date 2026. 10. 28
+ * @description [displayFormatter] 계좌번호 11자리를 앞 3자리·끝 2자리만 보이게 가려 표시한다. 실행 중 교체 시연용.
+ * @param {String} value 셀 원본 값(숫자 11자리)
+ * @returns {String} 표시 문자열 (11자리가 아니면 원본 그대로)
+ * @hidden N
+ * @example
+ * grd_list.setColumnDisplayFormatter("acctNo", "scwin.fmtAcctMask");
+ * scwin.fmtAcctMask("12345678901"); // "123-**-****01"
+*/
+scwin.fmtAcctMask = function (value) {
+    if (value.length !== 11) {
+        return value;
+    }
+    return value.substring(0, 3) + "-**-****" + value.substring(9);
+};
+
+/**
+ * @method
+ * @name scwin.fmtFeeRt
+ * @author Inswave
+ * @date 2026. 10. 28
+ * @description [displayFormatter] 소수로 저장된 비율(0.0523)을 백분율 소수 둘째 자리(5.23%)로 표시한다.
+ *              displayFormatter 를 주면 같은 컬럼의 displayFormat 은 무시되므로 쉼표·자릿수도 이 함수가 만든다.
+ * @param {String} value 셀 원본 값
+ * @returns {String} 표시 문자열 (숫자가 아니면 원본 그대로)
+ * @hidden N
+ * @example
+ * <w2:column id="feeRt" inputType="text" dataType="number" displayFormatter="scwin.fmtFeeRt"/>
+ * scwin.fmtFeeRt("0.0523");  // "5.23%"
+ * scwin.fmtFeeRt("0.00125"); // "0.13%"
+*/
+scwin.fmtFeeRt = function (value) {
+    if (value === "") {
+        return "";
+    }
+    const num = Number(value);
+    if (isNaN(num)) {
+        return value;
+    }
+    return (num * 100).toFixed(2) + "%";
+};
+
+///////// 5-2. customFormatter — (data, formattedData, rowIndex, colIndex), this = gridView /////////
+
+/**
+ * @method
+ * @name scwin.fmtProcState
+ * @author Inswave
+ * @date 2026. 10. 28
+ * @description [customFormatter] 처리상태 코드를 코드명으로 바꿔 표시하고 상태별 글자색 class 를 붙인다.
+ *              정의되지 않은 코드는 코드 그대로 표시하고 class 를 뗀다.
+ * @param {String} data 셀 원본 값(처리상태 코드)
+ * @param {String} formattedData displayFormat 이 적용된 값(이 컬럼은 포맷이 없어 원본과 같다)
+ * @param {Number} rowIndex 화면 행 번호(정렬 반영)
+ * @param {Number} colIndex 컬럼 인덱스
+ * @returns {String} 표시 문자열(순수 데이터)
+ * @hidden N
+ * @example
+ * <w2:column id="procState" inputType="text" customFormatter="scwin.fmtProcState"/>
+ * // "20" → "처리중"(blue), "90" → "반려"(red), "99" → "99"(class 없음)
+*/
+scwin.fmtProcState = function (data, formattedData, rowIndex, colIndex) {
+    const state = scwin.PROC_STATE[data];
+    if (state && state.cls) {
+        this.setCellClass(rowIndex, colIndex, state.cls);
+    } else {
+        this.removeCellClass(rowIndex, colIndex);
+    }
+    return state ? state.name : formattedData;
+};
+
+/**
+ * @method
+ * @name scwin.fmtChgRt
+ * @author Inswave
+ * @date 2026. 10. 28
+ * @description [customFormatter] displayFormat("#,##0.00")이 만든 값에 부호·% 를 붙이고 상승 red·하락 blue 글자색을 붙인다.
+ *              displayFormat 과 customFormatter 를 함께 쓰는 예 — formattedData 가 displayFormat 결과다.
+ * @param {String} data 셀 원본 값(등락률)
+ * @param {String} formattedData displayFormat 이 적용된 값(예 "1.23", "-0.50")
+ * @param {Number} rowIndex 화면 행 번호(정렬 반영)
+ * @param {Number} colIndex 컬럼 인덱스
+ * @returns {String} 표시 문자열(순수 데이터, 빈 값은 "")
+ * @hidden N
+ * @example
+ * <w2:column id="chgRt" inputType="text" dataType="number" displayFormat="#,##0.00" customFormatter="scwin.fmtChgRt"/>
+ * // 1.234 → "+1.23%"(red), -0.5 → "-0.50%"(blue), 0 → "0.00%"(class 없음)
+*/
+scwin.fmtChgRt = function (data, formattedData, rowIndex, colIndex) {
+    if ($c.util.isEmpty(data)) {
+        this.removeCellClass(rowIndex, colIndex);
+        return "";
+    }
+    const num = Number(data);
+    if (num > 0) {
+        this.setCellClass(rowIndex, colIndex, "red");
+        return "+" + formattedData + "%";
+    }
+    if (num < 0) {
+        this.setCellClass(rowIndex, colIndex, "blue");
+    } else {
+        this.removeCellClass(rowIndex, colIndex);
+    }
+    return formattedData + "%";
+};
+
+/**
+ * @method
+ * @name scwin.fmtTrdAmt
+ * @author Inswave
+ * @date 2026. 10. 28
+ * @description [customFormatter] 같은 행의 한도금액(limitAmt)보다 거래금액이 크면 bg_orange 배경 class 를 붙인다.
+ *              같은 행 값은 this.getCellData(rowIndex, …) 로 읽는다 — dlt_list.getCellData 는 정렬 뒤 다른 행을 읽는다.
+ * @param {String} data 셀 원본 값(거래금액)
+ * @param {String} formattedData displayFormat("#,###")이 적용된 값
+ * @param {Number} rowIndex 화면 행 번호(정렬 반영)
+ * @param {Number} colIndex 컬럼 인덱스
+ * @returns {String} 표시 문자열(displayFormat 결과 그대로)
+ * @hidden N
+ * @example
+ * <w2:column id="trdAmt" inputType="text" dataType="number" displayFormat="#,###" customFormatter="scwin.fmtTrdAmt"/>
+ * // trdAmt 32,000,000 · limitAmt 30,000,000 → "32,000,000"(bg_orange)
+*/
+scwin.fmtTrdAmt = function (data, formattedData, rowIndex, colIndex) {
+    const limitAmt = this.getCellData(rowIndex, "limitAmt");
+    if (!$c.util.isEmpty(data) && !$c.util.isEmpty(limitAmt) && Number(data) > Number(limitAmt)) {
+        this.setCellClass(rowIndex, colIndex, "bg_orange");
+    } else {
+        this.removeCellClass(rowIndex, colIndex);
+    }
+    return formattedData;
+};
+]]></script>
+    </head>
+
+    <body ev:onpageload="scwin.onpageload">
+        <xf:group class="sub_contents" id="" meta_componentContainer="true" style="">
+            <w2:pageFrame id="pfmContentHeader" src="/cm/xml/contentHeader.xml" style=""></w2:pageFrame>
+            <w2:textbox class="txt_info blue bold" id="" label="gridView 컬럼의 표시만 바꾸는 두 가지 formatter 가이드입니다. 둘 다 표시 전용이라 dataList·getCellData·저장 데이터는 원본 그대로 남습니다." style="" tagname=""></w2:textbox>
+            <w2:textbox class="txt_info" id="" label="displayFormatter=&quot;scwin.fmtX&quot; 는 셀 값 하나만 받아 표시 문자열을 돌려줍니다(전화번호·주민번호·계좌번호·비율 형식). 같은 컬럼의 displayFormat 은 무시되고, 다른 컬럼 값이나 셀 class 는 다룰 수 없습니다." style="" tagname=""></w2:textbox>
+            <w2:textbox class="txt_info" id="" label="customFormatter=&quot;scwin.fmtX&quot; 는 (data, formattedData, rowIndex, colIndex) 를 받고 this 가 gridView 입니다. displayFormat 결과(formattedData)를 이어 받아 가공하고, this.getCellData 로 같은 행 값을 읽고, this.setCellClass·removeCellClass 로 셀 색을 정합니다." style="" tagname=""></w2:textbox>
+            <w2:textbox class="txt_info red" id="" label="customFormatter 는 동기 함수로, 순수 데이터만 반환합니다(HTML 태그·escape=&quot;false&quot;·async·setCellData 금지). class 가 필요 없는 값은 removeCellClass 로 떼야 이전 class 가 남지 않습니다. formatter 함수는 publicInfo 에 올립니다." style="" tagname=""></w2:textbox>
+
+            <xf:group class="titbox" id="" style="">
+                <w2:textbox class="tit" id="" label="gridView — 왼쪽 4개 displayFormatter · 오른쪽 3개 customFormatter (헤더 클릭 정렬 · 상태/등락률/거래금액 편집 가능)" style="" tagname="h3"></w2:textbox>
+            </xf:group>
+            <xf:group class="btnbox" id="" style="">
+                <xf:group class="rt" id="" style="">
+                    <xf:trigger class="btn_cm" id="btn_acctMask" type="button" ev:onclick="scwin.btn_acctMask_onclick"><xf:label><![CDATA[계좌번호 마스킹]]></xf:label></xf:trigger>
+                    <xf:trigger class="btn_cm" id="btn_check" type="button" ev:onclick="scwin.btn_check_onclick"><xf:label><![CDATA[원본/표시값 확인]]></xf:label></xf:trigger>
+                    <xf:trigger class="btn_cm" id="btn_reset" type="button" ev:onclick="scwin.btn_reset_onclick"><xf:label><![CDATA[초기화]]></xf:label></xf:trigger>
+                </xf:group>
+            </xf:group>
+            <xf:group class="gvwbox" id="" style="">
+                <w2:gridView autoFit="allColumn" class="gvw row10" dataList="data:dlt_list" focusMode="row" id="grd_list"
+                    keepDefaultColumnWidth="false" rowNumHeaderValue="번호" rowNumVisible="true" rowNumWidth="60"
+                    scrollByColumn="false" style="" visibleRowNum="10">
+                    <w2:header id="header_list" style="">
+                        <w2:row id="row_listHead" style="">
+                            <w2:column displayMode="label" id="hIsuNm" inputType="text" value="종목명" width="110" sortable="true"></w2:column>
+                            <w2:column displayMode="label" id="hTelNo" inputType="text" value="연락처 [D] fmtTelNo" width="140" sortable="true"></w2:column>
+                            <w2:column displayMode="label" id="hSsn" inputType="text" value="주민번호 [D] fmtSsnMask" width="150" sortable="true"></w2:column>
+                            <w2:column displayMode="label" id="hAcctNo" inputType="text" value="계좌번호 [D] fmtAcctNo" width="150" sortable="true"></w2:column>
+                            <w2:column displayMode="label" id="hFeeRt" inputType="text" value="수수료율 [D] fmtFeeRt" width="130" sortable="true"></w2:column>
+                            <w2:column displayMode="label" id="hProcState" inputType="text" value="처리상태 [C] fmtProcState" width="150" sortable="true"></w2:column>
+                            <w2:column displayMode="label" id="hChgRt" inputType="text" value="등락률 [C] fmtChgRt" width="130" sortable="true"></w2:column>
+                            <w2:column displayMode="label" id="hTrdAmt" inputType="text" value="거래금액 [C] fmtTrdAmt" width="150" sortable="true"></w2:column>
+                            <w2:column displayMode="label" id="hLimitAmt" inputType="text" value="한도금액" width="130" sortable="true"></w2:column>
+                        </w2:row>
+                    </w2:header>
+                    <w2:gBody id="gBody_list" style="">
+                        <w2:row id="row_listBody" style="">
+                            <w2:column id="isuNm" inputType="text" width="110" readOnly="true"></w2:column>
+                            <w2:column id="telNo" inputType="text" width="140" textAlign="center" displayFormatter="scwin.fmtTelNo"></w2:column>
+                            <w2:column id="ssn" inputType="text" width="150" textAlign="center" readOnly="true" displayFormatter="scwin.fmtSsnMask"></w2:column>
+                            <w2:column id="acctNo" inputType="text" width="150" textAlign="center" readOnly="true" displayFormatter="scwin.fmtAcctNo"></w2:column>
+                            <w2:column id="feeRt" inputType="text" width="130" textAlign="right" dataType="number" displayFormatter="scwin.fmtFeeRt"></w2:column>
+                            <w2:column id="procState" inputType="text" width="150" textAlign="center" customFormatter="scwin.fmtProcState"></w2:column>
+                            <w2:column id="chgRt" inputType="text" width="130" textAlign="right" dataType="number" displayFormat="#,##0.00" customFormatter="scwin.fmtChgRt"></w2:column>
+                            <w2:column id="trdAmt" inputType="text" width="150" textAlign="right" dataType="number" displayFormat="#,###" customFormatter="scwin.fmtTrdAmt"></w2:column>
+                            <w2:column id="limitAmt" inputType="text" width="130" textAlign="right" readOnly="true" dataType="number" displayFormat="#,###"></w2:column>
+                        </w2:row>
+                    </w2:gBody>
+                </w2:gridView>
+            </xf:group>
+            <w2:span id="spn_result" label="" style="display:block;margin-top:8px;font-size:12px;color:#1c5dd9;"/>
+            <w2:textbox class="txt_info" id="" label="[D] = displayFormatter, [C] = customFormatter. 처리상태는 10 접수·20 처리중(blue)·30 완료(green)·90 반려(red), 정의되지 않은 코드(99)는 코드 그대로 표시합니다. 거래금액이 같은 행 한도금액을 넘으면 bg_orange 배경입니다." style="" tagname=""></w2:textbox>
+            <w2:textbox class="txt_info" id="" label="셀을 편집 모드로 열면 formatter 없이 원본(예 0212345678, 20)이 보이고, 편집을 마치면 다시 formatter 결과로 그려집니다. 거래금액을 한도보다 크게/작게 고쳐 배경이 붙고 떨어지는지, 헤더 정렬 뒤에도 색이 행을 따라가는지 확인하세요." style="" tagname=""></w2:textbox>
+        </xf:group>
+    </body>
+</html>
