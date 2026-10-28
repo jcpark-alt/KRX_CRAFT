@@ -832,7 +832,7 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
 * **삽입 위치**: `scwin.init` 의 화면 상태 단계. 반복 호출되는 5구역 함수에 두지 않습니다(호출할 때마다 재바인딩 — 동작은 같지만 init 1회 원칙). 필수 여부·조회 시점 기간 검사는 이 규칙이 아니라 `validateDataCollect`(규칙 24)의 몫입니다.
 * **제외**: 날짜형이 아닌 달력(`yearMonthDateTimeSec` 등)·그리드 컬럼 달력(`inputType="calendar"`) — 검사 도구가 INFO 로만 알립니다.
 * **검사**: `init_binding_check.py` — B01(단일 미적용)·B02(기간 미적용·순서 뒤바뀜)·B04(기간 쌍에 단일 검사 중복)·B06(init 밖)·B07(마크업 onviewchange 충돌). 테스트 `test_init_binding_check.py`.
-* **적용 현황**(2026-10-27 실측, 도구 기준): gfm-front 3본 중 1본(ULDSTF05621 기간 쌍) 보정. sample-front/ui 46본 중 15본, jsp-front ui-tobe 1,677본 중 343본(B01 370·B02 265·B03 81·B04 132 — B04 는 공급사 r13 `init_datefmt_*` 가 기간 쌍에도 단일 검사를 거는 것)이 미적용 — 각 모듈 재전환 때 반영합니다.
+* **적용 현황**(2026-10-27 실측, 도구 기준): conversion-front 3본 중 1본(ULDSTF05621 기간 쌍) 보정. sample-front/ui 46본 중 15본, jsp-front ui-tobe 1,677본 중 343본(B01 370·B02 265·B03 81·B04 132 — B04 는 공급사 r13 `init_datefmt_*` 가 기간 쌍에도 단일 검사를 거는 것)이 미적용 — 각 모듈 재전환 때 반영합니다.
 
 ### 규칙 38: `$c.sbm.executeDynamic` 의 `action` 은 전체 경로 리터럴 — 전역 변수 조립 금지 (2026-10-27 신설, 사용자 지시)
 
@@ -858,21 +858,21 @@ action : (trJob === "I") ? "/api/listing/lstproc/fund/dist-pay-basdd-change/inse
     2. 합친 뒤 쓰이지 않는 경로 상수 선언(`scwin.API = "…";`)은 1구역에서 지웁니다.
     3. contextRoot 는 붙이지 않습니다 — `executeDynamic` 이 `CONTEXT_PATH` 를 자동으로 붙입니다(`$c.sbm` 전처리).
 * **예외**
-    * (gfm-front 는 이 예외를 쓰지 않습니다 — 규칙 39: 접두 없이 전체 경로) UDC `bulkFileSaver` 의 `saveUrl`·`listUrl` 은 `fetch` 를 직접 불러 contextRoot 를 붙이지 않으므로 `$c.sbm.getContextPath() + "/api/…/전체경로"` 로 씁니다(경로 부분은 같은 규칙 — 전체 리터럴).
+    * (conversion-front 는 이 예외를 쓰지 않습니다 — 규칙 39: 접두 없이 전체 경로) UDC `bulkFileSaver` 의 `saveUrl`·`listUrl` 은 `fetch` 를 직접 불러 contextRoot 를 붙이지 않으므로 `$c.sbm.getContextPath() + "/api/…/전체경로"` 로 씁니다(경로 부분은 같은 규칙 — 전체 리터럴).
     * 데이터에 따라 경로가 정해지는 경우(신고서 종류별 서비스 배열 등)는 분기·`switch` 로 **전체 경로 리터럴 중 하나를 고르게** 바꿉니다. 그럴 수 없으면 단계 2 판단으로 남기고 `// TODO:` 로 표시합니다.
     * 함수 인자로 받은 경로(`job.action`·`url`)를 그대로 넘기는 공통 래퍼는 대상이 아닙니다 — 그 래퍼를 **부르는 쪽**이 전체 경로 리터럴을 넘깁니다.
 * **검사**: `api_spec_check.py` **A07**(FAIL) — `action`·`saveUrl`·`listUrl` 식에 `scwin.` 참조·`+` 조립(`$c.sbm.getContextPath() +` 접두 제외)·`/` 로 시작하지 않는 리터럴이 있으면 실패. 명세(`{화면ID}_API.txt`)가 없어도 이 형식 검사는 돈다.
-* **적용 현황**(2026-10-27, A07 실측): gfm-front 3본 12곳, sample-front/ui 18본 47곳 전환 완료 — A07 0건. 전환 방식: 전역 URL 변수(stf/bnsnew 5본 `scwin.fn*Url`·`fnProcComplt`)는 각 파일이 실행하는 자기 화면 분기의 경로로 리터럴화하고 변수 삭제, 작업 표(`JOB_INFO[jobKey].action`)·`svcId` 표는 처리구분별 삼항(가지마다 전체 경로), 경로 표(`LIST`·`detailMap`·`arr`·`nowAction`)는 표 값을 전체 경로로 바꾸고 상수(`scwin.API`·`CHART_DATA_URL`) 삭제.
+* **적용 현황**(2026-10-27, A07 실측): conversion-front 3본 12곳, sample-front/ui 18본 47곳 전환 완료 — A07 0건. 전환 방식: 전역 URL 변수(stf/bnsnew 5본 `scwin.fn*Url`·`fnProcComplt`)는 각 파일이 실행하는 자기 화면 분기의 경로로 리터럴화하고 변수 삭제, 작업 표(`JOB_INFO[jobKey].action`)·`svcId` 표는 처리구분별 삼항(가지마다 전체 경로), 경로 표(`LIST`·`detailMap`·`arr`·`nowAction`)는 표 값을 전체 경로로 바꾸고 상수(`scwin.API`·`CHART_DATA_URL`) 삭제.
 
-### 규칙 39: [gfm-front] UDC `saveUrl` 전체 경로 · API 경로에 `$c.sbm.getContextPath()` 금지 (2026-10-27 신설, 사용자 지시)
+### 규칙 39: [conversion-front] UDC `saveUrl` 전체 경로 · API 경로에 `$c.sbm.getContextPath()` 금지 (2026-10-27 신설, 사용자 지시)
 
-* **적용 범위**: `conversion/gfm-front` 화면만 — `ui/{화면ID}/` 업무 분석 결과서와 그 결과서로 만든 `ui-tobe/{화면ID}.xml`. 다른 모듈(sample-front·jsp-front·next-krx-lds-*)에는 적용하지 않습니다(규칙 38 의 UDC 예외를 그대로 둡니다).
+* **적용 범위**: `conversion/conversion-front` 화면만 — `ui/{화면ID}/` 업무 분석 결과서와 그 결과서로 만든 `ui-tobe/{화면ID}.xml`. 다른 모듈(sample-front·jsp-front·next-krx-lds-*)에는 적용하지 않습니다(규칙 38 의 UDC 예외를 그대로 둡니다).
 * **규칙**
     1. `udcSaver`(UDC `/cm/udc/bulkFileSaver.xml`)의 `save({ saveUrl })`·`loadList({ listUrl })` 도 `executeDynamic` 의 `action` 과 같이 **`/` 로 시작하는 전체 경로 문자열 리터럴**로 씁니다. 전역 변수·상수(`scwin.API` 등) 조립, 상대 경로는 금지(규칙 38 과 같은 기준).
     2. `$c.sbm.executeDynamic` 의 `action` 과 `udcSaver` 의 `saveUrl`·`listUrl` 에 **`$c.sbm.getContextPath()` 를 붙이지 않습니다.**
 
 ```javascript
-// (X) gfm-front 금지
+// (X) conversion-front 금지
 saveUrl : $c.sbm.getContextPath() + "/api/bonds/accountMgt/bndClaimMgrUpdate/mgrUpdate-proc",
 saveUrl : scwin.API + "mgrUpdate-proc",
 action : $c.sbm.getContextPath() + "/api/x/select-list",
@@ -883,8 +883,8 @@ action : "/api/x/select-list",
 ```
 
 * **이유**: 배포 설정 contextRoot 가 `"/"`(`websquare/config.xml`)라 `getContextPath()` 는 `"/"` 를 돌려줍니다. `executeDynamic` 은 경로가 contextRoot 로 시작하면 접두를 붙이지 않으므로 붙일 이유가 없고, UDC 는 `fetch` 에 그대로 넘겨 `"/" + "/api/…"` = **`"//api/…"`(프로토콜 상대 URL — 호스트가 `api` 로 해석)** 가 되어 요청이 다른 호스트로 갑니다. 경로 문자열은 명세의 경로와 글자 그대로 같아야 grep·명세 대조가 됩니다.
-* **검사**: `api_spec_check.py` **A08**(FAIL) — `action`·`saveUrl`·`listUrl` 식에 `getContextPath` 가 있으면 실패. 파일 경로에 `gfm-front` 가 있으면 자동으로 켜지고, 다른 경로는 `--no-context-path` 로만 켭니다. 전역 변수 조립은 A07 이 잡습니다(gfm-front 에서는 `getContextPath() +` 접두도 A07 허용 대상이 아닙니다).
-* **적용 현황**(2026-10-27): gfm-front 3본 중 해당 1본(ULDBNF45000 `saveUrl` 1곳)과 결과서 §5.4 를 전환. A07·A08 0건.
+* **검사**: `api_spec_check.py` **A08**(FAIL) — `action`·`saveUrl`·`listUrl` 식에 `getContextPath` 가 있으면 실패. 파일 경로에 `conversion-front` 가 있으면 자동으로 켜지고, 다른 경로는 `--no-context-path` 로만 켭니다. 전역 변수 조립은 A07 이 잡습니다(conversion-front 에서는 `getContextPath() +` 접두도 A07 허용 대상이 아닙니다).
+* **적용 현황**(2026-10-27): conversion-front 3본 중 해당 1본(ULDBNF45000 `saveUrl` 1곳)과 결과서 §5.4 를 전환. A07·A08 0건.
 
 ### 규칙 40: 색상 — 글자색·배경색은 `base.css` 공통 class 로 (`setCellColor`·인라인 색 금지, `setCellClass`) (2026-10-27 신설, 사용자 지시)
 
@@ -944,8 +944,8 @@ grd_list.setRowClass(i, "row_bg_lgray");
     * **class 가 정의된 요소만 색이 나온다** — `base.css` 의 `bg_*` 는 요소별 선택자로만 정의돼 있다: 그리드 셀(`td.gridBodyDefault`), 그리드 행(`row_bg_*` — `setRowClass`), 표 칸(`w2tb_td`), `w2input`·`inputCalendar`·`w2checkbox`·`w2radio`·`w2selectbox`. **단독 `.bg_red` 정의가 없어 일반 그룹(`xf:group`·div)에 붙이면 색이 나오지 않는다** — 그런 자리는 표 칸·입력 등 위 요소로 옮기거나, 공통 class 추가를 퍼블리싱 담당에게 요청하고 `// TODO:` 로 남긴다(임의 class·인라인 스타일 금지).
     * 표 칸(`w2tb_td`)에는 `bg_dgray` 정의가 없다(6종만) — 짙은 회색이 필요하면 위와 같이 요청·TODO.
     * 색 대응은 글자색과 같다 — 가까운 계열의 class 로 옮기고, 흰색·투명(기본 배경)은 class 없음, 7종으로 못 옮기는 색은 TODO. 다시 칠할 수 있으면 `removeCellClass`·`removeRowClass` 로 먼저 뗀다.
-    * **적용 현황**(2026-10-27): gfm-front 4화면은 해당 없음(인라인 배경색·배경색 함수 0건). sample-front/ui 인라인 배경색 68곳, jsp-front ui-tobe 1,231곳은 각 재전환 때 반영.
-* **적용 현황**(2026-10-27): gfm-front `ULDBNS30400`(처리결과 1곳) 전환. sample-front/ui 의 `setCellColor` 3곳은 샘플 갱신 때 반영.
+    * **적용 현황**(2026-10-27): conversion-front 4화면은 해당 없음(인라인 배경색·배경색 함수 0건). sample-front/ui 인라인 배경색 68곳, jsp-front ui-tobe 1,231곳은 각 재전환 때 반영.
+* **적용 현황**(2026-10-27): conversion-front `ULDBNS30400`(처리결과 1곳) 전환. sample-front/ui 의 `setCellColor` 3곳은 샘플 갱신 때 반영.
 
 ### 규칙 41: 하단 버튼 영역(`btnbox`) — 주요 버튼 5종은 `pt` + 오른쪽 고정 순서, 나머지는 그 바로 왼쪽 (2026-10-27 신설, 사용자 지시)
 
@@ -979,7 +979,7 @@ grd_list.setRowClass(i, "row_bg_lgray");
 * **판정은 버튼 라벨 기준** — 라벨이 정확히 「취소」「삭제」「수정」「저장」「신규」인 버튼만 주요 버튼이다. 「신청종목삭제」「임시저장」「행삭제」처럼 다른 말이 붙은 버튼은 일반 버튼이다. 「닫기」는 팝업 하단에 두지 않는다(퍼블리싱 규칙 — 팝업 닫기 금지).
 * 종전 관용구 「주요 동작 하나만 `btn_cm pt`, 맨 오른쪽」은 이 규칙으로 대체한다(퍼블리싱 스킬·markup-idioms 3.1·3.2 동기화).
 * 버튼 id·`ev:onclick`·라벨은 그대로 두고 **순서와 class 만** 바꾼다 — 퍼블리싱 게이트 보존 검사(P10~P13)에 걸리지 않는다.
-* **적용 현황**(2026-10-27, gfm-front TO-BE 전부 적용 — 순서·class 만 바꿔 publish_gate 보존 검사 경고 0):
+* **적용 현황**(2026-10-27, conversion-front TO-BE 전부 적용 — 순서·class 만 바꿔 publish_gate 보존 검사 경고 0):
     * ULDBNF45000: 수정(pt) 1개 — 이미 맞음. ULDBNS30400: 하단 `btnbox` 없음.
     * ULDSTF05621: 기안·안내문작성 | 삭제(pt)·수정(pt)·저장(pt)
     * ULDSTF05710: `rt` 신청종목삭제·안내문작성 | 삭제(pt)·수정(pt)·저장(pt). 인쇄는 승인일 입력과 한 묶음이라 `lt` 유지(버튼 아닌 요소가 있는 `lt`)
@@ -1007,7 +1007,7 @@ grd_list.setRowClass(i, "row_bg_lgray");
     2. **menuId** 는 `$c.win.getProgramId()` 로 얻는다 — 화면의 `meta_screenId`(전환 화면은 모두 지정), 없으면 화면 파일명을 돌려준다. 공통 함수 기본 규칙의 menuId(메뉴 `src` 파일명)와 같은 값이다. 화면 ID 문자열을 직접 적지 않는다(복사본 화면에서 어긋난다).
     3. **이름**은 AS-IS 파일명(`GridToExcel`·`GridToOffice` 의 파일명 인자)이나 화면·탭·그리드 구분명을 쓴다. 메뉴명과 같으면 `fileName` 을 생략해 공통 함수 기본 규칙에 맡겨도 된다 — 단 **팝업·탭 본문처럼 메뉴 정보가 없을 수 있는 화면은 생략하지 않는다**(`excel.xlsx` 가 되어 menuId 가 빠진다).
     4. 일시는 서버 시각 `$c.date.getServerDateTime("yyyyMMddHHmmss")`, 확장자는 `.xlsx` 를 명시한다. 파일명에 쓸 수 없는 문자(`\ / : * ? " < > |`)는 넣지 않는다(예: "행사가격/전환비율" → "행사가격_전환비율").
-* **적용 현황**(2026-10-27, gfm-front TO-BE): `fileName` 을 직접 지정하는 3곳 모두 적용 완료 — ULDBNS30400 `scwin.excelDown`·`scwin.excelDownDtl`, ULDSTF05911 엑셀 다운로드(팝업이라 생략 불가). sample-front·jsp-front 는 각 재전환 때.
+* **적용 현황**(2026-10-27, conversion-front TO-BE): `fileName` 을 직접 지정하는 3곳 모두 적용 완료 — ULDBNS30400 `scwin.excelDown`·`scwin.excelDownDtl`, ULDSTF05911 엑셀 다운로드(팝업이라 생략 불가). sample-front·jsp-front 는 각 재전환 때.
 
 ### 규칙 43: gridView 표시용 반복문 → 컬럼 `customFormatter` (2026-10-27 신설, 같은 날 상세 규칙 개정 — 사용자 지시)
 
@@ -1048,7 +1048,7 @@ scwin.fmtProcState = function (data, formattedData, rowIndex, colIndex) {
     5. 실화면 확인 항목: formatter 안에서 붙인 class 가 셀 다시 그리기 뒤에도 유지되는지(엔진 렌더 순서) — 첫 적용 화면에서 정렬·스크롤로 확인한다.
 * **예외 — 반복문 유지**: 편집 가능 여부(`setCellReadOnly`·`disabled`)와 실제 데이터 변경(`setCellData` 로 값을 계산해 저장, 행 추가 등)은 formatter 로 하지 않는다 — 기존 반복문 또는 이벤트를 쓴다.
 * **규칙 40 과의 관계**: 그리드 셀의 글자색·배경색은 조회 후 반복문 대신 이 규칙의 formatter 안 `setCellClass` 로 붙인다. 그리드 밖 요소는 규칙 40 의 마크업 class 를 쓴다.
-* **적용 현황**(2026-10-27): gfm-front ULDBNS30400 `scwin.fmtProcState`(그리드 3개 `procState`) — 개정 규칙대로 순수 데이터 반환 + `this.setCellClass`·`removeCellClass`, `escape="false"` 제거 완료. ULDSTF05911 `applyKoEditable`(readOnly)·ULDSTF05621 월·일 계산(데이터 변경)은 예외라 유지.
+* **적용 현황**(2026-10-27): conversion-front ULDBNS30400 `scwin.fmtProcState`(그리드 3개 `procState`) — 개정 규칙대로 순수 데이터 반환 + `this.setCellClass`·`removeCellClass`, `escape="false"` 제거 완료. ULDSTF05911 `applyKoEditable`(readOnly)·ULDSTF05621 월·일 계산(데이터 변경)은 예외라 유지.
     * **점검 필요**: jsp-front ui-tobe 101개 파일의 `_fmt_* = async function` customFormatter — 지킬 것 1번 위반(Promise 표시 의심), HTML(`<a class="lnk">` 등) 반환도 상세 규칙 1번 위반. 해당 모듈 재전환 때 고친다.
 
 ### 규칙 44: `$c.sbm.executeDynamic` 의 `gridview` 옵션은 gridView 컴포넌트 id 만 (2026-10-28 신설, 사용자 지시)
@@ -1067,7 +1067,7 @@ gridview : "grd_list|focus",
 * **접미사를 쓰는 경우**: 요청자(업무 분석·화면 설계·리뷰 회신)가 0건 안내·첫 행 포커스 등을 **명시적으로 요구**했을 때만 붙이고, 업무 분석 결과서 §5 해당 절에 근거를 적는다. 원본에 0건 안내 문구가 있었다는 이유만으로 붙이지 않는다 — 결과서 §10 에 올려 요청자가 정한다.
 * 여러 그리드면 쉼표로 이은 id 목록만 쓴다(`"grd_a,grd_b"`). 객체 형태(`gridview : { … }`)도 요청이 있을 때만.
 * 규칙 6 보충의 `gridview` 자동 매핑(역추적)도 추출한 **id 만** 넣는다.
-* **적용 현황**(2026-10-28, gfm-front TO-BE): 6곳 중 5곳은 id 만(ULDBNS30400 3·ULDSTF05621 1·ULDSTF05911 1). **ULDBNF45000 `scwin.searchList` 의 `"grd_bdchrgList|message"` 1곳**이 규칙과 다르다 — 리뷰 권고로 붙인 것이라 요청 근거가 없으면 다음 갱신 때 id 만으로 바꾸고 결과서 §5.1 후처리 문구도 고친다. sample-front/ui 접미사 9곳(97곳 중)은 샘플 갱신 때.
+* **적용 현황**(2026-10-28, conversion-front TO-BE): 6곳 중 5곳은 id 만(ULDBNS30400 3·ULDSTF05621 1·ULDSTF05911 1). **ULDBNF45000 `scwin.searchList` 의 `"grd_bdchrgList|message"` 1곳**이 규칙과 다르다 — 리뷰 권고로 붙인 것이라 요청 근거가 없으면 다음 갱신 때 id 만으로 바꾸고 결과서 §5.1 후처리 문구도 고친다. sample-front/ui 접미사 9곳(97곳 중)은 샘플 갱신 때.
 
 ## 규칙 6 보충: Submission 변환 상세
 

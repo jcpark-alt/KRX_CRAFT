@@ -2,9 +2,9 @@
 
 | 항목 | 내용 |
 |---|---|
-| AS-IS | `/lstproc/ULDSTF05621.gfm` (Gauce/X-Internet, 610×680 모달 창 — 부모가 615×710 `window` 로 연다) — 반입 `conversion/gfm-front/ui/ULDSTF05621/ULDSTF05621.gfm` |
-| 신규 API 명세 | `conversion/gfm-front/ui/ULDSTF05621/ULDSTF05621_API.md` — 블록 7종(이 화면 6종, 다른 화면 1종: ULDSTF05620 목록 조회). §2.2·§5 는 명세 기준(가이드 §0.3·§5). **2026-10-27 명세 갱신**(txt → md): 저장 요청을 상세 데이터 합본으로, 저장·삭제 응답 신설, 상세 목록 id `dlt_detail_dtl*List`, `select-one` 응답은 개요만. 같은 날 2차 수정으로 블록마다 AS-IS 가 **AS-IS 함수·인덱스 표기**(`fn_save_trs(TRS_IDX_INSERT)` 등)로 바뀌고 파일 감싸기(```` ```markdown ````)가 없어짐 — 변경 대조는 §5 「명세 갱신(2026-10-27)」 |
-| TO-BE | `conversion/gfm-front/ui-tobe/ULDSTF05621.xml` (배포 경로 `/ui/lst/lstproc/ULDSTF05621.xml` — 가정, §10). 가이드 §13.2 대로 퍼블리싱본(마크업 전용)을 먼저 만들고 그 위에 스크립트를 전환함 (2026-10-26). 2026-10-27 갱신 명세(md) 기준으로 재전환 완료(§10 #15) |
+| AS-IS | `/lstproc/ULDSTF05621.gfm` (Gauce/X-Internet, 610×680 모달 창 — 부모가 615×710 `window` 로 연다) — 반입 `conversion/conversion-front/ui/ULDSTF05621/ULDSTF05621.gfm` |
+| 신규 API 명세 | `conversion/conversion-front/ui/ULDSTF05621/ULDSTF05621_API.md` — 블록 7종(이 화면 6종, 다른 화면 1종: ULDSTF05620 목록 조회). §2.2·§5 는 명세 기준(가이드 §0.3·§5). **2026-10-27 명세 갱신**(txt → md): 저장 요청을 상세 데이터 합본으로, 저장·삭제 응답 신설, 상세 목록 id `dlt_detail_dtl*List`, `select-one` 응답은 개요만. 같은 날 2차 수정으로 블록마다 AS-IS 가 **AS-IS 함수·인덱스 표기**(`fn_save_trs(TRS_IDX_INSERT)` 등)로 바뀌고 파일 감싸기(```` ```markdown ````)가 없어짐 — 변경 대조는 §5 「명세 갱신(2026-10-27)」 |
+| TO-BE | `conversion/conversion-front/ui-tobe/ULDSTF05621.xml` (배포 경로 `/ui/lst/lstproc/ULDSTF05621.xml` — 가정, §10). 가이드 §13.2 대로 퍼블리싱본(마크업 전용)을 먼저 만들고 그 위에 스크립트를 전환함 (2026-10-26). 2026-10-27 갱신 명세(md) 기준으로 재전환 완료(§10 #15) |
 | 퍼블리싱 | `conversion/publish/상장/상장처리(대내)/ULDSTF05621.xml` — 컴포넌트 id 는 AS-IS 와 같고, 날짜는 `w2:inputCalendar`, 사유는 `xf:select1`, 달력 이미지 버튼은 없음 |
 | 화면 캡처 | `ULDSTF05621.png` (신규 빈 입력 상태) — TO-BE 퍼블리싱 기준 |
 | 업무공통 | `$c.stf`(`getNewBzProcNo`·`getMessageParam`·`setButtonSetWithDate`)·`$c.lc`(`isProcess`·`getSecuGrpNm`·`glb.*` 상수) — `cm/pcc/stf`. 게이트는 `--pcc stf` 로 돌린다 |

@@ -51,15 +51,15 @@
 
 결과서를 쓰기 전에 원본 옆의 자료를 먼저 찾아 읽습니다. 있는 자료는 결과서 머리 표에 적고, 없으면 "없음"이라고 적습니다.
 
-**폴더 배치** — 화면 하나의 입력 자료와 결과서는 **화면ID 이름의 폴더 하나**에 모읍니다(2026-10-26 gfm-front 정리).
+**폴더 배치** — 화면 하나의 입력 자료와 결과서는 **화면ID 이름의 폴더 하나**에 모읍니다(2026-10-26 conversion-front 정리).
 
 ```text
-conversion/gfm-front/ui/{화면ID}/
+conversion/conversion-front/ui/{화면ID}/
     {화면ID}.gfm          AS-IS 원본
     {화면ID}_API.txt|md   신규 API 명세 (txt 블록 형식 또는 md 머리글 형식)
     {화면ID}*.png         화면 캡처
     {화면ID}.md           업무 분석 결과서 (이 가이드의 산출)
-conversion/gfm-front/ui-tobe/{화면ID}.xml   TO-BE 화면
+conversion/conversion-front/ui-tobe/{화면ID}.xml   TO-BE 화면
 ```
 
 | 자료 | 위치 (예) | 결과서에서 쓰는 곳 |
@@ -326,7 +326,7 @@ AS-IS 의 Ajax(`$.ajax`·`$.post`·axios) 또는 Form Submit 을 `$c.sbm.execute
 
 **API 명세 적용 (`{화면ID}_API.txt` / `{화면ID}_API.md`) — 필수**
 
-원본 옆에 `{화면ID}_API.txt` 또는 `{화면ID}_API.md`(예: `conversion/gfm-front/ui/ULDSTF05621/ULDSTF05621_API.md`)가 있으면, 결과서 §5 와 TO-BE 의 모든 통신을 **이 명세의 API 로 바꿉니다**. AS-IS URL(`*.do`, `DIV_IDX`·`TRS_IDX`·`queryId` 파라미터)은 TO-BE 코드에 남기지 않습니다.
+원본 옆에 `{화면ID}_API.txt` 또는 `{화면ID}_API.md`(예: `conversion/conversion-front/ui/ULDSTF05621/ULDSTF05621_API.md`)가 있으면, 결과서 §5 와 TO-BE 의 모든 통신을 **이 명세의 API 로 바꿉니다**. AS-IS URL(`*.do`, `DIV_IDX`·`TRS_IDX`·`queryId` 파라미터)은 TO-BE 코드에 남기지 않습니다.
 
 1. **명세 읽기** — 블록 하나가 API 하나입니다. md 명세는 `## n. [화면ID][업무][제목]` 머리글이 블록이고, 경로·method 는 `* **TO-BE** : \`GET /api/…\`` 줄을 씁니다(`AS-IS` 줄의 `.do` 경로는 대조하지 않음). 게이트는 두 형식을 모두 읽습니다(같은 폴더에 둘 다 있으면 txt 우선). md 명세에서 `$c.sbm.executeDynamic` 옵션 `ref`·`target` 을 적을 때는 블록의 `**[REQUEST]**` 바로 아래에 아래 샘플 형식으로 둡니다(값이 없으면 빈 문자열, 2026-10-27).
 
@@ -350,7 +350,7 @@ AS-IS 의 Ajax(`$.ajax`·`$.post`·axios) 또는 Form Submit 을 `$c.sbm.execute
 4. **응답** — 명세 RESPONSE 의 dataMap/dataList keyInfo 를 결과서 §2.2 데이터 정의와 TO-BE `<w2:dataCollection>` 에 그대로 옮기고(id·name·dataType), `target` 은 그 구조에 맞춥니다.
 5. **명세에 없는 AS-IS 통신** — 업무공통 함수가 대신하는지(예: 채번 `$c.stf.getNewBzProcNo`) 확인하고, 없으면 §10 TODO.
 6. **명세가 모호하거나 AS-IS 와 어긋나면** 명세를 따르되 고치지 않고 기록합니다. 예: 응답이 dataMap 인데 화면은 여러 행, 응답이 비어 재조회할 키가 없음, "등록 시 서버채번", 명세 설명과 요청 열이 다름. → §10 TODO + 코드 `// TODO:` 주석.
-7. **전체 경로** — `action` 은 명세의 경로를 **그대로 쓴 전체 경로 리터럴**입니다(`action : "/api/…/select-one"`). 같은 접두라도 `scwin.API` 같은 전역 상수에 끝 경로를 붙이지 않고, 분기는 가지마다 전체 경로를 씁니다(전환 규칙 38 — 2026-10-27, 게이트 A07). UDC `udcSaver` 의 `saveUrl`·`listUrl` 도 같은 전체 경로 리터럴이고, `executeDynamic`·UDC 모두 **`$c.sbm.getContextPath()` 를 붙이지 않습니다**(전환 규칙 39 — gfm-front 전용, 게이트 A08. contextRoot 가 `"/"` 라 UDC 에 붙이면 `"//api/…"` 가 되어 다른 호스트로 요청됩니다).
+7. **전체 경로** — `action` 은 명세의 경로를 **그대로 쓴 전체 경로 리터럴**입니다(`action : "/api/…/select-one"`). 같은 접두라도 `scwin.API` 같은 전역 상수에 끝 경로를 붙이지 않고, 분기는 가지마다 전체 경로를 씁니다(전환 규칙 38 — 2026-10-27, 게이트 A07). UDC `udcSaver` 의 `saveUrl`·`listUrl` 도 같은 전체 경로 리터럴이고, `executeDynamic`·UDC 모두 **`$c.sbm.getContextPath()` 를 붙이지 않습니다**(전환 규칙 39 — conversion-front 전용, 게이트 A08. contextRoot 가 `"/"` 라 UDC 에 붙이면 `"//api/…"` 가 되어 다른 호스트로 요청됩니다).
 8. **게이트** — `api_spec_check.py` 로 TO-BE 의 `executeDynamic` action 을 명세와 대조합니다(§13.3).
 
    | 코드 | 판정 | 내용 |
@@ -359,7 +359,7 @@ AS-IS 의 Ajax(`$.ajax`·`$.post`·axios) 또는 Form Submit 을 `$c.sbm.execute
    | A02 | FAIL | 같은 경로인데 method 가 다름 |
    | A03 | FAIL | 이 화면ID 의 명세 API 를 부르지 않음 — 쓰지 않는 근거가 있으면 `--allow-unused <경로>` 로 낮추고 §10 에 적음 |
    | A07 | FAIL | `action`·`saveUrl`·`listUrl` 이 전체 경로 리터럴이 아님(전역 변수 조립·상대 경로) — 규칙 38 |
-   | A08 | FAIL | `action`·`saveUrl`·`listUrl` 에 `$c.sbm.getContextPath()` 가 붙음 — 규칙 39(gfm-front 경로면 자동 적용) |
+   | A08 | FAIL | `action`·`saveUrl`·`listUrl` 에 `$c.sbm.getContextPath()` 가 붙음 — 규칙 39(conversion-front 경로면 자동 적용) |
    | A04 | FAIL | 코드에 AS-IS URL(`*.do`) 이 남음(주석은 제외) |
    | A05 | WARN | action 을 정적으로 풀 수 없음(변수 조립) — 리뷰 |
    | A06 | INFO | 다른 화면ID 블록 |
@@ -664,9 +664,9 @@ done
 
 업무 분석을 마친 화면으로 TO-BE 파일을 만들 때, 그 화면의 **캡처 이미지가 있으면** 스크립트 전환보다 먼저 **퍼블리싱 XML(마크업 전용)을 TO-BE 폴더에 생성**하고, 그 파일 위에 스크립트를 얹습니다. 마크업과 로직을 한 번에 쓰면 레이아웃 검토와 로직 검토가 섞이고, 퍼블리싱 게이트의 보존 검사(P10~P13)를 쓸 수 없기 때문입니다.
 
-**캡처 위치** — `{화면 폴더}/{화면ID}*.png|jpg` (예: `conversion/gfm-front/ui/ULDSTF05621/ULDSTF05621.png`, 상태별이면 `ULDSTF05621_신규.png`). 결과서 머리 표의 "화면 캡처" 칸에 파일명과 상태를 적습니다. 캡처가 없으면 이 절을 건너뛰고 §13.3 으로 갑니다.
+**캡처 위치** — `{화면 폴더}/{화면ID}*.png|jpg` (예: `conversion/conversion-front/ui/ULDSTF05621/ULDSTF05621.png`, 상태별이면 `ULDSTF05621_신규.png`). 결과서 머리 표의 "화면 캡처" 칸에 파일명과 상태를 적습니다. 캡처가 없으면 이 절을 건너뛰고 §13.3 으로 갑니다.
 
-**TO-BE 위치** — 모듈 폴더의 `ui-tobe/{화면ID}.xml` (gfm-front 는 `conversion/gfm-front/ui-tobe/{화면ID}.xml`, sample-front 샘플은 `conversion/sample-front/ui/{화면ID}.xml`).
+**TO-BE 위치** — 모듈 폴더의 `ui-tobe/{화면ID}.xml` (conversion-front 는 `conversion/conversion-front/ui-tobe/{화면ID}.xml`, sample-front 샘플은 `conversion/sample-front/ui/{화면ID}.xml`).
 
 **1단계 — 퍼블리싱본 생성** ([websquare-publishing](../../.claude/skills/websquare-publishing/SKILL.md) 스킬 절차 ①~⑥ 을 따른다)
 1. **기준**: 레이아웃·영역 순서·라벨·버튼 위치는 **캡처**를 따릅니다. `conversion/publish/…/{화면ID}.xml`(KRX 퍼블리셔 XML)이 있으면 컴포넌트 종류·id 참고용으로 함께 봅니다. 둘이 다르면 캡처를 따르고 차이를 결과서 §10 에 적습니다.
@@ -702,14 +702,14 @@ flowchart TD
 
 ### 13.3 전환으로 넘길 때
 
-결과서 §9 대로 TO-BE 파일(`ui/{화면ID}.xml`, gfm-front 는 `ui-tobe/{화면ID}.xml`)을 쓴 뒤 아래를 통과시킵니다(샘플은 `convert.py` 고정점이 아니므로 수기 작성 + 게이트가 기준). §13.2 로 퍼블리싱본을 먼저 만들었으면 그 파일 위에 씁니다.
+결과서 §9 대로 TO-BE 파일(`ui/{화면ID}.xml`, conversion-front 는 `ui-tobe/{화면ID}.xml`)을 쓴 뒤 아래를 통과시킵니다(샘플은 `convert.py` 고정점이 아니므로 수기 작성 + 게이트가 기준). §13.2 로 퍼블리싱본을 먼저 만들었으면 그 파일 위에 씁니다.
 
 ```sh
 PYTHONUTF8=1 python conversion/tools/gate_screen.py --pcc {fil|stf|mgt|tms} conversion/sample-front/ui/{화면ID}.xml
 PYTHONUTF8=1 python conversion/tools/scan_mixed_compare.py conversion/sample-front/ui/{화면ID}.xml
 PYTHONUTF8=1 python conversion/tools/publish_gate.py --rev HEAD conversion/sample-front/ui/{화면ID}.xml   # 퍼블리싱본 위에 전환했으면
-PYTHONUTF8=1 python conversion/tools/api_spec_check.py conversion/gfm-front/ui-tobe/{화면ID}.xml        # {화면ID}_API.txt|md 가 있으면 필수(없으면 명세 대조 SKIP)
-PYTHONUTF8=1 python conversion/tools/init_binding_check.py conversion/gfm-front/ui-tobe/{화면ID}.xml    # 달력·조회 Enter 키 init 바인딩(규칙 22·37) — FAIL 0건
+PYTHONUTF8=1 python conversion/tools/api_spec_check.py conversion/conversion-front/ui-tobe/{화면ID}.xml        # {화면ID}_API.txt|md 가 있으면 필수(없으면 명세 대조 SKIP)
+PYTHONUTF8=1 python conversion/tools/init_binding_check.py conversion/conversion-front/ui-tobe/{화면ID}.xml    # 달력·조회 Enter 키 init 바인딩(규칙 22·37) — FAIL 0건
 python -m wsxml_lint conversion/sample-front/ui/{화면ID}.xml
 ```
 

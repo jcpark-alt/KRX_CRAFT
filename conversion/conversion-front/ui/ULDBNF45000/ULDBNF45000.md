@@ -2,9 +2,9 @@
 
 | 항목 | 내용 |
 |---|---|
-| AS-IS | `ULDBNF45000.jsp` (JSP/jQuery, 대외 메인 화면 — 계정관리 > 담당자정보 변경, `dmenus` bmenu 7) — 반입 `conversion/gfm-front/ui/ULDBNF45000/ULDBNF45000.jsp` |
-| 신규 API 명세 | `conversion/gfm-front/ui/ULDBNF45000/ULDBNF45000_API.md` — 블록 4종(이 화면 4종, 다른 화면 0종). §2.2·§5 는 명세 기준(가이드 §0.3·§5) |
-| TO-BE | `conversion/gfm-front/ui-tobe/ULDBNF45000.xml` — 전환 완료(2026-10-26). 1단계 퍼블리싱(캡처 기준 마크업 + §2.1 id) → 2단계 스크립트(이 문서 + API 명세). 게이트: gate_screen(`--pcc fil`)·publish_gate(1단계 대비 `--allow P20`)·api_spec_check·convert 고정점·lint 0/0 통과. 남은 확인은 §10 의 `TODO` |
+| AS-IS | `ULDBNF45000.jsp` (JSP/jQuery, 대외 메인 화면 — 계정관리 > 담당자정보 변경, `dmenus` bmenu 7) — 반입 `conversion/conversion-front/ui/ULDBNF45000/ULDBNF45000.jsp` |
+| 신규 API 명세 | `conversion/conversion-front/ui/ULDBNF45000/ULDBNF45000_API.md` — 블록 4종(이 화면 4종, 다른 화면 0종). §2.2·§5 는 명세 기준(가이드 §0.3·§5) |
+| TO-BE | `conversion/conversion-front/ui-tobe/ULDBNF45000.xml` — 전환 완료(2026-10-26). 1단계 퍼블리싱(캡처 기준 마크업 + §2.1 id) → 2단계 스크립트(이 문서 + API 명세). 게이트: gate_screen(`--pcc fil`)·publish_gate(1단계 대비 `--allow P20`)·api_spec_check·convert 고정점·lint 0/0 통과. 남은 확인은 §10 의 `TODO` |
 | 퍼블리셔 XML | `conversion/publish/채권/채권상장신청(대외)/ULDBNF45000.xml` (첨부 영역은 커밋 f21f61af 로 보강) |
 | 화면 캡처 | `ULDBNF45000.png` (신고담당자(부) 선택 · 첨부 영역 표시 상태) — TO-BE 퍼블리싱 기준(가이드 §13.2) |
 | 업무공통 | 쓰지 않음(gcc 만). 게이트는 `--pcc fil`(ULD* 기본) |

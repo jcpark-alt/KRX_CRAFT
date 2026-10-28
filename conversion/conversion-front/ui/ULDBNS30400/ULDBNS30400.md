@@ -2,9 +2,9 @@
 
 | 항목 | 내용 |
 |---|---|
-| AS-IS | `ULDBNS30400.gfm` (Gauce/X-Internet, 1250×774 메인 화면 — 채권 마감관리 메뉴에서 진입, 원 배포 경로 미상: `../js/*.js`·`../img/bns/*` 상대 참조) — 반입 `conversion/gfm-front/ui/ULDBNS30400/ULDBNS30400.gfm` |
-| 신규 API 명세 | `conversion/gfm-front/ui/ULDBNS30400/ULDBNS30400_API.md` — 블록 4종(이 화면 4종, 다른 화면 0종), 모두 `GET /api/bonds/clsAdm/procsStat/…`. §2.2·§5 는 명세 기준(가이드 §0.3·§5). 명세의 `[REQUEST]` 옵션 표기가 프로젝트 샘플 형식과 다르다(따옴표 없음·`=body` 없음·`ref: dma_search` + `requestData` 병기) — §5 「명세 표기와 TO-BE 표기」, §10 #1·#2. **월별등록현황(일괄 목록 상세) 조회 블록은 없다**(§10 #3) |
-| TO-BE | `conversion/gfm-front/ui-tobe/ULDBNS30400.xml` (배포 경로 `/ui/bns/bnscls/ULDBNS30400.xml` — 가정, §10 #15). **전환 완료(2026-10-27)** — 출발점은 publish-tobe 파이프라인 사본(`conversion/publish-tobe/채권/채권처리(대내)/ULDBNS30400.xml`, 퍼블리싱 마크업 + W-Craft 1차 스크립트 — §9 「W-Craft 1차본 대비」). **1단계** 마크업 기준본: 캡처가 없어 기존 ui-tobe 마크업을 기준으로 보강(§2.1·§10 #16 — ESG `onclick` 제거는 `publish_gate --allow P11`). **2단계** 스크립트: 이 문서와 `ULDBNS30400_API.md` 대로 다시 씀. 게이트: `gate_screen --pcc stf` 통과, `publish_gate`(1단계 사본 대비, `--allow P20`) 통과, `api_spec_check --allow-unused /api/bonds/clsAdm/procsStat/prevBzDd-select` 통과, `init_binding_check` 통과, `wsxml_lint` 0/0, `convert.py` 고정점 |
+| AS-IS | `ULDBNS30400.gfm` (Gauce/X-Internet, 1250×774 메인 화면 — 채권 마감관리 메뉴에서 진입, 원 배포 경로 미상: `../js/*.js`·`../img/bns/*` 상대 참조) — 반입 `conversion/conversion-front/ui/ULDBNS30400/ULDBNS30400.gfm` |
+| 신규 API 명세 | `conversion/conversion-front/ui/ULDBNS30400/ULDBNS30400_API.md` — 블록 4종(이 화면 4종, 다른 화면 0종), 모두 `GET /api/bonds/clsAdm/procsStat/…`. §2.2·§5 는 명세 기준(가이드 §0.3·§5). 명세의 `[REQUEST]` 옵션 표기가 프로젝트 샘플 형식과 다르다(따옴표 없음·`=body` 없음·`ref: dma_search` + `requestData` 병기) — §5 「명세 표기와 TO-BE 표기」, §10 #1·#2. **월별등록현황(일괄 목록 상세) 조회 블록은 없다**(§10 #3) |
+| TO-BE | `conversion/conversion-front/ui-tobe/ULDBNS30400.xml` (배포 경로 `/ui/bns/bnscls/ULDBNS30400.xml` — 가정, §10 #15). **전환 완료(2026-10-27)** — 출발점은 publish-tobe 파이프라인 사본(`conversion/publish-tobe/채권/채권처리(대내)/ULDBNS30400.xml`, 퍼블리싱 마크업 + W-Craft 1차 스크립트 — §9 「W-Craft 1차본 대비」). **1단계** 마크업 기준본: 캡처가 없어 기존 ui-tobe 마크업을 기준으로 보강(§2.1·§10 #16 — ESG `onclick` 제거는 `publish_gate --allow P11`). **2단계** 스크립트: 이 문서와 `ULDBNS30400_API.md` 대로 다시 씀. 게이트: `gate_screen --pcc stf` 통과, `publish_gate`(1단계 사본 대비, `--allow P20`) 통과, `api_spec_check --allow-unused /api/bonds/clsAdm/procsStat/prevBzDd-select` 통과, `init_binding_check` 통과, `wsxml_lint` 0/0, `convert.py` 고정점 |
 | 퍼블리싱 | `conversion/publish/채권/채권처리(대내)/ULDBNS30400.xml` — 컴포넌트 id 는 AS-IS 와 같음. 날짜는 `w2:inputCalendar`(달력 이미지 `btn_SDate`·`btn_EDate` 없음), 콤보·라디오는 `xf:select1`, ESG 체크는 `xf:select`(checkboxgroup), 발행기관코드 `txb_ISUR_CD` 는 `w2:autoComplete`, 탭은 `w2:tabControl`(`panel_2`·`panel_3`·`panel_4`, 본문 `panel_2_01`…), 건수는 `w2:span#panel_page1~4`. 그리드 컬럼 id 는 대문자 그대로 |
 | 화면 캡처 | 없음 — 가이드 §13.2 1단계는 **기존 ui-tobe 마크업을 기준본**으로 삼았다(마크업 보강 항목은 §2.1·§10 #16 완료, 남은 퍼블리셔 잔재는 §10 #20) |
 | 업무공통 | `$c.stf`(`getMessageParam`·`fillGridHeaderTotalCnt`)·`$c.bns`(`popClsProcesStatIsuInfo` — `cm/pcc/stf/bns_common.xml`) — `cm/pcc/stf`. 게이트는 `--pcc stf` 로 돌린다 |
@@ -612,11 +612,11 @@ const requestData = {
 
 블록 4 는 `{ target: dma_searchPrevBzDd }` 이고, 각 블록 끝의 `* **submission target**` 줄은 `"dlt_searchTotList=body"`·`"dlt_searchIndvdlisuList=body"`(대소문자 오타 — 정의 id 는 `dlt_searchIndvdlIsuList`)·`"dlt_searchPackListIsuList=body"`·`"dma_searchPrevBzDd=body"` 이다.
 
-| # | 명세 표기 | 프로젝트 표준 (가이드 §5 샘플·gfm-front 3본) | TO-BE 결정 |
+| # | 명세 표기 | 프로젝트 표준 (가이드 §5 샘플·conversion-front 3본) | TO-BE 결정 |
 |---|---|---|---|
 | 1 | `ref`·`target` 값에 따옴표가 없음(`ref: dma_search`) | 문자열 리터럴(`ref: ""`, `target: "dma_x=body"`) | 문자열로 쓴다 |
 | 2 | `target: dlt_searchTotList` 에 `=body` 없음(블록 끝 submission target 줄에는 있음) | `"<id>=body"` | `target : "dlt_searchTotList=body"` 등 `"<id>=body"` 꼴 |
-| 3 | `ref: dma_search` 와 `const requestData = {…}` 를 함께 적음 — 어느 쪽으로 보낼지 모호 | 기존 gfm-front 3본(ULDSTF05621·05911·ULDBNF45000)은 `ref` 를 쓰지 않고 `requestData` 로만 보냄 | **가정: `ref : ""` + `requestData = scwin.getSearchData()`(= `dma_search` 9키 JSON)**. `dma_search` 는 화면 조건 DataCollection 으로 둔다. GET 이라 `requestData` 가 쿼리 문자열로 붙는 것도 기존 3본과 같다 — 확인 §10 #1 |
+| 3 | `ref: dma_search` 와 `const requestData = {…}` 를 함께 적음 — 어느 쪽으로 보낼지 모호 | 기존 conversion-front 3본(ULDSTF05621·05911·ULDBNF45000)은 `ref` 를 쓰지 않고 `requestData` 로만 보냄 | **가정: `ref : ""` + `requestData = scwin.getSearchData()`(= `dma_search` 9키 JSON)**. `dma_search` 는 화면 조건 DataCollection 으로 둔다. GET 이라 `requestData` 가 쿼리 문자열로 붙는 것도 기존 3본과 같다 — 확인 §10 #1 |
 | 4 | 블록 2 submission target `dlt_searchIndvdlisuList` (소문자 `i`) | — | 정의 id `dlt_searchIndvdlIsuList` 로 맞춘다 — §10 #2 |
 
 ### 5.1 전체 탭 목록 조회 (`scwin.searchTotList`) — AS-IS `fn_Search1`
@@ -956,7 +956,7 @@ scwin.searchTotList = async function () {
 
 ## 10. 남은 작업 (TODO)
 
-1. **요청 방식 — `ref` vs `requestData` (가정)** — 명세 블록 1~3 은 `{ ref: dma_search, target: … }` 와 `const requestData = {…}` 를 함께 적었다. TO-BE 는 기존 gfm-front 3본 관행대로 **`ref : ""` + `requestData = scwin.getSearchData()`(`dma_search` 9키)** 로 보낸다고 가정했다(GET 쿼리 문자열). `ref : "dma_search"` 로 보내야 하는지(서버가 본문/쿼리 중 어디서 읽는지) 확인하고, `ref` 이면 `sbmOptions.ref` 만 바꾼다(§5).
+1. **요청 방식 — `ref` vs `requestData` (가정)** — 명세 블록 1~3 은 `{ ref: dma_search, target: … }` 와 `const requestData = {…}` 를 함께 적었다. TO-BE 는 기존 conversion-front 3본 관행대로 **`ref : ""` + `requestData = scwin.getSearchData()`(`dma_search` 9키)** 로 보낸다고 가정했다(GET 쿼리 문자열). `ref : "dma_search"` 로 보내야 하는지(서버가 본문/쿼리 중 어디서 읽는지) 확인하고, `ref` 이면 `sbmOptions.ref` 만 바꾼다(§5).
 2. **명세 표기 차이** — `[REQUEST]` 옵션 값에 따옴표가 없고 `target` 에 `=body` 가 없다(프로젝트 샘플 형식은 `{ ref: "", target: "dma_x=body" }`). 블록 2 submission target 은 `dlt_searchIndvdlisuList=body`(소문자 `i`)로 정의 id `dlt_searchIndvdlIsuList` 와 다르다. TO-BE 는 `"<정의 id>=body"` 로 썼다 — 명세 정정 요청(§5 「명세 표기와 TO-BE 표기」).
 3. **월별등록현황 API 없음** — AS-IS `fn_SearchDetail`(`select.list3detail`, `V_BND_APPL_ID`)에 대응하는 블록이 명세에 없다. 경로·요청 키(`bndApplId` 가정)·응답 정의(`dlt_searchPackListIsuDtlList` 7열 가정, §2.2)를 받아 §5.5 를 확정한다. 받기 전까지 TO-BE 는 `// TODO:` + 빈 목록(가정 경로를 넣으면 A01 FAIL, AS-IS URL 은 A04 FAIL) — **현재 월별등록현황은 늘 빈 목록·건수 0** 이다(업무 6). 명세를 받으면 `scwin.searchPackListIsuDtl` 을 async 로 바꾸고 호출처 2곳(`grd_List3_onrowindexchange`·`searchPackListIsuList` 첫 행)에 `await` 를 붙인다.
 4. **직전영업일 조회의 의도** — 원본은 조회 결과(3행 `CALND_DD`)를 시작일에 넣은 직후 오늘로 덮는다. 명세 블록 4 는 1건 dataMap(`calndDd`)이다. ① 원본 최종값(오늘~오늘)이 맞는지, 시작일을 직전영업일(또는 3영업일 전)로 하려던 것인지 ② 서버가 주는 날이 AS-IS 3행과 같은 날인지 확인한다. 지금은 미호출 + `--allow-unused /api/bonds/clsAdm/procsStat/prevBzDd-select`. 의도가 직전영업일이면 §3 단계 2 를 `await scwin.searchPrevBzDd()` 로 바꾸고 게이트 예외를 지운다(§5.4, §8 #1).

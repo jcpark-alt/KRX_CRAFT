@@ -4,7 +4,7 @@
     python conversion/tools/api_spec_check.py [--spec <API.txt|API.md>] [--allow-unused <path,...>] [--no-context-path] <TO-BE xml> ...
 
 업무 분석 가이드(conversion/md/websquare_gfm_conversion.md §5 「API 명세 적용」) 의 "API 명세가 있으면 그 API 로 바꾼다" 를 검사한다.
---spec 을 생략하면 TO-BE 파일명의 화면ID 로 `../ui/{화면ID}/{화면ID}_API.{txt,md}`(gfm-front 화면별 폴더 배치),
+--spec 을 생략하면 TO-BE 파일명의 화면ID 로 `../ui/{화면ID}/{화면ID}_API.{txt,md}`(conversion-front 화면별 폴더 배치),
 `../ui/{화면ID}_API.{txt,md}`, 같은 폴더의 `{화면ID}_API.{txt,md}` 를 차례로 찾는다(같은 자리면 txt 우선).
 명세가 없으면 명세 대조를 건너뛴다(SKIP — A07·A08 형식 검사만, FAIL 없으면 종료 코드 0).
 
@@ -35,8 +35,8 @@
   A07 FAIL  action·saveUrl·listUrl 이 전체 경로 리터럴이 아님 — 전역 변수(`scwin.*`) 조립·`+` 이어 붙이기·상대 경로
             (규칙 38. 분기는 가지마다 전체 경로 리터럴이면 통과, saveUrl·listUrl 의 `$c.sbm.getContextPath() +` 접두는 허용.
              명세가 없어도 이 형식 검사는 돈다)
-  A08 FAIL  action·saveUrl·listUrl 에 `$c.sbm.getContextPath()` 가 붙음 (규칙 39 — gfm-front 전용.
-            파일 경로에 `gfm-front` 가 있으면 자동, 그 밖은 --no-context-path 로 켠다. contextRoot "/" 라 UDC 는 "//api/…" 가 된다)
+  A08 FAIL  action·saveUrl·listUrl 에 `$c.sbm.getContextPath()` 가 붙음 (규칙 39 — conversion-front 전용.
+            파일 경로에 `conversion-front` 가 있으면 자동, 그 밖은 --no-context-path 로 켠다. contextRoot "/" 라 UDC 는 "//api/…" 가 된다)
 action 해석: `action : "…"`, `action : scwin.API + "…"`, `scwin.API + (조건 ? "a" : "b")` 처럼 한 줄 안의 문자열 리터럴을
 모두 후보로 보고, `scwin.API` 가 있으면 `scwin.API = "…"` 값을 앞에 붙인다.
 종료 코드: FAIL 0건이면 0, 하나라도 있으면 1.
@@ -239,7 +239,7 @@ def find_spec(xml_path):
     p = Path(xml_path)
     sid = SCREEN_ID.match(p.stem)
     sid = sid.group(1) if sid else p.stem
-    for base in (p.parent.parent / "ui" / sid,    # gfm-front 화면별 폴더 배치
+    for base in (p.parent.parent / "ui" / sid,    # conversion-front 화면별 폴더 배치
                  p.parent.parent / "ui",
                  p.parent):
         for ext in ("txt", "md"):
@@ -255,8 +255,8 @@ def check(xml_path, spec_path=None, allow_unused=(), no_context_path=False):
     _raw, _eol, reg = st.read_xml(xml_path)
     script = reg["script"] if reg else ""
     actions = extract_actions(script)
-    # 규칙 39(gfm-front): getContextPath 접두 금지 — 접두는 A08 로만 알리고 A07 은 접두를 뗀 식으로 본다
-    no_ctx = no_context_path or "gfm-front" in Path(xml_path).resolve().as_posix()
+    # 규칙 39(conversion-front): getContextPath 접두 금지 — 접두는 A08 로만 알리고 A07 은 접두를 뗀 식으로 본다
+    no_ctx = no_context_path or "conversion-front" in Path(xml_path).resolve().as_posix()
     form_fails = []
     for a in actions:
         prob = a["form"]

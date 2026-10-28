@@ -2,9 +2,9 @@
 
 | 항목 | 내용 |
 |---|---|
-| AS-IS | `/lstproc/ULDSTF05911.gfm` (Gauce/X-Internet, 980×480 모달 창 — 부모가 1000×490 `window` 로 연다) — 반입 `conversion/gfm-front/ui/ULDSTF05911/ULDSTF05911.gfm` |
-| 신규 API 명세 | `conversion/gfm-front/ui/ULDSTF05911/ULDSTF05911_API.md` — 블록 4종(이 화면 4종, 다른 화면 0종). §2.2·§5 는 명세 기준(가이드 §0.3·§5). **2026-10-26 갱신**: `register`·`modify` 요청 전달 방식 명시(머리 dataMap 은 `ref` 없이 `requestData` 로, 목록은 `requestData.isuList`). **2026-10-27 형식 전환**: `_API.txt` → `_API.md`(블록 제목·경로·요청/응답 정의는 원문 그대로, 블록마다 AS-IS 호출(이 결과서 §5 표 기준)과 `[REQUEST]` 아래 `{ ref, target }` 옵션 표기 추가 — 내용 변경 없음) |
-| TO-BE | `conversion/gfm-front/ui-tobe/ULDSTF05911.xml` (배포 경로 `/ui/lst/lstproc/ULDSTF05911.xml` — 가정, §10) |
+| AS-IS | `/lstproc/ULDSTF05911.gfm` (Gauce/X-Internet, 980×480 모달 창 — 부모가 1000×490 `window` 로 연다) — 반입 `conversion/conversion-front/ui/ULDSTF05911/ULDSTF05911.gfm` |
+| 신규 API 명세 | `conversion/conversion-front/ui/ULDSTF05911/ULDSTF05911_API.md` — 블록 4종(이 화면 4종, 다른 화면 0종). §2.2·§5 는 명세 기준(가이드 §0.3·§5). **2026-10-26 갱신**: `register`·`modify` 요청 전달 방식 명시(머리 dataMap 은 `ref` 없이 `requestData` 로, 목록은 `requestData.isuList`). **2026-10-27 형식 전환**: `_API.txt` → `_API.md`(블록 제목·경로·요청/응답 정의는 원문 그대로, 블록마다 AS-IS 호출(이 결과서 §5 표 기준)과 `[REQUEST]` 아래 `{ ref, target }` 옵션 표기 추가 — 내용 변경 없음) |
+| TO-BE | `conversion/conversion-front/ui-tobe/ULDSTF05911.xml` (배포 경로 `/ui/lst/lstproc/ULDSTF05911.xml` — 가정, §10) |
 | 퍼블리싱 | `conversion/publish/상장/상장처리(대내)/ULDSTF05911.xml` — 컴포넌트 id 는 AS-IS 와 같음(`edt_MktactEnforceDd` `inputCalendar`, `txb_ChgRsnContn` `xf:input`, 버튼·`img_SetIsuCd`·`img_Excel`·`btn_exelUpload` 는 `xf:trigger`). 그리드 컬럼 id 는 대문자·한글(`번호`) 그대로 |
 | 화면 캡처 | 없음 |
 | 업무공통 | `$c.stf`(`getMessageParam`·`setButtonSetWithDate`)·`$c.lc`(`isProcess`·`getSecuGrpNm`·`glb.*` 상수) — `cm/pcc/stf`. 게이트는 `--pcc stf` 로 돌린다 |

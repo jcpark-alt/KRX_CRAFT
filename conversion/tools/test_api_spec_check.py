@@ -109,7 +109,7 @@ def test_no_spec_skips(tmp_path):
 
 
 def test_spec_found_in_screen_folder_layout(tmp_path):
-    # gfm-front 배치: ui/{화면ID}/{화면ID}_API.txt ↔ ui-tobe/{화면ID}.xml
+    # conversion-front 배치: ui/{화면ID}/{화면ID}_API.txt ↔ ui-tobe/{화면ID}.xml
     (tmp_path / "ui" / "ULDTST00001").mkdir(parents=True)
     (tmp_path / "ui-tobe").mkdir()
     (tmp_path / "ui" / "ULDTST00001" / "ULDTST00001_API.txt").write_text(SPEC, encoding="utf-8")
@@ -183,8 +183,8 @@ def test_a07_multiline_ternary_is_joined(tmp_path):
     assert "A07" not in fails
 
 
-# ── 규칙 39 (gfm-front): getContextPath 접두 금지 (A08) ──
-def _a08(tmp_path, expr, key="saveUrl", folder="gfm-front", no_ctx=False):
+# ── 규칙 39 (conversion-front): getContextPath 접두 금지 (A08) ──
+def _a08(tmp_path, expr, key="saveUrl", folder="conversion-front", no_ctx=False):
     d = tmp_path / folder / "ui-tobe"
     d.mkdir(parents=True, exist_ok=True)
     x = d / "ULDTST00009.xml"
