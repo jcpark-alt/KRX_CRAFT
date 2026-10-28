@@ -2,8 +2,8 @@
 
 | 항목 | 내용 |
 |---|---|
-| AS-IS | `/lstproc/ULDSTF08200.gfm` (Gauce/X-Internet, 1270×750 메인 화면, 탭 2개 「ETN마감처리」·「ETN마감처리내역」) — 반입 `conversion/conversion-front/ui/ULDSTF08200/ULDSTF08200.gfm` |
-| 신규 API 명세 | `conversion/conversion-front/ui/ULDSTF08200/ULDSTF08200_API.md` — 블록 21종(머리 `[STF08200]`, 전부 이 화면). **이 화면이 쓰는 것은 `close-procs-newlisting` 9종**이고, `close-procs-invst-warn` 12종(투자유의종목 마감)은 이 화면 원본·캡처에 대응 기능이 없어 쓰지 않는다(§5, §10 #1). §2.2·§5 는 명세 기준(가이드 §0.3·§5) |
+| AS-IS | `/lstproc/ULDSTF08200.gfm` (Gauce/X-Internet, 1270×750 메인 화면, 탭 2개 「ETN마감처리」·「ETN마감처리내역」) — 반입 `conversion/conversion-front/ui/completed/ULDSTF08200/ULDSTF08200.gfm` |
+| 신규 API 명세 | `conversion/conversion-front/ui/completed/ULDSTF08200/ULDSTF08200_API.md` — 블록 21종(머리 `[STF08200]`, 전부 이 화면). **이 화면이 쓰는 것은 `close-procs-newlisting` 9종**이고, `close-procs-invst-warn` 12종(투자유의종목 마감)은 이 화면 원본·캡처에 대응 기능이 없어 쓰지 않는다(§5, §10 #1). §2.2·§5 는 명세 기준(가이드 §0.3·§5) |
 | TO-BE | `conversion/conversion-front/ui-tobe/ULDSTF08200.xml` (배포 경로 `/ui/lst/lstproc/ULDSTF08200.xml` — 가정, §10 #13) |
 | 퍼블리싱 | `conversion/publish/상장/상장처리(대내)/ULDSTF08200.xml`(사본 `conversion/publish/publish-tobe/…`) — **원본과 다르다**: 탭이 「신규상장 마감」·「투자유의종목 마감」이고 조회조건이 1번 탭 안에 있다. 컴포넌트 종류·id 만 참고하고 레이아웃은 캡처를 따랐다(§10 #1) |
 | 이전 샘플 전환본 | `conversion/sample-front/ui/ULDSTF08200.xml`(참고만, 수정 안 함) — 원본 두 탭을 「신규상장 마감」 한 탭(조회구분 자동 전환)으로 합치고 ULDSTF08311·08306 을 「투자유의종목 마감」 탭으로 통합한 판. 이번 전환은 캡처대로 원본 두 탭 구조를 유지한다 |
@@ -449,11 +449,15 @@ stateDiagram-v2
 | 5.8 | 팀장승인(마감처리) | `trs_Cls` `…&SCREN_PROCS_TP_CD_02&method=losslmtClsProcsSave` | `POST …/close-procs-newlisting/apprvFinal` (명세 19) | `scwin.cls` → `scwin.postClose` |
 | 5.9 | 재마감처리 | `trs_Cls` `…&SCREN_PROCS_TP_CD_04&method=losslmtReClsProcsSave` | `POST …/close-procs-newlisting/reClose` (명세 20) | `scwin.recls` → `scwin.postClose` |
 | — | 머리 정의 | `dts_Cls` `/gauceSystemierAdaptor.do?method=getGauceDataHeader&messageId=LOSSLMT_ETN_FINAL_LOG_EMP` (동기, `fn_trSetHeader`) | (없음) — 요청 객체로 대체 | — |
-| — | (명세에만) 투자유의 12종 | 이 화면 원본에 없음 | `GET …/close-procs-invst-warn/md-close-check`·`select-final-log`·`select-list-design`·`select-list-extn`·`select-list-first-detect`·`select-list-hist`·`select-list-noti`·`select-list-release`·`select-list-trd-halt`, `POST …/close-procs-invst-warn/apprvFinal`·`reclose`·`revwFinal` (명세 1~9·16~18) | **쓰지 않음**(§10 #1) |
+| — | (명세에만) 투자유의 12종 | 이 화면 원본에 없음 | `GET …/close-procs-invst-warn/md-close-check`·`select-final-log`·`select-list-design`·`select-list-extn`·`select-list-first-detect`·`select-list-hist`·`select-list-noti`·`select-list-release`·`select-list-trd-halt`, `POST …/close-procs-invst-warn/apprvFinal`·`reclose`·`revwFinal` (명세 1~9·16~18) | **쓰지 않음** — 두 탭 유지 확정(2026-10-28)으로 이 화면 범위 밖(§10 #1) |
 
 #### 명세 ↔ AS-IS 차이 (→ §10)
 
-* 명세 머리가 `[STF08200]`(`ULD` 접두 없음)이라 `api_spec_check.py` 가 21종 전부를 「다른 화면 대상(A06)」으로 보고 대조를 건너뛴다. 머리를 `[ULDSTF08200]` 으로 바꾼 임시 사본으로 대조해 newlisting 9종 일치(A01·A02·A05 0건), invst-warn 12종은 `--allow-unused` 로 낮췄다(§10 #2).
+* 명세 머리가 `[STF08200]`(`ULD` 접두 없음)이지만 `api_spec_check.py` 가 접두 없는 화면ID 도 같은 화면으로 판정한다(2026-10-28 보강). 원본 명세로 대조해 newlisting 9종 일치(A01·A02·A05 0건). invst-warn 12종은 범위 밖이라 A03 을 `--allow-unused` 로 낮춘다 — 게이트 명령:
+
+  ```sh
+  MSYS_NO_PATHCONV=1 PYTHONUTF8=1 python conversion/tools/api_spec_check.py --allow-unused "$(python -c "p='/api/listing/lstproc/etn/close-procs-invst-warn/'; print(','.join(p+x for x in 'md-close-check select-final-log select-list-design select-list-extn select-list-first-detect select-list-hist select-list-noti select-list-release select-list-trd-halt apprvFinal reclose revwFinal'.split()))")" conversion/conversion-front/ui-tobe/ULDSTF08200.xml
+  ```
 * `select-list` 요청 키는 `taskDd` 이나 원본 조회조건은 **상장일**(`edt_LIST_DD`) — 상장일을 `taskDd` 로 보낸다(§10 #3).
 * `select-list-redemption-hist` 의 `isuCd` 빈 값이 원본 `rv.all`(마감일 전체)인지 명세에 설명이 없다(§10 #4).
 * POST 3종 요청: `revwFinal`·`reClose` 는 `completeYn` 하나(의미 불명 — 응답 필드처럼 보임), `apprvFinal` 은 `listDd` 하나. 원본은 `LOSSLMT_ETN_FINAL_LOG_EMP` 1행(`CHRG_EMP_NO`, 마감처리는 `LIST_DD` 도)을 보냈다(§10 #5). 응답 정의가 비어 성공은 `success` 로만 판정한다(§10 #6).
@@ -720,8 +724,8 @@ stateDiagram-v2
 
 ## 10. 남은 작업 (TODO)
 
-1. **화면 구성(탭) 확정 — 투자유의종목 마감 포함 여부** — 명세 21종 중 `close-procs-invst-warn` 12종(투자유의종목 지정예고·지정연장·지정·지정해제·매매거래정지 조회, 최초적출·시장정보 마감·최종마감정보, 투자유의 담당자 확인·팀장승인·재마감처리)은 이 화면 원본(.gfm)과 캡처(탭 「ETN마감처리」·「ETN마감처리내역」)에 없다. 퍼블리싱 XML 과 sample-front 전환본은 탭을 「신규상장 마감」·「투자유의종목 마감」으로 바꾸고 원본 ULDSTF08311(투자유의종목 마감)·08306 기능을 합쳤다. 이번 TO-BE 는 캡처·원본대로 두 탭을 유지하고 invst-warn 12종은 부르지 않았다(`api_spec_check --allow-unused`). 통합 화면으로 가면 ULDSTF08311·08306 원본·캡처를 받아 2번 탭을 다시 설계해야 한다(§2.1, §5).
-2. **명세 머리 화면ID** — `[STF08200]` 이라 `api_spec_check.py` 가 이 화면 블록으로 인식하지 못한다(21종 A06, 대조 생략). 명세를 `[ULDSTF08200]` 으로 고치거나 도구가 `ULD` 접두 없는 ID 를 같은 화면으로 보게 해야 한다. 임시 사본으로 대조한 결과는 §5(9종 일치).
+1. **~~화면 구성(탭) 확정~~ → 결정: 캡처대로 두 탭 유지(사용자 확정 2026-10-28)** — invst-warn 12종은 이 화면 범위 밖이다(투자유의종목 마감은 별도 화면 ULDSTF08311·08306 몫). 경위: 명세 21종 중 `close-procs-invst-warn` 12종(투자유의종목 지정예고·지정연장·지정·지정해제·매매거래정지 조회, 최초적출·시장정보 마감·최종마감정보, 투자유의 담당자 확인·팀장승인·재마감처리)은 이 화면 원본(.gfm)과 캡처(탭 「ETN마감처리」·「ETN마감처리내역」)에 없다. 퍼블리싱 XML 과 sample-front 전환본은 탭을 「신규상장 마감」·「투자유의종목 마감」으로 바꾸고 원본 ULDSTF08311(투자유의종목 마감)·08306 기능을 합쳤다. 이번 TO-BE 는 캡처·원본대로 두 탭을 유지하고 invst-warn 12종은 부르지 않았다(`api_spec_check --allow-unused`). 통합 화면으로 가면 ULDSTF08311·08306 원본·캡처를 받아 2번 탭을 다시 설계해야 한다(§2.1, §5).
+2. **~~명세 머리 화면ID~~ → 해소(도구 보강 bc44ef4c, 접두 없는 ID 를 같은 화면으로 판정)** — 명세 정정은 여전히 권장. 경위: `[STF08200]` 이라 `api_spec_check.py` 가 이 화면 블록으로 인식하지 못한다(21종 A06, 대조 생략). 명세를 `[ULDSTF08200]` 으로 고치거나 도구가 `ULD` 접두 없는 ID 를 같은 화면으로 보게 해야 한다. 임시 사본으로 대조한 결과는 §5(9종 일치).
 3. **`select-list` 조회조건** — 명세 요청 키는 `taskDd`, 원본 조회조건은 상장일(`{P}param01 = edt_LIST_DD`). TO-BE 는 상장일을 `taskDd` 로 보낸다. 서버가 마감일을 받아 다음 영업일을 스스로 구하는 것이면 `dma_search.taskDd` 로 바꾼다(§5.3, 코드 TODO).
 4. **`select-list-redemption-hist` 의 `isuCd` 빈 값** — 원본 `rv.all`(마감일 전체)·`rv.sel`(종목) 두 쿼리가 한 API 가 됐다. 빈 `isuCd` 가 전체인지 확인(§5.6, 코드 TODO).
 5. **POST 3종 요청 본문** — `revwFinal`·`reClose` 요청은 `completeYn` 하나(의미 불명, 응답 필드로 보임), `apprvFinal` 은 `listDd` 하나. 원본은 `CHRG_EMP_NO`(세션 사번)를 보냈다 — 서버가 세션으로 처리하는지, `completeYn` 에 무엇을 넣는지 확인(§5.7~§5.9, 코드 TODO).
