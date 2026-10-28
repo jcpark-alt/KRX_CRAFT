@@ -244,6 +244,50 @@ describe("validateDataCollect (cm/gcc/validate.xml)", () => {
     expect(h.state.alerts.join("")).toContain("중복된 값");
   });
 
+  // ==== 필터로 숨긴 행 — rowIndex 는 화면 행 번호(getCellData·setCellClass·setFocusedCell) ====
+
+  const makeFilteredGrid = (realRows, map, marks) => ({
+    getPluginName: () => "gridView",
+    getID: () => "grd_list",
+    getCellData: (d) => realRows[map[d]].NM,   // gridView getCellData 는 화면 행 번호
+    setCellClass: (d) => { marks.push(d); },
+    addClass: () => {},
+  });
+  const makeFilteredDataList = (realRows, map) => ({
+    getTotalRow: () => realRows.length,
+    getRowCount: () => map.length,
+    getAllJSON: () => realRows.slice(),           // 숨긴 행이 있으면 실제 순서 전체(엔진 동작)
+    getAllFilteredJSON: () => map.map((r) => realRows[r]),
+    getColumnName: () => "종목명",
+  });
+
+  test("필터로 숨긴 행은 검사하지 않고 경고만 — 숨긴 행의 빈 값으로 실패하지 않는다", async () => {
+    const h = loadHarness();
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    const realRows = [{ NM: "가" }, { NM: "" }, { NM: "다" }];   // 실제 1행(빈 값)이 필터로 숨음
+    const map = [2, 0];
+    h.scwin.getGridViewDataList = async () => makeFilteredDataList(realRows, map);
+    expect(await h.scwin.validateDataCollect(makeFilteredGrid(realRows, map, []), {
+      ...OPTS, fields: { NM: { required: true, name: "종목명" } },
+    })).toBe(true);
+    expect(warn.mock.calls.map((c) => c[0]).join("")).toContain("grd_list 의 필터로 숨긴 행 1건은 검사하지 않았습니다");
+    warn.mockRestore();
+  });
+
+  test("필터 중 보이는 행 실패는 화면 행 번호로 표시한다", async () => {
+    const h = loadHarness();
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    const realRows = [{ NM: "" }, { NM: "나" }, { NM: "다" }];   // 실제 0행(빈 값)이 화면 1행
+    const map = [2, 0];
+    const marks = [];
+    h.scwin.getGridViewDataList = async () => makeFilteredDataList(realRows, map);
+    expect(await h.scwin.validateDataCollect(makeFilteredGrid(realRows, map, marks), {
+      ...OPTS, validateType: "all", fields: { NM: { required: true, name: "종목명" } },
+    })).toBe(false);
+    expect(marks).toEqual([1]);
+    warn.mockRestore();
+  });
+
   // ==== includeUnbound — DataCollection 미바인딩 컴포넌트 처리 ====
 
   test("미바인딩 컴포넌트는 기본(includeUnbound 미지정) 건너뜀 — 규칙이 있어도 통과", async () => {

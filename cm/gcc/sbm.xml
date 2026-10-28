@@ -471,6 +471,18 @@ scwin.execute = function (sbmObj, requestData, compObj, options) {
             }
         }
 
+        // ref 의 행 상태 action(|M·|C·|U·|D) 행은 엔진이 화면 행 번호로 모으므로 필터로 숨긴 행은 전송되지 않는다.
+        // 전송은 그대로 진행하고 누락 행이 있으면 경고만 남긴다.(저장 전 clearFilter 권장)
+        // 점검 실패가 전송을 막지 않도록 예외는 로그만 남긴다.(중복 제어로 이전 요청이 이미 취소됐을 수 있다)
+        try {
+            scwin.__getRefActionItems(_sbmObj.ref).forEach(function (item) {
+                const hiddenRows = $c.data.getHiddenRowIndexByStatus($p.getComponentById(item.id), item.status);
+                if (hiddenRows.length > 0) {
+                    console.warn("[$c.sbm.execute] " + item.id + " 의 필터로 숨긴 " + item.action + " 행 " + hiddenRows.length + "건(실제 행 번호 " + hiddenRows.join(",") + ")은 전송되지 않습니다. 저장 전 필터를 해제하세요. submission id: " + _sbmObj.id);
+                }
+            });
+        } catch (e) { console.error(e); }
+
         // requestData가 비어 있고 ref가 단건 DataCollection(DataMap)을 가리키면,
         // 해당 DataMap의 데이터 객체만 추출해 ref 대신 requestData 인자로 전달한다.
         if ($c.util.isEmpty(requestData) && ($c.util.isEmpty(_sbmObj.ref) === false) && (_sbmObj.ref.indexOf("data:json,") === 0)) {
@@ -596,6 +608,44 @@ scwin.__toRefAction = function (code, token) {
     }
     console.warn("[$c.sbm.executeDynamic] 알 수 없는 ref action : " + token + " (M/C/D/U/A 또는 modified/inserted/deleted/updated/all)");
     return "";
+};
+
+/**
+ * @method
+ * @name __getRefActionItems
+ * @description submission ref 표현식(data:json,...)에서 행 상태 action(modified/inserted/updated/deleted)이 지정된 DataCollection 항목을 추출한다.
+ *  엔진은 이 action 의 행을 화면 행 번호 기준(getModifiedIndex 등)으로 모으므로 필터로 숨긴 행이 전송에서 빠진다 — 그 점검 대상을 고르는 데 쓴다.
+ *  action 이 all 이거나 없는 항목, data:json 이 아니거나 해석할 수 없는 표현식은 대상이 아니다(빈 배열).
+ * @param {String} ref submission ref 표현식
+ * @returns {Array} [{ id, action, status }] — status 는 해당 action 의 행 상태 문자 묶음(modified:"CUD", inserted:"C", updated:"U", deleted:"DV")
+ * @hidden Y
+ * @exception
+ * @example
+scwin.__getRefActionItems('data:json,{"id":"dlt_menu","action":"modified"}'); // [{ id:"dlt_menu", action:"modified", status:"CUD" }]
+scwin.__getRefActionItems('data:json,["dma_search",{"id":"dlt_menu","action":"deleted"}]'); // [{ id:"dlt_menu", action:"deleted", status:"DV" }]
+scwin.__getRefActionItems("data:json,dma_search"); // []
+ */
+scwin.__getRefActionItems = function (ref) {
+    const statusByAction = { modified: "CUD", inserted: "C", updated: "U", deleted: "DV" };
+    const prefix = "data:json,";
+    if ((typeof ref !== "string") || (ref.indexOf(prefix) !== 0)) {
+        return [];
+    }
+    const body = ref.substring(prefix.length).trim();
+    if ((body.charAt(0) !== "{") && (body.charAt(0) !== "[")) {
+        return [];
+    }
+    let parsed;
+    try {
+        parsed = JSON.parse(body);
+    } catch (e) {
+        return [];
+    }
+    return [].concat(parsed).filter(function (item) {
+        return (item !== null) && (typeof item === "object") && (typeof item.id === "string") && Object.prototype.hasOwnProperty.call(statusByAction, item.action);
+    }).map(function (item) {
+        return { id: item.id, action: item.action, status: statusByAction[item.action] };
+    });
 };
 
 /**
