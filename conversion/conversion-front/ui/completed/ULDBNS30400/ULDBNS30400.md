@@ -469,6 +469,8 @@ flowchart TD
 
 ---
 
+**날짜 표시 형식(규칙 46 확장, 2026-10-28)** — `grd_ListDetail` 의 `isuDd`(발행일)·`redmptDd`(상환일)에 `dataType="date" displayFormat="yyyy-MM-dd"` 를 붙였다(AS-IS 마스크 없음 → 원시 표시였음). `reqDt`·`recvDt`·`procDt`·`bossProcDt`·`procReqDt`·`aplDt`(`…Dt`)는 일시일 수 있어 붙이지 않았다 — §10 #21.
+
 ## 3. 로딩 (`gform onload` → `scwin.onpageload` → `scwin.init`)
 
 원본 `gform onload` 순서: `BnsPanelToGroupBox(panel_Top)` → 시장조치 콤보(`fn_SetBnsComboToCode2(vScrenID, dts_Temp, [{cid:'03057', cnm:'cmb_MktStsGb'}], '전체')`, 동기) → `fn_initSearchDate(edt_SDate, edt_EDate)` → `var vCurDate = cGetToday("yyyymmdd")`(미사용) → `fn_getDate()`(동기) → `setObjectValue(edt_SDate, dts_getDate.NameString(3, "CALND_DD"))` → `edt_EDate.text = cGetMinusDate2(cGetToday("yyyymmdd"), 0)` → `edt_SDate.text = cGetMinusDate2(cGetToday("yyyymmdd"), 0)` → `fn_Search()`.
@@ -976,3 +978,4 @@ scwin.searchTotList = async function () {
 18. **탭 되돌림 이벤트 순서** — TO-BE 는 `tab_Main.setSelectedTabIndex(0)` 뒤 **언제나 `applyTabCondition(0)` 을 직접 부른다**. `onchange` 가 다시 발화하면 전체 탭 조건이 두 번 적용되지만 결과가 같아 무해하다. ESG 안내 중 탭이 이미 바뀌어 보이는지 실화면으로 확인하고, 탭 전환을 미리 막는 `onbeforeselect` 를 쓸지도 함께 정한다(§6.2).
 19. **엔진 API 실측** — ① 처리구분 항목 교체: TO-BE 는 `cmb_BndStsGb.removeAll()` → `addItem(value, label)` → `setSelectedIndex(0)` — 바인딩 `dma_search.state` 가 "0" 으로 따라오는지 ② ~~처리결과 셀 색 class 가 정렬·필터 뒤에도 행을 따라가는지~~ — 해소: customFormatter 로 바꿔 그릴 때마다 계산(규칙 43) — 4종 모두 `sortable="true"` 라 정렬 후 확인 필수 ③ gridView 기본 `focus` 가 false 라 행 이벤트는 화면 코드의 `setFocusedCell` 로만 시작된다 — 조회 직후 `setFocusedCell(0, …)` 이 `onrowindexchange` 를 발화해 `searchPackListIsuDtl` 이 두 번 불리는지(명세 후 통신이 생기면 중복 조회) ④ 탭 본문 지연 렌더(`alwaysDraw` 기본 false) 시점 — 처음 고르기 전의 탭 그리드에 조회·`setFocusedCell` 이 안전한지(엑셀은 `$p.getComponentById` 로 막음, §6.7)(§5.3·§6.2·§6.9).
 20. **퍼블리셔 마크업 잔재 (Minor)** — 1단계에서 고치지 않은 것: ① 기간 칸 `td` 에 `flex flex_no` 래퍼가 없고 "~" 를 `w2:textbox`(`label_3`)로 둠 ② 그리드 높이를 `rowN`/`visibleRowNum` 대신 인라인 `style="height:153px;"` ③ `xf:trigger` 의 `src`·`cursor` 속성, `xf:select1` 의 `item=` 속성. 동작 영향은 없다 — 퍼블리싱 정비 때 표준 마크업으로 정리(§2.1, §8 #26).
+21. **날짜 표시 형식 확인(규칙 46 확장)** — `isuDd`·`redmptDd` 서버 값이 8자리 `yyyyMMdd` 인지 확인. `…Dt` 6열(신청일·접수처리일·처리완료일·팀장확인일·처리요구일·적용일)의 값 형식(날짜/일시)을 확인해 형식(`yyyy-MM-dd` 또는 일시 형식)을 정한다.

@@ -1118,6 +1118,26 @@ scwin.tab_List_ontabload = async function (tabId, index, userTabId) {
 * **규칙 22·37 과의 관계**: 탭 본문 안 달력·`schbox`/`tbl_search` 의 init 바인딩은 `scwin.init` 대신 이 규칙의 `ontabload` 분기에서 건다(바인딩 형태는 22·37 그대로).
 * **적용 현황**(2026-10-28, conversion-front TO-BE): `alwaysDraw` 기본(lazy) 탭이 있는 4본 중 init 이 탭 안 컴포넌트를 건드리던 **ULDBNS30300**(`tab_List` 0: 재마감 버튼·달력 2 / 1: 달력 1·Enter 키, `tab_ListCls` 0: 종목정보 열 초기화)·**ULDSTF05950**(`MaxTab_01` 0·1·3·4: 달력 바인딩) 적용 완료. ULDBNS30400 은 해당 없음, ULDSTF08200 은 `alwaysDraw="true"` 예외. sample-front·jsp-front 는 각 모듈 재전환 때.
 
+### 규칙 46: gridView 날짜 표시 — `dataType="date" displayFormat="yyyy-MM-dd"` (2026-10-28 신설, 같은 날 대상 확장 — 사용자 지시)
+
+* **대상** (둘 중 하나):
+    1. **AS-IS 마스크** — AS-IS(Gauce) 그리드 컬럼에 `mask="XXXX-XX-XX"` 가 있던 열.
+    2. **id + 명칭 동시 일치**(확장) — 컬럼 id 가 `Dd` 로 끝나고, **동시에** dataList 컬럼 `name`(끝의 번호·괄호 설명을 뗀 것)이 `일`·`일자` 로 끝나는 열. 한쪽만 맞으면 대상이 아니다 — 명칭만 보면 `암호화이메일`(`email`) 같은 단어 안의 '일'에 걸리고, 명칭이 `name1` 같은 자리표면 놓친다.
+* **제외** (확장 대상에서): ① 명세 `name` 에 다른 형식이 적힌 열(`(YYYY-MM-DD)` 등 — 이미 형식 있는 값이라 효과 없음) ② 결과서에 날짜가 아니라고 적힌 열(예: ULDSTF05621 `basDd` — 일(日) 두 자리) ③ `…Dt`·`…Tm` 열 — 일시일 수 있어 결과서에 값 형식을 확인해 정한다.
+* **확장 대상의 기록**: AS-IS 는 원시 값을 그대로 보여 주던 열이라 표시가 원본과 달라진다(`20261028` → `2026-10-28`). 결과서 §2.2 에 「AS-IS 원시 표시 → TO-BE 날짜 형식(규칙 46)」으로 적고, 서버 값이 8자리 `yyyyMMdd` 인지 §10 에 확인 항목으로 올린다.
+* **엔진 동작**(websquare-engine 소스 판독): 그리드 날짜 열은 셀마다 `formatter.format(값)`(85575·85666행) → `text.formatDate(값, displayFormat, ioFormat 기본 "yyyyMMdd")`(16519행)를 부르고, **값 길이가 8이 아니면 값을 그대로 돌려준다** — 이미 `-` 가 든 10자리·일시 14/19자리·2자리 일·빈 값은 그대로 표시된다. 8자리면 유효성 검사 없이 자리만 끼우므로 8자리 비날짜 값(`ab@cd.kr`, `20261399`)은 망가진다 — 확장 기준에 id·명칭 동시 조건과 제외 규칙을 둔 이유다.
+* **형태**: gBody 컬럼에 `dataType="date" displayFormat="yyyy-MM-dd"`.
+
+```xml
+<!-- AS-IS <column id="LIST_DD" … mask="XXXX-XX-XX"> -->
+<w2:column dataType="date" displayFormat="yyyy-MM-dd" displayMode="label" id="listDd" inputType="text" textAlign="center" width="80"></w2:column>
+```
+
+* **금지**: 문자열 자릿수 마스크 `displayFormat="####-##-##"`(dataType 없음) — AS-IS `XXXX-XX-XX` 를 1:1 로 옮긴 꼴이지만 이 규칙의 형태와 다르다.
+* **범위**: 그리드 표시 열만. 입력 달력은 `w2:inputCalendar`(규칙 37), 날짜·시각처럼 다른 마스크(`XXXX-XX-XX XX:XX` 등)는 이 규칙 밖 — 결과서 §2.2 에 근거를 적고 정한다. dataList 컬럼 `dataType` 은 명세 그대로 둔다(표시만 바꾼다).
+* **관련**: 퍼블리싱 스킬 `markup-idioms.md` §5.2 「날짜 컬럼은 `dataType="date" displayFormat="yyyy-MM-dd"`」 — 이 규칙이 「날짜 컬럼」의 기준이다.
+* **적용 현황**(2026-10-28, conversion-front TO-BE): ① AS-IS 마스크 열 48곳 모두 이 형태 — ULDSTF05700·05702·05232·05923·08200 31곳(처음부터), ULDBNS30300 15곳·ULDSTF05950 2곳(`####-##-##` → 이 형태로 정정). ② 확장 대상 23열(그리드 중복 43곳) 적용 — ULDBNS30300 21열(`grd_SendList`·`grd_SendList1` 전송 항목 20열 + `grd_ClsSendInfo.taskDd`), ULDBNS30400 2열(`grd_ListDetail.isuDd`·`redmptDd`). 제외: ULDSTF05950 6곳(명세에 `YYYY-MM-DD`), ULDSTF05621 `basDd` 2곳(날짜 아님), ULDBNS30400 `…Dt` 6열(일시 가능 — 결과서 §10).
+
 ## 규칙 6 보충: Submission 변환 상세
 
 * **규칙 12 — `{DC}.DataID = encodeURI(url)` 의 `url` 선언 역추적 스코프**(2026-10-08): 선언(`var|let|const url = …;`)은 DataID 문이 든 **같은 최상위 함수 안**에서만 찾는다. 스크립트 전체에서 "앞에 있는 마지막 대입"을 고르면 규칙 4 재배치 뒤 다른 핸들러의 팝업 URL 상수(`let url = "/ui/lst/lstproc/ULDSTF05106_read.xml";`)가 걸려 삭제되고 해석 실패한 DataID 는 그대로 남는다(ULDSTF92002 button_1_onclick). 같은 함수에 선언이 없으면 「action URL 해석 실패」로 보류한다. 회귀 테스트 `test_convert_rule12_scope.py`.

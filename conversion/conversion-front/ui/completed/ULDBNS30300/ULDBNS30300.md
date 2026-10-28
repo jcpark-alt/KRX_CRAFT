@@ -367,7 +367,7 @@ stateDiagram-v2
 
 ### 2.1 화면 구성
 
-1단계(마크업 보강) 기준은 폴더 퍼블리싱 xml 이다. 1단계에서 바꾼 것: W-Craft·퍼블리셔 잔재 속성(`userData2`·`hierarchy`·`orgid`·`comp_par_seqId`·`meta_name`·`metaev_*`·`tabIndex`·`cursor`·`xf:trigger src`) 삭제, 엉뚱한 바인딩 `edt_StrtDd ref="data:bnd_DtlInfo.STRT_DD"` 삭제, 마크업 `ev:onclick`(W-Craft 이름) 삭제 후 2단계에서 다시 붙임, 중첩 탭 `tbc_sub` → `tbcbox > tbc`, 그리드 `dataList` → `dlt_*`·컬럼 id camelCase·머리글 `h_`·번호 열 `expression`·전 열 `readOnly`·날짜 `####-##-##`·금액 `#,##0`, 캡션 기본 문구 교체, `tbl_search` id. 2단계에서 `ref`·`ev:on*` 만 더했다(`publish_gate` P24 경고 = 의도).
+1단계(마크업 보강) 기준은 폴더 퍼블리싱 xml 이다. 1단계에서 바꾼 것: W-Craft·퍼블리셔 잔재 속성(`userData2`·`hierarchy`·`orgid`·`comp_par_seqId`·`meta_name`·`metaev_*`·`tabIndex`·`cursor`·`xf:trigger src`) 삭제, 엉뚱한 바인딩 `edt_StrtDd ref="data:bnd_DtlInfo.STRT_DD"` 삭제, 마크업 `ev:onclick`(W-Craft 이름) 삭제 후 2단계에서 다시 붙임, 중첩 탭 `tbc_sub` → `tbcbox > tbc`, 그리드 `dataList` → `dlt_*`·컬럼 id camelCase·머리글 `h_`·번호 열 `expression`·전 열 `readOnly`·날짜 `dataType="date" displayFormat="yyyy-MM-dd"`(2026-10-28 규칙 46 — 종전 `####-##-##`)·금액 `#,##0`, 캡션 기본 문구 교체, `tbl_search` id. 2단계에서 `ref`·`ev:on*` 만 더했다(`publish_gate` P24 경고 = 의도).
 
 | 영역 | AS-IS 요소 | TO-BE 컴포넌트 (바인딩) | 설명 |
 |---|---|---|---|
@@ -429,6 +429,8 @@ AS-IS 대문자 키 → 명세 키: `CLS_DD → clsDd`, `PRSNT_DD → prsntDd`, 
 - **`grd_ClsSendInfo`** (`dlt_bndListingCloseClsSendInfo`): 번호 → `no` · `MKTACT_NM` 구분 → `mktactNm` · `TASK_DD` 전송일 → `taskDd` · `MKTACT_CNT` 전송수 *숨김* → `mktactCnt` · `MKTACT_TRNSM_TM` 전송시작시각 → `mktactTrnsmTm` · `MKTACT_END_TM` 전송마감시각 → `mktactEndTm` · `MKTACT_CNT` 전송건수 → `mktactCnt`
 
 ---
+
+**날짜 표시 형식(규칙 46 확장, 2026-10-28)** — AS-IS 에 마스크가 없어 원시 값을 그대로 보여 주던 날짜 열에 `dataType="date" displayFormat="yyyy-MM-dd"` 를 붙였다(AS-IS 원시 표시 → TO-BE 날짜 형식): `grd_SendList`·`grd_SendList1` 전송 항목 20열(`strtDd` 영업일자 · `listDd` · `isuDd` · `redmptDd` · `saleDd` · `fstIntPayDd` · `grtYdStrtDd` · `addYdStrtDd` · `bndDelistDd` · `exerStrtDd` · `exerEndDd` · `intRtDecsnBasDd` · 1·2차 콜/풋 행사개시·종료일자 8열), `grd_ClsSendInfo.taskDd`(전송일). 값이 8자리 `yyyyMMdd` 가 아니면 엔진이 그대로 표시한다 — 확인 §10 #17.
 
 ## 3. 로딩 (`gform onload` → `scwin.onpageload` → `scwin.init`)
 
@@ -919,3 +921,4 @@ getPar/setPar 계약은 §6.11·§6.12 에서 `openPopup` data 로 바꿨다(가
 14. **엔진 이벤트 실측** — ① 조회 직후 `setFocusedCell(0, …)` 이 `onrowindexchange` 를 발화해 종목정보를 두 번 부르는지(두 번째가 `abort` 로 이겨 결과는 같음, 통신만 한 번 더) ② `tab_ListCls.setSelectedTabIndex(1)` 이 탭 본문 지연 렌더 중에도 안전한지 ③ 숨겨진 탭(처음 열기 전 [상장마감내역]·전송내역) 그리드에 조회 결과·머리글(`setHeaderValue`)·`setColumnVisible` 이 반영되는지 ④ `tab_List` 의 `onchange` 가 사용자 클릭에서만 발화하는지(코드로 바꾸지 않음).
 15. **TO-BE 배포 경로** — `/ui/bns/bnscls/ULDBNS30300.xml`(가정 — pcc 의 30301 경로 `/ui/bns/bnscls/` 근거). head `meta_desc` 끝에 `(원본 ULDBNS30300.gfm, 업무 분석 ULDBNS30300.md)`.
 16. **퍼블리싱 사본 차이 (참고)** — 마크업 기준은 폴더 xml. publish-tobe 대내·샘플 사본과 폴더 xml 의 차이: 폴더 xml 은 `contentHeader` pageFrame(사본은 `pgtbox`+breadcrumb), `<xf:model>` W-Craft 주석·`<xf:events>` 27행 없음, 머리글 id `*_H`·`visibleRowNum`, `tab_ListCls` `selectedIndex="0"`(사본 `1`). 대내 사본과 샘플 사본은 body 의 퍼블리셔 업무 설명 속성(`meta_name`·`metaev_*`)만 다르다(대내에만 있음 — 내용은 §1.4 와 같은 업무 설명이며 "적용일은 오늘일자 + 1 세팅" 은 AS-IS(서버 `CLS_DD`)와 다름). 1단계 보강(완료, 2026-10-28): 잔재 속성 삭제, `edt_StrtDd` 엉뚱한 `ref` 삭제, 중첩 탭 `tbcbox > tbc`, `tbl_search`, 그리드 `dlt_*`·camelCase·`h_`·expression·`readOnly`·표시 형식, `txb_ClsDtl` 을 빨간 문구 textbox 로(숨김 input 삭제), `label_1` 복원, 전송건수 열, 읽기전용 달력. 남은 퍼블리셔 잔재(Minor): 그리드 높이 인라인 `style="height:153px"`, 고정 안내 문구의 `msgbox` 배치 — 동작 영향 없음.
+17. **날짜 표시 형식 확인(규칙 46 확장)** — §2.2 끝의 21열(전송 항목·전송일)에 날짜 형식을 붙였다. 서버 값이 8자리 `yyyyMMdd` 인지 확인 — 이미 `-` 가 들었거나 일시면 엔진이 그대로 보여 주고, 8자리 비날짜 값이면 자리만 끼워져 깨진다.
