@@ -1,0 +1,470 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:ev="http://www.w3.org/2001/xml-events"
+    xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+    <head meta_screenName="[가이드] gridView 키워드 검색·강조 UDC (udc_gridViewFinder)" meta_screenId="GRIDVIEW_FINDER" meta_screenDesc="/cm/udc/gridViewFinder.xml UDC 사용 가이드. gridView 와 UDC 를 한 그룹에 넣고 단축키로 검색창을 띄워 키워드를 찾고 강조하는 방법, UDC 옵션(hotKey·highlightColor·splitSearchRowCount·autoSearchDelay), 공개 API(search·clearSearch·setHighlightColor), onSearchProgress 이벤트를 시연한다." meta_author="Inswave" meta_type="가이드" meta_date="2026.10.29">
+        <w2:type>COMPONENT</w2:type>
+        <w2:buildDate/>
+        <w2:MSA/>
+        <xf:model>
+            <w2:dataCollection baseNode="map">
+                <w2:dataList baseNode="list" repeatNode="map" id="dlt_mktTp">
+                    <w2:columnInfo>
+                        <w2:column id="cd" name="코드" dataType="text"></w2:column>
+                        <w2:column id="nm" name="코드명" dataType="text"></w2:column>
+                    </w2:columnInfo>
+                </w2:dataList>
+                <w2:dataList baseNode="list" repeatNode="map" id="dlt_discTp">
+                    <w2:columnInfo>
+                        <w2:column id="cd" name="코드" dataType="text"></w2:column>
+                        <w2:column id="nm" name="코드명" dataType="text"></w2:column>
+                    </w2:columnInfo>
+                </w2:dataList>
+                <w2:dataList baseNode="list" repeatNode="map" id="dlt_stock">
+                    <w2:columnInfo>
+                        <w2:column id="isuCd" name="종목코드" dataType="text"></w2:column>
+                        <w2:column id="isuNm" name="종목명" dataType="text"></w2:column>
+                        <w2:column id="mktTpCd" name="시장구분" dataType="text"></w2:column>
+                        <w2:column id="lstDd" name="상장일" dataType="text"></w2:column>
+                        <w2:column id="trdAmt" name="거래대금" dataType="number"></w2:column>
+                        <w2:column id="trdStatCd" name="매매상태" dataType="text"></w2:column>
+                    </w2:columnInfo>
+                </w2:dataList>
+                <w2:dataList baseNode="list" repeatNode="map" id="dlt_disc">
+                    <w2:columnInfo>
+                        <w2:column id="discDd" name="공시일" dataType="text"></w2:column>
+                        <w2:column id="isuNm" name="종목명" dataType="text"></w2:column>
+                        <w2:column id="discTpCd" name="공시유형" dataType="text"></w2:column>
+                        <w2:column id="discTitle" name="공시제목" dataType="text"></w2:column>
+                    </w2:columnInfo>
+                </w2:dataList>
+                <w2:dataMap baseNode="map" id="dma_api">
+                    <w2:keyInfo>
+                        <w2:key id="keyword" name="검색어" dataType="text"></w2:key>
+                        <w2:key id="color" name="강조색" dataType="text"></w2:key>
+                    </w2:keyInfo>
+                </w2:dataMap>
+            </w2:dataCollection>
+            <w2:workflowCollection/>
+        </xf:model>
+        <w2:layoutInfo/>
+        <w2:publicInfo method="scwin.onpageload,scwin.init,scwin.udc_finderStock_onSearchProgress,scwin.udc_finderDisc_onSearchProgress,scwin.btn_apiSearch_onclick,scwin.btn_apiClear_onclick,scwin.btn_apiColor_onclick,scwin.fmtTrdStat,scwin.makeStockRows,scwin.makeDiscRows,scwin.showProgress"/>
+        <script lazy="false" type="text/javascript"><![CDATA[// 가이드 : gridView 키워드 검색·강조 UDC 샘플 (합성 화면 — 원본 없음)
+
+/*
+ * 화면 동작
+ * 1. 종목 그리드 셀을 클릭해 포커스를 둔 뒤 F2 를 누르면 그룹 오른쪽 위에 검색창이 뜬다
+ *    — 공시 그리드는 Ctrl+F2 (UDC 마다 hotKey 를 다르게 지정)
+ * 2. 검색어를 입력하고 잠시 기다리거나(autoSearchDelay) Enter 를 누르면 검색한다
+ *    — Enter·↓ 다음 결과, Shift+Enter·↑ 이전 결과, Esc 닫기, 검색어를 지우면 강조 해제
+ * 3. 종목 그리드는 3,000행이라 splitSearchRowCount(500행) 단위로 나눠 검색하고,
+ *    진행 상황은 onSearchProgress 이벤트로 그리드 아래에 표시한다
+ * 4. 「API 검색」·「강조 해제」·「강조색 적용」 은 검색창 없이 UDC 공개 API 를 직접 호출한다
+ *
+ * UDC 사용 규칙 (gridViewFinder.xml 동작 기준)
+ * - head 에 <w2:require as="udc_gridViewFinder" src="/cm/udc/gridViewFinder.xml" type="page"> 를 선언한다
+ * - gridView 와 UDC 를 같은 그룹에 넣는다. UDC 는 그 그룹(부모 요소)의 keyup 만 듣고,
+ *   검색창은 그룹 기준 오른쪽 위에 absolute 로 뜨므로 그룹에 position:relative 를 준다
+ * - gridView id 는 "grd_이름" 형식(밑줄 하나)이어야 한다. UDC 가 포커스 요소 id 에서 grd_ 뒤 한 단어만 잘라 대상을 찾는다
+ * - UDC 는 로드 시점에 화면의 gridView 를 모은다. 나중에 동적으로 만든 gridView 는 대상이 아니다
+ * - 강조는 셀 값을 HTML(<span>)로 바꿔 표시한다. 셀 값에 HTML 이 들어 있는 그리드에는 쓰지 않는다
+ * - 컬럼 유형별 처리 : select·autoComplete 는 코드명으로, calendar 는 displayFormat 날짜로,
+ *   displayFormat(#,### 등)·displayFormatter("scwin.함수명") 는 표시값으로 검색·강조한다
+ */
+
+///////// 1. 변수 및 선언 영역 /////////
+
+scwin.STOCK_ROW_CNT = 3000;     // 분할 검색을 보여주기 위한 종목 행 수
+scwin.DISC_ROW_CNT = 60;
+
+scwin.MKT_TP_LIST = [
+    { cd : "STK", nm : "유가증권" },
+    { cd : "KSQ", nm : "코스닥" },
+    { cd : "KNX", nm : "코넥스" }
+];
+
+scwin.DISC_TP_LIST = [
+    { cd : "A01", nm : "정기공시" },
+    { cd : "B02", nm : "주요사항보고" },
+    { cd : "C03", nm : "공정공시" },
+    { cd : "D04", nm : "조회공시" }
+];
+
+scwin.ISU_NM_LIST = ["한빛전자", "동해화학", "서울바이오", "가람에너지", "누리통신", "태성건설", "미래반도체", "청솔식품", "대한물산", "해오름제약"];
+scwin.DISC_TITLE_LIST = ["사업보고서", "주요사항보고서(유상증자결정)", "영업(잠정)실적(공정공시)", "조회공시요구(풍문또는보도)에 대한 답변", "타법인주식및출자증권취득결정"];
+
+// API 검색 대상 — searchedGridId 가 있어야 clearSearch 를 부를 수 있다(UDC 는 검색한 적 없는 상태의 해제를 처리하지 않음)
+scwin.searchedGridId = "";
+
+///////// 2. 초기화 영역 /////////
+
+/**
+ * @method
+ * @name scwin.onpageload
+ * @author Inswave
+ * @date 2026. 10. 29
+ * @description 페이지 로드. 초기화(scwin.init)를 호출한다.
+ * @hidden N
+*/
+scwin.onpageload = async function () {
+    try {
+        await scwin.init();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "GRIDVIEW_FINDER.onpageload" });
+    }
+};
+
+/**
+ * @method
+ * @name scwin.init
+ * @author Inswave
+ * @date 2026. 10. 29
+ * @description 코드 목록과 그리드 샘플 데이터를 적재한다.
+ * @hidden N
+*/
+scwin.init = async function () {
+    // 1) 코드 목록 — 샘플이라 서버 조회 대신 화면에서 적재(select 컬럼 코드명 검색 시연용)
+    dlt_mktTp.setJSON(scwin.MKT_TP_LIST);
+    dlt_discTp.setJSON(scwin.DISC_TP_LIST);
+
+    // 2) 그리드 데이터
+    dlt_stock.setJSON(scwin.makeStockRows(scwin.STOCK_ROW_CNT));
+    dlt_disc.setJSON(scwin.makeDiscRows(scwin.DISC_ROW_CNT));
+
+    // 3) API 영역 기본값
+    dma_api.set("keyword", "바이오");
+    dma_api.set("color", "yellow");
+};
+
+
+///////// 3. 컴포넌트 이벤트 영역 /////////
+
+/**
+ * @event
+ * @name scwin.udc_finderStock_onSearchProgress
+ * @description 종목 그리드 검색 진행 이벤트 — 분할 검색 진행률과 결과 건수를 표시한다.
+ * @param {Object} grdObj 검색 대상 gridView
+ * @param {String} keyword 검색어
+ * @param {Array} result [rowIndex, colIndex] 배열의 목록
+ * @param {Number} curRowIdx 처리한 행 수
+ * @param {Number} status 0 시작 · 1 진행 중 · 2 완료
+ * @hidden N
+*/
+scwin.udc_finderStock_onSearchProgress = function (grdObj, keyword, result, curRowIdx, status) {
+    try {
+        scwin.showProgress(spn_stockProgress, grdObj, keyword, result, curRowIdx, status);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "GRIDVIEW_FINDER.udc_finderStock_onSearchProgress" });
+    }
+};
+
+/**
+ * @event
+ * @name scwin.udc_finderDisc_onSearchProgress
+ * @description 공시 그리드 검색 진행 이벤트.
+ * @hidden N
+*/
+scwin.udc_finderDisc_onSearchProgress = function (grdObj, keyword, result, curRowIdx, status) {
+    try {
+        scwin.showProgress(spn_discProgress, grdObj, keyword, result, curRowIdx, status);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "GRIDVIEW_FINDER.udc_finderDisc_onSearchProgress" });
+    }
+};
+
+/**
+ * @event
+ * @name scwin.btn_apiSearch_onclick
+ * @description 검색창 없이 공개 API search(keyword, noHighLight, targetGridViewId) 로 종목 그리드를 검색한다.
+ * @hidden N
+*/
+scwin.btn_apiSearch_onclick = function () {
+    try {
+        const keyword = dma_api.get("keyword");
+        if ($c.util.isEmpty(keyword)) {
+            $c.win.alert("검색어를 입력하세요.");
+            return;
+        }
+        udc_finderStock.search(keyword, false, "grd_stock");
+        scwin.searchedGridId = "grd_stock";
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "GRIDVIEW_FINDER.btn_apiSearch_onclick" });
+    }
+};
+
+/**
+ * @event
+ * @name scwin.btn_apiClear_onclick
+ * @description 공개 API clearSearch 로 강조 표시와 검색 결과를 지운다.
+ * @hidden N
+*/
+scwin.btn_apiClear_onclick = function () {
+    try {
+        if ($c.util.isEmpty(scwin.searchedGridId)) {
+            $c.win.alert("먼저 「API 검색」 을 실행하세요.");
+            return;
+        }
+        udc_finderStock.clearSearch();
+        spn_stockProgress.setValue("");
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "GRIDVIEW_FINDER.btn_apiClear_onclick" });
+    }
+};
+
+/**
+ * @event
+ * @name scwin.btn_apiColor_onclick
+ * @description 공개 API setHighlightColor 로 강조색을 바꾸고, 검색 중이던 검색어가 있으면 다시 검색해 새 색으로 그린다.
+ * @hidden N
+*/
+scwin.btn_apiColor_onclick = function () {
+    try {
+        udc_finderStock.setHighlightColor(dma_api.get("color"));
+
+        const keyword = dma_api.get("keyword");
+        if (!$c.util.isEmpty(scwin.searchedGridId) && !$c.util.isEmpty(keyword)) {
+            udc_finderStock.search(keyword, false, scwin.searchedGridId);
+        }
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "GRIDVIEW_FINDER.btn_apiColor_onclick" });
+    }
+};
+
+
+///////// 5. 일반/업무 함수 영역 /////////
+
+/**
+ * @method
+ * @name scwin.fmtTrdStat
+ * @author Inswave
+ * @date 2026. 10. 29
+ * @description 매매상태 displayFormatter — 코드(Y/N)를 "정상"/"거래정지" 로 표시한다.
+ * UDC 는 이 함수를 "scwin.fmtTrdStat" 이름으로 찾아 강조 전에 다시 적용하므로, 모르는 값은 그대로 돌려준다.
+ * @param {String} value 셀 값
+ * @returns {String} 표시값
+ * @hidden N
+*/
+scwin.fmtTrdStat = function (value) {
+    if (value === "Y") return "정상";
+    if (value === "N") return "거래정지";
+    return value;
+};
+
+/**
+ * @method
+ * @name scwin.makeStockRows
+ * @author Inswave
+ * @date 2026. 10. 29
+ * @description 종목 샘플 행을 만든다(같은 입력이면 같은 결과).
+ * @param {Number} cnt 행 수
+ * @returns {Array} 종목 행 목록
+ * @hidden N
+*/
+scwin.makeStockRows = function (cnt) {
+    const rows = [];
+    for (let i = 0; i < cnt; i++) {
+        const month = String(i % 12 + 1).padStart(2, "0");
+        const day = String(i % 28 + 1).padStart(2, "0");
+        rows.push({
+            isuCd     : "KR7" + String(100000 + i * 7).padStart(6, "0") + "00" + (i % 10),
+            isuNm     : scwin.ISU_NM_LIST[i % scwin.ISU_NM_LIST.length] + (i < scwin.ISU_NM_LIST.length ? "" : String(Math.floor(i / scwin.ISU_NM_LIST.length))),
+            mktTpCd   : scwin.MKT_TP_LIST[i % scwin.MKT_TP_LIST.length].cd,
+            lstDd     : String(1990 + i % 35) + month + day,
+            trdAmt    : (i * 7919) % 900000000 + 1000000,
+            trdStatCd : (i % 17 === 0) ? "N" : "Y"
+        });
+    }
+    return rows;
+};
+
+/**
+ * @method
+ * @name scwin.makeDiscRows
+ * @author Inswave
+ * @date 2026. 10. 29
+ * @description 공시 샘플 행을 만든다.
+ * @param {Number} cnt 행 수
+ * @returns {Array} 공시 행 목록
+ * @hidden N
+*/
+scwin.makeDiscRows = function (cnt) {
+    const rows = [];
+    for (let i = 0; i < cnt; i++) {
+        rows.push({
+            discDd    : "2026" + String(i % 10 + 1).padStart(2, "0") + String(i % 28 + 1).padStart(2, "0"),
+            isuNm     : scwin.ISU_NM_LIST[i % scwin.ISU_NM_LIST.length],
+            discTpCd  : scwin.DISC_TP_LIST[i % scwin.DISC_TP_LIST.length].cd,
+            discTitle : scwin.DISC_TITLE_LIST[i % scwin.DISC_TITLE_LIST.length]
+        });
+    }
+    return rows;
+};
+
+/**
+ * @method
+ * @name scwin.showProgress
+ * @author Inswave
+ * @date 2026. 10. 29
+ * @description onSearchProgress 결과를 지정한 span 에 표시한다.
+ * @param {Object} spanObj 표시할 span
+ * @param {Object} grdObj 검색 대상 gridView
+ * @param {String} keyword 검색어
+ * @param {Array} result 검색 결과 목록
+ * @param {Number} curRowIdx 처리한 행 수
+ * @param {Number} status 0 시작 · 1 진행 중 · 2 완료
+ * @hidden N
+*/
+scwin.showProgress = function (spanObj, grdObj, keyword, result, curRowIdx, status) {
+    const statusNm = ["시작", "진행 중", "완료"][status] || "";
+    const total = grdObj.getRowCount();
+    spanObj.setValue("onSearchProgress — " + grdObj.getOriginalID() + " · 검색어 \"" + keyword + "\" · " + statusNm
+        + " (" + Math.min(curRowIdx, total) + "/" + total + "행) · 결과 " + result.length + "건");
+};
+]]></script>
+        <!--
+            검색·강조 UDC 를 불러온다. as 에 적은 이름이 곧 body 의 태그 이름(w2:udc_gridViewFinder)이 된다.
+        -->
+        <w2:require as="udc_gridViewFinder" src="/cm/udc/gridViewFinder.xml" type="page"></w2:require>
+    </head>
+    <body ev:onpageload="scwin.onpageload">
+        <xf:group class="sub_contents" id="" meta_componentContainer="true" style="">
+            <w2:pageFrame id="pfmContentHeader" src="/cm/xml/contentHeader.xml" style=""></w2:pageFrame>
+            <w2:textbox class="txt_info blue bold" id="" label="gridView 셀을 클릭해 포커스를 둔 뒤 단축키(종목 F2 · 공시 Ctrl+F2)를 누르면 검색창이 뜹니다. 검색어를 입력하고 잠시 기다리거나 Enter 를 누르면 일치하는 글자가 강조됩니다." style="" tagname=""></w2:textbox>
+            <w2:textbox class="txt_info" id="" label="Enter·↓ 다음 결과, Shift+Enter·↑ 이전 결과, Esc 닫기. 검색어를 지우면 강조가 해제됩니다. 시장구분·공시유형(select)은 코드명으로, 상장일(calendar)은 yyyy-MM-dd 로, 거래대금은 #,### 로, 매매상태는 displayFormatter 결과(정상/거래정지)로 검색됩니다." style="" tagname=""></w2:textbox>
+            <w2:textbox class="txt_info red" id="" label="사용 조건 — gridView 와 UDC 를 같은 그룹(position:relative)에 넣고, gridView id 는 grd_이름 형식(밑줄 하나)으로 짓습니다. 셀 값에 HTML 이 들어 있는 그리드에는 쓰지 않습니다." style="" tagname=""></w2:textbox>
+
+            <!-- 종목 그리드 + UDC (hotKey F2 · 500행 단위 분할 검색) -->
+            <xf:group class="titbox" id="" style="">
+                <w2:textbox class="tit" id="" label="종목 목록 (3,000행) — 단축키 F2" style="" tagname="h3"></w2:textbox>
+            </xf:group>
+            <xf:group class="gvwbox" id="grp_stock" style="position:relative;">
+                <w2:gridView autoFit="allColumn" class="gvw row10" dataList="data:dlt_stock" focusMode="cell" id="grd_stock"
+                    keepDefaultColumnWidth="false" rowNumVisible="true" rowNumWidth="50"
+                    scrollByColumn="false" style="" visibleRowNum="10" readOnly="true">
+                    <w2:header id="header_stock" style="">
+                        <w2:row id="row_stockHead" style="">
+                            <w2:column displayMode="label" id="hIsuCd" inputType="text" value="종목코드" width="140"></w2:column>
+                            <w2:column displayMode="label" id="hIsuNm" inputType="text" value="종목명" width="150"></w2:column>
+                            <w2:column displayMode="label" id="hMktTpCd" inputType="text" value="시장구분(select)" width="120"></w2:column>
+                            <w2:column displayMode="label" id="hLstDd" inputType="text" value="상장일(calendar)" width="120"></w2:column>
+                            <w2:column displayMode="label" id="hTrdAmt" inputType="text" value="거래대금(#,###)" width="150"></w2:column>
+                            <w2:column displayMode="label" id="hTrdStatCd" inputType="text" value="매매상태(displayFormatter)" width="150"></w2:column>
+                        </w2:row>
+                    </w2:header>
+                    <w2:gBody id="gBody_stock" style="">
+                        <w2:row id="row_stockBody" style="">
+                            <w2:column id="isuCd" inputType="text" width="140" textAlign="center"></w2:column>
+                            <w2:column id="isuNm" inputType="text" width="150"></w2:column>
+                            <w2:column id="mktTpCd" inputType="select" width="120" textAlign="center">
+                                <w2:choices>
+                                    <w2:itemset nodeset="data:dlt_mktTp">
+                                        <w2:label ref="nm"></w2:label>
+                                        <w2:value ref="cd"></w2:value>
+                                    </w2:itemset>
+                                </w2:choices>
+                            </w2:column>
+                            <w2:column id="lstDd" inputType="calendar" width="120" textAlign="center" displayFormat="yyyy-MM-dd"></w2:column>
+                            <w2:column id="trdAmt" inputType="text" width="150" textAlign="right" dataType="number" displayFormat="#,###"></w2:column>
+                            <w2:column id="trdStatCd" inputType="text" width="150" textAlign="center" displayFormatter="scwin.fmtTrdStat"></w2:column>
+                        </w2:row>
+                    </w2:gBody>
+                </w2:gridView>
+                <w2:udc_gridViewFinder id="udc_finderStock" hotKey="F2" highlightColor="yellow" splitSearchRowCount="500" autoSearchDelay="700"
+                    ev:onSearchProgress="scwin.udc_finderStock_onSearchProgress"></w2:udc_gridViewFinder>
+            </xf:group>
+            <w2:span id="spn_stockProgress" label="" style="display:block;margin-top:8px;font-size:12px;color:#1c5dd9;"/>
+
+            <!-- 공시 그리드 + UDC (hotKey Ctrl+F2 · 강조색 하늘색) -->
+            <xf:group class="titbox" id="" style="">
+                <w2:textbox class="tit" id="" label="공시 목록 — 단축키 Ctrl+F2 (공시유형은 종목 그리드 시장구분과 같은 3번째 열의 select)" style="" tagname="h3"></w2:textbox>
+            </xf:group>
+            <xf:group class="gvwbox" id="grp_disc" style="position:relative;">
+                <w2:gridView autoFit="allColumn" class="gvw row10" dataList="data:dlt_disc" focusMode="cell" id="grd_disc"
+                    keepDefaultColumnWidth="false" rowNumVisible="true" rowNumWidth="50"
+                    scrollByColumn="false" style="" visibleRowNum="6" readOnly="true">
+                    <w2:header id="header_disc" style="">
+                        <w2:row id="row_discHead" style="">
+                            <w2:column displayMode="label" id="hDiscDd" inputType="text" value="공시일(calendar)" width="120"></w2:column>
+                            <w2:column displayMode="label" id="hDiscIsuNm" inputType="text" value="종목명" width="150"></w2:column>
+                            <w2:column displayMode="label" id="hDiscTpCd" inputType="text" value="공시유형(select)" width="130"></w2:column>
+                            <w2:column displayMode="label" id="hDiscTitle" inputType="text" value="공시제목" width="320"></w2:column>
+                        </w2:row>
+                    </w2:header>
+                    <w2:gBody id="gBody_disc" style="">
+                        <w2:row id="row_discBody" style="">
+                            <w2:column id="discDd" inputType="calendar" width="120" textAlign="center" displayFormat="yyyy-MM-dd"></w2:column>
+                            <w2:column id="isuNm" inputType="text" width="150"></w2:column>
+                            <w2:column id="discTpCd" inputType="select" width="130" textAlign="center">
+                                <w2:choices>
+                                    <w2:itemset nodeset="data:dlt_discTp">
+                                        <w2:label ref="nm"></w2:label>
+                                        <w2:value ref="cd"></w2:value>
+                                    </w2:itemset>
+                                </w2:choices>
+                            </w2:column>
+                            <w2:column id="discTitle" inputType="text" width="320"></w2:column>
+                        </w2:row>
+                    </w2:gBody>
+                </w2:gridView>
+                <w2:udc_gridViewFinder id="udc_finderDisc" hotKey="ctrl+f2" highlightColor="#a5d8ff"
+                    ev:onSearchProgress="scwin.udc_finderDisc_onSearchProgress"></w2:udc_gridViewFinder>
+            </xf:group>
+            <w2:span id="spn_discProgress" label="" style="display:block;margin-top:8px;font-size:12px;color:#1c5dd9;"/>
+
+            <!-- 공개 API 직접 호출 -->
+            <xf:group class="titbox" id="" style="">
+                <w2:textbox class="tit" id="" label="공개 API 직접 호출 (종목 그리드 대상 — 검색창 없이)" style="" tagname="h3"></w2:textbox>
+            </xf:group>
+            <xf:group class="tblbox" id="" style="">
+                    <xf:group class="w2tb tbl" id="" style="" tagname="table">
+                        <w2:attributes>
+                            <w2:summary>공개 API 호출 조건</w2:summary>
+                        </w2:attributes>
+                        <xf:group tagname="colgroup">
+                            <xf:group style="width:120px;" tagname="col"></xf:group>
+                            <xf:group style="" tagname="col"></xf:group>
+                            <xf:group style="width:120px;" tagname="col"></xf:group>
+                            <xf:group style="" tagname="col"></xf:group>
+                        </xf:group>
+                        <xf:group style="" tagname="tr">
+                            <xf:group class="w2tb_th" style="" tagname="th">
+                                <w2:textbox class="" id="" label="검색어" style="" tagname="span"></w2:textbox>
+                            </xf:group>
+                            <xf:group class="w2tb_td" style="" tagname="td">
+                                <xf:input class="" id="ibx_apiKeyword" ref="data:dma_api.keyword" style="width:200px;" title="검색어"></xf:input>
+                            </xf:group>
+                            <xf:group class="w2tb_th" style="" tagname="th">
+                                <w2:textbox class="" id="" label="강조색" style="" tagname="span"></w2:textbox>
+                            </xf:group>
+                            <xf:group class="w2tb_td" style="" tagname="td">
+                                <xf:select1 allOption="" appearance="minimal" chooseOption="" class="" direction="auto" disabledClass="w2selectbox_disabled"
+                                    id="sbx_apiColor" ref="data:dma_api.color" style="width:150px;" submenuSize="auto" title="강조색">
+                                    <xf:choices>
+                                        <xf:item>
+                                            <xf:label><![CDATA[노랑(기본)]]></xf:label>
+                                            <xf:value><![CDATA[yellow]]></xf:value>
+                                        </xf:item>
+                                        <xf:item>
+                                            <xf:label><![CDATA[주황]]></xf:label>
+                                            <xf:value><![CDATA[#ffd8a8]]></xf:value>
+                                        </xf:item>
+                                        <xf:item>
+                                            <xf:label><![CDATA[연두]]></xf:label>
+                                            <xf:value><![CDATA[#c3fae8]]></xf:value>
+                                        </xf:item>
+                                    </xf:choices>
+                                </xf:select1>
+                            </xf:group>
+                        </xf:group>
+                    </xf:group>
+            </xf:group>
+            <xf:group class="btnbox" id="" style="">
+                <xf:group class="lt" id="" style="">
+                    <xf:trigger class="btn_cm" id="btn_apiSearch" type="button" ev:onclick="scwin.btn_apiSearch_onclick"><xf:label><![CDATA[API 검색 (search)]]></xf:label></xf:trigger>
+                    <xf:trigger class="btn_cm" id="btn_apiClear" type="button" ev:onclick="scwin.btn_apiClear_onclick"><xf:label><![CDATA[강조 해제 (clearSearch)]]></xf:label></xf:trigger>
+                    <xf:trigger class="btn_cm" id="btn_apiColor" type="button" ev:onclick="scwin.btn_apiColor_onclick"><xf:label><![CDATA[강조색 적용 (setHighlightColor)]]></xf:label></xf:trigger>
+                </xf:group>
+            </xf:group>
+        </xf:group>
+    </body>
+</html>
