@@ -2329,7 +2329,8 @@ scwin.PRINT_DEFAULT_OPTIONS = {
     orientation : "portrait",   // PDF 용지 방향 portrait | landscape
     margin : 10,                // PDF 여백(mm)
     scale : 2,                  // 캡처 해상도 배율 — 높일수록 선명하지만 느리다
-    title : ""                  // 인쇄 문서 제목 — 없으면 document.title
+    title : "",                 // 인쇄 문서 제목 — 없으면 document.title
+    exclude : ""                // 출력 제외 컴포넌트 id 목록(콤마 구분) — 예: "btn_search,grp_button"
 };
 
 /**
@@ -2348,6 +2349,8 @@ scwin.PRINT_DEFAULT_OPTIONS = {
  *              PDF 는 html2pdf 가 대상을 A4 본문 폭에 다시 배치하므로 화면 폭·높이를 강제하지 않는다(강제하면 오른쪽이 비고 내용이 축소된다).
  *              input 버튼(WebSquare trigger)은 복제본에서 계산 스타일을 복사한 <button> 으로 바꿔 value 텍스트가 세로 가운데에 오게 한다.
  *              캡처에 필요한 보정은 모두 복제본에서 하므로 실제 화면 DOM 은 건드리지 않는다.
+ *              options.exclude 로 지정한 컴포넌트(버튼 영역 등)는 캡처 동안만 data-html2canvas-ignore="true" 를 붙여 출력에서 빼고,
+ *              인쇄·PDF 저장의 성공·실패와 관계없이 finally 에서 속성을 떼어 화면을 원상 복구한다(원래 속성이 있던 요소는 건드리지 않는다).
  * @param {Object} options 출력 옵션 (생략 시 기본값 — 화면 전체 인쇄)
  * @param {String} options.type [default : "print"] "print" 인쇄 대화상자 | "pdf" PDF 파일 저장
  * @param {Object|String|HTMLElement} options.target [default : 현재 화면 frame] 출력 영역 — WebSquare 컴포넌트 객체, DOM id, DOM 요소
@@ -2356,6 +2359,7 @@ scwin.PRINT_DEFAULT_OPTIONS = {
  * @param {Number} options.margin [default : 10] PDF 여백(mm) (type "pdf")
  * @param {Number} options.scale [default : 2] 캡처 해상도 배율
  * @param {String} options.title [default : document.title] 인쇄 문서 제목 (type "print")
+ * @param {String} options.exclude [default : ""] 출력에서 제외할 컴포넌트 id 목록(콤마 구분) — 화면 컴포넌트 id 또는 DOM id, 찾지 못한 id 는 건너뜀
  * @returns {Promise<void>} 인쇄 대화상자 표시 또는 PDF 저장 시작 시 resolve
  * @hidden N
  * @exception 라이브러리(html2canvas / html2pdf)가 config.xml 에 등록되지 않아 전역이 없는 경우, target 을 지정했으나 찾지 못한 경우 Error
@@ -2368,6 +2372,9 @@ await $c.win.print({ type : "pdf", fileName : "공시안내문.pdf" });
 
 // 화면 안의 특정 영역(그룹 컴포넌트)만 가로 방향 PDF 로 저장
 await $c.win.print({ type : "pdf", target : grp_printArea, fileName : "종목목록.pdf", orientation : "landscape" });
+
+// 조회 조건·버튼 영역을 빼고 PDF 로 저장
+await $c.win.print({ type : "pdf", fileName : "공시안내문.pdf", exclude : "grp_search,grp_btnbox" });
  */
 scwin.print = async function (options) {
     const opt = Object.assign({}, scwin.PRINT_DEFAULT_OPTIONS, options || {});
@@ -2389,16 +2396,83 @@ scwin.print = async function (options) {
     // 라이브러리는 config.xml 의 engine module 로 정적 로드돼 있어야 한다 (html2pdf 번들은 전역 html2canvas 를 노출하지 않으므로 둘 다 필요)
     scwin.__checkPrintLib(opt.type);
 
+    // 출력 제외 컴포넌트 — 화면 컴포넌트 id 로 찾고, 없으면 DOM id 로 찾는다. 찾지 못한 id 는 건너뛴다.
+    const excludeElements = [];
+
+    String(opt.exclude || "").split(",").forEach(function (id) {
+        id = id.trim();
+
+        if (!id) {
+            return;
+        }
+
+        const comp = (typeof $p.getComponentById === "function") ? $p.getComponentById(id) : null;
+        const el = scwin.__resolvePrintElement(comp || id);
+
+        if (el) {
+            excludeElements.push(el);
+        }
+    });
+
     // 실제 화면 DOM 은 건드리지 않는다 — 캡처에 필요한 보정(스크롤·overflow·input 버튼)은 모두 html2canvas 복제본(onclone)에서 한다.
+    // 단, 출력 제외 표시(data-html2canvas-ignore)만 캡처 동안 실제 DOM 에 붙였다가 성공·실패와 관계없이 finally 에서 떼어 원상 복구한다.
     // (종전의 "최대화 windowContainer 창 폭을 캡처 동안 px 고정" 은 복제본 보정 도입 후 실화면 확인 결과 불필요해 제거 — 2026-10-01)
-    if (opt.type === "pdf") {
-        await scwin.__savePdf(element, opt);
-        return;
+    const marked = scwin.__markPrintIgnore(excludeElements);
+
+    try {
+        if (opt.type === "pdf") {
+            await scwin.__savePdf(element, opt);
+            return;
+        }
+
+        const canvas = await window.html2canvas(element, scwin.__getCanvasOptions(element, opt));
+
+        scwin.__printCanvas(canvas, opt.title || document.title);
+    } finally {
+        scwin.__unmarkPrintIgnore(marked);
     }
+};
 
-    const canvas = await window.html2canvas(element, scwin.__getCanvasOptions(element, opt));
+/**
+ * @method
+ * @name __markPrintIgnore
+ * @description 출력 제외 요소에 data-html2canvas-ignore="true" 를 붙여 html2canvas(html2pdf 내장 포함) 캡처에서 빠지게 한다.
+ *              이미 속성이 있던 요소는 화면이 직접 지정한 것이므로 건드리지 않고, 이 함수가 붙인 요소만 돌려준다(__unmarkPrintIgnore 로 제거).
+ * @param {HTMLElement[]} elements 출력 제외 DOM 요소 목록
+ * @returns {HTMLElement[]} 속성을 새로 붙인 요소 목록
+ * @hidden Y
+ * @exception
+ * @example
+const marked = scwin.__markPrintIgnore([el1, el2]);
+ */
+scwin.__markPrintIgnore = function (elements) {
+    const marked = [];
 
-    scwin.__printCanvas(canvas, opt.title || document.title);
+    (elements || []).forEach(function (el) {
+        if (el && typeof el.setAttribute === "function" && !el.hasAttribute("data-html2canvas-ignore") && marked.indexOf(el) < 0) {
+            el.setAttribute("data-html2canvas-ignore", "true");
+            marked.push(el);
+        }
+    });
+
+    return marked;
+};
+
+/**
+ * @method
+ * @name __unmarkPrintIgnore
+ * @description __markPrintIgnore 가 붙인 data-html2canvas-ignore 속성을 떼어 화면을 원상 복구한다.
+ * @param {HTMLElement[]} marked __markPrintIgnore 가 돌려준 요소 목록
+ * @returns
+ * @hidden Y
+ * @exception
+ * @example
+scwin.__unmarkPrintIgnore(marked);
+ */
+scwin.__unmarkPrintIgnore = function (marked) {
+    (marked || []).forEach(function (el) {
+        el.removeAttribute("data-html2canvas-ignore");
+    });
 };
 
 /**

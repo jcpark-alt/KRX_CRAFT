@@ -381,6 +381,54 @@ describe("화면 인쇄·PDF 저장 $c.win.print — 메인·팝업 공통 (cm/g
     expect(el.style.overflow).toBe("visible");
   });
 
+  // 출력 제외(exclude) — 속성 조작을 기록하는 DOM 요소 mock
+  const attrEl = (id, initial = {}) => ({
+    id, nodeType: 1, attrs: Object.assign({}, initial),
+    setAttribute(k, v) { this.attrs[k] = v; },
+    hasAttribute(k) { return Object.prototype.hasOwnProperty.call(this.attrs, k); },
+    removeAttribute(k) { delete this.attrs[k]; },
+  });
+  const IGNORE = "data-html2canvas-ignore";
+
+  test("exclude: 컴포넌트 id(getComponentById)·DOM id 를 콤마로 받아 캡처 동안만 data-html2canvas-ignore=true, 끝나면 제거 (print·pdf)", async () => {
+    for (const type of ["print", "pdf"]) {
+      const btnBox = attrEl("mf_frame_grp_btnbox");
+      const search = attrEl("mf_frame_grp_search");
+      const w = loadWindow({ $p: { getComponentById: (id) => (id === "grp_btnbox" ? { getID: () => btnBox.id } : null) } });
+      w.elements[btnBox.id] = btnBox;
+      w.elements[search.id] = search;     // 컴포넌트로는 못 찾고 DOM id 로 찾는 경우
+
+      const seen = [];
+      const snap = () => seen.push([btnBox.attrs[IGNORE], search.attrs[IGNORE]]);
+      const origCanvas = w.win.html2canvas;
+      w.win.html2canvas = async (el, o) => { snap(); return origCanvas(el, o); };
+      const origPdf = w.win.html2pdf;
+      w.win.html2pdf = () => { const c = origPdf(); const s = c.save; c.save = () => { snap(); return s(); }; return c; };
+
+      await w.scwin.print({ type, exclude: " grp_btnbox , mf_frame_grp_search ,," });
+      expect(seen).toEqual([["true", "true"]]);
+      expect(btnBox.hasAttribute(IGNORE)).toBe(false);
+      expect(search.hasAttribute(IGNORE)).toBe(false);
+    }
+  });
+
+  test("exclude: 캡처가 실패해도 finally 에서 속성을 제거해 화면을 원상 복구한다", async () => {
+    const btnBox = attrEl("mf_frame_grp_btnbox");
+    const w = loadWindow({ captureError: "canvas fail", $p: { getComponentById: () => null } });
+    w.elements[btnBox.id] = btnBox;
+    await expect(w.scwin.print({ exclude: "mf_frame_grp_btnbox" })).rejects.toThrow("canvas fail");
+    expect(btnBox.hasAttribute(IGNORE)).toBe(false);
+  });
+
+  test("exclude: 원래 속성이 있던 요소는 건드리지 않고, 찾지 못한 id 는 건너뛴다", async () => {
+    const pre = attrEl("mf_frame_grp_pre", { [IGNORE]: "true" });
+    const w = loadWindow({ $p: { getComponentById: () => null } });
+    w.elements[pre.id] = pre;
+    await w.scwin.print({ exclude: "mf_frame_grp_pre,no_such_id" });
+    expect(pre.attrs[IGNORE]).toBe("true");
+    expect(w.calls.html2canvas).toHaveLength(1);
+  });
+
   test("상수: 라이브러리 경로는 /cm/js 아래(config.xml engine module 과 일치), 기본 옵션은 print/세로/여백 10/배율 2", () => {
     const w = loadWindow();
     expect(w.scwin.PRINT_LIB_INFO).toEqual({
