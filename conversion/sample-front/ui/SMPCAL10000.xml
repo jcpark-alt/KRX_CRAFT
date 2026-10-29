@@ -1,0 +1,275 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:ev="http://www.w3.org/2001/xml-events"
+    xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+    <head meta_screenName="[가이드] 기간 선택 달력 UDC (udc_fromToCalendar)" meta_screenId="SMPCAL10000" meta_screenDesc="/cm/udc/fromToCalendar.xml UDC 사용 가이드. 시작일~종료일 기간 선택, 빠른 선택 버튼(오늘·내일·다음주·다음달·3개월·1년), 옵션(period 주간·당월 / quarter 분기 / time HH:mm·HH:mm:ss), 영업일 보기(dlt_holiday), 공개 API(getFromInValue·getToInValue·getFromValue·getToValue·setFromInValue·setToInValue·validationDate)를 시연한다." meta_author="Inswave" meta_type="가이드" meta_date="2026.10.29">
+        <w2:type>COMPONENT</w2:type>
+        <w2:buildDate/>
+        <w2:MSA/>
+        <xf:model>
+            <w2:dataCollection baseNode="map"/>
+            <w2:workflowCollection/>
+        </xf:model>
+        <w2:layoutInfo/>
+        <w2:publicInfo method="scwin.onpageload,scwin.init,scwin.btn_getValue_onclick,scwin.btn_setValue_onclick,scwin.btn_validate_onclick,scwin.showHolidayStatus,scwin.getUdcList,scwin.checkPeriod"/>
+        <script lazy="false" type="text/javascript"><![CDATA[// 가이드 : 기간 선택 달력 UDC 샘플 (합성 화면 — 원본 없음)
+
+/*
+ * 화면 동작
+ * 1. 각 UDC 오른쪽 달력 버튼을 누르면 시작(왼쪽)·종료(오른쪽) 달력이 함께 뜬다
+ *    — 날짜를 고르거나 입력란에 yyyyMMdd 를 직접 입력하면 선택 기간(일수)이 하단에 표시된다
+ *    — 빠른 선택 : 오늘·내일·다음주·다음달·3개월·1년 (시작일 기준, 시작일이 비어 있으면 동작하지 않음)
+ *    — 「영업일 보기」 를 켜면 주말·휴일을 뺀 영업일 수와 영업일 기준 2~5일후 버튼이 나온다
+ *    — 「닫기」·달력 버튼은 시작·종료(시간 모드면 시각까지)를 모두 입력해야 닫힌다
+ * 2. 「값 조회」 : 네 UDC 의 입력란 값(getFromInValue·getToInValue)과 달력 값(getFromValue·getToValue)을 표시한다
+ * 3. 「값 설정」 : setFromInValue·setToInValue 로 값을 넣는다 — 날짜 모드는 yyyyMMdd, 시간 모드는 yyyyMMddHHmm(ss)
+ * 4. 「기간 검증」 : validationDate 로 형식을 확인하고 시작 ≤ 종료 인지 비교한다(업무 화면의 조회 전 검사 패턴)
+ *
+ * UDC 사용 규칙 (fromToCalendar.xml 동작 기준)
+ * - head 에 <w2:require as="udc_fromToCalendar" src="/cm/udc/fromToCalendar.xml" type="page"> 를 선언한다
+ * - 옵션은 태그 속성 문자열 : period="true"(주간·당월) · quarter="true"(1~4분기) · time="HH:mm" | "HH:mm:ss"(시각 입력)
+ * - 영업일 계산은 최상위 화면의 dlt_holiday(REST_DATE yyyyMMdd)를 읽는다. 메인 프레임이
+ *   $c.data.createHolidayDataList()·$c.data.loadHoliday() 로 만들어 채우며, 없으면 주말만 빼고 콘솔에 경고를 남긴다
+ * - 한 화면에 여러 개를 두어도 된다 — 선택·오늘 표시 정리는 각 UDC 안의 달력에만 적용된다
+ * - 공개 함수 이름 calulateDays·quareterSelect·day_Calcultate 는 원래 철자 그대로다(호출부 호환)
+ */
+
+///////// 1. 변수 및 선언 영역 /////////
+
+// 「값 설정」 에 쓰는 예시 값 — 모드별 자릿수가 다르다
+scwin.SAMPLE_VALUE = {
+    date   : { from : "20250101", to : "20250131" },
+    minute : { from : "202501010900", to : "202501311800" },
+    second : { from : "20250101090000", to : "20250131183059" }
+};
+
+///////// 2. 초기화 영역 /////////
+
+/**
+ * @method
+ * @name scwin.onpageload
+ * @author Inswave
+ * @date 2026. 10. 29
+ * @description 페이지 로드. 초기화(scwin.init)를 호출한다.
+ * @hidden N
+*/
+scwin.onpageload = async function () {
+    try {
+        await scwin.init();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "SMPCAL10000.onpageload" });
+    }
+};
+
+/**
+ * @method
+ * @name scwin.init
+ * @author Inswave
+ * @date 2026. 10. 29
+ * @description 영업일 계산에 쓰이는 휴일 목록 상태를 표시한다.
+ * @hidden N
+*/
+scwin.init = async function () {
+    // 1) 휴일 목록 상태 — 샘플은 휴일 목록을 만들거나 바꾸지 않고 읽기만 한다
+    scwin.showHolidayStatus();
+};
+
+
+///////// 3. 컴포넌트 이벤트 영역 /////////
+
+/**
+ * @event
+ * @name scwin.btn_getValue_onclick
+ * @description 네 UDC 의 입력란 값과 달력 값을 조회해 표시한다.
+ * @hidden N
+*/
+scwin.btn_getValue_onclick = function () {
+    try {
+        const lines = scwin.getUdcList().map(item => {
+            const udc = item.comp;
+            return "[" + item.nm + "] 입력란 " + (udc.getFromInValue() || "(빈 값)") + " ~ " + (udc.getToInValue() || "(빈 값)")
+                + " · 달력 " + udc.getFromValue() + " ~ " + udc.getToValue();
+        });
+        spn_result.setValue(lines.join("  |  "));
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "SMPCAL10000.btn_getValue_onclick" });
+    }
+};
+
+/**
+ * @event
+ * @name scwin.btn_setValue_onclick
+ * @description setFromInValue·setToInValue 로 모드별 예시 기간을 넣는다. 형식이 맞지 않는 값은 UDC 가 무시한다.
+ * @hidden N
+*/
+scwin.btn_setValue_onclick = function () {
+    try {
+        scwin.getUdcList().forEach(item => {
+            const sample = scwin.SAMPLE_VALUE[item.mode];
+            item.comp.setFromInValue(sample.from);
+            item.comp.setToInValue(sample.to);
+        });
+        spn_result.setValue("예시 기간을 설정했습니다 — 날짜 " + scwin.SAMPLE_VALUE.date.from + "~" + scwin.SAMPLE_VALUE.date.to
+            + ", 시각 " + scwin.SAMPLE_VALUE.second.from + "~" + scwin.SAMPLE_VALUE.second.to);
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "SMPCAL10000.btn_setValue_onclick" });
+    }
+};
+
+/**
+ * @event
+ * @name scwin.btn_validate_onclick
+ * @description 각 UDC 의 기간을 검사한다 — 입력 여부, validationDate 형식, 시작 ≤ 종료.
+ * @hidden N
+*/
+scwin.btn_validate_onclick = async function () {
+    try {
+        for (const item of scwin.getUdcList()) {
+            const message = scwin.checkPeriod(item.comp);
+            if (message) {
+                await $c.win.alert("[" + item.nm + "] " + message);
+                return;
+            }
+        }
+        await $c.win.alert("네 UDC 의 기간이 모두 올바릅니다.");
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "SMPCAL10000.btn_validate_onclick" });
+    }
+};
+
+
+///////// 5. 일반/업무 함수 영역 /////////
+
+/**
+ * @method
+ * @name scwin.getUdcList
+ * @author Inswave
+ * @date 2026. 10. 29
+ * @description 화면의 기간 선택 UDC 목록(이름·컴포넌트·값 모드)을 반환한다.
+ * @returns {Array} [{ nm, comp, mode }]
+ * @hidden N
+*/
+scwin.getUdcList = function () {
+    return [
+        { nm : "기본", comp : udc_ftcBasic, mode : "date" },
+        { nm : "주간·당월·분기", comp : udc_ftcPeriod, mode : "date" },
+        { nm : "시간 HH:mm", comp : udc_ftcMinute, mode : "minute" },
+        { nm : "시간 HH:mm:ss", comp : udc_ftcSecond, mode : "second" }
+    ];
+};
+
+/**
+ * @method
+ * @name scwin.checkPeriod
+ * @author Inswave
+ * @date 2026. 10. 29
+ * @description 기간 UDC 한 개를 검사한다. 날짜는 validationDate 로 형식을 보고, 시작·종료는 입력란 값(시간 모드는 시각 포함)을 문자열로 비교한다.
+ * @param {Object} udc 기간 선택 UDC
+ * @returns {String} 오류 메시지 (문제없으면 빈 문자열)
+ * @hidden N
+*/
+scwin.checkPeriod = function (udc) {
+    const from = udc.getFromInValue();
+    const to = udc.getToInValue();
+
+    if ($c.util.isEmpty(from) || $c.util.isEmpty(to)) {
+        return "시작일과 종료일을 모두 입력하세요.";
+    }
+    if (!udc.validationDate(from.slice(0, 8)) || !udc.validationDate(to.slice(0, 8))) {
+        return "날짜 형식이 올바르지 않습니다.";
+    }
+    // 같은 자릿수(yyyyMMdd[HHmm[ss]])라 문자열 비교가 곧 시간순 비교다
+    if (from > to) {
+        return "시작이 종료보다 늦습니다. (" + from + " > " + to + ")";
+    }
+    return "";
+};
+
+/**
+ * @method
+ * @name scwin.showHolidayStatus
+ * @author Inswave
+ * @date 2026. 10. 29
+ * @description 최상위 화면의 휴일 목록(dlt_holiday) 유무와 건수를 표시한다.
+ * @hidden N
+*/
+scwin.showHolidayStatus = function () {
+    const top = $p.top();
+    const dlt = top ? top.dlt_holiday : null;
+    if (dlt && typeof dlt.getRowCount === "function") {
+        spn_holiday.setValue("휴일 목록(dlt_holiday) " + dlt.getRowCount() + "건 — 「영업일 보기」 에서 주말과 함께 제외됩니다.");
+    } else {
+        spn_holiday.setValue("최상위 화면에 휴일 목록(dlt_holiday)이 없습니다 — 「영업일 보기」 는 주말만 제외합니다. (메인 프레임에서 $c.data.createHolidayDataList · loadHoliday 로 적재)");
+    }
+};
+]]></script>
+        <!--
+            기간 선택 달력 UDC 를 불러온다. as 에 적은 이름이 곧 body 의 태그 이름(w2:udc_fromToCalendar)이 된다.
+        -->
+        <w2:require as="udc_fromToCalendar" src="/cm/udc/fromToCalendar.xml" type="page"></w2:require>
+    </head>
+    <body ev:onpageload="scwin.onpageload">
+        <xf:group class="sub_contents" id="" meta_componentContainer="true" style="">
+            <w2:pageFrame id="pfmContentHeader" src="/cm/xml/contentHeader.xml" style=""></w2:pageFrame>
+            <w2:textbox class="txt_info blue bold" id="" label="오른쪽 달력 버튼을 누르면 시작·종료 달력이 함께 뜹니다. 날짜를 고르거나 입력란에 직접 입력하면 선택 기간이 표시되고, 상단 버튼으로 오늘·내일·다음주·다음달·3개월·1년을 바로 고를 수 있습니다." style="" tagname=""></w2:textbox>
+            <w2:textbox class="txt_info" id="" label="옵션은 태그 속성으로 켭니다 — period=&quot;true&quot;(주간·당월), quarter=&quot;true&quot;(1~4분기), time=&quot;HH:mm&quot; 또는 &quot;HH:mm:ss&quot;(시각 입력). 「영업일 보기」 를 켜면 주말·휴일을 뺀 영업일 수와 영업일 기준 2~5일후 버튼이 나옵니다." style="" tagname=""></w2:textbox>
+            <w2:span id="spn_holiday" label="" style="display:block;margin:4px 0 8px;font-size:12px;color:#0a7a52;"/>
+
+            <xf:group class="titbox" id="" style="">
+                <w2:textbox class="tit" id="" label="옵션별 기간 선택 UDC" style="" tagname="h3"></w2:textbox>
+            </xf:group>
+            <xf:group class="tblbox" id="" style="">
+                <xf:group class="w2tb tbl" id="" style="" tagname="table">
+                    <w2:attributes>
+                        <w2:summary>옵션별 기간 선택 UDC</w2:summary>
+                    </w2:attributes>
+                    <xf:group tagname="colgroup">
+                        <xf:group style="width:200px;" tagname="col"></xf:group>
+                        <xf:group style="" tagname="col"></xf:group>
+                    </xf:group>
+                    <xf:group style="" tagname="tr">
+                        <xf:group class="w2tb_th" style="" tagname="th">
+                            <w2:textbox class="" id="" label="기본 (옵션 없음)" style="" tagname="span"></w2:textbox>
+                        </xf:group>
+                        <xf:group class="w2tb_td" style="" tagname="td">
+                            <w2:udc_fromToCalendar id="udc_ftcBasic"></w2:udc_fromToCalendar>
+                        </xf:group>
+                    </xf:group>
+                    <xf:group style="" tagname="tr">
+                        <xf:group class="w2tb_th" style="" tagname="th">
+                            <w2:textbox class="" id="" label="주간·당월·분기 (period · quarter)" style="" tagname="span"></w2:textbox>
+                        </xf:group>
+                        <xf:group class="w2tb_td" style="" tagname="td">
+                            <w2:udc_fromToCalendar id="udc_ftcPeriod" period="true" quarter="true"></w2:udc_fromToCalendar>
+                        </xf:group>
+                    </xf:group>
+                    <xf:group style="" tagname="tr">
+                        <xf:group class="w2tb_th" style="" tagname="th">
+                            <w2:textbox class="" id="" label="시간 HH:mm (time)" style="" tagname="span"></w2:textbox>
+                        </xf:group>
+                        <xf:group class="w2tb_td" style="" tagname="td">
+                            <w2:udc_fromToCalendar id="udc_ftcMinute" time="HH:mm"></w2:udc_fromToCalendar>
+                        </xf:group>
+                    </xf:group>
+                    <xf:group style="" tagname="tr">
+                        <xf:group class="w2tb_th" style="" tagname="th">
+                            <w2:textbox class="" id="" label="시간 HH:mm:ss (time)" style="" tagname="span"></w2:textbox>
+                        </xf:group>
+                        <xf:group class="w2tb_td" style="" tagname="td">
+                            <w2:udc_fromToCalendar id="udc_ftcSecond" time="HH:mm:ss"></w2:udc_fromToCalendar>
+                        </xf:group>
+                    </xf:group>
+                </xf:group>
+            </xf:group>
+
+            <xf:group class="btnbox" id="" style="">
+                <xf:group class="lt" id="" style="">
+                    <xf:trigger class="btn_cm" id="btn_getValue" type="button" ev:onclick="scwin.btn_getValue_onclick"><xf:label><![CDATA[값 조회 (getFromInValue · getFromValue)]]></xf:label></xf:trigger>
+                    <xf:trigger class="btn_cm" id="btn_setValue" type="button" ev:onclick="scwin.btn_setValue_onclick"><xf:label><![CDATA[값 설정 (setFromInValue · setToInValue)]]></xf:label></xf:trigger>
+                    <xf:trigger class="btn_cm" id="btn_validate" type="button" ev:onclick="scwin.btn_validate_onclick"><xf:label><![CDATA[기간 검증 (validationDate)]]></xf:label></xf:trigger>
+                </xf:group>
+            </xf:group>
+            <w2:span id="spn_result" label="" style="display:block;margin-top:8px;font-size:12px;color:#1c5dd9;"/>
+        </xf:group>
+    </body>
+</html>
