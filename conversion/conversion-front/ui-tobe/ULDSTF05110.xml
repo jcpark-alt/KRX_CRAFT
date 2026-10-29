@@ -1,0 +1,564 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare"
+	xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_screenId="ULDSTF05110" meta_screenName="(팝업)종류주식 위원회결과"
+		meta_desc="종류주식 예비심사 건의 상장위원회 심사결과(위원회일/철회일·결과·비고)를 조회·등록·삭제하는 팝업 (원본 W-Craft 변환본, 업무 분석 ULDSTF05110.md)"
+		meta_author="Inswave" meta_date="2026-10-29">
+		<title>종류주식 위원회결과</title>
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate />
+		<xf:model>
+			<w2:dataCollection baseNode="map">
+				<!-- 공통 코드 조회 요청 (list-code-value) -->
+				<w2:dataMap baseNode="map" id="dma_codReq">
+					<w2:keyInfo>
+						<w2:key dataType="text" id="codeList" name="코드정보 List"></w2:key>
+					</w2:keyInfo>
+				</w2:dataMap>
+				<!-- 위원회결과 코드 (COMITE_INVSTG_RSLT_CD) -->
+				<w2:dataList baseNode="list" id="dlt_comiteInvstgRsltCd" repeatNode="map">
+					<w2:columnInfo>
+						<w2:column dataType="text" id="value" name="코드"></w2:column>
+						<w2:column dataType="text" id="text" name="코드명"></w2:column>
+					</w2:columnInfo>
+				</w2:dataList>
+				<!-- 위원회 심사결과 목록 (select-list 응답, save 요청 copmiteDlrltDto) -->
+				<w2:dataList baseNode="list" id="dlt_Cmt" repeatNode="map" saveRemovedData="true">
+					<w2:columnInfo>
+						<w2:column dataType="text" id="billSubmitDd" name="청구서 제출일"></w2:column>
+						<w2:column dataType="text" id="comiteDd" name="위원회일자"></w2:column>
+						<w2:column dataType="text" id="retrYn" name="철회여부"></w2:column>
+						<w2:column dataType="text" id="comiteInvstgRsltCd" name="심사결과코드"></w2:column>
+						<w2:column dataType="text" id="remk" name="비고"></w2:column>
+						<w2:column dataType="text" id="bzProcsNo" name="업무처리번호"></w2:column>
+						<w2:column dataType="text" id="comiteInvstgRsltNm" name="심사결과"></w2:column>
+						<w2:column dataType="text" id="jobType" name="jobType"></w2:column>
+					</w2:columnInfo>
+				</w2:dataList>
+				<!-- 심사청구 정보 (select-info 응답) — 화면에 보이지 않고 저장에도 보내지 않는다 (§2.2, §10 #3) -->
+				<w2:dataMap baseNode="map" id="dma_ReqInf">
+					<w2:keyInfo>
+						<w2:key dataType="text" id="billSubmitDd" name="심사청구서접수일자"></w2:key>
+						<w2:key dataType="text" id="lstComiteRsltSaveEmpNo" name="최종위원회결과저장사원번호"></w2:key>
+						<w2:key dataType="text" id="lstComiteRsltSaveDdtm" name="최종위원회결과저장일시"></w2:key>
+						<w2:key dataType="text" id="bzProcsNo" name="업무처리번호"></w2:key>
+						<w2:key dataType="text" id="lstComiteRsltSaveEmpNm" name="최종위원회결과저장사원이름"></w2:key>
+					</w2:keyInfo>
+				</w2:dataMap>
+			</w2:dataCollection>
+			<w2:workflowCollection />
+		</xf:model>
+		<w2:layoutInfo />
+		<w2:publicInfo method="scwin.onpageload,scwin.init,scwin.grd_oncellclick,scwin.img_Delete_onclick,scwin.img_Save_onclick,scwin.img_Regist_onclick,scwin.selectCode,scwin.selectList,scwin.selectReqInf,scwin.saveTrs,scwin.save,scwin.addNewCmt,scwin.setKeyCtrl" />
+		<script lazy="false" type="text/javascript"><![CDATA[
+///////// 1. 변수 및 선언 영역 /////////
+scwin.isurCd = "";          // 발행기관코드 — 목록 조회 키 (부모가 넘긴 값, AS-IS arr[0] strKeyIsurCd — §1.2)
+scwin.bzProcsNo = "";       // 예비심사 업무처리번호 — 새 행의 업무처리번호 (부모가 넘긴 값, AS-IS arr[1] strKeyLstBzProcsNo — §1.2)
+scwin.isSaved = false;      // 저장 성공 여부 — 닫을 때 부모에 돌려준다
+scwin.JOB_TYPE_NEW = "2";   // 행 처리구분(jobType) 신규 — 원본 값 그대로, 삭제는 화면처리구분코드 04 의 숫자 (§5.4, §10 #4)
+scwin.JOB_TYPE_OLD = "3";   // 행 처리구분(jobType) 기존(조회한 행)
+scwin.MSG_TR_DOME = "작업이 정상적으로 처리되었습니다.";                   // 원본 메시지 상수 그대로
+scwin.MSG_TR_FAIL = "처리 중 오류가 발생하였습니다.";
+scwin.MSG_NO_UPDT = "저장할 수정내용이 없습니다.";
+scwin.MSG_NO_COMT = "위원회심사결과 내역이 없습니다. 새로 추가하시겠습니까?";
+
+// 원본 : ULDSTF05110.xml (W-Craft 변환본 + API 적용 개발 사본, 원본 ULDSTF05110.gfm 은 저장소에 없음)
+/*
+ * 화면 동작
+ *  - 부모(ULDSTF05101 주권 종류주식 예비심사관리)가 넘긴 발행기관코드로 위원회 심사결과 목록을 조회한다.
+ *    업무처리번호가 없으면(예비심사 미등록) 조회하지 않는다. 목록이 없으면 새로 추가할지 묻고, 아니면 닫는다.
+ *  - [신규]로 행을 더해 위원회일/철회일·철회여부·결과·비고를 입력하고 [저장], 고른 행은 [삭제]한다.
+ *    저장할 때마다 목록 전체를 보내고(행마다 jobType 2 신규 / 3 기존 / 4 삭제), 성공하면 다시 조회한다.
+ *  - 저장에 한 번이라도 성공하면 닫을 때 { isSaved : true } 를 돌려 부모가 상세를 다시 읽게 한다(계약서 §2 재조회 규약).
+ * 업무 분석 : conversion/conversion-front/ui/ULDSTF05110/ULDSTF05110.md (§번호는 이 문서의 절)
+ */
+
+///////// 2. 초기화 영역 /////////
+/**
+ * @method
+ * @name scwin.onpageload
+ * @author Inswave
+ * @date 2026. 10. 29
+ * @description 페이지로드. 로딩 로직은 scwin.init 하나에 둔다. (§3)
+ * @returns
+ * @hidden N
+ */
+scwin.onpageload = async function () {
+    try {
+        await scwin.init();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF05110.onpageload" });
+    }
+};
+
+/**
+ * @method
+ * @name scwin.init
+ * @author Inswave
+ * @date 2026. 10. 29
+ * @description 로딩 — 파라미터 수신 → 달력 검사 바인딩 → 위원회결과 코드 → 업무처리번호가 있으면 목록 조회. (원본 scwin.init — §3)
+ * @returns
+ * @hidden N
+ */
+scwin.init = async function () {
+    // 1) 파라미터 수신 — 원본은 부모 scwin.fn_GetPar(=fn_GetParDtl)를 빌려 arr 로 받았다 (§1.2)
+    const param = $c.data.getParameter() ?? {};
+    scwin.isurCd = param.isurCd ?? "";          // AS-IS arr[0]
+    scwin.bzProcsNo = param.bzProcsNo ?? "";    // AS-IS arr[1]
+    txb_IsurCd.setValue(scwin.isurCd);
+    txb_CoNm.setValue(param.comNm ?? "");       // AS-IS arr[2]
+
+    // 2) 단일 달력 검사 (규칙 37)
+    $c.date.checkCalendarFormat(med_ComiteDd, "yyyyMMdd");
+
+    // 3) 위원회결과 코드 — 목록 바인딩 전에 콤보 항목을 채운다
+    await scwin.selectCode();
+
+    // 4) 원본은 arr 길이가 2를 넘을 때(업무처리번호까지 받았을 때)만 조회했다 (§3, 계약서 §2)
+    if (!$c.util.isEmpty(scwin.bzProcsNo)) {
+        await scwin.selectList();
+    }
+};
+
+///////// 3. 컴포넌트 이벤트 영역 /////////
+/**
+ * @method
+ * @name scwin.grd_oncellclick
+ * @author Inswave
+ * @date 2026. 10. 29
+ * @description 목록 행 클릭 — 위원회일 수정 가능 여부를 그 행 기준으로 바꾸고, 업무처리번호가 있으면 심사청구 정보를 조회한다. (원본 grd_oncellclick — §4)
+ * @param {Number} rowIndex 행 번호
+ * @param {Number} columnIndex 열 번호
+ * @param {String} columnId 열 id
+ * @returns
+ * @hidden N
+ */
+scwin.grd_oncellclick = async function (rowIndex, columnIndex, columnId) {
+    try {
+        if (dlt_Cmt.getRowCount() === 0) return;
+
+        scwin.setKeyCtrl(rowIndex);
+        if (dlt_Cmt.getCellData(rowIndex, "bzProcsNo") !== "") {
+            await scwin.selectReqInf(rowIndex);
+        }
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF05110.grd_oncellclick" });
+    }
+};
+
+/**
+ * @method
+ * @name scwin.img_Delete_onclick
+ * @author Inswave
+ * @date 2026. 10. 29
+ * @description [삭제] — 고른 행을 지우고 목록을 저장한다. (원본 img_Delete_onclick → fn_DeleteRow → fn_save("D") — §4)
+ * @returns
+ * @hidden N
+ */
+scwin.img_Delete_onclick = async function () {
+    try {
+        await scwin.save("D");
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF05110.img_Delete_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name scwin.img_Save_onclick
+ * @author Inswave
+ * @date 2026. 10. 29
+ * @description [저장] — 목록을 저장한다. (원본 img_Save_onclick → fn_save("I") — §4)
+ * @returns
+ * @hidden N
+ */
+scwin.img_Save_onclick = async function () {
+    try {
+        await scwin.save("I");
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF05110.img_Save_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name scwin.img_Regist_onclick
+ * @author Inswave
+ * @date 2026. 10. 29
+ * @description [신규] — 새 위원회결과 행을 더한다. (원본 img_Regist_onclick → fn_addNewCmt — §4)
+ * @returns
+ * @hidden N
+ */
+scwin.img_Regist_onclick = async function () {
+    try {
+        await scwin.addNewCmt();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF05110.img_Regist_onclick" });
+    }
+};
+
+///////// 4. 서브미션 콜백 영역 /////////
+/**
+ * @method
+ * @name scwin.selectCode
+ * @author Inswave
+ * @date 2026. 10. 29
+ * @description 위원회결과 코드 조회 — GET list-code-value(codeList=COMITE_INVSTG_RSLT_CD) → dlt_comiteInvstgRsltCd.
+ * 원본 setCommonCode(action 옵션)는 공통이 action 을 무시해 동작하지 않으므로 공통 코드 조회 한 번으로 바꿨다. (원본 fn_searchCode — §5.1, 계약서 §4.5)
+ * @returns
+ * @hidden N
+ */
+scwin.selectCode = async function () {
+    dma_codReq.set("codeList", "COMITE_INVSTG_RSLT_CD");
+
+    const sbmOptions = {
+        id : "sbm_listCodeValue",
+        action : "/api/listing/common/code/list-code-value",
+        method : "get",
+        ref : "dma_codReq",
+        target : "dlt_comiteInvstgRsltCd=body.COMITE_INVSTG_RSLT_CD",
+        isProcessMsg : false
+    };
+    await $c.sbm.executeDynamic(sbmOptions);
+};
+
+/**
+ * @method
+ * @name scwin.selectList
+ * @author Inswave
+ * @date 2026. 10. 29
+ * @description 위원회 심사결과 목록 조회 — GET prelisting-kindstk-comite/select-list(isurCd) → dlt_Cmt.
+ * 행이 있으면 모두 기존(jobType 3)으로 표시하고 첫 행을 고른다. 없으면 새로 추가할지 묻고, 아니면 닫는다. (원본 fn_search — §5.2)
+ * @returns
+ * @hidden N
+ */
+scwin.selectList = async function () {
+    const sbmOptions = {
+        id : "sbm_selectListComite",
+        action : "/api/listing/lstproc/kind/prelisting-kindstk-comite/select-list",
+        method : "get",
+        target : "dlt_Cmt=body",
+        isProcessMsg : false
+    };
+
+    const res = await $c.sbm.executeDynamic(sbmOptions, { isurCd : scwin.isurCd });
+    if (res?.skipped || res?.responseJSON?.success !== true) return;
+
+    const rowCount = dlt_Cmt.getRowCount();
+    if (rowCount > 0) {
+        // 조회한 행은 모두 기존 행 — 원본처럼 jobType 을 넣는다(행 상태가 수정으로 바뀐다 — §8 #5)
+        dlt_Cmt.setBroadcast(false);
+        for (let i = 0; i < rowCount; i++) {
+            dlt_Cmt.setCellData(i, "jobType", scwin.JOB_TYPE_OLD);
+        }
+        dlt_Cmt.setBroadcast(true, true);
+
+        grd.setFocusedCell(0, 0);
+        scwin.setKeyCtrl(0);    // 조회 직후에는 위원회일 수정 불가
+        await scwin.selectReqInf(0);
+        return;
+    }
+
+    if (await $c.win.confirm(scwin.MSG_NO_COMT)) {
+        await scwin.addNewCmt();
+    } else {
+        await $c.win.closePopup({ isSaved : scwin.isSaved });
+    }
+};
+
+/**
+ * @method
+ * @name scwin.selectReqInf
+ * @author Inswave
+ * @date 2026. 10. 29
+ * @description 심사청구 정보 조회 — GET prelisting-kindstk-comite/select-info(bzProcsNo) → dma_ReqInf. (원본 fn_searchReqInf — §5.3)
+ * 원본은 현재 행 위치(getRowPosition)로 읽었다 → 호출한 곳이 행 번호를 넘긴다.
+ * @param {Number} rowIndex 행 번호
+ * @returns
+ * @hidden N
+ */
+scwin.selectReqInf = async function (rowIndex) {
+    const sbmOptions = {
+        id : "sbm_selectInfoComite",
+        action : "/api/listing/lstproc/kind/prelisting-kindstk-comite/select-info",
+        method : "get",
+        target : "dma_ReqInf=body",
+        isProcessMsg : false
+    };
+    await $c.sbm.executeDynamic(sbmOptions, { bzProcsNo : dlt_Cmt.getCellData(rowIndex, "bzProcsNo") });
+};
+
+/**
+ * @method
+ * @name scwin.saveTrs
+ * @author Inswave
+ * @date 2026. 10. 29
+ * @description 위원회 심사결과 저장 — POST prelisting-kindstk-comite/save, dlt_Cmt 를 copmiteDlrltDto 키로 보낸다. (원본 fn_save 의 통신부 — §5.4)
+ * @returns {Boolean} 서버 처리 성공(body.result === "S") 여부
+ * @hidden N
+ */
+scwin.saveTrs = async function () {
+    const sbmOptions = {
+        id : "sbm_saveComite",
+        action : "/api/listing/lstproc/kind/prelisting-kindstk-comite/save",
+        method : "post",
+        mediatype : "application/json",
+        ref : 'data:json,[{"id":"dlt_Cmt","key":"copmiteDlrltDto"}]',    // 키 철자(copmite)는 서버 계약 그대로 (§10 #5)
+        target : "data:json",
+        isProcessMsg : false
+    };
+
+    const res = await $c.sbm.executeDynamic(sbmOptions);
+    if (res?.skipped) return false;
+
+    if (res?.responseJSON?.success === true && res.responseJSON.body?.result === "S") {
+        return true;
+    }
+    await $c.win.alert(scwin.MSG_TR_FAIL);
+    return false;
+};
+
+///////// 5. 일반/업무 함수 영역 /////////
+/**
+ * @method
+ * @name scwin.save
+ * @author Inswave
+ * @date 2026. 10. 29
+ * @description 저장·삭제 — 위원회일/철회일 필수 검사 → (삭제면 고른 행 삭제·jobType 4) → 바뀐 것이 있으면 저장 → 성공하면 다시 조회.
+ * (원본 fn_save — §6.1. 원본의 부서 검사는 안내가 주석이라 동작이 없어 옮기지 않았다, §8 #6)
+ * @param {String} jobType "I" 저장 / "D" 삭제
+ * @returns
+ * @hidden N
+ */
+scwin.save = async function (jobType) {
+    if (med_ComiteDd.getValue() === "") {
+        await $c.win.alert("위원회일/철회일을 입력하여 주세요");
+        med_ComiteDd.focus();
+        return;
+    }
+
+    const rowIndex = dlt_Cmt.getRowPosition();
+    if (jobType === "D") {
+        dlt_Cmt.deleteRow(rowIndex);
+    }
+
+    if (!$c.data.isModified([dlt_Cmt, dma_ReqInf])) {
+        await $c.win.alert(scwin.MSG_NO_UPDT);
+        return;
+    }
+
+    // 원본 Number(SCREN_PROCS_TP_CD_04) — 삭제 표시(D)로 남은 기존 행에만 숫자 4 를 넣는다 (§10 #4).
+    // 저장 전 새 행은 지우면 목록에서 빠지므로 같은 번호의 다른 행을 건드리지 않게 상태를 확인한다 (§8 #9)
+    if (jobType === "D" && dlt_Cmt.getRowStatus(rowIndex) === "D") {
+        dlt_Cmt.setCellData(rowIndex, "jobType", Number($c.stf.glb.SCREN_PROCS_TP_CD_04));
+    }
+
+    if (!(await scwin.saveTrs())) return;
+
+    scwin.isSaved = true;   // 원본은 여기서 부모 scwin.fn_read_sync() 를 직접 불렀다 → 닫을 때 부모가 재조회 (계약서 §2)
+    await $c.win.alert(scwin.MSG_TR_DOME);
+    await scwin.selectList();
+};
+
+/**
+ * @method
+ * @name scwin.addNewCmt
+ * @author Inswave
+ * @date 2026. 10. 29
+ * @description 새 위원회결과 행 — 예비심사 업무처리번호·jobType 2 를 넣고 그 행을 고른 뒤 위원회일을 입력할 수 있게 한다. (원본 fn_addNewCmt — §6.2)
+ * @returns
+ * @hidden N
+ */
+scwin.addNewCmt = async function () {
+    const rowIndex = dlt_Cmt.insertRow();
+    dlt_Cmt.setCellData(rowIndex, "bzProcsNo", scwin.bzProcsNo);
+    dlt_Cmt.setCellData(rowIndex, "jobType", scwin.JOB_TYPE_NEW);
+
+    // 원본 grd.setFocusedCell(rowIdx, rowIdx, true) 는 열 자리에 행 번호를 넣었다 → 첫 열로 고친다 (§8 #7)
+    grd.setFocusedCell(rowIndex, 0);
+    scwin.setKeyCtrl(rowIndex);
+    await scwin.selectReqInf(rowIndex);
+};
+
+/**
+ * @method
+ * @name scwin.setKeyCtrl
+ * @author Inswave
+ * @date 2026. 10. 29
+ * @description 위원회일/철회일 수정 가능 여부 — 새 행(jobType 2)만 입력할 수 있다("위원회일은 수정할 수 없습니다").
+ * (원본 fn_setKeyCtrOnAdd / fn_setKeyCtrOnUpd — 원본은 조회·신규 때만 바꿔 다른 행을 눌러도 상태가 남았다, §8 #8)
+ * @param {Number} rowIndex 행 번호
+ * @returns
+ * @hidden N
+ */
+scwin.setKeyCtrl = function (rowIndex) {
+    med_ComiteDd.setReadOnly(dlt_Cmt.getCellData(rowIndex, "jobType") !== scwin.JOB_TYPE_NEW);
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload">
+		<xf:group class="pop_contents" id="" style="">
+			<w2:pageFrame id="pfmContentHeader" src="/cm/xml/contentHeader.xml" style="" />
+			<!-- 발행기관 (부모가 넘긴 값, 조회 전용) -->
+			<xf:group class="tblbox" id="pan_Cnd" style="">
+				<xf:group class="w2tb tbl" id="" style="" tagname="table">
+					<w2:attributes>
+						<w2:summary>발행기관</w2:summary>
+					</w2:attributes>
+					<xf:group tagname="colgroup">
+						<xf:group style="width:150px;" tagname="col" />
+						<xf:group tagname="col" />
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group class="w2tb_th" tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_2" label="발행기관코드" style="" />
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<xf:group class="flex flex_no" id="" style="">
+								<xf:input id="txb_IsurCd" readOnly="true" style="width:70px;" />
+								<xf:input id="txb_CoNm" readOnly="true" style="width:210px;" />
+							</xf:group>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<!-- 위원회 심사결과 상세 (그리드에서 고른 행) -->
+			<xf:group class="tblbox" id="pan_Cmt" style="">
+				<xf:group class="w2tb tbl" id="" style="" tagname="table">
+					<w2:attributes>
+						<w2:summary>위원회 심사결과</w2:summary>
+					</w2:attributes>
+					<xf:group tagname="colgroup">
+						<xf:group style="width:150px;" tagname="col" />
+						<xf:group tagname="col" />
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group class="w2tb_th" tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_1" label="청구서제출일" style="" />
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<xf:input dataType="date" displayFormat="yyyy-MM-dd" id="med_BillSubmitDd" ioFormat="yyyyMMddHHmmSS" readOnly="true" ref="data:dlt_Cmt.billSubmitDd"
+								style="width:135px;" />
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group class="w2tb_th" tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_5" label="철회여부" style="" />
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<xf:select1 appearance="full" cols="2" id="rdo_RetrYn" ref="data:dlt_Cmt.retrYn" renderType="radiogroup" style="">
+								<xf:choices>
+									<xf:item>
+										<xf:label><![CDATA[예]]></xf:label>
+										<xf:value><![CDATA[Y]]></xf:value>
+									</xf:item>
+									<xf:item>
+										<xf:label><![CDATA[아니오]]></xf:label>
+										<xf:value><![CDATA[N]]></xf:value>
+									</xf:item>
+								</xf:choices>
+							</xf:select1>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group class="w2tb_th" tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox class="req" id="label_7" label="위원회일/철회일" style="" />
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:inputCalendar calendarValueType="yearMonthDate" focusOnDateSelect="false" footerDiv="true" id="med_ComiteDd" ref="data:dlt_Cmt.comiteDd"
+								renderDiv="true" rightAlign="false" style="" />
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group class="w2tb_th" tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_84" label="위원회결과" style="" />
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<xf:select1 appearance="minimal" chooseOption="true" chooseOptionLabel="" disabledClass="w2selectbox_disabled" displayMode="label"
+								id="cmb_ComiteInvstgRsltCd" ref="data:dlt_Cmt.comiteInvstgRsltCd" style="width:135px;">
+								<xf:choices>
+									<xf:itemset nodeset="data:dlt_comiteInvstgRsltCd">
+										<xf:label ref="text"></xf:label>
+										<xf:value ref="value"></xf:value>
+									</xf:itemset>
+								</xf:choices>
+							</xf:select1>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group class="w2tb_th" tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_3" label="비고" style="" />
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<xf:textarea id="txa_Remk" ref="data:dlt_Cmt.remk" style="width:100%;" />
+						</xf:group>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<!-- 위원회 심사결과 목록 : 행을 고르면 위 상세에 보인다 -->
+			<xf:group class="gvwbox" id="" style="">
+				<w2:gridView autoFit="allColumn" class="gvw row5" dataList="data:dlt_Cmt" ev:oncellclick="scwin.grd_oncellclick" focusMode="row" id="grd" readOnly="true"
+					style="">
+					<w2:caption id="caption1" style="" value="위원회 심사결과 목록" />
+					<w2:header id="header1" style="">
+						<w2:row>
+							<w2:column displayMode="label" id="h_BILL_SUBMIT_DD" inputType="text" textAlign="center" value="청구서제출일" width="145" />
+							<w2:column displayMode="label" id="h_COMITE_DD" inputType="text" textAlign="center" value="위원회일/철회일" width="145" />
+							<w2:column displayMode="label" id="h_COMITE_INVSTG_RSLT_NM" inputType="text" textAlign="center" value="위원회결과" width="200" />
+						</w2:row>
+					</w2:header>
+					<w2:gBody id="gBody1" style="">
+						<w2:row>
+							<w2:column dataType="date" displayFormat="yyyy-MM-dd" displayMode="label" id="billSubmitDd" inputType="text" ioFormat="yyyyMMddHHmmSS"
+								textAlign="center" width="145" />
+							<w2:column dataType="date" displayFormat="yyyy-MM-dd" displayMode="label" id="comiteDd" inputType="text" textAlign="center" width="145" />
+							<w2:column displayMode="label" id="comiteInvstgRsltNm" inputType="text" textAlign="left" width="200" />
+						</w2:row>
+					</w2:gBody>
+				</w2:gridView>
+			</xf:group>
+			<!-- 하단 : 안내(왼쪽) · 처리 버튼(오른쪽). 팝업이라 「닫기」 없음, 주요 버튼은 [삭제]-[저장]-[신규] -->
+			<xf:group class="btnbox" id="panel_1" style="">
+				<xf:group class="lt" id="" style="">
+					<xf:group class="txt_list" id="" style="" tagname="ul">
+						<xf:group id="" tagname="li">
+							<w2:textbox id="label_9" label="위원회일은 수정할 수 없습니다." style="" />
+						</xf:group>
+						<xf:group id="" tagname="li">
+							<w2:textbox id="label_10" label="위원회 결과 추가시 '신규' 버튼을 선택하고 입력합니다." style="" />
+						</xf:group>
+					</xf:group>
+				</xf:group>
+				<xf:group class="rt" id="" style="">
+					<xf:trigger class="btn_cm pt" ev:onclick="scwin.img_Delete_onclick" id="img_Delete" type="button">
+						<xf:label><![CDATA[삭제]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm pt" ev:onclick="scwin.img_Save_onclick" id="img_Save" type="button">
+						<xf:label><![CDATA[저장]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm pt" ev:onclick="scwin.img_Regist_onclick" id="img_Regist" type="button">
+						<xf:label><![CDATA[신규]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+		</xf:group>
+	</body>
+</html>

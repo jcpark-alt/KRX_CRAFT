@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare"
+	xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_screenId="ULDSTF05107" meta_screenName="(팝업)종류주식 예비심사 종목선택"
+		meta_desc="발행기관의 종류주식 종목을 종목명으로 조회해 고르면 부모 화면에 돌려주는 팝업 (원본 W-Craft 변환본, 업무 분석 ULDSTF05107.md)"
+		meta_author="Inswave" meta_date="2026-10-29">
+		<title>종류주식 예비심사 종목선택</title>
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate />
+		<xf:model>
+			<w2:dataCollection baseNode="map">
+				<!-- 종목 목록 조회 요청 (GET 쿼리: isurCd·isuNm) -->
+				<w2:dataMap baseNode="map" id="dma_search">
+					<w2:keyInfo>
+						<w2:key dataType="text" id="isurCd" name="발행기관코드"></w2:key>
+						<w2:key dataType="text" id="isuNm" name="종목명"></w2:key>
+					</w2:keyInfo>
+				</w2:dataMap>
+				<!-- 종목 목록 응답 (select-list-kindstk). isurCd·bzProcsNo 는 반환 계약에 쓰는 응답 키 (§2.2, §10 #2) -->
+				<w2:dataList baseNode="list" id="dlt_listKindstkRes" repeatNode="map" saveRemovedData="true">
+					<w2:columnInfo>
+						<w2:column dataType="text" id="isuCd" name="표준종목코드"></w2:column>
+						<w2:column dataType="text" id="isuSrtCd" name="단축종목코드"></w2:column>
+						<w2:column dataType="text" id="secugrpId" name="증권그룹"></w2:column>
+						<w2:column dataType="text" id="isuNm" name="종목명"></w2:column>
+						<w2:column dataType="text" id="isuSnm" name="종목약명"></w2:column>
+						<w2:column dataType="text" id="isuEngNm" name="종목영문명"></w2:column>
+						<w2:column dataType="text" id="isuEngSnm" name="종목영문약명"></w2:column>
+						<w2:column dataType="text" id="isuEngSymbl" name="심볼"></w2:column>
+						<w2:column dataType="text" id="isurCd" name="발행기관코드"></w2:column>
+						<w2:column dataType="text" id="bzProcsNo" name="업무처리번호"></w2:column>
+					</w2:columnInfo>
+				</w2:dataList>
+			</w2:dataCollection>
+			<w2:workflowCollection />
+		</xf:model>
+		<w2:layoutInfo />
+		<w2:publicInfo method="scwin.onpageload,scwin.init,scwin.img_Search_onclick,scwin.grd_IsuInst_oncelldblclick,scwin.selectList,scwin.returnIsu" />
+		<script lazy="false" type="text/javascript"><![CDATA[///////// 1. 변수 및 선언 영역 /////////
+// 원본 : ULDSTF05107.xml (W-Craft 변환본 + API 적용 개발 사본, 원본 ULDSTF05107.gfm 은 저장소에 없음)
+/*
+ * 화면 동작
+ *  - 부모(ULDSTF05100 예비심사·ULDSTF05101 예비심사관리·ULDSTF05102 상장심사)가 넘긴 발행기관코드로
+ *    그 발행기관의 종류주식 종목을 조회한다. 열리면 바로 조회하고, 종목명으로 다시 조회할 수 있다.
+ *  - 행을 더블클릭하면 고른 종목을 부모에 돌려주고 닫는다(창 닫기 = 취소).
+ * 업무 분석 : conversion/conversion-front/ui/ULDSTF05107/ULDSTF05107.md (§번호는 이 문서의 절)
+ */
+
+///////// 2. 초기화 영역 /////////
+/**
+ * @method
+ * @name scwin.onpageload
+ * @author Inswave
+ * @date 2026. 10. 29
+ * @description 페이지로드. 로딩 로직은 scwin.init 하나에 둔다. (§3)
+ * @returns
+ * @hidden N
+ */
+scwin.onpageload = async function () {
+    try {
+        await scwin.init();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF05107.onpageload" });
+    }
+};
+
+/**
+ * @method
+ * @name scwin.init
+ * @author Inswave
+ * @date 2026. 10. 29
+ * @description 로딩 — 파라미터 수신 → Enter 키 바인딩 → 종목명 칸 포커스 → 종목 목록 조회. (원본 scwin.init — §3)
+ * @returns
+ * @hidden N
+ */
+scwin.init = async function () {
+    // 1) 파라미터 수신 — 원본은 부모 컴포넌트(ibx_isurCd/txb_ISU_CD)를 직접 읽었다 (§1.2, §8 #1)
+    //    secugrpId·mktTpCd·searchType 도 계약상 넘어오지만 조회 API 가 받지 않아 쓰지 않는다 (§10 #1)
+    const param = $c.data.getParameter() ?? {};
+    dma_search.set("isurCd", param.isurCd ?? "");
+
+    // 2) 조회 영역 Enter 키 (규칙 22) — 원본 txb_Search_onkeydown(keyCode 13)
+    $c.win.setEnterKeyEvent(grp_search, scwin.img_Search_onclick);
+
+    // 3) 열리면 바로 조회
+    txb_Search.focus();
+    await scwin.selectList();
+};
+
+///////// 3. 컴포넌트 이벤트 영역 /////////
+/**
+ * @method
+ * @name scwin.img_Search_onclick
+ * @author Inswave
+ * @date 2026. 10. 29
+ * @description [조회] — 종목명으로 다시 조회한다. (원본 img_Search_onclick — 원본 버튼에는 ev:onclick 이 없었다, §8 #3)
+ * @returns
+ * @hidden N
+ */
+scwin.img_Search_onclick = async function () {
+    try {
+        await scwin.selectList();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF05107.img_Search_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name scwin.grd_IsuInst_oncelldblclick
+ * @author Inswave
+ * @date 2026. 10. 29
+ * @description 목록 더블클릭 — 고른 종목을 부모에 돌려주고 닫는다. (원본 grd_IsuInst_OnDblClick — §4)
+ * @param {Number} rowIndex 행 번호
+ * @param {Number} columnIndex 열 번호
+ * @param {String} columnId 열 id
+ * @returns
+ * @hidden N
+ */
+scwin.grd_IsuInst_oncelldblclick = async function (rowIndex, columnIndex, columnId) {
+    try {
+        await scwin.returnIsu(rowIndex);
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF05107.grd_IsuInst_oncelldblclick" });
+    }
+};
+
+///////// 4. 서브미션 콜백 영역 /////////
+/**
+ * @method
+ * @name scwin.selectList
+ * @author Inswave
+ * @date 2026. 10. 29
+ * @description 종목 목록 조회 — GET select-list-kindstk(isurCd·isuNm) → dlt_listKindstkRes, 건수 표시. (원본 fn_list_sync — §5.1)
+ * 원본은 쿼리스트링을 문자열로 이어 붙여 종목명을 인코딩하지 않았다 → dma_search 를 ref 로 넘겨 공통이 인코딩한다(§8 #4).
+ * @returns
+ * @hidden N
+ */
+scwin.selectList = async function () {
+    const sbmOptions = {
+        id : "sbm_selectListKindstk",
+        action : "/api/listing/common/pop/isu/select-list-kindstk",
+        method : "get",
+        ref : "dma_search",
+        target : "dlt_listKindstkRes=body",
+        isProcessMsg : false
+    };
+
+    const res = await $c.sbm.executeDynamic(sbmOptions);
+    if (res?.skipped) return;   // 진행 중 조회가 있어 이번 호출은 건너뜀
+
+    txb_TotCnt.setValue(dlt_listKindstkRes.getRowCount());
+};
+
+///////// 5. 일반/업무 함수 영역 /////////
+/**
+ * @method
+ * @name scwin.returnIsu
+ * @author Inswave
+ * @date 2026. 10. 29
+ * @description 고른 종목을 반환 계약 키(camelCase)로 부모에 돌려주고 닫는다. 원본의 대문자 키(ISU_CD·DBCLICKYN 등)는 쓰지 않는다. (§1.2 반환 규약)
+ * @param {Number} rowIndex 행 번호
+ * @returns
+ * @hidden N
+ */
+scwin.returnIsu = async function (rowIndex) {
+    const row = dlt_listKindstkRes.getRowJSON(rowIndex);
+
+    await $c.win.closePopup({
+        isuCd : row.isuCd ?? "",            // AS-IS ISU_CD
+        isuNm : row.isuNm ?? "",            // AS-IS ISU_NM
+        isuEngNm : row.isuEngNm ?? "",      // AS-IS ISU_ENG_NM
+        isurCd : row.isurCd ?? "",          // AS-IS ISUR_CD
+        bzProcsNo : row.bzProcsNo ?? "",    // AS-IS BZPROCSNO — 신규상장에서 쓰는 값
+        dbClickYn : "Y"                     // AS-IS DBCLICKYN
+    });
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload">
+		<xf:group class="pop_contents" id="" style="">
+			<w2:pageFrame id="pfmContentHeader" src="/cm/xml/contentHeader.xml" style="" />
+			<!-- 조회조건 : 종목명 -->
+			<xf:group class="schbox" id="grp_search" style="">
+				<xf:group class="schbox_inner" id="" style="">
+					<xf:group class="w2tb tbl" id="" style="" tagname="table">
+						<w2:attributes>
+							<w2:summary>조회조건</w2:summary>
+						</w2:attributes>
+						<xf:group tagname="colgroup">
+							<xf:group style="width:100px;" tagname="col" />
+							<xf:group tagname="col" />
+						</xf:group>
+						<xf:group tagname="tr">
+							<xf:group class="w2tb_th" tagname="th">
+								<w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes>
+								<w2:textbox id="label_1" label="종목명" style="" />
+							</xf:group>
+							<xf:group class="w2tb_td" tagname="td">
+								<xf:input id="txb_Search" maxlength="1000" ref="data:dma_search.isuNm" style="width:185px;" />
+							</xf:group>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+				<xf:group class="btn_schbox" id="" style="">
+					<xf:trigger class="btn_cm sch" ev:onclick="scwin.img_Search_onclick" id="img_Search" type="button">
+						<xf:label><![CDATA[조회]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+			<!-- 종목 목록 : 행을 더블클릭하면 고른 종목을 부모에 돌려주고 닫는다 -->
+			<xf:group class="titbox" id="" style="">
+				<xf:group class="rt" id="" style="">
+					<xf:group class="count" id="" style="">
+						<w2:span id="" label="총" style="" />
+						<w2:span class="num" id="txb_TotCnt" label="0" style="" />
+						<w2:span id="" label="건" style="" />
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<xf:group class="gvwbox" id="" style="">
+				<w2:gridView autoFit="allColumn" class="gvw row15" dataList="data:dlt_listKindstkRes" ev:oncelldblclick="scwin.grd_IsuInst_oncelldblclick"
+					focusMode="row" id="grd_IsuInst" readOnly="true" style="">
+					<w2:caption id="caption1" style="" value="종목 목록" />
+					<w2:header id="header1" style="">
+						<w2:row>
+							<w2:column displayMode="label" id="h_ISU_CD" inputType="text" textAlign="center" value="종목코드" width="100" />
+							<w2:column displayMode="label" id="h_ISU_NM" inputType="text" textAlign="center" value="종목명" width="295" />
+							<w2:column displayMode="label" id="h_ISU_ENG_NM" inputType="text" textAlign="center" value="종목영문명" width="101" />
+							<w2:column displayMode="label" id="h_ISUR_CD" inputType="text" textAlign="center" value="발행기관코드" width="60" />
+						</w2:row>
+					</w2:header>
+					<w2:gBody id="gBody1" style="">
+						<w2:row>
+							<w2:column displayMode="label" id="isuCd" inputType="text" textAlign="center" width="100" />
+							<w2:column displayMode="label" id="isuNm" inputType="text" textAlign="left" width="295" />
+							<w2:column displayMode="label" id="isuEngNm" inputType="text" textAlign="left" width="101" />
+							<w2:column displayMode="label" id="isurCd" inputType="text" textAlign="center" width="60" />
+						</w2:row>
+					</w2:gBody>
+				</w2:gridView>
+			</xf:group>
+		</xf:group>
+	</body>
+</html>
