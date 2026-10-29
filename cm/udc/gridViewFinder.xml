@@ -142,7 +142,6 @@ scwin.displayOpt = [];
 scwin.nodeSet = [];
 scwin.select = [];
 scwin.sIdx = 0;
-scwin.cIdx = 0;
 scwin.arr = [];
 scwin.hotKeyInfo = {
     "complexKey": [],
@@ -173,8 +172,8 @@ scwin.searchManager = {
     // 현재 검색 작업을 중단.
     stopSearch: function (callbackFunc) {
         if (this.procId > -1) {
-            this.procId = -1;
             clearTimeout(this.procId);
+            this.procId = -1;
         }
         this.initStatus();
 
@@ -257,8 +256,12 @@ scwin.searchManager = {
 
                     // button, calendar, spinner 처리
                     if (type == 'calendar' || type == 'button' || type == 'spinner') {
-                        scwin.cIdx = j;
-                        grd.setDisplayFormatter(j, scwin.dpFormatter);
+                        // displayFormatter 는 data 만 전달받으므로 그리드뷰·컬럼 인덱스를 클로저로 고정한다.
+                        grd.setDisplayFormatter(j, (function (g, c) {
+                            return function (data) {
+                                return scwin.dpFormatter(data, g, c);
+                            };
+                        })(scwin.gIdx, j));
                         continue;
                     };
 
@@ -410,8 +413,11 @@ scwin.checkKey = function (e = {}) {
     lastKey = e.key || e.keyCode || e.which;
 
     if ($c.util.isEmpty(lastKey)) {
-        return ret;
+        return fireHotKey;
     }
+
+    // e.key 가 없어 keyCode(숫자)로 대체된 경우에도 문자열로 비교한다.
+    lastKey = String(lastKey);
 
     if (e.ctrlKey) {
         complexKey.push("CTRL");
@@ -848,7 +854,7 @@ scwin.searchItemFormatter = function (data, formattedData, rowIdx, colIdx) {
     // inputType select인 경우 동작하는 CustomFormatter
     let val, label;
     for (let j = 0; j < scwin.select.length; j++) {
-        if (scwin.select[j].colIdx == colIdx) {
+        if (scwin.select[j].gIdx == scwin.gIdx && scwin.select[j].colIdx == colIdx) {
             val = scwin.select[j].value;
             label = scwin.select[j].label;
 
@@ -863,13 +869,16 @@ scwin.searchItemFormatter = function (data, formattedData, rowIdx, colIdx) {
         }
     };
 
+    // number일 경우 형변환
+    if (typeof data == 'number') data = data.toString();
+
     // highlight 처리 여부 판단.
-    if (!scwin.checkHighLight()) return data;
+    if (!scwin.checkHighLight() || typeof data != 'string') return data;
 
     // 정규식
     const regEx = new RegExp(`(${scwin.keyword.replace(/[.*++?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
     if (regEx.test(data)) {
-        data = data.replace(regEx, '<span style="background-color:yellow">$1</span>');
+        data = data.replace(regEx, `<span style="background-color:${scwin.highlightColor}">$1</span>`);
     }
 
     return data;
@@ -879,33 +888,41 @@ scwin.searchItemFormatter = function (data, formattedData, rowIdx, colIdx) {
  * @name dpFormatter
  * @description inputType button, calendar, spinner 시 사용되는 formatter
  * @param {string} data cell의 data 값
+ * @param {number} gIdx 대상 GridView 인덱스
+ * @param {number} colIdx 대상 column 인덱스
  * @return {string} data cell에 표시될 data값
  */
-scwin.dpFormatter = function (data) {
-
-    // displayFormatter를 가진 경우 함수를 가져와서 선 적용
+scwin.dpFormatter = function (data, gIdx, colIdx) {
+    let opt;
     for (let col of scwin.displayOpt) {
-        // displayFormatter가 있는 경우 Data 적용
-        if (col.g == scwin.gIdx && col.c == scwin.cIdx && !$c.util.isEmpty(col.displayFormatter)) {
-            // 함수 찾고
-            const dpFunc = scwin.findDisplayFormatter(col.displayFormatter);
-            // 데이터 적용
-            data = dpFunc(data);
+        if (col.g == gIdx && col.c == colIdx) {
+            opt = col;
+            break;
         }
     };
 
-    // scwin.cIdx = column 인덱스, scwin.gIdx = GridView 인덱스
-    if (scwin.gridInfo[scwin.gIdx].getColumnType(scwin.cIdx) == 'calendar') {
-        const format = scwin.displayOpt[scwin.cIdx].displayFormat;
+    // displayFormatter를 가진 경우 함수를 가져와서 선 적용
+    if (opt && !$c.util.isEmpty(opt.displayFormatter)) {
+        const dpFunc = scwin.findDisplayFormatter(opt.displayFormatter);
+        if (typeof dpFunc == 'function') {
+            data = dpFunc(data);
+        }
+    }
+
+    if (scwin.gridInfo[gIdx].getColumnType(colIdx) == 'calendar') {
+        const format = opt ? opt.displayFormat : undefined;
         data = WebSquare.date.getFormattedDate(data, format);
     }
 
+    // number일 경우 형변환 (spinner)
+    if (typeof data == 'number') data = data.toString();
+
     // highlight 처리 여부 판단.
-    if (!scwin.checkHighLight()) return data;
+    if (!scwin.checkHighLight() || typeof data != 'string') return data;
 
     const regEx = new RegExp(`(${scwin.keyword.replace(/[.*++?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
     if (regEx.test(data)) {
-        data = data.replace(regEx, '<span style="background-color:yellow">$1</span>');
+        data = data.replace(regEx, `<span style="background-color:${scwin.highlightColor}">$1</span>`);
     }
 
     return data;
@@ -948,6 +965,7 @@ scwin.collectNodeSet = function () {
                 const type = scwin.gridInfo[i].getColumnType(j);
                 if (type == 'select' || type == 'autoComplete') {
                     const colDltInfo = scwin.gridInfo[i].getColumnDataListInfo(j);
+                    colDltInfo.gIdx = i;
                     colDltInfo.colIdx = j;
                     scwin.select.push(colDltInfo);
 
@@ -971,8 +989,12 @@ scwin.findDisplayFormatter = function (name) {
     // displayFormatter가 부모창에 존재하는 가정 
     const scope = $c.win.getParent();
 
-    // name 가공
-    name = name.split('.')[1];
+    if (!scope || !scope.scwin || typeof name != 'string') {
+        return false;
+    }
+
+    // name 가공 ("scwin.xxx" 또는 "xxx")
+    name = name.split('.').pop();
 
     let func = scope.scwin[name];
     if (typeof func == 'function') {
@@ -1009,7 +1031,9 @@ scwin.invokeFormatter = function (data, formattedData, rowIdx, colIdx) {
             // 함수 찾고
             const dpFunc = scwin.findDisplayFormatter(col.displayFormatter);
             // 데이터 적용
-            data = dpFunc(data);
+            if (typeof dpFunc == 'function') {
+                data = dpFunc(data);
+            }
         }
     };
 
@@ -1062,11 +1086,12 @@ scwin.clearSearch = function () {
     </head>
     <body ev:onpageload="scwin.onpageload" class="w2grid_finder">
     <xf:group id="grp_wrap" class="w2grid_finder gvw_finder">
-    	<xf:group style="" id="" class="w2grid_finder_form">
-    		<xf:input style="width: 200px;height: 30px;" id="ipt_search"></xf:input>
-    		<w2:textbox tagname="p" style="" id="txb_result" label="[0/0]" class="message"></w2:textbox>
-    		<w2:textbox tagname="button" style="" id="btn_up" label="&lt;" class="btn_movePrevious" ev:onclick="scwin.btn_up_onclick"></w2:textbox>
-    		<w2:textbox tagname="button" style="" id="btn_down" label="&gt;" class="btn_moveNext" ev:onclick="scwin.btn_down_onclick"></w2:textbox>
-    		<w2:textbox tagname="button" style="" id="btn_close" label="X" class="btn_finder_close" ev:onclick="scwin.btn_close_onclick"></w2:textbox>
-    	</xf:group></xf:group></body>
+    	<xf:group class="w2grid_finder_form">
+    		<xf:input id="ipt_search" title="검색어"></xf:input>
+    		<w2:textbox tagname="p" id="txb_result" label="[0/0]" class="message"></w2:textbox>
+    		<w2:textbox tagname="button" id="btn_up" label="이전" class="btn_movePrevious" ev:onclick="scwin.btn_up_onclick"></w2:textbox>
+    		<w2:textbox tagname="button" id="btn_down" label="다음" class="btn_moveNext" ev:onclick="scwin.btn_down_onclick"></w2:textbox>
+    		<w2:textbox tagname="button" id="btn_close" label="닫기" class="btn_finder_close" ev:onclick="scwin.btn_close_onclick"></w2:textbox>
+    	</xf:group>
+    </xf:group></body>
 </html>
