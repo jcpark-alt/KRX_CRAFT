@@ -59,6 +59,8 @@ METHOD_LINE = re.compile(r"^\s*(GET|POST|PUT|DELETE|PATCH)\s+(\S+)", re.I)
 BLOCK_HEAD = re.compile(r"^\s*\[([A-Za-z0-9_]+(?:\s*[/,~]\s*[A-Za-z0-9_]+)*)\]")
 # md 명세: `## 1. [화면ID][…]` 머리글, `* **TO-BE** : `GET /api/…`` 줄
 MD_BLOCK_HEAD = re.compile(r"^\s*#{1,6}\s*(?:\d+[.)]\s*)?\[([A-Za-z0-9_]+(?:\s*[/,~]\s*[A-Za-z0-9_]+)*)\]")
+# 화면ID 없는 번호 머리글(`## 1. [관리종목지정] 목록 조회`, 2026-10-30 ULDSTF05214) — 화면 자신의 `{화면ID}_API` 파일 안에서만 그 화면 블록
+MD_PLAIN_HEAD = re.compile(r"^\s*#{1,6}\s*\d+[.)]\s*\S")
 MD_TOBE_LINE = re.compile(r"TO-?BE\W*?:?\s*`?\s*(GET|POST|PUT|DELETE|PATCH)\s+([^`\s]+)", re.I)
 MD_METHOD_LINE = re.compile(r"^\s*(?:[*-]\s+)?`?\s*(GET|POST|PUT|DELETE|PATCH)\s+(/[^`\s]+)", re.I)
 SCREEN_ID = re.compile(r"([A-Za-z]{3}[A-Za-z0-9]*?\d{5}[A-Za-z0-9_]*)")
@@ -104,7 +106,7 @@ def is_screen_of(api, sid):
 def parse_spec(text, fmt=None):
     """명세 텍스트 → [{screen, title, method, path}] (블록 순서대로). fmt: "txt"|"md"|None(내용으로 판별)."""
     if fmt is None:
-        fmt = "md" if any(MD_BLOCK_HEAD.match(l) for l in text.split("\n")) else "txt"
+        fmt = "md" if any(MD_BLOCK_HEAD.match(l) or MD_PLAIN_HEAD.match(l) for l in text.split("\n")) else "txt"
     if fmt == "md":
         return _parse_spec_md(text)
     apis = []
@@ -250,12 +252,13 @@ def _parse_spec_md(text):
     first = True
     for line in text.replace("\r\n", "\n").split("\n"):
         h = MD_BLOCK_HEAD.match(line) or (BLOCK_HEAD.match(line) if first else None)
+        plain = h is None and MD_PLAIN_HEAD.match(line)
         if line.strip():
             first = False
-        if h:
+        if h or plain:
             if cur is not None and cur["path"] is None and fallback:
                 cur["method"], cur["path"] = fallback
-            cur = {"screen": h.group(1), "title": line.strip().lstrip("#").strip(), "method": None, "path": None}
+            cur = {"screen": h.group(1) if h else "", "title": line.strip().lstrip("#").strip(), "method": None, "path": None}
             fallback = None
             apis.append(cur)
             continue
@@ -321,8 +324,10 @@ def check(xml_path, spec_path=None, allow_unused=(), no_context_path=False):
 
     apis = parse_spec(io.open(spec_path, encoding="utf-8-sig").read(),
                       "md" if Path(spec_path).suffix.lower() == ".md" else "txt")
-    mine = [a for a in apis if is_screen_of(a, sid)]
-    others = [a for a in apis if not is_screen_of(a, sid)]
+    own_file = Path(spec_path).stem in (f"{sid}_API",)     # 화면 자신의 명세 — 화면ID 없는 블록도 이 화면 것
+    is_mine = lambda a: is_screen_of(a, sid) or (own_file and not a["screen"])
+    mine = [a for a in apis if is_mine(a)]
+    others = [a for a in apis if not is_mine(a)]
 
     fails, warns, infos = list(form_fails), [], []
     by_path = {}
@@ -356,7 +361,7 @@ def check(xml_path, spec_path=None, allow_unused=(), no_context_path=False):
             fails.append(("A04", f"L{line} AS-IS 서버 URL 이 남음: {dm.group(0)}"))
 
     for a in others:
-        infos.append(("A06", f"다른 화면 대상: [{a['screen']}] {a['method']} {a['path']}"))
+        infos.append(("A06", f"다른 화면 대상: [{a['screen'] or '화면ID 없음'}] {a['method']} {a['path']}"))
     return fails, warns, infos, spec_path
 
 

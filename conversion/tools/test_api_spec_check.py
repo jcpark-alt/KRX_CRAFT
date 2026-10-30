@@ -403,3 +403,30 @@ def test_shared_spec_file_found_by_listed_name(tmp_path):
     fails, warns, _infos, _ = ac.check(str(x))
     assert fails == [] and warns == []
     assert ac.find_spec(str(tobe / "ULDTST00004.xml"))[0] is None
+
+
+def test_md_heading_without_screen_id_belongs_to_own_file(tmp_path):
+    # 화면 자신의 명세 `{sid}_API.md` 안에서 `## 1. [업무명] 제목` 처럼 화면ID 가 없는 머리 — 그 화면 블록(2026-10-30 ULDSTF05214)
+    spec = ("## 0. 이 문서에는 다음 화면의 API를 담고 있다.\n"
+            "## 1. [관리종목지정] 목록 조회\n* **TO-BE** : `GET /api/x/select-list`\n"
+            "## 2. [관리종목지정] 건수 조회\n* **TO-BE** : `GET /api/x/select-count`\n")
+    apis = ac.parse_spec(spec, "md")
+    assert [(a["screen"], a["path"]) for a in apis] == [("", "/api/x/select-list"), ("", "/api/x/select-count")]
+    assert ac.parse_spec(spec)[0]["path"] == "/api/x/select-list"          # 형식 자동 판별도 md
+    (tmp_path / "ULDTST00001_API.md").write_text(spec, encoding="utf-8")
+    x = tmp_path / "ULDTST00001.xml"
+    x.write_text(DOC.format(script='scwin.a = async function () { const o = { method : "get", action : "/api/x/select-list" }; };'), encoding="utf-8")
+    fails, warns, infos, _ = ac.check(str(x))
+    assert [c for c, _ in fails] == ["A03"]                                 # 두 블록 모두 이 화면 것 — select-count 미호출
+    assert infos == []
+
+
+def test_md_heading_without_screen_id_in_shared_file_is_other(tmp_path):
+    # 공용 명세(파일명이 화면ID 나열)에서는 화면ID 없는 블록을 이 화면 것으로 보지 않는다
+    spec = "## 1. [업무] 공통 조회\n* **TO-BE** : `GET /api/x/common`\n## 2. [ULDTST00001][업무] 조회\n* **TO-BE** : `GET /api/x/mine`\n"
+    p = tmp_path / "ULDTST00001,ULDTST00002_API.md"
+    p.write_text(spec, encoding="utf-8")
+    x = tmp_path / "ULDTST00001.xml"
+    x.write_text(DOC.format(script='scwin.a = async function () { const o = { method : "get", action : "/api/x/mine" }; };'), encoding="utf-8")
+    fails, warns, infos, _ = ac.check(str(x), spec_path=str(p))
+    assert fails == [] and [c for c, _ in infos] == ["A06"]
