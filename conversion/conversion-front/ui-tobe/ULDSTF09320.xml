@@ -1,0 +1,793 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare"
+	xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_screenId="ULDSTF09320" meta_screenName="(팝업)상장형수익증권상품정보관리"
+		meta_desc="상장형 수익증권 상품정보(보수·비용율, 홈페이지·회계기간·분배금 지급기준일, 상품정보·투자유의사항 국·영문) 조회·등록·수정, 총보수·총비용 계산 (원본 W-Craft 변환본, 업무 분석 ULDSTF09320.md)"
+		meta_author="Inswave" meta_date="2026-10-30">
+		<title>상장형 수익증권 상품정보관리</title>
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate />
+		<xf:model>
+			<w2:dataCollection baseNode="map">
+				<!-- 화면에 적용된 API 의 keyInfo 를 명세로 간주한다(사용자 결정 2026-10-29 준용). 키 목록은 결과서 §2.2 -->
+				<!-- 상품정보 — select-one 응답이자 register·modify 요청 -->
+				<w2:dataMap baseNode="map" id="dma_itemRes">
+					<w2:keyInfo>
+						<w2:key id="bzProcsNo" name="업무처리번호" dataType="text"></w2:key>
+						<w2:key id="hpage" name="홈페이지" dataType="text"></w2:key>
+						<w2:key id="trstCalcPdContn" name="신탁계산기간내용" dataType="text"></w2:key>
+						<w2:key id="trstDistrPayBasDdContn" name="투자신탁분배금지급기준일자내용" dataType="text"></w2:key>
+						<w2:key id="pfProdInfo" name="PF상품정보" dataType="text"></w2:key>
+						<w2:key id="pfInvstwarnContn" name="PF투자유의사항" dataType="text"></w2:key>
+						<w2:key id="pfProdEngInfo" name="PF상품영문정보" dataType="text"></w2:key>
+						<w2:key id="pfInvstwarnEngContn" name="PF투자유의영문내용" dataType="text"></w2:key>
+						<w2:key id="trstCalcPdEngContn" name="신탁계산기간영문내용" dataType="text"></w2:key>
+						<w2:key id="distrPayBasDdEngContn" name="분배금지급기준일자영문내용" dataType="text"></w2:key>
+						<w2:key id="synthPfBasIdxOvrvw" name="합성PF기초지수개요" dataType="text"></w2:key>
+						<w2:key id="basIdxRelAsstcomHpageAddr" name="기초지수관련자산운용사홈페이지주소" dataType="text"></w2:key>
+						<w2:key id="synthPfColtrlAdmOvrvw" name="합성PF담보관리개요" dataType="text"></w2:key>
+						<w2:key id="coltrlAdmAsstcomHpageAddr" name="담보관리자산운용사홈페이지주소" dataType="text"></w2:key>
+						<w2:key id="cisCostRt" name="집합투자기구비용율" dataType="number"></w2:key>
+						<w2:key id="apCmpLpCostRt" name="AP대비LP비용율" dataType="number"></w2:key>
+						<w2:key id="trstComCostRt" name="신탁회사비용율" dataType="number"></w2:key>
+						<w2:key id="transagntCostRt" name="일반사무수탁회사비용율" dataType="number"></w2:key>
+						<w2:key id="pfTotFee" name="PF총수수료" dataType="number"></w2:key>
+						<w2:key id="miscCostRt" name="기타비용율" dataType="number"></w2:key>
+						<w2:key id="miscCostDtl" name="기타비용내역" dataType="text"></w2:key>
+						<w2:key id="synthSwapCostRt" name="합성스왑비용율" dataType="number"></w2:key>
+						<w2:key id="synthCostDtl" name="합성비용내역" dataType="text"></w2:key>
+						<w2:key id="totCostRt" name="총비용율" dataType="number"></w2:key>
+					</w2:keyInfo>
+				</w2:dataMap>
+			</w2:dataCollection>
+			<w2:workflowCollection />
+		</xf:model>
+		<w2:layoutInfo />
+		<w2:publicInfo method="scwin.onpageload,scwin.init,scwin.btn_calcul_onclick,scwin.btn_save_onclick,scwin.btn_Update_onclick,scwin.txa_PF_INVSTWARN_CONTN_onblur,scwin.selectOne,scwin.saveTrs,scwin.applyButtonState,scwin.toRate,scwin.checkRate,scwin.getTotals,scwin.calculate,scwin.validate,scwin.checkResult,scwin.save" />
+		<script lazy="false" type="text/javascript"><![CDATA[
+///////// 1. 변수 및 선언 영역 /////////
+scwin.vBzProcsNo = "";      // [부모 data] 업무처리번호 (AS-IS parentWin.scwin.vBzProcsNo)
+scwin.RT_DECIMAL = 6;      // 보수·비용 소수 자리(원본 maxdecimalplace 6)
+scwin.isSaved = false;      // 저장·수정 성공 여부 — X 로 닫히면 부모가 isCloseButtonClick 으로 판정한다(부모 09303 은 원본대로 재조회하지 않음)
+
+// 원본 : /pf/ULDSTF09320.gfm (상장형 수익증권 상품정보관리 팝업) — W-Craft 1차 변환 + API 적용 개발 사본(ui/ULDSTF09320/ULDSTF09320.xml)
+/*
+ * 화면 동작
+ *  - 부모(ULDSTF09303 신규상장관리)가 넘긴 업무처리번호로 상품정보를 조회한다. 등록된 정보가 없으면 [저장], 있으면 [수정]만 켠다.
+ *  - 보수 4종을 넣고 [계산] → 총보수, 총보수 + 기타비용 + 스왑비용 → 총비용. 저장·수정 전에 계산값과 일치하는지 확인한다.
+ *  - 통신은 화면에 적용된 API(경로·method·keyInfo)를 명세로 간주한다(사용자 결정 2026-10-29 준용).
+ * 업무 분석 : conversion/conversion-front/ui/completed/ULDSTF09320/ULDSTF09320.md (§번호는 이 문서의 절)
+ */
+
+///////// 2. 초기화 영역 /////////
+/**
+ * @method
+ * @name scwin.onpageload
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 페이지로드. 로딩 로직은 scwin.init 하나에 둔다(code-convention 초기화 절). (§3)
+ * @returns
+ * @hidden N
+ */
+scwin.onpageload = async function () {
+    try {
+        await scwin.init();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF09320.onpageload" });
+    }
+};
+
+/**
+ * @method
+ * @name scwin.init
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 로딩 — 파라미터 수신 → 종목 표시 → 상품정보 조회 → 등록 여부로 [저장]/[수정] 상태. (원본 scwin.init — §3)
+ * @returns
+ * @hidden N
+ */
+scwin.init = async function () {
+    // 1) 파라미터 수신 — 원본 parentWin.scwin.vBzProcsNo·txb_SearchIsuCd·txb_SearchIsuNm (§1.2)
+    const param = $c.data.getParameter() ?? {};
+    scwin.vBzProcsNo = String(param.bzProcsNo ?? "");
+    txb_ISU_CD.setValue(String(param.isuCd ?? ""));
+    txb_ISU_NM.setValue(String(param.isuNm ?? ""));
+
+    // 2) 상품정보 조회 → 등록 여부로 버튼 상태
+    await scwin.selectOne();
+    scwin.applyButtonState();
+    edt_CIS_COST_RT.focus();
+};
+
+///////// 3. 컴포넌트 이벤트 영역 /////////
+/**
+ * @method
+ * @name scwin.btn_calcul_onclick
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 계산 클릭 — 총보수·총비용을 합산해 채운다. (원본 btn_calcul_onclick → fn_calcul — §4)
+ * @param {Object} e 이벤트 객체
+ * @returns
+ * @hidden N
+ */
+scwin.btn_calcul_onclick = async function (e) {
+    try {
+        await scwin.calculate();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF09320.btn_calcul_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name scwin.btn_save_onclick
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 저장 클릭 — 상품정보를 등록한다. (원본 btn_save_onclick → fn_save — §4)
+ * @param {Object} e 이벤트 객체
+ * @returns
+ * @hidden N
+ */
+scwin.btn_save_onclick = async function (e) {
+    try {
+        await scwin.save("I");
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF09320.btn_save_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name scwin.btn_Update_onclick
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 수정 클릭 — 상품정보를 수정한다. (원본 btn_Update_onclick → fn_update — §4)
+ * @param {Object} e 이벤트 객체
+ * @returns
+ * @hidden N
+ */
+scwin.btn_Update_onclick = async function (e) {
+    try {
+        await scwin.save("U");
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF09320.btn_Update_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name scwin.txa_PF_INVSTWARN_CONTN_onblur
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 상품정보(투자유의사항)를 벗어나면 첫 보수 칸으로 포커스를 돌린다 — 원본은 비활성인 총보수로 보내 동작하지 않았다.
+ * (원본 txa_PF_INVSTWARN_CONTN_OnKillFocus — §4, §8 #6)
+ * @param {Object} e 이벤트 객체
+ * @returns
+ * @hidden N
+ */
+scwin.txa_PF_INVSTWARN_CONTN_onblur = function (e) {
+    try {
+        edt_CIS_COST_RT.focus();
+    } catch (ex) {
+        $c.exception.handleError(ex, { context : "ULDSTF09320.txa_PF_INVSTWARN_CONTN_onblur" });
+    }
+};
+
+///////// 4. 서브미션 콜백 영역 /////////
+/**
+ * @method
+ * @name scwin.selectOne
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 상품정보 조회. 등록 전이면 응답 body 가 비어 올 수 있어 target 대신 body 가 객체일 때만 적재하고, 아니면 비운다. (원본 fn_read_sync — §5.1)
+ * @returns {Promise<Boolean>} 성공 여부
+ * @hidden N
+ */
+scwin.selectOne = async function () {
+    const sbmOptions = {
+        id : "sbm_selectOne",
+        method : "get",
+        action : "/api/listing/lstproc/pf/new-listing/prod-info/select-one",
+        isProcessMsg : false
+    };
+    const result = await $c.sbm.executeDynamic(sbmOptions, { bzProcsNo : scwin.vBzProcsNo });
+    if (result?.skipped) return false;    // 진행 중 조회가 있어 이번 호출은 건너뜀
+    if (!result.responseJSON?.success) return false;    // 실패 안내는 공통 오류 핸들러
+
+    const body = result.responseJSON.body;
+    if (body !== null && typeof body === "object") {
+        dma_itemRes.setJSON(body);
+    } else {
+        dma_itemRes.setEmptyValue();
+    }
+    return true;
+};
+
+/**
+ * @method
+ * @name scwin.saveTrs
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 상품정보 등록(I)·수정(U) 전송. (원본 fn_trs + trs_Save_OnSuccess — §5.2·§5.3)
+ * @param {String} trJob 처리구분 I: 등록, U: 수정
+ * @returns {Promise<Boolean>} 성공 여부
+ * @hidden N
+ */
+scwin.saveTrs = async function (trJob) {
+    const sbmOptions = {
+        id : (trJob === "I") ? "sbm_prodInfoInsert" : "sbm_prodInfoUpdate",
+        method : "post",
+        action : (trJob === "I") ? "/api/listing/lstproc/pf/new-listing/prod-info/register" : "/api/listing/lstproc/pf/new-listing/prod-info/modify",
+        ref : "dma_itemRes",
+        isProcessMsg : false
+    };
+    const result = await $c.sbm.executeDynamic(sbmOptions);
+    if (result?.skipped) return false;    // 진행 중 처리가 있어 이번 호출은 건너뜀
+
+    return await scwin.checkResult(result, (trJob === "I") ? "저장" : "수정");
+};
+
+///////// 5. 일반/업무 함수 영역 /////////
+/**
+ * @method
+ * @name scwin.applyButtonState
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 등록 여부로 버튼 상태 — 등록 전이면 [저장]만, 등록됐으면 [수정]만 켠다. (원본 scwin.init 분기 — §6.1)
+ * @returns
+ * @hidden N
+ */
+scwin.applyButtonState = function () {
+    const registered = !$c.util.isEmpty(dma_itemRes.get("bzProcsNo"));
+    btn_save.setDisabled(registered);
+    btn_Update.setDisabled(!registered);
+};
+
+/**
+ * @method
+ * @name scwin.toRate
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 보수·비용 칸의 값을 숫자로 — 빈 값은 0. (원본 parseFloat 합산 — §6.2)
+ * @param {Object} comp 입력 컴포넌트
+ * @returns {Number} 숫자 값
+ * @hidden N
+ */
+scwin.toRate = function (comp) {
+    const value = Number.parseFloat(comp.getValue());
+    return Number.isNaN(value) ? 0 : value;
+};
+
+/**
+ * @method
+ * @name scwin.checkRate
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 보수·비용 6칸 필수 입력 확인. 원본은 결과를 버려 빈 칸이 있어도 계산·저장이 계속됐다 — 결과로 멈춘다. (원본 fn_checkRt — §6.2, §8 #2)
+ * @returns {Promise<Boolean>} 통과 여부
+ * @hidden N
+ */
+scwin.checkRate = async function () {
+    const items = [
+        [edt_CIS_COST_RT, "'집합투자업자보수'를 입력하세요."],
+        [edt_AP_CMP_LP_COST_RT, "'AP/LP보수'를 입력하세요."],
+        [edt_TRST_COM_COST_RT, "'신탁회사보수'를 입력하세요."],
+        [edt_TRANSAGNT_COST_RT, "'일반사무관리회사보수'를 입력하세요."],
+        [edt_MISC_COST_RT, "'기타비용'을 입력하세요."],
+        [edt_SYNTH_SWAP_COST_RT, "'스왑비용'을 입력하세요."]
+    ];
+    for (const [comp, msg] of items) {
+        if ($c.util.isEmpty(comp.getValue())) {
+            await $c.win.alert(msg);
+            comp.focus();
+            return false;
+        }
+    }
+    return true;
+};
+
+/**
+ * @method
+ * @name scwin.getTotals
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 총보수 = 보수 4종 합, 총비용 = 총보수 + 기타비용 + 스왑비용 — 소수 6자리로 반올림한 숫자. (원본 fn_calcul·fn_CheckForm 의 toFixed(6) — §6.2)
+ * @returns {Object} { totFee, totCost }
+ * @hidden N
+ */
+scwin.getTotals = function () {
+    const totFee = Number((scwin.toRate(edt_CIS_COST_RT) + scwin.toRate(edt_AP_CMP_LP_COST_RT)
+        + scwin.toRate(edt_TRST_COM_COST_RT) + scwin.toRate(edt_TRANSAGNT_COST_RT)).toFixed(scwin.RT_DECIMAL));
+    const totCost = Number((totFee + scwin.toRate(edt_MISC_COST_RT) + scwin.toRate(edt_SYNTH_SWAP_COST_RT)).toFixed(scwin.RT_DECIMAL));
+    return { totFee : totFee, totCost : totCost };
+};
+
+/**
+ * @method
+ * @name scwin.calculate
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 계산 — 필수 칸이 다 있으면 총보수·총비용을 채운다. (원본 fn_calcul — §6.2)
+ * @returns
+ * @hidden N
+ */
+scwin.calculate = async function () {
+    if (!await scwin.checkRate()) return;
+
+    const totals = scwin.getTotals();
+    edt_PF_TOT_FEE.setValue(totals.totFee);
+    edt_TOT_COST_RT.setValue(totals.totCost);
+};
+
+/**
+ * @method
+ * @name scwin.validate
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 저장·수정 전 검사 — 필수 보수·비용, 총보수·총비용이 계산값과 같은지(숫자로 비교), 상세내역·홈페이지·회계기간·분배금 지급기준일·
+ * 상품정보(기본정보·투자유의사항)의 필수·최대 byte. 원본은 문자열로 비교해 표시 형식에 따라 늘 다르다고 볼 수 있었다. (원본 fn_CheckForm — §6.3, §8 #3)
+ * @returns {Promise<Boolean>} 통과 여부
+ * @hidden N
+ */
+scwin.validate = async function () {
+    if (!await scwin.checkRate()) return false;
+
+    const totals = scwin.getTotals();
+    if (scwin.toRate(edt_PF_TOT_FEE) !== totals.totFee) {
+        await $c.win.alert("입력한 보수값과 현재 '총보수'값이 일치하지 않습니다.\n[계산]버튼을 눌러 합산하세요.");
+        return false;
+    }
+    if (scwin.toRate(edt_TOT_COST_RT) !== totals.totCost) {
+        await $c.win.alert("입력한 보수값과 현재 '총비용'값이 일치하지 않습니다.\n[계산]버튼을 눌러 합산하세요.");
+        return false;
+    }
+
+    // 선택 입력 — 값이 있을 때만 최대 byte
+    if (!$c.util.isEmpty(txa_MISC_COST_DTL.getValue()) && !$c.stf.checkMaxLength(txa_MISC_COST_DTL, 200, "기타비용 상세내역")) return false;
+    if (!$c.util.isEmpty(txa_SYNTH_COST_DTL.getValue()) && !$c.stf.checkMaxLength(txa_SYNTH_COST_DTL, 200, "스왑비용 상세내역")) return false;
+
+    // 필수 입력 + 최대 byte
+    const required = [
+        [txb_HPAGE, "홈페이지", 200],
+        [txb_TRST_CALC_PD_CONTN, "회계기간", 200],
+        [txb_TRST_DISTR_PAY_BAS_DD_CONTN, "분배금 지급기준일", 300],
+        [txa_PF_PROD_INFO, "상품정보(기본정보)", 4000],
+        [txa_PF_INVSTWARN_CONTN, "상품정보(투자유의사항)", 4000]
+    ];
+    for (const [comp, title, maxByte] of required) {
+        if ($c.util.isEmpty(comp.getValue())) {
+            await $c.win.alert("[" + title + "]를 입력하세요.");
+            comp.focus();
+            return false;
+        }
+        if (!$c.stf.checkMaxLength(comp, maxByte, title)) return false;    // 안내·포커스는 공통 함수
+    }
+    return true;
+};
+
+/**
+ * @method
+ * @name scwin.checkResult
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 처리 결과 판정 — 통신 성공이고 completeYn 이 false 가 아니면 성공. register·modify 는 응답 정의가 없어 completeYn 이 없으면 success 만 본다. (§5.2)
+ * @param {Object} result executeDynamic 결과
+ * @param {String} jobNm 처리명
+ * @returns {Promise<Boolean>} 성공 여부
+ * @hidden N
+ */
+scwin.checkResult = async function (result, jobNm) {
+    // TODO: 등록·수정 응답 구조 확인 필요 — completeYn 유무 (§10 #2)
+    const completeYn = result.responseJSON?.body?.completeYn;
+    const completed = (completeYn === undefined || completeYn === null || String(completeYn) === "true" || completeYn === "Y");
+    if (result.responseJSON?.success === true && completed) return true;
+
+    await $c.win.alert($c.stf.getMessageParam("MSG-A002", jobNm));
+    return false;
+};
+
+/**
+ * @method
+ * @name scwin.save
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 등록(I)·수정(U) — 검사 → 확인 → 전송 → 안내. 등록이면 업무처리번호를 채워 보내고, 성공하면 [저장]을 잠그고 [수정]을 켠다
+ * (원본은 [저장]만 잠가 다시 열 때까지 수정할 수 없었다). (원본 fn_save·fn_update·trs_Save_OnSuccess — §6.4, §8 #4)
+ * @param {String} trJob 처리구분 I: 등록, U: 수정
+ * @returns
+ * @hidden N
+ */
+scwin.save = async function (trJob) {
+    if (!await scwin.validate()) return;
+
+    // "[저장]/[수정] 처리를 하시겠습니까?" — 업무공통 MSG-A006
+    if (!await $c.lc.isProcess(trJob)) return;
+
+    if (trJob === "I") {
+        dma_itemRes.set("bzProcsNo", scwin.vBzProcsNo);
+    }
+    if (!await scwin.saveTrs(trJob)) return;
+
+    scwin.isSaved = true;
+    await $c.win.alert($c.stf.getMessageParam("MSG-A001", (trJob === "I") ? "저장" : "수정"));
+    scwin.applyButtonState();
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload">
+		<xf:group class="pop_contents" id="">
+			<w2:pageFrame id="pfmContentHeader" src="/cm/xml/contentHeader.xml" style="" />
+			<xf:group class="tblbox" id="panel_Top" style="">
+				<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+					<w2:attributes>
+						<w2:summary></w2:summary>
+					</w2:attributes>
+					<xf:group tagname="colgroup">
+						<xf:group style="width:150px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_1" label="종목코드" style=""></w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes></w2:attributes>
+							<xf:input id="txb_ISU_CD" maxlength="1000" readOnly="true" style="width:120px;" tabIndex="98">
+							</xf:input>
+							<xf:input id="txb_ISU_NM" maxlength="1000" readOnly="true" style="width:550px;" tabIndex="99">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<xf:group class="titbox" id=""
+				style="">
+				<w2:textbox id="label_28" label="총보수" style="" tagname="h3">
+				</w2:textbox>
+			</xf:group>
+			<xf:group class="tblbox" id="panel_1" style="">
+				<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+					<w2:attributes>
+						<w2:summary></w2:summary>
+					</w2:attributes>
+					<xf:group tagname="colgroup">
+						<xf:group style="width:140px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+						<xf:group style="width:100px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+						<xf:group style="width:120px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+						<xf:group style="width:160px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+					</xf:group>
+					<xf:group style="" tagname="tr">
+						<xf:group class="w2tb_th" style="" tagname="th">
+							<w2:textbox id="label_5" label="집합투자업자보수" style=""></w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" style="" tagname="td">
+							<xf:input applyFormat="display" class="tar" dataType="float" displayFormat="#,###.######[floor]" id="edt_CIS_COST_RT" maxlength="6" style="width:100%;" tabIndex="1" ref="data:dma_itemRes.cisCostRt">
+							</xf:input>
+						</xf:group>
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes></w2:attributes>
+							<w2:textbox id="label_18" label="AP/LP보수" style=""></w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes></w2:attributes>
+							<xf:input applyFormat="display" class="tar" dataType="float" displayFormat="#,###.######[floor]" id="edt_AP_CMP_LP_COST_RT" maxlength="6" style="width:100%;" tabIndex="2" ref="data:dma_itemRes.apCmpLpCostRt">
+							</xf:input>
+						</xf:group>
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_19" label="신탁회사보수" style=""></w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes></w2:attributes>
+							<xf:input applyFormat="display" class="tar" dataType="float" displayFormat="#,###.######[floor]" id="edt_TRST_COM_COST_RT" maxlength="6" style="width:100%;" tabIndex="3" ref="data:dma_itemRes.trstComCostRt">
+							</xf:input>
+						</xf:group>
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_20" label="일반사무관리회사보수" style=""></w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes></w2:attributes>
+							<xf:input applyFormat="display" class="tar" dataType="float" displayFormat="#,###.######[floor]" id="edt_TRANSAGNT_COST_RT" maxlength="6" style="width:100%;" tabIndex="4" ref="data:dma_itemRes.transagntCostRt">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_21" label="총보수(%)" style=""></w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:colspan>7</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:input applyFormat="display" class="tar" dataType="float" displayFormat="#,###.######[floor]" disabled="true" id="edt_PF_TOT_FEE" maxlength="18" style="width:115px;" tabIndex="1" ref="data:dma_itemRes.pfTotFee">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<xf:group class="titbox" id=""
+				style="">
+				<w2:textbox id="label_29" label="기타비용(%)" style="" tagname="h3">
+				</w2:textbox>
+			</xf:group>
+			<xf:group class="tblbox" id="panel_2" style="">
+				<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+					<w2:attributes>
+						<w2:summary></w2:summary>
+					</w2:attributes>
+					<xf:group tagname="colgroup">
+						<xf:group style="width:150px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+						<xf:group style="width:150px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+					</xf:group>
+					<xf:group style="" tagname="tr">
+						<xf:group class="w2tb_th" style="" tagname="th">
+							<w2:textbox id="label_22" label="기타비용" style=""></w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" style="" tagname="td">
+							<w2:attributes>
+								<w2:colspan>3</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:input applyFormat="display" class="tar" dataType="float" displayFormat="#,###.######[floor]" id="edt_MISC_COST_RT" maxlength="6" style="width:95px;" tabIndex="5" ref="data:dma_itemRes.miscCostRt">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_23" label="기타비용상세내역" style=""></w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes>
+								<w2:colspan>3</w2:colspan>
+								<w2:rowspan>1</w2:rowspan>
+							</w2:attributes>
+							<xf:textarea id="txa_MISC_COST_DTL" style="width:650px;" tabIndex="6" ref="data:dma_itemRes.miscCostDtl">
+							</xf:textarea>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<xf:group class="titbox" id=""
+				style="">
+				<w2:textbox id="label_42" label="합성비용(%)" style="" tagname="h3">
+				</w2:textbox>
+			</xf:group>
+			<xf:group class="tblbox" id=""
+				style="">
+				<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+					<w2:attributes>
+						<w2:summary></w2:summary>
+					</w2:attributes>
+					<xf:group tagname="colgroup">
+						<xf:group style="width:200px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+					</xf:group>
+					<xf:group style="" tagname="tr">
+						<xf:group class="w2tb_th" style="" tagname="th">
+							<w2:textbox id="label_24" label="스왑비용" style=""></w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" style="" tagname="td">
+							<xf:input applyFormat="display" class="tar" dataType="float" displayFormat="#,###.######[floor]" id="edt_SYNTH_SWAP_COST_RT" maxlength="6" style="width:95px;" tabIndex="7" ref="data:dma_itemRes.synthSwapCostRt">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group class="w2tb_th " tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_25" label="스왑비용 상세내역" style=""></w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:attributes></w2:attributes>
+							<xf:textarea id="txa_SYNTH_COST_DTL" style="width:650px;" tabIndex="8" ref="data:dma_itemRes.synthCostDtl">
+							</xf:textarea>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th ">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_26" label="총비용(%)" style=""></w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input applyFormat="display" class="tar" dataType="float" displayFormat="#,###.######[floor]" disabled="true" id="edt_TOT_COST_RT" maxlength="18" style="width:110px;" tabIndex="1" ref="data:dma_itemRes.totCostRt">
+							</xf:input>
+							<xf:trigger type="button" class="btn_cm" ev:onclick="scwin.btn_calcul_onclick" id="btn_calcul" style="">
+								<xf:label><![CDATA[계산]]></xf:label>
+							</xf:trigger>
+							<w2:textbox class="green" id="label_27" label="*[계산]버튼을 눌러 '총보수'와 '총비용'을 합산하세요." style="">
+							</w2:textbox>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<xf:group class="tblbox" id="panel_Main" style="">
+				<xf:group adaptive="" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+					<w2:attributes>
+						<w2:summary></w2:summary>
+					</w2:attributes>
+					<xf:group tagname="colgroup">
+						<xf:group style="width:200px;" tagname="col"></xf:group>
+						<xf:group style="" tagname="col"></xf:group>
+					</xf:group>
+					<xf:group style="" tagname="tr">
+						<xf:group class="w2tb_th" style="" tagname="th">
+							<w2:textbox id="label_2" label="홈페이지" style=""></w2:textbox>
+						</xf:group>
+						<xf:group class="w2tb_td" style="" tagname="td">
+							<xf:input id="txb_HPAGE" maxlength="100" style="width:600px;" tabIndex="14" ref="data:dma_itemRes.hpage">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_6" label="회계기간" style=""></w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input id="txb_TRST_CALC_PD_CONTN" maxlength="100" style="width:600px;" tabIndex="15" ref="data:dma_itemRes.trstCalcPdContn">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_7" label="분배금 지급기준일" style=""></w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:input id="txb_TRST_DISTR_PAY_BAS_DD_CONTN" maxlength="150" style="width:600px;" tabIndex="16" ref="data:dma_itemRes.trstDistrPayBasDdContn">
+							</xf:input>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_13" label="상품정보(기본정보)" style=""></w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:textarea id="txa_PF_PROD_INFO" style="width:598px;" tabIndex="17" ref="data:dma_itemRes.pfProdInfo">
+							</xf:textarea>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_3" label="상품정보(투자유의사항)" style=""></w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:textarea ev:onblur="scwin.txa_PF_INVSTWARN_CONTN_onblur" id="txa_PF_INVSTWARN_CONTN"
+								style="width:598px;" tabIndex="18" ref="data:dma_itemRes.pfInvstwarnContn">
+							</xf:textarea>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_9" label="영문회계기간" style=""></w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:textarea id="txa_TRST_CALC_PD_ENG_CONTN" style="width:598px;" tabIndex="19" ref="data:dma_itemRes.trstCalcPdEngContn">
+							</xf:textarea>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_10" label="영문분배금 지급기준일" style=""></w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:textarea id="txa_DISTR_PAY_BAS_DD_ENG_CONTN" style="width:598px;" tabIndex="20" ref="data:dma_itemRes.distrPayBasDdEngContn">
+							</xf:textarea>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_4" label="영문상품정보(기본정보)" style=""></w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:textarea id="txa_PF_PROD_ENG_INFO" style="width:598px;" tabIndex="21" ref="data:dma_itemRes.pfProdEngInfo">
+							</xf:textarea>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_8" label="영문상품정보(투자유의사항)" style=""></w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:textarea id="txa_PF_INVSTWARN_ENG_CONTN" style="width:598px;" tabIndex="22" ref="data:dma_itemRes.pfInvstwarnEngContn">
+							</xf:textarea>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_14" label="합성 상장형 수익증권" style=""></w2:textbox>
+							<w2:textbox id="label_11" label="담보관리개요 등" style=""></w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:textarea id="txa_SYNTH_PF_COLTRL_ADM_OVRVW" style="width:598px;" tabIndex="25" ref="data:dma_itemRes.synthPfColtrlAdmOvrvw">
+							</xf:textarea>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group tagname="th" class="w2tb_th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_15" label="담보관리관련자산운용사" style=""></w2:textbox>
+							<w2:textbox id="label_16" label="홈페이지" style=""></w2:textbox>
+						</xf:group>
+						<xf:group tagname="td" class="w2tb_td">
+							<w2:attributes></w2:attributes>
+							<xf:textarea id="txa_COLTRL_ADM_ASSTCOM_HPAGE_ADDR" style="width:598px;" tabIndex="26" ref="data:dma_itemRes.coltrlAdmAsstcomHpageAddr">
+							</xf:textarea>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<xf:group class="btnbox" id="grp_btnBox" style="">
+				<xf:group class="rt" id="" style="">
+					<xf:trigger type="button" class="btn_cm pt" ev:onclick="scwin.btn_Update_onclick" id="btn_Update" style="">
+						<xf:label><![CDATA[수정]]></xf:label>
+					</xf:trigger>
+					<xf:trigger type="button" class="btn_cm pt" ev:onclick="scwin.btn_save_onclick" id="btn_save" style="">
+						<xf:label><![CDATA[저장]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+		</xf:group>
+	</body>
+</html>

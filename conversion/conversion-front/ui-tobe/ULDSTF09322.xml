@@ -1,0 +1,394 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare"
+	xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_screenId="ULDSTF09322" meta_screenName="변경상장 수량조회"
+		meta_desc="상장형 수익증권 변경상장 수량조회 — 변경상장일 기준 운용사 신고 수량과 예탁원 수신 수량 대조(익일영업일이면 신규 임시 데이터) (원본 W-Craft 변환본, 업무 분석 ULDSTF09322.md)"
+		meta_author="Inswave" meta_date="2026-10-30">
+		<title>변경상장 수량조회</title>
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate />
+		<xf:model>
+			<w2:dataCollection baseNode="map">
+				<!-- select-list 요청 — bzCalndDd 는 조회 때 달력 값을 넣는다, changeListDate 는 달력 바인딩 -->
+				<w2:dataMap baseNode="map" id="dma_selectListReq">
+					<w2:keyInfo>
+						<w2:key dataType="text" id="bzCalndDd" name="영업일"></w2:key>
+						<w2:key dataType="text" id="changeListDate" name="변경상장일"></w2:key>
+					</w2:keyInfo>
+				</w2:dataMap>
+				<!-- select-list 응답 — 운용사 신고(krx*)·예탁원 수신(ksd*) 수량 대조 -->
+				<w2:dataList baseNode="list" id="dlt_selectListRes" repeatNode="map" saveRemovedData="true">
+					<w2:columnInfo>
+						<w2:column dataType="text" id="isuCd" name="종목코드"></w2:column>
+						<w2:column dataType="text" id="isuKorAbbrv" name="종목명"></w2:column>
+						<w2:column dataType="number" id="krxBfListShrs" name="운용사 변경전 상장증권수"></w2:column>
+						<w2:column dataType="number" id="krxEstbShrs" name="운용사 설정증권수"></w2:column>
+						<w2:column dataType="number" id="krxRepurShrs" name="운용사 환매증권수"></w2:column>
+						<w2:column dataType="number" id="krxModifyShrs" name="운용사 변경분"></w2:column>
+						<w2:column dataType="number" id="krxListShrs" name="운용사 변경후 상장증권수"></w2:column>
+						<w2:column dataType="number" id="ksdBfIsuShrs" name="예탁원 변경전 상장증권수"></w2:column>
+						<w2:column dataType="number" id="ksdEstbShrs" name="예탁원 설정증권수"></w2:column>
+						<w2:column dataType="number" id="ksdRepurShrs" name="예탁원 환매증권수"></w2:column>
+						<w2:column dataType="number" id="ksdModifyShrs" name="예탁원 변경분"></w2:column>
+						<w2:column dataType="number" id="ksdIsuShrs" name="예탁원 변경후 상장증권수"></w2:column>
+						<w2:column dataType="text" id="compare" name="일치여부"></w2:column>
+					</w2:columnInfo>
+				</w2:dataList>
+			</w2:dataCollection>
+			<w2:workflowCollection />
+		</xf:model>
+		<w2:layoutInfo />
+		<w2:publicInfo method="scwin.onpageload,scwin.init,scwin.btn_Search_onclick,scwin.btn_Excel_onclick,scwin.selectNextBzDd,scwin.selectList,scwin.search,scwin.applyComment,scwin.fmtCompare,scwin.excelDown" />
+		<script lazy="false" type="text/javascript"><![CDATA[
+///////// 1. 변수 및 선언 영역 /////////
+scwin.nextBzDd = "";        // 익일영업일 — 조회일이 이 날이면 신규 임시 데이터 기준(원본 strBzCalndDd)
+// 화면 상태값
+
+// 고정값
+// 일치여부 글자색 class (원본 h_COMPARE color decode — 불일치 #FF0033). base.css 공통 색상 class 만 쓴다(규칙 40·43).
+scwin.COMPARE_CLASS = {
+    "불일치" : "red"
+};
+
+// 원본 : ULDSTF09322.xml (W-Craft 1차 변환 + API 적용 개발 사본, meta_asisFileNm ULDSTF09322.gfm)
+/*
+ * 화면 동작
+ *  - 열리면 익일영업일을 받아 변경상장일에 넣고 바로 조회한다.
+ *  - 변경상장일 기준으로 운용사 신고 수량과 예탁원 수신 수량을 종목별로 대조한다(불일치는 빨간 글자).
+ *  - 조회일이 익일영업일이면 예탁원 수신은 신규 임시 데이터, 아니면 기존 데이터 기준 — 그 안내 문구를 바꿔 보인다.
+ * 업무 분석 : conversion/conversion-front/ui/completed/ULDSTF09322/ULDSTF09322.md (§번호는 이 문서의 절)
+ */
+
+///////// 2. 초기화 영역 /////////
+/**
+ * @method
+ * @name scwin.onpageload
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 페이지로드. 로딩 로직은 scwin.init 하나에 둔다(code-convention 초기화 절). (§3)
+ * @returns
+ * @hidden N
+ */
+scwin.onpageload = async function () {
+    try {
+        await scwin.init();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF09322.onpageload" });
+    }
+};
+
+/**
+ * @method
+ * @name scwin.init
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 로딩 — 안내 문구 숨김 → 조회 Enter 키·달력 검사 바인딩 → 익일영업일을 받아 바로 조회. (원본 scwin.init → fn_getDate — §3)
+ * @returns
+ * @hidden N
+ */
+scwin.init = async function () {
+    // 1) 안내 문구는 조회 뒤 하나만 보인다
+    lab_comment.hide();
+    lab_comment_new.hide();
+
+    // 2) 조회 영역 Enter 키(규칙 22)·단일 달력 검사(규칙 37) — 1회
+    $c.win.setEnterKeyEvent(panel_Top, scwin.btn_Search_onclick);
+    $c.date.checkCalendarFormat(tbx_changeListDd, "yyyyMMdd");
+
+    // 3) 익일영업일 → 변경상장일 기본값 → 조회(원본 fn_getDate 의 완료 처리)
+    if (!await scwin.selectNextBzDd()) return;
+    tbx_changeListDd.setValue(scwin.nextBzDd);
+    await scwin.search();
+};
+
+///////// 3. 컴포넌트 이벤트 영역 /////////
+/**
+ * @method
+ * @name scwin.btn_Search_onclick
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 조회 버튼 클릭 (조회 영역 Enter 키도 이 핸들러)
+ * @param {Object} e 이벤트 객체
+ * @returns
+ * @hidden N
+ */
+scwin.btn_Search_onclick = async function (e) {
+    try {
+        await scwin.search();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF09322.btn_Search_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name scwin.btn_Excel_onclick
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 엑셀다운로드 버튼 클릭
+ * @param {Object} e 이벤트 객체
+ * @returns
+ * @hidden N
+ */
+scwin.btn_Excel_onclick = async function (e) {
+    try {
+        scwin.excelDown();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF09322.btn_Excel_onclick" });
+    }
+};
+
+///////// 4. 서브미션 콜백 영역 /////////
+/**
+ * @method
+ * @name scwin.selectNextBzDd
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 익일영업일 조회 — 응답 body.calndDd 를 scwin.nextBzDd 에 담는다. (원본 fn_getDate — §5.1)
+ * @returns {Promise<Boolean>} 익일영업일을 받았으면 true
+ * @hidden N
+ */
+scwin.selectNextBzDd = async function () {
+    const sbmOptions = {
+        id : "sbm_selectNextBzDd",
+        method : "get",
+        action : "/api/listing/lstproc/etf/qtyinq/nextday",
+        isProcessMsg : false
+    };
+
+    const result = await $c.sbm.executeDynamic(sbmOptions);
+    if (result?.skipped) return false;    // 진행 중 조회가 있어 이번 호출은 건너뜀
+    if (!result.responseJSON?.success) return false;    // 실패 안내는 공통 오류 핸들러
+
+    // 원본은 body 가 없을 때 calndDd 를 읽다 TypeError 가 났다 — 없으면 조회하지 않는다(§8 #3)
+    scwin.nextBzDd = String(result.responseJSON.body?.calndDd ?? "");
+    return !$c.util.isEmpty(scwin.nextBzDd);
+};
+
+/**
+ * @method
+ * @name scwin.selectList
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 변경상장 수량 대조 목록 조회 — 변경상장일로. (원본 fn_list_sync 의 select-list 호출 — §5.2)
+ * @param {String} changeListDd 변경상장일(yyyyMMdd)
+ * @returns {Promise<Boolean>} 조회 성공 여부
+ * @hidden N
+ */
+scwin.selectList = async function (changeListDd) {
+    dlt_selectListRes.removeAll();
+    $c.stf.fillGridHeaderTotalCnt(0, edt_TotalCnt_1);
+
+    const sbmOptions = {
+        id : "sbm_selectList",
+        method : "get",
+        action : "/api/listing/lstproc/pf/qtyinq/select-list",
+        ref : "dma_selectListReq",
+        target : "dlt_selectListRes=body",
+        gridview : "grd_List",
+        isProcessMsg : false
+    };
+
+    // TODO: 원본은 조회일이 익일영업일인지에 따라 쿼리(신규 임시 / 기존)를 골랐다 — 서버가 같은 기준으로 고르는지 확인 (§10 #1)
+    dma_selectListReq.set("bzCalndDd", changeListDd);
+    const result = await $c.sbm.executeDynamic(sbmOptions);
+    if (result?.skipped) return false;    // 진행 중 조회가 있어 이번 호출은 건너뜀
+    if (!result.responseJSON?.success) return false;    // 실패 안내는 공통 오류 핸들러
+
+    $c.stf.fillGridHeaderTotalCnt(dlt_selectListRes.getRowCount(), edt_TotalCnt_1);
+    return true;
+};
+
+///////// 5. 일반/업무 함수 영역 /////////
+/**
+ * @method
+ * @name scwin.search
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 조회 — 변경상장일이 있으면 안내 문구를 맞추고 목록을 조회한다. (원본 btn_Search_onclick → fn_list_sync — §6.1)
+ * @returns
+ * @hidden N
+ */
+scwin.search = async function () {
+    const changeListDd = String(tbx_changeListDd.getValue() ?? "");
+    // 원본은 빈 변경상장일로도 조회했다 — 안내하고 멈춘다(§8 #4)
+    if ($c.util.isEmpty(changeListDd)) {
+        await $c.win.alert("[변경상장일]을 입력하세요.");
+        tbx_changeListDd.focus();
+        return;
+    }
+
+    scwin.applyComment(changeListDd);
+    await scwin.selectList(changeListDd);
+};
+
+/**
+ * @method
+ * @name scwin.applyComment
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 예탁원 수신 데이터 기준 안내 — 조회일이 익일영업일이면 신규(발행증권수확인) 문구, 아니면 기존(일별종목거래및시세) 문구.
+ * (원본 fn_list_sync 앞부분 — §6.2)
+ * @param {String} changeListDd 변경상장일(yyyyMMdd)
+ * @returns
+ * @hidden N
+ */
+scwin.applyComment = function (changeListDd) {
+    if (changeListDd === scwin.nextBzDd) {
+        lab_comment.hide();
+        lab_comment_new.show("");
+    } else {
+        lab_comment_new.hide();
+        lab_comment.show("");
+    }
+};
+
+/**
+ * @method
+ * @name scwin.fmtCompare
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 일치여부 컬럼 customFormatter — 값은 그대로(순수 데이터) 돌려주고, 불일치면 빨간 글자 class 를 붙인다.
+ * 셀을 그릴 때마다 엔진이 부르므로 반복문 없이 색이 행을 따라간다(전환 규칙 43). 동기 함수. (원본 h_COMPARE color decode — §6.3)
+ * @param {String} data 원본 값(일치 / 불일치)
+ * @param {String} formattedData 표시 형식이 적용된 값
+ * @param {Number} rowIndex 화면 행 번호 — setCellClass 에 그대로 넘긴다
+ * @param {Number} colIndex 컬럼 번호
+ * @returns {String} 셀에 표시할 값(HTML 없음)
+ * @hidden N
+ */
+scwin.fmtCompare = function (data, formattedData, rowIndex, colIndex) {
+    const cls = scwin.COMPARE_CLASS[data];
+    if (cls) {
+        this.setCellClass(rowIndex, colIndex, cls);
+    } else {
+        this.removeCellClass(rowIndex, colIndex);     // 값이 바뀐 행에 이전 class 가 남지 않게
+    }
+    return formattedData;
+};
+
+/**
+ * @method
+ * @name scwin.excelDown
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 수량 대조 목록을 엑셀로 내려받는다. 0건 안내는 공통 함수가 한다. (원본 fn_ExcelDown — §6.4)
+ * @returns
+ * @hidden N
+ */
+scwin.excelDown = function () {
+    $c.data.downloadGridViewExcel(grd_List, {
+        // 파일명 {menuId}_{이름}_{yyyyMMddHHmmss}.xlsx (전환 규칙 42)
+        fileName : $c.win.getProgramId() + "_상장형 수익증권 변경상장 수량_" + $c.date.getServerDateTime("yyyyMMddHHmmss") + ".xlsx",
+        sheetName : "sheet1"
+    });
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload">
+		<xf:group class="sub_contents" id="" meta_componentContainer="true" style="">
+			<w2:pageFrame id="pfmContentHeader" src="/cm/xml/contentHeader.xml" style="" />
+			<!-- 조회조건 : 변경상장일 -->
+			<xf:group class="schbox" id="panel_Top" style="">
+				<xf:group class="schbox_inner" id="" style="">
+					<xf:group adaptive="layout" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+						<w2:attributes>
+							<w2:summary>조회조건</w2:summary>
+						</w2:attributes>
+						<xf:group tagname="colgroup">
+							<xf:group style="width:100px;" tagname="col" />
+							<xf:group tagname="col" />
+						</xf:group>
+						<xf:group tagname="tr">
+							<xf:group class="w2tb_th" tagname="th">
+								<w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes>
+								<w2:textbox id="label_2_top" label="변경상장일" style="" />
+							</xf:group>
+							<xf:group class="w2tb_td" tagname="td">
+								<w2:inputCalendar displayFormat="yyyy-MM-dd" id="tbx_changeListDd" ref="data:dma_selectListReq.changeListDate" style="" />
+							</xf:group>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+				<xf:group class="btn_schbox" id="" style="">
+					<xf:trigger class="btn_cm sch" ev:onclick="scwin.btn_Search_onclick" id="btn_Search" type="button">
+						<xf:label><![CDATA[조회]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+			<!-- 목록 : 총건수 + 엑셀 -->
+			<xf:group class="titbox" id="" style="">
+				<xf:group class="rt" id="" style="">
+					<xf:group class="count" id="" style="">
+						<w2:span id="" label="총" style="" />
+						<w2:span class="num" id="edt_TotalCnt_1" label="0" style="" />
+						<w2:span id="" label="건" style="" />
+					</xf:group>
+					<xf:trigger class="btn_cm download" ev:onclick="scwin.btn_Excel_onclick" id="btn_Excel" type="button">
+						<xf:label><![CDATA[엑셀다운로드]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+			<xf:group class="gvwbox" id="" style="">
+				<w2:gridView autoFit="allColumn" class="gvw row10" dataList="data:dlt_selectListRes" focusMode="row" id="grd_List" readOnly="true" rowNumHeaderValue="번호"
+					rowNumVisible="true" rowNumWidth="40" style="">
+					<w2:caption id="caption1" style="" value="변경상장 수량"></w2:caption>
+					<w2:header id="header1" style="">
+						<w2:row id="row1" style="">
+							<w2:column displayMode="label" id="h_isuCd" inputType="text" rowSpan="3" textAlign="center" value="종목코드" width="92"></w2:column>
+							<w2:column displayMode="label" id="h_isuKorAbbrv" inputType="text" rowSpan="3" textAlign="center" value="종목명" width="173"></w2:column>
+							<w2:column colSpan="5" displayMode="label" id="h_krxGrp" inputType="text" textAlign="center" value="운용사 신고"></w2:column>
+							<w2:column colSpan="5" displayMode="label" id="h_ksdGrp" inputType="text" textAlign="center" value="예탁원 수신"></w2:column>
+							<w2:column displayMode="label" id="h_compare" inputType="text" rowSpan="3" textAlign="center" value="일치&lt;br/&gt;여부" width="50"></w2:column>
+						</w2:row>
+						<w2:row id="row2" style="">
+							<w2:column colSpan="1" displayMode="label" id="h_krxBfGrp" inputType="text" textAlign="center" value="변경전"></w2:column>
+							<w2:column colSpan="4" displayMode="label" id="h_krxAfGrp" inputType="text" textAlign="center" value="변경후"></w2:column>
+							<w2:column colSpan="1" displayMode="label" id="h_ksdBfGrp" inputType="text" textAlign="center" value="변경전"></w2:column>
+							<w2:column colSpan="4" displayMode="label" id="h_ksdAfGrp" inputType="text" textAlign="center" value="변경후"></w2:column>
+						</w2:row>
+						<w2:row id="row3" style="">
+							<w2:column displayMode="label" id="h_krxBfListShrs" inputType="text" textAlign="center" value="상장증권수" width="88"></w2:column>
+							<w2:column displayMode="label" id="h_krxEstbShrs" inputType="text" textAlign="center" value="설정증권수" width="88"></w2:column>
+							<w2:column displayMode="label" id="h_krxRepurShrs" inputType="text" textAlign="center" value="환매증권수" width="88"></w2:column>
+							<w2:column displayMode="label" id="h_krxModifyShrs" inputType="text" textAlign="center" value="변경분" width="88"></w2:column>
+							<w2:column displayMode="label" id="h_krxListShrs" inputType="text" textAlign="center" value="상장증권수" width="88"></w2:column>
+							<w2:column displayMode="label" id="h_ksdBfIsuShrs" inputType="text" textAlign="center" value="상장증권수" width="88"></w2:column>
+							<w2:column displayMode="label" id="h_ksdEstbShrs" inputType="text" textAlign="center" value="설정증권수" width="88"></w2:column>
+							<w2:column displayMode="label" id="h_ksdRepurShrs" inputType="text" textAlign="center" value="환매증권수" width="88"></w2:column>
+							<w2:column displayMode="label" id="h_ksdModifyShrs" inputType="text" textAlign="center" value="변경분" width="88"></w2:column>
+							<w2:column displayMode="label" id="h_ksdIsuShrs" inputType="text" textAlign="center" value="상장증권수" width="88"></w2:column>
+						</w2:row>
+					</w2:header>
+					<w2:gBody id="gBody1" style="">
+						<w2:row id="row4" style="">
+							<w2:column displayMode="label" id="isuCd" inputType="text" textAlign="center" width="92"></w2:column>
+							<w2:column displayMode="label" id="isuKorAbbrv" inputType="text" textAlign="left" width="173"></w2:column>
+							<w2:column dataType="number" displayFormat="#,###" displayMode="label" id="krxBfListShrs" inputType="text" textAlign="right" width="88"></w2:column>
+							<w2:column dataType="number" displayFormat="#,###" displayMode="label" id="krxEstbShrs" inputType="text" textAlign="right" width="88"></w2:column>
+							<w2:column dataType="number" displayFormat="#,###" displayMode="label" id="krxRepurShrs" inputType="text" textAlign="right" width="88"></w2:column>
+							<w2:column dataType="number" displayFormat="#,###" displayMode="label" id="krxModifyShrs" inputType="text" textAlign="right" width="88"></w2:column>
+							<w2:column dataType="number" displayFormat="#,###" displayMode="label" id="krxListShrs" inputType="text" textAlign="right" width="88"></w2:column>
+							<w2:column dataType="number" displayFormat="#,###" displayMode="label" id="ksdBfIsuShrs" inputType="text" textAlign="right" width="88"></w2:column>
+							<w2:column dataType="number" displayFormat="#,###" displayMode="label" id="ksdEstbShrs" inputType="text" textAlign="right" width="88"></w2:column>
+							<w2:column dataType="number" displayFormat="#,###" displayMode="label" id="ksdRepurShrs" inputType="text" textAlign="right" width="88"></w2:column>
+							<w2:column dataType="number" displayFormat="#,###" displayMode="label" id="ksdModifyShrs" inputType="text" textAlign="right" width="88"></w2:column>
+							<w2:column dataType="number" displayFormat="#,###" displayMode="label" id="ksdIsuShrs" inputType="text" textAlign="right" width="88"></w2:column>
+							<w2:column customFormatter="scwin.fmtCompare" displayMode="label" id="compare" inputType="text" textAlign="center" width="50"></w2:column>
+						</w2:row>
+					</w2:gBody>
+				</w2:gridView>
+			</xf:group>
+			<!-- 하단 안내 : 예탁원 수신 데이터 기준(조회일에 따라 하나만) + 단위 -->
+			<xf:group class="btnbox" id="" style="">
+				<xf:group class="lt" id="" style="">
+					<w2:textbox class="txt_info" id="lab_comment_new" label="※ 예탁원 수신 데이터 : 상장형 수익증권 발행증권수확인(신규) 데이터 기준 조회" style="" />
+					<w2:textbox class="txt_info" id="lab_comment" label="※ 예탁원 수신 데이터 : 일별종목거래및시세(기존) 데이터 기준 조회" style="" />
+					<w2:textbox class="txt_info" id="label_6" label="증권수는 TU단위로 표시된 값임" style="" />
+				</xf:group>
+			</xf:group>
+		</xf:group>
+	</body>
+</html>

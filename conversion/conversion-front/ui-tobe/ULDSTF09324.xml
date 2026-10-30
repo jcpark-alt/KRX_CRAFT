@@ -1,0 +1,532 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare"
+	xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_screenId="ULDSTF09324" meta_screenName="관리종목지정"
+		meta_desc="상장형 수익증권 종목을 골라 관리종목 지정·사유변경·해제 내역을 조회하고, 신규등록구분에 맞는 등록 팝업(ULDSTF09325·09326·09327)을 여는 화면 (원본 W-Craft 변환본, 업무 분석 ULDSTF09324.md)"
+		meta_author="Inswave" meta_date="2026-10-30">
+		<title>관리종목지정</title>
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate />
+		<xf:model>
+			<w2:dataCollection baseNode="map">
+				<!-- 화면 전용 — 종목 찾기로 고른 종목(원본 txb_ISU_CD·txb_ISU_NM, 결과서 §2.2) -->
+				<w2:dataMap id="dma_search" baseNode="map">
+					<w2:keyInfo>
+						<w2:key id="isuCd" name="종목코드" dataType="text"></w2:key>
+						<w2:key id="isuNm" name="종목명" dataType="text"></w2:key>
+					</w2:keyInfo>
+				</w2:dataMap>
+				<!-- 관리종목지정 내역 조회 응답 (화면 적용 API admisu-design/select-list — 개발 사본 dlt_listRes 키 그대로) -->
+				<w2:dataList id="dlt_list" baseNode="list" repeatNode="map" saveRemovedData="true">
+					<w2:columnInfo>
+						<w2:column id="dftYn" name="기안여부" dataType="text"></w2:column>
+						<w2:column id="dscYn" name="공시여부" dataType="text"></w2:column>
+						<w2:column id="bzProcsNo" name="업무처리번호" dataType="text"></w2:column>
+						<w2:column id="isurCd" name="발행기관코드" dataType="text"></w2:column>
+						<w2:column id="mktactEnforceDd" name="변경상장일" dataType="text"></w2:column>
+						<w2:column id="admisuDesignBzTpCd" name="구분코드" dataType="text"></w2:column>
+						<w2:column id="admisuDesignBzTpNm" name="구분" dataType="text"></w2:column>
+						<w2:column id="isuCd" name="종목코드" dataType="text"></w2:column>
+						<w2:column id="isuNm" name="종목명" dataType="text"></w2:column>
+						<w2:column id="admisuRsnNm" name="지정사유" dataType="text"></w2:column>
+						<w2:column id="bfchgDelistBasDdContn" name="변경전 유의사항" dataType="text"></w2:column>
+						<w2:column id="afchgDelistBasDdContn" name="변경후 유의사항" dataType="text"></w2:column>
+						<w2:column id="chgRsnContn" name="변경/해제 사유" dataType="text"></w2:column>
+						<w2:column id="admisuDesignGrndRegulNm" name="근거규정" dataType="text"></w2:column>
+						<w2:column id="remk" name="기타" dataType="text"></w2:column>
+						<w2:column id="lstEmpNm" name="최종처리자" dataType="text"></w2:column>
+					</w2:columnInfo>
+				</w2:dataList>
+			</w2:dataCollection>
+			<w2:workflowCollection />
+		</xf:model>
+		<w2:layoutInfo />
+		<w2:publicInfo method="scwin.onpageload,scwin.init,scwin.btn_FindIsu_onclick,scwin.btn_Search_onclick,scwin.btn_New_onclick,scwin.grd_List_oncelldblclick,scwin.btn_Excel_onclick,scwin.selectList,scwin.openIsuPopup,scwin.search,scwin.validateSearch,scwin.writeNew,scwin.openDetail,scwin.getPopupData,scwin.openRegPopup,scwin.excelDown" />
+		<script lazy="false" type="text/javascript"><![CDATA[
+///////// 1. 변수 및 선언 영역 /////////
+scwin.screenId = "ULDSTF09324";
+scwin.secugrpId = "";       // 증권그룹ID — init 에서 상장형 수익증권(PF) (원본 fr_SecuGrpId)
+scwin.mktId = "";           // 사용자 시장구분 — 팝업에 넘긴다 (원본 fr_MktId = session market)
+scwin.isurCd = "";          // 고른 종목의 발행기관코드 — 조회 조건 (원본 vIsurCd)
+scwin.listStatCd = "";      // 고른 종목의 상장상태코드 — D 면 [신규] 잠금 (원본 vLIST_STAT_CD)
+scwin.LIST_STAT_DELISTED = "D";             // 상장폐지 종목
+scwin.EXCEL_NM = "관리종목지정내역";        // 엑셀 이름 (원본 fn_getSecuGrpNm(PF) + "관리종목지정내역" — PF 이름이 없어 빈 앞부분, §8 #6)
+scwin.POPUP_DIR = "/ui/lst/pf/";            // 등록 팝업 배포 폴더 (원본 리터럴 "/ui/lst/pf/" + urlId + ".xml")
+// 원본 : /pf/ULDSTF09324.gfm (관리종목지정 — 상장형 수익증권). gfm 은 저장소에 없고 W-Craft 1차 변환 + API 적용 개발 사본으로 분석했다.
+/*
+ * 화면 동작
+ *  - [종목 찾기](ULDSTF92017_1)로 상장형 수익증권(PF) 종목을 고르면 그 발행기관의 관리종목지정 내역을 조회한다.
+ *    상장폐지 종목(상장상태 D)이면 [신규]를 잠근다.
+ *  - [신규]는 신규등록구분(0 지정 · 1 사유변경 · 4 해제)에 맞는 등록 팝업(ULDSTF09325·09326·09327)을 열고,
+ *    목록 더블클릭은 그 행의 구분으로 같은 팝업을 수정용으로 연다.
+ *  - 팝업이 저장했다고 돌려주거나 X 로 닫히면 목록을 다시 조회한다(공통 계약 — pf 계약서 §2).
+ * 업무 분석 : conversion/conversion-front/ui/completed/ULDSTF09324/ULDSTF09324.md (§번호는 이 문서의 절)
+ */
+
+// 고정값
+// 신규등록구분 → 등록 팝업. 크기는 원본 CreateDialogFrame 값 (원본 fn_newpre_create_frame 주석)
+// TODO: 09325·09326·09327 은 저장소에 없다 — 경로·data 키·반환 { isSaved } 는 제안이다 (§10 #1)
+scwin.REG_POPUP = {
+    "0" : { id : "ULDSTF09325", title : "관리종목지정", width : 620, height : 370 },
+    "1" : { id : "ULDSTF09326", title : "관리종목지정 사유변경", width : 620, height : 520 },
+    "4" : { id : "ULDSTF09327", title : "관리종목지정 해제", width : 620, height : 450 }
+};
+
+///////// 2. 초기화 영역 /////////
+/**
+ * @method
+ * @name scwin.onpageload
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 페이지로드. 로딩 로직은 scwin.init 하나에 둔다(code-convention 초기화 절). (§3)
+ * @returns
+ * @hidden N
+ */
+scwin.onpageload = async function () {
+    try {
+        await scwin.init();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF09324.onpageload" });
+    }
+};
+
+/**
+ * @method
+ * @name scwin.init
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 로딩 — 증권그룹·사용자 시장 → 조회 영역 Enter 키 바인딩. 초기 조회는 없다(종목을 골라야 조회). (원본 init — §3)
+ * @returns
+ * @hidden N
+ */
+scwin.init = async function () {
+    // 1) 증권그룹·사용자 시장 — 원본 전역 fr_SecuGrpId·fr_MktId
+    scwin.secugrpId = $c.lc.getGlbValue("SECUGRP_ID_PF");
+    scwin.mktId = String($c.session.getUserInfo("market") ?? "");
+
+    // 2) 조회 영역 Enter 키(규칙 22)
+    $c.win.setEnterKeyEvent(panel_Top, scwin.btn_Search_onclick);
+};
+
+///////// 3. 컴포넌트 이벤트 영역 /////////
+/**
+ * @method
+ * @name scwin.btn_FindIsu_onclick
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 종목 찾기(돋보기) 버튼 클릭 — 고르면 바로 조회한다. (원본 btn_iSU_CD onclick — §4)
+ * @param {Object} e 이벤트 객체
+ * @returns
+ * @hidden N
+ */
+scwin.btn_FindIsu_onclick = async function (e) {
+    try {
+        await scwin.openIsuPopup();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF09324.btn_FindIsu_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name scwin.btn_Search_onclick
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 조회 버튼 클릭 — 종목을 고르지 않았으면 안내한다. (원본 img_Search onclick — §4)
+ * @param {Object} e 이벤트 객체
+ * @returns
+ * @hidden N
+ */
+scwin.btn_Search_onclick = async function (e) {
+    try {
+        if (!await scwin.validateSearch()) return;
+        await scwin.search();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF09324.btn_Search_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name scwin.btn_New_onclick
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 신규 버튼 클릭 — 신규등록구분에 맞는 등록 팝업을 연다. (원본 img_Regist onclick — §4)
+ * @param {Object} e 이벤트 객체
+ * @returns
+ * @hidden N
+ */
+scwin.btn_New_onclick = async function (e) {
+    try {
+        await scwin.writeNew();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF09324.btn_New_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name scwin.grd_List_oncelldblclick
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 목록 더블클릭 — 그 행의 구분으로 등록 팝업을 수정용으로 연다. (원본 grd_List OnDblClick — §4)
+ * @param {Number} rowIndex 행 인덱스
+ * @param {Number} columnIndex 열 인덱스
+ * @param {String} columnId 열 id
+ * @returns
+ * @hidden N
+ */
+scwin.grd_List_oncelldblclick = async function (rowIndex, columnIndex, columnId) {
+    try {
+        await scwin.openDetail(rowIndex);
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF09324.grd_List_oncelldblclick" });
+    }
+};
+
+/**
+ * @method
+ * @name scwin.btn_Excel_onclick
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 엑셀다운로드 버튼 클릭. (원본 img_Excel onclick — §4)
+ * @param {Object} e 이벤트 객체
+ * @returns
+ * @hidden N
+ */
+scwin.btn_Excel_onclick = async function (e) {
+    try {
+        await scwin.excelDown();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF09324.btn_Excel_onclick" });
+    }
+};
+
+///////// 4. 서브미션 콜백 영역 /////////
+/**
+ * @method
+ * @name scwin.selectList
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 관리종목지정 내역 조회 → dlt_list. (원본 fn_search — §5.1)
+ * @param {String} isurCd 발행기관코드
+ * @returns {Promise<Boolean>} 조회 성공 여부
+ * @hidden N
+ */
+scwin.selectList = async function (isurCd) {
+    const sbmOptions = {
+        id : "sbm_selectList",
+        method : "get",
+        action : "/api/listing/lstproc/pf/admisu-design/select-list",
+        target : "dlt_list=body",
+        gridview : "grd_List",
+        isProcessMsg : false
+    };
+
+    // 개발 사본은 action 에 "?isurCd=" 를 이어 붙였다 — 전체 경로 리터럴 + requestData 로(규칙 38)
+    const result = await $c.sbm.executeDynamic(sbmOptions, { isurCd : isurCd });
+    if (result?.skipped) return false;      // 진행 중 조회가 있어 이번 호출은 건너뜀
+    return result?.responseJSON?.success === true;
+};
+
+///////// 5. 일반/업무 함수 영역 /////////
+/**
+ * @method
+ * @name scwin.openIsuPopup
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 종목 찾기(ULDSTF92017_1, 상장폐지 종목 포함) — 고른 종목·발행기관·상장상태를 담고, 상장폐지 종목이면 [신규]를 잠근 뒤 조회한다.
+ * 취소·닫기면 아무것도 하지 않는다. (원본 btn_iSU_CD onclick + fn_SetParIsur — §6.1)
+ * @returns
+ * @hidden N
+ */
+scwin.openIsuPopup = async function () {
+    // 원본(주석 popFindIsuAll(fr_SecuGrpId))대로 92017_1 — 개발 사본의 popFindIsu(92017)는 상장상태(listStatCd)를 돌려주지 않아
+    // 상장폐지 종목 잠금이 동작하지 않았고, secugrpId 자리에 객체를 넘겼다(§8 #3)
+    const result = await $c.lc.popFindIsuAll({ secugrpId : scwin.secugrpId });
+    // 취소·닫기(X)도 { isCloseButtonClick } 객체가 온다 → 종목코드로 판정(개발 사본은 typeof … != 'undefined')
+    if (result?.isCloseButtonClick === true || $c.util.isEmpty(result?.isuCd)) return;
+
+    dma_search.set("isuCd", result.isuCd);
+    dma_search.set("isuNm", result.isuKorNm ?? "");
+    scwin.isurCd = String(result.isurCd ?? "");
+    scwin.listStatCd = String(result.listStatCd ?? "");
+
+    // 상장폐지 종목은 신규 금지 (원본 vLIST_STAT_CD == "D" → img_Regist 비활성, 이미지 교체는 삭제)
+    btn_New.setDisabled(scwin.listStatCd === scwin.LIST_STAT_DELISTED);
+
+    await scwin.search();
+};
+
+/**
+ * @method
+ * @name scwin.search
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 조회 — 목록·건수를 비우고 고른 종목의 발행기관으로 조회한 뒤 건수를 적는다. (원본 fn_search + dlt_listRes OnLoadCompleted — §6.2)
+ * @returns
+ * @hidden N
+ */
+scwin.search = async function () {
+    // 조회가 실패하면 앞 종목의 행으로 팝업을 여는 일이 없도록 먼저 비운다
+    dlt_list.removeAll();
+    tbx_totCnt.setValue("0");
+
+    if (!await scwin.selectList(scwin.isurCd)) return;
+
+    tbx_totCnt.setValue(dlt_list.getRowCount());    // 원본 fillGridHeaderTotalCnt(rowcount, panel_page)
+};
+
+/**
+ * @method
+ * @name scwin.validateSearch
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 종목을 골랐는지 확인한다 — 고르지 않았으면 MSG-0015 "[종목코드(명)]을 선택해주세요." (원본 img_Search·img_Regist — §6.3)
+ * @returns {Promise<Boolean>} 통과 여부
+ * @hidden N
+ */
+scwin.validateSearch = async function () {
+    if (!$c.util.isEmpty(dma_search.get("isuCd")) && !$c.util.isEmpty(scwin.isurCd)) return true;
+
+    await $c.win.alert($c.stf.getMessageParam("MSG-0015", ""));
+    return false;
+};
+
+/**
+ * @method
+ * @name scwin.writeNew
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 신규 — 종목과 신규등록구분을 확인하고 그 구분의 등록 팝업을 연다. (원본 img_Regist onclick + fn_GetParNew — §6.4)
+ * @returns
+ * @hidden N
+ */
+scwin.writeNew = async function () {
+    if (!await scwin.validateSearch()) return;
+
+    const designBzTpCd = String(cmb_RegistTyp.getValue() ?? "");
+    if ($c.util.isEmpty(designBzTpCd)) {
+        // MSG-0014 "[신규등록구분]을 선택해주세요."
+        await $c.win.alert($c.stf.getMessageParam("MSG-0014", ""));
+        cmb_RegistTyp.focus();
+        return;
+    }
+
+    await scwin.openRegPopup(designBzTpCd, scwin.getPopupData(-1, designBzTpCd));
+};
+
+/**
+ * @method
+ * @name scwin.openDetail
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 수정 — 더블클릭한 행의 구분(0·1·4)으로 등록 팝업을 그 행 값과 함께 연다. 그 밖의 구분은 열 팝업이 없어 아무것도 하지 않는다.
+ * (원본 grd_List OnDblClick + fn_GetParUpdate — §6.5)
+ * @param {Number} rowIndex 행 인덱스(화면 번호)
+ * @returns
+ * @hidden N
+ */
+scwin.openDetail = async function (rowIndex) {
+    if (rowIndex < 0) return;
+
+    const designBzTpCd = String(dlt_list.getCellData(rowIndex, "admisuDesignBzTpCd") ?? "");
+    // TODO: 구분 2·3(사유및상장폐지기준일변경·상장폐지기준일변경)은 원본 주석에만 있고 팝업이 없다 — 이력에 오면 열지 않는다 (§8 #5, §10 #2)
+    if (!scwin.REG_POPUP[designBzTpCd]) return;
+
+    await scwin.openRegPopup(designBzTpCd, scwin.getPopupData(rowIndex, designBzTpCd));
+};
+
+/**
+ * @method
+ * @name scwin.getPopupData
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 등록 팝업에 넘길 data. 원본 fn_GetParNew / fn_GetParUpdate 의 arrPar[0..6] 을 키로 바꾼 것이다(pf 계약서 §2).
+ * @param {Number} rowIndex 수정이면 행 인덱스, 신규면 -1
+ * @param {String} designBzTpCd 관리종목지정업무구분코드
+ * @returns {Object} 넘길 data
+ * @hidden N
+ */
+scwin.getPopupData = function (rowIndex, designBzTpCd) {
+    const isNew = (rowIndex < 0);
+    return {
+        isurCd : scwin.isurCd,                                                  // arrPar[0]
+        isuNm : dma_search.get("isuNm"),                                        // arrPar[1]
+        secugrpId : scwin.secugrpId,                                            // arrPar[2]
+        mktId : scwin.mktId,                                                    // arrPar[3]
+        // arrPar[4] — 개발 사본은 대문자·snake 키(bz_procs_no)로 읽어 늘 빈 값이었다(§8 #4)
+        bzProcsNo : isNew ? "" : String(dlt_list.getCellData(rowIndex, "bzProcsNo") ?? ""),
+        admisuDesignBzTpCd : designBzTpCd,                                      // arrPar[5]
+        isuCd : dma_search.get("isuCd")                                         // arrPar[6]
+    };
+};
+
+/**
+ * @method
+ * @name scwin.openRegPopup
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 등록 팝업을 data 로 열고 닫힐 때까지 기다린다. 닫히면 신규등록구분을 처음으로 되돌리고,
+ * 저장했다고 돌려주거나 X 로 닫히면 목록을 다시 조회한다. (원본 fn_newpre_create_frame — §6.6)
+ * @param {String} designBzTpCd 관리종목지정업무구분코드 (0·1·4)
+ * @param {Object} data 넘길 data (scwin.getPopupData)
+ * @returns
+ * @hidden N
+ */
+scwin.openRegPopup = async function (designBzTpCd, data) {
+    const popup = scwin.REG_POPUP[designBzTpCd];
+    if (!popup) return;
+
+    const options = {
+        id : popup.id,
+        popupName : popup.title,
+        width : popup.width,
+        height : popup.height,
+        type : "pageFramePopup"
+    };
+
+    // 개발 사본은 data = {} 로 아무것도 넘기지 않았다 — 원본 fn_GetPar* 값을 키로 넘긴다(§8 #4)
+    const result = await $c.win.openPopup(scwin.POPUP_DIR + popup.id + ".xml", options, data);
+
+    cmb_RegistTyp.setSelectedIndex(0);      // 원본 그대로 — 닫힌 뒤 「선택해주세요」로
+
+    // 원본은 닫힌 뒤 다시 조회하지 않았다 — 공통 재조회 규약(pf 계약서 §2)
+    if (result?.isSaved === true || result?.isCloseButtonClick === true) {
+        await scwin.search();
+    }
+};
+
+/**
+ * @method
+ * @name scwin.excelDown
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 목록을 엑셀로 내려받는다. 0건 안내는 공통 함수가 한다. (원본 img_Excel onclick, doLogSave 삭제 — §6.7)
+ * @returns
+ * @hidden N
+ */
+scwin.excelDown = async function () {
+    await $c.data.downloadGridViewExcel(grd_List, {
+        // 파일명 {menuId}_{이름}_{yyyyMMddHHmmss}.xlsx (전환 규칙 42)
+        fileName : $c.win.getProgramId() + "_" + scwin.EXCEL_NM + "_" + $c.date.getServerDateTime("yyyyMMddHHmmss") + ".xlsx",
+        sheetName : "sheet1"
+    });
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload">
+		<xf:group class="sub_contents" id="" meta_componentContainer="true" style="">
+			<w2:pageFrame id="pfmContentHeader" src="/cm/xml/contentHeader.xml" style="" />
+			<!-- 조회조건 : 종목코드(명) — 찾기 팝업으로만 고른다 -->
+			<xf:group class="schbox" id="panel_Top" style="">
+				<xf:group class="schbox_inner" id="" style="">
+					<xf:group adaptive="layout" adaptiveThreshold="768" class="w2tb tbl" id="" style="" tagname="table">
+						<w2:attributes>
+							<w2:summary>조회조건</w2:summary>
+						</w2:attributes>
+						<xf:group tagname="colgroup">
+							<xf:group style="width:110px;" tagname="col" />
+							<xf:group tagname="col" />
+						</xf:group>
+						<xf:group tagname="tr">
+							<xf:group class="w2tb_th" tagname="th">
+								<w2:attributes>
+									<w2:scope>row</w2:scope>
+								</w2:attributes>
+								<w2:textbox class="req" id="label_6" label="종목코드(명)" style="" />
+							</xf:group>
+							<xf:group class="w2tb_td" tagname="td">
+								<xf:input id="txb_ISU_CD" readOnly="true" ref="data:dma_search.isuCd" style="width:120px;" />
+								<xf:input id="txb_ISU_NM" readOnly="true" ref="data:dma_search.isuNm" style="width:255px;" />
+								<xf:trigger class="btn_cm icon search" ev:onclick="scwin.btn_FindIsu_onclick" id="btn_FindIsu" type="button">
+									<xf:label><![CDATA[]]></xf:label>
+								</xf:trigger>
+							</xf:group>
+						</xf:group>
+					</xf:group>
+				</xf:group>
+				<xf:group class="btn_schbox" id="" style="">
+					<xf:trigger class="btn_cm sch" ev:onclick="scwin.btn_Search_onclick" id="btn_Search" type="button">
+						<xf:label><![CDATA[조회]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+			<!-- 관리종목지정 내역 -->
+			<xf:group class="titbox" id="" style="">
+				<w2:textbox class="" id="" label="관리종목지정 내역" style="" tagname="h3" />
+				<xf:group class="rt" id="" style="">
+					<xf:group class="count" id="" style="">
+						<w2:textbox class="" id="" label="총" style="" />
+						<w2:textbox class="num" id="tbx_totCnt" label="0" style="" />
+						<w2:textbox class="" id="" label="건" style="" />
+					</xf:group>
+					<xf:trigger class="btn_cm download" ev:onclick="scwin.btn_Excel_onclick" id="btn_Excel" type="button">
+						<xf:label><![CDATA[엑셀다운로드]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+			<xf:group class="gvwbox" id="" style="">
+				<w2:gridView autoFit="allColumn" autoFitMinWidth="1910" class="gvw row10" dataList="data:dlt_list" escape="false"
+					ev:oncelldblclick="scwin.grd_List_oncelldblclick" id="grd_List" readOnly="true" rowNumHeaderValue="번호" rowNumVisible="true"
+					style="">
+					<w2:caption id="cap_List" style="" value="관리종목지정 내역" />
+					<w2:header id="hdr_List" style="">
+						<w2:row>
+							<w2:column displayMode="label" id="h_dscYn" inputType="text" textAlign="center" value="공시검토&lt;br/&gt;여부" width="80" />
+							<w2:column displayMode="label" id="h_mktactEnforceDd" inputType="text" textAlign="center" value="시행일" width="90" />
+							<w2:column displayMode="label" id="h_admisuDesignBzTpNm" inputType="text" textAlign="center" value="구분" width="180" />
+							<w2:column displayMode="label" id="h_isuNm" inputType="text" textAlign="center" value="종목명" width="456" />
+							<w2:column displayMode="label" id="h_admisuRsnNm" inputType="text" textAlign="center" value="지정사유" width="300" />
+							<w2:column displayMode="label" id="h_chgRsnContn" inputType="text" textAlign="center" value="변경/해제 사유" width="250" />
+							<w2:column displayMode="label" id="h_admisuDesignGrndRegulNm" inputType="text" textAlign="center" value="근거규정" width="200" />
+							<w2:column displayMode="label" id="h_remk" inputType="text" textAlign="center" value="기타" width="150" />
+							<w2:column displayMode="label" id="h_lstEmpNm" inputType="text" textAlign="center" value="최종처리자" width="80" />
+							<w2:column displayMode="label" id="h_bzProcsNo" inputType="text" textAlign="center" value="업무처리번호" width="110" />
+						</w2:row>
+					</w2:header>
+					<w2:gBody id="gbd_List" style="">
+						<w2:row>
+							<w2:column displayMode="label" id="dscYn" inputType="text" textAlign="center" width="80" />
+							<w2:column dataType="date" displayFormat="yyyy-MM-dd" displayMode="label" id="mktactEnforceDd" inputType="text" textAlign="center" width="90" />
+							<w2:column displayMode="label" id="admisuDesignBzTpNm" inputType="text" textAlign="left" width="180" />
+							<w2:column displayMode="label" id="isuNm" inputType="text" textAlign="left" width="456" />
+							<w2:column displayMode="label" id="admisuRsnNm" inputType="text" textAlign="left" width="300" />
+							<w2:column displayMode="label" id="chgRsnContn" inputType="text" textAlign="left" width="250" />
+							<w2:column displayMode="label" id="admisuDesignGrndRegulNm" inputType="text" textAlign="left" width="200" />
+							<w2:column displayMode="label" id="remk" inputType="text" textAlign="left" width="150" />
+							<w2:column displayMode="label" id="lstEmpNm" inputType="text" textAlign="center" width="80" />
+							<w2:column displayMode="label" id="bzProcsNo" inputType="text" textAlign="center" width="110" />
+						</w2:row>
+					</w2:gBody>
+				</w2:gridView>
+			</xf:group>
+			<!-- 하단 : 신규등록구분 + [신규] (규칙 41 — 신규 pt 오른쪽 끝, 구분 콤보는 [신규]와 붙어 다니는 입력이라 바로 왼쪽) -->
+			<xf:group class="btnbox" id="grpBtnBox" style="">
+				<xf:group class="rt" id="" style="">
+					<w2:textbox id="label_3" label="신규등록구분" style="" />
+					<xf:select1 appearance="minimal" chooseOption="true" chooseOptionLabel="선택해주세요" direction="auto" disabledClass="w2selectbox_disabled"
+						displayMode="label" id="cmb_RegistTyp" style="width:270px;" submenuSize="auto">
+						<xf:choices>
+							<xf:item>
+								<xf:label><![CDATA[관리종목지정]]></xf:label>
+								<xf:value><![CDATA[0]]></xf:value>
+							</xf:item>
+							<xf:item>
+								<xf:label><![CDATA[관리종목지정사유변경]]></xf:label>
+								<xf:value><![CDATA[1]]></xf:value>
+							</xf:item>
+							<xf:item>
+								<xf:label><![CDATA[관리종목지정해제]]></xf:label>
+								<xf:value><![CDATA[4]]></xf:value>
+							</xf:item>
+						</xf:choices>
+					</xf:select1>
+					<xf:trigger class="btn_cm pt" ev:onclick="scwin.btn_New_onclick" id="btn_New" type="button">
+						<xf:label><![CDATA[신규]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+		</xf:group>
+	</body>
+</html>
