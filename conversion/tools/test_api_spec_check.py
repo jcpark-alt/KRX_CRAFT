@@ -377,3 +377,29 @@ def test_md_first_block_without_hash_heading():
             "```\n[ULDTST00009][코드 블록 안]\nGET /api/x/not-a-block\n```\n")
     apis = ac.parse_spec(text, "md")
     assert [a["path"] for a in apis] == ["/api/x/select-combo", "/api/x/select-list"]
+
+
+def test_group_head_numeric_tail_inherits_prefix():
+    # 공용 명세 머리 `[ULDSTF08032/08032_new/08033]` — 숫자로 시작하는 꼬리는 앞 화면ID 의 접두를 이어받는다(2026-10-30 ULDSTF08031~08037)
+    api = {"screen": "ULDSTF08032/08032_new/08033/08033_new/08034"}
+    assert ac.screens_of(api) == ["ULDSTF08032", "ULDSTF08032_new", "ULDSTF08033", "ULDSTF08033_new", "ULDSTF08034"]
+    assert ac.is_screen_of(api, "ULDSTF08033_new")
+    assert not ac.is_screen_of(api, "ULDSTF08037")
+    assert ac.screens_of({"screen": "ULDSTF08301~305, 08306"}) == [f"ULDSTF0830{n}" for n in range(1, 7)]
+
+
+def test_shared_spec_file_found_by_listed_name(tmp_path):
+    # 파일명이 화면ID 를 쉼표로 나열한 공용 명세 — ui/ 아래 어느 하위 폴더에 있어도 그 화면의 명세로 찾는다
+    ui = tmp_path / "ui" / "ULDTST00001"
+    ui.mkdir(parents=True)
+    spec = ui / "ULDTST00001,ULDTST00002_new,ULDTST00003_API.md"
+    spec.write_text("## 1. [ULDTST00001/00002_new][업무][x]\n* **TO-BE** : `GET /api/x/select-one`\n", encoding="utf-8")
+    tobe = tmp_path / "ui-tobe"
+    tobe.mkdir()
+    x = tobe / "ULDTST00002_new.xml"
+    x.write_text(DOC.format(script='scwin.a = async function () { const o = { method : "get", action : "/api/x/select-one" }; };'), encoding="utf-8")
+    found, sid = ac.find_spec(str(x))
+    assert found == spec and sid == "ULDTST00002_new"
+    fails, warns, _infos, _ = ac.check(str(x))
+    assert fails == [] and warns == []
+    assert ac.find_spec(str(tobe / "ULDTST00004.xml"))[0] is None

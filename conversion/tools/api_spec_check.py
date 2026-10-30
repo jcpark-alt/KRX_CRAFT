@@ -6,6 +6,8 @@
 업무 분석 가이드(conversion/md/websquare_gfm_conversion.md §5 「API 명세 적용」) 의 "API 명세가 있으면 그 API 로 바꾼다" 를 검사한다.
 --spec 을 생략하면 TO-BE 파일명의 화면ID 로 `../ui/{화면ID}/{화면ID}_API.{txt,md}`(conversion-front 화면별 폴더 배치),
 `../ui/completed/{화면ID}/{화면ID}_API.{txt,md}`(전환 완료 화면), `../ui/{화면ID}_API.{txt,md}`, 같은 폴더의 `{화면ID}_API.{txt,md}` 를 차례로 찾는다(같은 자리면 txt 우선).
+없으면 `../ui/` 아래(completed 포함)에서 파일명이 화면ID 를 쉼표로 나열한 공용 명세 `{ID1},{ID2},…_API.{txt,md}` 중 이 화면ID 가 든 것을 쓴다.
+블록 머리 묶음의 숫자로 시작하는 꼬리 표기(`[ULDSTF08032/08032_new/08033]`)는 앞 화면ID 의 영문 접두를 이어받는다.
 명세가 없으면 명세 대조를 건너뛴다(SKIP — A07·A08 형식 검사만, FAIL 없으면 종료 코드 0).
 
 명세 형식 1 — txt (블록 반복):
@@ -65,8 +67,14 @@ SCREEN_ID = re.compile(r"([A-Za-z]{3}[A-Za-z0-9]*?\d{5}[A-Za-z0-9_]*)")
 def screens_of(api):
     """블록 머리의 화면ID 목록 — `[A/B]`·`[A, B]` 묶음이면 둘 다, `[A~B]` 범위면 사이 번호 전부."""
     out = []
+    prefix = ""                                      # 묶음 앞 화면ID 의 영문 접두(`ULDSTF`) — 숫자로 시작하는 꼬리 표기가 이어받는다
     for part in re.split(r"[/,]", api["screen"]):
         part = part.strip()
+        if part[:1].isdigit() and prefix:            # `[ULDSTF08032/08032_new/08033]` 의 `08032_new` → ULDSTF08032_new (2026-10-30)
+            part = prefix + part
+        mp = re.match(r"^([A-Za-z]+)\d", part)
+        if mp:
+            prefix = mp.group(1)
         if "~" not in part:
             if part:
                 out.append(part)
@@ -278,6 +286,14 @@ def find_spec(xml_path):
             cand = base / f"{sid}_API.{ext}"
             if cand.is_file():
                 return cand, sid
+    # 여러 화면 공용 명세(2026-10-30 ULDSTF08031~08037): 파일명이 `{ID1},{ID2},…_API.md` 처럼 화면ID 를 쉼표로 나열 —
+    # ui/ 아래(completed 포함) 어디에 있든 파일명 목록에 sid 가 있으면 그 파일. 개별 `{sid}_API` 가 있으면 위에서 먼저 잡힌다.
+    ui = p.parent.parent / "ui"
+    if ui.is_dir():
+        for ext in ("txt", "md"):
+            for cand in sorted(ui.rglob(f"*,*_API.{ext}")):
+                if sid in [s.strip() for s in cand.name[:-len(f"_API.{ext}")].split(",")]:
+                    return cand, sid
     return None, sid
 
 
