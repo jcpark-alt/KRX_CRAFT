@@ -3,12 +3,12 @@
 | 항목 | 내용 |
 |---|---|
 | AS-IS | `/lstproc/ULDSTF05923.gfm` (Gauce/X-Internet, 1033×742 메인 화면 — 캡처 창 제목 "상장원부(ELW)_STF05923", 하단 [수정]·[닫기]) — 반입 `conversion/conversion-front/ui/completed/ULDSTF05923/ULDSTF05923.gfm` |
-| 신규 API 명세 | `conversion/conversion-front/ui/completed/ULDSTF05923/ULDSTF05923_API.md` — 블록 4종(이 화면 4종, 다른 화면 0종): `/api/listing/lstproc/elw/listed-register/` 아래 `GET select-list-lp`·`GET select-list-uly`·`GET select-one`·`POST modify`. §2.2·§5 는 명세 기준(가이드 §0.3·§5) |
+| 신규 API 명세 | `conversion/conversion-front/ui/completed/ULDSTF05923/ULDSTF05923_API.md` — 블록 4종(이 화면 4종, 다른 화면 0종): `/api/listing/lstproc/elw/listed-register/` 아래 `GET select-list-lp`·`GET select-list-uly`·`GET select-one`·`POST modify`. §2.2·§5 는 명세 기준(가이드 §0.3·§5). **2026-10-30 갱신본 반영** — 응답 target id `dlt_ulyIsu`→`dlt_uly`, `dma_isu`→`dma_detail`, `modify` 응답 `dma_saveResult`(4키) 신설, AS-IS 설명 보강·method 대문자 통일 |
 | TO-BE | `conversion/conversion-front/ui-tobe/ULDSTF05923.xml` (배포 경로 `/ui/lst/lstproc/ULDSTF05923.xml` — 가정, §10 #1). **2026-10-28 전환** — 1단계: 캡처 기준 퍼블리싱(마크업 전용, 사본 `$CLAUDE_JOB_DIR/tmp/stage1/ULDSTF05923.xml`), 2단계: 이 결과서대로 스크립트 전환. 게이트: `gate_screen --pcc stf`·`scan_mixed_compare`·`publish_gate --pcc stf --before {1단계} --allow P20`·`api_spec_check`(명세 4종 모두 사용)·`init_binding_check`·`wsxml_lint` 0/0 통과 |
 | 퍼블리셔 XML | `conversion/publish/상장/상장처리(대내)/ULDSTF05923.xml`(W-Craft 1차 스크립트 내장), 변환 사본 `conversion/publish/publish-tobe/상장/상장처리(대내)/ULDSTF05923.xml` — 본화면(`sub_contents` + `pgtbox`/breadcrumb) 꼴, 컴포넌트 id 는 AS-IS 와 같음(날짜 `w2:inputCalendar`, 콤보 `xf:select1`, 이미지 버튼 → `xf:trigger`, 그리드 컬럼 id 대문자). 표 배치·행 수가 캡처와 달라 **캡처를 따랐다**(§2.1, §10 #11) |
-| 화면 캡처 | `ULDSTF05923.png` (빈 화면 — 종목 선택 전, [수정]·[닫기]) → TO-BE 는 가이드 §13.2 퍼블리싱본부터 만들었다. 캡처 하단 [닫기] 는 **(옮기지 않음)** — §2.1·§10 #1 |
+| 화면 캡처 | `ULDSTF05923.png` (빈 화면 — 종목 선택 전, [수정]·[닫기]; 2026-10-30 교체본은 창 테두리를 뺀 같은 레이아웃이라 마크업 변경 없음) → TO-BE 는 가이드 §13.2 퍼블리싱본부터 만들었다. 캡처 하단 [닫기] 는 **(옮기지 않음)** — §2.1·§10 #1 |
 | 업무공통 | pcc(`cm/pcc/stf`): `$c.lc`(`popFindIsu`·`isProcess`·`glb.SECUGRP_ID_EW`)·`$c.stf`(`getNewBzProcNo`·`getMessageParam`). gcc: `$c.data.setCommonCode`·`$c.date`(`checkCalendarFormat`·`compareFromToDate`)·`$c.util.isEmpty`·`$c.win.alert`·`$c.sbm.executeDynamic`·`$c.exception.handleError`. 게이트는 `--pcc stf` 로 돌린다 |
-| 작성 | Inswave / 2026-10-28 |
+| 작성 | Inswave / 2026-10-28 (2026-10-30 명세 갱신 반영) |
 
 참고 양식: [websquare_gfm_conversion.md](../../../md/websquare_gfm_conversion.md) — 특히 §1.4 업무 프로세스 흐름, §5 「API 명세 적용」, §6.5 getPar/setPar 전환. Gauce 대응은 [gfm_business_analysis_guide.md](../../../md/gfm_business_analysis_guide.md) §5·§6 을 함께 따랐다. 같은 모듈 선례 [ULDSTF05710.md](../completed/ULDSTF05710/ULDSTF05710.md)·[ULDSTF05911.md](../completed/ULDSTF05911/ULDSTF05911.md) 의 구성을 따랐다.
 
@@ -89,12 +89,12 @@ flowchart TD
     R -- "아니오(취소 · 닫기)" --> E1(["끝: 화면 그대로"])
     R -- "예" --> F["종목코드 · 명 · 발행기관코드 보관<br/>dma_search"]
     F --> CL["이전 종목 값 비움 ※TO-BE §8 #7"]
-    CL --> T1[/"GET select-one §5.1<br/>dma_isu"/]
+    CL --> T1[/"GET select-one §5.1<br/>dma_detail"/]
     T1 -. "중복 실행 건너뜀 ※TO-BE" .-> E1
     T1 -- "실패" --> E2(["끝: 빈 화면(공통 오류 안내)"])
     T1 -- "성공" --> A["기관 · 주간사 콤보에 현재 값 넣기<br/>scwin.applyInstItems §6.4"]
     A --> T2[/"GET select-list-lp §5.2<br/>dlt_lp"/]
-    T2 --> T3[/"GET select-list-uly §5.3<br/>dlt_ulyIsu"/]
+    T2 --> T3[/"GET select-list-uly §5.3<br/>dlt_uly"/]
     T3 --> E3(["끝: 상장원부 표시"])
 ```
 
@@ -119,7 +119,7 @@ flowchart TD
     C -- "확인" --> N[/"업무처리번호 채번<br/>$c.stf.getNewBzProcNo §5.5"/]
     N --> N1{"14자리인가?"}
     N1 -- "아니오" --> N2>"MSG-0010 업무처리번호생성실패"] --> E1
-    N1 -- "예" --> G["전문 구성 dma_save<br/>dma_isu 명세 키 + bzProcsNo + isurCd"]
+    N1 -- "예" --> G["전문 구성 dma_save<br/>dma_detail 명세 키 + bzProcsNo + isurCd"]
     G --> T[/"POST modify §5.4"/]
     T -. "중복 실행 건너뜀 ※TO-BE" .-> E1
     T --> R{"성공?"}
@@ -170,62 +170,62 @@ stateDiagram-v2
 | └ 종목 찾기 | `img_ISU_CD` (이미지) | `img_ISU_CD` (`xf:trigger class="btn_cm icon search"`) | §6.1. 조회 버튼이 따로 없어 `schbox` 가 아니다(Enter 키 바인딩 대상 없음 — §3) |
 | 발행에관한사항 제목 | `panel_Item` + `label_3` | `titbox#panel_Item` > `label_3` (h3) | 원본 `panel_Item` 은 아래 네 섹션 전체를 감싸던 패널 |
 | 발행에관한사항 | `panel_3` | `tblbox#panel_3` > 8칸 표 7행 | 왼쪽 2칸(종목명 4행은 colspan 3), 오른쪽 2쌍 |
-| └ 한글종목명 | `label_25`, `txb_ISU_KOR_NM` | `txb_ISU_KOR_NM` (`readOnly`, `dma_isu.isuKorNm`) | |
-| └ 한글종목약명 | `label_10`, `txb_ISU_KOR_ABBRV` | `txb_ISU_KOR_ABBRV` (`readOnly`, `dma_isu.isuKorAbbrv`) | |
-| └ 영문종목명 | `label_11`, `txb_ISU_ENG_NM` | `txb_ISU_ENG_NM` (`readOnly`, `dma_isu.isuEngNm`) | |
-| └ 영문종목약명 | `label_12`, `txb_ISU_ENG_ABBRV` | `txb_ISU_ENG_ABBRV` (`readOnly`, `dma_isu.isuEngAbbrv`) | |
-| └ 종목코드 | `label_27`, `txb_ISU_CD` | `txb_ISU_CD` (`readOnly`, `dma_isu.isuCd`) | 수정 검증 대상(§6.2) |
-| └ 종목단축코드 | `label_9`, `txb_ISU_SRT_CD` | `txb_ISU_SRT_CD` (`readOnly`, `dma_isu.isuSrtCd`) | |
-| └ *전환비율(승수) | `label_13`(+`label_41` *), `edt_ELW_CONV_RTO` (편집, 소수 8) | `edt_ELW_CONV_RTO` (`dataType="float" maxLength="15.8"`, `dma_isu.elwConvRto`) | **명세 `modify` 요청에 없음** — 고쳐도 전송되지 않는다(§10 #2) |
-| └ 발행가액(원) (a) | `label_4`, `edt_ISU_PRC` (읽기전용 숫자) | `edt_ISU_PRC` (`readOnly`, `number #,###`, `dma_isu.isuPrc`) | |
-| └ 발행수량(b) | `label_26`, `edt_ISU_SHRS` | `edt_ISU_SHRS` (`readOnly`, `number`, `dma_isu.isuShrs`) | |
-| └ 발행총액(원) (a*b) | `label_6`, `edt_ISU_TOTAMT` | `edt_ISU_TOTAMT` (`readOnly`, `number`, `dma_isu.isuTotamt`) | 서버 값을 그대로 표시(화면 계산 없음) |
-| └ 상장일 | `label_62`, `edt_LIST_DD` (읽기전용 마스크) | `edt_LIST_DD` (`inputCalendar readOnly`, `dma_isu.listDd`) | |
-| └ 발행일 | `label_7`, `edt_ISU_DD` | `edt_ISU_DD` (`inputCalendar readOnly`, `dma_isu.isuDd`) | |
-| └ 만기일 | `label_22`, `edt_EXP_DD` | `edt_EXP_DD` (`inputCalendar readOnly`, `dma_isu.expDd`) | |
-| └ 청약일 | `label_23`, `edt_SUBS_DD` + `img_SUBS_DD` (달력 이미지) | `edt_SUBS_DD` (`inputCalendar`, `dma_isu.subsDd`) | 달력 이미지 **(옮기지 않음)** — inputCalendar 내장. **명세 `modify` 요청에 없음**(§10 #2) |
-| └ 납입일 | `label_8`, `edt_PAY_DD` + `img_PAY_DD` | `edt_PAY_DD` (`inputCalendar`, `dma_isu.payDd`) | 같음 |
-| └ 주간사 | `label_21`, `cmb_LEADCOM_MBR_NO` (`dts_LEADCOM_MBR_NO`, **바인딩 없음**) | `cmb_LEADCOM_MBR_NO` (`itemset dlt_leadCom`, `dma_isu.leadcomMbrNo`) | 원본은 바인더에 이 컬럼이 없어 늘 빈 칸(§8 #3) → TO-BE 는 명세 키로 바인딩 |
-| └ 납입은행 | `label_14`, `cmb_PAY_BK_INST_CD` (`dts_PAY_BK_INST_CD`) | `cmb_PAY_BK_INST_CD` (`itemset dlt_instCd`, `dma_isu.payBkInstCd`) | 목록 §6.4·§10 #3 |
-| └ 사무대행기관 | `label_20`, `cmb_BZAGNT_INST_CD` (`dts_BZAGNT_INST_CD`) | `cmb_BZAGNT_INST_CD` (`itemset dlt_instCd`, `dma_isu.bzagntInstCd`) | |
-| └ 인수기관 | `label_15`, `cmb_UDWRT_INST_CD` (`dts_UDWRT_INST_CD`) | `cmb_UDWRT_INST_CD` (`itemset dlt_instCd`, `dma_isu.udwrtInstCd`) | |
-| └ 예탁기관 | `label_19`, `cmb_DEPO_INST_CD` (`dts_DEPO_INST_CD`) | `cmb_DEPO_INST_CD` (`itemset dlt_instCd`, `dma_isu.depoInstCd`) | |
-| └ 명의개서대행기관 | `label_16`, `cmb_TRANSSTK_AGNT_CD` (`enable2=False`, 공통 코드) | `cmb_TRANSSTK_AGNT_CD` (`disabled`, `dma_isu.transstkAgntCd`) | 공통 코드 `TRANSSTK_AGNT_CD` |
-| └ 표준구분 | `label_18`, `cmb_STD_YN` (`Y^표준,N^비표준`) | `cmb_STD_YN` (고정 항목, `dma_isu.stdYn`) | |
-| └ 기명/무기명구분 | `label_17`, `cmb_UINSCRIBE_YN` (`Y^무기명,N^기명`, 잠김) | `cmb_UINSCRIBE_YN` (`disabled`, 고정 항목, `dma_isu.uinscribeYn`) | |
-| └ 권리형태 | `label_38`, `cmb_ELW_RGHT_TP_KIND_CD` (공통 코드) | `cmb_ELW_RGHT_TP_KIND_CD` (`dma_isu.elwRghtTpKindCd`) | |
+| └ 한글종목명 | `label_25`, `txb_ISU_KOR_NM` | `txb_ISU_KOR_NM` (`readOnly`, `dma_detail.isuKorNm`) | |
+| └ 한글종목약명 | `label_10`, `txb_ISU_KOR_ABBRV` | `txb_ISU_KOR_ABBRV` (`readOnly`, `dma_detail.isuKorAbbrv`) | |
+| └ 영문종목명 | `label_11`, `txb_ISU_ENG_NM` | `txb_ISU_ENG_NM` (`readOnly`, `dma_detail.isuEngNm`) | |
+| └ 영문종목약명 | `label_12`, `txb_ISU_ENG_ABBRV` | `txb_ISU_ENG_ABBRV` (`readOnly`, `dma_detail.isuEngAbbrv`) | |
+| └ 종목코드 | `label_27`, `txb_ISU_CD` | `txb_ISU_CD` (`readOnly`, `dma_detail.isuCd`) | 수정 검증 대상(§6.2) |
+| └ 종목단축코드 | `label_9`, `txb_ISU_SRT_CD` | `txb_ISU_SRT_CD` (`readOnly`, `dma_detail.isuSrtCd`) | |
+| └ *전환비율(승수) | `label_13`(+`label_41` *), `edt_ELW_CONV_RTO` (편집, 소수 8) | `edt_ELW_CONV_RTO` (`dataType="float" maxLength="15.8"`, `dma_detail.elwConvRto`) | **명세 `modify` 요청에 없음** — 고쳐도 전송되지 않는다(§10 #2) |
+| └ 발행가액(원) (a) | `label_4`, `edt_ISU_PRC` (읽기전용 숫자) | `edt_ISU_PRC` (`readOnly`, `number #,###`, `dma_detail.isuPrc`) | |
+| └ 발행수량(b) | `label_26`, `edt_ISU_SHRS` | `edt_ISU_SHRS` (`readOnly`, `number`, `dma_detail.isuShrs`) | |
+| └ 발행총액(원) (a*b) | `label_6`, `edt_ISU_TOTAMT` | `edt_ISU_TOTAMT` (`readOnly`, `number`, `dma_detail.isuTotamt`) | 서버 값을 그대로 표시(화면 계산 없음) |
+| └ 상장일 | `label_62`, `edt_LIST_DD` (읽기전용 마스크) | `edt_LIST_DD` (`inputCalendar readOnly`, `dma_detail.listDd`) | |
+| └ 발행일 | `label_7`, `edt_ISU_DD` | `edt_ISU_DD` (`inputCalendar readOnly`, `dma_detail.isuDd`) | |
+| └ 만기일 | `label_22`, `edt_EXP_DD` | `edt_EXP_DD` (`inputCalendar readOnly`, `dma_detail.expDd`) | |
+| └ 청약일 | `label_23`, `edt_SUBS_DD` + `img_SUBS_DD` (달력 이미지) | `edt_SUBS_DD` (`inputCalendar`, `dma_detail.subsDd`) | 달력 이미지 **(옮기지 않음)** — inputCalendar 내장. **명세 `modify` 요청에 없음**(§10 #2) |
+| └ 납입일 | `label_8`, `edt_PAY_DD` + `img_PAY_DD` | `edt_PAY_DD` (`inputCalendar`, `dma_detail.payDd`) | 같음 |
+| └ 주간사 | `label_21`, `cmb_LEADCOM_MBR_NO` (`dts_LEADCOM_MBR_NO`, **바인딩 없음**) | `cmb_LEADCOM_MBR_NO` (`itemset dlt_leadCom`, `dma_detail.leadcomMbrNo`) | 원본은 바인더에 이 컬럼이 없어 늘 빈 칸(§8 #3) → TO-BE 는 명세 키로 바인딩 |
+| └ 납입은행 | `label_14`, `cmb_PAY_BK_INST_CD` (`dts_PAY_BK_INST_CD`) | `cmb_PAY_BK_INST_CD` (`itemset dlt_instCd`, `dma_detail.payBkInstCd`) | 목록 §6.4·§10 #3 |
+| └ 사무대행기관 | `label_20`, `cmb_BZAGNT_INST_CD` (`dts_BZAGNT_INST_CD`) | `cmb_BZAGNT_INST_CD` (`itemset dlt_instCd`, `dma_detail.bzagntInstCd`) | |
+| └ 인수기관 | `label_15`, `cmb_UDWRT_INST_CD` (`dts_UDWRT_INST_CD`) | `cmb_UDWRT_INST_CD` (`itemset dlt_instCd`, `dma_detail.udwrtInstCd`) | |
+| └ 예탁기관 | `label_19`, `cmb_DEPO_INST_CD` (`dts_DEPO_INST_CD`) | `cmb_DEPO_INST_CD` (`itemset dlt_instCd`, `dma_detail.depoInstCd`) | |
+| └ 명의개서대행기관 | `label_16`, `cmb_TRANSSTK_AGNT_CD` (`enable2=False`, 공통 코드) | `cmb_TRANSSTK_AGNT_CD` (`disabled`, `dma_detail.transstkAgntCd`) | 공통 코드 `TRANSSTK_AGNT_CD` |
+| └ 표준구분 | `label_18`, `cmb_STD_YN` (`Y^표준,N^비표준`) | `cmb_STD_YN` (고정 항목, `dma_detail.stdYn`) | |
+| └ 기명/무기명구분 | `label_17`, `cmb_UINSCRIBE_YN` (`Y^무기명,N^기명`, 잠김) | `cmb_UINSCRIBE_YN` (`disabled`, 고정 항목, `dma_detail.uinscribeYn`) | |
+| └ 권리형태 | `label_38`, `cmb_ELW_RGHT_TP_KIND_CD` (공통 코드) | `cmb_ELW_RGHT_TP_KIND_CD` (`dma_detail.elwRghtTpKindCd`) | |
 | 기초자산의종류 (왼쪽 단) | `label_48` + `panel_4` | `lybox` > `col_5#panel_4` > `titbox`(`label_48`) + 표 + 그리드 | 캡처의 2단 배치 |
-| └ 기초자산종류 | `label_29`, `cmb_FNC_ULY_TP_CD` (잠김, 공통 코드) | `cmb_FNC_ULY_TP_CD` (`disabled`, `dma_isu.fncUlyTpCd`) | |
-| └ 기초지수 | `label_42`, `cmb_ELW_OBJ_IDX_TP_CD` (잠김, 공통 코드) | `cmb_ELW_OBJ_IDX_TP_CD` (`disabled`, `dma_isu.elwObjIdxTpCd`) | |
-| └ 외국인투자한도 | `label_37`, `cmb_FORN_INVST_LMT_OBJ_ISU_YN` (`N^No,Y^Yes`) | `cmb_FORN_INVST_LMT_OBJ_ISU_YN` (`dma_isu.fornInvstLmtObjIsuYn`) | |
-| └ 거래시장 | `label_40`, `txb_TRD_MKT_NM` (30자) | `txb_TRD_MKT_NM` (`maxlength="30"`, `dma_isu.trdMktNm`) | |
-| └ 지수산출기관 | `label_39`, `txb_IDX_CALC_INST_NM` (30자) | `txb_IDX_CALC_INST_NM` (`maxlength="30"`, `dma_isu.idxCalcInstNm`) | |
-| └ 기초주권 목록 | `grd_ULY_ISU_CD` (`dts_UlyIsu`) | `grd_ULY_ISU_CD` (`dataList="data:dlt_ulyIsu"`, 읽기전용) | 컬럼 아래 표 |
+| └ 기초자산종류 | `label_29`, `cmb_FNC_ULY_TP_CD` (잠김, 공통 코드) | `cmb_FNC_ULY_TP_CD` (`disabled`, `dma_detail.fncUlyTpCd`) | |
+| └ 기초지수 | `label_42`, `cmb_ELW_OBJ_IDX_TP_CD` (잠김, 공통 코드) | `cmb_ELW_OBJ_IDX_TP_CD` (`disabled`, `dma_detail.elwObjIdxTpCd`) | |
+| └ 외국인투자한도 | `label_37`, `cmb_FORN_INVST_LMT_OBJ_ISU_YN` (`N^No,Y^Yes`) | `cmb_FORN_INVST_LMT_OBJ_ISU_YN` (`dma_detail.fornInvstLmtObjIsuYn`) | |
+| └ 거래시장 | `label_40`, `txb_TRD_MKT_NM` (30자) | `txb_TRD_MKT_NM` (`maxlength="30"`, `dma_detail.trdMktNm`) | |
+| └ 지수산출기관 | `label_39`, `txb_IDX_CALC_INST_NM` (30자) | `txb_IDX_CALC_INST_NM` (`maxlength="30"`, `dma_detail.idxCalcInstNm`) | |
+| └ 기초주권 목록 | `grd_ULY_ISU_CD` (`dts_UlyIsu`) | `grd_ULY_ISU_CD` (`dataList="data:dlt_uly"`, 읽기전용) | 컬럼 아래 표 |
 | 유동성공급에관한사항 (오른쪽 단) | `label_64` + `panel_6` | `col_4#panel_6` > `titbox`(`label_64`) + 그리드 + 표 | 캡처대로 그리드 아래 호가스프레드(퍼블리셔 XML 은 위) |
 | └ 유동성공급자 목록 | `grd_LP_MBR_NO` (`dts_LP`) | `grd_LP_MBR_NO` (`dataList="data:dlt_lp"`, 읽기전용) | |
-| └ 호가스프레드 | `label_73`, `edt_ORD_SPD_RTO` (소수 8) | `edt_ORD_SPD_RTO` (`float 15.8`, `dma_isu.ordSpdRto`) | |
+| └ 호가스프레드 | `label_73`, `edt_ORD_SPD_RTO` (소수 8) | `edt_ORD_SPD_RTO` (`float 15.8`, `dma_detail.ordSpdRto`) | |
 | 권리행사에관한사항 | `label_58` + `panel_5` | `titbox`(`label_58`) + `tblbox#panel_5` > 6칸 표 4행 | |
-| └ 권리유형 | `label_43`, `cmb_ELW_RGHT_TP_CD` (잠김, 공통 코드) | `cmb_ELW_RGHT_TP_CD` (`disabled`, `dma_isu.elwRghtTpCd`) | |
-| └ 권리행사방식 | `label_44`, `cmb_ELW_EXER_TP_CD` (잠김, 공통 코드 `EXER_TP_CD`) | `cmb_ELW_EXER_TP_CD` (`disabled`, `dma_isu.elwExerTpCd`) | |
-| └ 행사시작일·행사종료일 | `label_47`·`label_45`, `edt_EXER_STRT_DD`·`edt_EXER_END_DD` (읽기전용) | 같은 id (`inputCalendar readOnly`, `dma_isu.exerStrtDd`·`exerEndDd`) | 기간 쌍 → `compareFromToDate`(§3) |
-| └ 자동권리행사여부 | `label_49`, `cmb_AUTO_EXER_TP_CD` (잠김, 공통 코드) | `cmb_AUTO_EXER_TP_CD` (`disabled`, `dma_isu.autoExerTpCd`) | |
-| └ 중도상환여부 | `label_50`, `cmb_HALFWY_REDMPT_YN` (`Y^Yes,N^No`) | `cmb_HALFWY_REDMPT_YN` (`dma_isu.halfwyRedmptYn`) | |
-| └ *만기시 권리내용 | `label_46`(+`label_36` *), `txb_ELW_EXER_CONTN` (100자) | `txb_ELW_EXER_CONTN` (`maxlength="100"`, `dma_isu.elwExerContn`) | 캡처 라벨이 겹쳐 "*간기시"로 보이나 원본 문구 "만기시 권리내용" |
-| └ 조기종료시 권리내용 | `label_1`, `txb_ELW_KO_EXER_CONTN` (1000자) | `txb_ELW_KO_EXER_CONTN` (`maxlength="1000"`, `dma_isu.elwKoExerContn`) | |
+| └ 권리유형 | `label_43`, `cmb_ELW_RGHT_TP_CD` (잠김, 공통 코드) | `cmb_ELW_RGHT_TP_CD` (`disabled`, `dma_detail.elwRghtTpCd`) | |
+| └ 권리행사방식 | `label_44`, `cmb_ELW_EXER_TP_CD` (잠김, 공통 코드 `EXER_TP_CD`) | `cmb_ELW_EXER_TP_CD` (`disabled`, `dma_detail.elwExerTpCd`) | |
+| └ 행사시작일·행사종료일 | `label_47`·`label_45`, `edt_EXER_STRT_DD`·`edt_EXER_END_DD` (읽기전용) | 같은 id (`inputCalendar readOnly`, `dma_detail.exerStrtDd`·`exerEndDd`) | 기간 쌍 → `compareFromToDate`(§3) |
+| └ 자동권리행사여부 | `label_49`, `cmb_AUTO_EXER_TP_CD` (잠김, 공통 코드) | `cmb_AUTO_EXER_TP_CD` (`disabled`, `dma_detail.autoExerTpCd`) | |
+| └ 중도상환여부 | `label_50`, `cmb_HALFWY_REDMPT_YN` (`Y^Yes,N^No`) | `cmb_HALFWY_REDMPT_YN` (`dma_detail.halfwyRedmptYn`) | |
+| └ *만기시 권리내용 | `label_46`(+`label_36` *), `txb_ELW_EXER_CONTN` (100자) | `txb_ELW_EXER_CONTN` (`maxlength="100"`, `dma_detail.elwExerContn`) | 캡처 라벨이 겹쳐 "*간기시"로 보이나 원본 문구 "만기시 권리내용" |
+| └ 조기종료시 권리내용 | `label_1`, `txb_ELW_KO_EXER_CONTN` (1000자) | `txb_ELW_KO_EXER_CONTN` (`maxlength="1000"`, `dma_detail.elwKoExerContn`) | |
 | 결제에관한사항 | `label_51` + `panel_7` | `titbox`(`label_51`) + `tblbox#panel_7` > 8칸 표 7행 | |
-| └ 결제방법 | `label_52`, `cmb_ELW_LST_SETL_METHD_CD` (`A^혼합형,C^현금결제,D^실물결제`, 잠김) | `cmb_ELW_LST_SETL_METHD_CD` (`disabled`, `dma_isu.elwLstSetlMethdCd`) | |
-| └ *확정지급액 | `label_53`(+`label_34`), `edt_ELW_FINAL_PAY_VAL` (정수) | `edt_ELW_FINAL_PAY_VAL` (`number #,###`, `dma_isu.elwFinalPayVal`) | |
-| └ 지급일 | `label_24`, `edt_ELW_PAY_DD` (읽기전용) | `edt_ELW_PAY_DD` (`inputCalendar readOnly`, `dma_isu.elwPayDd`) | |
-| └ 최종거래일 | `label_60`, `edt_ELW_LSTTRD_DD` (읽기전용) | `edt_ELW_LSTTRD_DD` (`inputCalendar readOnly`, `dma_isu.elwLsttrdDd`) | |
-| └ *기준가격/지수 | `label_56`(+`label_2`), `edt_ELW_ULY_BAS_PRC` (소수 8) | `edt_ELW_ULY_BAS_PRC` (`float 15.8`, `dma_isu.elwUlyBasPrc`) | |
-| └ *가격상승참가율 | `label_57`(+`label_33`), `edt_ELW_PRC_UP_PARTC_RT` (소수 8) | `edt_ELW_PRC_UP_PARTC_RT` (`float 15.8`, `dma_isu.elwPrcUpPartcRt`) | |
-| └ *지급대리인 | `label_81`(+`label_35`), `txb_ELW_PAY_AGNT_NM` (40자) | `txb_ELW_PAY_AGNT_NM` (`maxlength="40"`, `dma_isu.elwPayAgntNm`) | |
-| └ *행사가격/지수 | `label_54`(+`label_28`), `edt_ELW_EXER_PRC` (소수 8) | `edt_ELW_EXER_PRC` (`float 15.8`, `dma_isu.elwExerPrc`) | |
-| └ *최소지급비율 | `label_59`(+`label_32`), `edt_ELW_COMPNS_RT` (소수 8) | `edt_ELW_COMPNS_RT` (`float 15.8`, `dma_isu.elwCompnsRt`) | 명세 이름 "ELW보상률" |
-| └ 조기종료발생기준가격/지수 | `label_63`, `edt_ELW_KO_OCCR_BAS_PRC` (소수 8) | `edt_ELW_KO_OCCR_BAS_PRC` (`float 15.8`, `dma_isu.elwKoOccrBasPrc`) | 명세 키는 `text`(AS-IS `TO_CHAR 'fm999999990.099'`) — §10 #9 |
-| └ *만기평가가격/지수 | `label_55`(+`label_30`), `txb_ELW_EXP_VALU_PRC_METHD` (100자) | `txb_ELW_EXP_VALU_PRC_METHD` (`maxlength="100"`, `dma_isu.elwExpValuPrcMethd`) | |
-| └ 조기종료평가가격/지수 | `label_65`, `txa_ELW_KO_VALU_METHD` (`mxtextarea`) | `txa_ELW_KO_VALU_METHD` (`xf:textarea`, `dma_isu.elwKoValuMethd`) | |
-| └ *상장폐지시 지급조건 | `label_61`(+`label_31`), `txb_DELISTTM_PAY_COND_CONTN` (100자) | `txb_DELISTTM_PAY_COND_CONTN` (`maxlength="100"`, `dma_isu.delisttmPayCondContn`) | |
+| └ 결제방법 | `label_52`, `cmb_ELW_LST_SETL_METHD_CD` (`A^혼합형,C^현금결제,D^실물결제`, 잠김) | `cmb_ELW_LST_SETL_METHD_CD` (`disabled`, `dma_detail.elwLstSetlMethdCd`) | |
+| └ *확정지급액 | `label_53`(+`label_34`), `edt_ELW_FINAL_PAY_VAL` (정수) | `edt_ELW_FINAL_PAY_VAL` (`number #,###`, `dma_detail.elwFinalPayVal`) | |
+| └ 지급일 | `label_24`, `edt_ELW_PAY_DD` (읽기전용) | `edt_ELW_PAY_DD` (`inputCalendar readOnly`, `dma_detail.elwPayDd`) | |
+| └ 최종거래일 | `label_60`, `edt_ELW_LSTTRD_DD` (읽기전용) | `edt_ELW_LSTTRD_DD` (`inputCalendar readOnly`, `dma_detail.elwLsttrdDd`) | |
+| └ *기준가격/지수 | `label_56`(+`label_2`), `edt_ELW_ULY_BAS_PRC` (소수 8) | `edt_ELW_ULY_BAS_PRC` (`float 15.8`, `dma_detail.elwUlyBasPrc`) | |
+| └ *가격상승참가율 | `label_57`(+`label_33`), `edt_ELW_PRC_UP_PARTC_RT` (소수 8) | `edt_ELW_PRC_UP_PARTC_RT` (`float 15.8`, `dma_detail.elwPrcUpPartcRt`) | |
+| └ *지급대리인 | `label_81`(+`label_35`), `txb_ELW_PAY_AGNT_NM` (40자) | `txb_ELW_PAY_AGNT_NM` (`maxlength="40"`, `dma_detail.elwPayAgntNm`) | |
+| └ *행사가격/지수 | `label_54`(+`label_28`), `edt_ELW_EXER_PRC` (소수 8) | `edt_ELW_EXER_PRC` (`float 15.8`, `dma_detail.elwExerPrc`) | |
+| └ *최소지급비율 | `label_59`(+`label_32`), `edt_ELW_COMPNS_RT` (소수 8) | `edt_ELW_COMPNS_RT` (`float 15.8`, `dma_detail.elwCompnsRt`) | 명세 이름 "ELW보상률" |
+| └ 조기종료발생기준가격/지수 | `label_63`, `edt_ELW_KO_OCCR_BAS_PRC` (소수 8) | `edt_ELW_KO_OCCR_BAS_PRC` (`float 15.8`, `dma_detail.elwKoOccrBasPrc`) | 명세 키는 `text`(AS-IS `TO_CHAR 'fm999999990.099'`) — §10 #9 |
+| └ *만기평가가격/지수 | `label_55`(+`label_30`), `txb_ELW_EXP_VALU_PRC_METHD` (100자) | `txb_ELW_EXP_VALU_PRC_METHD` (`maxlength="100"`, `dma_detail.elwExpValuPrcMethd`) | |
+| └ 조기종료평가가격/지수 | `label_65`, `txa_ELW_KO_VALU_METHD` (`mxtextarea`) | `txa_ELW_KO_VALU_METHD` (`xf:textarea`, `dma_detail.elwKoValuMethd`) | |
+| └ *상장폐지시 지급조건 | `label_61`(+`label_31`), `txb_DELISTTM_PAY_COND_CONTN` (100자) | `txb_DELISTTM_PAY_COND_CONTN` (`maxlength="100"`, `dma_detail.delisttmPayCondContn`) | |
 | 하단 버튼 | `btn_Update` (이미지 `btn_modify.gif`) | `btnbox#grpBtnBox` > `rt` > `btn_Update` (`btn_cm pt`, [수정]) | 규칙 41 — 주요 버튼 `pt` 오른쪽 |
 | 하단 버튼 | `btn_Close` (이미지, `frame.CloseFrame()`) | **(옮기지 않음)** | 메인 화면은 탭(windowContainer)의 닫기를 쓴다. gcc 에 "현재 메뉴 닫기" 함수가 없고 `$c.win.closePopup` 은 팝업용이다 → §10 #1 확인 |
 | (바인더 잔재) | `bnd_Isu` 의 `RISKFRE_INT_RT`·`ELW_DIV_RT`·`APPL_VOLT_RTO`·`CALC_OPT_PRC`·`CALC_ISU_PRC` → `edt_RISKFRE_INT_RT`·`edt_ELW_DIV_RT`·`edt_APPL_VOLT_RTO`·`edt_CALC_OPT_PRC`·`edt_CALC_ISU_PRC` | **(옮기지 않음)** | 화면에 그 컨트롤이 없다(다른 ELW 화면 바인더를 복사한 잔재, §8 #4). 명세에도 키가 없다 |
@@ -247,10 +247,11 @@ stateDiagram-v2
 
 | AS-IS | TO-BE | 종류 | 키(컬럼) | 출처 / 용도 |
 |---|---|---|---|---|
-| `dts_Isu` (+ `bnd_Isu`) | `dma_isu` | dataMap | 명세 `select-one` 응답 `dma_isu` keyInfo 58개 그대로 — `isuCd`·`isuSrtCd`·`isuKorNm`·`isuKorAbbrv`·`isuEngNm`·`isuEngAbbrv`·`listDd`·`delistDd`·`isuDd`·`elwLsttrdDd`·`expDd`·`subsDd`·`payDd`, `isuPrc`·`isuShrs`·`isuTotamt`·`elwConvRto`(number), 기관 코드·명 5쌍(`payBkInst*`·`leadcomMbr*`·`udwrtInst*`·`depoInst*`·`bzagntInst*`), `transstkAgntCd`·`transstkAgntNm`, `uinscribeYn`·`stdYn`·`fncUlyTpCd`·`elwObjIdxTpCd`·`fornInvstLmtObjIsuYn`·`idxCalcInstNm`·`elwRghtTpKindCd`·`trdMktNm`·`elwRghtTpCd`·`elwExerTpCd`·`elwExerContn`·`exerStrtDd`·`exerEndDd`·`autoExerTpCd`·`halfwyRedmptYn`·`elwLstSetlMethdCd`, `elwUlyBasPrc`·`elwExerPrc`·`elwPrcUpPartcRt`·`elwCompnsRt`(number), `elwExpValuPrcMethd`·`delisttmPayCondContn`·`elwPayDd`·`elwPayAgntNm`, `ordSpdRto`·`elwFinalPayVal`(number), `elwKoOccrBasPrc`(text)·`elwKoExerContn`·`elwKoValuMethd` | 상세 조회 응답 → 화면 바인딩(§2.1). 수정 전문의 원천 |
+| `dts_Isu` (+ `bnd_Isu`) | `dma_detail` | dataMap | 명세 `select-one` 응답 `dma_detail` keyInfo 58개 그대로 — `isuCd`·`isuSrtCd`·`isuKorNm`·`isuKorAbbrv`·`isuEngNm`·`isuEngAbbrv`·`listDd`·`delistDd`·`isuDd`·`elwLsttrdDd`·`expDd`·`subsDd`·`payDd`, `isuPrc`·`isuShrs`·`isuTotamt`·`elwConvRto`(number), 기관 코드·명 5쌍(`payBkInst*`·`leadcomMbr*`·`udwrtInst*`·`depoInst*`·`bzagntInst*`), `transstkAgntCd`·`transstkAgntNm`, `uinscribeYn`·`stdYn`·`fncUlyTpCd`·`elwObjIdxTpCd`·`fornInvstLmtObjIsuYn`·`idxCalcInstNm`·`elwRghtTpKindCd`·`trdMktNm`·`elwRghtTpCd`·`elwExerTpCd`·`elwExerContn`·`exerStrtDd`·`exerEndDd`·`autoExerTpCd`·`halfwyRedmptYn`·`elwLstSetlMethdCd`, `elwUlyBasPrc`·`elwExerPrc`·`elwPrcUpPartcRt`·`elwCompnsRt`(number), `elwExpValuPrcMethd`·`delisttmPayCondContn`·`elwPayDd`·`elwPayAgntNm`, `ordSpdRto`·`elwFinalPayVal`(number), `elwKoOccrBasPrc`(text)·`elwKoExerContn`·`elwKoValuMethd` | 상세 조회 응답 → 화면 바인딩(§2.1). 수정 전문의 원천 |
 | `dts_LP` | `dlt_lp` | dataList | 명세 `select-list-lp` 응답 — `lpMbrNo`, `lpMbrNm`, `lpContrtDd`, `lpStrtDd`, `lpEndDd` | `grd_LP_MBR_NO` |
-| `dts_UlyIsu` | `dlt_ulyIsu` | dataList | 명세 `select-list-uly` 응답 — `isuCd`, `ulyIsuCd`, `ulyIsuNm`, `ulyCompstRto`(number) | `grd_ULY_ISU_CD` |
-| (`trs_Save` 전송 `dts_Isu`) | `dma_save` | dataMap | 명세 `modify` 요청 31키 — `bzProcsNo`·`isurCd`·`isuCd`, 기관 코드 5개·`transstkAgntCd`, `uinscribeYn`·`stdYn`·`fornInvstLmtObjIsuYn`·`elwObjIdxTpCd`·`idxCalcInstNm`·`elwRghtTpKindCd`·`trdMktNm`·`elwExerContn`·`autoExerTpCd`·`halfwyRedmptYn`, `elwUlyBasPrc`·`elwExerPrc`·`elwPrcUpPartcRt`·`elwCompnsRt`(number), `elwExpValuPrcMethd`·`delisttmPayCondContn`·`elwPayAgntNm`, `ordSpdRto`·`elwFinalPayVal`(number), `elwKoOccrBasPrc`·`elwKoExerContn`·`elwKoValuMethd` | 수정 요청(`ref : "dma_save"`). `dma_isu` 의 같은 키 + 채번 번호 + 발행기관코드 |
+| `dts_UlyIsu` | `dlt_uly` | dataList | 명세 `select-list-uly` 응답 — `isuCd`, `ulyIsuCd`, `ulyIsuNm`, `ulyCompstRto`(number) | `grd_ULY_ISU_CD` |
+| (`trs_Save` 전송 `dts_Isu`) | `dma_save` | dataMap | 명세 `modify` 요청 31키 — `bzProcsNo`·`isurCd`·`isuCd`, 기관 코드 5개·`transstkAgntCd`, `uinscribeYn`·`stdYn`·`fornInvstLmtObjIsuYn`·`elwObjIdxTpCd`·`idxCalcInstNm`·`elwRghtTpKindCd`·`trdMktNm`·`elwExerContn`·`autoExerTpCd`·`halfwyRedmptYn`, `elwUlyBasPrc`·`elwExerPrc`·`elwPrcUpPartcRt`·`elwCompnsRt`(number), `elwExpValuPrcMethd`·`delisttmPayCondContn`·`elwPayAgntNm`, `ordSpdRto`·`elwFinalPayVal`(number), `elwKoOccrBasPrc`·`elwKoExerContn`·`elwKoValuMethd` | 수정 요청(`ref : "dma_save"`). `dma_detail` 의 같은 키 + 채번 번호 + 발행기관코드 |
+| (`trs_Save` 결과 — AS-IS 는 `OnSuccess`/`OnFail` 만) | `dma_saveResult` | dataMap | 명세 `modify` 응답 — `bzProcsNo`, `result`, `resultMessage`, `completeYn`(모두 text) | 수정 결과 판정·실패 메시지(§5.4) |
 | `txb_SearchCd`·`txb_SearchNm`·전역 `vIsurCd` | `dma_search` (**화면 전용 — 명세 외**) | dataMap | `isuCd`, `isuKorNm`, `isurCd` | 종목 선택 결과. 조회 요청의 `isuCd`, 수정 요청 `isurCd` 의 출처 |
 | `dts_INST_CD`·`dts_UDWRT_INST_CD`·`dts_PAY_BK_INST_CD`·`dts_BZAGNT_INST_CD`·`dts_DEPO_INST_CD` | `dlt_instCd` (**화면 전용 — 명세 외**) | dataList | `instCd`, `instNm` | 기관 콤보 4개 공용 목록. AS-IS 는 한 목록을 4벌 복사(`CopyDataSet`) → TO-BE 는 한 목록을 4개 콤보가 `itemset` 으로 공유. 목록 API 없음(§10 #3) |
 | `dts_LEADCOM_MBR_NO` | `dlt_leadCom` (**화면 전용 — 명세 외**) | dataList | `leadcomMbrNo`, `leadcomMbrNm` | 주간사 콤보 목록. 목록 API 없음(§10 #3) |
@@ -347,9 +348,9 @@ scwin.onpageload = async function () {
 | # | 명세 블록 | method · 경로 | 요청 (명세 정의) | 응답 (명세 정의) | AS-IS 대응 | TO-BE 함수 |
 |---|---|---|---|---|---|---|
 | 1 | [ULDSTF05923][ELW][상장원부] LP공급자 조회 | `GET …/select-list-lp` | `isuCd` | `dlt_lp` (dataList 5열) | `readLpMbrNoIssueBook` → `dts_LP` | `scwin.selectLp` |
-| 2 | [ULDSTF05923][ELW][상장원부] 기초자산 조회 | `get …/select-list-uly` | `isuCd` | `dlt_ulyIsu` (dataList 4열) | `readUlyIssueBook` → `dts_UlyIsu` | `scwin.selectUly` |
-| 3 | [ULDSTF05923][ELW][상장원부] 상세 조회 | `get …/select-one` | `isuCd` | `dma_isu` (dataMap 58키) | `readIssueBook` → `dts_Isu` | `scwin.selectIsu` |
-| 4 | [ULDSTF05923][ELW][상장원부] 수정 | `post …/modify` | `ref : "dma_save"` (31키) | (없음) | `trs_Save` `updateIssueBook` (`dts_Isu` 전체) | `scwin.saveTrs` |
+| 2 | [ULDSTF05923][ELW][상장원부] 기초자산 조회 | `GET …/select-list-uly` | `isuCd` | `dlt_uly` (dataList 4열) | `readUlyIssueBook` → `dts_UlyIsu` | `scwin.selectUly` |
+| 3 | [ULDSTF05923][ELW][상장원부] 상세 조회 | `GET …/select-one` | `isuCd` | `dma_detail` (dataMap 58키) | `readIssueBook` → `dts_Isu` | `scwin.selectIsu` |
+| 4 | [ULDSTF05923][ELW][상장원부] 수정 | `POST …/modify` | `ref : "dma_save"` (31키) | `dma_saveResult` (dataMap 4키) | `trs_Save` `updateIssueBook` (`dts_Isu` 전체) | `scwin.saveTrs` |
 
 - AS-IS 의 `DIV_IDX` 없이 `method` 로 나뉘던 조회 3회는 명세에서도 3개 API 로 그대로 나뉜다(합쳐지지 않음).
 
@@ -361,9 +362,9 @@ scwin.onpageload = async function () {
 | 2 | 기관(`listInstCd`)·주간사(`listLeadCom`) 목록 API 가 없다 | 목록 비움 + 조회한 현재 값만 항목으로 | #3 |
 | 3 | `modify` 의 `bzProcsNo` 주석은 "`/api/listing/common/bzprocsno/create` 채번값" 인데 pcc `getNewBzProcNo` 는 `/api/listing/lstproc/stock/chglisting/new-bzprocsno` 를 부른다 | pcc 를 그대로 씀(재사용 우선) | #5 |
 | 4 | AS-IS 가 보내던 `SECUGRP_ID(EW)`·`TRS_IDX(2)`·`LIST_BZ_TP_CD(309 ELW 기타상장)`·`SCREN_ID`·`SCREN_PROCES_TP_CD`·세션이 명세에 없다 | 보내지 않음 | #6 |
-| 5 | `modify` 응답이 비어 있다 | `responseJSON.success` 로만 판정 | #7 |
+| 5 | `modify` 응답 `dma_saveResult` 의 `completeYn` 이 text 라 값 형식(Y/N·true/false)이 정해지지 않았다(2026-10-30 갱신 전에는 응답 없음) | `success` 이고 `completeYn` 이 실패 표기(`N`·`false`)가 아니면 성공 | #7 |
 | 6 | `elwKoOccrBasPrc` 가 응답·요청 모두 `text`(AS-IS `TO_CHAR 'fm999999990.099'` 문자열) — 화면은 소수 8자리 숫자 입력 | 입력은 `float`, 값은 문자열로 주고받음 | #9 |
-| 7 | 명세 블록 1 은 `GET`, 2~4 는 소문자 `get`/`post` | 의미 같음(게이트 통과) | — |
+| 7 | (2026-10-30 갱신으로 해소) method 표기가 블록마다 대소문자가 달랐다 → 갱신본은 모두 대문자 | — | — |
 
 ### 5.1 상장원부 상세 조회 (`scwin.selectIsu(isuCd)`)
 
@@ -372,8 +373,8 @@ scwin.onpageload = async function () {
 | `id` | `sbm_selectIsu` |
 | `method` / `action` | `get` / `/api/listing/lstproc/elw/listed-register/select-one` *(AS-IS `/IssueBook.do?method=readIssueBook`)* |
 | `requestData` | `{ isuCd }` (`dma_search.isuCd`) |
-| `target` / `gridview` | `dma_isu=body` / (없음) |
-| 선행 / 순서 | `scwin.searchAll` 이 `dma_isu`·`dlt_lp`·`dlt_ulyIsu` 를 비운 뒤 가장 먼저 부른다(원본 동기 1번째) |
+| `target` / `gridview` | `dma_detail=body` / (없음) |
+| 선행 / 순서 | `scwin.searchAll` 이 `dma_detail`·`dlt_lp`·`dlt_uly` 를 비운 뒤 가장 먼저 부른다(원본 동기 1번째) |
 | 후처리 | `scwin.applyInstItems()` — 기관·주간사 콤보에 현재 값(§6.4). `true` 반환 |
 | 실패 처리 | `success:false` 면 `false` 반환 → `searchAll` 이 LP·기초자산 조회를 하지 않는다(화면은 빈 채, 통신 오류 안내는 공통) |
 | 중복 실행 | 기본(건너뜀) — `skipped` 면 `false` |
@@ -394,7 +395,7 @@ scwin.onpageload = async function () {
 |---|---|
 | `id` / `method` / `action` | `sbm_selectUly` / `get` / `/api/listing/lstproc/elw/listed-register/select-list-uly` *(AS-IS `readUlyIssueBook`)* |
 | `requestData` | `{ isuCd }` |
-| `target` / `gridview` | `dlt_ulyIsu=body` / `grd_ULY_ISU_CD` |
+| `target` / `gridview` | `dlt_uly=body` / `grd_ULY_ISU_CD` |
 | 후처리 · 실패 | 없음 |
 | 중복 실행 | 기본(건너뜀) |
 
@@ -404,11 +405,11 @@ scwin.onpageload = async function () {
 |---|---|
 | `id` | `sbm_saveTrs` |
 | `method` / `action` | `post` / `/api/listing/lstproc/elw/listed-register/modify`, `mediatype : "application/json"` *(AS-IS `trs_Save` `updateIssueBook`)* |
-| `ref` | `dma_save` (명세 그대로). 전문: `dma_save.setEmptyValue()` → `dma_save.setJSON(dma_isu.getJSON())`(정의된 31키만 남는다) → `bzProcsNo`(§5.5 채번값)·`isurCd`(`dma_search.isurCd` = 원본 `vIsurCd`) |
-| `target` | 없음(명세 응답 없음) |
+| `ref` | `dma_save` (명세 그대로). 전문: `dma_save.setEmptyValue()` → `dma_save.setJSON(dma_detail.getJSON())`(정의된 31키만 남는다) → `bzProcsNo`(§5.5 채번값)·`isurCd`(`dma_search.isurCd` = 원본 `vIsurCd`) |
+| `target` | `dma_saveResult=body` (명세 응답 4키). 보내기 전에 `dma_saveResult.setEmptyValue()` |
 | 선행 / 순서 | §6.3 검증 → 확인 → 채번 뒤 |
 | 후처리 | 성공: `MSG-A001` "[수정] 처리 성공하였습니다." → `await scwin.searchAll()` 재조회(원본 `OnSuccess` 의 `fn_read_sync()`) |
-| 실패 처리 | `success:false`: `MSG-A002` "[수정] 처리 실패하였습니다." (원본 `fn_alertMsg('F')`; `alert_error` 의 오류 상세는 공통 핸들러) |
+| 실패 처리 | `success:false` 또는 `completeYn` 이 `N`·`false`: `resultMessage` 가 있으면 그 문구, 없으면 `MSG-A002` "[수정] 처리 실패하였습니다." (원본 `fn_alertMsg('F')`; `alert_error` 의 오류 상세는 공통 핸들러) |
 | 중복 실행 | 기본(건너뜀) |
 
 ### 5.5 업무처리번호 채번 (`scwin.getNewBzProcsNo`)
@@ -440,7 +441,7 @@ scwin.onpageload = async function () {
 ### 6.2 수정 전 검증 (`scwin.validate`) — 원본 `fn_CheckForm`
 
 - **Return:** `Promise<Boolean>`
-- `dma_isu.isuCd`(화면 `txb_ISU_CD`)가 비면 "[종목]을 선택하세요." 안내 → `txb_ISU_CD.focus()` → false.
+- `dma_detail.isuCd`(화면 `txb_ISU_CD`)가 비면 "[종목]을 선택하세요." 안내 → `txb_ISU_CD.focus()` → false.
 - 원본의 `if (! dts_Isu.IsUpdated) fn_alertNoUpdate()` 는 **주석**이라 무효(§8 #6) — 옮기지 않는다.
 - 필수(`*`) 표시 항목 10개는 원본에서도 검사하지 않는다 → **공통 검증(`validateDataCollect`)으로 옮길 항목 없음**, 그대로 유지하고 §10 #8 에 올린다. 길이 제한은 입력 `maxlength`·`maxLength` 로 막는다.
 
@@ -457,14 +458,14 @@ scwin.onpageload = async function () {
 ### 6.4 기관·주간사 콤보 현재 값 (`scwin.applyInstItems`) — TO-BE 보조
 
 - 목록 API 가 없어(§10 #3) 콤보 항목이 비면 조회한 코드가 빈 칸으로 보인다. 상세 조회 뒤 `scwin.INST_COMBOS` 5건(`cmb_PAY_BK_INST_CD`·`cmb_UDWRT_INST_CD`·`cmb_BZAGNT_INST_CD`·`cmb_DEPO_INST_CD` → `dlt_instCd`, `cmb_LEADCOM_MBR_NO` → `dlt_leadCom`)마다:
-  1. 코드(`dma_isu.payBkInstCd` 등)가 비면 건너뜀.
+  1. 코드(`dma_detail.payBkInstCd` 등)가 비면 건너뜀.
   2. 목록에 그 코드가 없으면(`getMatchedIndex(codeCol, code, true)`) 행을 넣고 명(`payBkInstNm` 등, 없으면 코드)을 채운다.
   3. 콤보를 그 코드로 다시 선택(`setValue`).
 - 목록 API 가 정해지면 init 에서 목록을 채우고 이 함수는 지운다.
 
 ### 6.5 조회 묶음 (`scwin.searchAll`) — 원본 `fn_read_sync`
 
-- `dma_isu.setEmptyValue()`·`dlt_lp.removeAll()`·`dlt_ulyIsu.removeAll()` 로 이전 종목 값을 비운 뒤(§8 #7) `selectIsu` → (성공했을 때만) `selectLp` → `selectUly` 를 차례로 `await`.
+- `dma_detail.setEmptyValue()`·`dlt_lp.removeAll()`·`dlt_uly.removeAll()` 로 이전 종목 값을 비운 뒤(§8 #7) `selectIsu` → (성공했을 때만) `selectLp` → `selectUly` 를 차례로 `await`.
 - 원본은 인자 없이 `txb_SearchCd.value` 를 읽었다(`fn_SetParIsuCd` 가 넘기는 인자는 무시됨, §8 #1) → TO-BE 는 `dma_search.isuCd`.
 
 ---
@@ -512,7 +513,7 @@ scwin.onpageload = async function () {
 | 4 | 바인더에 화면에 없는 컨트롤 5개(`edt_RISKFRE_INT_RT`·`edt_ELW_DIV_RT`·`edt_APPL_VOLT_RTO`·`edt_CALC_OPT_PRC`·`edt_CALC_ISU_PRC`)가 남아 있다 — 다른 ELW 화면 바인더 복사 잔재 | 옮기지 않음 |
 | 5 | `var fn_GetPar, fn_SetPar;` 가 두 번 선언됐다 | 옮기지 않음(getPar 계약 삭제) |
 | 6 | `fn_CheckForm` 의 바뀐 내용 확인(`IsUpdated` → `fn_alertNoUpdate`)이 **주석**이라 바뀐 것이 없어도 수정 전송한다 | 그대로 유지(업무 결과가 같음) |
-| 7 | 다른 종목을 골라 조회가 실패하면 dataset 에 이전 종목 값이 남을 수 있고, 위 입력란에는 새 종목명이 보여 **다른 종목으로 수정**할 위험이 있다 | 고침 — 조회 전에 `dma_isu`·목록을 비우고, 상세 조회가 실패하면 뒤 조회를 하지 않는다 |
+| 7 | 다른 종목을 골라 조회가 실패하면 dataset 에 이전 종목 값이 남을 수 있고, 위 입력란에는 새 종목명이 보여 **다른 종목으로 수정**할 위험이 있다 | 고침 — 조회 전에 `dma_detail`·목록을 비우고, 상세 조회가 실패하면 뒤 조회를 하지 않는다 |
 | 8 | `fn_searchCode` 는 콤보를 못 찾으면 `alert(콤보 id)` 를 띄운다(디버그 잔재) | 옮기지 않음 — `setCommonCode` |
 | 9 | 필수 표시(`*`) 10개 항목을 검사하지 않는다(검증은 종목 선택 하나) | 그대로 유지 + §10 #8 |
 | 10 | 원본 동기 처리(조회·채번·`trs`)라 연속 클릭이 막혔다. 비동기 전환본은 조회·수정이 겹칠 수 있다 | 고침 — `executeDynamic` 중복 실행 건너뜀 + `skipped` 확인 |
@@ -548,9 +549,9 @@ scwin.onpageload = async function () {
 | `dts_Isu`·`dts_UlyIsu`·`dts_LP` `OnLoadError` (`alert_error`) | 삭제 — 공통 오류 핸들러 |
 | `getMessageParam("MSG-0010", "")` | `$c.stf.getMessageParam("MSG-0010", "")` |
 | `alert(...)` | `await $c.win.alert(...)` |
-| `getObjectValue(txb_ISU_CD) == ""` | `$c.util.isEmpty(dma_isu.get("isuCd"))` |
+| `getObjectValue(txb_ISU_CD) == ""` | `$c.util.isEmpty(dma_detail.get("isuCd"))` |
 | `txb_SearchCd.value = …` / `txb_SearchNm.value = …` | `dma_search.set("isuCd"/"isuKorNm", …)` (`ref` 바인딩) |
-| `mxbinder bnd_Isu` | 컴포넌트 `ref="data:dma_isu.*"` (주간사 추가, 잔재 5개 제외) |
+| `mxbinder bnd_Isu` | 컴포넌트 `ref="data:dma_detail.*"` (주간사 추가, 잔재 5개 제외) |
 | `mxmaskedit` 날짜(`format="YYYY-MM-DD"`) | `w2:inputCalendar` (읽기전용은 `readOnly`) |
 | `mxmaskedit` 숫자(`numeric`, `maxdecimalplace="8"`) | `xf:input dataType="float" maxLength="15.8" displayFormat="#,###.########[floor]"` / 정수 `dataType="number" displayFormat="#,###"` |
 | `mxcombo` `cbdata` / `combodataid` / `CBData` | `xf:select1` 고정 `choices` / `itemset` / `setCommonCode` |
@@ -559,6 +560,7 @@ scwin.onpageload = async function () {
 | `btn_Close` + `frame.CloseFrame()` | 삭제 — 탭 닫기(§10 #1) |
 | `btn_Update` (이미지) | `btn_Update` (`xf:trigger btn_cm pt`) + `ev:onclick="scwin.btn_Update_onclick"` |
 | `#include(...)` 7종(`libRoundPanel.js`·`stf.js`·`utils.js`·`PopupCalendar.js`·`list_common.js`·`session.js`·`elw_recv_common.js`) | 삭제(규칙 11) — 쓰는 함수만 `$c.lc`·`$c.stf`·gcc 로 |
+| (명세 갱신 2026-10-30) | DataCollection id `dma_isu`→`dma_detail`, `dlt_ulyIsu`→`dlt_uly`(바인딩·스크립트 전부), `dma_saveResult` 신설 + `saveTrs` 의 `target`·`completeYn` 판정 |
 | (없음 — TO-BE 보조) | `scwin.applyInstItems`(목록 API 없을 때 현재 값 표시), `scwin.INST_COMBOS`·`scwin.BZ_PROCS_NO_LEN` 상수 |
 
 ---
@@ -571,9 +573,9 @@ scwin.onpageload = async function () {
 4. **상장종목찾기(ULDSTF92017) 계약** — pcc `$c.lc.popFindIsu(secugrpId)` 는 `secugrpId` 만 넘긴다. 원본이 넘기던 현재 종목명(`arr[1]`, 초기 검색어)은 빠진다 — 필요하면 pcc 함수·92017 에 `isuKorNm` 을 추가한다(공용 소관, 보고만). 반환 키 `isuCd`·`isuKorNm`·`isurCd` 는 `sample-front/ui/stf/lst/common/ULDSTF92017.xml`(dlt_listRes 행 JSON) 기준이다. (§1.3, §6.1)
 5. **채번 API·응답 모양** — 명세 `dma_save.bzProcsNo` 주석은 `/api/listing/common/bzprocsno/create` 인데 pcc `getNewBzProcNo` 는 `/api/listing/lstproc/stock/chglisting/new-bzprocsno` 를 부른다. 어느 쪽이 맞는지, 응답이 문자열인지 `{ bzProcsNo }` 인지 확인한다(지금은 둘 다 받음). 공용 pcc 수정이 필요하면 보고 대상. (§5.5)
 6. **화면 이력·세션·업무유형 파라미터** — AS-IS 의 `SECUGRP_ID(EW)`·`SCREN_ID`·`SCREN_PROCES_TP_CD(01/03)`·`fn_encodeNSession`·`TRS_IDX(2)`·`LIST_BZ_TP_CD(309)` 를 서버가 대신 정하는지 확인한다. (§5)
-7. **modify 성공 판정** — 응답이 비어 있어 `responseJSON.success` 만으로 판정한다. 결과 코드가 따로 오면 판정을 맞춘다. (§5.4)
+7. **modify 성공 판정** — 갱신 명세의 응답 `dma_saveResult.completeYn` 은 text 라 값 형식이 정해지지 않았다. 지금은 `success` 이고 `completeYn` 이 `N`·`false` 가 아니면 성공으로 본다(비어 와도 성공). `result` 의 코드 체계와 함께 확인해 판정을 좁힌다. (§5.4)
 8. **필수 표시 항목 검증** — `*` 표시 10개(전환비율·만기시 권리내용·확정지급액·기준가격/지수·가격상승참가율·지급대리인·행사가격/지수·최소지급비율·만기평가가격/지수·상장폐지시 지급조건)를 원본은 검사하지 않는다. 검사를 넣을지 정한다 — 넣으면 `scwin.validate` 에 `$c.validate.validateDataCollect` 로 추가한다. (§6.2, §8 #9)
 9. **조기종료발생기준가격 형식** — 명세는 `elwKoOccrBasPrc` 를 `text`(AS-IS `TO_CHAR 'fm999999990.099'` — 소수 최대 3자리)로 주고받는다. 화면 입력은 원본처럼 소수 8자리 `float` 이다. 서버가 숫자 문자열을 받는지, 자릿수를 3자리로 맞출지 확인한다. (§5 차이 #6)
 10. **공통 코드 그룹명** — `setCommonCode` 에 원본 `CD_ENG_NM`(영문 그룹명 `TRANSSTK_AGNT_CD` 등)을 넘겼다. TO-BE 공통 코드 API 가 영문명으로 찾는지, 번호(00685 등)로 찾는지 확인해 맞춘다. (§3)
 11. **퍼블리셔 XML 과 캡처의 차이** — 퍼블리셔 XML 은 발행 사항 표의 행 배치(오른쪽 칸 순서·colspan 없음으로 칸 수 불일치), 호가스프레드 위치(그리드 위), 종목코드 `autoComplete`, 하단 [닫기] 가 캡처·원본과 달라 **캡처를 따랐다**. 퍼블리셔 확인이 필요하면 회신 받는다. (§2.1)
-12. **실화면 확인** — `itemset` 목록에 행을 넣은 뒤 `setValue` 로 다시 선택되는지, 읽기전용 `inputCalendar` 의 표시, `float` 입력의 8자리 표시, `dma_save.setJSON(dma_isu.getJSON())` 이 정의된 31키만 남기는지(선례 05911 과 같은 전제 — 조회 전용 키가 섞이면 정의 키만 골라 옮기도록 바꾼다)를 실화면에서 확인한다. (§5.4, §6.4)
+12. **실화면 확인** — `itemset` 목록에 행을 넣은 뒤 `setValue` 로 다시 선택되는지, 읽기전용 `inputCalendar` 의 표시, `float` 입력의 8자리 표시, `dma_save.setJSON(dma_detail.getJSON())` 이 정의된 31키만 남기는지(선례 05911 과 같은 전제 — 조회 전용 키가 섞이면 정의 키만 골라 옮기도록 바꾼다)를 실화면에서 확인한다. (§5.4, §6.4)

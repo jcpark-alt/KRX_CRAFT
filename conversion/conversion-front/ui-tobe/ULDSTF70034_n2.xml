@@ -1,0 +1,718 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare"
+	xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_screenId="ULDSTF70034_n2" meta_screenName="(팝업)만기에 의한 상장폐지"
+		meta_desc="투자계약증권·신탁수익증권 중 최종거래일이 도래한 종목을 만기에 의한 상장폐지로 일괄 등록하고 공시안내문을 작성하는 팝업 (원본 /digital/ULDSTF70034_n2.gfm, 업무 분석 ULDSTF70034_n2.md)"
+		meta_author="Inswave" meta_date="2026-10-30">
+		<title>만기에 의한 상장폐지</title>
+		<w2:type>COMPONENT</w2:type>
+		<w2:buildDate />
+		<xf:model>
+			<w2:dataCollection baseNode="map">
+				<!-- 아래 정의는 ULDSTF70034_n2_API.md 명세 원문 그대로(id·name·dataType) — 가이드 §5 「API 명세 적용」 -->
+				<!-- 상장폐지종목 (명세 select-list-new-isu 응답) — 그리드 -->
+				<w2:dataList id="dlt_newIsu" baseNode="list" saveRemovedData="true" repeatNode="map">
+					<w2:columnInfo>
+						<w2:column id="bzProcsNo" name="업무처리번호 (p2 만)" dataType="text"></w2:column>
+						<w2:column id="isuCd" name="종목코드" dataType="text"></w2:column>
+						<w2:column id="isuNm" name="종목약명" dataType="text"></w2:column>
+						<w2:column id="isurCd" name="발행기관코드" dataType="text"></w2:column>
+						<w2:column id="isurNm" name="발행기관약명 (n2 만)" dataType="text"></w2:column>
+						<w2:column id="comNm" name="발행기관약명 (p2 만)" dataType="text"></w2:column>
+						<w2:column id="lsttrdDd" name="최종거래일자" dataType="text"></w2:column>
+						<w2:column id="exerEndDd" name="만기일자 (n2 만)" dataType="text"></w2:column>
+						<w2:column id="isuPrc" name="상장금액 (n2 만)" dataType="number"></w2:column>
+						<w2:column id="isuShrs" name="상장수량 (n2 만)" dataType="number"></w2:column>
+						<w2:column id="secugrpId" name="증권그룹ID" dataType="text"></w2:column>
+						<w2:column id="secugrpIdNm" name="증권그룹명" dataType="text"></w2:column>
+					</w2:columnInfo>
+				</w2:dataList>
+				<!-- 상장폐지 중복 조회 응답 (명세 select-list-dup) -->
+				<w2:dataList id="dlt_dup" baseNode="list" saveRemovedData="true" repeatNode="map">
+					<w2:columnInfo>
+						<w2:column id="isuCd" name="중복 종목코드" dataType="text"></w2:column>
+					</w2:columnInfo>
+				</w2:dataList>
+				<!-- 등록 요청 (명세 register — ref : "dma_register"). 입력 폼(상장폐지일·사유·근거규정·기타)도 여기에 바인딩하고,
+				     등록 때마다 종목별 bzProcsNo·isuCd 만 바꿔 보낸다(원본: 종목마다 fn_copy_dts → trs.Post). -->
+				<w2:dataMap id="dma_register" baseNode="map">
+					<w2:keyInfo>
+						<w2:key id="bzProcsNo" name="업무처리번호 (등록: /api/listing/common/bzprocsno/create 채번값, 수정: 목록 선택값)" dataType="text"></w2:key>
+						<w2:key id="isuCd" name="상장폐지 종목코드 (AS-IS dts_Isu.ISU_CD)" dataType="text"></w2:key>
+						<w2:key id="delistDd" name="상장폐지일자(YYYYMMDD) (AS-IS edt_DelistDd)" dataType="text"></w2:key>
+						<w2:key id="delistRsnCd" name="상장폐지사유코드 (AS-IS 신규 기본값 730002)" dataType="text"></w2:key>
+						<w2:key id="delistRsnDsc" name="상장폐지사유설명 (AS-IS 신규 기본값 '투자계약증권/신탁수익증권 최종거래일 도래')" dataType="text"></w2:key>
+						<w2:key id="grndRegulNm" name="근거규정명 (AS-IS txb_GrndRegulNm)" dataType="text"></w2:key>
+						<w2:key id="remk" name="기타(비고) (AS-IS txa_Remk)" dataType="text"></w2:key>
+					</w2:keyInfo>
+				</w2:dataMap>
+			</w2:dataCollection>
+			<w2:workflowCollection />
+		</xf:model>
+		<w2:layoutInfo />
+		<w2:publicInfo method="scwin.onpageload,scwin.init,scwin.grd_isu_oncellclick,scwin.btn_Save_onclick,scwin.btn_Dscl_onclick,scwin.selectNewIsu,scwin.checkDup,scwin.registerTrs,scwin.initNewForm,scwin.applyNewIsuDefault,scwin.formatRemkDate,scwin.getEditState,scwin.validate,scwin.getNewBzProcsNo,scwin.save,scwin.getDsclData,scwin.writeDscl,scwin.getPar,scwin.fillDataList" />
+		<script lazy="false" type="text/javascript"><![CDATA[
+///////// 1. 변수 및 선언 영역 /////////
+scwin.screenId = "ULDSTF70034_n2";
+scwin.curDate = "";         // 서버 현재일 (yyyyMMdd)
+scwin.selectedRow = -1;     // 안내문작성 대상 행 (원본 selectedGrdNum, 0 = 미선택 → TO-BE -1)
+scwin.savedState = "";      // 입력 폼 값의 기준 스냅샷 — 안내문작성 전 변경 여부 판정용 (원본 dts_Mst.IsUpdated)
+scwin.DEFAULT_RSN_CD = "730002";                            // 신규 기본 상장폐지사유코드 (원본 DELIST_RSN_CD)
+scwin.DEFAULT_RSN_DSC = "신종증권 최종거래일 도래";          // 신규 기본 상장폐지사유설명 (원본·캡처 값 — 명세 주석과 다름 §10 #3)
+scwin.DEFAULT_GRND_REGUL_NM = "신종증권시장운영규정 제00조 제00호";  // 신규 기본 근거규정 (원본·캡처 값)
+scwin.BZ_PROCS_NO_LEN = 14;                                 // 업무처리번호 자릿수 (원본 fr_bz_procs_no.length != 14 → MSG-0010)
+scwin.DSCL_FORM_CD = "69544";                               // 공시안내문 서식코드 (원본 arr[0])
+scwin.DSCL_MKT_ID = "1";                                    // 공시안내문 시장구분 (원본 arr[3] '1')
+// 원본 : /digital/ULDSTF70034_n2.gfm (투자계약증권/신탁수익증권 만기에 의한 상장폐지 — 부모 ULDSTF70034 「만기에 의한 상장폐지」 탭의 [등록] 팝업)
+/*
+ * 화면 동작
+ *  - 열리면 오늘을 기준으로 최종거래일이 도래한 대상 종목을 조회해 그리드에 담고, 첫 행의 최종거래일 익일을 상장폐지일로, 최종거래일을 기타 문구로 채운다.
+ *  - [저장]은 입력을 검증하고 종목마다 같은 상장폐지일 중복을 확인한 뒤, 종목마다 업무처리번호를 새로 받아 하나씩 등록한다.
+ *  - [안내문작성]은 등록된 행을 골라 공시안내문작성(ULDSTF92024)을 연다.
+ *  - [수정]·[삭제]는 명세에 API 가 없어 잠가 둔다 — 부모는 등록 건 수정을 ULDSTF70034_p2 로 연다(§10 #1).
+ *  - 통신·데이터 정의는 ULDSTF70034_n2_API.md 명세 기준(select-list-new-isu · select-list-dup · register).
+ * 업무 분석 : conversion/conversion-front/ui/completed/ULDSTF70034_n2/ULDSTF70034_n2.md (§번호는 이 문서의 절)
+ */
+
+// 이 화면의 역할→버튼 매핑 — 상태별 활성 정책은 공통(BTN_STATE_MAP)이 보유한다.
+// [수정]·[삭제]는 매핑하지 않고 마크업에서 잠근다(명세 API 없음 §10 #1).
+scwin.BTN_MAP = {
+    save : "btn_Save",          // [저장]
+    guide : "btn_Dscl"          // [안내문작성]
+};
+
+///////// 2. 초기화 영역 /////////
+/**
+ * @method
+ * @name scwin.onpageload
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 페이지로드. 로딩 로직은 scwin.init 하나에 둔다(code-convention 초기화 절). (§3)
+ * @returns
+ * @hidden N
+ */
+scwin.onpageload = async function () {
+    try {
+        await scwin.init();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF70034_n2.onpageload" });
+    }
+};
+
+/**
+ * @method
+ * @name scwin.init
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 로딩 — 버튼 잠금 → 달력 바인딩 → 현재일 → 신규 준비(기본 사유·근거규정, 대상 종목 조회). (원본 gform onload + fn_new_onload — §3)
+ * 부모(ULDSTF70034)는 이 팝업을 신규 등록에만 열어 업무처리번호를 넘기지 않으므로 받는 값이 없다(§1.2).
+ * @returns
+ * @hidden N
+ */
+scwin.init = async function () {
+    // 1) 로딩 동안 버튼 잠금 — 조회가 예외로 끝나도 버튼이 XML 기본값(전부 활성)으로 남지 않게 한다.
+    $c.util.setButtonState("grpBtnBox", "disabled", scwin.BTN_MAP);
+
+    // 2) 달력 형식 검사 (규칙 22·37). 조회조건 영역(schbox)이 없어 Enter 키 바인딩은 없다.
+    $c.date.checkCalendarFormat(edt_DelistDd, "yyyyMMdd");
+    scwin.curDate = $c.date.getServerDateTime("yyyyMMdd");
+
+    // 3) 신규 준비
+    await scwin.initNewForm();
+};
+
+///////// 3. 컴포넌트 이벤트 영역 /////////
+/**
+ * @method
+ * @name scwin.grd_isu_oncellclick
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 상장폐지종목 행 클릭 — 안내문작성 대상 행으로 기억한다. (원본 MxGrid_2 OnClick → fn_SelectGridRow — §4)
+ * @param {Number} rowIndex 행 번호
+ * @param {Number} columnIndex 열 번호
+ * @param {String} columnId 열 id
+ * @returns
+ * @hidden N
+ */
+scwin.grd_isu_oncellclick = async function (rowIndex, columnIndex, columnId) {
+    try {
+        scwin.selectedRow = rowIndex;
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF70034_n2.grd_isu_oncellclick" });
+    }
+};
+
+/**
+ * @method
+ * @name scwin.btn_Save_onclick
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 저장 버튼 클릭
+ * @param {Object} e 이벤트 객체
+ * @returns
+ * @hidden N
+ */
+scwin.btn_Save_onclick = async function (e) {
+    try {
+        await scwin.save();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF70034_n2.btn_Save_onclick" });
+    }
+};
+
+/**
+ * @method
+ * @name scwin.btn_Dscl_onclick
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 안내문작성 버튼 클릭
+ * @param {Object} e 이벤트 객체
+ * @returns
+ * @hidden N
+ */
+scwin.btn_Dscl_onclick = async function (e) {
+    try {
+        await scwin.writeDscl();
+    } catch (ex) {
+        await $c.exception.handleError(ex, { context : "ULDSTF70034_n2.btn_Dscl_onclick" });
+    }
+};
+
+///////// 4. 서브미션 콜백 영역 /////////
+/**
+ * @method
+ * @name scwin.selectNewIsu
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 오늘을 기준으로 최종거래일이 도래한 만기 상장폐지 대상 종목을 조회해 그리드에 담는다.
+ * (원본 fn_new_onload 의 dts_Isu_Temp — selectDigitalDelist DIV_IDX=DIGITAL_DELLIST_DTL, TRS_IDX=NEWSEL, GUBUN_CD=오늘 — §5.1)
+ * @returns {Promise<Boolean>} 조회 성공 여부
+ * @hidden N
+ */
+scwin.selectNewIsu = async function () {
+    const sbmOptions = {
+        id : "sbm_selectNewIsu",
+        method : "get",
+        action : "/api/listing/lstproc/digital/delisting/select-list-new-isu",
+        target : "dlt_newIsu=body",
+        gridview : "grd_isu",
+        isProcessMsg : false
+    };
+
+    const result = await $c.sbm.executeDynamic(sbmOptions, { gubunCd : scwin.curDate });
+    if (result?.skipped) return false;     // 진행 중 조회가 있어 이번 호출은 건너뜀
+
+    return result?.responseJSON?.success === true;
+};
+
+/**
+ * @method
+ * @name scwin.checkDup
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 같은 상장폐지일에 이미 상장폐지된 종목이 있는지 종목마다 확인한다. 하나라도 있으면 안내하고 false.
+ * 원본처럼 수정이 아니므로 업무처리번호는 비워 보낸다. (원본 fn_dupCheck — searchDigitalDupDelist, §5.2)
+ * @param {Array} rows 확인할 종목 행 배열
+ * @returns {Promise<Boolean>} 중복 없음 여부
+ * @hidden N
+ */
+scwin.checkDup = async function (rows) {
+    const delistDd = dma_register.get("delistDd");
+
+    for (const row of rows) {
+        const sbmOptions = {
+            id : "sbm_checkDup",
+            method : "get",
+            action : "/api/listing/lstproc/digital/delisting/select-list-dup",
+            target : "dlt_dup=body",
+            isProcessMsg : false
+        };
+
+        dlt_dup.removeAll();
+        const result = await $c.sbm.executeDynamic(sbmOptions, { isuCd : row.isuCd, delistDd : delistDd, bzProcsNo : "" });
+        if (result?.skipped) return false;
+        if (!result?.responseJSON?.success) return false;
+
+        if (dlt_dup.getRowCount() > 0) {
+            await $c.win.alert("동일한 날짜에 상장폐지된 종목[" + dlt_dup.getCellData(0, "isuCd") + "]이 존재합니다.");
+            return false;
+        }
+    }
+    return true;
+};
+
+/**
+ * @method
+ * @name scwin.registerTrs
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 종목 한 건을 등록한다. 입력 폼(dma_register)에 이 종목의 업무처리번호·종목코드를 넣어 ref 로 보낸다.
+ * (원본 fn_copy_dts + fn_save_trs — saveDigitalDelist TRS_IDX=1, §5.3)
+ * @param {String} bzProcsNo 새로 받은 업무처리번호
+ * @param {String} isuCd 종목코드
+ * @returns {Promise<Boolean>} 등록 성공 여부
+ * @hidden N
+ */
+scwin.registerTrs = async function (bzProcsNo, isuCd) {
+    // TODO: 원본이 보내던 ISUR_CD "99999"·MKTACT_APPL_OBJ_TP_CD "1"·LIST_BZ_TP_CD "794"·SCREN_ID·DIV_IDX 는 명세에 없음 (§10 #4)
+    dma_register.set("bzProcsNo", bzProcsNo);
+    dma_register.set("isuCd", isuCd);
+
+    const sbmOptions = {
+        id : "sbm_registerTrs",
+        method : "post",
+        action : "/api/listing/lstproc/digital/delisting/register",
+        ref : "dma_register",
+        isProcessMsg : false
+    };
+
+    const result = await $c.sbm.executeDynamic(sbmOptions);
+    if (result?.skipped) return false;
+
+    // TODO: 명세에 응답 정의가 없어 통신 성공(success)만으로 판정한다 (§10 #5)
+    return result?.responseJSON?.success === true;
+};
+
+///////// 5. 일반/업무 함수 영역 /////////
+/**
+ * @method
+ * @name scwin.initNewForm
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 신규 준비. 기본 사유·근거규정을 채우고 대상 종목을 조회한 뒤, 첫 종목으로 상장폐지일·기타를 채우고 [저장]을 켠다.
+ * (원본 fn_new_onload + dts_Mst · dts_Isu_Temp OnLoadCompleted 신규 분기 — §3)
+ * @returns
+ * @hidden N
+ */
+scwin.initNewForm = async function () {
+    dma_register.setEmptyValue();
+    dma_register.set("delistRsnCd", scwin.DEFAULT_RSN_CD);
+    dma_register.set("delistRsnDsc", scwin.DEFAULT_RSN_DSC);
+    dma_register.set("grndRegulNm", scwin.DEFAULT_GRND_REGUL_NM);
+    scwin.selectedRow = -1;
+
+    // 조회가 실패하면 버튼을 잠근 채 둔다 — 대상이 없는 상태로 저장하지 않게 한다.
+    if (!await scwin.selectNewIsu()) return;
+
+    scwin.applyNewIsuDefault();
+
+    scwin.savedState = scwin.getEditState();
+    $c.util.setButtonState("grpBtnBox", "insert", scwin.BTN_MAP);
+};
+
+/**
+ * @method
+ * @name scwin.applyNewIsuDefault
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 대상 종목이 있으면 첫 행의 최종거래일 익일을 상장폐지일로, "최종거래일 yy년 mm월 dd일" 을 기타로 채운다.
+ * (원본 dts_Isu_Temp OnLoadCompleted — cGetPlusDate2(LSTTRD_DD, 1) · dateForm, §3)
+ * @returns
+ * @hidden N
+ */
+scwin.applyNewIsuDefault = function () {
+    if (dlt_newIsu.getRowCount() === 0) return;
+
+    const lsttrdDd = String(dlt_newIsu.getCellData(0, "lsttrdDd") ?? "");
+    dma_register.set("delistDd", $c.date.addDate(lsttrdDd, 1));
+    dma_register.set("remk", "최종거래일 " + scwin.formatRemkDate(lsttrdDd));
+};
+
+/**
+ * @method
+ * @name scwin.formatRemkDate
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 기타 문구용 날짜. yyyyMMdd 를 "yy년 mm월 dd일" 로, 비어 있으면 "★★년★★월★★일" 로 바꾼다. (원본 dateForm — §6.3)
+ * @param {String} ymd 날짜 (yyyyMMdd)
+ * @returns {String} 문구용 날짜
+ * @hidden N
+ */
+scwin.formatRemkDate = function (ymd) {
+    if ($c.util.isEmpty(ymd)) return "★★년★★월★★일";
+    return ymd.substring(2, 4) + "년 " + ymd.substring(4, 6) + "월 " + ymd.substring(6, 8) + "일";
+};
+
+/**
+ * @method
+ * @name scwin.getEditState
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 입력 폼(상장폐지일·사유·근거규정·기타) 값의 스냅샷. 종목별로 바뀌는 업무처리번호·종목코드는 뺀다.
+ * @returns {String} 입력 값 JSON 문자열
+ * @hidden N
+ */
+scwin.getEditState = function () {
+    const form = dma_register.getJSON();
+    return JSON.stringify({
+        delistDd : form.delistDd,
+        delistRsnCd : form.delistRsnCd,
+        delistRsnDsc : form.delistRsnDsc,
+        grndRegulNm : form.grndRegulNm,
+        remk : form.remk
+    });
+};
+
+/**
+ * @method
+ * @name scwin.validate
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 저장 전 입력 검증. 원본 fn_CheckForm 순서를 따른다. (§6.1)
+ *  1) 대상 종목 1건 이상  2) 상장폐지일 필수·날짜, 익일 이후  3) 근거규정 필수·200 byte  4) 기타 2000 byte
+ * @returns {Promise<Boolean>} 검증 통과 여부
+ * @hidden N
+ */
+scwin.validate = async function () {
+    if (dlt_newIsu.getRowCount() === 0) {
+        await $c.win.alert("[상장폐지종목] 만기에 의한 상장폐지 종목이 존재하지 않습니다.");
+        return false;
+    }
+
+    const dateOptions = {
+        validateType : "alert",     // alert|mark|all
+        checkType : "single",       // single|multi
+        fields : {
+            edt_DelistDd : { required : true, format : "date", name : "상장폐지일" }
+        }
+    };
+    if (!await $c.validate.validateDataCollect(panel_3, dateOptions)) return false;
+
+    // 상장폐지일은 익일 이후 (원본 checkDdTm("DD", edt_DelistDd, "상장폐지", false) — pcc 함수는 Gauce 속성 .text 를 읽어 쓰지 않는다)
+    if (dma_register.get("delistDd") <= scwin.curDate) {
+        await $c.win.alert("[상장폐지일]을 익일 이후로 입력하세요.");
+        edt_DelistDd.focus();
+        return false;
+    }
+
+    const textOptions = {
+        validateType : "alert",
+        checkType : "single",
+        fields : {
+            txb_GrndRegulNm : { required : true, maxLengthB : 200, name : "근거규정" },
+            txa_Remk : { maxLengthB : 2000, name : "기타" }
+        }
+    };
+    if (!await $c.validate.validateDataCollect(panel_3, textOptions)) return false;
+
+    return true;
+};
+
+/**
+ * @method
+ * @name scwin.getNewBzProcsNo
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 등록용 업무처리번호를 새로 받는다. pcc 응답 형태(문자열 / { body } / { body : { bzProcsNo } })를 모두 받아 문자열로 돌려준다.
+ * (원본 fn_getNewBzProcNo(dts_BzProcsNo) — §5.3)
+ * @returns {Promise<String>} 업무처리번호 (실패 시 빈 문자열)
+ * @hidden N
+ */
+scwin.getNewBzProcsNo = async function () {
+    // TODO: 명세 dma_register.bzProcsNo 주석의 채번 경로(/api/listing/common/bzprocsno/create)와 pcc 의 채번 경로가 다르다 (§10 #2)
+    const res = await $c.stf.getNewBzProcNo();
+    const body = (res !== null && typeof res === "object") ? res.body : res;
+    const no = (body !== null && typeof body === "object") ? body.bzProcsNo : body;
+    return String(no ?? "");
+};
+
+/**
+ * @method
+ * @name scwin.save
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 등록. 검증 → 중복 확인 → 확인 → 종목마다 채번(14자리 아니면 MSG-0010 후 다음 종목) → 등록 순서.
+ * 이미 등록돼 업무처리번호가 있는 행은 건너뛴다(일부 실패 뒤 다시 저장할 때 중복 등록 방지 — §8 #3).
+ * 하나라도 등록되면 [저장]을 잠그고 [안내문작성]을 켠다. (원본 fn_save + trs OnSuccess/OnFail — §6.2)
+ * @returns
+ * @hidden N
+ */
+scwin.save = async function () {
+    if (!await scwin.validate()) return;
+
+    const targets = [];
+    dlt_newIsu.getAllJSON().forEach((row, idx) => {
+        if ($c.util.isEmpty(row.bzProcsNo)) targets.push({ idx : idx, isuCd : row.isuCd });
+    });
+    if (targets.length === 0) return;
+
+    if (!await scwin.checkDup(targets)) return;
+
+    // "[저장] 처리를 하시겠습니까?" — 업무공통 MSG-A006
+    if (!await $c.lc.isProcess("I")) return;
+
+    let okCnt = 0;
+    let failCnt = 0;
+    for (const target of targets) {
+        const bzProcsNo = await scwin.getNewBzProcsNo();
+        if (bzProcsNo.length !== scwin.BZ_PROCS_NO_LEN) {
+            await $c.win.alert($c.stf.getMessageParam("MSG-0010", ""));
+            failCnt++;
+            continue;
+        }
+
+        if (await scwin.registerTrs(bzProcsNo, target.isuCd)) {
+            dlt_newIsu.setCellData(target.idx, "bzProcsNo", bzProcsNo);   // 원본 OnSuccess: 행에 업무처리번호 반영
+            okCnt++;
+        } else {
+            failCnt++;
+        }
+    }
+    dma_register.set("bzProcsNo", "");
+    dma_register.set("isuCd", "");
+
+    await $c.win.alert($c.stf.getMessageParam(failCnt === 0 ? "MSG-A001" : "MSG-A002", "저장"));
+    if (okCnt === 0) return;
+
+    // 원본 OnSuccess(전 건 처리 후): 버튼 update 상태, 행 1건이면 그 행 선택. 부모 목록은 팝업이 닫힌 뒤 부모가 다시 조회한다(§1.2).
+    scwin.savedState = scwin.getEditState();
+    scwin.selectedRow = (dlt_newIsu.getRowCount() === 1) ? 0 : -1;
+    $c.util.setButtonState("grpBtnBox", failCnt === 0 ? "update" : "enabled", scwin.BTN_MAP);
+};
+
+/**
+ * @method
+ * @name scwin.getDsclData
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 공시안내문작성 팝업(ULDSTF92024)에 넘길 data. 선택한 행 기준이다. (원본 fn_dscl 의 임시 fn_GetPar — arr[0]~[5] + CopyDataSet 2종, §6.4)
+ * @returns {Object} 넘길 data
+ * @hidden N
+ */
+scwin.getDsclData = function () {
+    const row = dlt_newIsu.getRowJSON(scwin.selectedRow);
+    const form = dma_register.getJSON();
+
+    return {
+        formCd : scwin.DSCL_FORM_CD,        // AS-IS arr[0] "69544"
+        bzProcsNo : row.bzProcsNo,          // AS-IS arr[1] fr_bz_procs_no (선택 행)
+        isurCd : row.isurCd,                // AS-IS arr[2] Isur_cd (선택 행)
+        mktId : scwin.DSCL_MKT_ID,          // AS-IS arr[3] '1'
+        msg : "",                           // AS-IS arr[4] (원본은 비워 두고 arr[5] 를 채워 길이 6)
+        title : row.isuNm,                  // AS-IS arr[5] 선택 행 종목명
+        // AS-IS CopyDataSet(dts_Isu, param_dts_isu) — fn_copy_dts 가 선택 행을 한 건으로 옮긴 것
+        isu : [{
+            bzProcsNo : row.bzProcsNo,
+            isuCd : row.isuCd,
+            isuNm : row.isuNm,
+            isurCd : row.isurCd,
+            isurNm : row.isurNm,
+            comNm : row.comNm,
+            lsttrdDd : row.lsttrdDd,
+            expDd : row.exerEndDd           // AS-IS EXP_DD — 명세 응답에는 만기일자(exerEndDd)로 온다
+        }],
+        // AS-IS CopyDataSet(dts_Mst, param_dts_mst) + DELIST_RSN_NM = DELIST_RSN_DSC, ISU_NM = 선택 종목명
+        mst : [{
+            ...form,
+            bzProcsNo : row.bzProcsNo,
+            isuCd : row.isuCd,
+            delistRsnNm : form.delistRsnDsc,
+            isuNm : row.isuNm
+        }]
+    };
+};
+
+/**
+ * @method
+ * @name scwin.writeDscl
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 공시안내문작성. 행을 골랐는지, 등록된 행인지, 입력을 고친 뒤 저장하지 않았는지 확인하고 팝업을 data 로 넘겨 열고 닫힐 때까지 기다린다.
+ * (원본 fn_dscl · fn_checkModifyDts — §6.4, 가이드 §6.5)
+ * @returns
+ * @hidden N
+ */
+scwin.writeDscl = async function () {
+    if (scwin.selectedRow < 0 || scwin.selectedRow >= dlt_newIsu.getRowCount()) {
+        await $c.win.alert("종목을 선택해 주세요!");
+        return;
+    }
+
+    // 등록 실패로 업무처리번호가 없는 행은 안내문을 만들 수 없다(원본은 빈 번호로 열었다 — §8 #4)
+    if ($c.util.isEmpty(dlt_newIsu.getCellData(scwin.selectedRow, "bzProcsNo"))) {
+        await $c.win.alert("등록되지 않은 종목입니다. [저장] 후 진행하세요.");
+        return;
+    }
+
+    if (scwin.getEditState() !== scwin.savedState) {
+        await $c.win.alert("변경된 내용이 있습니다. [수정] 후 진행하세요.");
+        return;
+    }
+
+    const options = {
+        id : "ULDSTF92024",
+        popupName : "공시안내문작성",
+        width : 745,
+        height : 825,
+        type : "pageFramePopup"
+    };
+
+    // TODO: 경로는 가정, 92024 는 아직 getPar 계약이라 수신부 변경 필요 (§10 #6)
+    await $c.win.openPopup("/ui/listingcommon/ULDSTF92024.xml", options, scwin.getDsclData());
+};
+
+/**
+ * @method
+ * @name scwin.getPar
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description [호환용 · 임시] 공시안내문작성(ULDSTF92024) 전환본은 아직 부모의 scwin.getPar 를 이름으로 불러 값을 받는다.
+ * 92024 가 $c.data.getParameter() 수신으로 바뀌면 이 함수를 지운다. (§6.4, §10 #6, 가이드 §6.5 예외)
+ * @param {Array} arr 92024 가 넘기는 빈 배열 — [0] 서식코드 [1] 업무처리번호 [2] 발행기관코드 [3] 시장구분 [4] 메시지 [5] 공시제목 을 채운다
+ * @param {Object} dltIsu 92024 의 종목 dataList
+ * @param {Object} dltMst 92024 의 마스터 dataList
+ * @returns {Number} arr 길이
+ * @hidden N
+ */
+scwin.getPar = function (arr, dltIsu, dltMst) {
+    const data = scwin.getDsclData();
+
+    arr[0] = data.formCd;
+    arr[1] = data.bzProcsNo;
+    arr[2] = data.isurCd;
+    arr[3] = data.mktId;
+    arr[4] = data.msg;
+    arr[5] = data.title;
+
+    scwin.fillDataList(dltIsu, data.isu);
+    scwin.fillDataList(dltMst, data.mst);
+
+    return arr.length;
+};
+
+/**
+ * @method
+ * @name scwin.fillDataList
+ * @author Inswave
+ * @date 2026. 10. 30
+ * @description 컬럼 정의가 비어 있는 92024 의 원천 dataList 에 행 키를 컬럼으로 더하고 행을 채운다. (원본 CopyDataSet 의 헤더 복사 — §6.4)
+ * @param {Object} dataList 채울 dataList
+ * @param {Array} rows 행 배열
+ * @returns
+ * @hidden N
+ */
+scwin.fillDataList = function (dataList, rows) {
+    if (!dataList) return;
+
+    Object.keys(rows[0] ?? {}).forEach(key => {
+        if (dataList.getColumnIndex(key) < 0) dataList.insertColumn(key);
+    });
+    dataList.setJSON(rows);
+};
+]]></script>
+	</head>
+	<body ev:onpageload="scwin.onpageload">
+		<xf:group class="pop_contents" id="" meta_componentContainer="true" style="">
+			<w2:pageFrame id="pfmContentHeader" src="/cm/xml/contentHeader.xml" style="" />
+			<!-- 상장폐지 입력 : 1. 상장폐지종목(그리드) ~ 5. 기타 -->
+			<xf:group class="tblbox" id="panel_3" style="">
+				<xf:group class="w2tb tbl" id="" style="" tagname="table">
+					<w2:attributes>
+						<w2:summary>만기에 의한 상장폐지 입력</w2:summary>
+					</w2:attributes>
+					<xf:group tagname="colgroup">
+						<xf:group style="width:150px;" tagname="col" />
+						<xf:group tagname="col" />
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group class="w2tb_th" tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox class="req" id="label_2" label="1. 상장폐지종목" style="" />
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<xf:group class="gvwbox" id="" style="">
+								<w2:gridView autoFit="allColumn" class="gvw" dataList="data:dlt_newIsu" ev:oncellclick="scwin.grd_isu_oncellclick" id="grd_isu" style="height:153px;">
+									<w2:caption id="grd_isu_cap" style="" value="상장폐지종목" />
+									<w2:header id="grd_isu_hd" style="">
+										<w2:row id="" style="">
+											<w2:column displayMode="label" id="h_isuCd" inputType="text" textAlign="center" value="종목코드" width="100" />
+											<w2:column displayMode="label" id="h_secugrpIdNm" inputType="text" textAlign="center" value="증권구분" width="89" />
+											<w2:column displayMode="label" id="h_isurNm" inputType="text" textAlign="center" value="상장신청인" width="100" />
+											<w2:column displayMode="label" id="h_isuNm" inputType="text" textAlign="center" value="종목명" width="149" />
+											<w2:column displayMode="label" id="h_lsttrdDd" inputType="text" textAlign="center" value="최종거래일" width="77" />
+											<w2:column displayMode="label" id="h_bzProcsNo" inputType="text" textAlign="center" value="업무처리번호" width="102" />
+										</w2:row>
+									</w2:header>
+									<w2:gBody id="grd_isu_bd" style="">
+										<w2:row id="" style="">
+											<w2:column displayMode="label" id="isuCd" inputType="text" readOnly="true" textAlign="center" width="100" />
+											<w2:column displayMode="label" id="secugrpIdNm" inputType="text" readOnly="true" textAlign="center" width="89" />
+											<w2:column displayMode="label" id="isurNm" inputType="text" readOnly="true" textAlign="left" width="100" />
+											<w2:column displayMode="label" id="isuNm" inputType="text" readOnly="true" textAlign="left" width="149" />
+											<w2:column dataType="date" displayFormat="yyyy-MM-dd" displayMode="label" id="lsttrdDd" inputType="text" readOnly="true" textAlign="center" width="77" />
+											<w2:column displayMode="label" id="bzProcsNo" inputType="text" readOnly="true" textAlign="center" width="102" />
+										</w2:row>
+									</w2:gBody>
+								</w2:gridView>
+							</xf:group>
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group class="w2tb_th" tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox class="req" id="label_1" label="2. 상장폐지일" style="" />
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<w2:inputCalendar calendarValueType="yearMonthDate" focusOnDateSelect="false" footerDiv="true" id="edt_DelistDd" ref="data:dma_register.delistDd" renderDiv="true" rightAlign="false" style="" />
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group class="w2tb_th" tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox class="req" id="label_11" label="3. 상장폐지사유" style="" />
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<xf:input id="txb_Rsn_Cd" maxlength="1000" readOnly="true" ref="data:dma_register.delistRsnDsc" style="width:100%;" />
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group class="w2tb_th" tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox class="req" id="label_6" label="4. 근거규정" style="" />
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<xf:input id="txb_GrndRegulNm" maxlength="1000" readOnly="true" ref="data:dma_register.grndRegulNm" style="width:100%;" />
+						</xf:group>
+					</xf:group>
+					<xf:group tagname="tr">
+						<xf:group class="w2tb_th" tagname="th">
+							<w2:attributes>
+								<w2:scope>row</w2:scope>
+							</w2:attributes>
+							<w2:textbox id="label_7" label="5. 기타" style="" />
+						</xf:group>
+						<xf:group class="w2tb_td" tagname="td">
+							<xf:textarea id="txa_Remk" ref="data:dma_register.remk" style="width:100%;height:108px;" />
+						</xf:group>
+					</xf:group>
+				</xf:group>
+			</xf:group>
+			<!-- 하단 : 처리 버튼. 팝업이라 「닫기」 없음, 주요 버튼(삭제·수정·저장)은 pt 로 맨 오른쪽(규칙 41).
+			     [수정]·[삭제]는 이 화면 명세에 API 가 없어 잠가 둔다 — 등록 건 수정은 부모가 ULDSTF70034_p2 로 연다(§10 #1). -->
+			<xf:group class="btnbox" id="grpBtnBox" style="">
+				<xf:group class="rt" id="" style="">
+					<xf:trigger class="btn_cm" ev:onclick="scwin.btn_Dscl_onclick" id="btn_Dscl" type="button">
+						<xf:label><![CDATA[안내문작성]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm pt" disabled="true" id="btn_Delete" type="button">
+						<xf:label><![CDATA[삭제]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm pt" disabled="true" id="btn_Update" type="button">
+						<xf:label><![CDATA[수정]]></xf:label>
+					</xf:trigger>
+					<xf:trigger class="btn_cm pt" ev:onclick="scwin.btn_Save_onclick" id="btn_Save" type="button">
+						<xf:label><![CDATA[저장]]></xf:label>
+					</xf:trigger>
+				</xf:group>
+			</xf:group>
+		</xf:group>
+	</body>
+</html>
