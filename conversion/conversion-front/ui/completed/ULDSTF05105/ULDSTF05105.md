@@ -563,6 +563,7 @@ stateDiagram-v2
 - 게이트(2026-10-29): `gate_screen --pcc stf` OK · `scan_mixed_compare` A 2(`getRowCount() === 0`·`length !== 14` — 숫자끼리 비교, 의도) / B 0 · `publish_gate --before {1단계} --allow P20` OK(P22~P24 는 스크립트 전환으로 추가한 바인딩·핸들러·itemset) · `api_spec_check` SKIP(명세 없음, A07·A08 0) · `init_binding_check` OK · `wsxml_lint` 0/0 · `convert.py` 고정점.
 
 ---
+- **규칙 48(2026-10-30) 숫자·금액 입력 오른쪽 정렬**: 상장주식수 3종(`ibx_BF_ACC_ISU_SHRS`·`ibx_ISU_SHRS`·`ibx_ACC_ISU_SHRS`) 정수형(`number`·`#,###`), 발행가·액면가·1주당자본금·상장자본금 3종(`ibx_ISU_PRC`·`edt_PARVAL`·`ibx_PER1STK_CAP`·`ibx_BF_ACC_ISU_CAP`·`ibx_ISU_CAP`·`ibx_ACC_ISU_CAP`) 소수형(`float`·`#,###.###[floor]`·`applyFormat="display"`) — 모두 `class="tar"`.
 
 ## 10. 남은 작업 (TODO)
 
@@ -571,7 +572,7 @@ stateDiagram-v2
 3. **`isuinfo` 덧붙임 값** — `listBzTpCd`·`listProcsStatCd`(20/""/50)·`indefinpdYn`(Y/N) 을 서버가 받는지(`dma_isuinfo` keyInfo 에 없는 키).
 4. **채번·등록 응답 모양** — `getNewBzProcNo` 와 `register` 응답 body 가 문자열인지 `{ bzProcsNo }` 인지, 등록 실패를 `success` 만으로 판정해도 되는지(`completeYn` 등).
 5. **`listProcsStatCd`** — 상세 조회 응답에 오는지(추가한 키). 오지 않으면 05106 이 상태를 모른다.
-6. **소수 자릿수** — DR·FS 의 액면가·증감자본금 소수 3자리 입력 제한을 어떤 방식(`dataType`·`displayFormat`·`allowChar`)으로 둘지.
+6. **소수 자릿수** — 규칙 48(2026-10-30)로 표시는 정했다: 가격·액면가·자본금은 `dataType="float"` + `displayFormat="#,###.###[floor]"`, 주식수는 `number` + `#,###`. 남은 것은 DR·FS 의 소수 3자리 **입력 제한**(`maxLength="정수.3"`)까지 둘지 확인.
 7. **의무보유 번호 열** — 원본은 현재 행 번호(`{CurRow}`)를 보였다. TO-BE 는 `seq`(저장 때 1부터) — 조회 직후 서버 `seq` 와 다르면 표시용 행 번호 열로 바꿀지.
 8. **의무보유 저장 DTO** — 개발 사본에 정의만 있던 `dlt_prtdepoInfo` 에는 `prtdepoId` 가 있고 `seq` 가 없다. 서버가 `prtdepoInfo` 에 무엇을 기대하는지 확인.
 9. **신형우선주 이력 0건 응답** — body 가 null 인지 빈 객체인지(현재는 `isuCd` 유무로 판정).

@@ -110,7 +110,7 @@
 ```xml
 <xf:input class="tar" dataType="number" displayFormat="#,###" id="…" ref="data:…" style="width:150px;" />
 ```
-- 오른쪽 정렬 `tar` + `dataType="number"`. 소수 자리 표시·입력 제한은 `SMPFMT10000`(소수 데이터 표시 가이드)을 따른다.
+- 오른쪽 정렬 `tar` + `dataType="number"`. 소수 자리 표시·입력 제한은 `SMPFMT10000`(소수 데이터 표시 가이드)을 따른다. 대상·제외(코드성 숫자)·정수형/소수형(`dataType="float" displayFormat="#,###.###[floor]" applyFormat="display"`) 기준은 전환 규칙 48.
 
 ### 4.3 팝업 찾기 「10_10 InputBox_조회버튼」 (43)
 ```xml

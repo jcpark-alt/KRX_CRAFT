@@ -802,6 +802,7 @@ flowchart TD
 
 - publicInfo: 정의한 33함수 전부(내부 helper 없음). 전역 상수·상태는 등재하지 않는다.
 - 게이트: `gate_screen --pcc stf`·`scan_mixed_compare`(A 1건: `getByteLength(…) !== 14` 숫자 비교 — 의도)·`publish_gate --before 1단계 사본 --allow P20`(P22·P24 는 스크립트 전환분)·`api_spec_check`(명세 SKIP, A07·A08 통과)·`init_binding_check`·`wsxml_lint` 0/0, `convert.py` 고정점.
+- **규칙 48(2026-10-30) 숫자·금액 입력 오른쪽 정렬**: `edt_PER1DR_FORNSTK_RTO`(1DR당 원주비율) 에 `class="tar"` 추가(정수형 — 이미 `dataType="number"`, `displayFormat="#,###"` 추가).
 
 ## 10. 남은 작업 (TODO)
 

@@ -323,6 +323,7 @@ stateDiagram-v2
 | `scwin.BTN_MAP`(`save`·`modify`) | 그대로 + `scwin.YN_KEYS` |
 | `$c.lc.isProcess`(await) | 그대로 |
 | `buttonSet.setInsertStatus/setUpdateStatus` | `$c.util.setButtonState("grpBtnBox", "insert"\|"update", scwin.BTN_MAP)` |
+- **규칙 48(2026-10-30) 숫자·금액 입력 오른쪽 정렬**: 배당률·회사/주주 전환비율(`tbx_DIV_RT`·`tbx_COM_CONV_RTO`·`tbx_SHRHD_CONV_RTO`) 소수형(`float`·`#,###.###[floor]`·`applyFormat="display"`) + `class="tar"`.
 
 ## 10. 남은 작업 (TODO)
 
@@ -331,3 +332,4 @@ stateDiagram-v2
 3. **`listProcsStatCd`·`mktTpCd`** — 계약상 받지만 쓰지 않는다. 원형 `buttonSet.js`(저장소 없음)가 상장처리상태로 버튼을 잠갔는지 확인 필요.
 4. **팝업 크기** — 부모 3본이 1135×840 으로 맞추는지(부모 묶음 몫).
 5. **publish 원본과의 차이** — 1단계 기준은 개발 사본 body 다. publish 원본 대비 개발 사본이 바꾼 마크업(테이블 정렬 등)은 그대로 두었고, 이 화면에서 추가로 바꾼 것은 §2.1(체크 값·숨은 라벨·달력 readOnly·버튼 영역)뿐이다.
+6. **배당률·전환비율 소수 자리** — 규칙 48 로 소수 3자리 표시(`#,###.###[floor]`)로 두었다. 원본 maxlength 40 은 그대로다. 실제 값의 소수 자리 수·단위(% 여부)를 확인해 `displayFormat` 을 맞춘다.

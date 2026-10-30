@@ -713,6 +713,7 @@ stateDiagram-v2
 | (gform onload 시장 분기) | `scwin.applyMktView` |
 | (결산 마스크 `##월 ##일`) | `scwin.acntclsMmFormatter` |
 | 전역 `fn_GetPar, fn_SetPar`·`clickBzProcsNo`·`TR_JOB`·`vCurDate`·`rowPos`·`pJsMarket`·`vScrenID` | `scwin.trJob`·`scwin.newMktTpCd`·`scwin.userMkt` 등 1구역 선언, 나머지 삭제(서버 오늘은 판단할 때 `getServerDateTime`) |
+- **규칙 48(2026-10-30) 숫자·금액 입력 오른쪽 정렬**: `ibx_per1drFornstkRto`(1DR당 원주비율, 정수형 `number`·`#,###`)·`ibx_applExchrt`(적용환율, 소수형 `float`·`#,###.###[floor]`·`applyFormat="display"`) 에 `class="tar"`.
 
 ## 10. 남은 작업 (TODO)
 
@@ -726,3 +727,4 @@ stateDiagram-v2
 8. **기존 건 수정** — 기존 건은 저장이 잠긴다. 상장일을 바꿔야 하면 수정 API 가 필요하다(현재 화면 API 에 없음).
 9. **DR 증권그룹 전역값** — `$c.lc.getGlbValue("SECUGRP_ID_DR")` 이 `"DR"` 을 돌려주는지 확인(§6.12).
 10. **외국주 항목 출처** — 본점소재지국가·상장해외거래소·1DR당 원주비율·원주보관기관·통화·적용환율·Reg.S 를 select-one 의 `corpInfo` 가 채우는지 확인(전부 읽기 전용 표시).
+11. **적용환율 소수 자리** — 규칙 48 로 `ibx_applExchrt` 를 소수 3자리 표시(`#,###.###[floor]`)로 두었다. 서버 값의 실제 소수 자리 수(2·4자리 등)를 확인해 `displayFormat` 을 맞춘다.

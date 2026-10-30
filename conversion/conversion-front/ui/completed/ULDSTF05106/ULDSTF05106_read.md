@@ -169,6 +169,7 @@ flowchart TD
 | `scwin.img_*_onclick` 8종 · `scwin.btn_Close_onclick` | 삭제 |
 | 주석 처리된 저장 함수들 | 삭제 |
 | 전역 `fn_GetPar, fn_SetPar`·`vScrenID`·`TR_JOB`·`vListProcsStatCd`·`mktTpCd`·`vBzProcsNo` | `scwin.bzProcsNo` + `scwin.YN_KEYS` |
+- **규칙 48(2026-10-30) 숫자·금액 입력 오른쪽 정렬**: 배당률·회사/주주 전환비율(`tbx_DIV_RT`·`tbx_COM_CONV_RTO`·`tbx_SHRHD_CONV_RTO`) 소수형(`float`·`#,###.###[floor]`·`applyFormat="display"`) + `class="tar"` — 05106 과 같은 형식.
 
 ## 10. 남은 작업 (TODO)
 
@@ -176,3 +177,4 @@ flowchart TD
 2. **조회 전용 잠금** — 체크·입력을 바꿀 수 있는 원본 동작을 유지했다. 잠글지(입력 `readOnly`/체크 `disabled`) 업무 확인.
 3. **호출자 전환** — 92002·92050(sample-front, 범위 밖)이 openPopup data `{ bzProcsNo }` 로 넘기게 바뀌면 init 의 `getParent()` 호환 분기를 지운다.
 4. **배포 경로** — 92002 `/ui/lst/lstproc/`, 92050 `/ui/lstproc/`, kindstk 묶음은 `/ui/lst/kindstk/` — 실제 배치 확인.
+5. **배당률·전환비율 소수 자리** — 05106 과 같이 소수 3자리 표시로 두었다. 실제 소수 자리 수·단위를 확인해 두 화면을 함께 맞춘다.

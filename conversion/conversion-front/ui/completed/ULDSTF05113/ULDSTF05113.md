@@ -485,6 +485,7 @@ stateDiagram-v2
 - 게이트(2026-10-29): `gate_screen --pcc stf` OK · `scan_mixed_compare` A 1(`length !== 14` — 숫자끼리 비교, 의도) / B 0 · `publish_gate --before {1단계} --allow P20` OK(P22~P24 는 스크립트 전환으로 추가한 바인딩·핸들러·itemset) · `api_spec_check` SKIP(명세 없음, A07·A08 0) · `init_binding_check` OK · `wsxml_lint` 0/0 · `convert.py` 고정점.
 
 ---
+- **규칙 48(2026-10-30) 숫자·금액 입력 오른쪽 정렬**: 상장주식수 3종(`edt_BF_ACC_ISU_SHRS`·`edt_ISU_SHRS`·`edt_ACC_ISU_SHRS`) 정수형(`number`·`#,###`), 발행가·액면가·1주당자본금·상장자본금 3종(`edt_ISU_PRC`·`edt_PARVAL`·`edt_PER1STK_CAP`·`edt_BF_ACC_ISU_CAP`·`edt_ISU_CAP`·`edt_ACC_ISU_CAP`) 소수형(`float`·`#,###.###[floor]`·`applyFormat="display"`) — 모두 `class="tar"`.
 
 ## 10. 남은 작업 (TODO)
 
@@ -498,3 +499,4 @@ stateDiagram-v2
 8. **부모 05103·05104 계약** — data 키(§1.2, `comAbbrv` 포함)·크기(1350×900 통일 권고)·`isSaved` 재조회·행 복원은 부모 묶음이 맞춘다.
 9. **배포 경로** — `/ui/lst/kindstk/ULDSTF05113.xml`(부모 원본 리터럴).
 10. **publish 원본과의 차이** — 1단계는 화면 폴더 xml(개발 사본 body)을 기준으로 했다. 화면 캡처를 받으면 다시 대조한다.
+11. **가격·자본금 소수 자리** — 규칙 48 로 DR·FS 를 고려해 소수형(`#,###.###[floor]`)으로 두었다. 원본의 소수 3자리 입력 제한(`MaxDecimalPlace`)은 옮기지 않았다 — 입력 자리 제한(`maxLength="정수.3"`)까지 둘지 확인.

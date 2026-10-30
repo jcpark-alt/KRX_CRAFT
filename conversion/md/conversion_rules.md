@@ -1194,6 +1194,32 @@ await $c.data.openReportPdf({ url : "/api/listing/common/report/pdf-download", r
 * **공통함수**: `$c.str.toUpperSnakeCase(value, { exclude })`·`$c.data.openReportPdf(param)` — `cm/gcc`(2026-10-28 `ba1b608c`). 화면에 같은 변환 함수를 따로 만들지 않는다.
 * **적용 현황**(2026-10-28, conversion-front TO-BE): `ULDSTF05710` `scwin.print`(RLDSTF00029) 적용 완료 — AS-IS `uid` 19개와 키·값 대조 불일치 0(조합 2: `ISU_INFO`·`ISU_DD_INFO`, 화면 값 1: `COMMIT_DD`, 형식 8), 잉여 7키 동반, 서버 키 형식 확인은 결과서 §10 #17.
 
+### 규칙 48: 숫자·금액 입력(`xf:input`)은 오른쪽 정렬 — `class="tar"` + `dataType` + `displayFormat` (2026-10-30 신설, 사용자 지시)
+
+* **대상**: 값이 수량·금액·비율·환율 등 **계산되는 숫자**인 `xf:input` — 바인딩 키가 명세(또는 keyInfo)에서 `number` 이거나, 화면 스크립트가 값을 `parseInt`·`parseFloat` 로 계산하거나, 라벨이 금액·가격·주식수·자본금·비율·환율인 칸. 읽기 전용(계산 결과 표시) 칸도 포함한다.
+* **제외 — 코드성 숫자**: 숫자로만 이뤄졌어도 계산하지 않는 식별·자리 값은 왼쪽 정렬 그대로 둔다 — 종목·회사·심볼 코드(`isurSymbl` `######`), 결산월·월일(`acntclsMmdd` `##`), 업무처리번호·접수번호, 전화·사업자번호, 연도. 천 단위 쉼표를 넣으면 값이 망가지는 것들이다.
+* **형태** — 정수형과 소수형 두 가지(퍼블리싱 스킬 `markup-idioms.md` §4.2, 소수 표시는 `SMPFMT10000`):
+
+    | 값 | 속성 | 예 |
+    |---|---|---|
+    | 정수(주식수·건수·원화 금액) | `class="tar" dataType="number" displayFormat="#,###"` | 상장주식수, 증감주식수 |
+    | 소수가 올 수 있음(가격·자본금이 외국주권 소수 3자리, 비율·환율) | `class="tar" dataType="float" displayFormat="#,###.###[floor]" applyFormat="display"` | 발행가, 액면가, 상장자본금, 배당률, 전환비율, 적용환율 |
+
+```xml
+<!-- AS-IS(W-Craft 변환본) — 정렬·형식 없음 -->
+<xf:input id="ibx_ISU_SHRS" maxlength="15" ref="data:dma_isuRes.isuShrs" style="width:130px;" />
+<!-- TO-BE -->
+<xf:input class="tar" dataType="number" displayFormat="#,###" id="ibx_ISU_SHRS" maxlength="15" ref="data:dma_isuRes.isuShrs" style="width:130px;" />
+<xf:input applyFormat="display" class="tar" dataType="float" displayFormat="#,###.###[floor]" id="ibx_ISU_PRC" maxlength="9" ref="data:dma_isuRes.isuPrc" style="width:95px;" />
+```
+
+* **정수형/소수형 고르기**: 같은 화면이 외국주권(DR·FS)도 다루면 가격·액면가·자본금은 소수형(AS-IS `MaxDecimalPlace`·`Decao 3` 이 근거). 원화 금액만 오는 것이 확실할 때만 정수형. `dataType="number"` 칸은 소수점 입력이 막히므로 애매하면 소수형으로 두고 결과서 §10 에 소수 자리 수 확인을 올린다.
+* **`class` 합치기**: 이미 `class` 가 있으면 그 값에 `tar` 를 더한다(`class="req tar"`) — `class` 속성을 둘 두지 않는다. 기존 `maxlength` 는 그대로 둔다(소수형의 정수.소수 자리 제한 `maxLength="9.3"` 은 명세·원본에 근거가 있을 때만).
+* **스크립트 영향**: `displayFormat` 은 표시만 바꾸고 `getValue()` 는 쉼표 없는 원시 값을 돌려준다 — `parseInt(x.getValue())`·`String(x.getValue()) === "0"` 같은 기존 비교는 그대로 동작한다. `setValue(숫자)` 도 그대로다.
+* **그리드**: 그리드 숫자 열은 이 규칙이 아니라 퍼블리싱 스킬 §5.2(`textAlign="right"` + `displayFormat`) — 같은 기준이다.
+* **배경**: 퍼블리싱 파일·캡처가 있는 화면은 퍼블리셔의 `tar` 가 그대로 이어지지만, 캡처 없이 W-Craft 변환본 마크업을 정비한 화면(kindstk 묶음)은 원본에 `tar` 가 없어 빠졌다. 게이트는 이 규칙을 검사하지 않으므로 1단계 마크업에서 직접 확인한다.
+* **적용 현황**(2026-10-30, conversion-front TO-BE): 숫자·금액 입력 72개 중 69개 적용, 3개는 코드성 숫자로 제외(05101 `edt_ACNTCLS_MMDD1`, 05103·05104 `ibx_isurSymbl`). 이번 보정 27곳 — 정수형 7(05101 `edt_PER1DR_FORNSTK_RTO`, 05104 `ibx_per1drFornstkRto`, 05105·05113 상장주식수 3종씩), 소수형 20(05104 `ibx_applExchrt`, 05105·05113 발행가·액면가·1주당자본금·상장자본금 3종 각 6, 05106·05106_read 배당률·전환비율 2종 각 3). 그 밖의 화면(05101·05702·05710·05806·05807·05923 의 42곳)은 처음부터 적용돼 있었다.
+
 ## 규칙 6 보충: Submission 변환 상세
 
 * **규칙 12 — `{DC}.DataID = encodeURI(url)` 의 `url` 선언 역추적 스코프**(2026-10-08): 선언(`var|let|const url = …;`)은 DataID 문이 든 **같은 최상위 함수 안**에서만 찾는다. 스크립트 전체에서 "앞에 있는 마지막 대입"을 고르면 규칙 4 재배치 뒤 다른 핸들러의 팝업 URL 상수(`let url = "/ui/lst/lstproc/ULDSTF05106_read.xml";`)가 걸려 삭제되고 해석 실패한 DataID 는 그대로 남는다(ULDSTF92002 button_1_onclick). 같은 함수에 선언이 없으면 「action URL 해석 실패」로 보류한다. 회귀 테스트 `test_convert_rule12_scope.py`.
