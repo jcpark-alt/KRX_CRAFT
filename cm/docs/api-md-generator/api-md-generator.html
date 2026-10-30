@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>API.md 생성기</title>
+<style>
+* { box-sizing: border-box; }
+body { margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Malgun Gothic',sans-serif;
+       color:#1f2933; background:#f0f4f8; line-height:1.5; }
+.wrap { max-width:1500px; margin:0 auto; padding:24px 20px 48px; }
+header h1 { font-size:20px; margin:0 0 4px; }
+header p { margin:0 0 20px; color:#627d98; font-size:13px; }
+.grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,916px); gap:20px; align-items:start; }
+@media (max-width:860px){ .grid { grid-template-columns:1fr; } }
+.card { background:#fff; border:1px solid #e4e7eb; border-radius:10px; padding:18px; }
+.card h2 { font-size:14px; margin:0 0 14px; color:#243b53; }
+.field { margin-bottom:16px; }
+.field > label { display:block; font-size:12px; font-weight:700; color:#486581; margin-bottom:6px; }
+input[type=text] { width:100%; padding:9px 11px; border:1px solid #cbd2d9; border-radius:8px; font-size:13px; }
+textarea { width:100%; padding:11px; border:1px solid #cbd2d9; border-radius:8px;
+           font-family:Consolas,'D2Coding',monospace; font-size:13px; resize:vertical; }
+#targets { min-height:200px; }
+#result { min-height:520px; background:#0f172a; color:#e2e8f0; border-color:#0f172a; }
+.btn { border:none; border-radius:8px; padding:10px 18px; font-size:13px; font-weight:700; cursor:pointer; }
+.btn-primary { background:#2563eb; color:#fff; width:100%; }
+.btn-primary:hover { background:#1d4ed8; }
+.btn-primary:disabled { background:#9aa5b1; cursor:default; }
+.btn-ghost { background:#eef2f7; color:#243b53; }
+.btn-ghost:hover { background:#dde5ee; }
+.btn-file { padding:8px 14px; }
+#docFile { display:none; }
+.file-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.result-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; gap:8px; }
+.result-head h2 { margin:0; }
+.result-head .btns { display:flex; gap:8px; }
+.meta { font-size:12px; color:#7b8794; margin-top:8px; }
+.hint { font-size:11px; color:#9aa5b1; margin-top:6px; }
+.status { font-size:12px; color:#486581; }
+.status.err, .err { color:#b91c1c; }
+.check { display:inline-flex; align-items:center; gap:8px; border:1px solid #cbd2d9; border-radius:8px;
+         padding:8px 12px; font-size:13px; cursor:pointer; user-select:none; }
+.check:hover { background:#f7f9fc; }
+.check input { accent-color:#2563eb; }
+#warnings { margin:10px 0 0; padding-left:18px; font-size:12px; color:#b45309; }
+#warnings:empty { display:none; }
+#finder { margin-top:8px; }
+#finderList { max-height:260px; overflow:auto; border:1px solid #e4e7eb; border-radius:8px; margin-top:8px; }
+#finderList:empty { display:none; }
+#finderList div { padding:6px 10px; font-size:12px; border-bottom:1px solid #f0f4f8; cursor:pointer; }
+#finderList div:hover { background:#f7f9fc; }
+#finderList .m { display:inline-block; min-width:44px; font-family:Consolas,monospace; font-weight:700; color:#2563eb; }
+#finderList .p { font-family:Consolas,monospace; color:#627d98; }
+.toast { position:fixed; left:50%; bottom:32px; transform:translateX(-50%) translateY(20px);
+         background:#102a43; color:#fff; padding:10px 20px; border-radius:24px; font-size:13px;
+         opacity:0; pointer-events:none; transition:all .25s ease; z-index:50; }
+.toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+.toast.error { background:#b91c1c; }
+details { margin-top:14px; font-size:12px; color:#627d98; }
+details code { background:#eef2f7; padding:1px 5px; border-radius:4px; font-size:11px; }
+details pre { background:#f7f9fc; border:1px solid #e4e7eb; border-radius:6px; padding:10px; overflow:auto; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>API.md 생성기</h1>
+    <p>저장한 RapiDoc API 문서(HTML)에서 고른 API 의 요청·응답 표를 읽어, 전환용 <code>{화면ID}_API.md</code> 를 만듭니다.</p>
+  </header>
+
+  <div class="grid">
+    <section class="card" id="inputCard">
+      <h2>입력</h2>
+
+      <div class="field">
+        <label>1. 저장한 API 문서 (RapiDoc HTML)</label>
+        <div class="file-row">
+          <button type="button" class="btn btn-ghost btn-file" id="btnFile">파일 선택</button>
+          <input type="file" id="docFile" accept=".html,.htm" multiple>
+          <span class="status" id="docStatus">선택한 파일 없음</span>
+        </div>
+        <div class="hint">브라우저에서 API 문서를 연 뒤 「다른 이름으로 저장(웹페이지, 전체)」한 HTML 입니다. 서비스가 다르면 여러 파일을 함께 고릅니다.</div>
+      </div>
+
+      <div class="field">
+        <label for="targets">2. 대상 API (한 줄에 하나)</label>
+        <textarea id="targets" spellcheck="false" placeholder="https://…/api/listing/rapidoc#get-/api/listing/lstproc/warrant/exerprcchange/select-one
+GET /api/listing/lstproc/etn/adm-isu/select-list
+post-/api/listing/lstproc/etn/adm-isu/modify-design
+ULDSTF08031"></textarea>
+        <div class="hint">문서 URL(# 뒤 앵커), <code>GET /api/…</code>, <code>get-/api/…</code>, 경로만(method 전부), 화면ID(요약에 그 화면ID 가 든 API 전부)를 섞어 적을 수 있습니다.</div>
+        <div id="finder">
+          <input type="text" id="finderInput" placeholder="문서 안에서 찾기 — 화면ID·요약·경로 일부 (클릭하면 위 목록에 추가)">
+          <div id="finderList"></div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="check"><input type="checkbox" id="optHeader" checked> 화면이 둘 이상이면 「## 0. 이 문서에는 다음 화면의 API를 담고 있다.」 머리글</label>
+      </div>
+
+      <button type="button" class="btn btn-primary" id="btnGen" disabled>API.md 생성</button>
+
+      <details>
+        <summary>생성 규칙</summary>
+        <pre>블록 머리   ## n. {요약}            (요약 = 문서의 API 제목, 예: [ULDSTF05702][업무][제목] 상세 조회)
+AS-IS       문서의 API 설명 전체     (설명에 "AS-IS fn_xxx" 를 적어 두면 그대로 옮겨진다)
+TO-BE       {METHOD} {경로}
+
+id 이름     경로 끝 단어에서 "select-" 를 떼고 camelCase
+              select-list → list · select-list-releas-isu → listReleasIsu
+              select-one → detail · check-double-input → checkDoubleInput
+            응답 object → dma_{이름}, array → dlt_{이름}
+            하위 object/array 필드 → dma_/dlt_{이름}{필드}  (target "…=body.{필드}")
+            요청 본문이 있는 API 의 응답은 {이름}Result
+dataType    integer·number → number, 그 밖(string·boolean·[string]) → text
+name        필드 설명 (➔·Constraints·Examples 표기는 뺀다)
+
+GET 쿼리    const requestData = { 파라미터: "" }
+POST 본문   평면 object → 요청 dataMap + ref
+            하위 구조가 있으면 dataMap/dataList 여러 개 + requestData 조합
+              (object → .getJSON(), array → .getAllJSON())</pre>
+        <p>id 는 규칙으로 제안한 이름입니다. 화면에서 쓰는 이름(예: <code>dlt_list</code>·<code>dma_detail</code>)이 따로 있으면 결과에서 고친 뒤 저장합니다. 결과 영역은 직접 고칠 수 있습니다.</p>
+      </details>
+    </section>
+
+    <section class="card" id="resultCard">
+      <div class="result-head">
+        <h2>결과 — API.md</h2>
+        <div class="btns">
+          <button type="button" class="btn btn-ghost" id="btnCopy">복사</button>
+          <button type="button" class="btn btn-ghost" id="btnSave">다운로드</button>
+        </div>
+      </div>
+      <textarea id="result" spellcheck="false" placeholder="여기에 생성 결과가 나옵니다."></textarea>
+      <div class="meta" id="meta"></div>
+      <ul id="warnings"></ul>
+    </section>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script id="core">
+/*
+ * API.md 생성기 — 파싱·생성 로직 (화면 UI 와 분리: window.ApiMdGen)
+ *
+ * 입력: 브라우저로 저장한 RapiDoc 페이지 HTML. RapiDoc 은 API 마다
+ *   <div class="expanded-endpoint-body …" id="{method}-{path}"> 블록을 그리고, 그 안에
+ *   h2[part=section-operation-summary](요약) · span[part=label-operation-method|path] · .m-markdown(설명),
+ *   .request-panel(table.m-table 파라미터 · 요청 본문 스키마 표) · .response-panel(상태별 응답 스키마 표)을 둔다.
+ *   스키마 표는 div.tr(span.key-label · .key-type · .key-descr) 행이고, object/array 필드의 하위 행은
+ *   그 행 다음의 div.object-body 안에 있다. 선언적 shadow DOM(<template shadowrootmode>)으로 저장되므로
+ *   template 태그를 벗겨 평범한 DOM 으로 파싱한다.
+ */
+(function (global) {
+    "use strict";
+
+    const METHODS = ["get", "post", "put", "delete", "patch"];
+    const OP_HEAD = /<div class="expanded-endpoint-body[^"]*"[^>]*?\bid="((get|post|put|delete|patch)-([^"]+))"/g;
+
+    function decodeEntities(s) {
+        return String(s)
+            .replace(/&#x([0-9a-f]+);/gi, (m, h) => String.fromCodePoint(parseInt(h, 16)))
+            .replace(/&#(\d+);/g, (m, d) => String.fromCodePoint(parseInt(d, 10)))
+            .replace(/&quot;/g, "\"").replace(/&#39;|&apos;/g, "'")
+            .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&");
+    }
+
+    function squash(s) {
+        return String(s || "").replace(/\s+/g, " ").trim();
+    }
+
+    /** 저장 HTML 한 개 → API 목록 [{ id, method, path, summary, src, start, end }] (블록 위치만 기억, 파싱은 필요할 때) */
+    function buildIndex(text, srcName) {
+        const ops = [];
+        OP_HEAD.lastIndex = 0;
+        let m;
+        while ((m = OP_HEAD.exec(text)) !== null) {
+            ops.push({ id : m[1], method : m[2].toUpperCase(), path : m[3], src : srcName || "", start : m.index });
+        }
+        ops.forEach((op, i) => {
+            op.end = i + 1 < ops.length ? ops[i + 1].start : text.length;
+            const head = text.slice(op.start, Math.min(op.end, op.start + 4000));
+            const h2 = head.match(/<h2[^>]*section-operation-summary[^>]*>([\s\S]*?)<\/h2>/);
+            op.summary = h2 ? squash(decodeEntities(h2[1].replace(/<!--[\s\S]*?-->/g, "").replace(/<[^>]+>/g, " "))) : "";
+        });
+        return ops;
+    }
+
+    /** 요약 앞 대괄호의 화면ID 목록 — `[A/B]`·`[A, B]` 묶음, 숫자로 시작하는 꼬리(`08032_new`)는 앞 ID 의 영문 접두를 이어받는다 */
+    function screensOf(summary) {
+        const m = String(summary || "").match(/^\s*\[([A-Za-z0-9_]+(?:\s*[\/,~]\s*[A-Za-z0-9_]+)*)\]/);
+        if (!m) return [];
+        const out = [];
+        let prefix = "";
+        m[1].split(/[\/,]/).forEach(raw => {
+            let part = raw.trim();
+            if (!part) return;
+            if (/^\d/.test(part) && prefix) part = prefix + part;
+            const mp = part.match(/^([A-Za-z]+)\d/);
+            if (mp) prefix = mp[1];
+            if (part.indexOf("~") < 0) { out.push(part); return; }
+            const [lo, hi0] = part.split("~").map(x => x.trim());
+            const hi = /^\d/.test(hi0) && prefix ? prefix + hi0 : hi0;
+            const ml = lo.match(/^(.*?)(\d+)$/), mh = hi.match(/^(.*?)(\d+)$/);
+            if (!ml || !mh || (mh[1] && mh[1] !== ml[1])) { out.push(lo, hi); return; }
+            const w = ml[2].length;
+            let a = parseInt(ml[2], 10), b = parseInt(mh[2], 10);
+            if (mh[2].length < w) b = parseInt(ml[2].slice(0, w - mh[2].length) + mh[2], 10);
+            for (let n = a; n <= b; n++) out.push(ml[1] + String(n).padStart(w, "0"));
+        });
+        return out;
+    }
+
+    function isScreenOf(summary, sid) {
+        return screensOf(summary).some(s => s === sid || (/^[A-Za-z]{3}\d{5}/.test(s) && sid.length > s.length && sid.endsWith(s)));
+    }
+
+    /** 대상 줄 하나 → 고른 API 목록. 못 찾으면 [] */
+    function resolveLine(line, ops) {
+        let t = squash(line);
+        if (!t) return [];
+        const hash = t.indexOf("#");
+        if (hash >= 0) t = t.slice(hash + 1);
+        try { t = decodeURIComponent(t); } catch (e) { /* 그대로 */ }
+        t = t.trim();
+        let mm = t.match(/^(get|post|put|delete|patch)-(\/\S+)$/i) || t.match(/^(get|post|put|delete|patch)\s+(\/\S+)$/i);
+        if (mm) {
+            const id = mm[1].toLowerCase() + "-" + mm[2];
+            return ops.filter(o => o.id === id);
+        }
+        if (/^\/\S+$/.test(t)) return ops.filter(o => o.path === t);
+        if (/^[A-Za-z]{3}[A-Za-z0-9]*\d{5}[A-Za-z0-9_]*$/.test(t)) return ops.filter(o => isScreenOf(o.summary, t));
+        return [];
+    }
+
+    /** 대상 텍스트 전체 → { ops(중복 제거, 입력 순서), unmatched[] } */
+    function resolveTargets(text, ops) {
+        const picked = [], seen = new Set(), unmatched = [];
+        String(text || "").split(/\r?\n/).forEach(line => {
+            if (!line.trim()) return;
+            const found = resolveLine(line, ops);
+            if (!found.length) { unmatched.push(line.trim()); return; }
+            found.forEach(o => {
+                const key = o.id + "@" + o.src;
+                if (seen.has(o.id)) return;      // 같은 API 가 여러 문서에 있으면 처음 것
+                seen.add(o.id);
+                picked.push(o);
+            });
+        });
+        return { ops : picked, unmatched };
+    }
+
+    /* ---------- 블록 파싱 ---------- */
+
+    function blockDom(text, op) {
+        let html = text.slice(op.start, op.end)
+            .replace(/<!--[\s\S]*?-->/g, "")
+            .replace(/<style[\s\S]*?<\/style>/gi, "")
+            .replace(/<svg[\s\S]*?<\/svg>/gi, "")
+            .replace(/<template\b[^>]*>/gi, "")
+            .replace(/<\/template>/gi, "");
+        const doc = new DOMParser().parseFromString("<!DOCTYPE html><html><body>" + html + "</body></html>", "text/html");
+        return doc.body.firstElementChild;
+    }
+
+    function cleanDesc(s) {
+        return squash(s)
+            .replace(/^➔\s*/, "")
+            .replace(/\s*⮕\s*\[[\s\S]*\]\s*$/, "")      // object 필드 설명 끝에 RapiDoc 이 붙이는 하위 스키마 제목
+            .replace(/\s*Constraints:.*$/, "")
+            .replace(/\s*Examples?:.*$/, "")
+            .replace(/\s*Allowed:.*$/, "")
+            .replace(/\s*Default:.*$/, "")
+            .trim();
+    }
+
+    function rowToField(tr) {
+        const keyEl = tr.querySelector(".key-label") || tr.querySelector(".td.key, .key");
+        const raw = keyEl ? keyEl.textContent : "";
+        const typeEl = tr.querySelector(".key-type");
+        const descEl = tr.querySelector(".key-descr .m-markdown-small") || tr.querySelector(".key-descr");
+        const type = squash(typeEl ? typeEl.textContent : "");
+        const cls = tr.className || "";
+        return {
+            name : squash(raw).replace(/\*/g, "").replace(/^[-+\s]+/, "").trim(),
+            required : /\*/.test(raw) || !!tr.querySelector(".key .red, .key [style*='red']"),
+            type : type,
+            desc : cleanDesc(descEl ? descEl.textContent : ""),
+            isObject : /\bobject\b/.test(type) || /\bobject\b/.test(cls),
+            isArray : /^array\b/i.test(type) || /^\[/.test(type),
+            children : null
+        };
+    }
+
+    /** 스키마 표 몸체(div.object-body) → 필드 트리. 하위 행은 object 행 다음에 오는 object-body 에 있다 */
+    function parseFields(container) {
+        const out = [];
+        let last = null;
+        (function walk(el) {
+            for (const ch of Array.from(el.children)) {
+                const cl = ch.classList;
+                if (cl.contains("tr")) {
+                    last = rowToField(ch);
+                    if (last.name || last.type) out.push(last);
+                } else if (cl.contains("object-body")) {
+                    if (last && last.isObject && !last.children) last.children = parseFields(ch);
+                    else walk(ch);
+                } else {
+                    walk(ch);
+                }
+            }
+        })(container);
+        return out;
+    }
+
+    /** 패널 안의 첫 스키마 표 → { rootType, desc, fields } (없으면 null) */
+    function schemaOf(scope) {
+        if (!scope) return null;
+        const rootEl = scope.querySelector(".schema-root-type");
+        if (!rootEl) return null;
+        const rootType = (rootEl.className.match(/schema-root-type\s+(\S+)/) || [])[1] || "object";
+        const table = rootEl.closest(".table") || rootEl.parentElement.parentElement;
+        const descEl = table.querySelector("[part='schema-description'], .schema-description");
+        const body = table.querySelector(".object-body");
+        return { rootType : rootType, desc : cleanDesc(descEl ? descEl.textContent : ""), fields : body ? parseFields(body) : [] };
+    }
+
+    function parseOp(text, op) {
+        const root = blockDom(text, op);
+        const q = sel => root.querySelector(sel);
+        const descEl = Array.from(root.children).find(c => c.classList && c.classList.contains("m-markdown"));
+        const res = {
+            id : op.id,
+            method : squash(q("[part='label-operation-method']") ? q("[part='label-operation-method']").textContent : op.method).toUpperCase(),
+            path : squash(q("[part='label-operation-path']") ? q("[part='label-operation-path']").textContent : op.path),
+            summary : squash(q("[part='section-operation-summary']") ? q("[part='section-operation-summary']").textContent : op.summary),
+            desc : squash(descEl ? Array.from(descEl.querySelectorAll("p, li")).map(p => p.textContent).join(" ") || descEl.textContent : ""),
+            params : [],
+            body : null,
+            response : null,
+            responseStatus : ""
+        };
+        // 요청: 파라미터 표(제목 순서대로 위치 구분) + 본문 스키마
+        const req = q(".request-panel");
+        if (req) {
+            let where = "";
+            req.querySelectorAll(".table-title, table.m-table").forEach(el => {
+                if (el.classList.contains("table-title")) { where = squash(el.textContent).toUpperCase(); return; }
+                if (/HEADER|COOKIE/.test(where)) return;
+                const loc = /PATH/.test(where) ? "path" : "query";
+                const rows = Array.from(el.querySelectorAll("tr"));
+                rows.forEach((tr, i) => {
+                    const nameEl = tr.querySelector(".param-name");
+                    if (!nameEl) return;
+                    const raw = nameEl.textContent;
+                    const next = rows[i + 1];
+                    const dEl = next && !next.querySelector(".param-name") ? next.querySelector(".m-markdown-small") : null;
+                    res.params.push({
+                        name : squash(raw).replace(/\*/g, "").trim(),
+                        required : /\*/.test(raw),
+                        type : squash(tr.querySelector(".param-type") ? tr.querySelector(".param-type").textContent : ""),
+                        desc : cleanDesc(dEl ? dEl.textContent : ""),
+                        loc : loc
+                    });
+                });
+            });
+            const hasBody = Array.from(req.querySelectorAll(".table-title")).some(t => /REQUEST BODY/i.test(t.textContent));
+            if (hasBody) res.body = schemaOf(req);
+        }
+        // 응답: 첫 번째 상태(선택 상태 200)의 스키마
+        const resp = q(".response-panel");
+        if (resp) {
+            const d = resp.querySelector(".resp-descr");
+            res.responseStatus = d ? squash(d.textContent) : "";
+            res.response = schemaOf(resp);
+        }
+        return res;
+    }
+
+    /* ---------- 생성 ---------- */
+
+    function camel(seg) {
+        const parts = String(seg).split(/[-_\s]+/).filter(Boolean);
+        return parts.map((p, i) => i === 0 ? p.charAt(0).toLowerCase() + p.slice(1) : p.charAt(0).toUpperCase() + p.slice(1)).join("");
+    }
+
+    function pascal(s) {
+        const c = camel(s);
+        return c.charAt(0).toUpperCase() + c.slice(1);
+    }
+
+    function baseName(path) {
+        const segs = String(path).split("/").filter(s => s && !/^\{.*\}$/.test(s));
+        let last = (segs[segs.length - 1] || "data").replace(/^select-?/, "");
+        let b = camel(last);
+        if (!b || b === "one") b = "detail";
+        if (/^\d/.test(b)) b = "api" + b;
+        return b;
+    }
+
+    function dataType(type) {
+        return /^(integer|number|int|long|double|float|bigdecimal)\b/i.test(type) ? "number" : "text";
+    }
+
+    function xmlAttr(s) {
+        return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+
+    function jsStr(s) {
+        return String(s).replace(/\r?\n/g, " ");
+    }
+
+    /** 필드 트리 → DataCollection 목록 [{ kind:'map'|'list', id, fields, key, note }] */
+    function collections(fields, rootType, base, key, notes) {
+        const cols = [];
+        const prims = fields.filter(f => !f.children);
+        const nested = fields.filter(f => f.children);
+        if (rootType === "array") {
+            cols.push({ kind : "list", id : "dlt_" + base, fields : prims, key : key });
+            // 배열 행 안의 하위 구조 — 행마다 따로 있어 target 경로로 바로 적재할 수 없다. 구조만 보이도록 target 없이 싣는다
+            nested.forEach(f => {
+                collections(f.children, f.isArray ? "array" : "object", base + pascal(f.name), null, notes).forEach(c => {
+                    c.note = "dlt_" + base + " 행 안의 " + f.name + " — 행마다 따로 있어 target 으로 바로 적재할 수 없다";
+                    cols.push(c);
+                });
+                notes.push("배열 행 안의 하위 구조 `" + f.name + "` 는 target 없이 구조만 실었다 (dlt_" + base + ").");
+            });
+            return cols;
+        }
+        if (prims.length || !nested.length) cols.push({ kind : "map", id : "dma_" + base, fields : prims, key : key });
+        nested.forEach(f => {
+            cols.push(...collections(f.children, f.isArray ? "array" : "object", base + pascal(f.name), key ? key + "." + f.name : null, notes));
+        });
+        return cols;
+    }
+
+    function colXml(col) {
+        const lines = [];
+        if (col.note) lines.push("<!-- " + col.note.replace(/--/g, "-") + " -->");
+        if (col.kind === "map") {
+            lines.push("<w2:dataMap id=\"" + col.id + "\" baseNode=\"map\">", "\t<w2:keyInfo>");
+            col.fields.forEach(f => lines.push("\t\t<w2:key id=\"" + xmlAttr(f.name) + "\" name=\"" + xmlAttr(f.desc) + "\" dataType=\"" + dataType(f.type) + "\"></w2:key>"));
+            lines.push("\t</w2:keyInfo>", "</w2:dataMap>");
+        } else {
+            lines.push("<w2:dataList id=\"" + col.id + "\" baseNode=\"list\" saveRemovedData=\"true\" repeatNode=\"map\">", "\t<w2:columnInfo>");
+            col.fields.forEach(f => lines.push("\t\t<w2:column id=\"" + xmlAttr(f.name) + "\" name=\"" + xmlAttr(f.desc) + "\" dataType=\"" + dataType(f.type) + "\"></w2:column>"));
+            lines.push("\t</w2:columnInfo>", "</w2:dataList>");
+        }
+        return lines.join("\n");
+    }
+
+    /** id 충돌 방지 — 같은 id 에 다른 키 구성이면 숫자 꼬리 */
+    function makeIdRegistry() {
+        const used = new Map();
+        return function claim(col) {
+            const sig = col.kind + ":" + col.fields.map(f => f.name + "/" + dataType(f.type)).join(",");
+            let id = col.id, n = 2;
+            while (used.has(id) && used.get(id) !== sig) id = col.id + n++;
+            used.set(id, sig);
+            col.id = id;
+            return col;
+        };
+    }
+
+    function opMarkdown(api, no, claim, warnings) {
+        const L = [];
+        const notes = [];
+        const base = baseName(api.path);
+        const hasBody = !!(api.body && api.body.fields.length);
+        L.push("## " + no + ". " + (api.summary || (api.method + " " + api.path)), "");
+        L.push("**1) AS-IS 함수 → TO-BE 변환 API 명세 내용**");
+        L.push("*   **AS-IS** : `" + api.desc.replace(/`/g, "'") + "`");
+        L.push("*   **TO-BE** : `" + api.method + " " + api.path + "`", "");
+        if (!/AS-IS/.test(api.desc)) warnings.noAsis.push(api.method + " " + api.path);
+
+        // 응답 DataCollection
+        let respCols = [];
+        const r = api.response;
+        if (r && (r.fields.length || r.rootType === "array" || r.rootType === "object")) {
+            if (/^(object|array)$/.test(r.rootType) && r.fields.length) {
+                respCols = collections(r.fields, r.rootType, hasBody ? base + "Result" : base, "body", notes).map(claim);
+            }
+        }
+        if (!r) warnings.push(api.method + " " + api.path + " — 응답 스키마 표를 찾지 못했다.");
+        const target = respCols.filter(c => c.key).map(c => c.id + "=" + c.key).join(", ");
+
+        // 요청
+        L.push("**[REQUEST]**", "");
+        const query = api.params;
+        if (hasBody) {
+            const b = api.body;
+            const prims = b.fields.filter(f => !f.children && !f.isArray);
+            const composite = b.rootType === "object" && b.fields.some(f => f.children || f.isArray);
+            if (!composite) {
+                const col = claim({ kind : b.rootType === "array" ? "list" : "map", id : (b.rootType === "array" ? "dlt_" : "dma_") + base, fields : b.fields.filter(f => !f.children) });
+                L.push("```xml", colXml(col), "```", "");
+                L.push("```javascript", "// submission ref, target 지정", "{", "\tref: \"" + col.id + "\"" + (target ? "," : ""));
+                if (target) L.push("\ttarget: \"" + target + "\"");
+                L.push("}", "```", "");
+            } else {
+                const rootCol = prims.length ? claim({ kind : "map", id : "dma_" + base, fields : prims }) : null;
+                const subCols = [];
+                b.fields.filter(f => f.children).forEach(f => {
+                    const cs = collections(f.children, f.isArray ? "array" : "object", base + pascal(f.name), null, notes).map(claim);
+                    subCols.push({ field : f, col : cs[0] });
+                    cs.slice(1).forEach(c => subCols.push({ field : null, col : c }));
+                });
+                L.push("```xml");
+                if (rootCol) L.push(colXml(rootCol));
+                subCols.forEach(s => L.push(colXml(s.col)));
+                L.push("```", "");
+                L.push("```javascript", "// submission ref, target 지정", "{");
+                if (target) L.push("\ttarget: \"" + target + "\"");
+                L.push("}", "", "const requestData = {");
+                b.fields.forEach(f => {
+                    const d = f.desc ? " // " + jsStr(f.desc) : "";
+                    if (f.children) {
+                        const s = subCols.find(x => x.field === f);
+                        L.push("    " + f.name + " : " + s.col.id + (s.col.kind === "list" ? ".getAllJSON()" : ".getJSON()") + "," + d);
+                    } else if (f.isArray) {
+                        L.push("    " + f.name + " : [], // type: " + f.type + (f.desc ? ", " + jsStr(f.desc) : ""));
+                    } else {
+                        L.push("    " + f.name + " : " + rootCol.id + ".get(\"" + f.name + "\")," + d);
+                    }
+                });
+                L.push("};", "```", "");
+            }
+            if (query.length) L.push("> 쿼리·경로 파라미터 " + query.map(p => "`" + p.name + "`" + (p.loc === "path" ? "(경로)" : "")).join(", ") + " 는 action 에 붙여 보낸다.", "");
+        } else {
+            L.push("```javascript");
+            if (target) L.push("// submission ref, target 지정", "{", "\ttarget: \"" + target + "\"", "}", "");
+            if (query.length) {
+                L.push("// requestData 지정", "const requestData = {");
+                query.forEach((p, i) => L.push("    " + p.name + ": \"\"" + (i < query.length - 1 ? "," : "") + (p.loc === "path" ? " // 경로 파라미터" : "")));
+                L.push("};");
+            } else if (!target) {
+                L.push("// 요청 파라미터 없음");
+            }
+            L.push("```", "");
+        }
+
+        // 응답
+        L.push("**[RESPONSE]**", "");
+        if (respCols.length) {
+            L.push("```xml", respCols.map(colXml).join("\n"), "```", "");
+        } else if (r) {
+            L.push("```javascript", "// 응답 body : " + r.rootType + (r.desc ? " — " + jsStr(r.desc) : "") + " (DataCollection 없음)", "```", "");
+        } else {
+            L.push("```javascript", "// 응답 스키마 없음 — 문서 확인 필요", "```", "");
+        }
+        notes.forEach(n => warnings.push(api.method + " " + api.path + " — " + n));
+        L.push("---", "");
+        return L.join("\n");
+    }
+
+    /** 고른 API 들 → { md, screens, warnings } */
+    function generate(apis, opts) {
+        opts = opts || {};
+        const warnings = [];
+        const claim = makeIdRegistry();
+        const screens = [];
+        apis.forEach(a => screensOf(a.summary).forEach(s => { if (screens.indexOf(s) < 0) screens.push(s); }));
+        const out = [];
+        if (opts.header !== false && screens.length > 1) {
+            out.push("## 0. 이 문서에는 다음 화면의 API를 담고 있다.", " - " + screens.join(","), "");
+        }
+        warnings.noAsis = [];
+        apis.forEach((a, i) => out.push(opMarkdown(a, i + 1, claim, warnings)));
+        const list = warnings.slice();
+        if (warnings.noAsis.length) {
+            list.unshift("설명에 「AS-IS」 표기가 없어 AS-IS 줄에 설명 전체를 옮긴 API " + warnings.noAsis.length + "건 — AS-IS 함수를 직접 적어 넣으세요: " + warnings.noAsis.join(", "));
+        }
+        return { md : out.join("\n").replace(/\n{3,}/g, "\n\n"), screens : screens, warnings : list };
+    }
+
+    function suggestFileName(screens) {
+        return (screens.length ? screens.join(",") : "API") + "_API.md";
+    }
+
+    global.ApiMdGen = { buildIndex, resolveTargets, screensOf, parseOp, generate, baseName, suggestFileName };
+})(window);
+</script>
+
+<script>
+/* ---------- 화면 UI ---------- */
+(function () {
+    "use strict";
+    const G = window.ApiMdGen;
+    const $ = id => document.getElementById(id);
+    const docs = [];        // [{ name, text, ops }]
+    let allOps = [];
+    let lastScreens = [];
+    let toastTimer = null;
+
+    function toast(msg, isErr) {
+        const t = $("toast");
+        t.textContent = msg;
+        t.classList.toggle("error", !!isErr);
+        t.classList.add("show");
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => t.classList.remove("show"), 1800);
+    }
+
+    function fitResult() {
+        const r = $("result");
+        r.style.height = "auto";
+        r.style.height = Math.max(r.scrollHeight + 4, 520) + "px";
+    }
+
+    $("btnFile").addEventListener("click", () => $("docFile").click());
+
+    $("docFile").addEventListener("change", async e => {
+        const files = Array.from(e.target.files || []);
+        if (!files.length) return;
+        const st = $("docStatus");
+        st.classList.remove("err");
+        st.textContent = "읽는 중… (큰 파일은 수 초 걸립니다)";
+        docs.length = 0;
+        try {
+            for (const f of files) {
+                const text = await f.text();
+                const ops = G.buildIndex(text, f.name);
+                docs.push({ name : f.name, text : text, ops : ops });
+            }
+        } catch (err) {
+            st.classList.add("err");
+            st.textContent = "파일을 읽지 못했습니다: " + err.message;
+            return;
+        }
+        allOps = [];
+        docs.forEach(d => d.ops.forEach(o => { o.doc = d; allOps.push(o); }));
+        const parts = docs.map(d => d.name + " " + d.ops.length.toLocaleString() + "개");
+        if (!allOps.length) {
+            st.classList.add("err");
+            st.textContent = "RapiDoc API 블록을 찾지 못했습니다 — 저장한 API 문서 HTML 인지 확인하세요.";
+        } else {
+            st.textContent = "API " + allOps.length.toLocaleString() + "개 인식 (" + parts.join(", ") + ")";
+        }
+        $("btnGen").disabled = !allOps.length;
+        renderFinder();
+    });
+
+    function renderFinder() {
+        const q = $("finderInput").value.trim().toLowerCase();
+        const list = $("finderList");
+        list.innerHTML = "";
+        if (!q || !allOps.length) return;
+        const hits = allOps.filter(o => (o.summary + " " + o.path).toLowerCase().indexOf(q) >= 0).slice(0, 200);
+        hits.forEach(o => {
+            const div = document.createElement("div");
+            const m = document.createElement("span"); m.className = "m"; m.textContent = o.method;
+            const s = document.createElement("span"); s.textContent = " " + o.summary + " ";
+            const p = document.createElement("span"); p.className = "p"; p.textContent = o.path;
+            div.append(m, s, p);
+            div.title = "클릭하면 대상 목록에 추가";
+            div.addEventListener("click", () => {
+                const ta = $("targets");
+                ta.value = (ta.value.trim() ? ta.value.replace(/\s*$/, "\n") : "") + o.method + " " + o.path;
+                toast("추가: " + o.method + " " + o.path);
+            });
+            list.appendChild(div);
+        });
+        if (!hits.length) list.innerHTML = "<div>찾은 API 없음</div>";
+    }
+    $("finderInput").addEventListener("input", renderFinder);
+
+    $("btnGen").addEventListener("click", () => {
+        const sel = G.resolveTargets($("targets").value, allOps);
+        const warn = $("warnings");
+        warn.innerHTML = "";
+        if (!sel.ops.length) {
+            toast(sel.unmatched.length ? "대상 API 를 문서에서 찾지 못했습니다" : "대상 API 를 적어 주세요", true);
+            sel.unmatched.forEach(u => { const li = document.createElement("li"); li.textContent = "찾지 못함: " + u; warn.appendChild(li); });
+            return;
+        }
+        const apis = [];
+        const errs = [];
+        sel.ops.forEach(o => {
+            try { apis.push(G.parseOp(o.doc.text, o)); }
+            catch (err) { errs.push(o.method + " " + o.path + " — 파싱 실패: " + err.message); }
+        });
+        const res = G.generate(apis, { header : $("optHeader").checked });
+        lastScreens = res.screens;
+        $("result").value = res.md;
+        fitResult();
+        const ws = sel.unmatched.map(u => "찾지 못함: " + u).concat(errs, res.warnings);
+        ws.forEach(w => { const li = document.createElement("li"); li.textContent = w; warn.appendChild(li); });
+        $("meta").textContent = "API " + apis.length + "건 · 화면 " + res.screens.length + "개" + (res.screens.length ? " (" + res.screens.join(", ") + ")" : "") + " · 확인 " + ws.length + "건";
+        toast("API.md 를 만들었습니다");
+    });
+
+    async function copyText(text) {
+        try {
+            await navigator.clipboard.writeText(text);
+            return true;
+        } catch (e) {
+            const ta = $("result");
+            ta.select();
+            try { return document.execCommand("copy"); } catch (e2) { return false; }
+        }
+    }
+
+    $("btnCopy").addEventListener("click", async () => {
+        const v = $("result").value;
+        if (!v) { toast("복사할 내용이 없습니다", true); return; }
+        const ok = await copyText(v);
+        toast(ok ? "복사했습니다" : "복사하지 못했습니다", !ok);
+    });
+
+    $("btnSave").addEventListener("click", () => {
+        const v = $("result").value;
+        if (!v) { toast("저장할 내용이 없습니다", true); return; }
+        const blob = new Blob([v], { type : "text/markdown;charset=utf-8" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = G.suggestFileName(lastScreens);
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+        toast("다운로드: " + a.download);
+    });
+
+    $("result").addEventListener("input", fitResult);
+})();
+</script>
+</body>
+</html>
