@@ -1220,6 +1220,95 @@ await $c.data.openReportPdf({ url : "/api/listing/common/report/pdf-download", r
 * **배경**: 퍼블리싱 파일·캡처가 있는 화면은 퍼블리셔의 `tar` 가 그대로 이어지지만, 캡처 없이 W-Craft 변환본 마크업을 정비한 화면(kindstk 묶음)은 원본에 `tar` 가 없어 빠졌다. 게이트는 이 규칙을 검사하지 않으므로 1단계 마크업에서 직접 확인한다.
 * **적용 현황**(2026-10-30, conversion-front TO-BE): 숫자·금액 입력 72개 중 69개 적용, 3개는 코드성 숫자로 제외(05101 `edt_ACNTCLS_MMDD1`, 05103·05104 `ibx_isurSymbl`). 이번 보정 27곳 — 정수형 7(05101 `edt_PER1DR_FORNSTK_RTO`, 05104 `ibx_per1drFornstkRto`, 05105·05113 상장주식수 3종씩), 소수형 20(05104 `ibx_applExchrt`, 05105·05113 발행가·액면가·1주당자본금·상장자본금 3종 각 6, 05106·05106_read 배당률·전환비율 2종 각 3). 그 밖의 화면(05101·05702·05710·05806·05807·05923 의 42곳)은 처음부터 적용돼 있었다.
 
+### 규칙 49: gridView 손 모양 커서·정렬 — `cursor="hand"` → `pointer` class, `sort="True"` → 헤더 `sortable` + `showSortableImage` (2026-11-03 신설, 사용자 지시)
+
+* **손 모양 커서**: AS-IS 그리드 `<column … cursor="hand">`·`<fcolumn … cursor="hand">`(고정 열 포함)는 TO-BE 본문 컬럼에 `class="pointer"` 를 붙인다. `pointer` 는 공통 class 다(`cm/css/base.css` `.pointer`, `cm/css/contents.css` `.w2grid .pointer:hover`) — 인라인 `style="cursor:pointer"` 를 쓰지 않는다.
+    * 이미 `class` 가 있으면 그 값에 더한다(`class="bg_orange pointer"`) — `class` 속성을 둘 두지 않는다(규칙 48 과 같은 요령).
+    * 손 모양은 "누르면 무엇이 일어난다"는 표시다. 그 열에 `oncellclick`·`oncelldblclick` 처리가 TO-BE 에 남는지 함께 확인하고, 처리를 옮기지 않았으면 `pointer` 도 붙이지 않고 결과서 §9 에 적는다.
+* **정렬**: AS-IS `sort="True"`(대소문자 무관, `<column>`·`<fcolumn>` 모두)인 열은 TO-BE **헤더 컬럼**(`<w2:header>` 안 `<w2:column>`)에 `sortable="true"` 를 붙이고, 그 열이 하나라도 있는 gridView 에 `showSortableImage="true"` 를 둔다. 정답지 `conversion/sample-front/ui/ULDSTF30702.xml`(`grdMain`).
+    * gridView 자체의 `sortable="true"`(전 열 정렬)는 쓰지 않는다 — AS-IS 에서 정렬이 없던 열까지 정렬된다. 이미 붙어 있으면 지우고 열 단위로 옮긴다.
+    * AS-IS 에 `sort="True"` 가 없는 열에는 붙이지 않는다(대부분의 열에 있어도 열마다 대조한다).
+    * 정렬하면 화면 행 순서가 데이터 순서와 달라진다. `oncellclick(row)` 의 `row` 로 `dlt.getCellData(row, …)`·`grd.getCellData(row, …)` 를 읽는 것은 화면 번호끼리라 그대로 맞지만, 실제 행 번호 API(`getCellAllData`·`getRealRowIndex` 등)나 행 번호를 저장해 두었다가 쓰는 코드는 다시 확인한다(gridView 행 번호 가이드 `conversion/sample-front/ui/SMPROW10000.xml`).
+* **예**:
+
+```xml
+<!-- AS-IS -->
+<column id="DOC_TITLE" width="250" name="공시제목" sort="True" cursor="hand" bgcolor="#ffff99"></column>
+<!-- TO-BE -->
+<w2:gridView id="grd_list" … showSortableImage="true">
+    <w2:header id="header1">
+        <w2:row>
+            <w2:column id="h_docTitle" value="공시제목" sortable="true" … />
+    …
+    <w2:gridBody id="gBody1">
+        <w2:row>
+            <w2:column id="docTitle" class="pointer" … />
+```
+
+* **게이트**: 검사하지 않는다 — 1단계 마크업에서 AS-IS 그리드 `cursor`·`sort` 속성 목록과 TO-BE 를 직접 대조한다(`grep -io 'cursor="hand"\|sort="true"' {ID}.gfm`).
+
+### 규칙 50: 그리드 총 건수 — `w2:textbox` + `$c.num.formatNumber` (2026-11-03 신설, 사용자 지시)
+
+* **마크업**: 총 건수 자리는 `<w2:textbox class="num" id="tbx_totalCnt" label="0">` 로 둔다. 퍼블리싱이 `w2:span` 으로 둔 자리도 `w2:textbox` 로 바꾼다(`setValue` 사용법은 같다). 앞뒤의 "총"·"건" 라벨 textbox 는 퍼블리싱 그대로 둔다(`xf:group class="count"` 꼴, sample-front `ULDSTF05011`).
+* **id**: 그리드가 하나면 `tbx_totalCnt`. 한 화면에 건수 자리가 여럿이면 AS-IS `panel_page{n}` 의 번호를 이어 `tbx_totalCnt1`·`tbx_totalCnt2`… 로 둔다(AS-IS 번호가 없으면 화면 위에서부터 1, 2, …). 퍼블리싱·W-Craft 변환본의 `tbx_totCnt`·`txb_TotCnt`·`spn_totalCnt`·`panel_page*` 는 이 이름으로 바꾸고 스크립트 참조도 함께 바꾼다.
+* **스크립트**: 건수는 천 단위 쉼표를 넣어 쓴다.
+
+```javascript
+// AS-IS
+panel_page.setValue(dlt_list.getRowCount());
+$c.stf.fillGridHeaderTotalCnt(dlt_list.getRowCount(), panel_page1);
+// TO-BE
+tbx_totalCnt.setValue($c.num.formatNumber(dlt_list.getRowCount()));
+tbx_totalCnt1.setValue($c.num.formatNumber(dlt_list1.getRowCount()));
+```
+
+* **`fillGridHeaderTotalCnt` 를 거치지 않는다**: pcc `fillGridHeaderTotalCnt(cnt, comp)`(`cm/pcc/stf/stf.xml`)는 쉼표 없이 `setValue` + `show("")` 만 한다. AS-IS 가 건수 영역을 숨겼다가 보이던 화면이 아니면 `show("")` 는 필요 없다 — 위의 직접 `setValue` 로 쓴다. 숨김 처리가 남는 화면만 `tbx_totalCnt.show("")` 를 따로 둔다.
+* **0건·실패**: 조회 실패나 초기화로 건수를 비울 때도 `tbx_totalCnt.setValue("0")` 처럼 같은 컴포넌트를 쓴다(빈 문자열로 두지 않는다).
+* **게이트**: 검사하지 않는다 — 1단계 마크업·스크립트에서 `getRowCount()` 를 건수 컴포넌트에 넣는 자리를 모두 찾아 대조한다.
+
+### 규칙 51: 컴포넌트 id 접두 — AS-IS `txb_`·`edt_`·`panel_` 은 **TO-BE 컴포넌트 종류**로 정한다 (2026-11-03 신설, 사용자 지시)
+
+* **원칙**: 요청 기준 대응은 `txb_` → `ibx_`, `edt_` → `ica_`, `panel_` → `grp_` 이다. 다만 같은 AS-IS 접두가 퍼블리싱에서 여러 컴포넌트가 되므로(퍼블리싱 1,934본 실측: `edt_` → `xf:input` 1,512·`w2:inputCalendar` 1,466, `txb_` → `xf:input` 6,619·`w2:autoComplete` 393·`w2:textbox` 246·`w2:inputCalendar` 53, `panel_` → `xf:group` 1,666·`w2:tabs` 370·`w2:content` 341·`w2:textbox` 124) **글자 치환이 아니라 TO-BE 컴포넌트 종류로 접두를 고른다**.
+
+    | TO-BE 컴포넌트 | 접두 | 주로 오는 AS-IS | 예 |
+    |---|---|---|---|
+    | `xf:input` (텍스트·숫자 입력) | `ibx_` | `txb_`, 숫자·코드 `edt_` | `txb_IsuNm` → `ibx_isuNm`, `edt_TotalCnt` → `ibx_totalCnt` |
+    | `w2:inputCalendar` (날짜) | `ica_` | 날짜 `edt_`(`mxmaskedit` 날짜 마스크), 날짜 `txb_` | `edt_StrtDd` → `ica_strtDd` |
+    | `w2:autoComplete` (코드 검색) | `acb_` | 코드 `txb_`(종목·발행사 코드) | `txb_IsuCd` → `acb_isuCd` (규칙 52) |
+    | `w2:textbox`·`w2:span` (표시) | `tbx_` | 표시용 `txb_`·`panel_` | `panel_page1` → `tbx_totalCnt1` (규칙 50) |
+    | `xf:group` (영역) | `grp_` | `panel_` | `panel_1` → `grp_1` |
+    | `w2:tabControl` 의 `w2:tabs`·`w2:content` | 퍼블리싱 탭 id 그대로 | 탭 본문 `panel_` | 탭 규칙(규칙 45)을 따른다 |
+    | `xf:textarea` | 퍼블리싱 id 의 접두 그대로 | `txb_`(여러 줄) | |
+
+    * **`edt_` 를 무조건 `ica_` 로 바꾸지 않는다** — `edt_` 의 절반은 숫자·건수 입력(`xf:input`)이다. AS-IS 마스크가 날짜(`XXXX-XX-XX`, `YYYY-MM-DD`)이거나 퍼블리싱이 `w2:inputCalendar` 일 때만 `ica_`.
+    * **접두 뒤는 camelCase**: `txb_IsuCd` → `acb_isuCd`, `edt_BasMmDdAf` → `ica_basMmDdAf`. 뜻이 분명해지도록 줄기를 바꾸는 것(`txb_IsuNm` → `ibx_isuCdNm`)은 결과서 §2.1 에 근거를 적을 때만.
+    * 입력 접두는 `ipt_` 가 아니라 `ibx_` 다(이 규칙으로 통일, 가이드의 `ipt_` 표기도 고친다).
+* **함께 바꾸는 것**: id 를 바꾸면 그 id 를 가리키는 모든 자리를 같이 바꾼다 — 스크립트 참조, `ev:on*` 핸들러 이름(`scwin.{id}_{event}`, 규칙 3), `$p.getComponentById("…")` 문자열, `$c.validate` 필드 목록, `$c.win.setEnterKeyEvent` 대상, 결과서 §2.1 컴포넌트 표.
+* **게이트**: `publish_gate` P13(컴포넌트 id 누락)은 퍼블리싱 대비 **경고**로 뜬다 — 이 규칙에 따른 개명이면 결과서 §2.1 표가 근거다. 바꾼 뒤 옛 id 가 남지 않았는지 `grep` 으로 확인하고 `wsxml_lint`·`gate_screen` 에 새 경고가 없는지 본다.
+
+### 규칙 52: 종목 자동완성 `fn_jongMok` → `await $c.cm.searchJongMokCode(acb, ibx, 증권그룹ID, 시장구분, 상장구분)` (2026-11-03 신설, 사용자 지시)
+
+* **배경**: AS-IS `fn_jongMok(코드칸, 명칭칸, SECUGRP_ID_*, 시장구분, 상장구분)` 은 종목 전체 목록을 Gauce 데이터셋(`MxDataSet_jong_mok`)에 읽어 입력 중 필터하던 함수다. pcc 의 `$c.cm.jongMok*` 는 Gauce 잔재라 쓸 수 없어 종전에는 옮기지 않고 삭제했다(ULDSTF15900 §8 #5). 2026-11-03 `cm/pcc/stf/common.xml` 에 `searchJongMokCode` 가 생겨 이제 옮긴다.
+* **변환**:
+
+```javascript
+// AS-IS
+fn_jongMok(txb_IsuCd, txb_IsuNm, SECUGRP_ID_PF, "0", "A");
+// TO-BE — scwin.init 의 공통 코드 단계
+await $c.cm.searchJongMokCode(acb_isuCd, ibx_isuCdNm, "EF", "0", "A");
+```
+
+* **인자**:
+    1. 코드칸 → `w2:autoComplete` `acb_*`(규칙 51). 퍼블리싱이 `xf:input` 이면 `w2:autoComplete` 로 바꾼다(발행사 `searchIsurCode` 와 같은 꼴).
+    2. 명칭칸 → `xf:input` `ibx_*`(읽기 전용 표시). 함수가 이 칸의 현재 값을 종목명 조회 조건으로 쓰고 선택에 따라 값을 채운다.
+    3. 증권그룹ID → AS-IS 전역 상수 `SECUGRP_ID_*` 를 **그 값의 문자열 리터럴**로 쓴다(`cm/pcc/stf/list_common.xml` `scwin.glb.SECUGRP_ID_*` — `SECUGRP_ID_EF` = `"EF"` ETF, `SECUGRP_ID_PF` = `"PF"` 상장형 수익증권 …).
+    4. 시장구분·5. 상장구분 → AS-IS 값 그대로. 시장구분은 세션 `market` 이 있으면 함수가 세션 값을 우선한다.
+* **반드시 `await`**: `async` 함수다(목록 조회 뒤 그리드·이벤트를 바인딩). `scwin.init` 을 `async` 로 두고 기다린 뒤 다음 단계로 간다.
+* **함께 없애는 것**: `fn_jongMok_set`·`fn_jongMok_nm`·`srchJongMokNm`, `Grd_jong_mok`·`MxDataSet_jong_mok` 와 그 이벤트(`OnKeyPress`·`OnDblClick`·`OnFilter` …), 전역 `stFocusGrid`·`skw` — 자동완성은 `w2:autoComplete` 가 맡는다. 코드칸 `onkeyup`·`onfocus` 로 목록을 띄우던 처리도 옮기지 않는다.
+* **한 화면 여러 개**: 핸들러가 호출마다 자기 컴포넌트만 보므로 코드칸마다 따로 호출해도 된다(2026-11-03 함수 보정).
+* **미결 — 증권그룹ID 값**: 요청 예시는 AS-IS `SECUGRP_ID_PF` 자리에 `"EF"` 를 쓴다. 상수 값대로면 `"PF"` 다 — 화면이 ETF 를 다루는지 확인해 결과서 §10 에 적는다(ULDSTF15900 확인 필요).
+* **적용 현황**(2026-11-03): 규칙만 신설, 기존 TO-BE 소급은 하지 않았다(ULDSTF15900 은 §8 #5 삭제 상태 그대로).
+
 ## 규칙 6 보충: Submission 변환 상세
 
 * **규칙 12 — `{DC}.DataID = encodeURI(url)` 의 `url` 선언 역추적 스코프**(2026-10-08): 선언(`var|let|const url = …;`)은 DataID 문이 든 **같은 최상위 함수 안**에서만 찾는다. 스크립트 전체에서 "앞에 있는 마지막 대입"을 고르면 규칙 4 재배치 뒤 다른 핸들러의 팝업 URL 상수(`let url = "/ui/lst/lstproc/ULDSTF05106_read.xml";`)가 걸려 삭제되고 해석 실패한 DataID 는 그대로 남는다(ULDSTF92002 button_1_onclick). 같은 함수에 선언이 없으면 「action URL 해석 실패」로 보류한다. 회귀 테스트 `test_convert_rule12_scope.py`.

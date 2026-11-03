@@ -27,7 +27,7 @@
   * 부모·팝업이 서로 이름으로 부르던 `fn_GetPar`/`fn_SetPar`(getPar/setPar)는 개명해 남기지 않고 **`$c.win.openPopup` + `await` 반환값 방식으로 바꿉니다**(§6.5).
   * **예외** — 그 밖에 하위 팝업이 부모 함수를 원래 이름으로 부르는데 하위 팝업을 이번에 바꿀 수 없는 경우만 원래 이름을 유지하고, 그 이유를 §9 와 §10 에 적습니다.
 * 이벤트 핸들러는 `scwin.{컴포넌트ID}_{이벤트}` 이고 이벤트명은 소문자입니다(규칙 3). 예: `scwin.btn_search_onclick`, `scwin.grd_list_oncellclick`.
-* 컴포넌트 접두는 `btn_`·`ipt_`·`sbx_`·`ica_`·`grd_`·`tbl_`, DataCollection 은 `dma_`(1건)·`dlt_`(다건) 입니다.
+* 컴포넌트 접두는 `btn_`·`ibx_`(입력)·`sbx_`·`ica_`(날짜)·`acb_`(자동완성)·`tbx_`(표시)·`grp_`(영역)·`grd_`·`tbl_` 이고 AS-IS 접두가 아니라 TO-BE 컴포넌트 종류로 고릅니다(규칙 51). DataCollection 은 `dma_`(1건)·`dlt_`(다건) 입니다.
 * **DataCollection 키는 camelCase** 입니다. AS-IS 의 `USER_ID` 같은 대문자 키는 `userId` 로 바꿔 적고, 화면이 실제로 그 키로 읽는지 확인합니다(대문자 키를 그대로 남기면 `undefined` 를 읽는 결함이 됩니다).
 
 ### 0.2 결과서 장 ↔ 전환본 스크립트 구역
@@ -210,7 +210,7 @@ stateDiagram-v2
 
 | 영역 | AS-IS 요소 | TO-BE 컴포넌트 (바인딩) | 설명 |
 |---|---|---|---|
-| 검색 조건 | `<input name="searchWord">` | `ipt_searchWord` (`ref="data:dma_search.searchWord"`) | Enter 로 조회 |
+| 검색 조건 | `<input name="searchWord">` | `ibx_searchWord` (`ref="data:dma_search.searchWord"`) | Enter 로 조회 |
 | 목록 | `<table id="userTable">` + `<tr>` 문자열 빌드 | `grd_userList` (`dataList="data:dlt_userList"`) | 행 클릭 시 상세 |
 | (숨김) | `<input type="hidden" name="mode">` | **(옮기지 않음)** → `scwin.trJob` | 처리구분은 화면 상태값으로 |
 
@@ -437,7 +437,7 @@ scwin.searchList = async function () {
   | `ica_strtDd` | 필수, 날짜 형식 | 시작일자 |
   | `ica_endDd` | 필수, 날짜 형식, `ica_strtDd` 이후 | 종료일자 |
 
-* **업무 검증** (공통으로 옮기지 않는 것): 검색 구분을 골랐는데 검색어가 비면 "검색어를 입력하세요." 안내 후 `ipt_searchWord` 포커스, false.
+* **업무 검증** (공통으로 옮기지 않는 것): 검색 구분을 골랐는데 검색어가 비면 "검색어를 입력하세요." 안내 후 `ibx_searchWord` 포커스, false.
 
 #### 6.2 팝업 호출 (`scwin.openDeptPopup`)
 * **파라미터:** `deptNm` (초기 검색 부서명)
@@ -563,7 +563,7 @@ scwin.btn_confirm_onclick = async function () {
 | `$(document).ready(fn)` | `scwin.onpageload` → `scwin.init` |
 | `fn_SearchList()` | `scwin.searchList()` (규칙 13) |
 | `$.ajax({ url : "/user/list.do", … success : fn })` | `await $c.sbm.executeDynamic(...)` + await 뒤 후처리 |
-| `$("#searchWord").val()` | `ipt_searchWord.getValue()` 또는 `dma_search.get("searchWord")` (규칙 19) |
+| `$("#searchWord").val()` | `ibx_searchWord.getValue()` 또는 `dma_search.get("searchWord")` (규칙 19) |
 | `fn_GetPar`/`fn_SetPar` + `CreateDialogFrame` / `window.open` | 부모 `await $c.win.openPopup(url, options, data)` → 결과로 처리, 팝업 `$c.data.getParameter()` / `$c.win.closePopup(결과)` (§6.5) |
 
 * 진입점, 함수 개명(원래 이름을 유지한 함수와 그 이유), 전역 변수 → `scwin.*`, 통신, 팝업(`window.open` → `$c.win.openPopup`), DOM 조작 → 컴포넌트 API, 공통함수 → `$c.*`/`$c.{pcc}.*`, `alert`/`confirm` → `await $c.win.alert`/`await $c.win.confirm`, 세션 값 → `$c.session.getUserInfo(...)`, 삭제한 것(호출 없는 함수, 디버그 코드)과 근거.
@@ -607,6 +607,10 @@ scwin.btn_confirm_onclick = async function () {
 | 리포트 PDF 출력 (`fn_open_report_pdf(파일명, [{uid, unm}])` / `$c.print.openReportPdf`) | `const rpt = dma.getJSON();` → 조합·형식 키 덮어쓰기 → `const reqParam = $c.str.toUpperSnakeCase(rpt);` → `reqParam.pdf_rptname = "R…";` → `await $c.data.openReportPdf({ url, reqParam })` (규칙 47) | `pdf_rptname` 은 변환 뒤에(대문자로 바뀌지 않게), AS-IS `uid` 와 1:1 대조, 화면 값(달력)은 getJSON 밖, 서버 키 형식 계약 확인 |
 | 엑셀 다운로드 파일명 (`GridToExcel`·`GridToOffice` 파일명 인자) | `fileName : $c.win.getProgramId() + "_{이름}_" + $c.date.getServerDateTime("yyyyMMddHHmmss") + ".xlsx"` — menuId(화면 파일명) 맨 앞 (규칙 42) | menuId 없는 이름 금지. 메뉴명과 같으면 생략 가능하나 팝업·탭 본문은 지정 |
 | 배경색 (`style="background-color:…"`, 셀·행 배경 지정) | 마크업 `class="bg_red"` 등 / 스크립트 `setCellClass(row, col, "bg_blue")`·`setRowClass(row, "row_bg_lgray")` — `base.css` 공통 배경색 class `bg_lgray`·`bg_dgray`·`bg_blue`·`bg_red`·`bg_orange`·`bg_green`·`bg_violet` (규칙 40) | 인라인 배경색·`setCellBackgroundColor`·`setRowBackgroundColor` 금지. `bg_*` 는 그리드·표 칸·입력류에만 정의돼 일반 그룹엔 색이 안 나옴 |
+| 그리드 손 모양 커서 (`<column`·`<fcolumn … cursor="hand">`) | 본문 컬럼 `class="pointer"` (기존 class 에 덧붙임) (규칙 49) | 그 열의 클릭 처리가 TO-BE 에 남는가. 인라인 `cursor:pointer` 금지 |
+| 그리드 정렬 (`<column … sort="True">`) | 헤더 컬럼 `sortable="true"` + gridView `showSortableImage="true"` (규칙 49, 정답지 sample-front `ULDSTF30702`) | 열마다 대조, gridView 전체 `sortable` 금지. 실제 행 번호 API 사용처 재확인 |
+| 그리드 총 건수 (`panel_page.setValue(ds.getRowCount())`·`FillGridHeaderTotalCnt(cnt, panel_page1)`) | `<w2:textbox class="num" id="tbx_totalCnt">` + `tbx_totalCnt.setValue($c.num.formatNumber(dlt.getRowCount()))` (규칙 50) | span 자리도 textbox 로. 여럿이면 `tbx_totalCnt1`… (AS-IS 번호) |
+| 컴포넌트 id 접두 `txb_`·`edt_`·`panel_` | TO-BE 컴포넌트 종류로: `xf:input` `ibx_` · `inputCalendar` `ica_` · `autoComplete` `acb_` · textbox/span `tbx_` · `xf:group` `grp_` (규칙 51) | `edt_` 를 무조건 `ica_` 로 바꾸지 않음(숫자 edt 는 `ibx_`). 참조·핸들러명 동반 개명 |
 | `$.parseJSON(x)` | `JSON.parse(x)` / `$c.util.getJSON(x)` | |
 
 ---

@@ -260,6 +260,11 @@ grep -no '"[0-9A-Z]\{5,7\}"' $F | sort -u                            # 서식·�
 | `js_market`, `js_dep_cd` 등 세션 전역 | `$c.session.getUserInfo("market" \| "depCd" …)` | |
 | `cGetToday2()` 등 날짜 | `$c.date.getServerDateTime()` 등 | 서버/클라이언트 시각 |
 | `fn_open_report_pdf(파일명, [{uid, unm}])` | `dma.getJSON()` → 조합·형식 덮어쓰기 → `$c.str.toUpperSnakeCase` → `pdf_rptname` → `await $c.data.openReportPdf({ url, reqParam })` (규칙 47) | AS-IS `uid` 목록과 변환 키 1:1 대조(화면 값·조합 키·형식 누락), 서버 키 형식 계약, 응답 뒤 창 — 팝업 차단 |
+| 그리드 손 모양 커서 (`<column`·`<fcolumn … cursor="hand">`) | 본문 컬럼 `class="pointer"` (기존 class 에 덧붙임) (규칙 49) | 그 열의 클릭 처리가 TO-BE 에 남는가. 인라인 `cursor:pointer` 금지 |
+| 그리드 정렬 (`<column … sort="True">`) | 헤더 컬럼 `sortable="true"` + gridView `showSortableImage="true"` (규칙 49, 정답지 sample-front `ULDSTF30702`) | 열마다 대조, gridView 전체 `sortable` 금지. 실제 행 번호 API 사용처 재확인 |
+| 그리드 총 건수 (`panel_page.setValue(ds.getRowCount())`·`FillGridHeaderTotalCnt(cnt, panel_page1)`) | `<w2:textbox class="num" id="tbx_totalCnt">` + `tbx_totalCnt.setValue($c.num.formatNumber(dlt.getRowCount()))` (규칙 50) | span 자리도 textbox 로. 여럿이면 `tbx_totalCnt1`… (AS-IS 번호) |
+| 컴포넌트 id 접두 `txb_`·`edt_`·`panel_` | TO-BE 컴포넌트 종류로: `xf:input` `ibx_` · `inputCalendar` `ica_` · `autoComplete` `acb_` · textbox/span `tbx_` · `xf:group` `grp_` (규칙 51) | `edt_` 를 무조건 `ica_` 로 바꾸지 않음(숫자 edt 는 `ibx_`). 참조·핸들러명 동반 개명 |
+| `fn_jongMok(txb_IsuCd, txb_IsuNm, SECUGRP_ID_*, 시장, 상장)` 종목 자동완성 | `await $c.cm.searchJongMokCode(acb_isuCd, ibx_isuCdNm, "EF", "0", "A")` (규칙 52) | 증권그룹ID 는 상수 값 리터럴(`SECUGRP_ID_PF`=`"PF"`) — 예시 `"EF"` 와 다르면 §10. `fn_jongMok_set`·`Grd_jong_mok`·`MxDataSet_jong_mok` 삭제 |
 | `#include("../js/*.js")` | 삭제(규칙 11) — 필요한 함수만 `$c.*` 로 대응 | 호출되는 함수만 추림 |
 | `vScrenID` | 삭제(규칙 1) | |
 
