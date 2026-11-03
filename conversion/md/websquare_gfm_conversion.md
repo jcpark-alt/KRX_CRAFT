@@ -611,6 +611,7 @@ scwin.btn_confirm_onclick = async function () {
 | 그리드 정렬 (`<column … sort="True">`) | 헤더 컬럼 `sortable="true"` + gridView `showSortableImage="true"` (규칙 49, 정답지 sample-front `ULDSTF30702`) | 열마다 대조, gridView 전체 `sortable` 금지. 실제 행 번호 API 사용처 재확인 |
 | 그리드 총 건수 (`panel_page.setValue(ds.getRowCount())`·`FillGridHeaderTotalCnt(cnt, panel_page1)`) | `<w2:textbox class="num" id="tbx_totalCnt">` + `tbx_totalCnt.setValue($c.num.formatNumber(dlt.getRowCount()))` (규칙 50) | span 자리도 textbox 로. 여럿이면 `tbx_totalCnt1`… (AS-IS 번호) |
 | 컴포넌트 id 접두 `txb_`·`edt_`·`panel_` | TO-BE 컴포넌트 종류로: `xf:input` `ibx_` · `inputCalendar` `ica_` · `autoComplete` `acb_` · textbox/span `tbx_` · `xf:group` `grp_` (규칙 51) | `edt_` 를 무조건 `ica_` 로 바꾸지 않음(숫자 edt 는 `ibx_`). 참조·핸들러명 동반 개명 |
+| 미정의 함수 호출 (gcc·pcc·화면 어디에도 정의가 없는 `$c.*`·`fn_*`·`scwin.*` 호출) | 삭제 금지 — 호출 문장을 `//` 로 막고 바로 위에 `// [미정의] {함수} — {찾아본 위치}에 정의 없음. TODO: … (규칙 53)` | TO-BE 가 대체한 AS-IS 공통(`PanelToGroupBox`·`#include`·`buttonSet` 등)은 대상 아님(기존 규칙대로 대체). 반환값을 쓰는 호출은 뒤 문장 영향까지 §8·§10 |
 | `$.parseJSON(x)` | `JSON.parse(x)` / `$c.util.getJSON(x)` | |
 
 ---

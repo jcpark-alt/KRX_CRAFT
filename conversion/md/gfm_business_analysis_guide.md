@@ -265,6 +265,7 @@ grep -no '"[0-9A-Z]\{5,7\}"' $F | sort -u                            # 서식·�
 | 그리드 총 건수 (`panel_page.setValue(ds.getRowCount())`·`FillGridHeaderTotalCnt(cnt, panel_page1)`) | `<w2:textbox class="num" id="tbx_totalCnt">` + `tbx_totalCnt.setValue($c.num.formatNumber(dlt.getRowCount()))` (규칙 50) | span 자리도 textbox 로. 여럿이면 `tbx_totalCnt1`… (AS-IS 번호) |
 | 컴포넌트 id 접두 `txb_`·`edt_`·`panel_` | TO-BE 컴포넌트 종류로: `xf:input` `ibx_` · `inputCalendar` `ica_` · `autoComplete` `acb_` · textbox/span `tbx_` · `xf:group` `grp_` (규칙 51) | `edt_` 를 무조건 `ica_` 로 바꾸지 않음(숫자 edt 는 `ibx_`). 참조·핸들러명 동반 개명 |
 | `fn_jongMok(txb_IsuCd, txb_IsuNm, SECUGRP_ID_*, 시장, 상장)` 종목 자동완성 | `await $c.cm.searchJongMokCode(acb_isuCd, ibx_isuCdNm, "EF", "0", "A")` (규칙 52) | 증권그룹ID 는 상수 값 리터럴(`SECUGRP_ID_PF`=`"PF"`) — 예시 `"EF"` 와 다르면 §10. `fn_jongMok_set`·`Grd_jong_mok`·`MxDataSet_jong_mok` 삭제 |
+| 미정의 함수 호출 (gcc·pcc·화면 어디에도 정의가 없는 `$c.*`·`fn_*`·`scwin.*` 호출) | 삭제 금지 — 호출 문장을 `//` 로 막고 바로 위에 `// [미정의] {함수} — {찾아본 위치}에 정의 없음. TODO: … (규칙 53)` | TO-BE 가 대체한 AS-IS 공통(`PanelToGroupBox`·`#include`·`buttonSet` 등)은 대상 아님(기존 규칙대로 대체). 반환값을 쓰는 호출은 뒤 문장 영향까지 §8·§10 |
 | `#include("../js/*.js")` | 삭제(규칙 11) — 필요한 함수만 `$c.*` 로 대응 | 호출되는 함수만 추림 |
 | `vScrenID` | 삭제(규칙 1) | |
 

@@ -502,7 +502,7 @@ W-Craft 변환 후에도 Gauce Dataset/그리드 API 가 그대로 남은 화면
   keyCode 비교는 `Number(e.keyCode) === 13` 형태로 통일(문자 `"13"` 비교·`window.event` 금지).
   콤보의 Gauce 잔재 바인딩(`ref="data:{dlt}"` + `listexprformat`)은 `<xf:choices><xf:itemset nodeset="data:{dlt}">` 로 전환한다.
 * **동반 정정 유형**: 미정의 `$c` 네임스페이스에 함수를 정의하는 오기(`$c.xxx.fn = function` — 로드 시점 TypeError)는
-  `scwin.` 으로 교정, 미정의 공통 호출(`PanelToGroupBox` 류)은 삭제, 최상위 즉시 실행문은 `onpageload` 로 이동(규칙 4 보류 해소).
+  `scwin.` 으로 교정, 미정의 공통 호출 중 TO-BE 가 대체한 것(`PanelToGroupBox` 류)은 삭제(그 밖의 미정의 호출은 삭제하지 않고 주석 처리 — 규칙 53), 최상위 즉시 실행문은 `onpageload` 로 이동(규칙 4 보류 해소).
 
 ### 규칙 30: W-Craft 주석 전부 삭제 (변환 확인 마커 + `★Wcraft guide★` 안내 블록)
 
@@ -1308,6 +1308,36 @@ await $c.cm.searchJongMokCode(acb_isuCd, ibx_isuCdNm, "EF", "0", "A");
 * **한 화면 여러 개**: 핸들러가 호출마다 자기 컴포넌트만 보므로 코드칸마다 따로 호출해도 된다(2026-11-03 함수 보정).
 * **미결 — 증권그룹ID 값**: 요청 예시는 AS-IS `SECUGRP_ID_PF` 자리에 `"EF"` 를 쓴다. 상수 값대로면 `"PF"` 다 — 화면이 ETF 를 다루는지 확인해 결과서 §10 에 적는다(ULDSTF15900 확인 필요).
 * **적용 현황**(2026-11-03): 규칙만 신설, 기존 TO-BE 소급은 하지 않았다(ULDSTF15900 은 §8 #5 삭제 상태 그대로).
+
+### 규칙 53: 미정의 함수 호출 — 삭제하지 않고 주석 처리 + 사유 (2026-11-03 신설, 사용자 지시)
+
+* **대상**: TO-BE 에 옮길 호출인데 **불러야 할 함수가 어디에도 정의돼 있지 않은 것**.
+    * `$c.<ns>.<함수>()` — gcc(`cm/gcc`) 공개 목록(`publicInfo`)에도, 그 모듈의 pcc(`cm/pcc/{fil|stf|mgt|tms}` — 모듈별 pcc 참조 규칙)에도 없음. `gate_screen` 의 `undefined $c`·`todo $c` 로 잡힌다.
+    * AS-IS 전역 공통 `fn_X()`(`#include` 한 js 의 함수)인데 대응하는 gcc·pcc 함수가 없음.
+    * `scwin.x()` 인데 같은 화면에 정의가 없음(공급사가 다른 화면 함수를 가정한 호출 등).
+* **처리**: 코드를 **지우지 않는다**. 호출 문장을 `//` 줄 주석으로 막고, 바로 위에 사유 한 줄을 단다.
+
+```javascript
+// [미정의] $c.cm.fn_jongMok_set — cm/pcc/stf/common.xml 에 정의 없음(Gauce 데이터셋 잔재). TODO: 대응 함수가 생기면 주석 해제 (규칙 53)
+// $c.cm.fn_jongMok_set();
+```
+
+* **사유 형식**: `// [미정의] {호출 함수} — {찾아본 위치}에 정의 없음({알면 원인}). TODO: {풀리는 조건} (규칙 53)` — 무엇이 없는지, 어디를 찾았는지, 언제 되살리는지를 적는다.
+* **문장 단위**: 여러 줄에 걸친 호출은 문장 전체를 줄마다 `//` 로 막는다(`/* */` 는 쓰지 않는다 — 안에 `*/` 가 있으면 깨진다). 같은 줄에 다른 코드가 있으면 줄을 나눈 뒤 호출 문장만 막는다.
+* **반환값을 쓰는 호출**(`const x = fn_X(…)`·`if (!fn_X(…)) return;`): 문장째 막으면 뒤에서 쓰는 `x` 가 깨진다. 그 값을 쓰는 문장까지 같은 표지로 막거나, 흐름을 지켜야 하면 원래 문장은 주석으로 두고 **원본이 성공했을 때의 값**을 대신 둔다(`// [미정의] … ` + `const x = true;  // 규칙 53 임시값`). 어느 쪽이든 동작 영향(검증이 빠짐 등)을 결과서 §8·§10 에 적는다.
+* **이벤트 핸들러 전체가 미정의 호출뿐**이어도 핸들러 함수와 `ev:on*` 연결은 남기고 본문만 주석으로 둔다.
+* **결과서**: §9 대응표에 `{호출} | 주석 처리 — 미정의(규칙 53)`, §10 에 "정의되면 주석 해제" 항목을 올린다(어느 공통 파일에 무엇이 필요한지).
+* **대상이 아닌 것 — 대체된 AS-IS 공통**: TO-BE 가 다른 수단으로 같은 일을 하는 AS-IS 공통 호출은 "미정의"가 아니라 "대체"다. 기존 규칙대로 대체 코드로 바꾸고 원문은 남기지 않는다 — `PanelToGroupBox`(퍼블리싱 마크업), `#include`(규칙 11), `vScrenID`(규칙 1), `popUpCalendar*`(inputCalendar 내장 달력), `buttonSet.*`(`$c.util.setButtonState`), `frame.CreateDialogFrame`(`$c.win.openPopup`, 규칙 17) 등. 결과서 §9 에 대체 대응을 적는다. 대응 공통이 있는데 이름·인자만 다르면(예: `fn_isProcess` → `$c.lc.isProcess`) 바꿔 부르면 되고 이 규칙 대상이 아니다.
+* **게이트**: `gate_screen` 은 주석·문자열을 지운 코드로 `undefined $c` 를 보므로(`screen_tools.strip_for_scan`) 주석 처리한 호출은 실패로 치지 않는다. 주석 안 코드는 다른 변환 규칙도 손대지 않는다(규칙 0). 주석으로 막은 뒤 `undefined $c` 가 0 인지, 남은 코드가 막힌 호출의 결과를 쓰지 않는지(`node --check` 는 문법만 본다) 확인한다.
+
+```sh
+# 미정의 후보 찾기 — gate_screen 의 undefined/todo $c + 화면에 정의 없는 scwin 호출
+PYTHONUTF8=1 python conversion/tools/gate_screen.py --pcc stf {TO-BE xml}
+grep -c '\[미정의\]' {TO-BE xml}    # 주석 처리한 자리 수 — 결과서 §10 항목 수와 맞춘다
+```
+
+* **기존 규칙과의 관계**: 규칙 29 「동반 정정 유형」의 "미정의 공통 호출은 삭제"는 위 **대체된 AS-IS 공통**(`PanelToGroupBox` 류)에 한한다. 그 밖의 미정의 호출은 이 규칙대로 주석 처리한다.
+* **적용 현황**(2026-11-03): 규칙만 신설, 기존 TO-BE 소급은 하지 않았다.
 
 ## 규칙 6 보충: Submission 변환 상세
 
